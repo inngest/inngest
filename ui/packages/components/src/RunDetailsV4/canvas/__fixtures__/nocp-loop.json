@@ -1,0 +1,1638 @@
+{
+  "run": {
+    "status": "COMPLETED",
+    "trace": {
+      "discoveries": [
+        {
+          "spanID": "7d968c6a16993da4",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.343Z",
+          "startedAt": "2026-09-08T04:06:10.393Z",
+          "endedAt": "2026-09-08T04:06:10.41Z",
+          "plannedStepIDs": ["575bc3e88e98334e01ccd1ce6f4fc55b841782e2"]
+        },
+        {
+          "spanID": "df73e4897cec251a",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.412Z",
+          "startedAt": "2026-09-08T04:06:10.431Z",
+          "endedAt": "2026-09-08T04:06:10.455Z",
+          "plannedStepIDs": ["6fe9db257c447436be0f1975e3664b91a2149737"]
+        },
+        {
+          "spanID": "9e9a0b71f02143e9",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.456Z",
+          "startedAt": "2026-09-08T04:06:10.482Z",
+          "endedAt": "2026-09-08T04:06:10.506Z",
+          "plannedStepIDs": ["35e58666a3e09561fcc33a7372630ebed7a40d4a"]
+        },
+        {
+          "spanID": "7d9827258285e2cd",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.507Z",
+          "startedAt": "2026-09-08T04:06:10.531Z",
+          "endedAt": "2026-09-08T04:06:10.541Z",
+          "plannedStepIDs": ["b39686d00fd865ace81f8db6926b75466533e7b2"]
+        },
+        {
+          "spanID": "dd4f0c1249f1761a",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.542Z",
+          "startedAt": "2026-09-08T04:06:10.588Z",
+          "endedAt": "2026-09-08T04:06:10.598Z",
+          "plannedStepIDs": ["8a7c280a5d04833ff354f6d1c568b5544ed39565"]
+        },
+        {
+          "spanID": "3dd5d5b9e8b1842d",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.599Z",
+          "startedAt": "2026-09-08T04:06:10.632Z",
+          "endedAt": "2026-09-08T04:06:10.643Z",
+          "plannedStepIDs": ["8a68132625bbd07620d76fd514acf298376adf01"]
+        },
+        {
+          "spanID": "11644bdf0e82994c",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.645Z",
+          "startedAt": "2026-09-08T04:06:10.697Z",
+          "endedAt": "2026-09-08T04:06:10.71Z",
+          "plannedStepIDs": ["dd1945282bd2db2285f37a86c1b00acdb927a7f9"]
+        },
+        {
+          "spanID": "74bcc4ae7d18b820",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.712Z",
+          "startedAt": "2026-09-08T04:06:10.731Z",
+          "endedAt": "2026-09-08T04:06:10.742Z",
+          "plannedStepIDs": ["12f5bba54acb6918ffcf6046d7e0f87396b6ac8f"]
+        },
+        {
+          "spanID": "c63e1aeb2b239dea",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.744Z",
+          "startedAt": "2026-09-08T04:06:10.784Z",
+          "endedAt": "2026-09-08T04:06:10.797Z",
+          "plannedStepIDs": ["ed68691323d60827a7e303ddb44e31a264877ca2"]
+        },
+        {
+          "spanID": "6762fa3c10fe132b",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.798Z",
+          "startedAt": "2026-09-08T04:06:10.833Z",
+          "endedAt": "2026-09-08T04:06:10.847Z",
+          "plannedStepIDs": ["c9fde7c25f8eb459249be6a716276f5fb2be7ca2"]
+        },
+        {
+          "spanID": "1c9c51b6c4e0bb54",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.849Z",
+          "startedAt": "2026-09-08T04:06:10.886Z",
+          "endedAt": "2026-09-08T04:06:10.902Z",
+          "plannedStepIDs": ["8ba3725accfe1fda4626639a9a891391ae6ef1c9"]
+        },
+        {
+          "spanID": "54ea245ecf246204",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.903Z",
+          "startedAt": "2026-09-08T04:06:10.932Z",
+          "endedAt": "2026-09-08T04:06:10.946Z",
+          "plannedStepIDs": ["67c28aa6a9bfaa52ae9b9063799d60240bc52699"]
+        },
+        {
+          "spanID": "a310699fa27d61ae",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-08T04:06:10.948Z",
+          "startedAt": "2026-09-08T04:06:10.981Z",
+          "endedAt": "2026-09-08T04:06:10.994Z",
+          "plannedStepIDs": []
+        }
+      ],
+      "name": "Run",
+      "status": "COMPLETED",
+      "attempts": 0,
+      "queuedAt": "2026-09-08T04:06:10.342Z",
+      "scheduledAt": "2026-09-08T04:06:10.343Z",
+      "startedAt": "2026-09-08T04:06:10.391Z",
+      "endedAt": "2026-09-08T04:06:10.995Z",
+      "isRoot": true,
+      "isUserland": false,
+      "isCheckpoint": false,
+      "userlandSpan": null,
+      "metadata": [
+        {
+          "scope": "run",
+          "kind": "inngest.usage",
+          "values": {
+            "metadata_bytes": 2205
+          },
+          "updatedAt": "2026-09-08T04:06:10.995Z"
+        }
+      ],
+      "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYmZhNDgxNDIzZjFjNWVjZiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZSwiaW5fc2lkIjoiMjNkYjQ2NDc0YTBiYWM3YyJ9",
+      "groupID": "ec4acbeb-955b-4539-9424-ce09156e09ba",
+      "plannedSteps": null,
+      "userlandStepID": null,
+      "userlandStepIndex": null,
+      "parentStepIDs": null,
+      "parentAlternateStepIDs": null,
+      "debugRunID": null,
+      "debugSessionID": null,
+      "spanID": "23db46474a0bac7c",
+      "stepID": null,
+      "stepOp": null,
+      "stepType": "",
+      "stepInfo": null,
+      "response": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Length": "6",
+          "Content-Type": "application/json",
+          "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+          "Etag": "\"17o4nev5bso6\"",
+          "Server-Timing": "handler, action;dur=6",
+          "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-5d8ead35fc6f0732-01",
+          "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-7579f73cf459a7fc-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+          "User-Agent": "inngest-js:v4.19.0",
+          "Vary": "Accept-Encoding",
+          "X-Inngest-Framework": "nextjs",
+          "X-Inngest-Req-Version": "2",
+          "X-Inngest-Sdk": "inngest-js:v4.19.0",
+          "X-Inngest-Sdk-Handled": "true"
+        }
+      },
+      "childrenSpans": [
+        {
+          "name": "poll-0",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.343Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.393Z",
+          "endedAt": "2026-09-08T04:06:10.41Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 16,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 16
+              },
+              "updatedAt": "2026-09-08T04:06:10.411038202Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 16,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 48,
+                "total_inngest_ms": 48
+              },
+              "updatedAt": "2026-09-08T04:06:10.411260298Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiOGViODgyMTlkMGUzMjc0MSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": null,
+          "plannedSteps": [
+            {
+              "stepID": "575bc3e88e98334e01ccd1ce6f4fc55b841782e2",
+              "name": "poll-0",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "7d968c6a16993da4",
+          "stepID": "575bc3e88e98334e01ccd1ce6f4fc55b841782e2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "192",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"t9v0slcy5k5c\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-12b70625d914aff4-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-555f25580436bc9f-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-0",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.343Z",
+          "scheduledAt": "2026-09-08T04:06:10.343Z",
+          "startedAt": "2026-09-08T04:06:10.409Z",
+          "endedAt": "2026-09-08T04:06:10.41Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMDA2NzljZjBhZTAxMmE3YyIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "6ce5f6cd-b110-47c5-a0de-e53261bdf773",
+          "plannedSteps": null,
+          "userlandStepID": "poll-0",
+          "userlandStepIndex": 0,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "00679cf0ae012a7c",
+          "stepID": "575bc3e88e98334e01ccd1ce6f4fc55b841782e2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-1",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.412Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.431Z",
+          "endedAt": "2026-09-08T04:06:10.455Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 22,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 22
+              },
+              "updatedAt": "2026-09-08T04:06:10.455914918Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 22,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 18,
+                "total_inngest_ms": 18
+              },
+              "updatedAt": "2026-09-08T04:06:10.456006712Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMjk2NDViZWI4YTcxNzA3ZCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "6ce5f6cd-b110-47c5-a0de-e53261bdf773",
+          "plannedSteps": [
+            {
+              "stepID": "6fe9db257c447436be0f1975e3664b91a2149737",
+              "name": "poll-1",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["575bc3e88e98334e01ccd1ce6f4fc55b841782e2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "df73e4897cec251a",
+          "stepID": "6fe9db257c447436be0f1975e3664b91a2149737",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"4f1soczffl7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-edd6105f441400b4-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-c57954cbbb85cc7b-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-1",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.412Z",
+          "scheduledAt": "2026-09-08T04:06:10.412Z",
+          "startedAt": "2026-09-08T04:06:10.454Z",
+          "endedAt": "2026-09-08T04:06:10.455Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNjVhMjIwN2QxMDRlMWE4NiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "4b6cd25f-c53f-46ab-a4c4-028c4ad13bc6",
+          "plannedSteps": null,
+          "userlandStepID": "poll-1",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["575bc3e88e98334e01ccd1ce6f4fc55b841782e2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "65a2207d104e1a86",
+          "stepID": "6fe9db257c447436be0f1975e3664b91a2149737",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-2",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.456Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.482Z",
+          "endedAt": "2026-09-08T04:06:10.506Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 21,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 22
+              },
+              "updatedAt": "2026-09-08T04:06:10.50654873Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 22,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 25,
+                "total_inngest_ms": 25
+              },
+              "updatedAt": "2026-09-08T04:06:10.506670378Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZDNmZTNiYThjZDkwNGYwOCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "4b6cd25f-c53f-46ab-a4c4-028c4ad13bc6",
+          "plannedSteps": [
+            {
+              "stepID": "35e58666a3e09561fcc33a7372630ebed7a40d4a",
+              "name": "poll-2",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["6fe9db257c447436be0f1975e3664b91a2149737"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "9e9a0b71f02143e9",
+          "stepID": "35e58666a3e09561fcc33a7372630ebed7a40d4a",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"ngh56vun7i7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-eb1b9ef8181a415a-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-9880c2c0563e6468-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-2",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.456Z",
+          "scheduledAt": "2026-09-08T04:06:10.456Z",
+          "startedAt": "2026-09-08T04:06:10.505Z",
+          "endedAt": "2026-09-08T04:06:10.506Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiOWFjYTZkOTBlNDQzOTY2OSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "297f85d4-dfea-4524-a731-5ceec8af4b1c",
+          "plannedSteps": null,
+          "userlandStepID": "poll-2",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["6fe9db257c447436be0f1975e3664b91a2149737"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "9aca6d90e4439669",
+          "stepID": "35e58666a3e09561fcc33a7372630ebed7a40d4a",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-3",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.507Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.531Z",
+          "endedAt": "2026-09-08T04:06:10.541Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 7,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 8
+              },
+              "updatedAt": "2026-09-08T04:06:10.54152516Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 8,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 23,
+                "total_inngest_ms": 23
+              },
+              "updatedAt": "2026-09-08T04:06:10.541700982Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYjhhYzcyNDEyZTQyMzM0OCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "297f85d4-dfea-4524-a731-5ceec8af4b1c",
+          "plannedSteps": [
+            {
+              "stepID": "b39686d00fd865ace81f8db6926b75466533e7b2",
+              "name": "poll-3",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["35e58666a3e09561fcc33a7372630ebed7a40d4a"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "7d9827258285e2cd",
+          "stepID": "b39686d00fd865ace81f8db6926b75466533e7b2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"k8au2xpjkt7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-1eb843c7f33764e2-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-5f5ca4f2cc8f9896-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-3",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.507Z",
+          "scheduledAt": "2026-09-08T04:06:10.507Z",
+          "startedAt": "2026-09-08T04:06:10.54Z",
+          "endedAt": "2026-09-08T04:06:10.541Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiM2M1ZTZmMjNkNzk1YTNmNiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "8e56091b-e353-48ae-a6c6-b3c69e165afd",
+          "plannedSteps": null,
+          "userlandStepID": "poll-3",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["35e58666a3e09561fcc33a7372630ebed7a40d4a"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "3c5e6f23d795a3f6",
+          "stepID": "b39686d00fd865ace81f8db6926b75466533e7b2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-4",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.542Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.588Z",
+          "endedAt": "2026-09-08T04:06:10.598Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 8,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 8
+              },
+              "updatedAt": "2026-09-08T04:06:10.598586061Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 8,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 44,
+                "total_inngest_ms": 44
+              },
+              "updatedAt": "2026-09-08T04:06:10.598719768Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiODY0NWFjZjEwODYzZDExMSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "8e56091b-e353-48ae-a6c6-b3c69e165afd",
+          "plannedSteps": [
+            {
+              "stepID": "8a7c280a5d04833ff354f6d1c568b5544ed39565",
+              "name": "poll-4",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["b39686d00fd865ace81f8db6926b75466533e7b2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "dd4f0c1249f1761a",
+          "stepID": "8a7c280a5d04833ff354f6d1c568b5544ed39565",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"h4odiv7zq07l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-ea3e9ab034d4dd48-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-6e6b73f6b3a131c0-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-4",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.542Z",
+          "scheduledAt": "2026-09-08T04:06:10.542Z",
+          "startedAt": "2026-09-08T04:06:10.597Z",
+          "endedAt": "2026-09-08T04:06:10.598Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNTYzOTRjZTkxMTlmN2Y2ZSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "6d2ca7e4-8d7d-4eb5-85b7-f6ef6bf21245",
+          "plannedSteps": null,
+          "userlandStepID": "poll-4",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["b39686d00fd865ace81f8db6926b75466533e7b2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "56394ce9119f7f6e",
+          "stepID": "8a7c280a5d04833ff354f6d1c568b5544ed39565",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-5",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.599Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.632Z",
+          "endedAt": "2026-09-08T04:06:10.643Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 9,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 9
+              },
+              "updatedAt": "2026-09-08T04:06:10.644169557Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 9,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 32,
+                "total_inngest_ms": 32
+              },
+              "updatedAt": "2026-09-08T04:06:10.644308562Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZjdmMTY5ODBmMDc1NGJjNyIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "6d2ca7e4-8d7d-4eb5-85b7-f6ef6bf21245",
+          "plannedSteps": [
+            {
+              "stepID": "8a68132625bbd07620d76fd514acf298376adf01",
+              "name": "poll-5",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["8a7c280a5d04833ff354f6d1c568b5544ed39565"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "3dd5d5b9e8b1842d",
+          "stepID": "8a68132625bbd07620d76fd514acf298376adf01",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"qw61r1tbtj7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-9dbf8ac45bbb0b95-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-4e1a98ed9c9b021e-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-5",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.599Z",
+          "scheduledAt": "2026-09-08T04:06:10.599Z",
+          "startedAt": "2026-09-08T04:06:10.642Z",
+          "endedAt": "2026-09-08T04:06:10.643Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiY2MwNGJkNjQxOTE0YjYwNyIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "428e60f5-cd0e-4939-a9d9-aa9dacad1942",
+          "plannedSteps": null,
+          "userlandStepID": "poll-5",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["8a7c280a5d04833ff354f6d1c568b5544ed39565"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "cc04bd641914b607",
+          "stepID": "8a68132625bbd07620d76fd514acf298376adf01",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-6",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.645Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.697Z",
+          "endedAt": "2026-09-08T04:06:10.71Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 8,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 9
+              },
+              "updatedAt": "2026-09-08T04:06:10.710871258Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 9,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 49,
+                "total_inngest_ms": 49
+              },
+              "updatedAt": "2026-09-08T04:06:10.711008237Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNTAyZmZkZTRmNzg0NzUzOSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "428e60f5-cd0e-4939-a9d9-aa9dacad1942",
+          "plannedSteps": [
+            {
+              "stepID": "dd1945282bd2db2285f37a86c1b00acdb927a7f9",
+              "name": "poll-6",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["8a68132625bbd07620d76fd514acf298376adf01"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "11644bdf0e82994c",
+          "stepID": "dd1945282bd2db2285f37a86c1b00acdb927a7f9",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"gknpc9lsto7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-f9d64980ced7506b-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-dcf7b338110dfc29-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-6",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.645Z",
+          "scheduledAt": "2026-09-08T04:06:10.645Z",
+          "startedAt": "2026-09-08T04:06:10.709Z",
+          "endedAt": "2026-09-08T04:06:10.71Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiOTAyNmUxMGNmOWU0YjdiOSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "01140556-e751-494b-bd77-394eb78f4eab",
+          "plannedSteps": null,
+          "userlandStepID": "poll-6",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["8a68132625bbd07620d76fd514acf298376adf01"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "9026e10cf9e4b7b9",
+          "stepID": "dd1945282bd2db2285f37a86c1b00acdb927a7f9",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-7",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.712Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.731Z",
+          "endedAt": "2026-09-08T04:06:10.742Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 9,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 9
+              },
+              "updatedAt": "2026-09-08T04:06:10.743088825Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 9,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 17,
+                "total_inngest_ms": 17
+              },
+              "updatedAt": "2026-09-08T04:06:10.743209507Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYTM5ZjJiZGI4ODk2YTkyMCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "01140556-e751-494b-bd77-394eb78f4eab",
+          "plannedSteps": [
+            {
+              "stepID": "12f5bba54acb6918ffcf6046d7e0f87396b6ac8f",
+              "name": "poll-7",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["dd1945282bd2db2285f37a86c1b00acdb927a7f9"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "74bcc4ae7d18b820",
+          "stepID": "12f5bba54acb6918ffcf6046d7e0f87396b6ac8f",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"15cjitccgzr7l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-5f58adac12149cb6-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-1d8f7b6366090c94-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-7",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.712Z",
+          "scheduledAt": "2026-09-08T04:06:10.712Z",
+          "startedAt": "2026-09-08T04:06:10.741Z",
+          "endedAt": "2026-09-08T04:06:10.742Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiN2ExYTZkY2JlOTY2NDVkNiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "49d25737-7774-453b-bf70-09079b096bcb",
+          "plannedSteps": null,
+          "userlandStepID": "poll-7",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["dd1945282bd2db2285f37a86c1b00acdb927a7f9"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "7a1a6dcbe96645d6",
+          "stepID": "12f5bba54acb6918ffcf6046d7e0f87396b6ac8f",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-8",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.744Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.784Z",
+          "endedAt": "2026-09-08T04:06:10.797Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 9,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 9
+              },
+              "updatedAt": "2026-09-08T04:06:10.797935292Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 9,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 38,
+                "total_inngest_ms": 38
+              },
+              "updatedAt": "2026-09-08T04:06:10.798075156Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMGU2YzczYmM1ZWIwODc1NCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "49d25737-7774-453b-bf70-09079b096bcb",
+          "plannedSteps": [
+            {
+              "stepID": "ed68691323d60827a7e303ddb44e31a264877ca2",
+              "name": "poll-8",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["12f5bba54acb6918ffcf6046d7e0f87396b6ac8f"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "c63e1aeb2b239dea",
+          "stepID": "ed68691323d60827a7e303ddb44e31a264877ca2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"ylgk6ue4c27l\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-984118f8898ebc8a-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-3326a47a0ac565b4-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-8",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.744Z",
+          "scheduledAt": "2026-09-08T04:06:10.744Z",
+          "startedAt": "2026-09-08T04:06:10.796Z",
+          "endedAt": "2026-09-08T04:06:10.797Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiN2JjZTEyMmM4NmNkZWU4ZCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "5293e18e-9a50-42e1-a1e6-a1336d41cfc5",
+          "plannedSteps": null,
+          "userlandStepID": "poll-8",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["12f5bba54acb6918ffcf6046d7e0f87396b6ac8f"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "7bce122c86cdee8d",
+          "stepID": "ed68691323d60827a7e303ddb44e31a264877ca2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-9",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.798Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.833Z",
+          "endedAt": "2026-09-08T04:06:10.847Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 11,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 12
+              },
+              "updatedAt": "2026-09-08T04:06:10.848106875Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 12,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 33,
+                "total_inngest_ms": 33
+              },
+              "updatedAt": "2026-09-08T04:06:10.848250567Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNjM4NzFiYjZlMTgzNzZmYSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "5293e18e-9a50-42e1-a1e6-a1336d41cfc5",
+          "plannedSteps": [
+            {
+              "stepID": "c9fde7c25f8eb459249be6a716276f5fb2be7ca2",
+              "name": "poll-9",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["ed68691323d60827a7e303ddb44e31a264877ca2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "6762fa3c10fe132b",
+          "stepID": "c9fde7c25f8eb459249be6a716276f5fb2be7ca2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"rtu879rkt77l\"",
+              "Server-Timing": "handler, action;dur=5",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-a04637d00b36a872-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-f06c9523ee903181-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-9",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.799Z",
+          "scheduledAt": "2026-09-08T04:06:10.799Z",
+          "startedAt": "2026-09-08T04:06:10.846Z",
+          "endedAt": "2026-09-08T04:06:10.847Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMjJjYTAwYTgwNmY0YmI0YiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "7ea4d473-c913-4068-9c48-8111bc569b91",
+          "plannedSteps": null,
+          "userlandStepID": "poll-9",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["ed68691323d60827a7e303ddb44e31a264877ca2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "22ca00a806f4bb4b",
+          "stepID": "c9fde7c25f8eb459249be6a716276f5fb2be7ca2",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-10",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.849Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.886Z",
+          "endedAt": "2026-09-08T04:06:10.902Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 12,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 13
+              },
+              "updatedAt": "2026-09-08T04:06:10.902444152Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 13,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 36,
+                "total_inngest_ms": 36
+              },
+              "updatedAt": "2026-09-08T04:06:10.902653782Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMzk4YmFiNDVmZDg2N2RjNCIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "7ea4d473-c913-4068-9c48-8111bc569b91",
+          "plannedSteps": [
+            {
+              "stepID": "8ba3725accfe1fda4626639a9a891391ae6ef1c9",
+              "name": "poll-10",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["c9fde7c25f8eb459249be6a716276f5fb2be7ca2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "1c9c51b6c4e0bb54",
+          "stepID": "8ba3725accfe1fda4626639a9a891391ae6ef1c9",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "277",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"rv7gbwiomt7p\"",
+              "Server-Timing": "handler, action;dur=7",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-458e09e1ab1d9d69-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-82edf383f42fbac3-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-10",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.849Z",
+          "scheduledAt": "2026-09-08T04:06:10.849Z",
+          "startedAt": "2026-09-08T04:06:10.9Z",
+          "endedAt": "2026-09-08T04:06:10.901Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZTBlZWIzMWNmZWI0OWU0MSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "7bbc579b-33ad-4561-890f-97314c3f9378",
+          "plannedSteps": null,
+          "userlandStepID": "poll-10",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["c9fde7c25f8eb459249be6a716276f5fb2be7ca2"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "e0eeb31cfeb49e41",
+          "stepID": "8ba3725accfe1fda4626639a9a891391ae6ef1c9",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-11",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.903Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.932Z",
+          "endedAt": "2026-09-08T04:06:10.946Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 11,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 12
+              },
+              "updatedAt": "2026-09-08T04:06:10.947213742Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 12,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 28,
+                "total_inngest_ms": 28
+              },
+              "updatedAt": "2026-09-08T04:06:10.94734091Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMjE1ODdiOWViOTRmMGEyMiIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "7bbc579b-33ad-4561-890f-97314c3f9378",
+          "plannedSteps": [
+            {
+              "stepID": "67c28aa6a9bfaa52ae9b9063799d60240bc52699",
+              "name": "poll-11",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": ["8ba3725accfe1fda4626639a9a891391ae6ef1c9"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "54ea245ecf246204",
+          "stepID": "67c28aa6a9bfaa52ae9b9063799d60240bc52699",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "277",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"14fyyzu8lmt7p\"",
+              "Server-Timing": "handler, action;dur=5",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-01a47a471ddc77a3-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-a82f83829425b816-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "poll-11",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.903Z",
+          "scheduledAt": "2026-09-08T04:06:10.903Z",
+          "startedAt": "2026-09-08T04:06:10.945Z",
+          "endedAt": "2026-09-08T04:06:10.946Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiODY5YmYyZjA0ZTA5YWEyZSIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "4ee2613d-3fc2-495d-b9f9-545d76ca69f0",
+          "plannedSteps": null,
+          "userlandStepID": "poll-11",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["8ba3725accfe1fda4626639a9a891391ae6ef1c9"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "869bf2f04e09aa2e",
+          "stepID": "67c28aa6a9bfaa52ae9b9063799d60240bc52699",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "Finalization",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.948Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-08T04:06:10.981Z",
+          "endedAt": "2026-09-08T04:06:10.994Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 11,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 11
+              },
+              "updatedAt": "2026-09-08T04:06:10.995039798Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 11,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 32,
+                "total_inngest_ms": 32
+              },
+              "updatedAt": "2026-09-08T04:06:10.995124264Z"
+            }
+          ],
+          "outputID": null,
+          "groupID": "4ee2613d-3fc2-495d-b9f9-545d76ca69f0",
+          "plannedSteps": null,
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "a310699fa27d61ae",
+          "stepID": null,
+          "stepOp": null,
+          "stepType": "FINALIZATION",
+          "stepInfo": null,
+          "response": {
+            "statusCode": 200,
+            "headers": {
+              "Content-Length": "6",
+              "Content-Type": "application/json",
+              "Date": "Tue, 08 Sep 2026 04:06:10 GMT",
+              "Etag": "\"17o4nev5bso6\"",
+              "Server-Timing": "handler, action;dur=6",
+              "Traceparent": "00-f2b30b94f7b509fd01e6f3513a22298f-5d8ead35fc6f0732-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-d0c3b7ce88da732831c5294ced0252c7-7579f73cf459a7fc-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=1bd09496-0a0d-5fe6-8a42-1bd6fbc80bff,inngest@app=b89addd7-fbc5-5518-a36c-a286453740fc",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "executor.nonstep",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-08T04:06:10.948Z",
+          "scheduledAt": "2026-09-08T04:06:10.948Z",
+          "startedAt": "2026-09-08T04:06:10.98Z",
+          "endedAt": "2026-09-08T04:06:10.995Z",
+          "isRoot": false,
+          "isUserland": false,
+          "isCheckpoint": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNDBlOWZmZmVkOTA2ODQzMyIsInJpZCI6IjAxTTFaSzNSNTZNMk1BTlc4SDIzUjMyWDkxIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "ec4acbeb-955b-4539-9424-ce09156e09ba",
+          "plannedSteps": null,
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "40e9fffed9068433",
+          "stepID": null,
+          "stepOp": null,
+          "stepType": "",
+          "stepInfo": null,
+          "response": null,
+          "childrenSpans": []
+        }
+      ]
+    }
+  }
+}
