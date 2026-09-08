@@ -11,6 +11,24 @@
  * drawing needs and cannot infer — which request reported which steps — so
  * ribbons and cables come out of the capture rather than out of coincident
  * timings.
+ *
+ * ## What the captures do not say
+ *
+ * Three gaps, all in the v4 payloads, all of which this file compensates for
+ * rather than corrects -- they want fixing at the source:
+ *
+ *   - **Requests go unrecorded.** `v4sequential` lists two, for a run that
+ *     made at least four (run `first step`; plan the sleep; run `second
+ *     step`; finalize). `step` and `v4parallel` list every one of theirs.
+ *     So a step can have no request in the payload at all, and the request
+ *     that produced it has to be found by which window contains it.
+ *   - **A request can carry the RUN's `queuedAt` instead of its own.**
+ *     `v4sequential`'s surviving request reports 1ms -- the run's queue --
+ *     though it cannot have been enqueued before the step that preceded it
+ *     returned at 68ms.
+ *   - **A request that plans a sleep records `startedAt === endedAt`.** True
+ *     of `v4sequential` and of `step`, and of nothing else. There is no
+ *     execution window, so that request cannot be drawn as one.
  */
 import fs from 'fs';
 import * as R from './rules.mjs';
@@ -88,18 +106,21 @@ export function loadRun(id){
     if(sep){
       const dq=at(d.queuedAt), ds=at(d.startedAt), de=at(d.endedAt);
       /**
-       * A request can RUN steps before it plans the next one.
+       * Where a request's own queue is not recorded, take the end of the work
+       * that preceded it.
        *
-       * A sequential thread executes `a` and then hits the sleep and returns
-       * it, all in one request -- so that request's queue is the run's queue
-       * and its first stretch of work is `a`, neither of which has anything
-       * to do with the sleep. Drawing the request from its `queuedAt` put all
-       * of it in the sleep's row: the sleep appeared to have been waiting since
-       * the run was enqueued, through another step's execution.
+       * A request is enqueued when the previous one returns, so the request
+       * that plans a step cannot have been waiting through the execution of a
+       * step that ran before it. The v4 capture reports the RUN's `queuedAt`
+       * on the request that plans the sleep, which put all of that in the
+       * sleep's row: it appeared to have been waiting since the run was
+       * enqueued, through `first step`'s whole execution.
        *
-       * The part of the request that produced THIS step is what came after the
-       * last thing it ran, and there is no queue in front of it because the
-       * step did not exist to be queued.
+       * So the request is drawn from the end of the last step that finished
+       * inside its reported window. That is a floor, not the real queue -- the
+       * queue between the two is real and is simply not in the data (see the
+       * capture notes below). Where the request records a queue of its own,
+       * which every other fixture does, this does not fire.
        */
       let prior=null;
       for(const o of (t.childrenSpans||[])){
@@ -133,13 +154,12 @@ export function loadRun(id){
      * A step nobody planned was still QUEUED -- inside the request that ran it.
      *
      * A sequential `step.run` is discovered and run in one execution, so it
-     * has no plan of its own and the only record that it was ever waiting is
-     * the request that did both: the run sat in the queue, the executor picked
-     * it up, the SDK worked its way down to the step. The span's own
-     * `queuedAt` is the instant the SDK started running it, which is not when
-     * it began waiting -- so the row opened on a queue of zero width and the
-     * first step of every v4 capture appeared to have started the moment the
-     * run did.
+     * has no plan of its own, and its span's `queuedAt` is the instant the SDK
+     * started running it rather than when it began waiting. The only record
+     * that it waited at all is the request that did both: the run sat in the
+     * queue, the executor picked it up, the SDK worked its way down to the
+     * step. Without this the row opened on a queue of zero width and the first
+     * step of every v4 capture appeared to start the moment the run did.
      *
      * Where the request ran SEVERAL steps the wait is only the part after the
      * previous one returned; the rest was that step's, not this one's.
