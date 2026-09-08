@@ -48,7 +48,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
         </Link>
       }
     >
-      <h2 className="text-xs font-bold leading-4">New runs are paused</h2>
+      <h2 className="text-xs font-bold leading-4">Execution Limit Reached</h2>
       <p className="mt-1 text-xs font-medium leading-4">
         You&apos;ve used {formattedUsage} executions this month and reached the
         Hobby limit. Performance will be impacted. Upgrade to Pro to avoid
