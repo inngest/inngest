@@ -126,7 +126,8 @@ export const EVC = Object.fromEntries(
 /** Filled marks mean finished; hollow ones mean the row has not resolved. */
 export const EV_HOLLOW = ['queued','ribbon','hollow','hollow-bad'];
 
-export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false, sub=''){
+export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false, sub='', key=''){
+  const K=key?` data-k="${key}"`:'';
   const R=r+GEOM.HALO;
   const col=EVC[c]||c;
   /**
@@ -139,17 +140,17 @@ export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false, sub=''
    */
   const ring = !cp ? ''
     : c==='cancelled'
-      ? `<rect class="ev-cp sq" x="${x-r-GEOM.CP_GAP}" y="${y-r-GEOM.CP_GAP}" width="${(r+GEOM.CP_GAP)*2}" height="${(r+GEOM.CP_GAP)*2}" rx="1" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`
-      : `<circle class="ev-cp" cx="${x}" cy="${y}" r="${r+GEOM.CP_GAP}" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`;
+      ? `<rect class="ev-cp sq"${K} x="${x-r-GEOM.CP_GAP}" y="${y-r-GEOM.CP_GAP}" width="${(r+GEOM.CP_GAP)*2}" height="${(r+GEOM.CP_GAP)*2}" rx="1" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`
+      : `<circle class="ev-cp"${K} cx="${x}" cy="${y}" r="${r+GEOM.CP_GAP}" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`;
   const bg = !halo ? ''
     : c==='cancelled'
-      ? `<rect class="ev-bg sq" x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
-      : `<circle class="ev-bg" cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
+      ? `<rect class="ev-bg sq"${K} x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
+      : `<circle class="ev-bg"${K} cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
   if(c==='cancelled')
-    return bg+ring+`<rect class="ev ev-cancelled"${sub?` data-sub="${sub}"`:''} x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<rect class="ev ev-cancelled"${K}${sub?` data-sub="${sub}"`:''} x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
   if(EV_HOLLOW.indexOf(c)>=0)
-    return bg+ring+`<circle class="ev ev-${c}"${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
-  return bg+ring+`<circle class="ev ev-${c}"${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<circle class="ev ev-${c}"${K}${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
+  return bg+ring+`<circle class="ev ev-${c}"${K}${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
 }
 export const dot = markSvg;
 
@@ -167,7 +168,7 @@ export const eventCSS = () =>
  * One bar. Every kind is a pattern, so this is the only place a bar is drawn.
  * `k` is the axis scale, so the minimum width is a minimum on screen.
  */
-export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H}={}){
+export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H, key=''}={}){
   // `k` scales coordinates now; `floor` is the scale the drawing ends up at,
   // so the minimum width is a minimum on screen whether the caller scales
   // afterwards (the static figures) or not (the browser).
@@ -176,7 +177,7 @@ export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H}={}){
   // height in the panel does not also move it.
   const cls=h===GEOM.BAR_H?'bar':(h<3?'bar rail':'bar sm');
   const wpx=Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k);
-  return `<rect class="${cls}" style="--w:${wpx.toFixed(2)}px" `+
+  return `<rect class="${cls}"${key?` data-k="${key}"`:''} style="--w:${wpx.toFixed(2)}px" `+
     `x="${pxOf(x,k).toFixed(2)}" y="${y.toFixed(1)}" `+
     `width="${wpx.toFixed(2)}" height="${h}" `+
     `rx="1" fill="url(#hx-${b})" opacity="${o}"/>`;

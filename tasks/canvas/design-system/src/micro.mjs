@@ -102,6 +102,7 @@ export function runProfile(i,{to=100,intervals=[],resolved,n='Run',breaks=[],lea
   // rank of the bar it came from, and where slices overlap the higher rank is
   // drawn last and so is the one left showing.
   const col=v=> R.RUN_COLOUR[v.rank!=null?v.rank:2];
+  let ti=0, si=0;
   let s=rowLabel(y,n);
   /**
    * The grey track is the run's whole extent — and where the axis is
@@ -127,10 +128,10 @@ export function runProfile(i,{to=100,intervals=[],resolved,n='Run',breaks=[],lea
     for(const [a,b] of breaks){
       const x0=Math.max(LBL,px(a)), x1=Math.min(end,px(b));
       if(x1<=x0) continue;
-      if(x0>at) s+=`<rect class="run-track" x="${at.toFixed(1)}" y="${y}" width="${(x0-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+      if(x0>at) s+=`<rect class="run-track" data-k="run:t:${ti++}" x="${at.toFixed(1)}" y="${y}" width="${(x0-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
       s+=tear(x0,x1); at=x1;
     }
-    if(end>at) s+=`<rect class="run-track" x="${at.toFixed(1)}" y="${y}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+    if(end>at) s+=`<rect class="run-track" data-k="run:t:${ti++}" x="${at.toFixed(1)}" y="${y}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
   }
   // Drawn worst-last, so where slices overlap the higher rank survives.
   const ordered=[...intervals].sort((p,q)=>(p.rank||0)-(q.rank||0));
@@ -139,7 +140,7 @@ export function runProfile(i,{to=100,intervals=[],resolved,n='Run',breaks=[],lea
     if(b<=a) continue;
     // Failure stays findable even when the interval is tiny.
     const w=Math.max((v.rank===3?R.GEOM.MIN_FAIL_W:R.GEOM.MIN_W)/sc, ((b-a)/100)*PLOT);
-    s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${col(v)}"/>`;
+    s+=`<rect class="run-slice" data-k="run:s:${si++}" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${col(v)}"/>`;
   }
   // The Run row opens on the moment the run was actually in when the drawing
   // starts. Trim its opening queue away and the drawing starts with the run
@@ -219,13 +220,29 @@ export function row(i,r,sc=1,yy){
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
   // IS your code, so it keeps the same status colours the step has.
   const bh=(r.thin||r.span)?GEOM.BAR_H*0.6:GEOM.BAR_H;
-  if(!noBars) segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
+  /**
+   * Every bar and every mark carries an identity: which row it is on, what
+   * kind it is, and which one of that kind. That is what lets a redraw be
+   * matched to the drawing before it -- the same bar animating from where it
+   * was to where it now is, rather than the nth bar in one figure being
+   * matched to the nth in the next. Toggling compression adds and removes
+   * bars, so counting position alone pairs a step with a band and everything
+   * after it is off by one.
+   */
+  const bn={};
+  if(!noBars) segs.forEach(([k,a,w])=>{
+    const b=base(k); bn[b]=(bn[b]||0)+1;
+    put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh,key:i+':b:'+b+':'+bn[b]}));
+  });
+  const en={};
   if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
     // How we came to know a moment is a fact about the moment, so it is
     // carried on the row as the instants that arrived by checkpoint.
     const cp=(r.cp||[]).some(p=>Math.abs(p-d.p)<0.01);
-    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true,cp,d.s||''));
+    const c=onRib?'ribbon':(d.c||C.mut);
+    en[c]=(en[c]||0)+1;
+    put(litDot(d.p)===1, dot(px(d.p),y,c,1,R.GEOM.MARK_R,true,cp,d.s||'',i+':e:'+c+':'+en[c]));
   });
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
@@ -308,6 +325,7 @@ export function groupRow(i, {n, x, w, members, kind='good', note=''}){
 }
 function groupRowAt(i, {n, x, w, members, kind='good', note=''}){
   const y=cy(i);
+  let ti=0, si=0;
   let s=rowLabel(y,n);
   s+=`<rect x="${px(x)}" y="${y-5}" width="${(w/100)*PLOT}" height="10" rx="2" fill="var(--surface-2)" stroke="${C.idle}" stroke-width="1"/>`;
   members.forEach(mm=>{

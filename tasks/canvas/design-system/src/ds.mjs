@@ -590,16 +590,9 @@ const page=`<title>Trace Design System</title>
      property or it cannot be transitioned — an unregistered one is a string as
      far as animation is concerned, and jumps. */
   @property --w{syntax:'<length>';inherits:false;initial-value:0px}
-  /* The morph is driven by element.animate(), not by these — see morphFeat.
-     --w still has to be a registered custom property or it cannot be
-     interpolated at all: an unregistered one is a string to the animation
-     engine and jumps from one value to the other. */
-  .varset{display:contents}
-  .varset > .v{display:none}
-  html[data-feat="11"] .varset > .v-11,
-  html[data-feat="10"] .varset > .v-10,
-  html[data-feat="01"] .varset > .v-01,
-  html[data-feat="00"] .varset > .v-00{display:contents}
+  /* --w has to be a REGISTERED custom property or it cannot be interpolated
+     at all: an unregistered one is a string to the animation engine, and a
+     bar would jump from one width to the other rather than travelling. */
   .pal{display:flex;flex-direction:column;gap:5px}
   .pal label{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
   .vrow{padding:6px 0;border-top:1px solid var(--rule)}
@@ -1152,79 +1145,62 @@ ${dsmod}
             w:el.getAttribute('width'),
             vw:(el.style&&el.style.getPropertyValue('--w'))||''};
   }
-  var MORPH_SEL=['rect.bar','rect.cmpband','rect.rib','rect.run-track','rect.run-slice',
-                 'circle.ev','circle.ev-bg','text'];
-  /** Every animatable element under a root, grouped by kind. */
+  /**
+   * Where everything was, keyed by what it IS.
+   *
+   * Matching by position in the document is what made the toggle chaotic:
+   * switching compression adds bands and splits bars, so the nth element of
+   * one drawing is not the nth of the next, and every pair after the first
+   * difference animated something towards a place it had never been. Each bar,
+   * mark and run-row slice carries a data-k -- its row, its kind, and which
+   * one of that kind -- so the same thing is matched to itself.
+   *
+   * Everything without a key is left alone. Labels, ticks and band scrims
+   * change wholesale between the two drawings and have no counterpart to
+   * travel from; sliding them was most of the noise.
+   */
   function snapGeom(root){
     var out={};
-    MORPH_SEL.forEach(function(sel){
-      out[sel]=[].slice.call(root.querySelectorAll(sel)).map(geomOf);
+    root.querySelectorAll('[data-k]').forEach(function(el){
+      out[el.getAttribute('data-k')]=geomOf(el);
     });
     return out;
   }
-  /** Animate a freshly drawn root out of the geometry the old one had. */
+  /** Animate a freshly drawn figure out of the geometry the old one had. */
   function morphInto(root, snap){
-    if(!snap || !root.animate && !document.body.animate) return;
-    MORPH_SEL.forEach(function(sel){
-      var b=root.querySelectorAll(sel), was=snap[sel]||[];
-      for(var i=0;i<b.length;i++){
-        var el=b[i], g=was[i];
-        try{
-          if(!g){ el.animate([{opacity:0},{opacity:1}], MORPH); continue; }
-          var a={}, z={}, moved=false, now=geomOf(el);
-          if(g.x!=null  && now.x!=null  && g.x!==now.x)  { a.x=g.x+'px';   z.x=now.x+'px';   moved=true; }
-          if(g.cx!=null && now.cx!=null && g.cx!==now.cx){ a.cx=g.cx+'px'; z.cx=now.cx+'px'; moved=true; }
-          if(g.vw && now.vw && g.vw!==now.vw)            { a['--w']=g.vw;  z['--w']=now.vw;  moved=true; }
-          else if(g.w!=null && now.w!=null && g.w!==now.w){ a.width=g.w+'px'; z.width=now.w+'px'; moved=true; }
-          if(moved) el.animate([a,z], MORPH);
-        }catch(e){}
-      }
-    });
-  }
-
-  function morphFeat(nextKey){
-    var prevKey=document.documentElement.getAttribute('data-feat');
-    document.documentElement.setAttribute('data-feat', nextKey);
-    if(!prevKey || prevKey===nextKey || !document.body.animate){ refit(); return; }
-
-    var pairs=[];
-    document.querySelectorAll('.varset').forEach(function(set){
-      var from=set.querySelector('.v-'+prevKey), to=set.querySelector('.v-'+nextKey);
-      if(!from || !to || from===to) return;
-      // Matched per KIND, not across one mixed list. A compressed figure draws
-      // itself a second time to blur what passes through the band, so the two
-      // variants hold different numbers of elements; one mixed list diverges at
-      // the first extra and every pair after it is a bar against a circle.
-      ['rect.bar','rect.cmpband','rect.rib','rect.run-track','rect.run-slice',
-       'circle.ev','circle.ev-bg','text'].forEach(function(sel){
-        var a=from.querySelectorAll(sel), b=to.querySelectorAll(sel);
-        var n=Math.min(a.length,b.length);
-        for(var i=0;i<n;i++) pairs.push([b[i], geomOf(a[i])]);
-        for(var j=n;j<b.length;j++) pairs.push([b[j], null]);   // no counterpart: fade in
-      });
-      // A cable is a bezier and two path strings cannot be interpolated, so it
-      // fades rather than pretending to move.
-      to.querySelectorAll('g.cable').forEach(function(c){ pairs.push([c, null]); });
-    });
-
-    pairs.forEach(function(p){
-      var el=p[0], g=p[1];
+    root.querySelectorAll('[data-k]').forEach(function(el){
+      var g=snap[el.getAttribute('data-k')];
       try{
+        // Nothing it was before: new to this drawing, so it arrives where it
+        // belongs rather than travelling from somewhere it never was.
         if(!g){ el.animate([{opacity:0},{opacity:1}], MORPH); return; }
-        var a={}, b={}, moved=false;
-        var now=geomOf(el);
-        if(g.x!=null  && now.x!=null  && g.x!==now.x)  { a.x=g.x+'px';   b.x=now.x+'px';   moved=true; }
-        if(g.cx!=null && now.cx!=null && g.cx!==now.cx){ a.cx=g.cx+'px'; b.cx=now.cx+'px'; moved=true; }
-        if(g.vw && now.vw && g.vw!==now.vw)            { a['--w']=g.vw;  b['--w']=now.vw;  moved=true; }
-        else if(g.w!=null && now.w!=null && g.w!==now.w){ a.width=g.w+'px'; b.width=now.w+'px'; moved=true; }
-        if(moved) el.animate([a,b], MORPH);
+        var a={}, z={}, moved=false, now=geomOf(el);
+        if(g.x!=null  && now.x!=null  && g.x!==now.x)   { a.x=g.x+'px';    z.x=now.x+'px';    moved=true; }
+        if(g.cx!=null && now.cx!=null && g.cx!==now.cx) { a.cx=g.cx+'px';  z.cx=now.cx+'px';  moved=true; }
+        if(g.vw && now.vw && g.vw!==now.vw)             { a['--w']=g.vw;   z['--w']=now.vw;   moved=true; }
+        else if(g.w!=null && now.w!=null && g.w!==now.w){ a.width=g.w+'px';z.width=now.w+'px';moved=true; }
+        if(moved) el.animate([a,z], MORPH);
       }catch(e){}
     });
-    setTimeout(refit, MORPH.duration+40);
   }
 
   function applyFeat(animate){
     document.documentElement.setAttribute('data-feat', featKey());
+    /**
+     * Read where everything IS before the figures are redrawn.
+     *
+     * The component replaces each figure's whole subtree, so the outgoing
+     * elements are gone by the time the new ones exist -- there is nothing left
+     * to measure afterwards. Snapshot first, redraw, then animate the new
+     * elements out of the old geometry.
+     */
+    var snaps=null;
+    if(animate && document.body.animate){
+      snaps=[];
+      document.querySelectorAll('svg[data-fig]').forEach(function(svg){
+        snaps.push([svg.parentNode, snapGeom(svg)]);
+      });
+    }
     // The features are properties of a drawing. Every figure re-renders from
     // the events it was drawn from, through the same component.
     if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress});
@@ -1232,7 +1208,18 @@ ${dsmod}
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';
     });
-    refit(); requestAnimationFrame(refit);
+    if(!snaps){ refit(); requestAnimationFrame(refit); return; }
+    // A frame later, because the render is batched and the new subtree does not
+    // exist yet. Refit first: it settles the viewBox, and an animation started
+    // against a viewBox that then changes is an animation that drifts.
+    requestAnimationFrame(function(){
+      refit();
+      snaps.forEach(function(p){
+        var svg=p[0] && p[0].querySelector && p[0].querySelector('svg[data-fig]');
+        if(svg) morphInto(svg, p[1]);
+      });
+      setTimeout(refit, MORPH.duration+40);
+    });
   }
   document.querySelectorAll('#side [data-feat]').forEach(function(b){
     b.addEventListener('click',function(){
