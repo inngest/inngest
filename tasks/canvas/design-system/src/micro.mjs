@@ -34,6 +34,28 @@ export const causal=(sources,target,opts={})=>_cr(sources,target,{px,cy,...opts}
 export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.5" fill="${c}">${t}</text>`;
 
 /**
+ * The label column and the line that closes it.
+ *
+ * Every row name in every figure goes through here, so the column is one width
+ * everywhere and the bars all start at the same x -- which is the point of
+ * giving it a fixed width at all. A name too long for the column is elided;
+ * the whole name is still in `data-n`.
+ */
+export const RULE_X=LBL-R.GEOM.LBL_RULE;
+export function rowLabel(y,n,{span=false,o=1}={}){
+  const x=R.GEOM.LBL_X+(span?R.GEOM.LBL_INDENT:0);
+  const f=span?R.GEOM.LBL_SPAN_FONT:R.GEOM.LBL_FONT;
+  const t=R.elide(String(n), RULE_X-x-R.GEOM.LBL_PAD, f);
+  // Centred on the row from the font size, so shrinking the label does not
+  // leave it sitting off the line its bar is on.
+  return `<text class="rowlbl" data-n="${n}" x="${x}" y="${(y+f*0.36).toFixed(1)}" ${MONO} `+
+    `font-size="${f}" fill="${C.mut}" opacity="${o}">${t}</text>`;
+}
+/** The divider, full height, so the column reads as a column and not as an indent. */
+export const gutter=h=>`<rect class="gut" x="${(RULE_X-0.3).toFixed(1)}" y="0" width="0.6" `+
+  `height="${h}" fill="${C.idle}" opacity=".5"/>`;
+
+/**
  * A row. `segs` are [kind, start%, width%]. Circles are placed automatically at
  * transitions: the row's first event, each point where active work begins after
  * idle time or changes outcome, and the resolution — which is the only one that
@@ -62,7 +84,7 @@ export function runProfile(i,{to=R.FRAME.rowsAxis,intervals=[],resolved,n='Run',
   // rank of the bar it came from, and where slices overlap the higher rank is
   // drawn last and so is the one left showing.
   const col=v=> R.RUN_COLOUR[v.rank!=null?v.rank:2];
-  let s=`<text x="9" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
+  let s=rowLabel(y,n);
   /**
    * The grey track is the run's whole extent — and where the axis is
    * compressed, **the track itself tears** rather than running straight under a
@@ -172,9 +194,8 @@ export function row(i,r,sc=1,yy){
   // over it keeps bars under marks inside both layers.
   const put=(on,frag)=>{ lo+=frag; if(on) hi+=frag; };
   if(r.spans) lo+=[0,1,2].map(j=>
-    `<rect x="1" y="${(y-2.6+j*2.2).toFixed(1)}" width="5.4" height="1.1" rx="0.5" fill="${C.mut}" opacity="${0.85-j*0.22}"/>`).join('');
-  lo+=`<text x="${r.span?15:9}" y="${y+2.2}" ${MONO} font-size="${r.span?6:7}" `+
-     `fill="${C.mut}" opacity="${r.span?0.78:1}">${n}</text>`;
+    `<rect x="0.5" y="${(y-2.6+j*2.2).toFixed(1)}" width="${R.GEOM.LBL_GLYPH}" height="1" rx="0.5" fill="${C.mut}" opacity="${0.85-j*0.22}"/>`).join('');
+  lo+=rowLabel(y,n,{span:!!r.span, o:r.span?0.78:1});
   // A userland span is a subdivision of the step above it, not a peer, so it is
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
   // IS your code, so it keeps the same status colours the step has.
@@ -263,7 +284,7 @@ export function groupRow(i, {n, x, w, members, kind='good', note=''}){
 }
 function groupRowAt(i, {n, x, w, members, kind='good', note=''}){
   const y=cy(i);
-  let s=tag(9, y+2.5, n, C.mut);
+  let s=rowLabel(y,n);
   s+=`<rect x="${px(x)}" y="${y-5}" width="${(w/100)*PLOT}" height="10" rx="2" fill="var(--surface-2)" stroke="${C.idle}" stroke-width="1"/>`;
   members.forEach(mm=>{
     s+=`<rect x="${px(mm[0])}" y="${y-3.5}" width="${Math.max(1.2,(mm[1]/100)*PLOT)}" height="7" rx="1" fill="url(#hx-${mm[2]||kind})"/>`;
@@ -1047,7 +1068,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0,
                 opts:{...opts0, frame:framed}});
   return `<svg data-fig="${fid}" viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
+    HATCH+BLURDEF+cmp.clip+gutter(bandH)+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
 }
 
 const BLURDEF='';

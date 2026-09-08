@@ -50,7 +50,38 @@ export const GEOM = {
   SPAN_EXIT: 4,                      // the extra gap coming back out of a block of spans
   SPAN_ROW:9,                        // pitch for a userland span row
   SPAN_BAR:0.6,                      // span bar height, as a fraction of BAR_H
+  /**
+   * The label column, fixed so that every figure begins its bars in the same
+   * place. A divider sits at its right edge, and a name that would cross the
+   * divider is cut rather than allowed to run on under the trace.
+   */
+  LBL_X:6,                           // where a row label starts
+  LBL_GLYPH:3,                       // ...and the width of the "collapsed rows" mark left of it
+  LBL_INDENT:5,                      // a userland span sits in under its step
+  LBL_RULE:8,                        // the divider, this far left of the plot
+                                     // — clear of the mark that sits on the plot's first pixel
+  LBL_PAD:3,                         // clearance kept between a label and the divider
+  LBL_FONT:5.5, LBL_SPAN_FONT:5,     // row label size, and the smaller one a span gets
+  LBL_CH:0.6,                        // monospace advance, as a fraction of the font size
 };
+
+/**
+ * A name cut to fit the label column.
+ *
+ * The column is fixed, so something has to give when a name is longer than it
+ * is wide: either the name runs on into the trace or it is elided. SVG has no
+ * `text-overflow`, so the cut is made here -- which is arithmetic and not
+ * measurement only because the labels are monospace and every glyph is the
+ * same width.
+ *
+ * The full name stays in the markup as `data-n`, so nothing reading a figure
+ * back -- the code/figure check, a tooltip -- ever sees the shortened form.
+ */
+export function elide(text, width, font){
+  const max=Math.floor(width/(font*GEOM.LBL_CH));
+  if(max<1) return "";
+  return text.length<=max ? text : text.slice(0,max-1)+"\u2026";
+}
 
 /**
  * When a stretch of dead time is worth compressing.

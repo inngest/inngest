@@ -291,7 +291,10 @@ async function checkCodeSync(){
   for(const g of ['items-a','items-bc','items-disc','items-more'])
     Object.assign(EX, JSON.parse(fs.readFileSync(HERE+g+'.json','utf8')));
 
-  const labels=svg=>[...svg.matchAll(/<text x="(?:9|15)" y="[\d.]+"[^>]*>([^<]*)<\/text>/g)]
+  // Read off `data-n`, not the drawn text: a name too long for the label
+  // column is elided, and comparing the elided form against the code would
+  // fail on exactly the rows whose names are worth checking.
+  const labels=svg=>[...svg.matchAll(/<text class="rowlbl" data-n="([^"]*)"/g)]
     .map(m=>m[1]).filter(r=>r && !/^(Run\b|Finalization$)/.test(r));
   const ids=code=>[...code.matchAll(/step\.(?:run|sleep|waitForEvent|waitForSignal|invoke|sendEvent)\(\s*['"\`]([^'"\`]+)/g)]
     .map(m=>m[1]).filter(n=>!n.includes('${'));

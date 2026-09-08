@@ -635,7 +635,7 @@ const page=`<title>Trace Design System</title>
   svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
   /* A compressed stretch is marked across every row, so its height is the
      figure's — which moves with the pitch sliders. */
-  svg rect.cmpband{height:var(--fig-h)}
+  svg rect.cmpband,svg rect.gut{height:var(--fig-h)}
   svg g.cmpmid{transform:translateY(calc((var(--fig-h) - var(--fig-h0)) / 2))}
   /* A ribbon spans N row gaps, so it restretches with the pitch. */
   svg rect.run-track{height:var(--geo-trk,5px);transform:translateY(calc(var(--geo-trk,5px) / -2))}
