@@ -314,13 +314,22 @@ const experimental = `  <section class="sc exp"><h3>Experimental</h3>
     <p class="note">Shapes we are still working out. Nothing here is settled.</p>
   </section>
 `+SCEN_EXP.map(group).join('\n');
-const FIX=[['simple','No steps.'],['step','Three steps around a step.sleep().'],
- ['v4sequential','Sequential on an SDK that can report batches. No ribbon anywhere.'],
- ['emit','step.sendEvent() whose events started other runs.'],
- ['invoke','step.invoke(), collapsed and expanded.']];
-const fixtures=FIX.map(([id,note])=>
-`    <div class="item"><p class="note"><code>${id}</code> ${note}</p>`+
-  J.batch1[id].map(p=>fig(p.svg,p.cap)).join('')+`</div>`).join('\n');
+/**
+ * Each fixture is one function captured twice -- with checkpointing and
+ * without -- so the tabs switch between two pictures of the same run rather
+ * than between two runs. The caption belongs to the shape, not to either
+ * capture, so it sits above both.
+ */
+const fixtures=Object.entries(J.batch1).map(([id,modes])=>{
+  const cap=modes[0].cap||'';
+  return `    <div class="item fixpair" data-fix="${id}">`+
+    `<p class="note"><code>${id}</code> ${cap}</p>`+
+    `<div class="modewrap">`+
+      `<div class="modes">`+modes.map((m,i)=>
+        `<button class="modeb${i?'':' on'}" data-mode="${i}">${m.mode}</button>`).join('')+`</div>`+
+      modes.map((m,i)=>`<div class="mode${i?'':' on'}" data-mode="${i}">${fig(m.svg)}</div>`).join('')+
+    `</div></div>`;
+}).join('\n');
 
 /**
  * The configurator.
@@ -729,6 +738,15 @@ const page=`<title>Trace Design System</title>
   .figure svg{display:block;width:100%;height:auto}
   figcaption{font-size:13.5px;color:var(--muted);margin-top:6px;max-width:76ch}
   .fl{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;margin-top:5px}
+  /* One fixture, two captures: only the selected one is in the layout, so the
+     item does not reserve space for the other. */
+  .modes{display:flex;gap:6px;margin:0 0 10px}
+  .modeb{font:11px/1 var(--mono);letter-spacing:.02em;padding:5px 9px;border-radius:5px;
+    border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+  .modeb:hover{color:var(--ink)}
+  .modeb.on{background:var(--surface-2);color:var(--ink);border-color:var(--muted)}
+  .modewrap > .mode{display:none}
+  .modewrap > .mode.on{display:block}
   .frames{display:grid;gap:10px}
   figure.frame{margin:0}
   .item{border-top:1px solid var(--rule);padding:16px 0 4px}
@@ -942,6 +960,20 @@ ${dsmod}
     var t=e.target.closest&&e.target.closest('.rowhit');
     if(t) show(t,e); else pop.classList.remove('on');
   });
+  // ---- fixture modes ----------------------------------------------------
+  // A hidden figure cannot be measured, so the one being revealed is refit
+  // after the swap rather than before it.
+  document.querySelectorAll('.fixpair').forEach(function(item){
+    item.querySelectorAll('.modeb').forEach(function(btn){
+      btn.addEventListener('click',function(){
+        var want=btn.dataset.mode;
+        item.querySelectorAll('.modeb').forEach(function(b){ b.classList.toggle('on', b===btn); });
+        item.querySelectorAll('.mode').forEach(function(m){ m.classList.toggle('on', m.dataset.mode===want); });
+        refit();
+      });
+    });
+  });
+
   // ---- tabs -------------------------------------------------------------
   var tabs=document.querySelectorAll('.tab');
   tabs.forEach(function(t){
