@@ -1917,7 +1917,19 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 				})
 			})
 	}
-	return nil, nil, ErrFunctionSkipped
+	return nil, nil, SkippedError{Reason: reason}
+}
+
+type SkippedError struct {
+	Reason enums.SkipReason
+}
+
+func (e SkippedError) Error() string {
+	return "function skipped: " + e.Reason.String()
+}
+
+func (e SkippedError) Is(target error) bool {
+	return target == ErrFunctionSkipped
 }
 
 // Execute loads a workflow and the current run state, then executes the
