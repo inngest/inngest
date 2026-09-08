@@ -144,6 +144,23 @@ export const FRAME = {
   finRun: 0.045,
 };
 
+/**
+ * The tick strip: what the width is worth, in time.
+ *
+ * A compressed axis makes a short interval look long -- eleven milliseconds of
+ * SDK execution takes half the width once two seconds of sleep have collapsed
+ * to a band -- and nothing on the drawing said so. The ticks are placed at even
+ * DRAWN positions and labelled with the time each one falls on, which is the
+ * way round that works on an axis that is not linear: even spacing in time
+ * would pile every tick into the live stretches.
+ */
+export const AXIS = {
+  ticks: 5,                          // including both ends
+  strip: 13,                         // the height it takes above the figure
+  tick: 3,                           // the length of a tick mark
+  font: 5.5,
+};
+
 /** Attention. */
 export const FOCUS = {
   dim: 0.15,                         // everything off the path

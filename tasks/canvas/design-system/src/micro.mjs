@@ -714,6 +714,35 @@ if(typeof process!=='undefined' && process.on) process.on('exit',async()=>{
   try{ fs.writeFileSync(out, JSON.stringify(FIGURES)); }catch{}
 });
 
+/**
+ * The tick strip, drawn from the same axis the bars were laid out on.
+ *
+ * `at` is monotonic, so each drawn position is inverted back to the time it
+ * stands for by bisection rather than by a second copy of the elastic
+ * arithmetic. A tick landing inside a compressed band is dropped: the band is
+ * the one part of the width that is not to scale, so a time written across it
+ * would be the drawing contradicting itself.
+ */
+export function tickStrip(at, total, unit, k, breaks=[]){
+  if(!(total>0)) return '';
+  const inv=x=>{ let lo=0, hi=total;
+    for(let i=0;i<48;i++){ const mid=(lo+hi)/2; if(at(mid)<x) lo=mid; else hi=mid; }
+    return (lo+hi)/2; };
+  const n=R.AXIS.ticks, y=-R.AXIS.strip;
+  const inBand=p=>(breaks||[]).some(([a,b])=>p>a+1e-9 && p<b-1e-9);
+  let s=`<line x1="${LBL}" y1="${y+R.AXIS.tick}" x2="${(LBL+PLOT).toFixed(1)}" y2="${y+R.AXIS.tick}" stroke="${C.idle}" stroke-width="0.6" opacity=".45"/>`;
+  for(let i=0;i<n;i++){
+    const p=(i/(n-1))*100;
+    if(inBand(p*k)) continue;
+    const x=LBL+((p*k)/100)*PLOT;
+    const t=R.human(unit==='s' ? inv(p)*1000 : inv(p));
+    s+=`<line x1="${x.toFixed(1)}" y1="${y}" x2="${x.toFixed(1)}" y2="${(y+R.AXIS.tick).toFixed(1)}" stroke="${C.idle}" stroke-width="0.8" opacity=".7"/>`
+      +`<text x="${x.toFixed(1)}" y="${(y-1.6).toFixed(1)}" ${MONO} font-size="${R.AXIS.font}" fill="${C.mut}" opacity=".8" `
+      +`text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${t}</text>`;
+  }
+  return s;
+}
+
 export function fig(rows,extra='',label='',under='',opts={}){
   // Kept before anything derives from them, so the record is what was asked for
   // rather than what it turned into.
@@ -758,7 +787,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * the label needs a duration, so a figure that never measured one is trimmed
    * without being told how much was taken.
    */
-  let leadLabel='', leadTrimmed=false;
+  let leadLabel='', leadTrimmed=false, axisAt=null, axisTotal=0;
   // Only where the figure is a RUN. A figure drawn from proportions has an
   // opening wait too, but several exist precisely to show it -- queue time,
   // flow control, finalization -- and trimming those leaves three identical
@@ -813,6 +842,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
     if(last>0) opts={...opts, ms:last};
     const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear});
     rows=L.rows; opts={...opts, breaks:L.breaks};
+    // Kept so the tick strip reads the same axis the bars were laid on.
+    axisAt=L.el.at; axisTotal=opts.ms;
   }
   /**
    * A run's opening queue time is named, not drawn. Done before the elastic
@@ -1023,7 +1054,17 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * 105px while the Run row tore at 187px over the sleep it was supposed to be
    * cutting. Since px() is linear from LBL, the stretch is just a factor.
    */
-  const cmp=compression((opts.breaks||[]).map(([a,b,t])=>[a*k,b*k,t]), bandH, ++UID);   // k is 1 unless the content was scaled up
+  const cmp=compression((opts.breaks||[]).map(([a,b,t])=>[a*k,b*k,t]), bandH, ++UID);
+  /**
+   * Ticks go on the figures that are a run -- the same ones that carry the Run
+   * row. A Concepts figure is about one mark or one bar and invents whatever
+   * timings it needs, so putting a clock over it would read meaning into
+   * numbers that have none.
+   */
+  const ax=(framed && axisAt)
+    ? tickStrip(axisAt, axisTotal, opts.unit, k, (opts.breaks||[]).map(b=>[b[0]*k, b[1]*k]))
+    : '';
+  const AXH=ax?R.AXIS.strip:0;   // k is 1 unless the content was scaled up
   // Only the figure's own rows are blurred. The Run row is deliberately left
   // sharp: its torn track is what says "compressed here", and blurring the one
   // element carrying that message defeats drawing it at all.
@@ -1054,8 +1095,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // mark or one bar and have no run to overview.
   FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0,
                 opts:{...opts0, frame:framed}});
-  return `<svg data-fig="${fid}" viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+cmp.clip+gutter(bandH)+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
+  return `<svg data-fig="${fid}" viewBox="${-M} ${-AXH} ${W+M*2} ${h+AXH}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
+    HATCH+BLURDEF+cmp.clip+gutter(bandH)+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+ax+over+cab+lin+`</svg>`;
 }
 
 const BLURDEF='';
