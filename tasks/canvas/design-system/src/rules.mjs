@@ -40,11 +40,14 @@ export function setFeatures(f){
 
 /** The geometry of a row. Every renderer reads these rather than restating them. */
 export const GEOM = {
+  MAX_SCALE: 3,                      // the most a hand-placed figure is scaled up to fill the width
   W:470, LBL:64, RGT:10, PLOT:396,   // PLOT = W - LBL - RGT
   ROW:17, TOP:6,
   BAR_H:7, RUN_H:8, TRACK_H:5,       // step bar, run profile slice, run track
   MARK_R:3, HALO:1.3,                // mark radius, and the ring of surface behind it
   MIN_W:1.4, MIN_FAIL_W:3.2,         // a bar never narrower than this on screen
+  ROW_TOP: 9,                        // where the first row sits under the top edge
+  SPAN_EXIT: 4,                      // the extra gap coming back out of a block of spans
   SPAN_ROW:9,                        // pitch for a userland span row
   SPAN_BAR:0.6,                      // span bar height, as a fraction of BAR_H
 };
@@ -91,6 +94,14 @@ export const BAND = {
 
 /** The surround: the Run row above, finalization below. */
 export const FRAME = {
+  /**
+   * How much of the axis the ROWS get, as a percentage.
+   *
+   * A framed figure grows its own finalization after the last row, and the Run
+   * row is drawn to where that ends -- so the rows cannot have all of it or
+   * they run past the overview above them. The rest is that room.
+   */
+  rowsAxis: 86,
   opacity: 0.34,
   blur: 0.62,
   desaturate: 0.25,

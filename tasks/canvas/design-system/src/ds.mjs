@@ -215,13 +215,13 @@ const frames=id=>{const e=EX[id];if(!e)throw new Error('no '+id);
  */
 const SCEN=[
  ['oneStep',[
-  ['c14','Queue time: the step enqueued, waiting for the executor to pick it up. Hatched, because it is not your code running.'],
+  ['c14',['Queue time: the step enqueued, waiting for the executor to pick it up. Hatched, because it is not your code running.',
+          'Below it, Finalization: the request that asks what runs next and is told nothing. It is your compute, so it keeps its own row — every figure on this page has one.']],
   ['c16','Held by flow control — concurrency, throttle, rate limit or debounce. Queue time with a reason, and a colour of its own.'],
   ['c25',['It threw, backed off, and returned on the second attempt. The backoff is red-hatched: a consequence of the failure, not a failure itself.',
           'Every millisecond between the row’s start and its resolution belongs to a named interval — the queue, the attempt, its backoff, the queue again, and the attempt that worked. There are no unexplained gaps.']],
   ['c23','It threw on the final attempt, and the run failed with it.'],
   ['c30','Every attempt threw. The only place a circle is filled red.'],
-  ['c18','Finalization is the request that asks what runs next and is told nothing. It is your compute, so it keeps its own row.'],
   ['h2','A row’s label and its drawing have to agree about which interval the number names.'],
  ]],
  ['chain',[
@@ -233,9 +233,9 @@ const SCEN=[
   ['c24','The function caught the error and carried on. Red step, green run: the outcomes are separate facts.'],
  ]],
  ['parallel',[
-  ['c1','One request reports three steps. The ribbon threads their enqueue marks, which are blue because a discovery request put them there.'],
+  ['c1',['One request reports three steps. The ribbon threads their enqueue marks, which are blue because a discovery request put them there.',
+         'It covers exactly the steps that request reported, so an uneven fan-out is countable without interacting. Nothing static predicted that width.']],
   ['c2','All three resolving causes the next request. That request reported one step, so it rolls into that step’s row.'],
-  ['c4','The ribbon covers exactly the steps the request reported, so an uneven fan-out is countable without interacting.'],
   ['c16b','Flow control on three steps at once is the same fact three times, and takes the same treatment.'],
   ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
   ['h1','Where nothing reported what caused a request, the trace declines rather than guessing — some earlier step always finished just before.'],
@@ -256,17 +256,14 @@ const SCEN=[
   ['c31','step.sendEvent() is the one row that points out of the run. The ring is hollow because those runs are not in this trace, and the count is the way into them.'],
  ]],
  ['sleep',[
+  ['t1','Seven days of dead time, given four percent of the width. The threshold is scale-free: a stretch is compressed when it is longer than all the compute in the run put together, several times over. Switch it off in the panel to see what it is saving you.'],
   ['t1d','Asleep right now. The bar is open and carries no closing mark, and there is no Finalization row: the run has not ended.'],
-  ['t4','Done. A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],
+  ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],
  ]],
  ['wait',[
   ['w1','A wait that matched. Blue while it is open, green at the mark where the event arrived.'],
   ['w2','A wait that expired with no match. The run carries on: a timeout is a result the function can act on.'],
   ['c28','A wait still open when the run was cancelled. Undecided, so it ends on the square rather than a resolution.'],
- ]],
- ['compress',[
-  ['t1','Seven days of dead time, given four percent of the width. The threshold is scale-free: a stretch is compressed when it is longer than all the compute in the run put together, several times over.'],
-  ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
  ]],
  ['otel',[
   ['o0','A step instrumented with @inngest/otel. The icon by the name says there are spans inside; selecting the row expands them.'],

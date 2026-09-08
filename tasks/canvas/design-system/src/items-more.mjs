@@ -85,10 +85,10 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
 
 D('t1d',{d:'A wait that has not resolved still compresses. The run is asleep right now: the bar is blue and carries no closing mark, because the missing mark is what says unresolved &mdash; and the dead time inside it is real whether or not it has finished. There is no Finalization row, because the run has not been finalized.',
   svg:(()=>{
-    const total=20+3*3600;
+    const total=0.34+7*86400;
     const _rows=[
-      {n:'a',   at:[['started',0],['ok',20]]},
-      {n:'nap', at:[['started',20]],end:total,kind:'wait',note:'sleeping'},
+      {n:'a',   at:[['started',0],['ok',0.34]]},
+      {n:'nap', at:[['started',0.34]],end:total,kind:'wait',note:'sleeping'},
     ];
     return fig(_rows,'','an unresolved wait, compressed','',
       {margin:0,running:true,ms:total,unit:'s'});
@@ -112,7 +112,7 @@ D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you 
     {n:'a', at:[['started',0],['ok',12]]},
     {n:'nap', at:[['started',12],['ok',580]],kind:'wait'},
     {n:'b', at:[['started',580],['ok',590],['queued',590],['started',630],['ok',645]],reported:1},
-  ],'','62ms of execution inside seven days','',{linear:true})});
+  ],'','62ms of execution inside seven days','')});
 
 D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed, the fine tier carries offsets inside it, so a run measured in days keeps its resolution without a second axis.',
   // No rows. This figure is about the axis, so it draws the axis and nothing
@@ -124,10 +124,10 @@ D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed
 
 D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so it can be pointed at, and the number beside it is the real one: the drawing rounds, the reported duration does not.',
   svg:fig([
-    {n:'a', at:[['started',0],['ok',4]],note:'12ms'},
-    {n:'nap',  at:[['started',4],['ok',964]],kind:'wait'},
-    {n:'b', at:[['started',964],['ok',966],['started',966],['ok',970]],reported:1,note:'10ms'},
-  ],'','sub-pixel steps drawn honestly','',{linear:true})});
+    {n:'a', at:[['started',0],['ok',12]],note:'12ms'},
+    {n:'nap',  at:[['started',12],['ok',7*864e5+12]],kind:'wait'},
+    {n:'b', at:[['started',7*864e5+12],['ok',7*864e5+22],['started',7*864e5+22],['ok',7*864e5+32]],reported:1,note:'10ms'},
+  ],'','sub-pixel steps drawn honestly','')});
 
 // ---- Scale --------------------------------------------------------------
 

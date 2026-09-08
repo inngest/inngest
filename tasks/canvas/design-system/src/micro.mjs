@@ -8,13 +8,14 @@ const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
 export const px=p=>LBL+(p/100)*PLOT;
-export const cy=i=>TOP+9+ROW*i;
+export const cy=i=>TOP+R.GEOM.ROW_TOP+ROW*i;
 /** Row pitch for a userland span: tight enough that the bars nearly touch. */
 export const SPAN_ROW=R.GEOM.SPAN_ROW;
 /** y for each row, honouring any that sit on the tighter span pitch. */
 export const rowYs=rows=>{
   const ys=[]; let y=cy(0);
-  rows.forEach((r,i)=>{ if(i) y+=rows[i].span?SPAN_ROW:(rows[i-1].span?SPAN_ROW+4:ROW); ys.push(y); });
+  rows.forEach((r,i)=>{ if(i) y+=rows[i].span?SPAN_ROW
+    :(rows[i-1].span?SPAN_ROW+R.GEOM.SPAN_EXIT:ROW); ys.push(y); });
   return ys;
 };
 /** How many gaps of each pitch sit above row i — the multipliers CSS needs. */
@@ -51,7 +52,7 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead='',opened='queued'},sc=1){
+export function runProfile(i,{to=R.FRAME.rowsAxis,intervals=[],resolved,n='Run',breaks=[],lead='',opened='queued'},sc=1){
   // The queue the run opened with is named here rather than drawn, so it does
   // not push every row's work to the right of a gap that says the same thing
   // about all of them.
@@ -73,12 +74,13 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
     // Small. The tear only has to be legible as a break in the track, and at
     // any real amplitude it stops being the track and becomes a decoration
     // sitting where the track used to be.
-    const n=Math.min(3,Math.max(2,Math.round((x1-x0)/8))), step=(x1-x0)/n, amp=1.9;
+    const [lo,hi]=R.BAND.tearZigs;
+    const n=Math.min(hi,Math.max(lo,Math.round((x1-x0)/8))), step=(x1-x0)/n, amp=R.BAND.tearAmp;
     let d=`M${x0.toFixed(1)} ${y}`;
     for(let j=0;j<n;j++)
       d+=` L${(x0+step*(j+0.5)).toFixed(1)} ${(y+(j%2?amp:-amp)).toFixed(1)}`+
          ` L${(x0+step*(j+1)).toFixed(1)} ${y}`;
-    return `<path d="${d}" fill="none" stroke="${C.idle}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return `<path d="${d}" fill="none" stroke="${C.idle}" stroke-width="${R.BAND.tearWidth}" stroke-linecap="round" stroke-linejoin="round"/>`;
   };
   {
     let at=LBL;
@@ -96,7 +98,7 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
     const a=v.a, b=Math.min(v.b,to);
     if(b<=a) continue;
     // Failure stays findable even when the interval is tiny.
-    const w=Math.max((v.rank===3?3.2:1.4)/sc, ((b-a)/100)*PLOT);
+    const w=Math.max((v.rank===3?R.GEOM.MIN_FAIL_W:R.GEOM.MIN_W)/sc, ((b-a)/100)*PLOT);
     s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${col(v)}"/>`;
   }
   // The Run row opens on the moment the run was actually in when the drawing
@@ -180,7 +182,7 @@ export function row(i,r,sc=1,yy){
   if(!noBars) segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
   if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
-    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,3,true));
+    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true));
   });
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
@@ -329,7 +331,25 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   // Where the run ends. With a finalization of its own that is where ITS work
   // ended; the invented one is placed past the last row and sized to nothing in
   // particular, and the Run row must not be drawn to a length nothing measured.
-  const fx=Math.min(end+2,90), fq=2.2, fw=4.5;
+  /**
+   * How long the finalization the frame adds takes -- measured off THIS run.
+   *
+   * A figure that does not draw its own finalization still had one, and the
+   * frame has to say something about it. What it says is what the run's other
+   * requests did: the typical time one of them spent queued, and the typical
+   * time one of them spent executing. Those numbers were 2.2 and 4.5 written
+   * inline, which is a claim about every run ever drawn.
+   */
+  const mid=xs=>{ if(!xs.length) return null;
+    const s=[...xs].sort((p,q)=>p-q); return s[(s.length-1)>>1]; };
+  const widths=k=>{ const out=[];
+    rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{ if(base(kd)===k) out.push(w); }));
+    return out; };
+  const fq=mid(widths('idle')) ?? R.FRAME.finQueue;
+  // Not a step's duration: a request is not a step, and falling back to one
+  // gave a run with no requests in it a finalization as long as its work.
+  const fw=mid(widths('disc')) ?? R.FRAME.finRun;
+  const fx=Math.min(end+fq, 100-(fq+fw));
   const finEnd=running?end:(ownFin?end:fx+fq+fw);
 
   /**
@@ -347,7 +367,16 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   const intervals=[];
   const add=(kd,x,w)=>{ const rank=R.runRank(kd); if(rank!=null) intervals.push({a:x,b:x+w,rank}); };
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
-  if(!running && !ownFin) add('disc',fx+fq,fw);
+  /**
+   * Finalization goes into the Run row as what it IS.
+   *
+   * It was added as `disc` while being DRAWN as a step, so the Run row went
+   * blue underneath a green finalization row -- the overview disagreeing with
+   * the row it is an overview of, from two statements of the same fact.
+   */
+  const finalization=(running||ownFin)?null:resolveRow(
+    {n:'Finalization', at:[['queued',fx],['started',fx+fq],['ok',finEnd]]});
+  if(finalization) (finalization.segs||[]).forEach(([kd,x,w])=>add(kd,x,w));
 
   // The run resolves as its LAST interval, not as "did anything fail". A run
   // that threw and then succeeded is a recovery, and resolving it red would say
@@ -365,8 +394,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
    * dot calls placed by hand here, which is why it was the one row in the
    * artifact that could not be wrong in the same way as the others.
    */
-  const fin=(running||ownFin)?'':row(0, resolveRow(
-    {n:'Finalization', at:[['queued',fx],['started',fx+fq],['ok',finEnd]]}), k, finY);
+  const fin=finalization?row(0, finalization, k, finY):'';
 
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run
@@ -436,7 +464,7 @@ export function deadStretches(total, compute=[]){
   return gaps;
 }
 
-export function elastic(total, dead=[], {plot=86, threshold=R.ELASTIC.floor,
+export function elastic(total, dead=[], {plot=R.FRAME.rowsAxis, threshold=R.ELASTIC.floor,
     budget=R.ELASTIC.budget, minBand=R.ELASTIC.minBand, maxBand=R.ELASTIC.maxBand,
     inset=R.ELASTIC.inset, compute}={}){
   // Given the compute intervals, work out the dead stretches rather than being
@@ -757,7 +785,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // real run's first wait; it is not a global eraser.
   if(R.FEAT.trim && opts.ms && opts.trimLead!==false){
     let first=Infinity;
-    for(const rw of rows) for(const [k,x] of (rw.at||[])) if(k==='started'){ first=Math.min(first,x); break; }
+    // Stops at the first thing that is not plain waiting. Being held by flow
+    // control is queue time WITH A REASON, and hiding it would hide the reason.
+    for(const rw of rows) for(const [k,x] of (rw.at||[]))
+      if(k==='started' || k==='held'){ first=Math.min(first,x); break; }
     if(first>1e-9 && first<Infinity){
       leadTrimmed=true;
       if(opts.ms) leadLabel=R.human(opts.unit==='s'?first*1000:first);
@@ -786,7 +817,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     const willFrame=(opts.frame!==undefined?!!opts.frame:FRAMED)
       && !opts.running && !rows.some(r=>r.n==='Finalization');
     const L=layout(opts.ms, rows,
-      {plot:willFrame?86:100, unit:opts.unit, linear:opts.linear});
+      {plot:willFrame?R.FRAME.rowsAxis:100, unit:opts.unit, linear:opts.linear});
     rows=L.rows; opts={...opts, breaks:L.breaks};
   }
   /**
@@ -914,7 +945,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * scale that was never applied. That is what put the compression bands 14%
    * away from the bars they were cutting.
    */
-  const k=opts.scale||(opts.ms!=null?1:(max>0?Math.max(1,Math.min(86/max,3)):1));
+  const k=opts.scale||(opts.ms!=null?1
+    :(max>0?Math.max(1,Math.min(R.FRAME.rowsAxis/max, R.GEOM.MAX_SCALE)):1));
   // Rows are placed from their own pitches, so a block of span rows packs
   // tighter than the trace around it.
   const ys=rowYs(rows), st=rowSteps(rows);

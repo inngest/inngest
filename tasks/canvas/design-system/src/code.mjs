@@ -16,27 +16,25 @@
  * the figures, and a snippet that wraps stops looking like code.
  */
 export const CODE={
- oneStep:`await step.run('a', async () => {\n  if (attempt < 2)\n    throw new Error('flaky')\n  return 'ok'\n})`,
+ oneStep:`await step.run('a', …)`,
 
  chain:`await step.run('a', …)\nawait step.run('b', …)`,
 
- caught:`try {\n  await step.run('caught', async () => {\n    throw new Error('boom')\n  })\n} catch {}\n\nawait step.run('after', …)`,
+ caught:`try {\n  await step.run('a', …)\n} catch {}\n\nawait step.run('b', …)`,
 
- parallel:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n  step.run('c', …),\n])\nawait step.run('d', …)\n\n// a step outside the fan-out\nawait step.run('unrelated', …)`,
+ parallel:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n  step.run('c', …),\n])\nawait step.run('d', …)`,
 
- discovery:`await step.run('a', …)\n\n// one request reports both of these,\n// so it gets a bar of its own\nawait Promise.all([\n  step.run('b', …),\n  step.run('c', …),\n])`,
+ discovery:`await step.run('a', …)\n\nawait Promise.all([\n  step.run('b', …),\n  step.run('c', …),\n])`,
 
  nested:`await Promise.all([\n  (async () => {\n    await step.run('a', …)\n    await step.run('a1', …)\n    await step.run('a2', …)\n  })(),\n  (async () => {\n    await step.run('b', …)\n    await step.run('b1', …)\n    await step.run('b2', …)\n  })(),\n])`,
 
  orphan:`await step.run('a', …)\n\n// started, never awaited\nstep.run('orphan', …)\n\nawait step.run('b', …)`,
 
- emit:`const ids =\n  await step.sendEvent('notify', [\n    { name: 'app/thing' },\n  ])`,
+ emit:`await step.sendEvent('notify', [\n  { name: 'app/thing' },\n])`,
 
- sleep:`await step.run('a', …)\nawait step.sleep('nap', '2s')\nawait step.run('b', …)`,
+ sleep:`await step.run('a', …)\nawait step.sleep('nap', '7d')\nawait step.run('b', …)`,
 
  wait:`await step.run('a', …)\n\nconst ev = await step.waitForEvent('w', {\n  event: 'app/paid',\n  timeout: '1h',\n})\n\nif (ev) await step.run('b', …)\nelse     await step.run('fallback', …)`,
-
- compress:`await step.run('a', …)\nawait step.sleep('nap', '7d')\nawait step.run('b', …)`,
 
  otel:`await step.run('charge', async () => {\n  await fetch('/pay', …)\n  await db.query('SELECT …')\n  await db.query('UPDATE …')\n})\n\nawait step.run('fanout', async () => {\n  await Promise.all([\n    fetch('/a'),\n    fetch('/b'),\n    fetch('/c'),\n  ])\n})`,
 
@@ -44,7 +42,7 @@ export const CODE={
 
  wideFanout:`await Promise.all(\n  items.map(() =>                // 12\n    step.run('worker', …)),\n)\nawait step.run('collect', …)`,
 
- failureCluster:`for (const i of items) {\n  // a cluster of these threw\n  await step.run('act', …)\n}`,
+ failureCluster:`for (const i of items) {\n  await step.run('act', …)\n}`,
 
  expandGroup:`await step.run('first', …)\n\nfor (const i of items) {        // 40\n  await step.run('batch', …)\n}\n\nawait step.run('last', …)`,
 
