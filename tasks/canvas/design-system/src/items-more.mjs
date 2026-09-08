@@ -203,7 +203,7 @@ D('n1',{d:'The same step name on two branches. The name is not the identity: row
     fin(580,30,40),
   ],'','the same name twice')});
 
-D('n2',{d:'The SDK’s :1 and :2 suffixes are not stable under parallelism, so nothing in the drawing depends on them. They are shown as text on the row and used for nothing else.',
+D('n2',{d:'A step id used twice is two steps, and the run numbers the repeats so the rows can be told apart. The number does that and nothing else: it is not stable under parallelism, so no relationship is read from it — which of these came first, or which branch either belongs to, comes from the request that reported them.',
   svg:fig([
     {n:'fetch:1', at:[['started',60],['ok',260]]},
     {n:'fetch:2', at:[['started',60],['ok',360]]},

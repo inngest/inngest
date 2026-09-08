@@ -143,7 +143,18 @@ export function loadRun(id){
     const first=spans.reduce((m,s)=>ms(s.queuedAt)<ms(m.queuedAt)?s:m);
     const last =spans.reduce((m,s)=>ms(s.endedAt||s.startedAt)>ms(m.endedAt||m.startedAt)?s:m);
     const exec =spans.reduce((m,s)=>ms(s.startedAt)>ms(m.startedAt)?s:m);
-    const name=first.name;
+    /**
+     * A step id used twice in one run is two steps, and the rows have to say so.
+     *
+     * The SDK numbers the repeats and the spans carry it as
+     * `userlandStepIndex` -- 0 for the first, 1 for the next -- so the suffix
+     * is read rather than invented. Two rows both called `work` were not just
+     * ambiguous to look at: everything that identifies a row by name was
+     * finding the first of them twice, so the request that planned one branch
+     * drew its ribbon across the other's row.
+     */
+    const dupIdx=spans.map(sp=>sp.userlandStepIndex).find(v=>v!=null);
+    const name=dupIdx>0 ? first.name+':'+dupIdx : first.name;
     const isFin=name==='Finalization';
     const kind=KIND[first.stepOp]||'step';
 
