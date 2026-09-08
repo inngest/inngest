@@ -65,6 +65,22 @@ const SHAPES = {
   loop40: ['tests/canvas.loop', { iterations: 40 }],
   tall500: ['tests/v4.tall', { steps: 500 }],
   emit: 'tests/v4.emit',
+
+  // The paired shapes: one function, one event, two apps that differ only in
+  // whether checkpointing is on. Both runs start from the same send, so the
+  // pair has to be told apart by which app produced it.
+  'cp-simple': { event: 'tests/pair.simple', fn: 'canvas-cp-' },
+  'nocp-simple': { event: 'tests/pair.simple', fn: 'canvas-nocp-' },
+  'cp-sequential': { event: 'tests/pair.sequential', fn: 'canvas-cp-' },
+  'nocp-sequential': { event: 'tests/pair.sequential', fn: 'canvas-nocp-' },
+  'cp-emit': { event: 'tests/pair.emit', fn: 'canvas-cp-' },
+  'nocp-emit': { event: 'tests/pair.emit', fn: 'canvas-nocp-' },
+  'cp-parallel': { event: 'tests/pair.parallel', fn: 'canvas-cp-' },
+  'nocp-parallel': { event: 'tests/pair.parallel', fn: 'canvas-nocp-' },
+  'cp-chains': { event: 'tests/pair.chains', fn: 'canvas-cp-' },
+  'nocp-chains': { event: 'tests/pair.chains', fn: 'canvas-nocp-' },
+  'cp-invoke': { event: 'tests/pair.invoke', fn: 'canvas-cp-' },
+  'nocp-invoke': { event: 'tests/pair.invoke', fn: 'canvas-nocp-' },
   blocked: 'tests/v4.contended',
   cancelled: 'tests/v4.cancel',
 };
@@ -95,7 +111,7 @@ async function send(spec) {
 
 /** The runs an event triggered, once the executor has picked it up. */
 async function runsFor(eventID, { tries = 40, waitMs = 500 } = {}) {
-  const q = `query($id: ID!) { event(query: { eventId: $id }) { functionRuns { id status } } }`;
+  const q = `query($id: ID!) { event(query: { eventId: $id }) { functionRuns { id status function { slug } } } }`;
   for (let i = 0; i < tries; i++) {
     const data = await gql(q, { id: eventID }).catch(() => null);
     const runs = data?.event?.functionRuns ?? [];
@@ -125,13 +141,23 @@ const targets = Object.entries(SHAPES).filter(([id]) => !wanted.length || wanted
 const done = [];
 const failed = [];
 
-for (const [fixture, event] of targets) {
+for (const [fixture, spec] of targets) {
   try {
-    const eventID = await send(event);
+    // A shape is an event, optionally with data, optionally naming which app's
+    // run to keep -- one send starts a run in every app subscribed to it.
+    const s =
+      typeof spec === 'string'
+        ? { event: spec }
+        : Array.isArray(spec)
+        ? { event: spec[0], data: spec[1] }
+        : spec;
+    const eventID = await send(s.data ? [s.event, s.data] : s.event);
     const runs = await runsFor(eventID);
     if (!runs.length) throw new Error('no run started');
 
-    const runID = runs[0].id;
+    const pick = s.fn ? runs.find((r) => (r.function?.slug ?? '').startsWith(s.fn)) : runs[0];
+    if (!pick) throw new Error(`no run from an app matching ${s.fn}`);
+    const runID = pick.id;
     const status = await settle(runID);
     execFileSync('node', ['capture.mjs', runID, fixture], { stdio: 'pipe' });
     done.push(`${fixture.padEnd(24)} ${status.padEnd(10)} ${runID}`);
