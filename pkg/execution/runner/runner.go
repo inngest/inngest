@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"sync"
@@ -710,8 +711,8 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		},
 	})
 
-	switch err {
-	case executor.ErrFunctionRateLimited:
+	switch {
+	case errors.Is(err, executor.ErrFunctionRateLimited):
 		if opts.evt.GetEvent().IsInvokeEvent() {
 			// This function was invoked by another function, so we need to
 			// ensure that the invoker fails. If we don't do this, it'll
@@ -728,10 +729,10 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		}
 
 		return nil, nil
-	case executor.ErrFunctionDebounced,
-		executor.ErrFunctionSkipped,
-		executor.ErrFunctionSkippedIdempotency,
-		state.ErrIdentifierExists:
+	case errors.Is(err, executor.ErrFunctionDebounced),
+		errors.Is(err, executor.ErrFunctionSkipped),
+		errors.Is(err, executor.ErrFunctionSkippedIdempotency),
+		errors.Is(err, state.ErrIdentifierExists):
 		return nil, nil
 	}
 

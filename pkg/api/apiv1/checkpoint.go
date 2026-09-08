@@ -211,12 +211,16 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	})
 
 	if err != nil {
-		switch err {
-		case state.ErrIdentifierExists:
+		var skipped executor.SkippedError
+		switch {
+		case errors.Is(err, state.ErrIdentifierExists):
 			_ = publicerr.WriteHTTP(w, publicerr.Errorf(http.StatusConflict, "Run already exists"))
 			return
-		case executor.ErrFunctionRateLimited:
+		case errors.Is(err, executor.ErrFunctionRateLimited):
 			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusTooManyRequests, "Rate limits exceeded"))
+			return
+		case errors.As(err, &skipped):
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, http.StatusForbidden, "Run skipped: %s", skipped.Reason))
 			return
 		default:
 			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Failed to schedule run"))

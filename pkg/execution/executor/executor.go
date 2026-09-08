@@ -1386,7 +1386,7 @@ func (e *executor) schedule(
 	var skipReason enums.SkipReason
 	var singletonSkipRunID *ulid.ULID
 
-	skipReason = e.checkExecutionCap(ctx, req)
+	skipReason, _ = e.checkExecutionCap(ctx, req)
 
 	//
 	// Create singleton information and try to handle it prior to creating state.
