@@ -53,9 +53,13 @@ export function loadRun(id){
   }
 
   // Which discovery planned which step, and when it ran.
+  // The FIRST request to report a step is the one that planned it. A request
+  // that goes on to run a step lists it again, and last-write-wins pointed the
+  // row at the request that ran it -- whose window ends after the step starts,
+  // so the row lost its discovery bar and its planned mark entirely.
   const planner=new Map();
   for(const d of (t.discoveries||[]))
-    for(const sid of (d.plannedStepIDs||[])) planner.set(sid, d);
+    for(const sid of (d.plannedStepIDs||[])) if(!planner.has(sid)) planner.set(sid, d);
 
   const rows=[];
   for(const [key,spans] of byStep){
