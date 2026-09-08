@@ -2,6 +2,7 @@ const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,setFrame} from './micro.mjs';
 import {loadRun} from './runs.mjs';
+import {fixtureCode} from './fixcode.mjs';
 setFrame(true);
 
 /**
@@ -37,17 +38,35 @@ const PAIRS=[
   ['simple','No steps at all. The whole run is the request that asks what to do and is told nothing.'],
   ['sequential','A step, a sleep, a step. The sleep cannot be run inline either way, so this is where checkpointing shows most plainly.'],
   ['emit','Three steps in a row with nothing between them, so every one of them can be run inline.'],
+  ['loop','Twelve steps of one shape. With checkpointing the whole loop is a single request.'],
   ['parallel','A parallel batch has to be planned, so the fan-out is the same either way and only the step after it moves.'],
+  ['wide','Twelve steps planned by one request, then a step that waits for all of them.'],
   ['chains','Parallel branches that are chains: planning and checkpointing in the same run.'],
+  ['nested','A fan-out whose branches are themselves fan-outs.'],
+  ['nested-in-branch','A branch that fans out: one resumption discovers two steps.'],
+  ['unbalanced','Branches of different depths, so the levels stop lining up.'],
+  ['dynamic','Fan-out width decided by a previous step, so nothing static predicted the shape.'],
+  ['dupe-names','The same step name in both branches. Nothing in the drawing may depend on the suffix.'],
+  ['deep3','Three chains, three deep, jittered so completion order varies between runs.'],
+  ['race','Promise.race: every branch schedules its own discovery, because racing skips coalescing.'],
+  ['mixed','A failing branch beside a succeeding one, caught. One red row must not colour the level.'],
+  ['dead-end','Two steps started, one awaited. The other has nothing following it.'],
+  ['foreign-async','A step discovered only after non-Inngest async work.'],
+  ['sleep-in-branch','A sleep inside one branch while the other keeps working.'],
+  ['wait-timeout','A wait nothing satisfies. The run carries on: a timeout is a result.'],
   ['invoke','step.invoke(), whose child run is its own substance.'],
 ];
 
+// The source of each shape, read from the file that defines it rather than
+// transcribed -- so the code on the page cannot drift from the run beside it.
+const CODE=fixtureCode();
+
 const F={};
 for(const [id,cap] of PAIRS){
-  F[id]=[
-    {mode:'checkpointing',    cap, svg:capture('cp-'+id,   id+': with checkpointing')},
-    {mode:'no checkpointing', cap, svg:capture('nocp-'+id, id+': without checkpointing')},
-  ];
+  F[id]={cap, code:CODE[id]||'', modes:[
+    {mode:'checkpointing',    svg:capture('cp-'+id,   id+': with checkpointing')},
+    {mode:'no checkpointing', svg:capture('nocp-'+id, id+': without checkpointing')},
+  ]};
 }
 
 fs.writeFileSync(HERE+'batch1.json',JSON.stringify(F));

@@ -320,14 +320,18 @@ const experimental = `  <section class="sc exp"><h3>Experimental</h3>
  * than between two runs. The caption belongs to the shape, not to either
  * capture, so it sits above both.
  */
-const fixtures=Object.entries(J.batch1).map(([id,modes])=>{
-  const cap=modes[0].cap||'';
+const fixtures=Object.entries(J.batch1).map(([id,f])=>{
+  // The note and the function's own source on the left, the two captures on the
+  // right. The code is extracted from the file that defines the shape, so it is
+  // the function that produced the run beside it rather than a transcription
+  // of it.
   return `    <div class="item fixpair" data-fix="${id}">`+
-    `<p class="note"><code>${id}</code> ${cap}</p>`+
+    `<div><p class="note"><code>${id}</code> ${f.cap||''}</p>`+
+      (f.code?`<pre class="code">${highlight(f.code)}</pre>`:'')+`</div>`+
     `<div class="modewrap">`+
-      `<div class="modes">`+modes.map((m,i)=>
+      `<div class="modes">`+f.modes.map((m,i)=>
         `<button class="modeb${i?'':' on'}" data-mode="${i}">${m.mode}</button>`).join('')+`</div>`+
-      modes.map((m,i)=>`<div class="mode${i?'':' on'}" data-mode="${i}">${fig(m.svg)}</div>`).join('')+
+      f.modes.map((m,i)=>`<div class="mode${i?'':' on'}" data-mode="${i}">${fig(m.svg)}</div>`).join('')+
     `</div></div>`;
 }).join('\n');
 
