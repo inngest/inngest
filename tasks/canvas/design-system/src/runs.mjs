@@ -41,6 +41,27 @@
  *     part of it after the step belongs to the sleep, which is what `prior`
  *     below is for.
  *
+ * ## The checkpoint round-trip is not measured
+ *
+ * When a step is checkpointed the SDK reports it out of band and, in the
+ * default blocking mode, WAITS for that to clear before carrying on. So the
+ * stretch this file draws as the SDK working towards the next step is partly
+ * the SDK working and partly the SDK waiting on us, and nothing in the payload
+ * separates them.
+ *
+ * What is there measures the other direction: `inngest.http.timing` and
+ * `inngest.timing` are the executor's view of ITS request to the SDK, and a
+ * checkpointed request carries exactly one of them however many steps ran
+ * inside it -- `cp-emit` reports 35ms total for three steps, where
+ * `nocp-emit` reports 11, 14 and 10 for its three separate requests. The
+ * inter-step gaps in the checkpointed run are 4-5ms each and are, on the SDK's
+ * own account of blocking checkpointing, mostly the round-trip.
+ *
+ * So the blue bar between two checkpointed steps is honest about the interval
+ * and silent about what filled it. A per-checkpoint timing -- when the SDK
+ * sent it, when it was acknowledged -- would let that stretch be split the way
+ * a retry's backoff is split from the queue that follows it. Worth asking for.
+ *
  * ## A discovery with no window
  *
  * Fixed at the source, and the fallbacks below are kept as guards rather than
