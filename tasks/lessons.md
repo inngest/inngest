@@ -568,3 +568,50 @@ range fixed the collision and grew the page 13%, because ids that differ between
 builds make two identical drawings compare as different — so every compressed
 figure shipped four times instead of once. Namespace at the point where the
 variants are merged, not at the point they are generated.
+
+---
+
+## 34. Conceding a disputed claim is not the same as resolving it
+
+**Failure mode**: I claimed a v4 run ran a step and planned the next in one
+request. Jack said that was impossible. I conceded and told him the capture was
+missing requests — which was wrong, and sent us both down a diagnosis of a
+non-existent data gap.
+
+**Detection signal**: a disagreement about system behaviour where the payload is
+consistent with both readings. That is the signal to stop reasoning and go and
+look.
+
+**Prevention**: instrument the source. Twenty lines of `fmt.Printf` in
+`HandleGeneratorResponse` and `CheckpointAsyncSteps` settled it in one run: two
+requests, and each response carrying ONE op, with the completed step arriving
+out of band as a checkpoint. Neither of our positions was right. Revert the
+probes afterwards; say plainly who was wrong.
+
+Three real bugs this session were found only because a disputed claim got
+instrumented rather than argued: the sleep opcode's `startedAt` overwriting the
+execution span's, the timed-out wait drawing as matched, and the retry drawing
+one green bar over a failure.
+
+---
+
+## 35. When the drawing looks wrong, suspect the reader before the data
+
+Every defect this session was a field the payload already carried and `loadRun`
+was not reading:
+
+| symptom | field that knew |
+|---|---|
+| a timed-out wait drawn green as matched | `stepInfo.timedOut` |
+| a retried step drawn as one clean green bar | the per-attempt spans |
+| the whole gap between attempts drawn as backoff | `scheduledAt` on the retry |
+| a cancelled run drawn as still going | the run's own `status` |
+| a request drawn three times, once per row it planned | `plannedStepIDs` order |
+| row order not matching the code | `plannedStepIDs` order again |
+
+**Prevention**: before concluding the trace cannot say something, dump every
+non-null field on the spans and metadata and look. Twice this session the answer
+was there and I proposed inventing a value instead — an earlier `queuedAt` to
+close a gap, a backoff derived from `TableBackoff`'s defaults. Both would have
+been guesses over measurements: the gap is real executor latency, and the
+backoff is 15s plus up to 30s of jitter so the defaults cannot give it.
