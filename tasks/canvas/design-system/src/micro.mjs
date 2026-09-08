@@ -774,7 +774,19 @@ export function fig(rows,extra='',label='',under='',opts={}){
     }
   }
   if(opts.ms){
-    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear});
+    /**
+     * The rows get the axis MINUS the room the frame needs after them.
+     *
+     * A framed figure grows its own Finalization past the last row, and the Run
+     * row is drawn to where that ends. Laying the rows across the whole axis
+     * left them running past the Run row above them -- the overview shorter
+     * than the rows it is an overview of, which is the one thing it must never
+     * be.
+     */
+    const willFrame=(opts.frame!==undefined?!!opts.frame:FRAMED)
+      && !opts.running && !rows.some(r=>r.n==='Finalization');
+    const L=layout(opts.ms, rows,
+      {plot:willFrame?86:100, unit:opts.unit, linear:opts.linear});
     rows=L.rows; opts={...opts, breaks:L.breaks};
   }
   /**
