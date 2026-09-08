@@ -144,7 +144,17 @@ export function loadRun(id){
     const kind=KIND[first.stepOp]||'step';
 
     const q=at(first.queuedAt), st=at(exec.startedAt), en=at(last.endedAt);
-    const out=OUTCOME[last.status];
+    /**
+     * A wait that expired is not a wait that matched.
+     *
+     * The executor reports both as COMPLETED -- the step did complete, it just
+     * completed with nothing -- so status alone cannot tell them apart, and a
+     * timed-out wait was being drawn green as though its event had arrived.
+     * `stepInfo.timedOut` is the field that knows, and `foundEventID` says the
+     * same thing from the other side.
+     */
+    const info=spans.map(sp=>sp.stepInfo).find(x=>x && x.timedOut!=null);
+    const out=(info && info.timedOut) ? 'timeout' : OUTCOME[last.status];
     const d=planner.get(first.stepID);
 
     /**
