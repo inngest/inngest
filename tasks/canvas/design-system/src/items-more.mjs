@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,px,cy,tag,axis,groupRow,arrow,dot,elastic,layout,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
+import {fig,fin,px,cy,tag,axis,groupRow,arrow,dot,elastic,layout,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
 import {setFrame} from './micro.mjs';
 import * as R from './rules.mjs'; setFrame(true);
 const E={}; const D=(k,v)=>{E[k]=v;};
@@ -13,6 +13,7 @@ D('w1',{d:'A wait that matched. The bar is blue while it is open because nothing
     {n:'a',              at:[['started',0],['ok',100]]},
     {n:'w',              at:[['started',100],['ok',120],['started',120],['ok',640]],kind:'wait',reported:1},
     {n:'b',              at:[['started',640],['ok',660],['queued',660],['started',700],['ok',860]],reported:1},
+    fin(860,45,40),
   ],'','a wait that matched')});
 
 D('w2',{d:'A wait that expired without a match. The run carries on: the timeout is a result the function can act on, so the row goes grey and the next step is reported as normal.',
@@ -20,6 +21,7 @@ D('w2',{d:'A wait that expired without a match. The run carries on: the timeout 
     {n:'a',              at:[['started',0],['ok',100]]},
     {n:'w',              at:[['started',100],['ok',120],['started',120],['timeout',640]],kind:'wait',reported:1},
     {n:'fallback',       at:[['started',640],['ok',660],['queued',660],['started',700],['ok',860]],reported:1},
+    fin(860,45,40),
   ],'','a wait that timed out, run continues')});
 
 D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and holds the level open: the request that collects them cannot start until the slowest resolves, which the queue time on the next row reports.',
@@ -28,6 +30,7 @@ D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and
     {n:'b',       at:[['started',80],['ok',220]]},
     {n:'c',       at:[['started',80],['ok',620]],kind:'wait'},
     {n:'d',       at:[['started',620],['ok',640],['queued',640],['started',680],['ok',860]],reported:1},
+    fin(860,45,40),
   ],'','a wait holding a level open')});
 
 D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red; the other is solid and red, and only its final attempt takes a filled mark.',
@@ -51,6 +54,7 @@ D('t1',{d:'Seven days of dead time, given four percent of the width. The thresho
       {n:'a',   at:[['started',0],['ok',41]]},
       {n:'nap', at:[['started',41],['ok',41+NAP]],kind:'wait',note:'7d'},
       {n:'b',   at:[['queued',B0],['started',B0+6,'disc'],['ok',B0+16],['queued',B0+16],['started',B0+22],['ok',total]],reported:1},
+      fin(total,8,12),
     ];
     return fig(_rows,'','seven days compressed to a band','',{margin:0,ms:total});
   })()});
@@ -62,6 +66,7 @@ D('t1b',{d:'What the space left over is worth. Thirty seconds of work on one sid
       {n:'left',  at:[['started',0],['ok',30]],note:'30s'},
       {n:'gap',   at:[['started',30],['ok',30+GAP]],kind:'wait'},
       {n:'right', at:[['started',30+GAP],['ok',total]],note:'10s'},
+      fin(total,0.2,0.3),
     ];
     return fig(_rows,'','the leftover width splits by real duration','',{margin:0,ms:total,unit:'s'});
   })()});
@@ -80,6 +85,7 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
                     members:polls.map(([a,b])=>[a,b,'good'])}},
       {n:'', group:{n:'× 8 nap', to:total,
                     members:dead.map(([a,b])=>[a,b,'waitok'])}},
+      fin(total,2,3),
     ],'','eight compressions sharing one budget','',{margin:0, ms:total, unit:'s'});
   })()});
 
@@ -102,17 +108,25 @@ D('t1e',{d:'Choosing where to cut. A gap in <em>one</em> row is not dead time &m
       {n:'b', at:[['started',4],['ok',26]]},
       {n:'c', at:[['started',26],['ok',900],['started',900],['ok',914]],kind:'wait'},
       {n:'d', at:[['started',914],['ok',930]]},
+      fin(930,3,5),
     ];
     return fig(_rows,'','only the stretch with nothing running','',{margin:0,ms:total,unit:'s'});
   })()});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
-  svg:fig([
-    {run:true, end:1000, intervals:[{a:0,b:1.2,ok:true},{a:58,b:59,ok:true},{a:63,b:64.5,ok:true}], resolvedAt:100, resolvedAs:EV.ok},
-    {n:'a', at:[['started',0],['ok',12]]},
-    {n:'nap', at:[['started',12],['ok',580]],kind:'wait'},
-    {n:'b', at:[['started',580],['ok',590],['queued',590],['started',630],['ok',645]],reported:1},
-  ],'','62ms of execution inside seven days','')});
+  // Real durations, and no Run row of its own: the row this figure is ARGUING
+  // for was written out here by hand, intervals and all, which is the one
+  // thing the argument is against. It is derived from the rows now, like
+  // everywhere else.
+  svg:(()=>{
+    const B=12+NAP;
+    return fig([
+      {n:'a',   at:[['started',0],['ok',12]]},
+      {n:'nap', at:[['started',12],['ok',B]],kind:'wait'},
+      {n:'b',   at:[['queued',B],['started',B+10,'disc'],['ok',B+20],['queued',B+20],['started',B+20],['ok',B+50]],reported:1},
+      fin(B+50,8,10),
+    ],'','62ms of execution inside seven days','');
+  })()});
 
 D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed, the fine tier carries offsets inside it, so a run measured in days keeps its resolution without a second axis.',
   // No rows. This figure is about the axis, so it draws the axis and nothing
@@ -127,6 +141,7 @@ D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so i
     {n:'a', at:[['started',0],['ok',12]],note:'12ms'},
     {n:'nap',  at:[['started',12],['ok',7*864e5+12]],kind:'wait'},
     {n:'b', at:[['started',7*864e5+12],['ok',7*864e5+22],['started',7*864e5+22],['ok',7*864e5+32]],reported:1,note:'10ms'},
+    fin(7*864e5+32,8,12),
   ],'','sub-pixel steps drawn honestly','')});
 
 // ---- Scale --------------------------------------------------------------
@@ -138,6 +153,7 @@ D('s1',{d:'Five hundred sequential steps do not become five hundred rows. Repeti
       {n:'setup', at:[['started',0],['ok',30]]},
       {n:''},
       {n:'teardown', at:[['queued',880],['started',900],['ok',980]]},
+      fin(980,40,50),
     ], groupRow(1,{n:'× 500 fetch',x:3,w:79,members,note:'500 · 0 failed'}),
       'five hundred steps, one row','',{busy:[[3,82]]});
   })()});
@@ -149,6 +165,7 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
       {n:'req + worker ×12', at:[['queued',0],['started',20],['ok',40]],kind:'disc'},
       {n:''},
       {n:'collect', at:[['started',800],['ok',820],['queued',820],['started',850],['ok',970]],reported:1},
+      fin(970,40,50),
     ], groupRow(1,{n:'× 12 worker',x:5,w:70,members,note:'12 · staggered'}),
       'a wide fan-out, collapsed','',{busy:[[5,75]]});
   })()});
@@ -173,6 +190,7 @@ D('s4',{d:'Whatever the step count, the trace draws about forty rows at rest. Ev
     {n:'  ↳ batch 7', at:[['queued',200],['started',210],['ok',270]]},
     {n:'  ↳ batch 8', at:[['queued',240],['started',250],['ok',300]]},
     {n:'last', at:[['started',700],['ok',720],['queued',720],['started',750],['ok',870]],reported:1},
+    fin(870,40,50),
   ],'','one group expanded in place')});
 
 // ---- Naming & identity --------------------------------------------------
@@ -182,12 +200,14 @@ D('n1',{d:'The same step name on two branches. The name is not the identity: row
     {n:'req + fetch', at:[['queued',0],['started',24,'disc'],['ok',70],['started',70],['ok',330]],reported:1},
     {n:'fetch',       at:[['started',70],['ok',250]]},
     {n:'save',        at:[['started',330],['ok',350],['queued',350],['started',380],['ok',580]],reported:1},
+    fin(580,30,40),
   ],'','the same name twice')});
 
 D('n2',{d:'The SDK’s :1 and :2 suffixes are not stable under parallelism, so nothing in the drawing depends on them. They are shown as text on the row and used for nothing else.',
   svg:fig([
     {n:'fetch:1', at:[['started',60],['ok',260]]},
     {n:'fetch:2', at:[['started',60],['ok',360]]},
+    fin(360,25,30),
   ],'','unstable suffixes')});
 
 // ---- Interaction --------------------------------------------------------
@@ -198,6 +218,7 @@ D('i1',{d:'Three tiers of attention on hover: the row itself, what caused it, an
     {n:'b',  at:[['queued',180],['started',220],['ok',480]],sel:true},
     {n:'c',  at:[['started',40],['ok',160]],dim:DIM},
     {n:'d',  at:[['queued',480],['started',510],['ok',710]],dim:DIM},
+    {...fin(710,35,40),dim:DIM},
   ],'','hovered, immediate cause, everything else')});
 
 D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it drawing the same run in the same place in the same colours &mdash; two pictures of one fact, and a second overview that could drift out of step with the first. One picture of the run, not two.',
@@ -219,12 +240,13 @@ D('o0',{d:'A step with userland spans says so in the gutter and nothing else. Se
   frames:(()=>{
     const step={n:'charge',at:[['queued',0],['started',60],['ok',800]],spans:true};
     return [
-      {l:'at rest', svg:fig([step],'','the gutter says there is more')},
+      {l:'at rest', svg:fig([step,fin(800,40,50)],'','the gutter says there is more')},
       {l:'selected', svg:fig([
         {...step,sel:true},
         {n:'POST /pay', at:[['started',90],['done',380]],kind:'span',span:true},
         {n:'SELECT',    at:[['started',490],['done',610]],kind:'span',span:true},
         {n:'UPDATE',    at:[['started',630],['done',770]],kind:'span',span:true},
+        fin(800,40,50),
       ],'','expanded on select')},
     ];
   })()});
@@ -233,7 +255,7 @@ D('o0b',{d:'The same at any complexity. Spans inside a <code>Promise.all</code> 
   frames:(()=>{
     const step={n:'fanout',at:[['queued',0],['started',50],['ok',850]],spans:true};
     return [
-      {l:'at rest', svg:fig([step],'','nine spans, one row')},
+      {l:'at rest', svg:fig([step,fin(850,40,50)],'','nine spans, one row')},
       {l:'selected', svg:fig([
         {...step,sel:true},
         {n:'GET /a', at:[['started',80],['done',380]],kind:'span',span:true},
@@ -241,6 +263,7 @@ D('o0b',{d:'The same at any complexity. Spans inside a <code>Promise.all</code> 
         {n:'GET /c', at:[['started',120],['failed',440]],kind:'span',span:true},
         {n:'SELECT', at:[['started',460],['ok',680]],kind:'span',span:true},
         {n:'UPDATE', at:[['started',680],['done',830]],kind:'span',span:true},
+        fin(850,40,50),
       ],'','overlapping spans on their own pitch')},
     ];
   })()});
@@ -251,6 +274,7 @@ D('o1',{d:'A span keeps the three states OpenTelemetry gives it. Most instrument
     {n:'POST /pay',at:[['started',90],['done',290]],kind:'span',span:true,note:'Unset'},
     {n:'SELECT',   at:[['started',310],['failed',510]],kind:'span',span:true,note:'ERROR'},
     {n:'UPDATE',   at:[['started',530],['ok',770]],kind:'span',span:true,note:'OK'},
+    fin(800,40,50),
   ],'','the three span statuses')});
 
 D('o2',{d:'The nesting is a claim, and the trace has to be able to keep it. A span always sits <em>inside</em> its step&rsquo;s execution, because that is where it ran &mdash; one that starts before its step or outruns it is a clock disagreement between your process and ours, not a slow query, and drawing it as though it were would be the view inventing a fact. Where the extents do not contain each other the row says so rather than clamping quietly.',
@@ -258,6 +282,7 @@ D('o2',{d:'The nesting is a claim, and the trace has to be able to keep it. A sp
     {n:'charge',   at:[['queued',0],['started',60],['ok',600]],spans:true},
     {n:'POST /pay',at:[['started',90],['done',470]],kind:'span',span:true},
     {n:'SELECT',   at:[['started',520],['done',780]],kind:'span',span:true,note:'outruns its step'},
+    fin(780,35,45),
   ],'','a span that leaves its parent')});
 
 // ---- Honesty ------------------------------------------------------------
@@ -267,12 +292,14 @@ D('h1',{d:'Where the trace cannot say which step caused a request, it declines r
     {n:'a', at:[['started',0],['ok',200]],dim:DIM},
     {n:'b', at:[['started',40],['ok',280]],dim:DIM},
     {n:'c', at:[['queued',280],['started',320],['ok',560]],sel:true},
+    fin(560,30,35),
   ],'','declining to attribute','',{attributed:false})});
 
 D('h2',{d:'A row’s label and its drawing have to agree. If the bar is drawn across a wider interval than the step ran for, the number beside it names the interval that was widened, not the one the SDK reported.',
   svg:fig([
     {n:'a', at:[['queued',0],['started',20,'disc'],['ok',30],['queued',30],['started',110],['ok',310]],reported:1,
      note:'3ms reported · 31ms on the row'},
+    fin(310,25,30),
   ],'','the label reconciles with the drawing')});
 
 

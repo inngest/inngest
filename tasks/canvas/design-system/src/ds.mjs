@@ -216,7 +216,7 @@ const frames=id=>{const e=EX[id];if(!e)throw new Error('no '+id);
 const SCEN=[
  ['oneStep',[
   ['c14',['Queue time: the step enqueued, waiting for the executor to pick it up. Hatched, because it is not your code running.',
-          'Below it, Finalization: the request that asks what runs next and is told nothing. It is your compute, so it keeps its own row — every figure on this page has one.']],
+          'Below it, Finalization: the request that asks what runs next and is told nothing. It is your compute, so it keeps its own row — and it is a row like any other, drawn only where the run actually got that far. A run still going, cancelled, or ended by a failure has none.']],
   ['c16','Held by flow control — concurrency, throttle, rate limit or debounce. Queue time with a reason, and a colour of its own.'],
   ['c25',['It threw, backed off, and returned on the second attempt. The backoff is red-hatched: a consequence of the failure, not a failure itself.',
           'Every millisecond between the row’s start and its resolution belongs to a named interval — the queue, the attempt, its backoff, the queue again, and the attempt that worked. There are no unexplained gaps.']],

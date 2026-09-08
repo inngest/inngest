@@ -124,16 +124,24 @@ export const BAND = {
 /** The surround: the Run row above, finalization below. */
 export const FRAME = {
   /**
-   * How much of the axis the ROWS get, as a percentage.
+   * The finalization the frame supplies, for a run that did not record one.
    *
-   * A framed figure grows its own finalization after the last row, and the Run
-   * row is drawn to where that ends -- so the rows cannot have all of it or
-   * they run past the overview above them. The rest is that room.
+   * FRACTIONS OF THE RUN, and only a fallback. What the frame would rather say
+   * is what this run's own requests did -- the typical time one spent queued
+   * and the typical time one spent executing -- and it only reaches for these
+   * when the run contains no request to copy. A fixed number of milliseconds
+   * here would be a claim about every run ever drawn.
+   *
+   * These used to be percentages of the AXIS, alongside a `rowsAxis: 86` that
+   * reserved the last 14% of the width for them. Two unrelated numbers for one
+   * piece of space: the rows were laid across 86 on the assumption the frame
+   * would fill the rest, and the frame filled whatever its medians came to.
+   * Where they disagreed -- which was nearly every figure -- the trace stopped
+   * short of its own axis. The finalization is a row of moments on the run's
+   * timeline now, so there is one number and it is the run.
    */
-  rowsAxis: 86,
-  blur: 0.62,
-  finQueue: 2.2,                     // finalization waits, then runs
-  finRun: 4.5,
+  finQueue: 0.022,
+  finRun: 0.045,
 };
 
 /** Attention. */

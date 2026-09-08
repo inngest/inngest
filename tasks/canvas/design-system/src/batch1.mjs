@@ -85,6 +85,9 @@ F.invoke=[
     {name:'  ↳ work',dur:'180ms',at:[['queued',22],['started',30],['ok',63]]},
     {name:'  ↳ finish',dur:'40ms',at:[['queued',63],['started',67],['ok',69]]},
     {name:'after',dur:'58ms',at:[['queued',78.1],['started',82.7],['ok',83.4]]},
+    // The capture has a finalization; the expanded view is the same run, so it
+    // has the same one.
+    {name:'Finalization',dur:'55ms',at:[['queued',84],['started',92],['ok',98]]},
   ],'','invoke expanded: child rows on the same axis',909),
  },
 ];

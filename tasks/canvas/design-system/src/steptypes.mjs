@@ -68,7 +68,7 @@ for(const [type,cap,states] of GROUPS){
   // step.sendEvent()'s row points out of the run; the row says so and the
   // marker is placed from where that row's own work ended.
   if(type==='step.sendEvent' && rows.length) rows[0]={...rows[0], lineage:2};
-  const opts = type==='step.sendEvent' ? {scale:1.6} : {};
+  const opts = {};
   O[type]={svg:fig(rows,'',type+' states','',opts), cap};
 }
 

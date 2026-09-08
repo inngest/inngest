@@ -31,6 +31,24 @@ export const arrow=(x1,y1,x2,y2,o=1)=>{
 };
 export { wire };
 export const causal=(sources,target,opts={})=>_cr(sources,target,{px,cy,...opts});
+/**
+ * The finalization request, spelled out by the figure that had one.
+ *
+ * A run that finished has one -- the request that asks what runs next and is
+ * told nothing -- and it is a row like any other: queued at `t`, executing `q`
+ * later, done `w` after that. Green, because it is your app executing: it is a
+ * discovery request at the start and is retried like one, but once it succeeds
+ * it will never plan.
+ *
+ * This exists so the three moments read the same way in every figure, NOT so
+ * the drawing can supply one. The frame used to invent a finalization for any
+ * run that had not declared one, which put a real part of the trace into
+ * figures whose run had not got that far. A finalization happened or it did
+ * not, and only the figure knows which.
+ */
+export const fin=(t,q,w)=>({n:'Finalization', kind:'step',
+  at:[['queued',t],['started',t+q],['ok',t+q+w]]});
+
 export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.5" fill="${c}">${t}</text>`;
 
 /**
@@ -74,7 +92,7 @@ export const gutter=h=>`<rect class="gut" x="${(RULE_X-0.3).toFixed(1)}" y="0" w
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=R.FRAME.rowsAxis,intervals=[],resolved,n='Run',breaks=[],lead='',opened='queued'},sc=1){
+export function runProfile(i,{to=100,intervals=[],resolved,n='Run',breaks=[],lead='',opened='queued'},sc=1){
   // The queue the run opened with is named here rather than drawn, so it does
   // not push every row's work to the right of a gap that says the same thing
   // about all of them.
@@ -324,49 +342,21 @@ let FRAMED=false;
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=R.ENV.DS_FRAME==='0'?false:on;};
 
-export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead='',trimmed=false}){
-  // A captured run HAS a finalization, measured. Inventing a second one over
-  // the top of it is the same defect as drawing a second Run row.
-  const ownFin=rows.some(r=>r.n==='Finalization');
-  const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
-  // Finalization sits a full row below whatever the last row was, which may
-  // have been on the tighter span pitch.
-  const ys=rowYs(rows);
-  const finY=(ys.length?ys[ys.length-1]:cy(0)-ROW)+ROW+ROW*above;
-
-  // Finalization is a discovery request like any other — it asks the SDK what
-  // is next and the answer is "nothing". So it is queued, it waits, it starts,
-  // and the bar is `disc`: **your app executes for it**, and you are billed for
-  // it. Computed before the Run row, because the Run row has to contain it.
-  // Where the run ends. With a finalization of its own that is where ITS work
-  // ended; the invented one is placed past the last row and sized to nothing in
-  // particular, and the Run row must not be drawn to a length nothing measured.
-  /**
-   * How long the finalization the frame adds takes -- measured off THIS run.
-   *
-   * A figure that does not draw its own finalization still had one, and the
-   * frame has to say something about it. What it says is what the run's other
-   * requests did: the typical time one of them spent queued, and the typical
-   * time one of them spent executing. Those numbers were 2.2 and 4.5 written
-   * inline, which is a claim about every run ever drawn.
-   */
-  const mid=xs=>{ if(!xs.length) return null;
-    const s=[...xs].sort((p,q)=>p-q); return s[(s.length-1)>>1]; };
-  const widths=k=>{ const out=[];
-    rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{ if(base(kd)===k) out.push(w); }));
-    return out; };
-  const fq=mid(widths('idle')) ?? R.FRAME.finQueue;
-  // Not a step's duration: a request is not a step, and falling back to one
-  // gave a run with no requests in it a finalization as long as its work.
-  const fw=mid(widths('disc')) ?? R.FRAME.finRun;
-  const fx=Math.min(end+fq, 100-(fq+fw));
-  const finEnd=running?end:(ownFin?end:fx+fq+fw);
-
+/**
+ * The surround: the Run row, and nothing else.
+ *
+ * It used to draw the finalization too -- and, worse, INVENT one for any run
+ * that had not recorded a finalization, at coordinates it worked out itself. A
+ * finalization is a real request that either happened or did not, so a figure
+ * declares it as moments like every other row and the frame never supplies it.
+ * The frame is left with the one thing that genuinely is not a row.
+ */
+export function traceFrame(rows,k,{hasOwnRun,breaks=[],running=false,lead='',trimmed=false}){
   /**
    * The Run row is the whole overview, and it is **derived from every row in
    * the trace, finalization included**. It was built from the figure's own rows
    * only, so the run appeared to do nothing during finalization and stopped
-   * short of where the trace actually ended — the profile disagreeing with the
+   * short of where the trace actually ended -- the profile disagreeing with the
    * rows underneath it, which is the one thing it must never do.
    *
    * It replaced a separate minimap that drew the same run in the same place in
@@ -377,52 +367,20 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   const intervals=[];
   const add=(kd,x,w)=>{ const rank=R.runRank(kd); if(rank!=null) intervals.push({a:x,b:x+w,rank}); };
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
-  /**
-   * Finalization goes into the Run row as what it IS.
-   *
-   * It was added as `disc` while being DRAWN as a step, so the Run row went
-   * blue underneath a green finalization row -- the overview disagreeing with
-   * the row it is an overview of, from two statements of the same fact.
-   */
-  const finalization=(running||ownFin)?null:resolveRow(
-    {n:'Finalization', at:[['queued',fx],['started',fx+fq],['ok',finEnd]]});
-  if(finalization) (finalization.segs||[]).forEach(([kd,x,w])=>add(kd,x,w));
-
   // The run resolves as its LAST interval, not as "did anything fail". A run
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
-  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,lead,opened:trimmed?'started':'queued',
+  // To the end of the axis, because the axis IS the run: it runs from the
+  // first moment in the trace to the last, and the finalization is the last.
+  const run=hasOwnRun?'':runProfile(0,{to:100,intervals,breaks,lead,opened:trimmed?'started':'queued',
     resolved:running?null:((last&&last.rank===3)?EV.failed:EV.ok)},k);
-
-  // A run still going has not been finalized. Drawing the row anyway would be
-  // the frame asserting an event that has not happened.
-  /**
-   * Finalization is a discovery request like any other -- it asks the SDK what
-   * is next and the answer is "nothing" -- so it is a ROW OF MOMENTS put
-   * through the same renderer as everything else. It used to be four barSvg and
-   * dot calls placed by hand here, which is why it was the one row in the
-   * artifact that could not be wrong in the same way as the others.
-   */
-  const fin=finalization?row(0, finalization, k, finY):'';
-
   // The frame shares the row grid with the figure, and the inner content keeps
-  // its own `cy` attributes because it is translated as a group — so the Run
+  // its own `cy` attributes because it is translated as a group -- so the Run
   // row and the figure rows read as one row to anything parsing the SVG back.
   // Tag the frame marks so the validator skips them: context, not rows.
   const tagCtx=t=>t.replace(/<circle class="ev /g,'<circle class="ev ctx ');
-  // Finalization sits this many gaps of each pitch below the Run row, so it
-  // tracks the rows above it instead of staying where it was generated.
-  // ...which is one gap below the last row, or level with the body when there
-  // is no last row. Using tail[0]+1 unconditionally moved an empty fixture's
-  // Finalization by a gap it had not been drawn a gap below, so it climbed onto
-  // the Run row as soon as the pitch came off 17.
-  const st=rowSteps(rows), tail=st.length?st[st.length-1]:[0,0];
-  const finRow=above+(rows.length?tail[0]+1:0);
-  const wrapFin=t=>`<g class="r" style="--i:${finRow};--s:${tail[1]}">${t}</g>`;
-  // Two layers, both currently soft. Kept split because the Run row is the one
-  // piece of the surround that is sometimes the subject rather than context.
-  return {sharp:tagCtx(run), soft:wrapFin(tagCtx(fin))};
+  return {sharp:tagCtx(run), soft:''};
 }
 
 /**
@@ -474,7 +432,7 @@ export function deadStretches(total, compute=[]){
   return gaps;
 }
 
-export function elastic(total, dead=[], {plot=R.FRAME.rowsAxis, threshold=R.ELASTIC.floor,
+export function elastic(total, dead=[], {plot=100, threshold=R.ELASTIC.floor,
     budget=R.ELASTIC.budget, minBand=R.ELASTIC.minBand, maxBand=R.ELASTIC.maxBand,
     inset=R.ELASTIC.inset, compute}={}){
   // Given the compute intervals, work out the dead stretches rather than being
@@ -582,7 +540,21 @@ export function layout(total, rows, opts={}){
   const busy=compute.reduce((n,[a,b])=>n+(b-a),0);
   // `linear` is a figure opting out: two of them exist to show the UNCOMPRESSED
   // proportion, so compressing them deletes their point.
-  const el=(R.FEAT.compress && !opts.linear) ? elastic(total, [], {compute,
+  /**
+   * A run with NO compute in it is never compressed.
+   *
+   * The threshold is a multiple of the run's total compute, and three times
+   * nothing is nothing -- so every stretch qualified and a run whose whole
+   * substance is a wait collapsed to a single 4-unit band with the rest of the
+   * width empty. `step.sleep` on its own, a wait cancelled while open, a
+   * waitForEvent that timed out: the figures that exist to show waiting were
+   * exactly the ones the rule erased.
+   *
+   * The rule reads correctly the other way round: compression buys width for
+   * the compute. Where there is none, there is nothing to buy it for, and the
+   * wait is not dead time -- it is the whole trace.
+   */
+  const el=(R.FEAT.compress && !opts.linear && busy>0) ? elastic(total, [], {compute,
       threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
       ...opts})
     : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
@@ -815,18 +787,18 @@ export function fig(rows,extra='',label='',under='',opts={}){
   }
   if(opts.ms){
     /**
-     * The rows get the axis MINUS the room the frame needs after them.
+     * The axis IS the run: from zero to the last moment in it.
      *
-     * A framed figure grows its own Finalization past the last row, and the Run
-     * row is drawn to where that ends. Laying the rows across the whole axis
-     * left them running past the Run row above them -- the overview shorter
-     * than the rows it is an overview of, which is the one thing it must never
-     * be.
+     * A capture's recorded duration can outlast its last span by a millisecond
+     * or two of bookkeeping, and laying the axis out to THAT leaves the trace
+     * ending short of the width with nothing drawn in the remainder -- an
+     * unexplained gap, which is the one thing this drawing does not allow.
      */
-    const willFrame=(opts.frame!==undefined?!!opts.frame:FRAMED)
-      && !opts.running && !rows.some(r=>r.n==='Finalization');
-    const L=layout(opts.ms, rows,
-      {plot:willFrame?R.FRAME.rowsAxis:100, unit:opts.unit, linear:opts.linear});
+    let last=0;
+    rows.forEach(r=>{ (r.at||[]).forEach(([,t])=>{ last=Math.max(last,t); });
+                      if(r.end!=null) last=Math.max(last,r.end); });
+    if(last>0) opts={...opts, ms:last};
+    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear});
     rows=L.rows; opts={...opts, breaks:L.breaks};
   }
   /**
@@ -920,7 +892,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const above=framed?(ownRun?0:FRAME_ROWS_ABOVE):0;
   const n=opts.rowCount||rows.length;
   const lastY=rows.length?rowYs(rows)[rows.length-1]:cy(0)-ROW;
-  const h=lastY+ROW*(1+above+(framed?1:0))+TOP+(opts.pad||0)
+  // Only the Run row is extra: the finalization is one of `rows`.
+  const h=lastY+ROW*(1+above)+TOP+(opts.pad||0)
     -(rows.length?0:ROW);
   /**
    * How far down the LOWEST ROW sits, in gaps of each pitch — which is what a
@@ -932,7 +905,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * strip underneath.
    */
   const _st=rowSteps(rows), _tail=_st.length?_st[_st.length-1]:[0,0];
-  const lowRow=above+(framed?(rows.length?_tail[0]+1:0):_tail[0]), lowSpan=_tail[1];
+  const lowRow=above+_tail[0], lowSpan=_tail[1];
   // Half a row of clearance past the last one, so the band still crosses a row
   // whose bar or mark hangs below the centre line — and half a ROW, not a fixed
   // number, so it keeps clearing it when the pitch slider moves.
@@ -955,7 +928,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * away from the bars they were cutting.
    */
   const k=opts.scale||(opts.ms!=null?1
-    :(max>0?Math.max(1,Math.min(R.FRAME.rowsAxis/max, R.GEOM.MAX_SCALE)):1));
+    :(max>0?Math.max(1,Math.min(100/max, R.GEOM.MAX_SCALE)):1));
   // Rows are placed from their own pitches, so a block of span rows packs
   // tighter than the trace around it.
   const ys=rowYs(rows), st=rowSteps(rows);
@@ -1011,7 +984,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel,trimmed:R.leadingQueue(rows)<=0.01});
+    const F=traceFrame(rows,k,{hasOwnRun:ownRun,breaks:opts.breaks||[],
+      running:!!opts.running,lead:leadLabel,trimmed:R.leadingQueue(rows)<=0.01});
     /**
      * The frame is drawn like everything else.
      *
@@ -1050,7 +1024,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * and a clip path per figure whose id collided with the next one's.
    */
   const blurred='';
-  const nr=n+above+(framed?1:0);
+  const nr=n+above;
   /**
    * Every figure carries the events it was drawn from.
    *

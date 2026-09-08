@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,px,cy,arrow,tag,C,W,LBL,PLOT} from './micro.mjs';
+import {fig,fin,px,cy,arrow,tag,C,W,LBL,PLOT} from './micro.mjs';
 import {setFrame} from './micro.mjs'; setFrame(true);
 const E={};const DIM=.15;
 
@@ -10,10 +10,12 @@ E.c67={d:'The request that would produce <code>b</code> failed twice before it w
   {l:'at rest',svg:fig([
     {n:'a',at:[['started',0],['ok',18]]},
     {n:'req + b',at:[['started',22],['retry',30],['started',40,'disc'],['retry',48],['started',64,'disc'],['ok',72],['queued',72],['started',76],['ok',96]],reported:1,note:'2 failed requests  20ms'},
+    fin(96,5,7),
   ],'','discovery retried')},
   {l:'hovering b',svg:fig([
     {n:'a',at:[['started',0],['ok',18]],dim:DIM},
     {n:'req + b',at:[['started',22],['retry',30],['started',40,'disc'],['retry',48],['started',64,'disc'],['ok',72],['queued',72],['started',76],['ok',96]],reported:1,note:'20ms',sel:true},
+    {...fin(96,5,7),dim:DIM},
   ],'','discovery retried, hovered','',{focus:1})},
  ]};
 
