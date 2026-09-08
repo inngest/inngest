@@ -83,6 +83,10 @@ export function loadRun(id){
   let total=Math.max(1, t1-t0);
   const at=v=>{ const n=ms(v); return n==null?null:n-t0; };
   const runStart=at(t.startedAt);
+  // A run that was cancelled took its unfinished rows with it: they neither
+  // succeeded nor failed, and drawing them as still running would say the run
+  // is still going.
+  const runCancelled=t.status==='CANCELLED';
 
   // One row per step. A step has a span of its own and a span per attempt; the
   // step's span carries the queue, the last attempt carries the execution.
@@ -143,7 +147,21 @@ export function loadRun(id){
     const isFin=name==='Finalization';
     const kind=KIND[first.stepOp]||'step';
 
-    const q=at(first.queuedAt), st=at(exec.startedAt), en=at(last.endedAt);
+    /**
+     * The attempts, in order: the spans that are not containers of another.
+     * A retried step has one span per attempt plus a parent spanning all of
+     * them, and the row is the attempts.
+     */
+    const tries=spans.filter(sp=>at(sp.startedAt)!=null && at(sp.endedAt)!=null)
+      .filter(sp=>!spans.some(o=>o!==sp && at(o.startedAt)!=null && at(o.endedAt)!=null &&
+        at(o.startedAt)>=at(sp.startedAt) && at(o.endedAt)<=at(sp.endedAt) &&
+        (at(o.startedAt)>at(sp.startedAt) || at(o.endedAt)<at(sp.endedAt))))
+      .sort((x,y)=>at(x.startedAt)-at(y.startedAt));
+
+    // Where the row's own work begins -- its FIRST attempt. The request that
+    // produced it hands over there, not at the attempt that finally worked.
+    const q=at(first.queuedAt),
+          st=tries.length ? at(tries[0].startedAt) : at(exec.startedAt);
     /**
      * A wait that expired is not a wait that matched.
      *
@@ -154,7 +172,9 @@ export function loadRun(id){
      * same thing from the other side.
      */
     const info=spans.map(sp=>sp.stepInfo).find(x=>x && x.timedOut!=null);
-    const out=(info && info.timedOut) ? 'timeout' : OUTCOME[last.status];
+    let out=(info && info.timedOut) ? 'timeout' : OUTCOME[last.status];
+    let en=at(last.endedAt);
+    if(!out && runCancelled){ out='cancelled'; en=total; }
     const d=planner.get(first.stepID);
 
     /**
@@ -306,9 +326,32 @@ export function loadRun(id){
       qq=null;
     }
     if(qq!=null && (st==null || qq<=st)) moments.push([planned?'planned':'queued', qq]);
-    if(st!=null) moments.push(['started', st]);
-    if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
-      moments.push([out, en]);
+    /**
+     * Every attempt, not just the last one.
+     *
+     * A step that failed and was retried has a span per attempt plus a parent
+     * spanning all of them, and taking the last attempt's start with the
+     * parent's end drew one bar from the first attempt to the last resolution
+     * -- the failure, the backoff and the retry all inside a single green bar
+     * that said nothing had gone wrong.
+     *
+     * The parent is the span that CONTAINS the others; what is left are the
+     * attempts, in order. Each one starts, and either resolves or hands over
+     * to the next with a `retry` -- and the gap between them is the backoff,
+     * which the moments already imply.
+     */
+    if(tries.length>1){
+      tries.forEach((sp,i)=>{
+        moments.push(['started', at(sp.startedAt)]);
+        const done=i===tries.length-1;
+        if(done){ const o=OUTCOME[sp.status]; if(o) moments.push([o, at(sp.endedAt)]); }
+        else moments.push(['retry', at(sp.endedAt)]);
+      });
+    }else{
+      if(st!=null) moments.push(['started', st]);
+      if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
+        moments.push([out, en]);
+    }
 
     // Sorted by when the STEP was queued, not by when the request that
     // reported it was: a row belongs where its own work sits.
@@ -327,6 +370,10 @@ export function loadRun(id){
     if(priorCp && priorAt!=null) cpAt.add(priorAt);
     const cp = cpAt.size ? [...cpAt] : undefined;
 
+    // Sorted by where the row BEGINS on the axis, which is its first moment --
+    // not the span's queuedAt, which for a retried step is the parent span's
+    // and can precede everything the row draws.
+    const begins=moments.length ? moments[0][1] : (q==null?0:q);
     /**
      * Rows a request reported together were queued TOGETHER, so they sort
      * together.
@@ -337,9 +384,9 @@ export function loadRun(id){
      * and `busy-2` were planned by one request, in that order, and came out
      * `busy-2` first because its span was written 1ms sooner.
      */
-    const group = planned && at(d.endedAt)!=null ? at(d.endedAt) : (q==null?0:q);
+    const group = planned && at(d.endedAt)!=null ? at(d.endedAt) : begins;
 
-    rows.push({_q:q==null?0:q, _g:group, n:name, kind, at:moments, cp, reported:sep||undefined,
+    rows.push({_q:begins, _g:group, n:name, kind, at:moments, cp, reported:sep||undefined,
                end:out?undefined:total, _stepID:first.stepID, _planner:d&&d.spanID});
   }
 

@@ -109,6 +109,22 @@ const SHAPES = {
   'nocp-wide': { event: 'tests/pair.wide', fn: 'canvas-nocp-' },
   'cp-wait-timeout': { event: 'tests/pair.wait-timeout', fn: 'canvas-cp-' },
   'nocp-wait-timeout': { event: 'tests/pair.wait-timeout', fn: 'canvas-nocp-' },
+  'cp-wait': { event: 'tests/pair.wait', fn: 'canvas-cp-pair-wait' },
+  'nocp-wait': { event: 'tests/pair.wait', fn: 'canvas-nocp-pair-wait' },
+  'cp-retry': { event: 'tests/pair.retry', fn: 'canvas-cp-pair-retry' },
+  'nocp-retry': { event: 'tests/pair.retry', fn: 'canvas-nocp-pair-retry' },
+  'cp-cancelled': {
+    event: 'tests/pair.cancelled',
+    fn: 'canvas-cp-pair-cancelled',
+    after: { event: 'tests/pair.cancel', afterMs: 2500 },
+  },
+  'nocp-cancelled': {
+    event: 'tests/pair.cancelled',
+    fn: 'canvas-nocp-pair-cancelled',
+    after: { event: 'tests/pair.cancel', afterMs: 2500 },
+  },
+  'cp-blocked': { event: 'tests/pair.blocked', fn: 'canvas-cp-pair-blocked', warm: true },
+  'nocp-blocked': { event: 'tests/pair.blocked', fn: 'canvas-nocp-pair-blocked', warm: true },
   blocked: 'tests/v4.contended',
   cancelled: 'tests/v4.cancel',
 };
@@ -179,6 +195,12 @@ for (const [fixture, spec] of targets) {
         : Array.isArray(spec)
         ? { event: spec[0], data: spec[1] }
         : spec;
+    // A run to contend with, for the shapes whose point is that the second one
+    // waits. Sent first and left running; the one we capture is the next.
+    if (s.warm) {
+      await send(s.event);
+      await sleep(s.warmMs ?? 600);
+    }
     const eventID = await send(s.data ? [s.event, s.data] : s.event);
     const runs = await runsFor(eventID);
     if (!runs.length) throw new Error('no run started');
@@ -186,6 +208,14 @@ for (const [fixture, spec] of targets) {
     const pick = s.fn ? runs.find((r) => (r.function?.slug ?? '').startsWith(s.fn)) : runs[0];
     if (!pick) throw new Error(`no run from an app matching ${s.fn}`);
     const runID = pick.id;
+    // Something that has to happen TO the run while it is alive -- a cancel, a
+    // signal it is parked on. Fired and not awaited, so the run is still going
+    // when it lands.
+    if (s.after) {
+      setTimeout(() => {
+        send(s.after.event).catch(() => {});
+      }, s.after.afterMs ?? 2500);
+    }
     const status = await settle(runID);
     execFileSync('node', ['capture.mjs', runID, fixture], { stdio: 'pipe' });
     done.push(`${fixture.padEnd(24)} ${status.padEnd(10)} ${runID}`);

@@ -53,8 +53,12 @@ const PAIRS=[
   ['dead-end','Two steps started, one awaited. The other has nothing following it.'],
   ['foreign-async','A step discovered only after non-Inngest async work.'],
   ['sleep-in-branch','A sleep inside one branch while the other keeps working.'],
-  ['wait-timeout','A wait nothing satisfies. The run carries on: a timeout is a result.'],
   ['invoke','step.invoke(), whose child run is its own substance.'],
+  ['wait','A wait that matched. The bar is blue while it is open, because nothing has decided it.'],
+  ['wait-timeout','A wait nothing satisfies. The run carries on: a timeout is a result.'],
+  ['retry','A step that threw, backed off and returned on the second attempt. The backoff is a bar of its own.'],
+  ['blocked','Two runs on a limit of one, so the second spends real time queued rather than executing.'],
+  ['cancelled','Cancelled while parked on a wait. A row that was open is neither succeeded nor failed.'],
 ];
 
 // The source of each shape, read from the file that defines it rather than

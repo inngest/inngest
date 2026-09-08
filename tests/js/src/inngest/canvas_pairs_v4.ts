@@ -22,7 +22,9 @@ export const noCpClient = new Inngest({ id: "canvas-nocp", ...base, checkpointin
 /** A shape: one handler, one id, one event, run on both clients. */
 type Shape = {
   id: string;
-  handler: () => Promise<unknown>;
+  // Given the run's context, for the shapes that need to know which attempt
+  // they are on. Most ignore it.
+  handler: (ctx: { attempt: number }) => Promise<unknown>;
   /** Extra function config, for the shapes that need it. */
   opts?: Record<string, unknown>;
 };
@@ -276,6 +278,72 @@ const SHAPES: Shape[] = [
     },
   },
 
+  // A wait that MATCHES. The signal arrives from a sibling function on the same
+  // trigger (see `signaller`), because a run cannot send the event it is itself
+  // parked on -- it is parked.
+  {
+    id: "wait",
+    handler: async () => {
+      await step.run("before", async () => "before");
+      const got = await step.waitForEvent("for a signal", {
+        event: "tests/pair.signal",
+        timeout: "30s",
+      });
+      await step.run("after", async () => (got ? "matched" : "timed out"));
+      return "done";
+    },
+  },
+
+  // A step that throws the first time and returns the second. The backoff
+  // between the attempts is a bar of its own: a consequence of the failure,
+  // not a failure itself.
+  {
+    id: "retry",
+    handler: async ({ attempt }) => {
+      await step.run("before", async () => "before");
+      await step.run("flaky", async () => {
+        if (attempt === 0) throw new Error("first attempt fails");
+        return "recovered";
+      });
+      await step.run("after", async () => "after");
+      return "done";
+    },
+  },
+
+  // A run parked long enough to be cancelled from outside. A step that was
+  // executing when the run was cut is neither succeeded nor failed, and
+  // colouring it as either would be a lie.
+  {
+    id: "cancelled",
+    opts: { cancelOn: [{ event: "tests/pair.cancel" }] },
+    handler: async () => {
+      await step.run("before", async () => "before");
+      await step.waitForEvent("never arrives", {
+        event: "tests/pair.never",
+        timeout: "5m",
+      });
+      await step.run("after", async () => "after");
+      return "done";
+    },
+  },
+
+  // Two runs contending on a limit of one, so the second spends real time
+  // QUEUED rather than executing. Without it the queued phase is always ~0ms
+  // and the bars that distinguish waiting from working have no data behind
+  // them.
+  {
+    id: "blocked",
+    opts: { concurrency: { limit: 1 } },
+    handler: async () => {
+      await step.run("hold", async () => {
+        await new Promise((r) => setTimeout(r, 4000));
+        return "held";
+      });
+      await step.run("release", async () => "released");
+      return "done";
+    },
+  },
+
   // A wait nothing satisfies, so it expires. The run carries on: a timeout is a
   // result the function can act on.
   {
@@ -303,6 +371,20 @@ const child = (c: Inngest.Any) =>
     }
   );
 
+/**
+ * Sends the event `wait` is parked on. A sibling rather than part of the shape,
+ * because a run cannot send the event it is waiting for.
+ */
+const signaller = (c: Inngest.Any) =>
+  c.createFunction(
+    { id: "pair-signaller", triggers: [{ event: "tests/pair.wait" }] },
+    async () => {
+      await step.sleep("let the wait park", "1s");
+      await step.sendEvent("signal", [{ name: "tests/pair.signal", data: {} }]);
+      return "sent";
+    }
+  );
+
 /** The handler that receives what `emit` sends, so the events lead somewhere. */
 const emitted = (c: Inngest.Any) =>
   c.createFunction(
@@ -315,7 +397,7 @@ const emitted = (c: Inngest.Any) =>
 
 function build(c: Inngest.Any) {
   const kid = child(c);
-  const fns: InngestFunction.Any[] = [kid, emitted(c)];
+  const fns: InngestFunction.Any[] = [kid, emitted(c), signaller(c)];
   for (const s of SHAPES) {
     fns.push(
       c.createFunction(
