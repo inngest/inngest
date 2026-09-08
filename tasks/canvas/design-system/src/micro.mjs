@@ -578,9 +578,42 @@ export function layout(total, rows, opts={}){
    * the compute. Where there is none, there is nothing to buy it for, and the
    * wait is not dead time -- it is the whole trace.
    */
-  const el=(R.FEAT.compress && !opts.linear && busy>0) ? elastic(total, [], {compute,
-      threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
-      ...opts})
+  /**
+   * With `compressCompute`, a stretch of WORK can be compressed too.
+   *
+   * The test is the same sentence either way -- a stretch is worth collapsing
+   * when it is longer than everything else put together, several times over --
+   * only now "everything else" excludes the stretch itself, so a single step
+   * that dwarfs the run qualifies on its own terms. Off, the candidates are
+   * the stretches with nothing executing and the sentence reduces to the one
+   * it has always been.
+   *
+   * Candidates are the intervals where NOTHING CHANGES on any row: cutting
+   * across a boundary would hide the transition, which is the one thing a
+   * compressed band must never do.
+   */
+  let candidates=null;
+  if(R.FEAT.compressCompute && busy>0 && total>0){
+    const pts=new Set([0,total]);
+    rows.forEach(r=>(r.segs||[]).forEach(([,a2,b2])=>{ pts.add(a2); pts.add(b2); }));
+    const xs=[...pts].filter(x=>x>=0&&x<=total).sort((p,q)=>p-q);
+    candidates=[];
+    for(let i=0;i<xs.length-1;i++){
+      const a2=xs[i], b2=xs[i+1], len=b2-a2;
+      if(len<=0) continue;
+      const inside=compute.reduce((n,[c,d])=>n+Math.max(0,Math.min(d,b2)-Math.max(c,a2)),0);
+      const others=busy-inside;
+      if(len > Math.max(total*R.ELASTIC.floor, others*R.ELASTIC.computeMultiple))
+        candidates.push([a2,b2]);
+    }
+  }
+  const el=(R.FEAT.compress && !opts.linear && busy>0)
+    ? (candidates
+        // Already filtered, one stretch at a time; elastic must not filter again.
+        ? elastic(total, candidates, {...opts, compute:undefined, threshold:0})
+        : elastic(total, [], {compute,
+            threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
+            ...opts}))
     : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
   /**
    * A bar keeps its real duration as well as its drawn one.

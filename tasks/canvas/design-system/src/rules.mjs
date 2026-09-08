@@ -10,6 +10,9 @@ export const ENV = typeof process !== 'undefined' && process.env ? process.env :
 export const FEAT = {
   trim:     ENV.DS_NOTRIM     !== '1',
   compress: ENV.DS_NOCOMPRESS !== '1',
+  // Off by default. Compressing the WORK is a stronger claim than compressing
+  // the gaps between it, and most runs do not need it.
+  compressCompute: ENV.DS_COMPRESSCOMPUTE === '1',
 };
 
 /**
@@ -23,6 +26,7 @@ export const FEAT = {
 export function setFeatures(f){
   if(f && 'trim' in f) FEAT.trim=!!f.trim;
   if(f && 'compress' in f) FEAT.compress=!!f.compress;
+  if(f && 'compressCompute' in f) FEAT.compressCompute=!!f.compressCompute;
   // The threshold is a rule, not a feature -- but it is the rule most worth
   // arguing with, so it is reachable from the panel too. Written back onto
   // ELASTIC because that is where every caller reads it.

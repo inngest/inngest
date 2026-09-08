@@ -429,6 +429,7 @@ const sec=(title,sub,body)=>
 const FEATURES = [
   {k:'trim',     n:'hide the opening queue', d:'name a run’s first wait instead of drawing it'},
   {k:'compress', n:'compress dead time',     d:'collapse a stretch with nothing executing to a band'},
+  {k:'compressCompute', n:'compress compute too', d:'…and a stretch of work that dwarfs the rest of the run'},
 ];
 
 /**
@@ -484,7 +485,7 @@ const dsmod=`<script type="module">
       m.root.render(K.React.createElement(K.Trace, {
         key: m.d.id,
         rows: m.d.rows, extra: m.d.extra, under: m.d.under, label: m.d.label,
-        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true, multiple:${MULT_DEFAULT}} : feat),
+        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true, compressCompute:false, multiple:${MULT_DEFAULT}} : feat),
       }));
   };
 
@@ -1163,7 +1164,7 @@ ${dsmod}
   // ---- feature toggles -------------------------------------------------
   // These change what is DRAWN, so the page carries a variant per combination
   // and this picks one. Everything else in the panel is a CSS variable.
-  var FKEY='tds.feat.v1', feat={trim:true, compress:true, multiple:${MULT_DEFAULT}};
+  var FKEY='tds.feat.v1', feat={trim:true, compress:true, compressCompute:false, multiple:${MULT_DEFAULT}};
   try{ feat=Object.assign(feat, JSON.parse(localStorage.getItem(FKEY)||'{}')); }catch(e){}
   function featKey(){ return (feat.trim?'1':'0')+(feat.compress?'1':'0'); }
   /**
@@ -1250,7 +1251,8 @@ ${dsmod}
     }
     // The features are properties of a drawing. Every figure re-renders from
     // the events it was drawn from, through the same component.
-    if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress, multiple:feat.multiple});
+    if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress,
+      compressCompute:feat.compressCompute, multiple:feat.multiple});
     document.querySelectorAll('#side [data-feat]').forEach(function(b){
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';
