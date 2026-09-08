@@ -82,14 +82,51 @@ export function loadRun(id){
     const sep = d && !isFin && at(d.endedAt)!=null && st!=null && at(d.endedAt) <= st;
     const moments=[];
     if(sep){
-      moments.push(['queued', at(d.queuedAt)]);
-      moments.push(['started', at(d.startedAt), 'disc']);
-      moments.push(['ok', at(d.endedAt)]);
+      const dq=at(d.queuedAt), ds=at(d.startedAt), de=at(d.endedAt);
+      /**
+       * A request can RUN steps before it plans the next one.
+       *
+       * A sequential thread executes `a` and then hits the sleep and returns
+       * it, all in one request -- so that request's queue is the run's queue
+       * and its first stretch of work is `a`, neither of which has anything
+       * to do with the sleep. Drawing the request from its `queuedAt` put all
+       * of it in the sleep's row: the sleep appeared to have been waiting since
+       * the run was enqueued, through another step's execution.
+       *
+       * The part of the request that produced THIS step is what came after the
+       * last thing it ran, and there is no queue in front of it because the
+       * step did not exist to be queued.
+       */
+      let prior=null;
+      for(const o of (t.childrenSpans||[])){
+        if(INTERNAL.test(o.name||'')) continue;
+        if((o.stepID||o.name)===key) continue;
+        const a=at(o.startedAt), b=at(o.endedAt);
+        if(a==null||b==null||dq==null||de==null) continue;
+        if(a>=dq && b<=de) prior=prior==null?b:Math.max(prior,b);
+      }
+      if(prior==null){
+        moments.push(['queued', dq]);
+        moments.push(['started', ds, 'disc']);
+      }else{
+        moments.push(['started', Math.min(Math.max(prior,dq), de), 'disc']);
+      }
+      moments.push(['ok', de]);
     }
-    // planned, where one request reported this step alongside others
-    const multi=d && (d.plannedStepIDs||[]).length>1;
-    const qq=sep ? Math.max(q, at(d.endedAt)) : q;
-    if(qq!=null && (st==null || qq<=st)) moments.push([multi?'planned':'queued', qq]);
+    /**
+     * A step reported by a separate request was PLANNED, and it was planned at
+     * the instant that request reported it.
+     *
+     * `planned` used to be reserved for a request that reported several steps,
+     * on the reasoning that one step needs no ribbon. But the mark is not about
+     * the ribbon: it says this step was handed to the executor by a request
+     * rather than run by one, which is the difference between a sleep and a
+     * `step.run` in a sequential thread. Placing it where the request resolved
+     * also collapses it with that resolution into the one circle it is -- they
+     * were a millisecond apart and drew two overlapping marks.
+     */
+    const qq=sep ? at(d.endedAt) : q;
+    if(qq!=null && (st==null || qq<=st)) moments.push([sep?'planned':'queued', qq]);
     if(st!=null) moments.push(['started', st]);
     if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
       moments.push([out, en]);
