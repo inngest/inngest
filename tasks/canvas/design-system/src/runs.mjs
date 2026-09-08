@@ -317,7 +317,19 @@ export function loadRun(id){
     if(priorCp && priorAt!=null) cpAt.add(priorAt);
     const cp = cpAt.size ? [...cpAt] : undefined;
 
-    rows.push({_q:q==null?0:q, n:name, kind, at:moments, cp, reported:sep||undefined,
+    /**
+     * Rows a request reported together were queued TOGETHER, so they sort
+     * together.
+     *
+     * Their own queue instants differ by a millisecond or two -- that is how
+     * fast the executor wrote them, not an order they happened in -- and
+     * sorting on that was enough to interleave one group with the next: `nap`
+     * and `busy-2` were planned by one request, in that order, and came out
+     * `busy-2` first because its span was written 1ms sooner.
+     */
+    const group = planned && at(d.endedAt)!=null ? at(d.endedAt) : (q==null?0:q);
+
+    rows.push({_q:q==null?0:q, _g:group, n:name, kind, at:moments, cp, reported:sep||undefined,
                end:out?undefined:total, _stepID:first.stepID, _planner:d&&d.spanID});
   }
 
@@ -336,7 +348,7 @@ export function loadRun(id){
    * Name is the last resort, for rows no request reported together.
    */
   const pi=r=>planIndex.has(r.n)?planIndex.get(r.n):Infinity;
-  rows.sort((a,b)=>a._q-b._q || pi(a)-pi(b) || (a.n<b.n?-1:a.n>b.n?1:0));
+  rows.sort((a,b)=>(a._g??a._q)-(b._g??b._q) || pi(a)-pi(b) || (a.n<b.n?-1:a.n>b.n?1:0));
 
   /**
    * The finalization, where the run did not make a request for it.
@@ -391,7 +403,7 @@ export function loadRun(id){
       lead.reports=mem.filter(r=>r!==lead).map(r=>r.n);
     }
   }
-  rows.forEach(r=>{ delete r._stepID; delete r._planner; delete r._q; });
+  rows.forEach(r=>{ delete r._stepID; delete r._planner; delete r._q; delete r._g; });
 
   // The run as it happened. What to hide is a drawing decision, made where
   // the drawing is: trimming here would bake it in and the toggle could not
