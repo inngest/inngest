@@ -38,7 +38,7 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		AppID:       appID,
 		EventKey:    &key,
 		Logger:      slog.New(slog.DiscardHandler),
-		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 
 	for _, o := range copts {
@@ -85,7 +85,7 @@ func NewSDKConnectHandler(t *testing.T, appID string, copts ...opt) inngestgo.Cl
 		AppID:       appID,
 		EventKey:    &key,
 		Logger:      logger.StdlibLogger(context.Background()).SLog(),
-		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+		RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 
 	for _, o := range copts {

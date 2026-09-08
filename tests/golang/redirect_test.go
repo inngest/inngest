@@ -47,7 +47,7 @@ func TestRedirect(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "my-fn",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("my-event", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

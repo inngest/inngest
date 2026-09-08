@@ -4,8 +4,6 @@ import (
 	"strconv"
 
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
-
-	"github.com/inngest/inngest/pkg/util"
 )
 
 // extractAIMetadataFromAttributes reads the OpenTelemetry GenAI semantic
@@ -34,7 +32,7 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 
 	read("gen_ai.usage.input_tokens", func(v *v1.AnyValue) { md.InputTokens = v.GetIntValue() })
 	read("gen_ai.usage.output_tokens", func(v *v1.AnyValue) { md.OutputTokens = v.GetIntValue() })
-	read("gen_ai.usage.total_tokens", func(v *v1.AnyValue) { md.TotalTokens = util.ToPtr(v.GetIntValue()) })
+	read("gen_ai.usage.total_tokens", func(v *v1.AnyValue) { md.TotalTokens = new(v.GetIntValue()) })
 
 	read("gen_ai.response.finish_reasons", func(v *v1.AnyValue) {
 		// semconv defines finish_reasons as an array (one entry per choice), but
@@ -86,12 +84,12 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 func intFromAny(v *v1.AnyValue) *int64 {
 	switch v.GetValue().(type) {
 	case *v1.AnyValue_IntValue:
-		return util.ToPtr(v.GetIntValue())
+		return new(v.GetIntValue())
 	case *v1.AnyValue_DoubleValue:
-		return util.ToPtr(int64(v.GetDoubleValue()))
+		return new(int64(v.GetDoubleValue()))
 	case *v1.AnyValue_StringValue:
 		if n, err := strconv.ParseFloat(v.GetStringValue(), 64); err == nil {
-			return util.ToPtr(int64(n))
+			return new(int64(n))
 		}
 	}
 	return nil
@@ -103,12 +101,12 @@ func intFromAny(v *v1.AnyValue) *int64 {
 func floatFromAny(v *v1.AnyValue) *float64 {
 	switch v.GetValue().(type) {
 	case *v1.AnyValue_DoubleValue:
-		return util.ToPtr(v.GetDoubleValue())
+		return new(v.GetDoubleValue())
 	case *v1.AnyValue_IntValue:
-		return util.ToPtr(float64(v.GetIntValue()))
+		return new(float64(v.GetIntValue()))
 	case *v1.AnyValue_StringValue:
 		if n, err := strconv.ParseFloat(v.GetStringValue(), 64); err == nil {
-			return util.ToPtr(n)
+			return new(n)
 		}
 	}
 	return nil

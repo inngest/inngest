@@ -34,7 +34,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(0),
+				Retries: new(0),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -84,7 +84,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(1),
+				Retries: new(1),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -137,7 +137,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(1),
+				Retries: new(1),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -186,7 +186,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(0),
+				Retries: new(0),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -226,7 +226,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(1),
+				Retries: new(1),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -268,7 +268,7 @@ func TestStepRetry(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "fn",
-				Retries: inngestgo.IntPtr(0),
+				Retries: new(0),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

@@ -510,11 +510,11 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.Fu
 	}
 
 	if run.BatchID != nil {
-		result.Trigger.BatchId = optionalString(run.BatchID.String())
+		result.Trigger.BatchId = new(run.BatchID.String())
 	}
 
 	if run.Cron != nil {
-		result.Trigger.CronSchedule = optionalString(*run.Cron)
+		result.Trigger.CronSchedule = new(*run.Cron)
 	}
 
 	if run.EndedAt != nil {
@@ -549,11 +549,11 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 	}
 
 	if run.BatchID != nil {
-		result.Trigger.BatchId = optionalString(run.BatchID.String())
+		result.Trigger.BatchId = new(run.BatchID.String())
 	}
 
 	if run.Cron != nil {
-		result.Trigger.CronSchedule = optionalString(*run.Cron)
+		result.Trigger.CronSchedule = new(*run.Cron)
 	}
 
 	if run.EndedAt != nil {
@@ -626,8 +626,9 @@ func jsonToStruct(raw json.RawMessage) *structpb.Struct {
 	}
 }
 
+//go:fix inline
 func optionalString(value string) *string {
-	return &value
+	return new(value)
 }
 
 func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool) (*apiv2.FunctionTrace, error) {

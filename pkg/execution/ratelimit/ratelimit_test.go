@@ -17,7 +17,7 @@ func TestRateLimitKey(t *testing.T) {
 			ctx,
 			id,
 			inngest.RateLimit{
-				Key: str("event.data.orderId"),
+				Key: new("event.data.orderId"),
 			},
 			map[string]any{
 				"data": map[string]any{
@@ -34,7 +34,7 @@ func TestRateLimitKey(t *testing.T) {
 			ctx,
 			id,
 			inngest.RateLimit{
-				Key: str("event.data.name + '--' + event.data.id"),
+				Key: new("event.data.name + '--' + event.data.id"),
 			},
 			map[string]any{
 				"data": map[string]any{
@@ -52,7 +52,7 @@ func TestRateLimitKey(t *testing.T) {
 			ctx,
 			id,
 			inngest.RateLimit{
-				Key: str("event.data.name + '--' + event.data.id"),
+				Key: new("event.data.name + '--' + event.data.id"),
 			},
 			map[string]any{
 				"data": map[string]any{
@@ -65,6 +65,7 @@ func TestRateLimitKey(t *testing.T) {
 	})
 }
 
+//go:fix inline
 func str(s string) *string {
-	return &s
+	return new(s)
 }

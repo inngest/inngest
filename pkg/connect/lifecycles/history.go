@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -77,7 +76,7 @@ func getMaxWorkerConcurrency(conn *state.Connection) int64 {
 func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
 	var disconnectReason *string
 	if closeReason != "" {
-		disconnectReason = ptr.String(closeReason)
+		disconnectReason = new(closeReason)
 	}
 	system := conn.Data.GetSystemAttributes()
 
@@ -98,8 +97,8 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 			MaxWorkerConcurrency: getMaxWorkerConcurrency(conn),
 
 			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-			LastHeartbeatAt: ptr.Time(time.Now()),
-			DisconnectedAt:  ptr.Time(time.Now()),
+			LastHeartbeatAt: new(time.Now()),
+			DisconnectedAt:  new(time.Now()),
 			RecordedAt:      time.Now(),
 
 			DisconnectReason: disconnectReason,
@@ -153,7 +152,7 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 			MaxWorkerConcurrency: getMaxWorkerConcurrency(conn),
 
 			ConnectedAt:     ulid.Time(conn.ConnectionId.Time()),
-			LastHeartbeatAt: ptr.Time(lastHeartbeatAt),
+			LastHeartbeatAt: new(lastHeartbeatAt),
 			DisconnectedAt:  nil,
 			RecordedAt:      time.Now(),
 

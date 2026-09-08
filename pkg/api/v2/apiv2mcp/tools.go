@@ -60,9 +60,9 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 		InputSchema: inputSchema(endpoint, includeEnv),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    readOnly,
-			DestructiveHint: boolPointer(!readOnly),
+			DestructiveHint: new(!readOnly),
 			IdempotentHint:  readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete,
-			OpenWorldHint:   boolPointer(false),
+			OpenWorldHint:   new(false),
 		},
 	}
 }
@@ -337,6 +337,7 @@ func ToolError(message string, structured any) *mcp.CallToolResult {
 	}
 }
 
+//go:fix inline
 func boolPointer(value bool) *bool {
-	return &value
+	return new(value)
 }

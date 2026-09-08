@@ -27,14 +27,14 @@ func TestDriverResponseFinal(t *testing.T) {
 		{
 			name: "error is not final",
 			r: DriverResponse{
-				Err: strptr("some err"),
+				Err: new("some err"),
 			},
 			expected: false,
 		},
 		{
 			name: "error marked as final is final",
 			r: DriverResponse{
-				Err:   strptr("some err"),
+				Err:   new("some err"),
 				final: true,
 			},
 			expected: true,
@@ -57,7 +57,7 @@ func TestDriverResponseFormatError(t *testing.T) {
 	}{
 		{
 			name: "with no Output and Err",
-			r:    DriverResponse{Output: nil, Err: strptr("something went wrong")},
+			r:    DriverResponse{Output: nil, Err: new("something went wrong")},
 			expected: StandardError{
 				Error:   "something went wrong",
 				Name:    "Error",
@@ -136,7 +136,7 @@ func TestDriverResponseFormatError(t *testing.T) {
 
 		{
 			name: "non map Output with error",
-			r:    DriverResponse{Output: "YOLO", Err: strptr("502 broken")},
+			r:    DriverResponse{Output: "YOLO", Err: new("502 broken")},
 			expected: StandardError{
 				Error:   "502 broken",
 				Name:    "Error",
@@ -212,7 +212,7 @@ func TestFatalUpstreamError(t *testing.T) {
 		// This mirrors what the driver does: set Output + keep the status Err.
 		dr := DriverResponse{
 			Output: json.RawMessage(out),
-			Err:    strptr("invalid status code: 502"),
+			Err:    new("invalid status code: 502"),
 		}
 		se := dr.StandardError()
 		require.Equal(t, FatalServerErrorName, se.Name)
@@ -274,7 +274,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "HTML output wrapped in error with quoted string",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("failed"),
+				Err:       new("failed"),
 				Output:    "<html><body>502 Bad Gateway</body></html>",
 			},
 			expected: `{"error":"<html><body>502 Bad Gateway</body></html>"}`,
@@ -315,7 +315,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "error with non-JSON output",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("request failed"),
+				Err:       new("request failed"),
 				Output:    "<html>Error page</html>",
 			},
 			expected: `{"error":"<html>Error page</html>"}`,
@@ -324,7 +324,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "already wrapped error returned as-is",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("failed"),
+				Err:       new("failed"),
 				Output:    `{"error":{"message":"SDK error"}}`,
 			},
 			expected: `{"error":{"message":"SDK error"}}`,
@@ -344,7 +344,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "StandardError serialized output passes through as-is",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("Unable to reach SDK URL"),
+				Err:       new("Unable to reach SDK URL"),
 				Output: StandardError{
 					Error:   "Unable to reach SDK URL",
 					Name:    DefaultErrorName,
@@ -358,7 +358,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "syscode StandardError serialized output passes through as-is",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("output_too_large"),
+				Err:       new("output_too_large"),
 				Output: StandardError{
 					Error:   "output_too_large: response too large",
 					Name:    "output_too_large",
@@ -372,7 +372,7 @@ func TestGetTraceFunctionOutput(t *testing.T) {
 			name: "V2 driver internal error StandardError passes through as-is",
 			r: DriverResponse{
 				Generator: []*GeneratorOpcode{},
-				Err:       strptr("Unable to reach SDK: connection refused"),
+				Err:       new("Unable to reach SDK: connection refused"),
 				Output: StandardError{
 					Error:   "Unable to reach SDK: connection refused",
 					Name:    DefaultErrorName,
@@ -455,6 +455,7 @@ func TestStandardErrorSerialize(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func strptr(s string) *string {
-	return &s
+	return new(s)
 }

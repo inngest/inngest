@@ -233,7 +233,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 				RateLimit: &inngest.RateLimit{
 					Limit:  10,
 					Period: "60s",
-					Key:    stringPtr("event.user.id"),
+					Key:    new("event.user.id"),
 				},
 			},
 			expected: constraintapi.ConstraintConfig{
@@ -292,13 +292,13 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 						},
 						{
 							Limit: 3,
-							Key:   stringPtr("event.user.id"),
+							Key:   new("event.user.id"),
 							Scope: enums.ConcurrencyScopeAccount,
 							Hash:  "user-key-hash",
 						},
 						{
 							Limit: 2,
-							Key:   stringPtr("event.organization.id"),
+							Key:   new("event.organization.id"),
 							Scope: enums.ConcurrencyScopeEnv,
 							Hash:  "org-key-hash",
 						},
@@ -368,7 +368,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					Limit:  15,
 					Burst:  3,
 					Period: 30 * time.Second,
-					Key:    stringPtr("event.tenant.id"),
+					Key:    new("event.tenant.id"),
 				},
 			},
 			expected: constraintapi.ConstraintConfig{
@@ -398,7 +398,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 				RateLimit: &inngest.RateLimit{
 					Limit:  25,
 					Period: "120s",
-					Key:    stringPtr("event.api_key"),
+					Key:    new("event.api_key"),
 				},
 				Concurrency: &inngest.ConcurrencyLimits{
 					Limits: []inngest.StepConcurrency{
@@ -408,7 +408,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 						},
 						{
 							Limit: 5,
-							Key:   stringPtr("event.user.id"),
+							Key:   new("event.user.id"),
 							Scope: enums.ConcurrencyScopeAccount,
 							Hash:  "complete-user-hash",
 						},
@@ -418,7 +418,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					Limit:  50,
 					Burst:  10,
 					Period: 90 * time.Second,
-					Key:    stringPtr("event.organization.slug"),
+					Key:    new("event.organization.slug"),
 				},
 			},
 			expected: constraintapi.ConstraintConfig{
@@ -491,6 +491,8 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 }
 
 // Helper function to create string pointers
+//
+//go:fix inline
 func stringPtr(s string) *string {
-	return &s
+	return new(s)
 }

@@ -2413,7 +2413,8 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	}
 }
 
-func int64ptr(i int64) *int64 { return &i }
+//go:fix inline
+func int64ptr(i int64) *int64 { return new(i) }
 
 func TestQueueEnqueueToBacklog(t *testing.T) {
 	t.Run("simple item", func(t *testing.T) {

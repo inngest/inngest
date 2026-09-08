@@ -96,8 +96,9 @@ func activeRoleLease(q queueImpl, roleName string) *ulid.ULID {
 	return nil
 }
 
+//go:fix inline
 func max(i int) *int {
-	return &i
+	return new(i)
 }
 
 func TestQueueRunBasic(t *testing.T) {
@@ -129,7 +130,7 @@ func TestQueueRunBasic(t *testing.T) {
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(3),
+				MaxAttempts: new(3),
 				Identifier: state.Identifier{
 					AccountID:  accountId,
 					WorkflowID: idA,
@@ -141,7 +142,7 @@ func TestQueueRunBasic(t *testing.T) {
 			FunctionID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID:  accountId,
 					WorkflowID: idB,
@@ -154,7 +155,7 @@ func TestQueueRunBasic(t *testing.T) {
 			QueueName:  &customQueueName,
 			Data: osqueue.Item{
 				Kind:        "test-kind",
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID:  accountId,
 					WorkflowID: idB,
@@ -221,7 +222,7 @@ func TestQueueRunRetry(t *testing.T) {
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(3),
+				MaxAttempts: new(3),
 				Identifier: state.Identifier{
 					AccountID:  accountId,
 					WorkflowID: idA,
@@ -472,7 +473,7 @@ func TestRunPriorityFactor(t *testing.T) {
 		{
 			WorkspaceID: idA,
 			Kind:        osqueue.KindEdge,
-			MaxAttempts: max(1),
+			MaxAttempts: new(1),
 			Identifier: state.Identifier{
 				AccountID:  accountId,
 				WorkflowID: idA,
@@ -482,7 +483,7 @@ func TestRunPriorityFactor(t *testing.T) {
 		{
 			WorkspaceID: idB,
 			Kind:        osqueue.KindEdge,
-			MaxAttempts: max(1),
+			MaxAttempts: new(1),
 			Identifier: state.Identifier{
 				AccountID:  accountId,
 				WorkflowID: idB,
@@ -575,7 +576,7 @@ func TestQueueAllowList(t *testing.T) {
 			Data: osqueue.Item{
 				QueueName:   &allowedQueueName,
 				Kind:        osqueue.KindPause,
-				MaxAttempts: max(3),
+				MaxAttempts: new(3),
 			},
 		},
 		{
@@ -584,7 +585,7 @@ func TestQueueAllowList(t *testing.T) {
 			Data: osqueue.Item{
 				QueueName:   &otherQueueName,
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID: accountId,
 					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
@@ -595,7 +596,7 @@ func TestQueueAllowList(t *testing.T) {
 			ID: "i3",
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID: accountId,
 					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
@@ -689,7 +690,7 @@ func TestQueueDenyList(t *testing.T) {
 			Data: osqueue.Item{
 				QueueName:   &deniedQueueName,
 				Kind:        osqueue.KindPause,
-				MaxAttempts: max(3),
+				MaxAttempts: new(3),
 			},
 		},
 		{
@@ -698,7 +699,7 @@ func TestQueueDenyList(t *testing.T) {
 			Data: osqueue.Item{
 				QueueName:   &otherQueueName,
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID: accountId,
 					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
@@ -709,7 +710,7 @@ func TestQueueDenyList(t *testing.T) {
 			ID: "i3",
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					AccountID: accountId,
 					RunID:     ulid.MustNew(ulid.Now(), rand.Reader),
@@ -788,7 +789,7 @@ func TestQueueRunAccount(t *testing.T) {
 			FunctionID: idA,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(3),
+				MaxAttempts: new(3),
 				Identifier: state.Identifier{
 					WorkflowID: idA,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
@@ -800,7 +801,7 @@ func TestQueueRunAccount(t *testing.T) {
 			FunctionID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					WorkflowID: idB,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
@@ -812,7 +813,7 @@ func TestQueueRunAccount(t *testing.T) {
 			FunctionID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
-				MaxAttempts: max(1),
+				MaxAttempts: new(1),
 				Identifier: state.Identifier{
 					WorkflowID: idB,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),

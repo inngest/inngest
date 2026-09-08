@@ -72,8 +72,11 @@ func TestRunTraceEnded(t *testing.T) {
 	}
 }
 
-func boolPtr(b bool) *bool    { return &b }
-func strPtr(s string) *string { return &s }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
+
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 	tr := &traceReader{}
@@ -87,8 +90,8 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 				{
 					RawOtelSpan: cqrs.RawOtelSpan{Name: "GET"},
 					Attributes: &meta.ExtractedValues{
-						IsUserland:   boolPtr(true),
-						UserlandName: strPtr("GET"),
+						IsUserland:   new(true),
+						UserlandName: new("GET"),
 					},
 				},
 			},
@@ -109,15 +112,15 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 				{
 					RawOtelSpan: cqrs.RawOtelSpan{Name: SDKExecutionSpanName},
 					Attributes: &meta.ExtractedValues{
-						IsUserland:   boolPtr(true),
-						UserlandName: strPtr(SDKExecutionSpanName),
+						IsUserland:   new(true),
+						UserlandName: new(SDKExecutionSpanName),
 					},
 					Children: []*cqrs.OtelSpan{
 						{
 							RawOtelSpan: cqrs.RawOtelSpan{Name: "GET"},
 							Attributes: &meta.ExtractedValues{
-								IsUserland:   boolPtr(true),
-								UserlandName: strPtr("GET"),
+								IsUserland:   new(true),
+								UserlandName: new("GET"),
 							},
 						},
 					},
@@ -139,15 +142,15 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 				{
 					RawOtelSpan: cqrs.RawOtelSpan{Name: "my-span"},
 					Attributes: &meta.ExtractedValues{
-						IsUserland:   boolPtr(true),
-						UserlandName: strPtr("my-span"),
+						IsUserland:   new(true),
+						UserlandName: new("my-span"),
 					},
 					Children: []*cqrs.OtelSpan{
 						{
 							RawOtelSpan: cqrs.RawOtelSpan{Name: "child-span"},
 							Attributes: &meta.ExtractedValues{
-								IsUserland:   boolPtr(true),
-								UserlandName: strPtr("child-span"),
+								IsUserland:   new(true),
+								UserlandName: new("child-span"),
 							},
 						},
 					},
@@ -230,7 +233,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 					Attributes: &meta.ExtractedValues{
 						DynamicStatus: &completedStatus,
 						StepOp:        &stepOpRun,
-						StepID:        strPtr("step-a"),
+						StepID:        new("step-a"),
 					},
 				},
 			},
@@ -260,7 +263,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 					Attributes: &meta.ExtractedValues{
 						DynamicStatus: &completedStatus,
 						StepOp:        &stepOpRun,
-						StepID:        strPtr("step-a"),
+						StepID:        new("step-a"),
 					},
 				},
 				{
@@ -275,7 +278,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 					Attributes: &meta.ExtractedValues{
 						DynamicStatus: &completedStatus,
 						StepOp:        &stepOpRun,
-						StepID:        strPtr("step-b"),
+						StepID:        new("step-b"),
 					},
 				},
 			},
@@ -324,7 +327,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 							Attributes: &meta.ExtractedValues{
 								DynamicStatus: &executionStatus,
 								StepOp:        &executionOp,
-								StepID:        strPtr("visible-discovery"),
+								StepID:        new("visible-discovery"),
 							},
 						},
 					},
@@ -335,7 +338,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 					Attributes: &meta.ExtractedValues{
 						DynamicStatus: &completedStatus,
 						StepOp:        &stepOpRun,
-						StepID:        strPtr("step-a"),
+						StepID:        new("step-a"),
 					},
 				},
 			},
@@ -376,7 +379,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 					Attributes: &meta.ExtractedValues{
 						DynamicStatus: &completedStatus,
 						StepOp:        &stepOpRun,
-						StepID:        strPtr("step-a"),
+						StepID:        new("step-a"),
 					},
 				},
 				{
@@ -410,13 +413,13 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 			StepAttempt:   intPtr(attempt),
 		}
 		if functionOutput {
-			attrs.IsFunctionOutput = boolPtr(true)
-			attrs.StepID = strPtr("fn-hash")
+			attrs.IsFunctionOutput = new(true)
+			attrs.StepID = new("fn-hash")
 		}
 		return &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution, SpanID: spanID},
 			Attributes:  attrs,
-			OutputID:    strPtr(outputID),
+			OutputID:    new(outputID),
 		}
 	}
 
@@ -470,13 +473,13 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 		// Guard against over-clearing: a step span whose exec child is NOT a
 		// function output must keep step identity and output.
 		child := execChild("exec-0", 0, completed, false, "step-output")
-		child.Attributes.StepID = strPtr("step-1")
+		child.Attributes.StepID = new("step-1")
 
 		step := &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep, SpanID: "step"},
 			Attributes: &meta.ExtractedValues{
-				StepName: strPtr("my-step"),
-				StepID:   strPtr("step-1"),
+				StepName: new("my-step"),
+				StepID:   new("step-1"),
 			},
 			Children: []*cqrs.OtelSpan{child},
 		}

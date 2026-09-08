@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -2907,11 +2906,11 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 
 	var disconnectedAt, lastHeartbeatAt *time.Time
 	if conn.DisconnectedAt.Valid {
-		disconnectedAt = ptr.Time(time.UnixMilli(conn.DisconnectedAt.Int64))
+		disconnectedAt = new(time.UnixMilli(conn.DisconnectedAt.Int64))
 	}
 
 	if conn.LastHeartbeatAt.Valid {
-		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
+		lastHeartbeatAt = new(time.UnixMilli(conn.LastHeartbeatAt.Int64))
 	}
 
 	var appVersion *string
@@ -3231,10 +3230,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 
 		var disconnectedAt, lastHeartbeatAt *time.Time
 		if data.DisconnectedAt.Valid {
-			disconnectedAt = ptr.Time(time.UnixMilli(data.DisconnectedAt.Int64))
+			disconnectedAt = new(time.UnixMilli(data.DisconnectedAt.Int64))
 		}
 		if data.LastHeartbeatAt.Valid {
-			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
+			lastHeartbeatAt = new(time.UnixMilli(data.LastHeartbeatAt.Int64))
 		}
 
 		var appVersion *string

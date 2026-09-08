@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -127,7 +126,7 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 		CreatedAt: &evt.ReceivedAt,
 		ID:        evt.InternalID(),
 		Name:      &evt.EventName,
-		Payload:   util.StrPtr(string(payload)),
+		Payload:   new(string(payload)),
 	}, nil
 }
 
@@ -169,7 +168,7 @@ func (r *functionRunResolver) Events(ctx context.Context, obj *models.FunctionRu
 			ID:        e.InternalID(),
 			Name:      &e.EventName,
 			CreatedAt: &e.ReceivedAt,
-			Payload:   util.StrPtr(string(payload)),
+			Payload:   new(string(payload)),
 		}
 	}
 

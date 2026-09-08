@@ -64,7 +64,7 @@ func TestService_SendEvent(t *testing.T) {
 		Name: "app/user.created",
 		Data: data,
 		User: user,
-		Id:   stringPointer("event-idempotency-key"),
+		Id:   new("event-idempotency-key"),
 		Ts:   &timestamp,
 	})
 
@@ -108,7 +108,7 @@ func TestService_SendEventValidation(t *testing.T) {
 			name: "timestamp too old",
 			request: &apiv2.SendEventRequest{
 				Name: "test/event",
-				Ts:   int64Pointer(time.Date(1979, 12, 31, 23, 59, 59, 0, time.UTC).UnixMilli()),
+				Ts:   new(time.Date(1979, 12, 31, 23, 59, 59, 0, time.UTC).UnixMilli()),
 			},
 			error: "timestamp is before Jan 1, 1980",
 		},
@@ -315,10 +315,12 @@ func TestHTTPGateway_SendEventBodyLimitDoesNotApplyToOtherRoutes(t *testing.T) {
 	require.NotEqual(t, http.StatusRequestEntityTooLarge, recorder.Code)
 }
 
+//go:fix inline
 func stringPointer(value string) *string {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func int64Pointer(value int64) *int64 {
-	return &value
+	return new(value)
 }

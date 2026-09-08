@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -314,7 +313,7 @@ func TestForwardDuringGatewayDrainReturnsFalse(t *testing.T) {
 			AppName:        res.appName,
 			FunctionId:     res.fnID.String(),
 			FunctionSlug:   res.fnSlug,
-			StepId:         ptr.String("step"),
+			StepId:         new("step"),
 			RequestPayload: []byte("should not be delivered while draining"),
 			RunId:          res.runID.String(),
 			LeaseId:        "test-lease",
@@ -413,7 +412,7 @@ func TestLeaseExtensionDuringGatewayDrain_IsProcessed(t *testing.T) {
 		AppName:        res.appName,
 		FunctionId:     res.fnID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RequestPayload: []byte("lease ext test"),
 		RunId:          res.runID.String(),
 		LeaseId:        leaseID.String(),

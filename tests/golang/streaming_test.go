@@ -27,8 +27,8 @@ func TestStreaming(t *testing.T) {
 		c := client.New(t)
 		inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
 			AppID:    "my-app",
-			EventKey: toPtr("test"),
-			EventURL: toPtr("http://localhost:8288"),
+			EventKey: new("test"),
+			EventURL: new("http://localhost:8288"),
 		})
 		r.NoError(err)
 
@@ -51,7 +51,7 @@ func TestStreaming(t *testing.T) {
 					http.Error(w, "failed to unmarshal body", http.StatusInternalServerError)
 					return
 				}
-				runID = toPtr(request.Context.RunID.String())
+				runID = new(request.Context.RunID.String())
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
@@ -84,7 +84,7 @@ func TestStreaming(t *testing.T) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}))
 		defer fakeSDK.Close()
-		appURL = toPtr(fakeSDK.URL())
+		appURL = new(fakeSDK.URL())
 
 		// Simulate an SDK syncing itself.
 		sync := func() error {
@@ -185,6 +185,7 @@ func TestStreaming(t *testing.T) {
 	})
 }
 
+//go:fix inline
 func toPtr[T any](v T) *T {
-	return &v
+	return new(v)
 }

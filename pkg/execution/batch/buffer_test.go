@@ -1034,7 +1034,7 @@ func TestBufferedBatchManagerMultipleBufferKeys(t *testing.T) {
 		EventBatch: &inngest.EventBatchConfig{
 			MaxSize: 10,
 			Timeout: "60s",
-			Key:     strPtr("event.data.tenant"),
+			Key:     new("event.data.tenant"),
 		},
 	}
 

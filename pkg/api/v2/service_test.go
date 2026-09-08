@@ -251,20 +251,24 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 	})
 }
 
+//go:fix inline
 func boolPtr(value bool) *bool {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func strPtr(value string) *string {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func intPtr(value int) *int {
-	return &value
+	return new(value)
 }
 
+//go:fix inline
 func int32Ptr(value int32) *int32 {
-	return &value
+	return new(value)
 }
 
 func TestService_GetApp(t *testing.T) {
@@ -478,7 +482,7 @@ func TestService_GetApps(t *testing.T) {
 		})
 
 		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{
-			Cursor: strPtr(firstID.String()),
+			Cursor: new(firstID.String()),
 			Limit:  int32Ptr(1),
 		})
 
@@ -499,7 +503,7 @@ func TestService_GetApps(t *testing.T) {
 		})
 
 		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{
-			Archived: boolPtr(true),
+			Archived: new(true),
 		})
 
 		require.NoError(t, err)
@@ -509,7 +513,7 @@ func TestService_GetApps(t *testing.T) {
 	t.Run("requires valid cursor", func(t *testing.T) {
 		resp, err := NewService(ServiceOptions{Apps: &mockAppProvider{}}).GetApps(
 			context.Background(),
-			&apiv2.GetAppsRequest{Cursor: strPtr("not-a-uuid")},
+			&apiv2.GetAppsRequest{Cursor: new("not-a-uuid")},
 		)
 
 		require.Nil(t, resp)
@@ -575,7 +579,7 @@ func TestService_GetFunction(t *testing.T) {
 			Slug: "my-app-test-fn",
 			Steps: []inngest.Step{{
 				ID:      "step",
-				Retries: intPtr(retries),
+				Retries: new(retries),
 			}},
 			Triggers: inngest.MultipleTriggers{
 				{EventTrigger: &inngest.EventTrigger{Event: "user.created", Expression: &condition}},
@@ -803,7 +807,7 @@ func TestService_GetFunctions(t *testing.T) {
 		service := NewService(ServiceOptions{Functions: functions})
 		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
 			AppId:  "my-app",
-			Cursor: strPtr(firstID.String()),
+			Cursor: new(firstID.String()),
 			Limit:  int32Ptr(1),
 		})
 
@@ -817,7 +821,7 @@ func TestService_GetFunctions(t *testing.T) {
 		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
 		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
 			AppId:  "my-app",
-			Cursor: strPtr("not-a-uuid"),
+			Cursor: new("not-a-uuid"),
 		})
 
 		require.Nil(t, resp)
@@ -893,7 +897,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 	t.Run("returns mapped run data", func(t *testing.T) {
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 		require.NoError(t, err)
 		require.Equal(t, runID.String(), resp.Data.Id)
@@ -972,7 +976,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 		outputIdentifier := cqrs.SpanIdentifier{
 			SpanID:      "output-span",
 			InputSpanID: &inputSpanID,
-			Preview:     boolPtr(true),
+			Preview:     new(true),
 		}
 		outputID, err := outputIdentifier.Encode()
 		require.NoError(t, err)
@@ -1011,7 +1015,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 
 		require.NoError(t, err)
@@ -1044,7 +1048,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 
 		require.NoError(t, err)
@@ -1102,9 +1106,9 @@ func TestService_ListRuns(t *testing.T) {
 
 		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
-			Cursor:        strPtr(pageCursor),
+			Cursor:        new(pageCursor),
 			Limit:         &limit,
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 			From:          timestamppb.New(from),
 			Until:         timestamppb.New(until),
 			TimeField:     "startedAt",
@@ -1163,7 +1167,7 @@ func TestService_ListRuns(t *testing.T) {
 	t.Run("validates cursor", func(t *testing.T) {
 		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
-			Cursor: strPtr("not-a-cursor"),
+			Cursor: new("not-a-cursor"),
 		})
 
 		require.Nil(t, resp)
@@ -1327,7 +1331,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId:       eventID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 
 		require.NoError(t, err)
@@ -1439,7 +1443,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
-			Cursor:  strPtr(runID.String()),
+			Cursor:  new(runID.String()),
 		})
 
 		require.Nil(t, resp)
@@ -1727,8 +1731,8 @@ func TestService_GetFunctionTrace(t *testing.T) {
 	responseHeaders := headers.Compact{"content-type": {"application/json"}}
 	outputIdentifier := cqrs.SpanIdentifier{
 		SpanID:      "span-output",
-		InputSpanID: strPtr("span-input"),
-		Preview:     boolPtr(true),
+		InputSpanID: new("span-input"),
+		Preview:     new(true),
 	}
 	outputID := mustEncodeSpanIdentifier(t, outputIdentifier)
 
@@ -1817,7 +1821,7 @@ func TestService_GetFunctionTrace(t *testing.T) {
 
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -1862,7 +1866,7 @@ func TestService_GetFunctionTrace(t *testing.T) {
 
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(false),
+			IncludeOutput: new(false),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -1932,7 +1936,7 @@ func TestService_GetFunctionTrace(t *testing.T) {
 
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
 			RunId:         runID.String(),
-			IncludeOutput: boolPtr(true),
+			IncludeOutput: new(true),
 		})
 
 		require.Nil(t, resp)

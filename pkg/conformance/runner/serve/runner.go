@@ -979,7 +979,7 @@ func runStepsSerial(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeStepRun,
 		ID:          hashes["first step"],
 		Name:        "first step",
-		DisplayName: inngestgo.StrPtr("first step"),
+		DisplayName: new("first step"),
 		Data:        []byte(`"first step"`),
 	}}, 5*time.Second); err != nil {
 		return err
@@ -997,7 +997,7 @@ func runStepsSerial(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeSleep,
 		ID:          hashes["sleep"],
 		Name:        "2s",
-		DisplayName: inngestgo.StrPtr("for 2s"),
+		DisplayName: new("for 2s"),
 		Data:        json.RawMessage("null"),
 	}}, 5*time.Second); err != nil {
 		return err
@@ -1015,7 +1015,7 @@ func runStepsSerial(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeStepRun,
 		ID:          hashes["second step"],
 		Name:        "second step",
-		DisplayName: inngestgo.StrPtr("second step"),
+		DisplayName: new("second step"),
 		Data:        json.RawMessage(`{"first":"first step","second":true}`),
 	}}, 5*time.Second); err != nil {
 		return err
@@ -1066,7 +1066,7 @@ func runRetryBasic(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeStepError,
 		ID:          hash,
 		Name:        "first step",
-		DisplayName: inngestgo.StrPtr("first step"),
+		DisplayName: new("first step"),
 		Error: &state.UserError{
 			Name:    "Error",
 			Message: "broken",
@@ -1085,7 +1085,7 @@ func runRetryBasic(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeStepRun,
 		ID:          hash,
 		Name:        "first step",
-		DisplayName: inngestgo.StrPtr("first step"),
+		DisplayName: new("first step"),
 		Data:        []byte(`"yes: 2"`),
 	}}, 5*time.Second); err != nil {
 		return err
@@ -1157,7 +1157,7 @@ func runCancelBasic(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeSleep,
 		ID:          "c3ca5f787365eae0dea86250e27d476406956478",
 		Name:        "10s",
-		DisplayName: inngestgo.StrPtr("sleep"),
+		DisplayName: new("sleep"),
 		Data:        json.RawMessage("null"),
 	}}, 5*time.Second); err != nil {
 		return err
@@ -1217,7 +1217,7 @@ func runWaitForEventBasic(ctx context.Context, h *caseHarness) error {
 		Op:          enums.OpcodeWaitForEvent,
 		ID:          waitHash,
 		Name:        "wait",
-		DisplayName: inngestgo.StrPtr("test/resume"),
+		DisplayName: new("test/resume"),
 		Data:        json.RawMessage("null"),
 		Opts: map[string]any{
 			"event":   "test/resume",

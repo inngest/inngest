@@ -204,7 +204,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 			AppId:          "my-app",
 			FunctionId:     "my-app-hello-world",
 			Data:           data,
-			IdempotencyKey: stringPtr("test-key-123"),
+			IdempotencyKey: new("test-key-123"),
 		}
 
 		resp, err := client.InvokeFunction(ctx, req)
@@ -302,8 +302,10 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 }
 
 // Helper function to create string pointer for optional fields
+//
+//go:fix inline
 func stringPtr(s string) *string {
-	return &s
+	return new(s)
 }
 
 func BenchmarkGRPCIntegration_Health(b *testing.B) {

@@ -765,8 +765,9 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 	})
 }
 
+//go:fix inline
 func int64Ptr(v int64) *int64 {
-	return &v
+	return new(v)
 }
 
 // mustV2Service spins up a miniredis, wires a sharded manager against it, and

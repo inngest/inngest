@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -179,7 +178,7 @@ func TestDebounce(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -473,7 +472,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -979,7 +978,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		ID: functionId,
 		Debounce: &inngest.Debounce{
 			Period:  "4s",
-			Timeout: util.StrPtr("6s"),
+			Timeout: new("6s"),
 		},
 	}
 
@@ -1622,7 +1621,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -1826,7 +1825,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -2003,7 +2002,7 @@ func TestRollbackPreparedMigrationKeepsMigratingFlagWhenPointerRestoreFails(t *t
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2112,7 +2111,7 @@ func TestFinalizePreparedMigrationCommitsWhenPrimaryReadyAfterError(t *testing.T
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2244,7 +2243,7 @@ func TestCompletePreparedMigrationKeepsMigratingFlagWhenSecondaryCleanupFails(t 
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2377,7 +2376,7 @@ func TestDebounceMigrationFailurePreservesExistingDebounce(t *testing.T) {
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -2496,7 +2495,7 @@ func TestGetDebounceInfo(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil, // Uses function ID as key
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2535,9 +2534,9 @@ func TestGetDebounceInfo(t *testing.T) {
 		fn := inngest.Function{
 			ID: customFnId,
 			Debounce: &inngest.Debounce{
-				Key:     util.StrPtr("event.data.debounce_key"),
+				Key:     new("event.data.debounce_key"),
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2580,7 +2579,7 @@ func TestGetDebounceInfo(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2684,7 +2683,7 @@ func TestDeleteDebounce(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2779,7 +2778,7 @@ func TestRunDebounce(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2860,7 +2859,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 

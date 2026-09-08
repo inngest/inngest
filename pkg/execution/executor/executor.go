@@ -1906,9 +1906,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		QueueKind:   item.Kind,
-		RequestID:   inngestgo.Ptr(requestID),
-		GroupID:     inngestgo.Ptr(item.GroupID),
-		JobID:       inngestgo.Ptr(jobID),
+		RequestID:   new(requestID),
+		GroupID:     new(item.GroupID),
+		JobID:       new(jobID),
 	})
 
 	if e.fl == nil {
@@ -3499,7 +3499,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		Identifier:  sv2id,
 		Attempt:     0,
 		MaxAttempts: pause.MaxAttempts,
-		GroupID:     inngestgo.Ptr(pause.GroupID),
+		GroupID:     new(pause.GroupID),
 	})
 
 	md, err := e.smv2.LoadMetadata(ctx, sv2id)

@@ -376,7 +376,7 @@ func TestBackfillEstimatedCostInValues(t *testing.T) {
 				"response_model": "gpt-4o",
 			},
 			wantCost:  true,
-			wantExact: util.ToPtr(12.5),
+			wantExact: new(12.5),
 		},
 		{
 			name: "falls back to request model when response model absent",
@@ -386,7 +386,7 @@ func TestBackfillEstimatedCostInValues(t *testing.T) {
 				"request_model": "gpt-4o",
 			},
 			wantCost:  true,
-			wantExact: util.ToPtr(12.5),
+			wantExact: new(12.5),
 		},
 		{
 			name: "leaves an existing non-null cost untouched",
@@ -397,7 +397,7 @@ func TestBackfillEstimatedCostInValues(t *testing.T) {
 				"estimated_cost": 42.0,
 			},
 			wantCost:  true,
-			wantExact: util.ToPtr(42.0),
+			wantExact: new(42.0),
 		},
 		{
 			name: "overwrites an explicit null cost",
@@ -408,7 +408,7 @@ func TestBackfillEstimatedCostInValues(t *testing.T) {
 				"estimated_cost": nil,
 			},
 			wantCost:  true,
-			wantExact: util.ToPtr(12.5),
+			wantExact: new(12.5),
 		},
 		{
 			name: "no model means no cost",

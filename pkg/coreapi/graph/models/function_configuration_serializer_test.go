@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 )
 
@@ -27,8 +26,8 @@ func TestToFunctionConfiguration(t *testing.T) {
 				Cancel: []inngest.Cancel{
 					{
 						Event:   "test/cancel",
-						Timeout: util.StrPtr("30m"),
-						If:      util.StrPtr("event.data.id == 2"),
+						Timeout: new("30m"),
+						If:      new("event.data.id == 2"),
 					},
 				},
 			}),
@@ -37,8 +36,8 @@ func TestToFunctionConfiguration(t *testing.T) {
 				Cancellations: []*CancellationConfiguration{
 					{
 						Event:     "test/cancel",
-						Timeout:   util.StrPtr("30m"),
-						Condition: util.StrPtr("event.data.id == 2"),
+						Timeout:   new("30m"),
+						Condition: new("event.data.id == 2"),
 					},
 				},
 			}),
@@ -52,7 +51,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 						ID:      "test-step",
 						Name:    "test-step",
 						URI:     "https://example.com/api/inngest?step=foo",
-						Retries: intPtr(10),
+						Retries: new(10),
 					},
 				},
 			}),
@@ -60,7 +59,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 			expected: mergeWithDefaultFunctionConfiguration(&FunctionConfiguration{
 				Retries: &RetryConfiguration{
 					Value:     10,
-					IsDefault: boolPtr(false),
+					IsDefault: new(false),
 				},
 			}),
 		},
@@ -68,12 +67,12 @@ func TestToFunctionConfiguration(t *testing.T) {
 			name: "priority",
 			fn: mergeWithDefaultFunction(&inngest.Function{
 				Priority: &inngest.Priority{
-					Run: util.StrPtr("event.data.plan == 'enterprise' ? 180 : 0"),
+					Run: new("event.data.plan == 'enterprise' ? 180 : 0"),
 				},
 			}),
 			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
 			expected: mergeWithDefaultFunctionConfiguration(&FunctionConfiguration{
-				Priority: util.StrPtr("event.data.plan == 'enterprise' ? 180 : 0"),
+				Priority: new("event.data.plan == 'enterprise' ? 180 : 0"),
 			}),
 		},
 		{
@@ -82,7 +81,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 				EventBatch: &inngest.EventBatchConfig{
 					MaxSize: 50,
 					Timeout: "30s",
-					Key:     util.StrPtr("event.data.customer_id"),
+					Key:     new("event.data.customer_id"),
 				},
 			}),
 			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
@@ -90,7 +89,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 				EventsBatch: &EventsBatchConfiguration{
 					MaxSize: 50,
 					Timeout: "30s",
-					Key:     util.StrPtr("event.data.customer_id"),
+					Key:     new("event.data.customer_id"),
 				},
 			}),
 		},
@@ -102,12 +101,12 @@ func TestToFunctionConfiguration(t *testing.T) {
 						{
 							Scope: enums.ConcurrencyScopeAccount,
 							Limit: 20,
-							Key:   util.StrPtr("event.data.id == 2"),
+							Key:   new("event.data.id == 2"),
 						},
 						{
 							Scope: enums.ConcurrencyScopeFn,
 							Limit: 5,
-							Key:   util.StrPtr("event.data.id == 2"),
+							Key:   new("event.data.id == 2"),
 						},
 					},
 				},
@@ -119,17 +118,17 @@ func TestToFunctionConfiguration(t *testing.T) {
 						Scope: ConcurrencyScopeAccount,
 						Limit: &ConcurrencyLimitConfiguration{
 							Value:       20,
-							IsPlanLimit: boolPtr(false),
+							IsPlanLimit: new(false),
 						},
-						Key: util.StrPtr("event.data.id == 2"),
+						Key: new("event.data.id == 2"),
 					},
 					{
 						Scope: ConcurrencyScopeFunction,
 						Limit: &ConcurrencyLimitConfiguration{
 							Value:       5,
-							IsPlanLimit: boolPtr(false),
+							IsPlanLimit: new(false),
 						},
-						Key: util.StrPtr("event.data.id == 2"),
+						Key: new("event.data.id == 2"),
 					},
 				},
 			}),
@@ -142,12 +141,12 @@ func TestToFunctionConfiguration(t *testing.T) {
 						{
 							Scope: enums.ConcurrencyScopeAccount,
 							Limit: 20,
-							Key:   util.StrPtr("event.data.id == 2"),
+							Key:   new("event.data.id == 2"),
 						},
 						{
 							Scope: enums.ConcurrencyScopeFn,
 							Limit: 5,
-							Key:   util.StrPtr("event.data.id == 2"),
+							Key:   new("event.data.id == 2"),
 						},
 					},
 				},
@@ -159,17 +158,17 @@ func TestToFunctionConfiguration(t *testing.T) {
 						Scope: ConcurrencyScopeAccount,
 						Limit: &ConcurrencyLimitConfiguration{
 							Value:       10,
-							IsPlanLimit: boolPtr(true),
+							IsPlanLimit: new(true),
 						},
-						Key: util.StrPtr("event.data.id == 2"),
+						Key: new("event.data.id == 2"),
 					},
 					{
 						Scope: ConcurrencyScopeFunction,
 						Limit: &ConcurrencyLimitConfiguration{
 							Value:       5,
-							IsPlanLimit: boolPtr(false),
+							IsPlanLimit: new(false),
 						},
-						Key: util.StrPtr("event.data.id == 2"),
+						Key: new("event.data.id == 2"),
 					},
 				},
 			}),
@@ -180,7 +179,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 				RateLimit: &inngest.RateLimit{
 					Limit:  10,
 					Period: "30s",
-					Key:    util.StrPtr("event.data.customer_id"),
+					Key:    new("event.data.customer_id"),
 				},
 			}),
 			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
@@ -188,7 +187,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 				RateLimit: &RateLimitConfiguration{
 					Limit:  10,
 					Period: "30s",
-					Key:    util.StrPtr("event.data.customer_id"),
+					Key:    new("event.data.customer_id"),
 				},
 			}),
 		},
@@ -215,7 +214,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 					Limit:  10,
 					Period: 30 * time.Minute,
 					Burst:  3,
-					Key:    util.StrPtr("event.data.customer_id"),
+					Key:    new("event.data.customer_id"),
 				},
 			}),
 			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
@@ -224,7 +223,7 @@ func TestToFunctionConfiguration(t *testing.T) {
 					Limit:  10,
 					Period: "30m0s",
 					Burst:  3,
-					Key:    util.StrPtr("event.data.customer_id"),
+					Key:    new("event.data.customer_id"),
 				},
 			}),
 		},
@@ -233,14 +232,14 @@ func TestToFunctionConfiguration(t *testing.T) {
 			fn: mergeWithDefaultFunction(&inngest.Function{
 				Singleton: &inngest.Singleton{
 					Mode: enums.SingletonModeSkip,
-					Key:  util.StrPtr("event.data.id == 2"),
+					Key:  new("event.data.id == 2"),
 				},
 			}),
 			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
 			expected: mergeWithDefaultFunctionConfiguration(&FunctionConfiguration{
 				Singleton: &SingletonConfiguration{
 					Mode: SingletonModeSkip,
-					Key:  util.StrPtr("event.data.id == 2"),
+					Key:  new("event.data.id == 2"),
 				},
 			}),
 		},
@@ -291,14 +290,14 @@ func mergeWithDefaultFunctionConfiguration(overlay *FunctionConfiguration) *Func
 		Cancellations: []*CancellationConfiguration{},
 		Retries: &RetryConfiguration{
 			Value:     4,
-			IsDefault: boolPtr(true),
+			IsDefault: new(true),
 		},
 		Concurrency: []*ConcurrencyConfiguration{
 			{
 				Scope: ConcurrencyScopeAccount,
 				Limit: &ConcurrencyLimitConfiguration{
 					Value:       UnknownPlanConcurrencyLimit,
-					IsPlanLimit: boolPtr(true),
+					IsPlanLimit: new(true),
 				},
 			},
 		},
@@ -310,6 +309,7 @@ func mergeWithDefaultFunctionConfiguration(overlay *FunctionConfiguration) *Func
 	return base
 }
 
+//go:fix inline
 func intPtr(b int) *int {
-	return &b
+	return new(b)
 }
