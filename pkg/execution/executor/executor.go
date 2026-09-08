@@ -914,17 +914,17 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
-func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) (enums.SkipReason, error) {
+func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
 	if e.accountExecutionCap == nil {
-		return enums.SkipReasonNone, nil
+		return enums.SkipReasonNone
 	}
 
 	decision := e.accountExecutionCap(ctx, req.AccountID)
-	if !decision.Exceeded {
-		return enums.SkipReasonNone, nil
+	if !decision.Exceeded || !decision.Enforce {
+		return enums.SkipReasonNone
 	}
 
-	return enums.SkipReasonAccountExecutionCapHit, nil
+	return enums.SkipReasonAccountExecutionCapHit
 }
 
 // Schedule initializes a new function run, ensuring that the function will be
@@ -1386,7 +1386,7 @@ func (e *executor) schedule(
 	var skipReason enums.SkipReason
 	var singletonSkipRunID *ulid.ULID
 
-	skipReason, _ = e.checkExecutionCap(ctx, req)
+	skipReason = e.checkExecutionCap(ctx, req)
 
 	//
 	// Create singleton information and try to handle it prior to creating state.
@@ -1394,7 +1394,7 @@ func (e *executor) schedule(
 	var singletonConfig *queue.Singleton
 	data := req.Events[0].GetEvent().Map()
 
-	if req.Function.Singleton != nil {
+	if skipReason == enums.SkipReasonNone && req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
