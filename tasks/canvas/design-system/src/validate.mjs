@@ -24,7 +24,7 @@ const FINAL=new Set(['ok','failed','timeout','cancelled','done']);
 
 function rowsOf(svg){
   const out=new Map();
-  for(const m of svg.matchAll(/<circle class="ev [^"]*" cx="([\d.]+)" cy="([\d.]+)"[^>]*\/>/g)){
+  for(const m of svg.matchAll(/<circle class="ev [^"]*"[^>]*? cx="([\d.]+)" cy="([\d.]+)"[^>]*\/>/g)){
     const [full,x,y]=m;
     // The trace frame (minimap, Run, Finalization) shares the row grid with the
     // figure it surrounds. It is context, not a row under test.
@@ -32,7 +32,11 @@ function rowsOf(svg){
     const k=classify(full); if(!k) continue;              // background discs
     const key=Math.round(+y);
     if(!out.has(key)) out.set(key,[]);
-    out.get(key).push({x:+x,k});
+    // Which substance the mark opens. A `started` that opens the REQUEST's
+    // work and one that opens the step's own are two different moments, and
+    // this is what tells them apart.
+    const sub=(full.match(/data-sub="([^"]*)"/)||[])[1]||'';
+    out.get(key).push({x:+x,k,sub});
   }
   // A row is drawn twice when part of it is lit: the whole row at its dim
   // opacity, then the lit parts repainted over it. The repaint is the SAME
@@ -68,8 +72,18 @@ function check(seq){
    * an unresolved sleep looks like at any time.
    */
   if(!OPENERS.has(k[0])) p.push(`opens on "${k[0]}" — a row must open on queued, planned or started`);
-  for(let i=1;i<k.length;i++) if(k[i]===k[i-1] && Math.abs(seq[i].x-seq[i-1].x)>1)
-    p.push(`two "${k[i]}" marks in a row`);
+  /**
+   * ...unless the substance changed hands.
+   *
+   * A checkpointed step opens on the request's own work and then begins its
+   * own, which is two `started` moments a few milliseconds apart -- and that
+   * boundary, Inngest executing becoming your step executing, is the single
+   * most important thing the row says. Two marks of a kind are still a defect
+   * where nothing changed between them.
+   */
+  for(let i=1;i<k.length;i++)
+    if(k[i]===k[i-1] && Math.abs(seq[i].x-seq[i-1].x)>1 && seq[i].sub===seq[i-1].sub)
+      p.push(`two "${k[i]}" marks in a row`);
   /**
    * A resolution mid-row is legitimate when the row goes on to do more work: a
    * row that carries its own reporting request has the REQUEST's outcome in the
@@ -88,11 +102,14 @@ function check(seq){
   // reason, which is the thing this check exists to catch.
   // ...or the request at the head of the row resolving, which is what hands the
   // row over from the request to the step it reported.
+  // ...or the row handing over from the request that produced it to the step
+  // itself, which a checkpointed row does with no moment in between: the
+  // substance changes and nothing else does.
   const REEXEC=new Set(['retry','planned','queued','ok','failed']);
   for(let i=1,last=-1;i<k.length;i++){
     if(k[i]!=='started') continue;
     if(last<0){ last=i; continue; }
-    if(!k.slice(last+1,i).some(x=>REEXEC.has(x)))
+    if(!k.slice(last+1,i).some(x=>REEXEC.has(x)) && seq[i].sub===seq[last].sub)
       p.push('a second "started" with no retry or planned between them');
     last=i;
   }
@@ -173,7 +190,7 @@ function checkRunExtent(){
                     else if(v&&typeof v==='object') Object.values(v).forEach(walk); };
     walk(J);
     svgs.forEach((svg,i)=>{
-      const marks=[...svg.matchAll(/<circle class="ev ctx [^"]*" cx="([\d.]+)" cy="([\d.]+)"/g)]
+      const marks=[...svg.matchAll(/<circle class="ev ctx [^"]*"[^>]*? cx="([\d.]+)" cy="([\d.]+)"/g)]
         .map(m=>({x:+m[1],y:Math.round(+m[2])}));
       if(!marks.length) return;                       // unframed figure
       const byRow={};

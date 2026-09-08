@@ -224,7 +224,7 @@ export function row(i,r,sc=1,yy){
     // How we came to know a moment is a fact about the moment, so it is
     // carried on the row as the instants that arrived by checkpoint.
     const cp=(r.cp||[]).some(p=>Math.abs(p-d.p)<0.01);
-    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true,cp));
+    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true,cp,d.s||''));
   });
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.

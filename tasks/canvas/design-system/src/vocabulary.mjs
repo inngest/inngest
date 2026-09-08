@@ -126,7 +126,7 @@ export const EVC = Object.fromEntries(
 /** Filled marks mean finished; hollow ones mean the row has not resolved. */
 export const EV_HOLLOW = ['queued','ribbon','hollow','hollow-bad'];
 
-export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false){
+export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false, sub=''){
   const R=r+GEOM.HALO;
   const col=EVC[c]||c;
   /**
@@ -146,10 +146,10 @@ export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false){
       ? `<rect class="ev-bg sq" x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
       : `<circle class="ev-bg" cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
   if(c==='cancelled')
-    return bg+ring+`<rect class="ev ev-cancelled" x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<rect class="ev ev-cancelled"${sub?` data-sub="${sub}"`:''} x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
   if(EV_HOLLOW.indexOf(c)>=0)
-    return bg+ring+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
-  return bg+ring+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<circle class="ev ev-${c}"${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
+  return bg+ring+`<circle class="ev ev-${c}"${sub?` data-sub="${sub}"`:''} cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
 }
 export const dot = markSvg;
 

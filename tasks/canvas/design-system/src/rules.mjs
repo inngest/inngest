@@ -542,7 +542,7 @@ export const MARK_OF = {
 /** The marks a row draws, from its moments. */
 export function marks(at){
   const out=[];
-  for(const [n,x] of at||[]){
+  for(const [n,x,sub] of at||[]){
     const c=MARK_OF[n];
     if(!c) continue;
     // Two moments at one instant -- a request resolving as the next step is
@@ -560,11 +560,18 @@ export function marks(at){
       out.pop();
     }
     // A mark says something CHANGED. Queue time becoming a named flow-control
-    // hold, or one stretch of work becoming another, changes the substance of
-    // the bar without changing the state of the row, so the second mark would
-    // repeat the first and is dropped.
-    if(out.length && out[out.length-1].c===c) continue;
-    out.push({p:x, c});
+    // hold changes the substance of the bar without changing the state of the
+    // row, so the second mark would repeat the first and is dropped.
+    //
+    // Unless the SUBSTANCE is what changed hands. A checkpointed step opens
+    // with the request's own work and then begins its own -- two `started`
+    // moments, one carrying `disc` and one not -- and that is the boundary
+    // between Inngest executing and your step executing, which is the single
+    // most important thing a row says. Dropping it left the handover to be
+    // inferred from a colour change with no mark on it.
+    const handover = out.length && out[out.length-1].s==='disc' && !sub;
+    if(out.length && out[out.length-1].c===c && !handover) continue;
+    out.push({p:x, c, s:sub});
   }
   return out;
 }
