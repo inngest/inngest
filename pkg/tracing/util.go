@@ -170,8 +170,20 @@ func DriverResponseAttrs(
 
 	// If we have a single op to process, also add any generator data to the
 	// span and overwrite any clashes
+	//
+	// ...except the op's own TIMINGS, which are about the step and not about
+	// the request that reported it. These attrs are merged onto the EXECUTION
+	// span, so a sleep -- which starts the moment it is queued, and says so by
+	// stamping startedAt with the time the op was handled -- was overwriting
+	// the moment the request began with the moment it ended. That left every
+	// discovery that planned a sleep reporting startedAt == endedAt: a request
+	// with no execution window at all, which no view could draw as one.
 	if op := resp.TraceVisibleStepExecution(); op != nil {
-		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op))
+		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op).Without(
+			meta.Attrs.StartedAt.Key(),
+			meta.Attrs.EndedAt.Key(),
+			meta.Attrs.QueuedAt.Key(),
+		))
 	}
 
 	// always add all steps received as a debugging attie

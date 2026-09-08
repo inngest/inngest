@@ -106,6 +106,29 @@ func (r *SerializableAttrs) Get(name string) any {
 	return nil
 }
 
+// Without returns a copy of the set with the named keys removed. For handing a
+// set of attributes to a span that some of them are not about -- a step's own
+// timings, say, merged onto the request that reported it.
+func (r *SerializableAttrs) Without(keys ...string) *SerializableAttrs {
+	if r == nil {
+		return nil
+	}
+	drop := make(map[string]struct{}, len(keys))
+	for _, k := range keys {
+		drop[k] = struct{}{}
+	}
+	out := NewAttrSet()
+	for _, a := range r.Attrs {
+		if _, skip := drop[a.key]; skip {
+			continue
+		}
+		out.keyMap[a.key] = len(out.Attrs)
+		out.Attrs = append(out.Attrs, a)
+	}
+	out.es = r.es
+	return out
+}
+
 func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
 	es := r.es
 	o := other
