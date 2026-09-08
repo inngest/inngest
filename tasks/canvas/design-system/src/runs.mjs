@@ -41,13 +41,15 @@
  *     part of it after the step belongs to the sleep, which is what `prior`
  *     below is for.
  *
- * ## What the payload still gets wrong
+ * ## A discovery with no window
  *
- * One thing, and it wants fixing at the source: **a discovery reports
- * `startedAt === endedAt`**. The executor knows when the request began -- it
- * sets it on the execution span at creation -- but the stored span comes back
- * with the start replaced by the end, so the request has no window to draw.
- * True of `v4sequential` and of `step`.
+ * Fixed at the source, and the fallbacks below are kept as guards rather than
+ * as workarounds. A discovery used to report `startedAt === endedAt` whenever
+ * the request it covered had planned a sleep: the sleep's own "starts when it
+ * is queued" timestamp was being merged onto the EXECUTION span along with the
+ * rest of the op's attributes, overwriting the moment the request began with
+ * the moment it ended. Captures taken before that fix have no window on those
+ * requests and cannot be given one.
  */
 import fs from 'fs';
 import * as R from './rules.mjs';
