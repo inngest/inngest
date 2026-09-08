@@ -3793,15 +3793,17 @@ func spanRunCELFilters(
 		run.WithExpressionSQLConverter(h.CELConverter()),
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
+	// CEL parsing can succeed for identifiers this SQL backend cannot filter on.
+	// Reject those expressions instead of silently returning unfiltered runs.
 	if !expHandler.HasFilters() {
-		return celFilters, useJoin, nil
+		return nil, false, fmt.Errorf("%w: expression has no supported predicates", cqrs.ErrInvalidRunExpression)
 	}
 
 	celFilters, err = expHandler.ToSQLFilters(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
 	useJoin = needsEventJoin(opt.Filter.CEL)
 

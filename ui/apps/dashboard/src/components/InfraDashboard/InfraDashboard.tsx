@@ -454,9 +454,8 @@ function InfraPlanDropdown({
 
           <div className="overflow-x-auto">
             <div className="min-w-[360px]">
-              <div className="bg-canvasSubtle text-muted grid grid-cols-[4.25rem_1fr_1fr_6.75rem] gap-x-3 px-3 py-2 text-left text-[11px] font-medium uppercase">
+              <div className="bg-canvasSubtle text-muted grid grid-cols-[4.25rem_1fr_6.75rem] gap-x-3 px-3 py-2 text-left text-[11px] font-medium uppercase">
                 <span>SKU</span>
-                <span>Queue depth</span>
                 <span>Concurrency</span>
                 <span className="text-right">Price / mo</span>
               </div>
@@ -484,7 +483,7 @@ function InfraPlanDropdown({
                 return (
                   <button
                     className={cn(
-                      'border-subtle text-basis grid w-full grid-cols-[4.25rem_1fr_1fr_6.75rem] items-center gap-x-3 border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
+                      'border-subtle text-basis grid w-full grid-cols-[4.25rem_1fr_6.75rem] items-center gap-x-3 border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
                       isCurrent && 'bg-canvasSubtle',
                       isActionable &&
                         'hover:bg-canvasSubtle focus:bg-canvasSubtle focus:outline-none',
@@ -506,7 +505,6 @@ function InfraPlanDropdown({
                         {plan.sku}
                       </span>
                     </span>
-                    <PlanMetric value={plan.queueDepth} />
                     <PlanMetric value={plan.execConcurrency} />
                     <span className="flex min-w-0 items-center justify-end gap-2">
                       {isCurrent ? <YourPlanBadge /> : null}
