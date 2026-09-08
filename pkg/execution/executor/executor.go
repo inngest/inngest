@@ -495,6 +495,22 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	}
 }
 
+// TODO: should this also include a ResetsAt time.Time?
+// TODO: would just ExecutionCapDecision be better naming?
+type ExecutionCapLimitDecision struct {
+	Exceeded bool
+	Enforce  bool
+}
+
+type ExecutionCapFn func(ctx context.Context, accountId uuid.UUID) ExecutionCapLimitDecision
+
+func WithAccountExecutionCap(capFn ExecutionCapFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).accountExecutionCap = capFn
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -547,6 +563,7 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
+	accountExecutionCap      ExecutionCapFn
 
 	accountPlanMetricTagResolver AccountPlanMetricTagResolver
 
@@ -895,6 +912,19 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	}
 
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
+}
+
+func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) (enums.SkipReason, error) {
+	if e.accountExecutionCap == nil {
+		return enums.SkipReasonNone, nil
+	}
+
+	decision := e.accountExecutionCap(ctx, req.AccountID)
+	if !decision.Exceeded {
+		return enums.SkipReasonNone, nil
+	}
+
+	return enums.SkipReasonAccountExecutionCapHit, nil
 }
 
 // Schedule initializes a new function run, ensuring that the function will be
@@ -1355,6 +1385,8 @@ func (e *executor) schedule(
 	// Track skip reason and context for span attributes
 	var skipReason enums.SkipReason
 	var singletonSkipRunID *ulid.ULID
+
+	skipReason = e.checkExecutionCap(ctx, req)
 
 	//
 	// Create singleton information and try to handle it prior to creating state.

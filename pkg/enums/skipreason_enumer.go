@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _SkipReasonName = "NoneFunctionPausedSingletonFunctionDrainedFunctionBacklogSizeLimitHit"
+const _SkipReasonName = "NoneFunctionPausedSingletonFunctionDrainedFunctionBacklogSizeLimitHitAccountExecutionCapHit"
 
-var _SkipReasonIndex = [...]uint8{0, 4, 18, 27, 42, 69}
+var _SkipReasonIndex = [...]uint8{0, 4, 18, 27, 42, 69, 91}
 
-const _SkipReasonLowerName = "nonefunctionpausedsingletonfunctiondrainedfunctionbacklogsizelimithit"
+const _SkipReasonLowerName = "nonefunctionpausedsingletonfunctiondrainedfunctionbacklogsizelimithitaccountexecutioncaphit"
 
 func (i SkipReason) String() string {
 	if i < 0 || i >= SkipReason(len(_SkipReasonIndex)-1) {
@@ -32,9 +32,10 @@ func _SkipReasonNoOp() {
 	_ = x[SkipReasonSingleton-(2)]
 	_ = x[SkipReasonFunctionDrained-(3)]
 	_ = x[SkipReasonFunctionBacklogSizeLimitHit-(4)]
+	_ = x[SkipReasonAccountExecutionCapHit-(5)]
 }
 
-var _SkipReasonValues = []SkipReason{SkipReasonNone, SkipReasonFunctionPaused, SkipReasonSingleton, SkipReasonFunctionDrained, SkipReasonFunctionBacklogSizeLimitHit}
+var _SkipReasonValues = []SkipReason{SkipReasonNone, SkipReasonFunctionPaused, SkipReasonSingleton, SkipReasonFunctionDrained, SkipReasonFunctionBacklogSizeLimitHit, SkipReasonAccountExecutionCapHit}
 
 var _SkipReasonNameToValueMap = map[string]SkipReason{
 	_SkipReasonName[0:4]:        SkipReasonNone,
@@ -47,6 +48,8 @@ var _SkipReasonNameToValueMap = map[string]SkipReason{
 	_SkipReasonLowerName[27:42]: SkipReasonFunctionDrained,
 	_SkipReasonName[42:69]:      SkipReasonFunctionBacklogSizeLimitHit,
 	_SkipReasonLowerName[42:69]: SkipReasonFunctionBacklogSizeLimitHit,
+	_SkipReasonName[69:91]:      SkipReasonAccountExecutionCapHit,
+	_SkipReasonLowerName[69:91]: SkipReasonAccountExecutionCapHit,
 }
 
 var _SkipReasonNames = []string{
@@ -55,6 +58,7 @@ var _SkipReasonNames = []string{
 	_SkipReasonName[18:27],
 	_SkipReasonName[27:42],
 	_SkipReasonName[42:69],
+	_SkipReasonName[69:91],
 }
 
 // SkipReasonString retrieves an enum value from the enum constants string name.
