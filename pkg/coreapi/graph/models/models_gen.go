@@ -285,6 +285,38 @@ type FunctionTrigger struct {
 	Condition *string              `json:"condition,omitempty"`
 }
 
+type InsightsDiagnostic struct {
+	Start    *InsightsDiagnosticPosition `json:"start"`
+	End      *InsightsDiagnosticPosition `json:"end"`
+	Severity InsightsDiagnosticSeverity  `json:"severity"`
+	Code     string                      `json:"code"`
+	Message  string                      `json:"message"`
+}
+
+type InsightsDiagnosticPosition struct {
+	Line   int `json:"line"`
+	Column int `json:"column"`
+}
+
+type InsightsQueryColumn struct {
+	Name string              `json:"name"`
+	Type InsightsColumnType  `json:"type"`
+	Hint *InsightsColumnHint `json:"hint,omitempty"`
+}
+
+type InsightsQueryInfo struct {
+	PrimaryTable *string  `json:"primaryTable,omitempty"`
+	Tables       []string `json:"tables"`
+	Limited      bool     `json:"limited"`
+}
+
+type InsightsQueryResult struct {
+	Columns     []*InsightsQueryColumn `json:"columns"`
+	Rows        [][]interface{}        `json:"rows"`
+	Info        *InsightsQueryInfo     `json:"info"`
+	Diagnostics []*InsightsDiagnostic  `json:"diagnostics"`
+}
+
 type InvokeStepInfo struct {
 	TriggeringEventID ulid.ULID  `json:"triggeringEventID"`
 	FunctionID        string     `json:"functionID"`
@@ -930,6 +962,143 @@ func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsColumnHint string
+
+const (
+	InsightsColumnHintAppID      InsightsColumnHint = "APP_ID"
+	InsightsColumnHintFunctionID InsightsColumnHint = "FUNCTION_ID"
+	InsightsColumnHintRunID      InsightsColumnHint = "RUN_ID"
+	InsightsColumnHintEventID    InsightsColumnHint = "EVENT_ID"
+)
+
+var AllInsightsColumnHint = []InsightsColumnHint{
+	InsightsColumnHintAppID,
+	InsightsColumnHintFunctionID,
+	InsightsColumnHintRunID,
+	InsightsColumnHintEventID,
+}
+
+func (e InsightsColumnHint) IsValid() bool {
+	switch e {
+	case InsightsColumnHintAppID, InsightsColumnHintFunctionID, InsightsColumnHintRunID, InsightsColumnHintEventID:
+		return true
+	}
+	return false
+}
+
+func (e InsightsColumnHint) String() string {
+	return string(e)
+}
+
+func (e *InsightsColumnHint) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsColumnHint(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsColumnHint", str)
+	}
+	return nil
+}
+
+func (e InsightsColumnHint) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsColumnType string
+
+const (
+	InsightsColumnTypeString   InsightsColumnType = "STRING"
+	InsightsColumnTypeNumber   InsightsColumnType = "NUMBER"
+	InsightsColumnTypeBoolean  InsightsColumnType = "BOOLEAN"
+	InsightsColumnTypeDatetime InsightsColumnType = "DATETIME"
+	InsightsColumnTypeJSON     InsightsColumnType = "JSON"
+	InsightsColumnTypeUnknown  InsightsColumnType = "UNKNOWN"
+)
+
+var AllInsightsColumnType = []InsightsColumnType{
+	InsightsColumnTypeString,
+	InsightsColumnTypeNumber,
+	InsightsColumnTypeBoolean,
+	InsightsColumnTypeDatetime,
+	InsightsColumnTypeJSON,
+	InsightsColumnTypeUnknown,
+}
+
+func (e InsightsColumnType) IsValid() bool {
+	switch e {
+	case InsightsColumnTypeString, InsightsColumnTypeNumber, InsightsColumnTypeBoolean, InsightsColumnTypeDatetime, InsightsColumnTypeJSON, InsightsColumnTypeUnknown:
+		return true
+	}
+	return false
+}
+
+func (e InsightsColumnType) String() string {
+	return string(e)
+}
+
+func (e *InsightsColumnType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsColumnType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsColumnType", str)
+	}
+	return nil
+}
+
+func (e InsightsColumnType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsDiagnosticSeverity string
+
+const (
+	InsightsDiagnosticSeverityInfo    InsightsDiagnosticSeverity = "INFO"
+	InsightsDiagnosticSeverityWarning InsightsDiagnosticSeverity = "WARNING"
+	InsightsDiagnosticSeverityError   InsightsDiagnosticSeverity = "ERROR"
+)
+
+var AllInsightsDiagnosticSeverity = []InsightsDiagnosticSeverity{
+	InsightsDiagnosticSeverityInfo,
+	InsightsDiagnosticSeverityWarning,
+	InsightsDiagnosticSeverityError,
+}
+
+func (e InsightsDiagnosticSeverity) IsValid() bool {
+	switch e {
+	case InsightsDiagnosticSeverityInfo, InsightsDiagnosticSeverityWarning, InsightsDiagnosticSeverityError:
+		return true
+	}
+	return false
+}
+
+func (e InsightsDiagnosticSeverity) String() string {
+	return string(e)
+}
+
+func (e *InsightsDiagnosticSeverity) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsDiagnosticSeverity(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsDiagnosticSeverity", str)
+	}
+	return nil
+}
+
+func (e InsightsDiagnosticSeverity) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

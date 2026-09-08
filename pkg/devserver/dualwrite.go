@@ -56,7 +56,10 @@ type syncLifecycleCloser interface {
 // default.
 //
 // persist mirrors devserver's --persist flag (StartOpts.Persist), the same
-// knob that already gates SQLite/Redis persistence. false skips DuckLake
+// knob that already gates SQLite/Redis persistence -- ANDed by the caller
+// with the EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE feature flag, so an
+// on-disk DuckLake catalog additionally requires that flag even when
+// --persist is set (see devserver.go's start()). false skips DuckLake
 // entirely and opens a plain in-memory duckdb catalog instead (no on-disk
 // catalog/data files), matching how --persist=false already means
 // "in-memory databases" for the rest of the dev server. It also changes the

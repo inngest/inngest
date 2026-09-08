@@ -11,32 +11,22 @@ import (
 )
 
 // quackClientVersion and quackClientPlatform are sent in the ConnectionRequest
-// handshake purely for server-side diagnostics; the server doesn't gate on
-// them beyond the min/max quack protocol version fields.
+// handshake for server-side diagnostics only; the server doesn't gate on them.
 const quackClientVersion = "inngest-duckdb-quack-client 0.0.1"
 
 func quackClientPlatform() string { return runtime.GOOS + "/" + runtime.GOARCH }
 
 // supportedQuackVersion is the only quack protocol version this client
-// speaks. Bumped to 3 to match DuckDB v2.1.0-alpha's quack extension, which
-// rejects a ConnectionRequest advertising version 1 ("Unsupported Quack
-// version - server only supports version 3 of quack") — DuckDB's own docs
-// say the wire format may still change before it stabilizes with DuckDB 2.0,
-// so a version mismatch here should fail loudly rather than silently
-// misparse a newer server's responses.
+// speaks. A mismatch fails loudly rather than risk silently misparsing a
+// newer server's responses, since DuckDB's wire format may still change
+// before it stabilizes.
 const supportedQuackVersion = 3
 
 // quackHeartbeatTimeoutSeconds is sent as every ConnectionRequest's
-// heartbeat_timeout, new as of quack protocol version 3: the server now
-// rejects a request that omits it (an absent field defaults to 0, which
-// falls outside the server's documented "between 1 and
-// 9223372036854775 seconds" range). This client has no heartbeat/keepalive
-// mechanism of its own — a quackSession is held open for the lifetime of
-// its owning process (see process.go) and may sit idle between exec calls
-// for arbitrarily long stretches — so it asks for the server's documented
-// maximum, confirmed by a real round trip against a live subprocess to
-// succeed (not just pass validation) rather than assumed from the range
-// the ErrorResponse message advertises.
+// heartbeat_timeout (required as of protocol version 3; omitting it defaults
+// to 0, which the server rejects as out of range). This client has no
+// keepalive of its own and a session may sit idle indefinitely between exec
+// calls, so it requests the server's maximum.
 const quackHeartbeatTimeoutSeconds = 9223372036854775
 
 func newQuackHTTPClient() *http.Client {
@@ -45,21 +35,16 @@ func newQuackHTTPClient() *http.Client {
 
 // quackSession implements sqlExecer (see conn.go) over DuckDB's quack wire
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
-// server-assigned connection id for its lifetime; process.go's restart-on-
-// failure handling (not this type) is what recovers from a lost session, by
-// discarding it and re-handshaking against a freshly bootstrapped subprocess.
-// exec pages a large result via FetchRequest/FetchResponse internally, but
-// that's within one exec call — it doesn't survive across a lost/discarded
-// session, since a fresh session has no result_uuid to resume against.
+// server-assigned connection id for its lifetime; process.go recovers from a
+// lost session by discarding it and re-handshaking against a fresh subprocess.
 type quackSession struct {
 	httpClient   *http.Client
 	endpoint     string
 	connectionID string
 }
 
-// newQuackSession performs the ConnectionRequest handshake against
-// listenURL (as reported by `CALL quack_serve(...)`, e.g.
-// "http://127.0.0.1:9494") and returns a session ready for exec.
+// newQuackSession performs the ConnectionRequest handshake against listenURL
+// (as reported by `CALL quack_serve(...)`) and returns a session ready for exec.
 func newQuackSession(ctx context.Context, listenURL, token string) (*quackSession, error) {
 	s := &quackSession{
 		httpClient: newQuackHTTPClient(),
@@ -100,10 +85,8 @@ func newQuackSession(ctx context.Context, listenURL, token string) (*quackSessio
 	return s, nil
 }
 
-// exec implements sqlExecer. It's query without the type-name conversion —
-// see query's doc comment for the shared implementation and error/paging
-// behavior; exec exists for ExecContext callers (DDL/INSERT/health checks)
-// that have no use for column types.
+// exec implements sqlExecer as query without the type-name conversion, for
+// ExecContext callers (DDL/INSERT/health checks) that don't need column types.
 func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error) {
 	cols, _, rows, err = s.query(ctx, sqlText)
 	return cols, rows, err
@@ -112,25 +95,19 @@ func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string,
 // query implements sqlExecer. A statement DuckDB itself rejected (bad SQL, a
 // missing table, a constraint violation) comes back wrapped in
 // errStatementFailed, matching rows.go's session.query so process.query's
-// restart-vs-surface classification (see process.go) works identically
-// regardless of which transport is in use: that's not a sign the subprocess
-// is unhealthy, and an identical retry fails identically either way. Any
+// restart-vs-surface classification works identically across transports. Any
 // other error (HTTP failure, malformed response) is left unwrapped, which
 // process.query treats as a dead subprocess warranting a restart.
 //
 // A result too large for one inline PrepareResponse (needsMoreFetch) is
 // paged in via a FetchRequest/FetchResponse loop, keyed off the
-// PrepareResponse's own result_uuid, until a response comes back with zero
-// chunks — see decodeQuackFetchResponseBody's doc comment for why that's the
-// only "done" signal the wire format gives.
+// PrepareResponse's result_uuid, until a response comes back with zero
+// chunks — see decodeQuackFetchResponseBody for why that's the wire format's
+// only "done" signal.
 //
-// cols and types both come from the PrepareResponse's own metadata
-// (result_names/field2, result_types/field1) — unlike rows.go's jsonlines
-// session, both are populated even when the query returns zero rows, and
-// getting types costs nothing extra: they're already decoded off the wire
-// in this same single PrepareRequest/PrepareResponse round trip, so unlike
-// the jsonlines transport (see session.query in rows.go) quack never needs
-// a separate DESCRIBE statement at all.
+// cols and types both come from the PrepareResponse's metadata, populated
+// even for zero-row results; unlike the jsonlines transport in rows.go,
+// quack never needs a separate DESCRIBE statement to get types.
 func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error) {
 	hdr, r, err := s.send(ctx, encodeQuackPrepareRequest(s.connectionID, sqlText))
 	if err != nil {
@@ -177,9 +154,8 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 }
 
 // decodeQuackStatementError decodes an ErrorResponse body into an error
-// wrapped in errStatementFailed — the server responded successfully, just
-// with a rejection (bad SQL, a closed/expired result on a stale Fetch), not
-// a transport or subprocess failure.
+// wrapped in errStatementFailed: the server responded, it just rejected the
+// statement — not a transport or subprocess failure.
 func decodeQuackStatementError(r *quackReader) error {
 	msg, derr := decodeQuackErrorResponseBody(r)
 	if derr != nil {

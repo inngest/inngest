@@ -456,6 +456,9 @@ importers:
       sonner:
         specifier: ^1.2.0
         version: 1.2.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      sql-formatter:
+        specifier: ^15.7.1
+        version: 15.7.1
       srvx:
         specifier: 0.11.13
         version: 0.11.13
@@ -23104,6 +23107,11 @@ snapshots:
     dependencies:
       uncrypto: 0.1.3
 
+  crossws@0.4.6(srvx@0.11.13):
+    optionalDependencies:
+      srvx: 0.11.13
+    optional: true
+
   crossws@0.4.6(srvx@0.11.16):
     optionalDependencies:
       srvx: 0.11.16
@@ -24712,7 +24720,7 @@ snapshots:
       rou3: 0.8.1
       srvx: 0.11.13
     optionalDependencies:
-      crossws: 0.4.6(srvx@0.11.16)
+      crossws: 0.4.6(srvx@0.11.13)
 
   has-bigints@1.0.2: {}
 

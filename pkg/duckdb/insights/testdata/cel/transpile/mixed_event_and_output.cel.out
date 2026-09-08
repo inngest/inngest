@@ -1,0 +1,14 @@
+INPUT
+event.name == "x" && output.ok == true
+
+EVENT SQL
+((x->>'$.name') = ?)
+
+EVENT ARGS
+[x]
+
+OUTPUT SQL
+((output->>'$.data.ok') = ?)
+
+OUTPUT ARGS
+[true]

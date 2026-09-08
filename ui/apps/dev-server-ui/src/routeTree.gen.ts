@@ -14,6 +14,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardFunctionsRouteRouteImport } from './routes/_dashboard/functions/route'
 import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
 import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
+import { Route as DashboardInsightsIndexRouteImport } from './routes/_dashboard/insights/index'
 import { Route as DashboardEventsIndexRouteImport } from './routes/_dashboard/events/index'
 import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/event/index'
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
@@ -48,6 +49,11 @@ const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
 const DashboardRunIndexRoute = DashboardRunIndexRouteImport.update({
   id: '/run/',
   path: '/run/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInsightsIndexRoute = DashboardInsightsIndexRouteImport.update({
+  id: '/insights/',
+  path: '/insights/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardEventsIndexRoute = DashboardEventsIndexRouteImport.update({
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/apps/': typeof DashboardAppsIndexRoute
   '/event/': typeof DashboardEventIndexRoute
   '/events/': typeof DashboardEventsIndexRoute
+  '/insights/': typeof DashboardInsightsIndexRoute
   '/run/': typeof DashboardRunIndexRoute
   '/runs/': typeof DashboardRunsIndexRoute
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/apps': typeof DashboardAppsIndexRoute
   '/event': typeof DashboardEventIndexRoute
   '/events': typeof DashboardEventsIndexRoute
+  '/insights': typeof DashboardInsightsIndexRoute
   '/run': typeof DashboardRunIndexRoute
   '/runs': typeof DashboardRunsIndexRoute
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/_dashboard/apps/': typeof DashboardAppsIndexRoute
   '/_dashboard/event/': typeof DashboardEventIndexRoute
   '/_dashboard/events/': typeof DashboardEventsIndexRoute
+  '/_dashboard/insights/': typeof DashboardInsightsIndexRoute
   '/_dashboard/run/': typeof DashboardRunIndexRoute
   '/_dashboard/runs/': typeof DashboardRunsIndexRoute
   '/_dashboard/apps/_onboarding/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/apps/'
     | '/event/'
     | '/events/'
+    | '/insights/'
     | '/run/'
     | '/runs/'
     | '/apps/choose-framework'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/apps'
     | '/event'
     | '/events'
+    | '/insights'
     | '/run'
     | '/runs'
     | '/apps/choose-framework'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/_dashboard/apps/'
     | '/_dashboard/event/'
     | '/_dashboard/events/'
+    | '/_dashboard/insights/'
     | '/_dashboard/run/'
     | '/_dashboard/runs/'
     | '/_dashboard/apps/_onboarding/choose-framework'
@@ -257,6 +269,13 @@ declare module '@tanstack/react-router' {
       path: '/run'
       fullPath: '/run/'
       preLoaderRoute: typeof DashboardRunIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/insights/': {
+      id: '/_dashboard/insights/'
+      path: '/insights'
+      fullPath: '/insights/'
+      preLoaderRoute: typeof DashboardInsightsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/events/': {
@@ -377,6 +396,7 @@ interface DashboardRouteChildren {
   DashboardAppsIndexRoute: typeof DashboardAppsIndexRoute
   DashboardEventIndexRoute: typeof DashboardEventIndexRoute
   DashboardEventsIndexRoute: typeof DashboardEventsIndexRoute
+  DashboardInsightsIndexRoute: typeof DashboardInsightsIndexRoute
   DashboardRunIndexRoute: typeof DashboardRunIndexRoute
   DashboardRunsIndexRoute: typeof DashboardRunsIndexRoute
   DashboardAiExperimentsIndexRoute: typeof DashboardAiExperimentsIndexRoute
@@ -392,6 +412,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAppsIndexRoute: DashboardAppsIndexRoute,
   DashboardEventIndexRoute: DashboardEventIndexRoute,
   DashboardEventsIndexRoute: DashboardEventsIndexRoute,
+  DashboardInsightsIndexRoute: DashboardInsightsIndexRoute,
   DashboardRunIndexRoute: DashboardRunIndexRoute,
   DashboardRunsIndexRoute: DashboardRunsIndexRoute,
   DashboardAiExperimentsIndexRoute: DashboardAiExperimentsIndexRoute,

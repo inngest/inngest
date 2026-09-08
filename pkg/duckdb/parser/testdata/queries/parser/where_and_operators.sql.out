@@ -1,0 +1,99 @@
+-- SELECT a FROM t WHERE a > 1 AND b < 2 OR c = 3
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(OR)
+    BinaryExpr(AND)
+      BinaryExpr(>)
+        Ident(a)
+        Literal(1,1)
+      BinaryExpr(<)
+        Ident(b)
+        Literal(1,2)
+    BinaryExpr(=)
+      Ident(c)
+      Literal(1,3)
+
+-- SELECT a FROM t WHERE a BETWEEN 1 AND 10
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BetweenExpr(not=false)
+    Ident(a)
+    Literal(1,1)
+    Literal(1,10)
+
+-- SELECT a FROM t WHERE a IN (1, 2, 3)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  InExpr(not=false)
+    Ident(a)
+    Literal(1,1)
+    Literal(1,2)
+    Literal(1,3)
+
+-- SELECT a FROM t WHERE a IN (SELECT id FROM other)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  InExpr(not=false)
+    Ident(a)
+    SelectStatement
+      SelectItem()
+        Ident(id)
+      FromClause
+        BaseTableRef(other,alias=)
+
+-- SELECT a FROM t WHERE a LIKE '%x%'
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  LikeExpr(LIKE,not=false)
+    Ident(a)
+    Literal(0,%x%)
+
+-- SELECT a FROM t WHERE a IS NOT NULL
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  IsExpr(not=true,NULL)
+    Ident(a)
+
+-- SELECT a FROM t WHERE a IS DISTINCT FROM b
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  DistinctFromExpr(not=false)
+    Ident(a)
+    Ident(b)
+
+-- SELECT (1 + 2) * 3 - 4 / 2 AS calc FROM t;
+SelectStatement
+  SelectItem(calc)
+    BinaryExpr(-)
+      BinaryExpr(*)
+        BinaryExpr(+)
+          Literal(1,1)
+          Literal(1,2)
+        Literal(1,3)
+      BinaryExpr(/)
+        Literal(1,4)
+        Literal(1,2)
+  FromClause
+    BaseTableRef(t,alias=)
+

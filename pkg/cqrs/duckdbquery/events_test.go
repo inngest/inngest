@@ -83,6 +83,40 @@ func TestGetEventsByInternalIDsEmptyInput(t *testing.T) {
 	require.Empty(t, events)
 }
 
+// TestGetEventsByExpressionsAppliesCEL proves GetEventsByExpressions is
+// answered from DuckDB (event.name pushed into a WHERE against
+// inngest.events, per insights.CELEventTableFilters), not silently falling
+// through to the primary manager the way GetEventsCount used to before it
+// was overridden here (see its own doc comment).
+func TestGetEventsByExpressionsAppliesCEL(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	seed := func(name string, data string) {
+		id := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+		_, err := db.ExecContext(ctx,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '1', ?);`,
+			accountID.String(), envID.String(), id.String(), now, id.String(), name, data, now,
+		)
+		require.NoError(t, err)
+	}
+	seed("app/match", `{"foo":"bar"}`)
+	seed("app/no-name-match", `{"foo":"bar"}`)
+	seed("app/match", `{"foo":"nope"}`)
+
+	m := Wrap(nil, db)
+	events, err := m.GetEventsByExpressions(ctx, []string{`event.name == "app/match"`, `event.data.foo == "bar"`})
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, "app/match", events[0].EventName)
+	require.Equal(t, map[string]any{"foo": "bar"}, events[0].EventData)
+}
+
 func TestGetEventsFiltersByNameAndExcludesInternalByDefault(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()

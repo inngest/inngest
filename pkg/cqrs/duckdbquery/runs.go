@@ -20,13 +20,10 @@ import (
 const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids, is_deferred"
 
 // runStatusToStepStatusString maps a cqrs.TraceRun filter's RunStatus back
-// to the single StepStatus string inngest.runs.status actually stores for
-// it. Only covers the five values pkg/execution/dualwrite/listener.go ever
-// writes (Queued/Running/Completed/Failed/Cancelled) — dual-write never
-// produces Waiting/Sleeping/Invoking/Errored/TimedOut/Skipped rows for the
-// runs table, so a RunStatus that only maps from those (e.g.
-// RunStatusSkipped) has nothing to match and is silently dropped from the
-// filter.
+// to the StepStatus string inngest.runs.status actually stores. Only
+// covers the five values dual-write ever writes — a RunStatus that maps
+// only from an unwritten status has nothing to match and is silently
+// dropped from the filter.
 func runStatusToStepStatusString(s enums.RunStatus) (string, bool) {
 	switch s {
 	case enums.RunStatusScheduled:
@@ -70,13 +67,8 @@ func latestRunsWhere(filter cqrs.GetTraceRunFilter) (string, []any) {
 		where = append(where, fmt.Sprintf("function_id IN (%s)", strings.Join(placeholders, ", ")))
 	}
 	if len(filter.EventID) > 0 {
-		// event_ids never varies across a run's lifecycle rows either, so
-		// this is safe to filter pre-collapse alongside app_id/function_id.
-		// list_has_any(event_ids, ?) matches if the run's event_ids array
-		// contains ANY of the given event IDs, bound as a single []string
-		// arg — pkg/db/duckdb/literal.go's encodeLiteral has a []string case
-		// that encodes it as a real DuckDB array literal, so no per-ID
-		// list_contains OR chain is needed.
+		// event_ids never varies across a run's lifecycle rows, so this is
+		// safe pre-collapse. list_has_any matches any of the given IDs.
 		ids := make([]string, len(filter.EventID))
 		for i, id := range filter.EventID {
 			ids[i] = id.String()
@@ -89,14 +81,10 @@ func latestRunsWhere(filter cqrs.GetTraceRunFilter) (string, []any) {
 }
 
 // resolveAppAndFunctionFilters resolves filter.AppName/FunctionSlug into
-// concrete AppID/FunctionID values via the embedded primary manager — the
-// source of truth for app/function metadata (inngest.runs only ever stores
-// app_id/function_id, never names/slugs, so there's nothing to join against
-// inside DuckDB itself). Returns the filter with AppID/FunctionID extended
-// by whatever resolved, or noMatch=true when a name- or slug-based filter
-// was requested but resolved to nothing at all: an AppName/FunctionSlug
-// filter with zero matches must return zero runs, not silently fall back to
-// "no filter" just because the merged ID list ends up empty.
+// concrete AppID/FunctionID values via the embedded primary manager, since
+// inngest.runs only stores IDs, never names/slugs. Returns noMatch=true
+// when a name/slug filter resolved to nothing — that must return zero
+// runs, not silently fall back to "no filter".
 func (m *Manager) resolveAppAndFunctionFilters(ctx context.Context, filter cqrs.GetTraceRunFilter) (resolved cqrs.GetTraceRunFilter, noMatch bool, err error) {
 	resolved = filter
 
@@ -144,22 +132,16 @@ func (m *Manager) resolveAppAndFunctionFilters(ctx context.Context, filter cqrs.
 
 // runsQualify builds the QUALIFY clause every runs query uses to collapse
 // each run_id's lifecycle rows down to its latest one and apply
-// status/time-range filtering against that row — status and timestamps
-// vary across a run's lifecycle rows, so both must be evaluated together
-// with the row-ranking window function, not in a separate WHERE against a
-// subquery's output.
+// status/time-range filtering against that row — those columns vary across
+// a run's lifecycle rows, so they must be evaluated together with the
+// row-ranking window function, not a separate WHERE.
 //
 // Tiebreak by COALESCE(ended_at, started_at, queued_at) DESC, not
-// inserted_at: the batcher flushes a whole batch of lifecycle rows in one
-// INSERT statement (pkg/execution/dualwrite/batch.go), and DuckDB evaluates
-// a column DEFAULT like current_timestamp once per statement, not once per
-// row — every row in the same flush gets an *identical* inserted_at, making
-// it useless as a tiebreak (verified empirically: all three of a run's
-// scheduled/started/finished rows land with the same inserted_at when
-// flushed together). COALESCE picks the furthest state a row's own columns
-// encode: a finished row's ended_at is always >= a started row's
-// started_at, which is always >= every row's queued_at — so this ranks a
-// run's rows by lifecycle progress regardless of flush/insertion timing.
+// inserted_at: a batch flush writes all of a run's lifecycle rows in one
+// INSERT, and DuckDB evaluates a DEFAULT like current_timestamp once per
+// statement, so every row in that flush gets an identical inserted_at.
+// COALESCE instead picks the furthest lifecycle state each row's own
+// columns encode.
 func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	where := []string{
 		`ROW_NUMBER() OVER (
@@ -193,10 +175,8 @@ func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	}
 	args = append(args, filter.From, until)
 
-	// is_deferred is a nullable boolean (TRUE/NULL only, never explicit
-	// FALSE — see its migration's doc comment), so "not deferred" means
-	// NULL, not "= FALSE", matching pkg/cqrs/manager's own
-	// spans.is_deferred.IsNull() branch for the same filter.
+	// is_deferred is TRUE/NULL only, never explicit FALSE, so "not
+	// deferred" means NULL.
 	if filter.IsDeferred != nil {
 		if *filter.IsDeferred {
 			where = append(where, "is_deferred = TRUE")
@@ -211,10 +191,8 @@ func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 // buildRunsCursorSeek decodes a request cursor (if any) into the
 // keyset-pagination predicate GetTraceRuns appends to runsQualify's
 // QUALIFY clause, keyed on the same (orderCol, orderDir) pair used for
-// ORDER BY — with run_id as the final tiebreak, always ascending,
-// matching pkg/cqrs/manager's own newRunsQueryBuilder convention. Returns
-// "", nil, nil for the first page (no cursor, or a cursor with nothing
-// under this field — same as manager's own tolerant Find/Add pattern).
+// ORDER BY, with run_id as the final tiebreak, always ascending. Returns
+// "", nil, nil for the first page (no cursor, or nothing under this field).
 func buildRunsCursorSeek(cursorStr, orderCol, orderDir string) (string, []any, error) {
 	if cursorStr == "" {
 		return "", nil, nil
@@ -236,8 +214,7 @@ func buildRunsCursorSeek(cursorStr, orderCol, orderDir string) (string, []any, e
 }
 
 // encodeRunsCursor builds the per-row response cursor for keyset
-// pagination, matching buildRunsCursorSeek's decode shape exactly — the
-// same field name (orderCol) and the same UnixMilli encoding.
+// pagination, matching buildRunsCursorSeek's decode shape exactly.
 func encodeRunsCursor(run *cqrs.TraceRun, orderCol string) (string, error) {
 	var fieldTime time.Time
 	switch orderCol {
@@ -280,11 +257,7 @@ func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (
 // GetTraceRunsByTriggerID returns every run triggered by the given event's
 // internal ULID, collapsed to each run's latest lifecycle row exactly like
 // GetTraceRuns — inngest.runs is append-only, so a run with multiple
-// lifecycle rows must not surface more than once here. event_ids is a real
-// VARCHAR[] column populated from the same sv2.Metadata.Config.EventIDs
-// field the SQLite/Postgres path serializes into trace_runs.trigger_ids
-// (see pkg/db/duckdb/migrations/000001_baseline.sql), so list_contains
-// gives an exact membership match — no substring matching required.
+// lifecycle rows must not surface more than once here.
 func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
 	query := fmt.Sprintf(
 		`SELECT %s FROM %s.runs
@@ -316,37 +289,27 @@ func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.UL
 	return out, nil
 }
 
-// eventCELArrayMatchClause wraps an event.*-predicate SQL fragment (from
-// insights.CELEventFilters + insights.RenderWhereSQL, written against a
-// lambda parameter named "x" — see insights.celScope's doc comment) in a
-// check that at least one of the run's triggering events
-// satisfies it. No join to inngest.events is needed: inngest.runs.inputs is
-// already a JSON array of the run's triggering event(s) (plural for a batch
-// trigger), each shaped exactly like pkg/event.Event's own JSON encoding.
-// list_filter+lambda (rather than an OR of per-field column checks) means
-// every ANDed event.* predicate in fragment must hold against the *same*
-// array element — required for a batch trigger, where different events in
-// the batch could otherwise each satisfy one predicate without any single
-// event satisfying all of them — and inputs, like event_ids, never varies
-// across a run's lifecycle rows, so this is safe to apply in the
-// pre-collapse WHERE alongside app_id/function_id.
+// eventCELArrayMatchClause wraps an event.*-predicate SQL fragment
+// (written against lambda parameter "x") in a check that at least one of
+// the run's triggering events satisfies it. No join to inngest.events is
+// needed: inngest.runs.inputs is already a JSON array of the run's
+// triggering event(s). list_filter+lambda (rather than an OR of per-field
+// checks) means every ANDed predicate must hold against the *same* array
+// element — required for a batch trigger, where different events could
+// otherwise each satisfy one predicate without any single event satisfying
+// all of them.
 func eventCELArrayMatchClause(fragment string) string {
 	return fmt.Sprintf(`len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: %s)) > 0`, fragment)
 }
 
 // GetTraceRuns pushes filter.CEL down into the SQL query rather than
 // fetching a candidate set and post-filtering in Go: event.* predicates
-// (including event.data.*) become an inputs-array match in the pre-collapse
-// WHERE (see eventCELArrayMatchClause); output.*/error.* predicates are
-// appended to the QUALIFY clause, since they're evaluated against the same
-// already-collapsed row status/time-range filtering uses. A single CEL
-// string mixing both kinds via && only applies correctly when true is
-// required from both; mixed via || the two sides are still evaluated
-// independently (see insights.celExprsToSQL's doc comment) and ANDed back
-// together here, which can accept a run neither side alone would — an
-// accepted, pre-existing limitation of the same generic per-predicate
-// conversion pkg/cqrs/manager's own SQLite/Postgres CEL pushdown already
-// has.
+// become an inputs-array match in the pre-collapse WHERE (see
+// eventCELArrayMatchClause); output.*/error.* predicates are appended to
+// the QUALIFY clause. A CEL string mixing both kinds via || has each side
+// evaluated independently and ANDed back together here, which can accept a
+// run neither side alone would — a pre-existing limitation shared with
+// pkg/cqrs/manager's own CEL pushdown.
 func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	resolvedFilter, noMatch, err := m.resolveAppAndFunctionFilters(ctx, opt.Filter)
 	if err != nil {
@@ -412,8 +375,7 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 		runColumns, duckdb.DuckLakeAlias, preWhere, qualify, orderCol, orderDir,
 	)
 	args := append(preArgs, qualifyArgs...)
-	// Every CEL predicate is now applied in SQL above, so — unlike before —
-	// nothing narrows the result set further in Go, and LIMIT can always be
+	// Every CEL predicate is applied in SQL above, so LIMIT can always be
 	// pushed down.
 	if opt.Items > 0 {
 		query += " LIMIT ?"
@@ -533,10 +495,7 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		return nil, err
 	}
 
-	// event_ids is a real VARCHAR[] (NULL for cron-only runs, which have no
-	// triggering event at all) — the driver hands it back as []any
-	// regardless of transport (see pkg/db/duckdb/quack_protocol.go's LIST
-	// decoding and the stdio transport's own JSON-lines auto-decoding).
+	// event_ids is a VARCHAR[] (NULL for cron-only runs), decoded as []any.
 	var triggerIDs []string
 	if rawEventIDs != nil {
 		items, ok := rawEventIDs.([]any)

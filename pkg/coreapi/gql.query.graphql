@@ -38,6 +38,8 @@ type Query {
   runTrigger(runID: String!): RunTraceTrigger!
   runTrace(runID: String!): RunTraceSpan!
 
+  insights(sql: String!): InsightsQueryResult!
+
   workerConnections(
     first: Int! = 100
     after: String

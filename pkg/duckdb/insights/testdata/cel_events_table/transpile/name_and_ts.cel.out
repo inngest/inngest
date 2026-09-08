@@ -1,0 +1,8 @@
+INPUT
+event.name == "test/hello" && event.ts > 1727291508963
+
+EVENTS SQL
+((event_name = ?) AND (epoch_ms(event_ts) > ?))
+
+EVENTS ARGS
+[test/hello 1727291508963]

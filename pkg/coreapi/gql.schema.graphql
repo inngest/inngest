@@ -800,3 +800,57 @@ enum AppMethod {
 input AppsFilterV1 {
   method: AppMethod
 }
+
+enum InsightsColumnType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATETIME
+  JSON
+  UNKNOWN
+}
+
+enum InsightsColumnHint {
+  APP_ID
+  FUNCTION_ID
+  RUN_ID
+  EVENT_ID
+}
+
+type InsightsQueryColumn {
+  name: String!
+  type: InsightsColumnType!
+  hint: InsightsColumnHint
+}
+
+type InsightsQueryInfo {
+  primaryTable: String
+  tables: [String!]!
+  limited: Boolean!
+}
+
+enum InsightsDiagnosticSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+type InsightsDiagnosticPosition {
+  line: Int!
+  column: Int!
+}
+
+type InsightsDiagnostic {
+  start: InsightsDiagnosticPosition!
+  end: InsightsDiagnosticPosition!
+  severity: InsightsDiagnosticSeverity!
+  code: String!
+  message: String!
+}
+
+type InsightsQueryResult {
+  columns: [InsightsQueryColumn!]!
+  rows: [[Unknown]!]!
+  info: InsightsQueryInfo!
+  diagnostics: [InsightsDiagnostic!]!
+}

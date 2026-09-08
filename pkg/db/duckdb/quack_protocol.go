@@ -10,19 +10,11 @@ import (
 	"time"
 )
 
-// Quack message types. Mirrors duckdb_quack::MessageType
-// (src/include/quack_message.hpp in duckdb/duckdb-quack, main branch,
-// protocol version 3 — matching the duckdb v2.1.0-alpha binary this client
-// targets, confirmed against the real source:
-// https://github.com/duckdb/duckdb-quack/blob/main/src/include/quack_message.hpp).
-// The message set changed from the v1.5-variegata branch this client
-// previously targeted: APPEND_REQUEST (a single-shot, standalone bulk-insert
-// message) is gone entirely, replaced by SEND_DATA_REQUEST/RESPONSE — a
-// streaming mechanism driven by the server's own query executor rather than
-// a self-contained RPC; see quack_senddata.go's package doc comment for how
-// that was discovered and how this client drives it. DISCONNECT_MESSAGE(11),
-// CANCEL_REQUEST(12), ACKNOWLEDGEMENT(15), and HEARTBEAT_REQUEST(16) exist
-// server-side but aren't implemented by this client.
+// Quack message types, mirroring duckdb_quack::MessageType for protocol
+// version 3. APPEND_REQUEST from the older v1.5-variegata protocol is gone,
+// replaced by SEND_DATA_REQUEST/RESPONSE (see quack_senddata.go).
+// DISCONNECT_MESSAGE(11), CANCEL_REQUEST(12), ACKNOWLEDGEMENT(15), and
+// HEARTBEAT_REQUEST(16) exist server-side but aren't implemented here.
 const (
 	quackMsgConnectionRequest  byte = 1
 	quackMsgConnectionResponse byte = 2
@@ -36,26 +28,19 @@ const (
 	quackMsgErrorResponse      byte = 100
 )
 
-// quackHugeint is DuckDB's hugeint_t as this client reads/writes it on the
-// wire: a signed-LEB128 upper half followed by an unsigned-LEB128 lower half
-// (see decodeQuackPrepareResponseBody's result_uuid field and
-// PrepareResponseMessage::Serialize in duckdb-quack's serialize_quack_message.cpp).
-// The client only ever treats it as an opaque correlation token — passed back
-// verbatim in a FetchRequest to keep pulling more of the same result — never
-// interpreted as a number.
+// quackHugeint is DuckDB's hugeint_t: a signed-LEB128 upper half followed by
+// an unsigned-LEB128 lower half. This client only ever treats it as an
+// opaque correlation token, never as a number.
 type quackHugeint struct {
 	hi int64
 	lo uint64
 }
 
-// randomQuackHugeint returns a random 128-bit value for use as an opaque,
-// client-generated correlation token (see encodeQuackPrepareRequest's field2
-// doc comment) — never interpreted as a number, so a crypto/rand source
-// costs nothing extra here versus math/rand and avoids a second dependency
-// on the caller to seed anything.
+// randomQuackHugeint returns a random 128-bit value for use as an opaque
+// client-generated correlation token (see encodeQuackPrepareRequest).
 func randomQuackHugeint() quackHugeint {
 	var b [16]byte
-	_, _ = rand.Read(b[:]) // crypto/rand.Read never errors on any supported platform
+	_, _ = rand.Read(b[:]) // never errors on any supported platform
 	return quackHugeint{
 		hi: int64(binary.BigEndian.Uint64(b[:8])),
 		lo: binary.BigEndian.Uint64(b[8:]),
@@ -132,15 +117,11 @@ type quackConnectionRequest struct {
 	ClientPlatform           string
 	MinSupportedQuackVersion uint64
 	MaxSupportedQuackVersion uint64
-	// HeartbeatTimeoutSeconds is new as of quack protocol version 3: the
-	// server now rejects a ConnectionRequest whose heartbeat_timeout is out
-	// of range (server-observed lower bound 1 second) rather than defaulting
-	// an absent field to "no timeout" the way version 1 did. Field 6
-	// (client_id, an optional string this client has no use for and always
-	// omits) sits between MaxSupportedQuackVersion and this field — confirmed
-	// by proxying a real DuckDB-to-DuckDB `ATTACH 'quack:...'` and diffing
-	// its raw ConnectionRequest bytes against this client's. See
-	// quackHeartbeatTimeoutSeconds for the value this client sends.
+	// HeartbeatTimeoutSeconds is required as of protocol version 3 (the
+	// server rejects an out-of-range value; version 1 defaulted an absent
+	// field to "no timeout"). Field 6 (client_id) sits between
+	// MaxSupportedQuackVersion and this field but is never sent — see
+	// quackHeartbeatTimeoutSeconds for the value this client uses.
 	HeartbeatTimeoutSeconds uint64
 }
 
@@ -151,7 +132,7 @@ func (m quackConnectionRequest) encode() []byte {
 		w.writeStringDefault(3, m.ClientPlatform)
 		w.writeUint64Default(4, m.MinSupportedQuackVersion)
 		w.writeUint64Default(5, m.MaxSupportedQuackVersion)
-		// field 6 (client_id) intentionally omitted — see HeartbeatTimeoutSeconds.
+		// field 6 (client_id) intentionally omitted.
 		w.writeUint64Default(7, m.HeartbeatTimeoutSeconds)
 	})
 }
@@ -160,14 +141,10 @@ type quackConnectionResponse struct {
 	ServerDuckDBVersion string
 	ServerPlatform      string
 	QuackVersion        uint64
-	// HeartbeatTimeoutSeconds is new as of quack protocol version 3: the
-	// server's own field4, echoing back the (possibly clamped) heartbeat
-	// lease it granted for this connection. This client never renews the
-	// lease and always requests the server's documented maximum (see
-	// quackHeartbeatTimeoutSeconds), so it's decoded but otherwise unused —
-	// present here only so endObject doesn't choke on an unexpected trailing
-	// field, confirmed present by proxying a real DuckDB-to-DuckDB
-	// `ATTACH 'quack:...'` handshake.
+	// HeartbeatTimeoutSeconds echoes back the (possibly clamped) heartbeat
+	// lease the server granted. Decoded but otherwise unused: this client
+	// never renews the lease and always requests the server's maximum (see
+	// quackHeartbeatTimeoutSeconds).
 	HeartbeatTimeoutSeconds uint64
 }
 
@@ -237,16 +214,9 @@ func decodeQuackErrorResponseBody(r *quackReader) (string, error) {
 // ---------- PrepareRequest / PrepareResponse ----------
 
 // encodeQuackPrepareRequest builds a PrepareRequest: field1 is the SQL text,
-// field2 is new as of quack protocol version 3 — a mandatory hugeint query
-// token this client has no other use for (the connection-level heartbeat
-// lease, not this token, is what quack_enable_reconnects' result-caching
-// keys off, and this client never turns that setting on). Confirmed
-// mandatory empirically: a version-3 PrepareRequest that omits field2
-// crashes the server with a bodyless HTTP 500, identical to the failure
-// mode a wrong field id produces elsewhere in this handshake —
-// randomQuackHugeint generates a fresh one per call so this client never
-// relies on any assumption about what the server does with
-// repeated/duplicate tokens.
+// field2 is a mandatory hugeint query token this client has no other use for
+// (omitting it crashes the server with a bodyless HTTP 500). A fresh token
+// is generated per call.
 func encodeQuackPrepareRequest(connectionID, sql string) []byte {
 	return encodeQuackMessage(quackMsgPrepareRequest, connectionID, func(w *quackWriter) {
 		w.writeStringDefault(1, sql)
@@ -256,18 +226,13 @@ func encodeQuackPrepareRequest(connectionID, sql string) []byte {
 
 // decodeQuackPrepareResponseBody reads a PrepareResponse body and returns
 // rows keyed by result column name, built from every inline DataChunk the
-// server returned, alongside names (result_names, field2) and types
-// (field1, one LogicalType per result column) both in the query's own
-// left-to-right order — the only place that order survives once namedRows
-// folds a chunk's columns into a map. Both names and types come from this
-// response's own metadata, so both are populated even when the query
-// matches zero rows (no DataChunk at all) — unlike rows.go's jsonlines
-// session, which learns cols only by sniffing the first data row's own JSON
-// keys and has no equivalent source for types at all; see quackSession.query
-// for why that makes quack able to skip a separate DESCRIBE round trip
-// entirely. needsMoreFetch signals the query has more rows than fit in this
-// response; resultUUID (field5) is the correlation token a caller must pass
-// back on a FetchRequest to pull the rest (see quackSession.exec).
+// server returned, alongside names (field2) and types (field1), both in the
+// query's own left-to-right order — the only place that order survives once
+// namedRows folds a chunk's columns into a map. Both are populated even for
+// a zero-row result, unlike rows.go's jsonlines session (see
+// quackSession.query). needsMoreFetch signals more rows than fit in this
+// response; resultUUID (field5) is the token a FetchRequest passes back to
+// pull the rest.
 func decodeQuackPrepareResponseBody(r *quackReader) (names []string, types []quackLogicalType, rows []map[string]any, needsMoreFetch bool, resultUUID quackHugeint, err error) {
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
 		return nil, nil, nil, false, quackHugeint{}, terr
@@ -384,12 +349,9 @@ func encodeQuackFetchRequest(connectionID string, uuid quackHugeint) []byte {
 // decoded from every inline DataChunk it carries, keyed against names (the
 // PrepareResponse's own result_names — a FetchResponse repeats the same
 // columns, so it carries no names of its own). chunkCount is the number of
-// DataChunks this response actually contained: the server signals "no more
-// rows" not with an explicit flag (FetchResponseMessage has none on the
-// wire — see FetchResponseMessage::Serialize in duckdb-quack) but by
-// eventually returning a response with zero chunks, once its query_result
-// is exhausted — see quackSession.exec's fetch loop, which keeps calling
-// FetchRequest until chunkCount is 0.
+// DataChunks this response actually contained: the wire format has no
+// explicit "no more rows" flag, so the server signals it by eventually
+// returning a response with zero chunks (see quackSession.exec's fetch loop).
 func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[string]any, chunkCount int, err error) {
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
 		return nil, 0, terr
@@ -426,11 +388,8 @@ func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[st
 		}
 	}
 
-	// field2 batch_index: optional_idx, always present on the wire (not
-	// default-omit — see MessageHeader's client_query_id for the same
-	// convention). This client has no use for it: it doesn't retry a
-	// specific batch, so nothing needs to correlate a response back to the
-	// request that produced it.
+	// field2 batch_index is always present on the wire but unused here: this
+	// client doesn't retry a specific batch.
 	if err := r.beginProperty(2); err != nil {
 		return nil, 0, err
 	}
@@ -446,30 +405,18 @@ func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[st
 
 // ---------- LogicalType ----------
 
-// quackLogicalTypeInteger and friends are DuckDB's LogicalTypeId values
-// (src/include/duckdb/common/types.hpp in duckdb/duckdb), confirmed byte-
-// for-byte against a real duckdb v1.5.5 subprocess (one CAST/literal per
-// type over quack, inspecting the decoded id — see quack_protocol_test.go).
+// quackLogicalTypeInteger and friends are DuckDB's LogicalTypeId values.
 // This is the *schema*-decoding vocabulary typeName() maps from — broader
-// than what decodeQuackVector actually decodes *values* for (see its own
-// doc comment): decoding a LogicalTypeId for schema purposes never needs to
-// interpret that type's on-the-wire value encoding, only its type_info
-// shape, so a column's declared type can be reported correctly (e.g. via
-// query()'s DESCRIBE-free schema) even for a type this client can't yet
-// fetch rows of.
+// than what decodeQuackVector actually decodes *values* for, since a
+// column's declared type can be reported correctly even for a type this
+// client can't yet fetch rows of.
 const (
-	// quackLogicalTypeSQLNull is DuckDB's own LogicalTypeId::SQLNULL — the
-	// type an untyped NULL literal with no other value to infer from gets,
-	// e.g. a STRUCT field whose only literal is NULL (`{'a': 1, 'b': NULL}`).
-	// Confirmed against a real DuckDB v2.1.0-alpha40409 subprocess: this
-	// query's 'b' field now types as SQLNULL rather than VARCHAR (whatever
-	// v1.5.5 did here, it wasn't this — this id previously reached values()'s
-	// unhandled default case, surfaced as "unsupported LogicalTypeId 1"). The
-	// wire shape itself needs no special-casing: it decodes via
-	// decodeFlatVector's ordinary fixed-data path exactly like any other
-	// scalar type, with every row's validity bit already false since a
-	// SQLNULL-typed vector is NULL by construction — only values() needed a
-	// case for it, to report those NULLs instead of erroring.
+	// quackLogicalTypeSQLNull is the type an untyped NULL literal with no
+	// other value to infer from gets, e.g. a STRUCT field whose only literal
+	// is NULL. It decodes via decodeFlatVector's ordinary fixed-data path
+	// like any scalar type (every row's validity bit is false by
+	// construction); only values() needs a case for it, to report those
+	// NULLs instead of erroring.
 	quackLogicalTypeSQLNull byte = 1
 
 	quackLogicalTypeBoolean      byte = 10
@@ -506,33 +453,25 @@ const (
 )
 
 // quackAliasJSON is the LogicalType alias DuckDB's JSON type carries: it's
-// physically a VARCHAR (LogicalType::JSON() is
-// `LogicalType(LogicalTypeId::VARCHAR)` with `SetAlias("JSON")` — no
-// structural difference from plain VARCHAR on the wire), distinguished only
-// by this alias in its ExtraTypeInfo. Confirmed against a real duckdb
-// subprocess: a JSON column's LogicalType serializes as id=25 (VARCHAR) with
-// type_info = {100: extraTypeInfoKind (byte, value 1 observed), 101: "JSON"}.
+// physically a VARCHAR, distinguished only by this alias in its
+// ExtraTypeInfo (type_info = {100: extraTypeInfoKind, 101: "JSON"}).
 const quackAliasJSON = "JSON"
 
 // quackStructField is one named child of a STRUCT LogicalType: field id 0
-// (name) and field id 1 (nested LogicalType) of a type_info field200 entry —
-// see decodeQuackLogicalType's doc comment.
+// (name) and field id 1 (nested LogicalType) of a type_info field200 entry.
 type quackStructField struct {
 	name string
 	typ  quackLogicalType
 }
 
-// quackLogicalType is a decoded LogicalType: the base id, its alias if any
-// ("" when untagged — e.g. "JSON" for DuckDB's JSON type), and whatever
-// extra shape its id implies: LIST/MAP's single unnamed child type (child,
-// nested at type_info's field200 — MAP's own child is itself a
-// STRUCT{key,value}, not a LIST, confirmed empirically), STRUCT's named
-// child fields (structFields, a counted list at that same field200), or
-// DECIMAL's width/scale or ENUM's dictionary values (decimalWidth/
-// decimalScale, enumValues — both at fields 200/201, plain scalars/lists
-// rather than a nested LogicalType or struct-field list despite sharing
-// those field numbers) — see decodeQuackLogicalType's doc comment for why
-// these shapes differ despite overlapping field numbers.
+// quackLogicalType is a decoded LogicalType: the base id, its alias if any,
+// and whatever extra shape its id implies: LIST/MAP's single unnamed child
+// type (child, at type_info's field200 — MAP's child is itself a
+// STRUCT{key,value}, not a LIST), STRUCT's named child fields (structFields,
+// a counted list at that same field200), or DECIMAL's width/scale or ENUM's
+// dictionary values (decimalWidth/decimalScale, enumValues — plain
+// scalars/lists at fields 200/201 despite sharing those field numbers with
+// the other shapes).
 type quackLogicalType struct {
 	id           byte
 	alias        string
@@ -554,21 +493,10 @@ type quackLogicalType struct {
 // entries at 200 (field id 0 = name, field id 1 = nested LogicalType, each
 // entry self-terminating); DECIMAL gets two plain ULEB128 scalars, width at
 // 200 and scale at 201; ENUM gets a plain ULEB128 scalar at 200 (the
-// dictionary's internal physical-size marker, unused by this client) and a
-// counted list of raw length-prefixed strings at 201 (the dictionary
-// values)}. Anything else — a LogicalTypeId with a type_info shape this
-// client doesn't special-case and that also isn't a bare nested LogicalType
-// — still errors, surfaced as an unexpected field id where the terminator
-// was expected.
-//
-// Confirmed against a real duckdb v1.5.5 subprocess: STRUCT/LIST via SELECT
-// {'a': 1, 'b': 'x'} AS s (cross-referencing decoded field names/types/
-// terminator counts against known byte-offset landmarks); MAP via SELECT
-// MAP {1:'a'} AS m (child is a bare STRUCT{key,value}, not wrapped in a
-// LIST); DECIMAL/ENUM via one CAST/literal per type, inspecting the raw
-// response bytes directly (see quack_protocol_test.go's
-// writeDecimalLogicalType/writeEnumLogicalType doc comments for the exact
-// byte layout each was confirmed against).
+// dictionary's internal physical-size marker, unused here) and a counted
+// list of raw length-prefixed strings at 201 (the dictionary values)}.
+// Anything else errors, surfaced as an unexpected field id where the
+// terminator was expected.
 func decodeQuackLogicalType(r *quackReader) (quackLogicalType, error) {
 	r.beginObject()
 	if err := r.beginProperty(100); err != nil {
@@ -627,10 +555,8 @@ func decodeQuackLogicalType(r *quackReader) (quackLogicalType, error) {
 					}
 					lt.decimalScale = scale
 				case quackLogicalTypeEnum:
-					// The scalar at field200 is the dictionary's internal
-					// physical-size marker (observed value 2 for a 2-value
-					// enum) — this client has no use for it beyond staying
-					// positioned on the wire.
+					// field200 is the dictionary's internal physical-size
+					// marker, unused beyond staying positioned on the wire.
 					if _, err := r.readByte(); err != nil {
 						return quackLogicalType{}, err
 					}
@@ -669,12 +595,9 @@ func decodeQuackLogicalType(r *quackReader) (quackLogicalType, error) {
 }
 
 // typeName renders lt as the same type-name string DuckDB's own DESCRIBE
-// would print for it (confirmed against a real duckdb subprocess for every
-// case below) — this is what lets a quack-sourced schema feed
-// DuckDBToColumnType (pkg/duckdb/insights/columntype.go) identically to a
-// DESCRIBE-sourced one, with no separate quack-specific bucketing rule
-// needed. An id this client has never seen (anything not in the const block
-// above) renders as "UNKNOWN(<id>)" rather than guessing.
+// would print, so a quack-sourced schema feeds DuckDBToColumnType
+// (pkg/duckdb/insights/columntype.go) identically to a DESCRIBE-sourced one.
+// An unrecognized id renders as "UNKNOWN(<id>)" rather than guessing.
 func (lt quackLogicalType) typeName() string {
 	switch lt.id {
 	case quackLogicalTypeSQLNull:
@@ -831,18 +754,14 @@ func (c quackColumn) isNull(i int) bool {
 
 // values decodes the column's raw bytes into canonical driver.Value-shaped Go
 // types: nil (for a NULL row), bool, int64, float64, string, time.Time, or —
-// for a VARCHAR aliased as JSON — the value's own json.Unmarshal result
-// (map[string]any, []any, a scalar, or nil), matching the shape the
-// stdio/-jsonlines transport already produces for the same column type (that
-// transport's own JSON-lines encoding round-trips a JSON-typed column's
-// value as nested JSON automatically; quack has no equivalent for free, so
-// this replicates it explicitly).
+// for a VARCHAR aliased as JSON — the value's own json.Unmarshal result,
+// matching the shape the stdio/jsonlines transport produces for the same
+// column type.
 func (c quackColumn) values() ([]any, error) {
 	out := make([]any, c.rowCount)
 	switch c.typeID {
 	case quackLogicalTypeSQLNull:
-		// Every row is NULL by construction (see the type's own doc
-		// comment) — out is already all-nil from make(), nothing to fill in.
+		// Every row is NULL by construction; out is already all-nil.
 	case quackLogicalTypeBoolean:
 		for i := range out {
 			if c.isNull(i) {
@@ -938,13 +857,9 @@ func quackTimestampToTime(typeID byte, raw int64) time.Time {
 
 // quackUUIDToString decodes a UUID column's 16-byte wire representation into
 // standard "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" text. DuckDB stores a UUID
-// internally as a signed hugeint (so it can reuse hugeint comparison for
-// ordering) built from the UUID's 16 bytes with the sign bit of the first
-// byte flipped, then serializes that hugeint little-endian — which, from the
-// wire's perspective, is the UUID's bytes in *reverse* order with the *last*
-// wire byte's top bit flipped instead. Confirmed against a real duckdb
-// subprocess by round-tripping a known UUID: reversing b and then XORing
-// byte 0 with 0x80 reconstructs the original UUID bytes exactly.
+// internally as a signed hugeint with the sign bit of the first byte
+// flipped, then serializes that little-endian — so on the wire it's the
+// UUID's bytes reversed, with the *last* wire byte's top bit flipped instead.
 func quackUUIDToString(b []byte) string {
 	var u [16]byte
 	for i := range u {
@@ -1062,10 +977,8 @@ func decodeQuackDataChunk(r *quackReader) (quackDataChunk, error) {
 }
 
 // decodeQuackVector reads one column's Vector object. Only VectorType.Flat
-// (the wire default, field90 omitted) is supported — see the package doc on
-// scope; Constant/Sequence/Dictionary vectors are a future-work decode
-// concern once this client needs to support arbitrary SELECT results rather
-// than just DDL/INSERT result rows and simple health-check queries.
+// (the wire default, field90 omitted) is supported; Constant/Sequence/
+// Dictionary vectors are unimplemented.
 func decodeQuackVector(r *quackReader, lt quackLogicalType, count int) (quackColumn, error) {
 	if ok, err := r.tryBeginProperty(90); err != nil {
 		return quackColumn{}, err
@@ -1087,26 +1000,19 @@ func decodeQuackVector(r *quackReader, lt quackLogicalType, count int) (quackCol
 	return decodeFlatVector(r, lt.id, lt.alias, count)
 }
 
-// decodeQuackListVector reads a LIST Vector object. Confirmed against a real
-// duckdb subprocess (INTEGER[] and VARCHAR[] columns, with rows covering a
-// NULL list, an empty list, and multi-element lists) by cross-referencing
-// decoded offsets/lengths and child values against the known input:
+// decodeQuackListVector reads a LIST Vector object:
 //
-//   - field100: hasValidity (for the list_entry_t data — whether a given
-//     row's whole list is itself SQL NULL), same convention as
-//     decodeFlatVector.
-//   - field101: validity mask, present only when hasValidity is true — same
-//     shape as decodeFlatVector's.
+//   - field100: hasValidity (whether a given row's whole list is itself SQL
+//     NULL), same convention as decodeFlatVector.
+//   - field101: validity mask, present only when hasValidity is true.
 //   - field104: the flattened child vector's total element count
 //     (DuckDB's ListVector::GetListSize()), a plain ULEB128.
-//   - field105: a list (ULEB128 count, expected to equal count) of
-//     list_entry_t objects, each {100: offset ULEB128, 101: length
-//     ULEB128}. A NULL row's entry is still present with an
-//     unspecified/garbage-but-typically-zero offset/length, exactly like a
-//     NULL fixed-size row's data — validity governs it, not the entry.
+//   - field105: a list of list_entry_t objects, each {100: offset ULEB128,
+//     101: length ULEB128}. A NULL row's entry is still present, with an
+//     unspecified offset/length — validity governs it, not the entry.
 //   - field106: the flattened child vector itself, wrapped in its own
-//     object exactly like DataChunk's own per-column wrapping, decoded
-//     recursively via decodeQuackVector so a LIST of LIST would also work.
+//     object, decoded recursively via decodeQuackVector so a LIST of LIST
+//     also works.
 func decodeQuackListVector(r *quackReader, lt quackLogicalType, count int) (quackColumn, error) {
 	if lt.child == nil {
 		return quackColumn{}, fmt.Errorf("duckdb: quack LIST LogicalType is missing its child type")
@@ -1198,26 +1104,17 @@ func decodeQuackListVector(r *quackReader, lt quackLogicalType, count int) (quac
 	return quackColumn{typeID: quackLogicalTypeList, list: lists, rowCount: count}, nil
 }
 
-// decodeQuackStructVector reads a STRUCT Vector object. Confirmed against a
-// real duckdb subprocess (SELECT {'a': 1, 'b': 'x'} AS s) the same way as
-// decodeQuackListVector: cross-referencing decoded field names/values and
-// terminator counts against the query's own known content, all the way to
-// the exact byte offset of the DataChunkWrapper/DataChunk/Vector object
-// terminators preceding the response's trailing result_uuid field:
+// decodeQuackStructVector reads a STRUCT Vector object:
 //
 //   - field100: hasValidity (whether a given row's whole struct is itself
 //     SQL NULL), same convention as decodeFlatVector/decodeQuackListVector.
-//   - field101: validity mask, present only when hasValidity is true — same
-//     shape as decodeFlatVector's.
+//   - field101: validity mask, present only when hasValidity is true.
 //   - field103: a raw ULEB128 count (expected to equal len(lt.structFields))
-//     followed by that many child Vector objects, each wrapped in its own
-//     object exactly like DataChunk's own per-column wrapping and decoded
-//     recursively via decodeQuackVector (so a STRUCT containing a LIST or
-//     another STRUCT also works), in the LogicalType's own field order — the
-//     children are not name-tagged on the wire, unlike field105's
-//     list_entry_t objects for LIST. Unlike LIST, each child vector carries
-//     the same row count as the parent (no flattening via offsets/lengths):
-//     a STRUCT's children are positionally aligned with their parent's rows.
+//     followed by that many child Vector objects, decoded recursively via
+//     decodeQuackVector, in the LogicalType's own field order (children are
+//     not name-tagged on the wire). Unlike LIST, each child vector carries
+//     the same row count as the parent — a STRUCT's children are
+//     positionally aligned with their parent's rows, no flattening.
 func decodeQuackStructVector(r *quackReader, lt quackLogicalType, count int) (quackColumn, error) {
 	if lt.structFields == nil {
 		return quackColumn{}, fmt.Errorf("duckdb: quack STRUCT LogicalType is missing its child fields")
@@ -1293,14 +1190,10 @@ func decodeFlatVector(r *quackReader, typeID byte, alias string, count int) (qua
 	}
 	// field101 (validity mask), present only when hasValidity is true, is a
 	// packed-bit mask covering count rows, one bit per row, LSB-first within
-	// each byte, 1=valid/0=null (confirmed against a real duckdb subprocess:
-	// a 2-row column with only its second row NULL produced mask byte 0xFD =
-	// 0b11111101 — bit 0 set, bit 1 clear). field102 (the column's data) is
-	// always present regardless, at the same physical width/shape as an
-	// all-valid column — DuckDB still writes a (unspecified/garbage) entry
-	// for a null row rather than omitting it, so decoding proceeds exactly
-	// as before and values() alone is responsible for substituting nil at
-	// invalid positions.
+	// each byte, 1=valid/0=null. field102 (the column's data) is always
+	// present regardless, at the same width/shape as an all-valid column —
+	// DuckDB writes an unspecified entry for a null row rather than omitting
+	// it, so values() alone is responsible for substituting nil.
 	var validity []bool
 	if hasValidity {
 		if err := r.beginProperty(101); err != nil {
@@ -1327,31 +1220,18 @@ func decodeFlatVector(r *quackReader, typeID byte, alias string, count int) (qua
 	return quackColumn{typeID: typeID, alias: alias, validity: validity, fixedData: data, rowCount: count}, nil
 }
 
-// decodeQuackVarcharFlatVector reads a VARCHAR flat vector's data, new as of
-// quack protocol version 3: gone is the old per-row length-prefixed list at
-// field102 (one readData call per row); in its place are three fields that
-// amortize the length prefix across the whole vector instead of paying it
-// per string:
+// decodeQuackVarcharFlatVector reads a VARCHAR flat vector's data. Unlike
+// the old per-row length-prefixed list, protocol version 3 amortizes the
+// length prefix across the whole vector via three fields:
 //
-//   - field107: a ULEB128 scalar equal to the total byte length of every
-//     row's string data added together (field109's own length, restated) —
-//     confirmed empirically (a 3-row vector holding "ab", NULL, "cde" carried
-//     107 = 5 = len("ab")+len("cde")); this client only reads past it, it
-//     isn't needed to decode the rest.
+//   - field107: a ULEB128 scalar equal to field109's total byte length,
+//     restated; this client only reads past it.
 //   - field108: a raw data blob of exactly 4*count bytes: one little-endian
 //     uint32 byte-length per row, in row order. A NULL row still gets a real
-//     (here always-zero, confirmed empirically) entry — same
-//     never-omit-a-null-row convention field101's validity mask exists to
-//     override, not the length array itself.
-//   - field109: a raw data blob holding every row's string bytes concatenated
-//     back-to-back in row order with no separator — each row's slice is
-//     recovered by walking field108's lengths and advancing a running
-//     offset into this blob.
-//
-// Confirmed against a real DuckDB v2.1.0-alpha40409 subprocess (this client's
-// old field102-list decode produces a hard "expected field id 0x0066 but
-// found 0x006b" parse error against the same server, which is what surfaced
-// this wire change in the first place).
+//     zero-length entry — validity (field101) is the only NULL signal.
+//   - field109: every row's string bytes concatenated back-to-back with no
+//     separator — each row's slice is recovered by walking field108's
+//     lengths and advancing a running offset.
 func decodeQuackVarcharFlatVector(r *quackReader, typeID byte, alias string, validity []bool, count int) (quackColumn, error) {
 	if err := r.beginProperty(107); err != nil {
 		return quackColumn{}, err

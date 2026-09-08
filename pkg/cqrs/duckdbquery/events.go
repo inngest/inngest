@@ -16,16 +16,9 @@ import (
 const eventColumns = "account_id, env_id, internal_id, received_at, source, source_id, event_id, event_name, event_data, event_v, event_ts"
 
 // GetEventsByExpressions returns every event matching all of the given CEL
-// expressions (ANDed together — insights.CELEventTableFilters converts each
-// independently and RenderWhereSQL's Where(filters...) ANDs the results),
-// pushed down into DuckDB's own events table. Previously unoverridden here,
-// so silently answered from the primary (SQLite/Postgres) manager instead
-// of DuckDB — the same class of bug GetEventsCount's own doc comment
-// describes for its own method — mirrors pkg/cqrs/manager's own
-// wrapper.GetEventsByExpressions, including its lack of account/env
-// scoping (the interface itself takes no accountID/workspaceID, so callers
-// are expected to have their CEL expressions do that filtering, or to use
-// this only where nothing else needs the scoping).
+// expressions (ANDed together), pushed down into DuckDB's own events table.
+// Like the interface itself, it takes no accountID/workspaceID — callers
+// must have their CEL expressions do that scoping.
 func (m *Manager) GetEventsByExpressions(ctx context.Context, cel []string) ([]*cqrs.Event, error) {
 	filters, err := insights.CELEventTableFilters(ctx, cel)
 	if err != nil {
@@ -107,12 +100,9 @@ func (m *Manager) GetEvents(ctx context.Context, accountID, workspaceID uuid.UUI
 	return m.queryEvents(ctx, query, args...)
 }
 
-// GetEventsCount backs EventsConnection.totalCount (events_connection.go) —
-// previously unoverridden, which silently fell through to the primary
-// (SQLite/Postgres) manager while GetEvents' edges came from DuckDB, so the
-// count and the list could disagree. Mirrors pkg/cqrs/manager's own
-// GetEventsCount: cursor is never applied to the count (total count must not
-// shrink as pagination advances), unlike GetEvents.
+// GetEventsCount backs EventsConnection.totalCount. Unlike GetEvents, the
+// cursor is never applied here — total count must not shrink as pagination
+// advances.
 func (m *Manager) GetEventsCount(ctx context.Context, accountID, workspaceID uuid.UUID, opts cqrs.WorkspaceEventsOpts) (int64, error) {
 	if err := opts.Validate(); err != nil {
 		return 0, err
@@ -148,10 +138,8 @@ func (m *Manager) GetEventsCount(ctx context.Context, accountID, workspaceID uui
 	return scanCount(m.db.QueryRowContext(ctx, query, args...))
 }
 
-// eventsCELWhere converts a single CEL expression into a WHERE-clause
-// fragment against the events table's own columns, using the same
-// insights.CELEventTableFilters/RenderWhereSQL machinery
-// GetEventsByExpressions uses above.
+// eventsCELWhere converts a single (possibly multi-line) CEL expression
+// into a WHERE-clause fragment against the events table's own columns.
 func eventsCELWhere(ctx context.Context, cel string) (string, []any, error) {
 	exprs := strings.Split(cel, "\n")
 

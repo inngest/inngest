@@ -443,6 +443,65 @@ export enum HistoryType {
   StepWaiting = 'StepWaiting'
 }
 
+export enum InsightsColumnHint {
+  AppId = 'APP_ID',
+  EventId = 'EVENT_ID',
+  FunctionId = 'FUNCTION_ID',
+  RunId = 'RUN_ID'
+}
+
+export enum InsightsColumnType {
+  Boolean = 'BOOLEAN',
+  Datetime = 'DATETIME',
+  Json = 'JSON',
+  Number = 'NUMBER',
+  String = 'STRING',
+  Unknown = 'UNKNOWN'
+}
+
+export type InsightsDiagnostic = {
+  __typename?: 'InsightsDiagnostic';
+  code: Scalars['String'];
+  end: InsightsDiagnosticPosition;
+  message: Scalars['String'];
+  severity: InsightsDiagnosticSeverity;
+  start: InsightsDiagnosticPosition;
+};
+
+export type InsightsDiagnosticPosition = {
+  __typename?: 'InsightsDiagnosticPosition';
+  column: Scalars['Int'];
+  line: Scalars['Int'];
+};
+
+export enum InsightsDiagnosticSeverity {
+  Error = 'ERROR',
+  Info = 'INFO',
+  Warning = 'WARNING'
+}
+
+export type InsightsQueryColumn = {
+  __typename?: 'InsightsQueryColumn';
+  hint: Maybe<InsightsColumnHint>;
+  name: Scalars['String'];
+  type: InsightsColumnType;
+};
+
+export type InsightsQueryInfo = {
+  __typename?: 'InsightsQueryInfo';
+  limited: Scalars['Boolean'];
+  primaryTable: Maybe<Scalars['String']>;
+  tables: Array<Scalars['String']>;
+};
+
+export type InsightsQueryResult = {
+  __typename?: 'InsightsQueryResult';
+  columns: Array<InsightsQueryColumn>;
+  diagnostics: Array<InsightsDiagnostic>;
+  info: InsightsQueryInfo;
+  rows: Array<Array<Maybe<Scalars['Unknown']>>>;
+};
+
 export type InvokeStepInfo = {
   __typename?: 'InvokeStepInfo';
   functionID: Scalars['String'];
@@ -531,6 +590,7 @@ export type Query = {
   functionBySlug: Maybe<Function>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
+  insights: InsightsQueryResult;
   run: Maybe<FunctionRunV2>;
   runTrace: RunTraceSpan;
   runTraceSpanOutputByID: RunTraceSpanOutput;
@@ -581,6 +641,11 @@ export type QueryFunctionBySlugArgs = {
 
 export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
+};
+
+
+export type QueryInsightsArgs = {
+  sql: Scalars['String'];
 };
 
 
@@ -1216,6 +1281,13 @@ export type GetEventV2RunsQueryVariables = Exact<{
 
 export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string }, trace: { __typename?: 'RunTraceSpan', skipReason: string | null, skipExistingRunID: string | null } | null }> } };
 
+export type ExecuteInsightsQueryQueryVariables = Exact<{
+  sql: Scalars['String'];
+}>;
+
+
+export type ExecuteInsightsQueryQuery = { __typename?: 'Query', insights: { __typename?: 'InsightsQueryResult', rows: Array<Array<any | null>>, columns: Array<{ __typename?: 'InsightsQueryColumn', name: string, type: InsightsColumnType, hint: InsightsColumnHint | null }>, info: { __typename?: 'InsightsQueryInfo', primaryTable: string | null, tables: Array<string>, limited: boolean }, diagnostics: Array<{ __typename?: 'InsightsDiagnostic', severity: InsightsDiagnosticSeverity, code: string, message: string, start: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number }, end: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number } }> } };
+
 export const RunDeferSummaryFieldsFragmentDoc = `
     fragment RunDeferSummaryFields on RunDefer {
   hashedDeferID
@@ -1832,6 +1904,36 @@ export const GetEventV2RunsDocument = `
   }
 }
     `;
+export const ExecuteInsightsQueryDocument = `
+    query ExecuteInsightsQuery($sql: String!) {
+  insights(sql: $sql) {
+    columns {
+      name
+      type
+      hint
+    }
+    rows
+    info {
+      primaryTable
+      tables
+      limited
+    }
+    diagnostics {
+      start {
+        line
+        column
+      }
+      end {
+        line
+        column
+      }
+      severity
+      code
+      message
+    }
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -1910,9 +2012,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetEventV2Runs: build.query<GetEventV2RunsQuery, GetEventV2RunsQueryVariables>({
       query: (variables) => ({ document: GetEventV2RunsDocument, variables })
     }),
+    ExecuteInsightsQuery: build.query<ExecuteInsightsQueryQuery, ExecuteInsightsQueryQueryVariables>({
+      query: (variables) => ({ document: ExecuteInsightsQueryDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetRunLinkageQuery, useLazyGetRunLinkageQuery, useGetRunTraceQuery, useLazyGetRunTraceQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetRunLinkageQuery, useLazyGetRunLinkageQuery, useGetRunTraceQuery, useLazyGetRunTraceQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery, useExecuteInsightsQueryQuery, useLazyExecuteInsightsQueryQuery } = injectedRtkApi;
 

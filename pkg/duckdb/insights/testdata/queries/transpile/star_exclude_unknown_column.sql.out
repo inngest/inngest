@@ -1,0 +1,3 @@
+{
+  "error": "insights: unknown column \"nonexistent_evil_column\" in EXCLUDE (at 1:8)"
+}

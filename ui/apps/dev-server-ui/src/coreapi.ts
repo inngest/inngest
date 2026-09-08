@@ -721,3 +721,34 @@ export const GET_EVENT_RUNS = gql`
     }
   }
 `;
+
+export const EXECUTE_INSIGHTS_QUERY = gql`
+  query ExecuteInsightsQuery($sql: String!) {
+    insights(sql: $sql) {
+      columns {
+        name
+        type
+        hint
+      }
+      rows
+      info {
+        primaryTable
+        tables
+        limited
+      }
+      diagnostics {
+        start {
+          line
+          column
+        }
+        end {
+          line
+          column
+        }
+        severity
+        code
+        message
+      }
+    }
+  }
+`;

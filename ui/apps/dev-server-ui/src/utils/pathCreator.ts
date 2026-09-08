@@ -7,8 +7,8 @@ export const pathCreator = {
     return `/event?eventID=${eventID}`;
   },
   function({ functionSlug }: { functionSlug: string }): string {
-    // TODO: Make this goes to a specific app page when we add that feature
-    return '/functions';
+    const params = new URLSearchParams({ slug: functionSlug });
+    return `/functions/config?${params.toString()}`;
   },
   runPopout({ runID }: { runID: string }): string {
     return `/run?runID=${runID}`;

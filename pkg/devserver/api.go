@@ -168,6 +168,9 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("enable-step-metadata") == "" {
 		features["enable-step-metadata"] = true
 	}
+	// Not user-toggleable: reflects whether --duckdb dual-write actually
+	// started, which is what gates the insights GQL field.
+	features["duckdb-insights"] = a.devserver.DuckDB != nil
 
 	//
 	// inngest feature flags are a map of arbitrary key value

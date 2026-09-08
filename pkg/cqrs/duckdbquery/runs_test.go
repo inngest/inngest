@@ -555,6 +555,97 @@ func TestGetTraceRunsFiltersByIsDeferred(t *testing.T) {
 	require.Len(t, runs, 1)
 	require.Equal(t, normalRun.String(), runs[0].RunID)
 }
+
+// TestGetTraceRunsAppliesEventCELFilter proves event.* CEL predicates push
+// down into the SQL query (matching against inngest.runs.inputs, the JSON
+// array of the run's triggering event(s) — see
+// run.SpanEventDuckDBConverter's doc comment) rather than being silently
+// dropped.
+func TestGetTraceRunsAppliesEventCELFilter(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	seedInputs := func(t *testing.T, runID ulid.ULID, inputsJSON string) {
+		t.Helper()
+		_, err := m.db.ExecContext(ctx, `UPDATE inngest.runs SET inputs = ? WHERE run_id = ?;`, inputsJSON, runID.String())
+		require.NoError(t, err)
+	}
+
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, matchRun, now, &completed, nil, nil, nil)
+	seedInputs(t, matchRun, `[{"id":"e1","name":"test/match","data":{}}]`)
+
+	noMatchRun := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, noMatchRun, now.Add(time.Millisecond), &completed, nil, nil, nil)
+	seedInputs(t, noMatchRun, `[{"id":"e2","name":"test/other","data":{}}]`)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+			CEL: `event.name == "test/match"`,
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, matchRun.String(), runs[0].RunID)
+}
+
+// TestGetTraceRunsEventCELFilterRequiresSameTriggeringEvent proves that,
+// for a batch-triggered run, an ANDed event.* CEL filter only matches when
+// a single triggering event satisfies every predicate together — not when
+// different events in the batch each satisfy one.
+func TestGetTraceRunsEventCELFilterRequiresSameTriggeringEvent(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	// A batch trigger where "test/match" and data.foo=="bar" are each
+	// satisfied by a different event, never both by the same one.
+	splitRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, splitRun, now, &completed, nil, nil, nil)
+	_, err := m.db.ExecContext(ctx, `UPDATE inngest.runs SET inputs = ? WHERE run_id = ?;`,
+		`[{"id":"e1","name":"test/match","data":{"foo":"nope"}},{"id":"e2","name":"test/other","data":{"foo":"bar"}}]`,
+		splitRun.String(),
+	)
+	require.NoError(t, err)
+
+	// A batch trigger where one single event satisfies both predicates.
+	sameEventRun := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, sameEventRun, now.Add(time.Millisecond), &completed, nil, nil, nil)
+	_, err = m.db.ExecContext(ctx, `UPDATE inngest.runs SET inputs = ? WHERE run_id = ?;`,
+		`[{"id":"e3","name":"test/other","data":{"foo":"nope"}},{"id":"e4","name":"test/match","data":{"foo":"bar"}}]`,
+		sameEventRun.String(),
+	)
+	require.NoError(t, err)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+			CEL: `event.name == "test/match" && event.data.foo == "bar"`,
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, sameEventRun.String(), runs[0].RunID)
+}
+
 func TestGetTraceRunsAppliesOutputCELFilter(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
