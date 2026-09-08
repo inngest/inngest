@@ -123,6 +123,16 @@ export function loadRun(id){
      */
     const sep = d && !isFin && at(d.endedAt)!=null && st!=null && at(d.endedAt) <= st;
     const moments=[];
+    /**
+     * Whether the instant this row OPENS on reached us by checkpoint.
+     *
+     * A row borrows that instant from whatever the request did before it, so a
+     * row that is not itself checkpointed can still open on a checkpointed
+     * moment -- `for 2s` begins where `first step` ended, and that end came
+     * from a checkpoint. The ring follows where a timestamp came from, not
+     * which row it landed on.
+     */
+    let priorCp=false, priorAt=null;
     if(sep){
       const dq=at(d.queuedAt), ds=at(d.startedAt), de=at(d.endedAt);
       /**
@@ -155,13 +165,14 @@ export function loadRun(id){
         if((o.stepID||o.name)===key) continue;
         const a=at(o.startedAt), b=at(o.endedAt);
         if(a==null||b==null||from==null||de==null) continue;
-        if(a>=from && b<=de) prior=prior==null?b:Math.max(prior,b);
+        if(a>=from && b<=de && (prior==null||b>prior)){ prior=b; priorCp=!!o.isCheckpoint; }
       }
       if(prior==null){
         moments.push(['queued', dq]);
         moments.push(['started', ds, 'disc']);
       }else{
-        moments.push(['started', Math.min(Math.max(prior,dq), de), 'disc']);
+        priorAt=Math.min(Math.max(prior,dq), de);
+        moments.push(['started', priorAt, 'disc']);
       }
       moments.push(['ok', de]);
     }
@@ -205,7 +216,7 @@ export function loadRun(id){
         const a=at(o.startedAt), b=at(o.endedAt);
         // Same rule as `prior`: the request ran it only if it began after the
         // request did.
-        if(a!=null && b!=null && a>=from && b>ranFrom && b<=st) ranFrom=b;
+        if(a!=null && b!=null && a>=from && b>ranFrom && b<=st){ ranFrom=b; priorCp=!!o.isCheckpoint; }
       }
     }
     /**
@@ -233,6 +244,7 @@ export function loadRun(id){
       // Already executing when this row's lead-in began: there is nothing to
       // wait for, the whole lead-in is the SDK working towards this step.
       if(rs!=null && rs<=ranFrom) rs=null;
+      priorAt=ranFrom;
       if(rs!=null){
         moments.push(['queued', ranFrom]);
         if(rs<st){                       // ...and then the SDK's own work
@@ -262,9 +274,10 @@ export function loadRun(id){
      * the tail of the list.
      */
     const isCp = spans.some(sp=>sp.isCheckpoint);
-    const cp = (isCp && st!=null)
-      ? moments.filter(mo=>mo[1]>=st).map(mo=>mo[1])
-      : undefined;
+    const cpAt = new Set();
+    if(isCp && st!=null) for(const mo of moments) if(mo[1]>=st) cpAt.add(mo[1]);
+    if(priorCp && priorAt!=null) cpAt.add(priorAt);
+    const cp = cpAt.size ? [...cpAt] : undefined;
 
     rows.push({_q:q==null?0:q, n:name, kind, at:moments, cp, reported:sep||undefined,
                end:out?undefined:total, _stepID:first.stepID, _planner:d&&d.spanID});
