@@ -342,7 +342,22 @@ export function loadRun(id){
      */
     if(tries.length>1){
       tries.forEach((sp,i)=>{
-        moments.push(['started', at(sp.startedAt)]);
+        /**
+         * The backoff ends where the attempt became RUNNABLE, not where it ran.
+         *
+         * A retry is scheduled the moment the attempt before it failed, and the
+         * executor holds it for the backoff -- fifteen seconds plus up to
+         * thirty of jitter, so it cannot be derived from the defaults even if
+         * you know them. `scheduledAt` is that instant measured: the wait
+         * before it is the backoff, and the wait after it is the ordinary queue
+         * that every other step has. Without the split the whole gap drew as
+         * backoff, which said the executor was still counting down when it was
+         * really just busy.
+         */
+        const sched=at(sp.scheduledAt), st0=at(sp.startedAt);
+        if(i>0 && sched!=null && st0!=null && sched>moments[moments.length-1][1] && sched<=st0)
+          moments.push(['queued', sched]);
+        moments.push(['started', st0]);
         const done=i===tries.length-1;
         if(done){ const o=OUTCOME[sp.status]; if(o) moments.push([o, at(sp.endedAt)]); }
         else moments.push(['retry', at(sp.endedAt)]);
