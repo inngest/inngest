@@ -518,7 +518,18 @@ export function marks(at){
     if(!c) continue;
     // Two moments at one instant -- a request resolving as the next step is
     // queued -- are one circle, and it is the later one that names it.
-    if(out.length && Math.abs(out[out.length-1].p-x)<1e-9) out.pop();
+    //
+    // Except at the row's OPENING, where the first moment names it instead.
+    // The rule is about a transition: one state ending as the next begins, and
+    // the circle carries what it became. A row has no earlier state, so there
+    // is no transition and nothing for the second moment to be the result of.
+    // Dropping the first mark there deleted the queue mark from every step the
+    // SDK reported and ran in one request -- the step was queued, at the same
+    // instant it started, and the row was drawn as though it never had been.
+    if(out.length && Math.abs(out[out.length-1].p-x)<1e-9){
+      if(out.length===1) continue;
+      out.pop();
+    }
     // A mark says something CHANGED. Queue time becoming a named flow-control
     // hold, or one stretch of work becoming another, changes the substance of
     // the bar without changing the state of the row, so the second mark would

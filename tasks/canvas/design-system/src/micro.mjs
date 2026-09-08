@@ -777,8 +777,21 @@ export function fig(rows,extra='',label='',under='',opts={}){
         const s=(rw.at||[]).map(mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first]);
         const kept=s.filter(mo=>mo[1]>=-1e-9);
         const open=(kept.length&&kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
-        return {...rw, at:(open?[[...open].map((v,q)=>q===1?0:v)]:[])
-          .concat(kept.map(mo=>mo[1]<0?[...mo].map((v,q)=>q===1?0:v):mo)),
+        let at=(open?[[...open].map((v,q)=>q===1?0:v)]:[])
+          .concat(kept.map(mo=>mo[1]<0?[...mo].map((v,q)=>q===1?0:v):mo));
+        /**
+         * A row whose ENTIRE wait was the wait being hidden opens already
+         * running, so it loses the moment that named the wait.
+         *
+         * Only where the trim is what closed the gap: both moments landing on
+         * zero is the trim having taken everything between them. A row queued
+         * and started at the same instant later in the run still says it was
+         * queued -- that instant is a fact about the run, not an artefact of
+         * what this drawing is hiding.
+         */
+        if(at.length>1 && (at[0][0]==='queued'||at[0][0]==='held')
+           && Math.abs(at[0][1])<1e-9 && Math.abs(at[1][1])<1e-9) at=at.slice(1);
+        return {...rw, at,
           end:rw.end!=null?Math.max(0,rw.end-first):rw.end,
           segs:undefined};
       }).map(resolveRow);
