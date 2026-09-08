@@ -78,6 +78,7 @@ export function loadRun(id){
   const t0=ms(t.queuedAt), t1=ms(t.endedAt)||ms(t.startedAt)||t0;
   let total=Math.max(1, t1-t0);
   const at=v=>{ const n=ms(v); return n==null?null:n-t0; };
+  const runStart=at(t.startedAt);
 
   // One row per step. A step has a span of its own and a span per attempt; the
   // step's span carries the queue, the last attempt carries the execution.
@@ -140,13 +141,21 @@ export function loadRun(id){
        * last thing it ran. There is no queue in front of it because the step
        * did not exist to be queued.
        */
+      // Only work the request actually RAN counts -- a span that merely ENDED
+      // inside the window was running long before it, a sleep most often, and
+      // taking its end as the request's earlier work put the request after a
+      // wait it had nothing to do with.
+      // ...using the request's own start only where it records a usable one:
+      // a discovery whose startedAt equals its endedAt has no window, and
+      // taking that as the floor excludes the very work it ran.
+      const from=(ds!=null && ds>dq && ds<de) ? ds : dq;
       let prior=null;
       for(const o of (t.childrenSpans||[])){
         if(INTERNAL.test(o.name||'')) continue;
         if((o.stepID||o.name)===key) continue;
         const a=at(o.startedAt), b=at(o.endedAt);
-        if(a==null||b==null||dq==null||de==null) continue;
-        if(a>=dq && b<=de) prior=prior==null?b:Math.max(prior,b);
+        if(a==null||b==null||from==null||de==null) continue;
+        if(a>=from && b<=de) prior=prior==null?b:Math.max(prior,b);
       }
       if(prior==null){
         moments.push(['queued', dq]);
@@ -188,14 +197,54 @@ export function loadRun(id){
     let ranFrom=null;
     if(ran){
       ranFrom=at(ran.queuedAt);
+      const rstart=at(ran.startedAt);
+      const from=rstart!=null&&rstart>ranFrom ? rstart : ranFrom;
       for(const o of (t.childrenSpans||[])){
         if(INTERNAL.test(o.name||'')) continue;
         if((o.stepID||o.name)===key) continue;
-        const b=at(o.endedAt);
-        if(b!=null && b>ranFrom && b<=st) ranFrom=b;
+        const a=at(o.startedAt), b=at(o.endedAt);
+        // Same rule as `prior`: the request ran it only if it began after the
+        // request did.
+        if(a!=null && b!=null && a>=from && b>ranFrom && b<=st) ranFrom=b;
       }
     }
-    const qq=sep ? at(d.endedAt) : (ranFrom!=null ? Math.min(ranFrom, st) : q);
+    /**
+     * The lead-in to a checkpointed step is the REQUEST, and most of it is
+     * compute.
+     *
+     * The SDK is running your function the whole time it is between two inline
+     * steps -- that is your app executing, not the step waiting its turn -- so
+     * drawing it hatched said the opposite of what happened. `emit` runs three
+     * steps in one request and had five and six millisecond queues between
+     * them; there was no queue, the SDK was working.
+     *
+     * So the lead-in splits at the moment the request started executing:
+     * waiting before it, the SDK's own work after it. A step that is not the
+     * first in its request has no waiting part at all -- the request was
+     * already running when the previous step returned.
+     */
+    let qq=sep ? at(d.endedAt) : (ranFrom!=null ? Math.min(ranFrom, st) : q);
+    if(ran && ranFrom!=null && st!=null && ranFrom<st){
+      const rstart=at(ran.startedAt), rend=at(ran.endedAt);
+      // A request whose startedAt equals its endedAt recorded no window at
+      // all, so it cannot say when it began; the run's own start is the next
+      // best thing, and for the first request it is the same instant.
+      let rs = (rstart!=null && !(rend!=null && rstart===rend)) ? rstart : runStart;
+      // Already executing when this row's lead-in began: there is nothing to
+      // wait for, the whole lead-in is the SDK working towards this step.
+      if(rs!=null && rs<=ranFrom) rs=null;
+      if(rs!=null){
+        moments.push(['queued', ranFrom]);
+        if(rs<st){                       // ...and then the SDK's own work
+          moments.push(['started', rs, 'disc']);
+          moments.push(['ok', st]);
+        }
+      }else{
+        moments.push(['started', ranFrom, 'disc']);
+        moments.push(['ok', st]);
+      }
+      qq=null;
+    }
     if(qq!=null && (st==null || qq<=st)) moments.push([sep?'planned':'queued', qq]);
     if(st!=null) moments.push(['started', st]);
     if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
