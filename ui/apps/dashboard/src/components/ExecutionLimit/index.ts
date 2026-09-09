@@ -1,8 +1,2 @@
-export {
-  ExecutionLimitCard,
-  type ExecutionLimitCardProps,
-} from './ExecutionLimitCard';
-export {
-  ExecutionLimitPill,
-  type ExecutionLimitPillProps,
-} from './ExecutionLimitPill';
+export { ExecutionLimitCard } from './ExecutionLimitCard';
+export { ExecutionLimitPill } from './ExecutionLimitPill';
