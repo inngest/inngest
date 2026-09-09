@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -20,6 +21,23 @@ import (
 
 type recordedBatchDelete struct {
 	residencyDuration time.Duration
+}
+
+type recordingBatchQueue struct {
+	item queue.Item
+}
+
+func (q *recordingBatchQueue) Enqueue(_ context.Context, item queue.Item, _ time.Time, _ queue.EnqueueOpts) error {
+	q.item = item
+	return nil
+}
+
+func (*recordingBatchQueue) Requeue(context.Context, string, queue.QueueItem, time.Time, ...queue.RequeueOptionFn) error {
+	return nil
+}
+
+func (*recordingBatchQueue) RequeueByJobID(context.Context, queue.Scope, string, string, time.Time) error {
+	return nil
 }
 
 func TestScheduleBatchPayloadBatchClusterJSON(t *testing.T) {
@@ -1003,5 +1021,40 @@ func TestRunBatch(t *testing.T) {
 		require.False(t, result.Scheduled)
 		require.Equal(t, "", result.BatchID)
 		require.Equal(t, 0, result.ItemCount)
+	})
+
+	t.Run("preserves batch cluster in scheduled payload", func(t *testing.T) {
+		functionID := uuid.New()
+		fn := inngest.Function{
+			ID:         functionID,
+			EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"},
+		}
+		queue := &recordingBatchQueue{}
+		bm := NewRedisBatchManager(bc, queue, WithoutBuffer())
+
+		_, err := bm.Append(context.Background(), BatchItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionID,
+			FunctionVersion: 1,
+			EventID:         ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:           event.Event{Name: "test/event"},
+		}, fn)
+		require.NoError(t, err)
+
+		result, err := bm.RunBatch(context.Background(), RunBatchOpts{
+			FunctionID:   functionID,
+			BatchCluster: "valkey-batching-a",
+			AccountID:    accountId,
+			WorkspaceID:  workspaceId,
+			AppID:        appId,
+		})
+		require.NoError(t, err)
+		require.True(t, result.Scheduled)
+
+		payload, ok := queue.item.Payload.(ScheduleBatchPayload)
+		require.True(t, ok)
+		require.Equal(t, "valkey-batching-a", payload.BatchCluster)
 	})
 }

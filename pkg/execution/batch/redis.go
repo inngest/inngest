@@ -501,6 +501,7 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 		ScheduleBatchPayload: ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    batchPointerKey,
+			BatchCluster:    opts.BatchCluster,
 			AccountID:       opts.AccountID,
 			WorkspaceID:     opts.WorkspaceID,
 			AppID:           opts.AppID,
