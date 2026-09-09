@@ -141,8 +141,8 @@ type DeleteBatchResult struct {
 
 // RunBatchOpts contains options for running a batch immediately.
 type RunBatchOpts struct {
-	FunctionID uuid.UUID
-	BatchKey   string
+	FunctionID      uuid.UUID
+	BatchKey        string
 	BatchCluster    string // backend that owns this batch.
 	BatchGeneration string // batch key namespace within the backend.
 	AccountID       uuid.UUID
