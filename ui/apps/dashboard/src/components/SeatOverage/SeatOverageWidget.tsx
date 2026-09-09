@@ -8,10 +8,10 @@ import {
 import { RiCloseLine, RiErrorWarningFill } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
+import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
 import { useSeatOverage } from './useSeatOverage';
 import { Link } from '@tanstack/react-router';
 
-// TODO: turn into a component for all other upsell widgets
 export default function SeatOverageWidget({
   collapsed,
 }: {
@@ -56,7 +56,10 @@ export default function SeatOverageWidget({
       )}
 
       {!collapsed && (
-        <div className="text-basis mb-5 block rounded border border-amber-200 bg-amber-50 p-3 leading-tight">
+        <SidebarAlertCard
+          className="text-basis mb-5 border-amber-200 bg-amber-50"
+          contentClassName="p-3"
+        >
           <div className="flex min-h-[110px] flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -97,7 +100,7 @@ export default function SeatOverageWidget({
               Upgrade plan
             </Link>
           </div>
-        </div>
+        </SidebarAlertCard>
       )}
     </>
   );
