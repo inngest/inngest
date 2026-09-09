@@ -62,7 +62,7 @@ func TestFunctionRunList(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      fmt.Sprintf("fn-run-err-%s", failedEventName),
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(failedEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {

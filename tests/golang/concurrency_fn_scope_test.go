@@ -208,7 +208,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 				Step: []inngestgo.ConfigStepConcurrency{
 					{
 						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.num"),
+						Key:   new("event.data.num"),
 					},
 				},
 			},
@@ -301,11 +301,11 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 					},
 					{
 						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.num"),
+						Key:   new("event.data.num"),
 					},
 				},
 			},
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

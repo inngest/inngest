@@ -30,7 +30,7 @@ func TestEvent(t *testing.T) {
 		// Send 1 event and wait for it show in the API.
 		inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
 			AppID: "app",
-			Dev:   toPtr(true),
+			Dev:   new(true),
 		})
 		r.NoError(err)
 		eventName := randomSuffix("foo")
@@ -115,7 +115,7 @@ func TestEvent(t *testing.T) {
 
 			inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
 				AppID: "app",
-				Dev:   toPtr(true),
+				Dev:   new(true),
 			})
 			r.NoError(err)
 			eventName := randomSuffix("evt")

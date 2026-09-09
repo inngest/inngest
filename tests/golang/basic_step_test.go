@@ -72,7 +72,7 @@ func TestFunctionSteps(t *testing.T) {
 			// Wait for an event with an expression
 			_, err = step.WaitForEvent[any](ctx, "wait2", step.WaitForEventOpts{
 				Event:   "api/new.event",
-				If:      inngestgo.StrPtr(`async.data.ok == "yes" && async.data.id == event.data.id`),
+				If:      new(`async.data.ok == "yes" && async.data.id == event.data.id`),
 				Timeout: 5 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {

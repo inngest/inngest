@@ -2,10 +2,6 @@ package util
 
 import "strings"
 
-func StrPtr(s string) *string {
-	return &s
-}
-
 var logSanitizer = strings.NewReplacer(
 	"\r", "",
 	"\n", "",

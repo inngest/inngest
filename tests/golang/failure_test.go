@@ -33,7 +33,7 @@ func TestFunctionFailure(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "test-sdk",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("failure/run", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
@@ -117,7 +117,7 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "test-sdk-fail-with-retry",
-			Retries: inngestgo.IntPtr(1),
+			Retries: new(1),
 		},
 		inngestgo.EventTrigger("failure/run-retry", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
@@ -256,7 +256,7 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "test-sdk-response-too-large",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("failure/run-response-too-large", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
@@ -336,7 +336,7 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "test-sdk-response-too-large",
-			Retries: inngestgo.IntPtr(1),
+			Retries: new(1),
 		},
 		inngestgo.EventTrigger("failure/run-response-too-large-retry", nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {

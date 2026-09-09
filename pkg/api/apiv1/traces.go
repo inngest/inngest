@@ -22,7 +22,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -319,8 +318,8 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		meta.Attr(meta.Attrs.RunID, &runID),
 		meta.Attr(meta.Attrs.AppID, &fn.AppID),
 		meta.Attr(meta.Attrs.FunctionID, &functionID),
-		meta.Attr(meta.Attrs.AccountID, util.ToPtr(auth.AccountID())),
-		meta.Attr(meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID())),
+		meta.Attr(meta.Attrs.AccountID, new(auth.AccountID())),
+		meta.Attr(meta.Attrs.EnvID, new(auth.WorkspaceID())),
 	)
 
 	// By default, the parent span is the trace ref we found.

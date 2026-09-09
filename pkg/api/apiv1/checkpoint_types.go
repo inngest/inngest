@@ -158,7 +158,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 				ID:      "step",
 				Name:    r.FnSlug(),
 				URI:     uri,
-				Retries: inngestgo.Ptr(retries),
+				Retries: new(retries),
 			},
 		},
 	}

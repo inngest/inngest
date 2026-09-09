@@ -114,7 +114,7 @@ func TestHistoryLifecycle_OnConnected(t *testing.T) {
 			"group1": {
 				AppName:       "test-app",
 				AppID:         &appId,
-				AppVersion:    ptr.String("1.0.0"),
+				AppVersion:    new("1.0.0"),
 				SyncID:        &syncId,
 				FunctionSlugs: []string{"func1", "func2"},
 			},
@@ -228,7 +228,7 @@ func TestHistoryLifecycle_OnDisconnected(t *testing.T) {
 		{
 			name:           "with close reason",
 			closeReason:    "client_disconnect",
-			expectedReason: ptr.String("client_disconnect"),
+			expectedReason: new("client_disconnect"),
 			expectedStatus: connectpb.ConnectionStatus_DISCONNECTED,
 		},
 		{
@@ -419,7 +419,7 @@ func createTestConnection() *state.Connection {
 			"group1": {
 				AppName:       "test-app",
 				AppID:         &appId,
-				AppVersion:    ptr.String("1.0.0"),
+				AppVersion:    new("1.0.0"),
 				SyncID:        &syncId,
 				FunctionSlugs: []string{"func1"},
 			},

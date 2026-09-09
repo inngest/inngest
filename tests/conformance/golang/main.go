@@ -37,8 +37,8 @@ func main() {
 
 	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
 		AppID:      appID,
-		EventKey:   inngestgo.StrPtr(eventKey),
-		SigningKey: inngestgo.StrPtr(signingKey),
+		EventKey:   new(eventKey),
+		SigningKey: new(signingKey),
 		Dev:        &devMode,
 	})
 	if err != nil {
@@ -136,7 +136,7 @@ func registerFunctions(client inngestgo.Client) {
 	mustCreate(client, inngestgo.FunctionOpts{
 		ID: "test-suite-cancel-test",
 		Cancel: []inngestgo.ConfigCancel{
-			{Event: "cancel/please", If: inngestgo.StrPtr("async.data.request_id == event.data.request_id")},
+			{Event: "cancel/please", If: new("async.data.request_id == event.data.request_id")},
 		},
 	},
 		inngestgo.EventTrigger("tests/cancel.test", nil),
@@ -162,7 +162,7 @@ func registerFunctions(client inngestgo.Client) {
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			payload, err := step.WaitForEvent[map[string]any](ctx, "wait", step.WaitForEventOpts{
 				Event:   "test/resume",
-				If:      inngestgo.StrPtr("async.data.resume == true && async.data.id == event.data.id"),
+				If:      new("async.data.resume == true && async.data.id == event.data.id"),
 				Timeout: 10 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {

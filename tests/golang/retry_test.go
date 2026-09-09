@@ -200,7 +200,7 @@ func TestMaxRetries(t *testing.T) {
 		ic,
 		inngestgo.FunctionOpts{
 			ID:      "fn",
-			Retries: inngestgo.IntPtr(consts.MaxRetries),
+			Retries: new(consts.MaxRetries),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

@@ -86,7 +86,7 @@ func TestValidate(t *testing.T) {
 					Limits: []StepConcurrency{
 						{
 							Limit: 5,
-							Key:   strptr("invalid because not a string"),
+							Key:   new("invalid because not a string"),
 						},
 					},
 				},
@@ -133,7 +133,7 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	t.Run("With ternaries", func(t *testing.T) {
 		f.Priority = &Priority{
-			Run: strptr("event.data.plan == 'paid' ? 100 : 0"),
+			Run: new("event.data.plan == 'paid' ? 100 : 0"),
 		}
 
 		pf, err := f.RunPriorityFactor(ctx, map[string]any{
@@ -151,7 +151,7 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	t.Run("With an int return value in the expression", func(t *testing.T) {
 		f.Priority = &Priority{
-			Run: strptr("event.data.priority"),
+			Run: new("event.data.priority"),
 		}
 
 		pf, err := f.RunPriorityFactor(ctx, map[string]any{
@@ -187,7 +187,7 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	t.Run("With missing data", func(t *testing.T) {
 		f.Priority = &Priority{
-			Run: strptr("event.data.priority"),
+			Run: new("event.data.priority"),
 		}
 
 		pf, err := f.RunPriorityFactor(ctx, map[string]any{
@@ -199,7 +199,7 @@ func TestRunPriorityFactor(t *testing.T) {
 
 	t.Run("With an invalid expression", func(t *testing.T) {
 		f.Priority = &Priority{
-			Run: strptr("event.data.priority = 123"),
+			Run: new("event.data.priority = 123"),
 		}
 
 		pf, err := f.RunPriorityFactor(ctx, map[string]any{
@@ -527,5 +527,3 @@ func TestDuplicateCronExpressionRejected(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "duplicate cron expression")
 }
-
-func strptr(s string) *string { return &s }

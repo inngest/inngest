@@ -37,7 +37,7 @@ func TestEndToEnd(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "connect-test", Retries: inngestgo.IntPtr(0)},
+		inngestgo.FunctionOpts{ID: "connect-test", Retries: new(0)},
 		inngestgo.EventTrigger("test/connect", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -52,7 +52,7 @@ func TestEndToEnd(t *testing.T) {
 
 	t.Run("with connection", func(t *testing.T) {
 		wc, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
-			InstanceID: inngestgo.StrPtr("my-worker"),
+			InstanceID: new("my-worker"),
 			Apps:       []inngestgo.Client{inngestClient},
 		})
 		require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestEndToEnd(t *testing.T) {
 
 		// Reconnect the worker — semaphore capacity is restored
 		wc2, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
-			InstanceID: inngestgo.StrPtr("my-worker-2"),
+			InstanceID: new("my-worker-2"),
 			Apps:       []inngestgo.Client{inngestClient},
 		})
 		require.NoError(t, err)

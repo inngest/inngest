@@ -32,7 +32,7 @@ func TestSingletonFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.ConfigSingleton{Key: inngestgo.StrPtr("event.data.user.id")},
+			Singleton: &inngestgo.ConfigSingleton{Key: new("event.data.user.id")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -96,7 +96,7 @@ func TestSingletonFunctionWithKeyResolvingToFalse(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.ConfigSingleton{Key: inngestgo.StrPtr("event.data.decision")},
+			Singleton: &inngestgo.ConfigSingleton{Key: new("event.data.decision")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -152,7 +152,7 @@ func TestSingletonCancelMode(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel",
 			Singleton: &inngestgo.ConfigSingleton{
-				Key:  inngestgo.StrPtr("event.data.user.id"),
+				Key:  new("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},
 		},
@@ -177,7 +177,7 @@ func TestSingletonCancelMode(t *testing.T) {
 			ID: "on-cancel",
 		},
 		inngestgo.EventTrigger("inngest/function.cancelled",
-			inngestgo.StrPtr(fmt.Sprintf(
+			new(fmt.Sprintf(
 				"event.data.function_id == '%s-fn-singleton-cancel'",
 				appName,
 			))),
@@ -194,7 +194,7 @@ func TestSingletonCancelMode(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID: "on-finish",
 		},
-		inngestgo.EventTrigger("inngest/function.finished", inngestgo.StrPtr(fmt.Sprintf(
+		inngestgo.EventTrigger("inngest/function.finished", new(fmt.Sprintf(
 			"event.data.function_id == '%s-fn-singleton-cancel' && event.data.result == true",
 			appName,
 		))),
@@ -258,7 +258,7 @@ func TestSingletonDifferentKeysBothRun(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel-different-keys",
 			Singleton: &inngestgo.ConfigSingleton{
-				Key:  inngestgo.StrPtr("event.data.user.id"),
+				Key:  new("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},
 		},
@@ -273,7 +273,7 @@ func TestSingletonDifferentKeysBothRun(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "on-cancel-different-keys"},
-		inngestgo.EventTrigger("inngest/function.cancelled", inngestgo.StrPtr(fmt.Sprintf(
+		inngestgo.EventTrigger("inngest/function.cancelled", new(fmt.Sprintf(
 			"event.data.function_id == '%s-fn-singleton-cancel-different-keys'",
 			appName,
 		))),
@@ -287,7 +287,7 @@ func TestSingletonDifferentKeysBothRun(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "on-success-different-keys"},
-		inngestgo.EventTrigger("inngest/function.finished", inngestgo.StrPtr(fmt.Sprintf(
+		inngestgo.EventTrigger("inngest/function.finished", new(fmt.Sprintf(
 			"event.data.function_id == '%s-fn-singleton-cancel-different-keys' && event.data.result == true",
 			appName,
 		))),

@@ -58,8 +58,8 @@ func TestNotSDKResponse(t *testing.T) {
 			ic, err := inngestgo.NewClient(
 				inngestgo.ClientOpts{
 					AppID:       randomSuffix("app"),
-					Dev:         inngestgo.BoolPtr(true),
-					RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+					Dev:         new(true),
+					RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
 					URL:         proxyURL,
 				},
 			)
@@ -69,7 +69,7 @@ func TestNotSDKResponse(t *testing.T) {
 				ic,
 				inngestgo.FunctionOpts{
 					ID:      "fn",
-					Retries: inngestgo.IntPtr(0),
+					Retries: new(0),
 				},
 				inngestgo.EventTrigger(eventName, nil),
 				func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
