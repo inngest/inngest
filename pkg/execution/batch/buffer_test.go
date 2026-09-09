@@ -50,6 +50,36 @@ func (m scheduleErrorBatchManager) ScheduleExecution(context.Context, ScheduleBa
 	return m.err
 }
 
+type recordingScheduleBatchManager struct {
+	BatchManager
+	opts ScheduleBatchOpts
+}
+
+func (m *recordingScheduleBatchManager) ScheduleExecution(_ context.Context, opts ScheduleBatchOpts) error {
+	m.opts = opts
+	return nil
+}
+
+func TestScheduleBatchExecutionPersistsGeneration(t *testing.T) {
+	buffer := newAppendBuffer(time.Second, 1, 1, logger.VoidLogger())
+	manager := &recordingScheduleBatchManager{}
+	batchID := ulid.Make()
+	generation := "01K0T21HZW9DHDZ5P5TQKBN1E6"
+
+	err := buffer.scheduleBatchExecution(
+		redis_state.WithBatchGeneration(context.Background(), generation),
+		manager,
+		batchID.String(),
+		&BulkAppendResult{BatchPointer: "pointer"},
+		BatchItem{},
+		ingest.Function{ID: uuid.New()},
+		time.Now(),
+		"new",
+	)
+	require.NoError(t, err)
+	require.Equal(t, generation, manager.opts.BatchGeneration)
+}
+
 func TestScheduleBatchExecutionErrorLog(t *testing.T) {
 	var output bytes.Buffer
 	log := logger.FromSlog(slog.New(slog.NewJSONHandler(&output, nil)), slog.LevelDebug)

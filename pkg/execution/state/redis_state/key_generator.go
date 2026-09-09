@@ -519,6 +519,11 @@ func WithBatchGeneration(ctx context.Context, generation string) context.Context
 	return context.WithValue(ctx, batchGenerationKey{}, generation)
 }
 
+// BatchGeneration returns the batch key namespace selected for ctx.
+func BatchGeneration(ctx context.Context) string {
+	return batchGeneration(ctx)
+}
+
 func batchGeneration(ctx context.Context) string {
 	generation, _ := ctx.Value(batchGenerationKey{}).(string)
 	return generation
