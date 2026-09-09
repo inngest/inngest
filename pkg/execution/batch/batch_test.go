@@ -1109,11 +1109,12 @@ func TestRunBatch(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := bm.RunBatch(context.Background(), RunBatchOpts{
-			FunctionID:   functionID,
-			BatchCluster: "valkey-batching-a",
-			AccountID:    accountId,
-			WorkspaceID:  workspaceId,
-			AppID:        appId,
+			FunctionID:      functionID,
+			BatchCluster:    "valkey-batching-a",
+			BatchGeneration: "01JGENERATION",
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
 		})
 		require.NoError(t, err)
 		require.True(t, result.Scheduled)
@@ -1121,5 +1122,6 @@ func TestRunBatch(t *testing.T) {
 		payload, ok := queue.item.Payload.(ScheduleBatchPayload)
 		require.True(t, ok)
 		require.Equal(t, "valkey-batching-a", payload.BatchCluster)
+		require.Equal(t, "01JGENERATION", payload.BatchGeneration)
 	})
 }
