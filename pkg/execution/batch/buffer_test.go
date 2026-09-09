@@ -73,7 +73,7 @@ func TestScheduleBatchExecutionPersistsGeneration(t *testing.T) {
 		batchID.String(),
 		&BulkAppendResult{BatchPointer: "pointer"},
 		BatchItem{},
-		ingest.Function{ID: uuid.New()},
+		inngest.Function{ID: uuid.New()},
 		time.Now(),
 		"new",
 	)

@@ -78,7 +78,7 @@ type batchBuffer struct {
 	timer          *time.Timer
 	fn             inngest.Function // Function config for batch settings
 	generation     string
-	createdAt      time.Time        // set when first item appended, reset in reset()
+	createdAt      time.Time // set when first item appended, reset in reset()
 }
 
 // newAppendBuffer creates a new appendBuffer with the given configuration.
