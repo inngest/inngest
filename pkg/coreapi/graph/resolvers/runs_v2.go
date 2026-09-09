@@ -40,14 +40,6 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 	edges := []*models.FunctionRunV2Edge{}
 	total := len(runs)
 	for i, r := range runs {
-		var (
-			started   *time.Time
-			ended     *time.Time
-			sourceID  *string
-			output    *string
-			batchTime *time.Time
-		)
-
 		c := r.Cursor
 		if i == 0 {
 			scursor = &c // start cursor
@@ -56,71 +48,26 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 			ecursor = &c // end cursor
 		}
 
-		if r.StartedAt.UnixMilli() > 0 {
-			started = &r.StartedAt
-		}
-		if r.EndedAt.UnixMilli() > 0 {
-			ended = &r.EndedAt
-		}
-		if len(r.SourceID) > 0 {
-			sourceID = &r.SourceID
-		}
-		if len(r.Output) > 0 {
-			s := string(r.Output)
-			output = &s
-		}
-
 		// If this run ID is the same as the starting cursor, do not include it.
 		if scursor != nil && r.RunID == *scursor {
 			continue
 		}
 
-		runID := ulid.MustParse(r.RunID)
-		status, err := models.ToFunctionRunStatus(r.Status)
+		node, err := models.MakeFunctionRunV2(r)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("error converting run: %w", err)
 		}
 
-		if r.BatchID != nil {
-			ts := ulid.Time(r.BatchID.Time())
-			batchTime = &ts
-		}
-
-		node := &models.FunctionRunV2{
-			ID:             runID,
-			AppID:          r.AppID,
-			FunctionID:     r.FunctionID,
-			TraceID:        r.TraceID,
-			QueuedAt:       r.QueuedAt,
-			StartedAt:      started,
-			EndedAt:        ended,
-			SourceID:       sourceID,
-			Status:         status,
-			Output:         output,
-			IsBatch:        r.IsBatch,
-			BatchCreatedAt: batchTime,
-			CronSchedule:   r.CronSchedule,
-			HasAi:          r.HasAI,
-			IsDeferred:     r.IsDeferred,
-		}
-
-		triggerIDS := []ulid.ULID{}
-		for _, tid := range r.TriggerIDs {
-			if id, err := ulid.Parse(tid); err == nil {
-				triggerIDS = append(triggerIDS, id)
-
-				// track evtID only if it's not batch nor cron
-				if !r.IsBatch && r.CronSchedule == nil {
-					if _, ok := evtRunMap[id]; !ok {
-						evtRunMap[id] = []*models.FunctionRunV2{}
-					}
-					evtRunMap[id] = append(evtRunMap[id], node)
-					evtIDs = append(evtIDs, id)
+		for _, id := range node.TriggerIDs {
+			// track evtID only if it's not batch nor cron
+			if !r.IsBatch && r.CronSchedule == nil {
+				if _, ok := evtRunMap[id]; !ok {
+					evtRunMap[id] = []*models.FunctionRunV2{}
 				}
+				evtRunMap[id] = append(evtRunMap[id], node)
+				evtIDs = append(evtIDs, id)
 			}
 		}
-
-		node.TriggerIDs = triggerIDS
 
 		edges = append(edges, &models.FunctionRunV2Edge{
 			Node:   node,
@@ -175,70 +122,11 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
 
-	var (
-		startedAt *time.Time
-		endedAt   *time.Time
-		sourceID  *string
-		output    *string
-		batchTS   *time.Time
-	)
-
-	triggerIDs := []ulid.ULID{}
-	for _, evtID := range run.TriggerIDs {
-		if id, err := ulid.Parse(evtID); err == nil {
-			triggerIDs = append(triggerIDs, id)
-		}
-	}
-
-	if len(run.Output) > 0 {
-		o := string(run.Output)
-		output = &o
-	}
-
-	if run.BatchID != nil {
-		ts := ulid.Time(run.BatchID.Time())
-		batchTS = &ts
-	}
-
-	status, err := models.ToFunctionRunStatus(run.Status)
+	res, err := models.MakeFunctionRunV2(run)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing status: %w", err)
+		return nil, fmt.Errorf("error converting run: %w", err)
 	}
-
-	if run.StartedAt.UnixMilli() > 0 {
-		startedAt = &run.StartedAt
-	}
-	if run.SourceID != "" {
-		sourceID = &run.SourceID
-	}
-
-	switch status {
-	case models.FunctionRunStatusCompleted, models.FunctionRunStatusFailed, models.FunctionRunStatusCancelled:
-		if run.EndedAt.UnixMilli() > 0 {
-			endedAt = &run.EndedAt
-		}
-	}
-
-	res := models.FunctionRunV2{
-		ID:             runid,
-		AppID:          run.AppID,
-		FunctionID:     run.FunctionID,
-		TraceID:        run.TraceID,
-		QueuedAt:       run.QueuedAt,
-		StartedAt:      startedAt,
-		EndedAt:        endedAt,
-		Status:         status,
-		SourceID:       sourceID,
-		TriggerIDs:     triggerIDs,
-		IsBatch:        run.IsBatch,
-		BatchCreatedAt: batchTS,
-		CronSchedule:   run.CronSchedule,
-		Output:         output,
-		HasAi:          run.HasAI,
-		IsDeferred:     run.IsDeferred,
-	}
-
-	return &res, nil
+	return res, nil
 }
 
 func (qr *queryResolver) RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error) {
@@ -355,6 +243,18 @@ func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.
 				ts = evtTime
 			}
 		}
+	}
+
+	// timestamp is a non-nullable Time! in the schema. It's normally the
+	// earliest trigger event's own ID timestamp (above), but evtIDs is
+	// empty whenever run.TriggerIDs can't be resolved — always true for
+	// DuckDB-backed runs today (a known gap: TriggerIDs isn't captured yet)
+	// — leaving ts at its zero value, which fails to serialize against the
+	// non-nullable schema type and crashes the whole query rather than just
+	// leaving a field blank.
+	// Falling back to the run's own QueuedAt keeps this field always valid.
+	if ts.IsZero() {
+		ts = run.QueuedAt
 	}
 
 	events, err := qr.Data.GetEventsByInternalIDs(ctx, evtIDs)

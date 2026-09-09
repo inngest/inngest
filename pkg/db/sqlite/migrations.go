@@ -14,6 +14,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
@@ -101,17 +102,9 @@ func Migrate(ctx context.Context, conn *sql.DB) error {
 }
 
 func openPersisted(opts Options) (*sql.DB, error) {
-	dir := consts.DefaultInngestConfigDir
-	if opts.Directory != "" {
-		dir = opts.Directory
-		if !filepath.IsAbs(opts.Directory) {
-			wd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-
-			dir = filepath.Join(wd, opts.Directory)
-		}
+	dir, err := util.ResolveStateDir(opts.Directory)
+	if err != nil {
+		return nil, err
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {

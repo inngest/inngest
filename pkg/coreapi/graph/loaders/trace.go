@@ -41,8 +41,9 @@ func (k *TraceRequestKey) String() string {
 }
 
 type traceReader struct {
-	loaders *Loaders
-	reader  cqrs.TraceReader
+	reader cqrs.TraceReader
+
+	convertRunSpanToGQL func(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error)
 }
 
 // just run id
@@ -85,7 +86,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
+func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	if op == nil {
 		return nil
 	}
@@ -114,7 +115,7 @@ func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	return nil
 }
 
-func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
+func stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
 	if status == nil {
 		return nil
 	}
@@ -146,12 +147,13 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+
 	status := models.RunTraceSpanStatusRunning
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
-		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
+		if gqlStatus := stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
 			status = *gqlStatus
 		}
 	}
@@ -240,7 +242,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
-		gqlSpan.StepOp = tr.opcodeToGQL(span.Attributes.StepOp)
+		gqlSpan.StepOp = opcodeToGQL(span.Attributes.StepOp)
 	}
 
 	if span.Attributes.StepID != nil {
@@ -338,7 +340,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		for i, cs := range span.Children {
-			child, err := tr.convertRunSpanToGQL(ctx, cs)
+			child, err := convertDynamicRunSpanToGQL(ctx, cs)
 			if err != nil {
 				return nil, fmt.Errorf("error converting child span: %w", err)
 			}
@@ -579,4 +581,3 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	return gqlSpan, nil
 }
-

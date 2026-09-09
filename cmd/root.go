@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/cmd/apiv2cli"
 	"github.com/inngest/inngest/cmd/devserver"
+	"github.com/inngest/inngest/cmd/duckdb"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
 	"github.com/inngest/inngest/pkg/api/tel"
@@ -96,6 +97,7 @@ func execute() {
 		Commands: []*cli.Command{
 			apiv2cli.Command(),
 			devserver.Command(),
+			duckdb.Command(),
 			version.Command(),
 			start.Command(),
 			alpha(),

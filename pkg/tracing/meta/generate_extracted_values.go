@@ -88,6 +88,18 @@ type ExtractedValues struct {
 
 	output += "}\n"
 
+	output += `
+var AttrsByKey = map[string]Serializer{
+
+`
+	for _, field := range attrsStruct.Fields.List {
+		for _, name := range field.Names {
+			output += fmt.Sprintf("\tAttrs.%s.Key(): Attrs.%s,\n", name.Name, name.Name)
+		}
+	}
+
+	output += "}\n"
+
 	// Write the generated file
 	err = os.WriteFile("extracted_values_gen.go", []byte(output), 0644)
 	if err != nil {

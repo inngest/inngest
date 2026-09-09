@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -37,6 +38,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/duckdbquery"
 	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
@@ -154,8 +156,35 @@ type StartOpts struct {
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
 
+	// EnableDuckDB opts into the experimental DuckDB dual-write POC, gated
+	// behind the `--duckdb` flag (or INNGEST_DUCKDB env var) on both
+	// `inngest dev` and `inngest start`. Off by default. Controls writing
+	// only -- see EnableDuckDBReads for reading.
+	EnableDuckDB bool `json:"enable_duckdb"`
+
+	// EnableDuckDBReads opts into serving the GQL API and REST trace/run
+	// endpoints from DuckDB once dual-write is up, gated behind the
+	// `--duckdb-reads` flag (or INNGEST_DUCKDB_READS env var). Has no effect
+	// unless EnableDuckDB is also true and dual-write starts successfully --
+	// it exists so writing can be validated (throughput, correctness of the
+	// dual-written data) before any read traffic depends on it. Off by
+	// default, independent of EnableDuckDB's own default.
+	EnableDuckDBReads bool `json:"enable_duckdb_reads"`
+
 	// Debug API
 	DebugAPIPort int `json:"debugAPIPort"`
+
+	// DuckDBClosed, if non-nil, is closed once the DuckDB dual-write
+	// subprocess (see EnableDuckDB) has been fully torn down as part of
+	// start()'s shutdown sequence -- i.e. after service.StartAll has already
+	// stopped every other service, since that call is synchronous and this
+	// signal only fires from start()'s deferred cleanup once it returns. It
+	// is closed immediately, with nothing to wait for, if dual-write was
+	// never enabled or never started successfully. Callers (e.g. cmd/devserver's
+	// signal-triggered exit) can block on this to guarantee they never
+	// terminate the process before dual-write has flushed and closed its
+	// subprocess.
+	DuckDBClosed chan struct{} `json:"-"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -500,6 +529,62 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	// Opt-in, best-effort DuckDB dual-write: nil unless opts.EnableDuckDB is
+	// true (the `--duckdb` flag / INNGEST_DUCKDB env var), and nil on any
+	// failure (missing binary, failed spawn, failed migration), in which
+	// case the rest of devserver startup proceeds unaffected. When non-nil,
+	// stopDualWrite tears down its background goroutines and the duckdb
+	// subprocess when start() returns (i.e. once service.StartAll below has
+	// finished shutting every other service down).
+	var (
+		syncListeners []execution.SyncLifecycleListener
+		// gqlData is the GQL resolver's data source, and also the trace/run
+		// read path for REST (apiv1's TraceReader, apiv2's Runs/
+		// FunctionTraces providers). It stays the primary (SQLite/
+		// Postgres-backed) manager unless dual-write starts successfully AND
+		// opts.EnableDuckDBReads is set, in which case it's wrapped to also
+		// read runs/events/run-trace data from DuckDB. EnableDuckDBReads is
+		// deliberately separate from EnableDuckDB: dual-write (writing) can
+		// run alone to validate throughput/correctness before any read
+		// traffic depends on it. The executor, runner, queue, and REST's
+		// apps/functions/event-write paths keep using dbcqrs/ds.Data
+		// directly regardless — DuckDB has no apps/functions tables and
+		// dual-write only covers reads.
+		gqlData = dbcqrs
+		// dwDB is the raw DuckDB connection dual-write writes through —
+		// nil unless dual-write started successfully (opts.EnableDuckDB),
+		// same gate as gqlData's duckdbquery.Wrap. Threaded into
+		// coreapi.Options below so insights can execute
+		// against it directly, independently of whether
+		// EnableDuckDBReads (which only affects gqlData) is also set.
+		dwDB *sql.DB
+	)
+	if dwListener, db := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist, "", opts.SQLiteDir); dwListener != nil {
+		dwDB = db
+		l.Info("dual-write enabled: syncing executions to DuckDB subprocess")
+		syncListeners = append(syncListeners, dwListener)
+		if opts.EnableDuckDBReads {
+			l.Info("dual-write reads enabled: serving GQL/REST trace and run data from DuckDB")
+			gqlData = duckdbquery.Wrap(dbcqrs, db)
+		}
+		defer func() {
+			// Bounded like every other service.Service's Stop (see
+			// pkg/service's defaultTimeout/stopTimeout, 30s) -- Close must
+			// never hang start()'s return indefinitely if a batcher flush
+			// wedges on an unresponsive subprocess.
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			stopDualWrite(shutdownCtx, dwListener)
+			if opts.DuckDBClosed != nil {
+				close(opts.DuckDBClosed)
+			}
+		}()
+	} else if opts.DuckDBClosed != nil {
+		// Dual-write was never enabled or never started; nothing for a
+		// caller waiting on DuckDBClosed to wait for.
+		close(opts.DuckDBClosed)
+	}
+
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -534,6 +619,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
+		executor.WithSyncLifecycleListeners(syncListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -604,10 +690,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
+		runner.WithSyncLifecycleListeners(syncListeners...),
 	)
 
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)
+	// Same dwDB dual-write succeeded/failed against as coreapi.Options.DuckDB
+	// below -- lets devapi.Info report the "duckdb-insights" feature flag
+	// accurately (nil here means insights would error).
+	ds.DuckDB = dwDB
 	ds.State = sm
 	ds.Executor = exec
 	ds.SemaphoreManager = semaphores
@@ -619,7 +710,8 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		Data:           ds.Data,
+		Data:           gqlData,
+		DuckDB:         dwDB,
 		Config:         ds.Opts.Config,
 		Logger:         l,
 		Runner:         ds.Runner,
@@ -662,17 +754,18 @@ func start(ctx context.Context, opts StartOpts) error {
 			AttemptResetter:   rq,
 			QueueShards:       shardRegistry,
 			Broadcaster:       broadcaster,
-			TraceReader:       ds.Data,
+			TraceReader:       gqlData,
 
-			AppCreator:        dbcqrs,
-			FunctionCreator:   dbcqrs,
-			EventPublisher:    runner,
-			TracerProvider:    tp,
-			State:             smv2,
-			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
+			AppCreator:             dbcqrs,
+			FunctionCreator:        dbcqrs,
+			EventPublisher:         runner,
+			TracerProvider:         tp,
+			SyncLifecycleListeners: syncListeners,
+			State:                  smv2,
+			RealtimeJWTSecret:      consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
-				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
+				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), gqlData, gqlData),
 				RunJWTSecret:    consts.DevServerRunJWTSecret,
 				BackoffFunc:     retryBackoff,
 				AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
@@ -718,8 +811,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                NewAppProvider(dbcqrs),
 		Functions:           NewFunctionProvider(dbcqrs),
-		Runs:                NewRunProvider(dbcqrs, exec),
-		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
+		Runs:                NewRunProvider(gqlData, exec),
+		FunctionTraces:      NewFunctionTraceReader(gqlData),
 		Executor:            exec,
 		EventPublisher:      runner,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
