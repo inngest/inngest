@@ -62,6 +62,13 @@ function Authed() {
     shouldThrow: false,
     select: (match) => match.loaderData?.env,
   });
+  const oauthApproval = useMatch({
+    from: '/_authed/oauth/device/',
+    shouldThrow: false,
+  });
+  if (oauthApproval) {
+    return <Outlet />;
+  }
 
   return (
     <Layout collapsed={navCollapsed} activeEnv={activeEnv} profile={profile}>
