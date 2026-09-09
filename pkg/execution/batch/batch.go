@@ -14,6 +14,29 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type appendBatchIDsKey struct{}
+
+type appendBatchIDs struct {
+	new      ulid.ULID
+	overflow ulid.ULID
+}
+
+// WithAppendBatchIDs pins identifiers created by an Append or BulkAppend call.
+// A multi-backend router uses one context for every replica so that an empty
+// pointer and an overflow rotate to the same batch identity on every backend.
+// Zero IDs preserve the manager's normal random-ID behavior.
+func WithAppendBatchIDs(ctx context.Context, newID, overflowID ulid.ULID) context.Context {
+	return context.WithValue(ctx, appendBatchIDsKey{}, appendBatchIDs{
+		new:      newID,
+		overflow: overflowID,
+	})
+}
+
+func appendIDsFromContext(ctx context.Context) (newID, overflowID ulid.ULID) {
+	ids, _ := ctx.Value(appendBatchIDsKey{}).(appendBatchIDs)
+	return ids.new, ids.overflow
+}
+
 // HashBatchKey hashes a batch key using SHA256 and encodes it as base64.
 // This is used to create a consistent key for batch pointers.
 func HashBatchKey(batchKey string) string {

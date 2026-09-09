@@ -55,6 +55,71 @@ func TestScheduleBatchPayloadBatchClusterJSON(t *testing.T) {
 	require.Equal(t, payload.BatchCluster, decoded.BatchCluster)
 }
 
+func TestAppendBatchIDsAreSharedAcrossBackends(t *testing.T) {
+	primaryRedis := miniredis.RunT(t)
+	mirrorRedis := miniredis.RunT(t)
+	primaryClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{primaryRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer primaryClient.Close()
+	mirrorClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{mirrorRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer mirrorClient.Close()
+
+	primary := NewRedisBatchManager(redis_state.NewBatchClient(primaryClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	mirror := NewRedisBatchManager(redis_state.NewBatchClient(mirrorClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	functionID := uuid.New()
+	newID := ulid.Make()
+	ctx := WithAppendBatchIDs(context.Background(), newID, ulid.Make())
+	item := BatchItem{
+		AccountID:       uuid.New(),
+		WorkspaceID:     uuid.New(),
+		AppID:           uuid.New(),
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         ulid.Make(),
+		Event:           event.Event{ID: "event-1", Name: "test/event"},
+	}
+	fn := inngest.Function{ID: functionID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+
+	primaryResult, err := primary.Append(ctx, item, fn)
+	require.NoError(t, err)
+	mirrorResult, err := mirror.Append(ctx, item, fn)
+	require.NoError(t, err)
+	require.Equal(t, newID.String(), primaryResult.BatchID)
+	require.Equal(t, primaryResult.BatchID, mirrorResult.BatchID)
+}
+
+func TestBulkAppendBatchIDsAreSharedAcrossBackends(t *testing.T) {
+	primaryRedis := miniredis.RunT(t)
+	mirrorRedis := miniredis.RunT(t)
+	primaryClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{primaryRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer primaryClient.Close()
+	mirrorClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{mirrorRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer mirrorClient.Close()
+
+	primary := NewRedisBatchManager(redis_state.NewBatchClient(primaryClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	mirror := NewRedisBatchManager(redis_state.NewBatchClient(mirrorClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	functionID := uuid.New()
+	newID, overflowID := ulid.Make(), ulid.Make()
+	ctx := WithAppendBatchIDs(context.Background(), newID, overflowID)
+	fn := inngest.Function{ID: functionID, EventBatch: &inngest.EventBatchConfig{MaxSize: 1, Timeout: "60s"}}
+	items := []BatchItem{
+		{AccountID: uuid.New(), FunctionID: functionID, EventID: ulid.Make(), Event: event.Event{ID: "event-1", Name: "test/event"}},
+		{AccountID: uuid.New(), FunctionID: functionID, EventID: ulid.Make(), Event: event.Event{ID: "event-2", Name: "test/event"}},
+	}
+
+	primaryResult, err := primary.BulkAppend(ctx, items, fn)
+	require.NoError(t, err)
+	mirrorResult, err := mirror.BulkAppend(ctx, items, fn)
+	require.NoError(t, err)
+	require.Equal(t, newID.String(), primaryResult.BatchID)
+	require.Equal(t, primaryResult.BatchID, mirrorResult.BatchID)
+	require.Equal(t, overflowID.String(), primaryResult.NextBatchID)
+	require.Equal(t, primaryResult.NextBatchID, mirrorResult.NextBatchID)
+}
+
 type recordingBatchMetricRecorder struct {
 	committedBytes []int64
 	deletes        []recordedBatchDelete
