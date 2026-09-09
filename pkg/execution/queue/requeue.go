@@ -2,33 +2,55 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
 func (q *queueProducer) Requeue(ctx context.Context, shardName string, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return err
+	// Account routing may have changed while this item was leased. Prefer the
+	// current shard so a migrated copy is requeued at its destination. During
+	// the copy window the destination may not contain the item yet; falling back
+	// to the named source preserves it for the migration reader.
+	current, resolveErr := q.selectShard(ctx, "", i)
+	if resolveErr == nil {
+		err := current.Requeue(ctx, i, at, opts...)
+		if err == nil || current.Name() == shardName || !errors.Is(err, ErrQueueItemNotFound) {
+			return err
+		}
 	}
 
-	return shard.Requeue(ctx, i, at, opts...)
+	source, err := q.shards.ByName(shardName)
+	if err != nil {
+		if resolveErr != nil {
+			return resolveErr
+		}
+		return err
+	}
+	return source.Requeue(ctx, i, at, opts...)
 }
 
 // RequeueByJobID requires scope to include account, environment, and function
-// IDs, preserving the producer interface contract used by wrappers. This
-// producer does not use scope for lookup or shard selection: shardName selects
-// the shard and jobID identifies the item within that shard. Other producer
-// implementations, such as Cloud rollout wrappers, may use scope before
-// delegating for account-level feature flag or routing decisions.
+// IDs. It prefers the account's current shard and falls back to shardName while
+// a migration has not copied the item yet.
 func (q *queueProducer) RequeueByJobID(ctx context.Context, scope Scope, shardName string, jobID string, at time.Time) error {
 	if err := scope.ValidateIDs(); err != nil {
 		return err
 	}
 
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return err
+	current, resolveErr := q.shards.Resolve(ctx, scope, nil)
+	if resolveErr == nil {
+		err := current.RequeueByJobID(ctx, jobID, at)
+		if err == nil || current.Name() == shardName || !errors.Is(err, ErrQueueItemNotFound) {
+			return err
+		}
 	}
 
-	return shard.RequeueByJobID(ctx, jobID, at)
+	source, err := q.shards.ByName(shardName)
+	if err != nil {
+		if resolveErr != nil {
+			return resolveErr
+		}
+		return err
+	}
+	return source.RequeueByJobID(ctx, jobID, at)
 }
