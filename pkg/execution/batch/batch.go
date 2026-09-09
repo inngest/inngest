@@ -15,6 +15,7 @@ import (
 )
 
 type appendBatchIDsKey struct{}
+type batchClusterKey struct{}
 
 type appendBatchIDs struct {
 	new      ulid.ULID
@@ -35,6 +36,18 @@ func WithAppendBatchIDs(ctx context.Context, newID, overflowID ulid.ULID) contex
 func appendIDsFromContext(ctx context.Context) (newID, overflowID ulid.ULID) {
 	ids, _ := ctx.Value(appendBatchIDsKey{}).(appendBatchIDs)
 	return ids.new, ids.overflow
+}
+
+// WithBatchCluster pins a batch operation to the backend that owns its data.
+// Buffered scheduling copies this into its durable payload.
+func WithBatchCluster(ctx context.Context, cluster string) context.Context {
+	return context.WithValue(ctx, batchClusterKey{}, cluster)
+}
+
+// BatchCluster returns the backend selected by WithBatchCluster.
+func BatchCluster(ctx context.Context) string {
+	cluster, _ := ctx.Value(batchClusterKey{}).(string)
+	return cluster
 }
 
 // HashBatchKey hashes a batch key using SHA256 and encodes it as base64.

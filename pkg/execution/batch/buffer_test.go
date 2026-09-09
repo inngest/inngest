@@ -66,8 +66,9 @@ func TestScheduleBatchExecutionPersistsGeneration(t *testing.T) {
 	batchID := ulid.Make()
 	generation := "01K0T21HZW9DHDZ5P5TQKBN1E6"
 
+	ctx := WithBatchCluster(redis_state.WithBatchGeneration(context.Background(), generation), "valkey-b")
 	err := buffer.scheduleBatchExecution(
-		redis_state.WithBatchGeneration(context.Background(), generation),
+		ctx,
 		manager,
 		batchID.String(),
 		&BulkAppendResult{BatchPointer: "pointer"},
@@ -77,6 +78,7 @@ func TestScheduleBatchExecutionPersistsGeneration(t *testing.T) {
 		"new",
 	)
 	require.NoError(t, err)
+	require.Equal(t, "valkey-b", manager.opts.BatchCluster)
 	require.Equal(t, generation, manager.opts.BatchGeneration)
 }
 

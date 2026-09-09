@@ -536,6 +536,7 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 		ScheduleBatchPayload: ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointer,
+			BatchCluster:    BatchCluster(ctx),
 			BatchGeneration: redis_state.BatchGeneration(ctx),
 			AccountID:       firstItem.AccountID,
 			WorkspaceID:     firstItem.WorkspaceID,
