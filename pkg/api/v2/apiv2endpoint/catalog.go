@@ -41,6 +41,7 @@ type Endpoint struct {
 	Summary             string
 	Description         string
 	Body                string
+	AuthzPermission     string
 	Input               protoreflect.MessageDescriptor
 	PathParams          []string
 	ServerStreaming     bool
@@ -82,6 +83,7 @@ func Discover() []Endpoint {
 			Summary:             summary,
 			Description:         description,
 			Body:                rule.Body,
+			AuthzPermission:     AuthzPermission(method),
 			Input:               method.Input(),
 			PathParams:          PathParams(path),
 			ServerStreaming:     method.IsStreamingServer(),
@@ -129,6 +131,21 @@ func HTTPRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
 	}
 	rule, _ := proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
 	return rule
+}
+
+func AuthzPermission(method protoreflect.MethodDescriptor) string {
+	opts := method.Options()
+	if !proto.HasExtension(opts, apiv2.E_Authz) {
+		return ""
+	}
+	authzOpts, ok := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
+	if !ok {
+		return ""
+	}
+	if !authzOpts.GetRequireAuthz() {
+		return ""
+	}
+	return authzOpts.GetPermission()
 }
 
 func MethodAndPath(rule *annotations.HttpRule) (string, string) {
