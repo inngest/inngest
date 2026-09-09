@@ -42,17 +42,20 @@ func (*recordingBatchQueue) RequeueByJobID(context.Context, queue.Scope, string,
 
 func TestScheduleBatchPayloadBatchClusterJSON(t *testing.T) {
 	payload := ScheduleBatchPayload{
-		BatchID:      ulid.MustNew(ulid.Now(), rand.Reader),
-		BatchCluster: "valkey-batching-a",
+		BatchID:         ulid.MustNew(ulid.Now(), rand.Reader),
+		BatchCluster:    "valkey-batching-a",
+		BatchGeneration: "01K0T21HZW9DHDZ5P5TQKBN1E6",
 	}
 
 	raw, err := json.Marshal(payload)
 	require.NoError(t, err)
 	require.Contains(t, string(raw), `"batchCluster":"valkey-batching-a"`)
+	require.Contains(t, string(raw), `"batchGeneration":"01K0T21HZW9DHDZ5P5TQKBN1E6"`)
 
 	var decoded ScheduleBatchPayload
 	require.NoError(t, json.Unmarshal(raw, &decoded))
 	require.Equal(t, payload.BatchCluster, decoded.BatchCluster)
+	require.Equal(t, payload.BatchGeneration, decoded.BatchGeneration)
 }
 
 func TestAppendBatchIDsAreSharedAcrossBackends(t *testing.T) {
