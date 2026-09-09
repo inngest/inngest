@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
 // Insights backs Query.insights — see
@@ -20,6 +22,25 @@ import (
 func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.InsightsQueryResult, error) {
 	if qr.DuckDB == nil {
 		return nil, fmt.Errorf("insights requires dual-write (--duckdb) to be enabled")
+	}
+
+	start := time.Now()
+
+	// SHOW TABLES / DESCRIBE <table> answer entirely from this package's
+	// own static schema registry (tables.go) -- no SQL parsing, no
+	// rewrite, no database round trip. Checked before Transpile since
+	// neither form is valid SELECT syntax the parser understands at all.
+	if sc, ok, err := insights.TryShortCircuit(sql); ok {
+		if err != nil {
+			if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
+				recordInsightsQueryMetrics(ctx, start, "meta_error", "", 0)
+				return emptyInsightsResultWithDiagnostic(verr.Diagnostic()), nil
+			}
+			recordInsightsQueryMetrics(ctx, start, "meta_error", "", 0)
+			return nil, err
+		}
+		recordInsightsQueryMetrics(ctx, start, "meta", "", len(sc.Result.Rows))
+		return toShortCircuitResult(sc), nil
 	}
 
 	// consts.DevServerAccountID/EnvID, matching every other resolver in
@@ -37,8 +58,10 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.Insi
 		// generic error banner. Transpile's own contract is unchanged: it
 		// still rejects the query outright, same as ever.
 		if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
+			recordInsightsQueryMetrics(ctx, start, "validation_error", "", 0)
 			return emptyInsightsResultWithDiagnostic(verr.Diagnostic()), nil
 		}
+		recordInsightsQueryMetrics(ctx, start, "parse_error", "", 0)
 		return nil, err
 	}
 
@@ -52,12 +75,34 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.Insi
 		// error, for the same reason: the UI can render it as a query
 		// problem instead of a generic error banner.
 		if eerr, ok := errors.AsType[*insights.ExecutionError](err); ok {
+			recordInsightsQueryMetrics(ctx, start, "execution_error", tr.PrimaryTable, 0)
 			return emptyInsightsResultWithDiagnostic(eerr.Diagnostic()), nil
 		}
+		recordInsightsQueryMetrics(ctx, start, "execution_error", tr.PrimaryTable, 0)
 		return nil, err
 	}
 
+	recordInsightsQueryMetrics(ctx, start, "ok", tr.PrimaryTable, len(result.Rows))
 	return toInsightsQueryResult(tr, result), nil
+}
+
+// recordInsightsQueryMetrics is this resolver's only per-query
+// observability today: a status-tagged count, an end-to-end duration (from
+// just before Transpile to the final outcome), and -- for a successful
+// query -- how many rows it returned. primaryTable is tagged rather than
+// the full table list to keep cardinality bounded to the six logical
+// tables, not their combinations; it's "" for a query that never reached
+// stageExtractQueryInfo (a parse/early-validation failure).
+func recordInsightsQueryMetrics(ctx context.Context, start time.Time, status, primaryTable string, rowCount int) {
+	tags := map[string]any{}
+	if primaryTable != "" {
+		tags["primary_table"] = primaryTable
+	}
+	metrics.IncrInsightsQueryCounter(ctx, status, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
+	metrics.HistogramInsightsQueryDuration(ctx, time.Since(start), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
+	if status == "ok" {
+		metrics.HistogramInsightsQueryRowCount(ctx, int64(rowCount), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
+	}
 }
 
 func emptyInsightsResultWithDiagnostic(d insights.Diagnostic) *models.InsightsQueryResult {
@@ -98,6 +143,22 @@ func toInsightsQueryResult(tr *insights.TranspileResult, result *insights.Result
 			Limited:      tr.Limited,
 		},
 		Diagnostics: diagnostics,
+	}
+}
+
+// toShortCircuitResult mirrors toInsightsQueryResult's shape for a
+// TryShortCircuit result -- no PrimaryTable/ColumnHints/Diagnostics/Limited,
+// since none of those pipeline concepts apply to a query that never went
+// through Transpile.
+func toShortCircuitResult(sc *insights.ShortCircuitResult) *models.InsightsQueryResult {
+	columns := make([]*models.InsightsQueryColumn, len(sc.Result.Columns))
+	for i, c := range sc.Result.Columns {
+		columns[i] = &models.InsightsQueryColumn{Name: c.Name, Type: toGQLColumnType(c.Type)}
+	}
+	return &models.InsightsQueryResult{
+		Columns: columns,
+		Rows:    sc.Result.Rows,
+		Info:    &models.InsightsQueryInfo{Tables: sc.Tables},
 	}
 }
 

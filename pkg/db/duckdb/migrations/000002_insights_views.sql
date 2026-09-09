@@ -47,7 +47,7 @@ SELECT
   r.inputs,
   r.output,
   r.is_deferred,
-  r.defer_parent_fn_slug,
+  r.defer_parent_fn_slug AS defer_parent_function_id,
   r.defer_parent_run_ids,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
@@ -75,6 +75,7 @@ WHERE account_id = p_account_id AND env_id = p_env_id;
 CREATE MACRO inngest.insights_metadata(p_account_id, p_env_id) AS TABLE
 SELECT
   run_id,
+  run_queued_at,
   span_id,
   scope,
   step_id,
@@ -93,10 +94,10 @@ WHERE account_id = p_account_id AND env_id = p_env_id;
 -- insights_step_attempts below).
 CREATE MACRO inngest.insights_extended_trace_spans(p_account_id, p_env_id) AS TABLE
 SELECT
-  rts.app_name as app_id,
-  rts.function_slug as function_id,
   rts.run_id,
   rts.run_queued_at,
+  rts.app_name as app_id,
+  rts.function_slug as function_id,
   rts.trace_id,
   rts.span_id,
   rts.parent_span_id,

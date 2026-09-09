@@ -218,6 +218,42 @@ func TestInsightsStepsMatchesFlatSpanReader(t *testing.T) {
 	require.ElementsMatch(t, []int{0, 1}, attempts, "GetSpansByRunID must see both attempts insights_step_attempts reported")
 }
 
+// TestInsightsShowTablesAndDescribeShortCircuit proves SHOW TABLES/DESCRIBE
+// resolve through Query.insights without ever touching DuckDB -- see
+// pkg/duckdb/insights/describe.go. Still requires qr.DuckDB non-nil,
+// same dual-write gate every other query goes through, even though this
+// path never uses the connection itself.
+func TestInsightsShowTablesAndDescribeShortCircuit(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	r := &Resolver{DuckDB: db}
+	qr := r.Query().(*queryResolver)
+
+	result, err := qr.Insights(context.Background(), "SHOW TABLES")
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Len(t, result.Columns, 2)
+	require.Equal(t, "name", result.Columns[0].Name)
+	require.Equal(t, "description", result.Columns[1].Name)
+	require.Len(t, result.Rows, 6)
+	require.ElementsMatch(t, result.Info.Tables, []string{
+		"runs", "events", "metadata", "extended_trace_spans", "steps", "step_attempts",
+	})
+
+	result, err = qr.Insights(context.Background(), "DESCRIBE runs")
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Equal(t, []string{"runs"}, result.Info.Tables)
+	require.Equal(t, "run_id", result.Rows[0][0])
+	require.Equal(t, "STRING", result.Rows[0][1])
+	require.NotEmpty(t, result.Rows[0][2])
+
+	result, err = qr.Insights(context.Background(), "DESCRIBE nonexistent_table")
+	require.NoError(t, err)
+	require.Len(t, result.Diagnostics, 1)
+	require.Contains(t, result.Diagnostics[0].Message, "unknown table")
+}
+
 func TestInsightsErrorsCleanlyWhenDualWriteOff(t *testing.T) {
 	r := &Resolver{DuckDB: nil}
 	qr := r.Query().(*queryResolver)

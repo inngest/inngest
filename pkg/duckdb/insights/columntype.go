@@ -42,6 +42,27 @@ func DuckDBToColumnType(duckdbType string) ColumnType {
 	}
 }
 
+// String is the same label the GQL layer's InsightsColumnType enum uses
+// (models.InsightsColumnType's string values), reused as-is by
+// DESCRIBE's short-circuited output (describe.go) so a column's
+// reported type reads identically there and in a real query result.
+func (t ColumnType) String() string {
+	switch t {
+	case ColumnTypeString:
+		return "STRING"
+	case ColumnTypeNumber:
+		return "NUMBER"
+	case ColumnTypeBoolean:
+		return "BOOLEAN"
+	case ColumnTypeDatetime:
+		return "DATETIME"
+	case ColumnTypeJSON:
+		return "JSON"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 func isNumberType(t string) bool {
 	switch {
 	case t == "TINYINT", t == "SMALLINT", t == "INTEGER", t == "BIGINT", t == "HUGEINT",

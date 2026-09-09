@@ -3,11 +3,14 @@ package duckdbquery
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 )
@@ -308,7 +311,68 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 }
 
 // scanSpanMetadata decodes GetSpansByRunID's aggregated
-// LIST(STRUCT(scope, kind, values, created_at)) metadata column.
+// LIST(STRUCT(scope, kind, values, created_at)) metadata column. Both
+// transports decode a DuckDB LIST/STRUCT the same way any other JSON value
+// decodes -- a []any of map[string]any, not a native Go struct -- so this
+// reads exactly like asMap/asJSON's handling of any other JSON-typed
+// column, just one level deeper. A NULL/empty list (a span the query's own
+// `FILTER (WHERE kind IS NOT NULL)` found no metadata for) decodes to a nil
+// slice, which this returns as-is, matching cqrs.OtelSpan.Metadata's
+// nil-means-none convention.
 func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
-	return nil, nil // XXX: Implemented in PR that'll get merged into this
+	if raw == nil {
+		return nil, nil
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("duckdbquery: expected list for column %q, got %T (%v)", "metadata", raw, raw)
+	}
+
+	out := make([]*cqrs.SpanMetadata, 0, len(items))
+	for _, item := range items {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("duckdbquery: expected object in metadata list, got %T (%v)", item, item)
+		}
+
+		scopeStr, err := asString(entry["scope"], "metadata.scope")
+		if err != nil {
+			return nil, err
+		}
+		scope, err := enums.MetadataScopeString(scopeStr)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbquery: parsing metadata.scope: %w", err)
+		}
+
+		kind, err := asString(entry["kind"], "metadata.kind")
+		if err != nil {
+			return nil, err
+		}
+
+		updatedAt, err := asTimestamp(entry["created_at"], "metadata.created_at")
+		if err != nil {
+			return nil, err
+		}
+
+		values, err := asMap(entry["values"], "metadata.values")
+		if err != nil {
+			return nil, err
+		}
+		mv := make(metadata.Values, len(values))
+		for k, v := range values {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return nil, fmt.Errorf("duckdbquery: re-marshaling metadata.values[%q]: %w", k, err)
+			}
+			mv[k] = b
+		}
+
+		out = append(out, &cqrs.SpanMetadata{
+			Scope:     scope,
+			Kind:      metadata.Kind(kind),
+			Values:    mv,
+			UpdatedAt: updatedAt,
+		})
+	}
+	return out, nil
 }

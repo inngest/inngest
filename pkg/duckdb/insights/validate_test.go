@@ -42,6 +42,22 @@ func TestValidateAccepts(t *testing.T) {
 		"SELECT JSON_KEYS(inngest) FROM runs",
 		"SELECT IF(status = 'Completed', run_id, app_id) FROM runs",
 		"SELECT IFNULL(app_id, function_id) FROM runs",
+		// A sampling of the second, larger round of allowed functions --
+		// see allowedFunctions' own doc comment (functions.go) for the full
+		// categorized list and functionReturnType (typecheck.go) for their
+		// return-type rules.
+		"SELECT ROW_NUMBER() OVER (ORDER BY queued_at) FROM runs",
+		"SELECT RANK() OVER (PARTITION BY app_id ORDER BY queued_at) FROM runs",
+		"SELECT LAG(status) OVER (ORDER BY queued_at) FROM runs",
+		"SELECT MEDIAN(queued_at), QUANTILE_CONT(queued_at, 0.95) FROM runs",
+		"SELECT STDDEV(step_index), APPROX_QUANTILE(step_index, 0.5) FROM steps",
+		"SELECT FIRST(status), LAST(status), ARG_MAX(run_id, queued_at) FROM runs GROUP BY app_id",
+		"SELECT BOOL_AND(is_deferred) FROM runs GROUP BY app_id",
+		"SELECT LEFT(run_id, 4), RIGHT(run_id, 4), MD5(run_id), HASH(run_id) FROM runs",
+		"SELECT CEIL(step_index / 2.0), SQRT(step_index), MOD(step_index, 2) FROM steps",
+		"SELECT ISODOW(queued_at), WEEK(queued_at), QUARTER(queued_at) FROM runs",
+		"SELECT JSON_OBJECT('run', run_id), JSON_ARRAY(1, 2) FROM runs",
+		"SELECT LIST_CONTAINS(event_ids, 'x'), ARRAY_LENGTH(event_ids) FROM runs",
 	}
 	for _, q := range queries {
 		t.Run(q, func(t *testing.T) {
@@ -70,6 +86,21 @@ func TestValidateRejectsUnknownColumnInNamedWindowClause(t *testing.T) {
 	_, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
+}
+
+// TestValidateErrorSpansOffendingIdentifier proves a *ValidationError's
+// End is the offending node's own End(), not a zero-width copy of Pos --
+// otherwise Diagnostic() can only underline a single character in the
+// editor instead of the whole bad identifier.
+func TestValidateErrorSpansOffendingIdentifier(t *testing.T) {
+	stmt := mustParse(t, "SELECT nonexistent_evil_column FROM runs")
+	_, _, err := validate(stmt)
+	require.Error(t, err)
+
+	verr, ok := err.(*ValidationError)
+	require.True(t, ok)
+	require.NotEqual(t, verr.Pos, verr.End, "End must span the identifier, not collapse to Pos")
+	require.Equal(t, len("nonexistent_evil_column"), verr.End.Column-verr.Pos.Column)
 }
 
 func TestValidateAcceptsDistinctOn(t *testing.T) {

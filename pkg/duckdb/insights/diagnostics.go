@@ -34,8 +34,15 @@ func diagnosticAt(n parser.Node, severity DiagnosticSeverity, code, message stri
 // for a caller (e.g. the GQL resolver) that wants to render "the query is
 // invalid" as an inline marker instead of a bare top-level error. Transpile
 // itself still rejects invalid queries outright; this doesn't change that.
-// Zero-width range (Start == End == e.Pos): ValidationError only carries a
-// single position, not a span.
+// Falls back to a zero-width range (End == Pos) only for the few
+// construction sites with no single offending node to point at -- every
+// other site sets End to that node's own End(), so most diagnostics
+// underline the whole identifier/clause rather than a single-character
+// caret.
 func (e *ValidationError) Diagnostic() Diagnostic {
-	return Diagnostic{Start: e.Pos, End: e.Pos, Severity: DiagnosticError, Code: "validation-error", Message: e.Message}
+	end := e.End
+	if (end == parser.Position{}) {
+		end = e.Pos
+	}
+	return Diagnostic{Start: e.Pos, End: end, Severity: DiagnosticError, Code: "validation-error", Message: e.Message}
 }

@@ -175,13 +175,14 @@ func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	}
 	args = append(args, filter.From, until)
 
-	// is_deferred is TRUE/NULL only, never explicit FALSE, so "not
-	// deferred" means NULL.
+	// is_deferred is BOOLEAN NOT NULL DEFAULT FALSE (migrations/
+	// 000001_baseline.sql) -- every non-deferred row is an explicit FALSE,
+	// not NULL, so both branches compare directly.
 	if filter.IsDeferred != nil {
 		if *filter.IsDeferred {
-			where = append(where, "is_deferred = TRUE")
+			where = append(where, "is_deferred")
 		} else {
-			where = append(where, "is_deferred IS NULL")
+			where = append(where, "NOT is_deferred")
 		}
 	}
 
@@ -421,8 +422,35 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	}
 	opt.Filter = resolvedFilter
 
+	expHandler, err := run.NewExpressionHandler(ctx, run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"))
+	if err != nil {
+		return 0, fmt.Errorf("duckdbquery: parsing CEL filter: %w", err)
+	}
+
 	preWhere, preArgs := latestRunsWhere(opt.Filter)
 	qualify, qualifyArgs := runsQualify(opt.Filter)
+
+	eventFilters, err := insights.CELEventFilters(ctx, expHandler.EventExprList)
+	if err != nil {
+		return 0, fmt.Errorf("duckdbquery: converting event CEL filter: %w", err)
+	}
+	if eventFrag, eventArgs, err := insights.RenderWhereSQL(eventFilters); err != nil {
+		return 0, fmt.Errorf("duckdbquery: rendering event CEL filter: %w", err)
+	} else if eventFrag != "" {
+		preWhere += " AND " + eventCELArrayMatchClause(eventFrag)
+		preArgs = append(preArgs, eventArgs...)
+	}
+
+	outputFilters, err := insights.CELOutputFilters(ctx, expHandler.OutputExprList)
+	if err != nil {
+		return 0, fmt.Errorf("duckdbquery: converting output CEL filter: %w", err)
+	}
+	if outputFrag, outputArgs, err := insights.RenderWhereSQL(outputFilters); err != nil {
+		return 0, fmt.Errorf("duckdbquery: rendering output CEL filter: %w", err)
+	} else if outputFrag != "" {
+		qualify += " AND " + outputFrag
+		qualifyArgs = append(qualifyArgs, outputArgs...)
+	}
 
 	// COUNT(*) with no GROUP BY can't reference raw columns even inside
 	// QUALIFY (DuckDB requires every referenced column to be part of an

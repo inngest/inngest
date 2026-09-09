@@ -92,6 +92,36 @@ func TestInferTypeFunctions(t *testing.T) {
 	}
 }
 
+// TestInferTypeListAggregateResolvesLiteralAggregateName proves
+// list_aggregate/array_aggregate's return type is only statically knowable
+// when the aggregate name (args[1]) is a literal string constant --
+// resolved by recursing into functionReturnType with that name, so it
+// reports the exact type the named aggregate itself would.
+func TestInferTypeListAggregateResolvesLiteralAggregateName(t *testing.T) {
+	cases := map[string]ColumnType{
+		// SUM/AVG/COUNT-family aggregates always return Number.
+		"SELECT LIST_AGGREGATE(event_ids, 'count') FROM runs":  ColumnTypeNumber,
+		"SELECT ARRAY_AGGREGATE(event_ids, 'sum') FROM runs":   ColumnTypeNumber,
+		"SELECT LIST_AGGREGATE(event_ids, 'stddev') FROM runs": ColumnTypeNumber,
+		// string_agg always returns String.
+		"SELECT LIST_AGGREGATE(event_ids, 'string_agg') FROM runs": ColumnTypeString,
+		// bool_and/bool_or always return Boolean.
+		"SELECT LIST_AGGREGATE(event_ids, 'bool_and') FROM runs": ColumnTypeBoolean,
+		// min/max/first/last preserve the list's own element type --
+		// event_ids is JSON-bucketed (a VARCHAR[]).
+		"SELECT LIST_AGGREGATE(event_ids, 'min') FROM runs": ColumnTypeJSON,
+		// An unrecognized aggregate name is honestly unknown, not a guess.
+		"SELECT LIST_AGGREGATE(event_ids, 'not_a_real_aggregate') FROM runs": ColumnTypeUnknown,
+		// A dynamic (non-literal) name can't be resolved statically either.
+		"SELECT LIST_AGGREGATE(event_ids, LOWER('SUM')) FROM runs": ColumnTypeUnknown,
+	}
+	for sql, want := range cases {
+		t.Run(sql, func(t *testing.T) {
+			require.Equal(t, want, typeOfFirstColumn(t, sql))
+		})
+	}
+}
+
 func TestInferTypeUnaryNot(t *testing.T) {
 	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT NOT is_deferred FROM runs"))
 }

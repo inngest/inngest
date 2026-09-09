@@ -14,3 +14,23 @@ const (
 	HintRunID
 	HintEventID
 )
+
+// String is the same label the GQL layer's InsightsColumnHint enum uses
+// (resolvers/insights.go's toGQLColumnHint), reused as-is by
+// cmd/gen-insights-schema's JSON dump. Returns "" for HintNone -- a caller
+// serializing this should omit the field entirely rather than write out an
+// empty hint.
+func (h ColumnHint) String() string {
+	switch h {
+	case HintAppID:
+		return "APP_ID"
+	case HintFunctionID:
+		return "FUNCTION_ID"
+	case HintRunID:
+		return "RUN_ID"
+	case HintEventID:
+		return "EVENT_ID"
+	default:
+		return ""
+	}
+}

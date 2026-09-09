@@ -111,9 +111,10 @@ func asNullableTimestamp(v any, col string) (time.Time, error) {
 	return asTimestamp(v, col)
 }
 
-// asNullableBool returns false (not an error) for a SQL NULL column —
-// matching inngest.runs.is_deferred's TRUE/NULL-only convention, where
-// non-deferred rows leave the column NULL rather than FALSE.
+// asNullableBool returns false (not an error) for a SQL NULL column. Its
+// only caller, is_deferred, is BOOLEAN NOT NULL DEFAULT FALSE so this
+// branch shouldn't be reachable in practice, but costs nothing to keep as a
+// defensive default rather than erroring on an unexpected NULL.
 func asNullableBool(v any, col string) (bool, error) {
 	if v == nil {
 		return false, nil

@@ -144,7 +144,7 @@ func TestAdaptCast(t *testing.T) {
 	require.False(t, c.TryCast)
 
 	e = parseExprForTest(t, "a::VARCHAR")
-	c, ok = e.(*CastExpr)
+	_, ok = e.(*CastExpr)
 	require.True(t, ok)
 }
 

@@ -44,7 +44,7 @@ func addDefaultLimit(stmt *parser.SelectStatement) (limitOutcome, error) {
 	// pkg/duckdb/insights/CLAUDE.md's "don't assume the database will
 	// catch it anyway" gotcha).
 	if stmt.Limit.Percent {
-		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), Message: "PERCENT-based LIMIT is not supported"}
+		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), End: stmt.Limit.End(), Message: "PERCENT-based LIMIT is not supported"}
 	}
 
 	if stmt.Limit.All {
@@ -58,7 +58,7 @@ func addDefaultLimit(stmt *parser.SelectStatement) (limitOutcome, error) {
 		// A computed expression (a parameter, arithmetic, a subquery, ...)
 		// -- this package has no static way to bound its runtime value, so
 		// it's rejected rather than reaching DuckDB uncapped.
-		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), Message: "LIMIT must be a literal, non-negative integer"}
+		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), End: stmt.Limit.End(), Message: "LIMIT must be a literal, non-negative integer"}
 	}
 
 	n, err := strconv.Atoi(lit.Text)

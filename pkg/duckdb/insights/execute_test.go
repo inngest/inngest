@@ -70,6 +70,36 @@ func TestExecuteWrapsFailureAsExecutionError(t *testing.T) {
 	require.NotEmpty(t, d.Message)
 }
 
+// TestExecuteRunsNewlyAllowedFunctions proves a sampling of the second
+// round of allowed functions (functions.go's allowedFunctions, categorized
+// doc comment there) not only validates but actually executes correctly
+// against real DuckDB -- validate/TestValidateAccepts only proves the
+// allowlist/parser accept the syntax, not that DuckDB itself runs it.
+func TestExecuteRunsNewlyAllowedFunctions(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	accountID := uuid.New()
+	now := time.Now()
+	insertRunRow(t, db, accountID, testEnvIDForExecuteTest, "run-a", "Completed", now.Add(-time.Minute))
+	insertRunRow(t, db, accountID, testEnvIDForExecuteTest, "run-b", "Failed", now)
+
+	tr, err := insights.Transpile(
+		"SELECT run_id, ROW_NUMBER() OVER (ORDER BY queued_at) AS rn, MEDIAN(step_count) OVER () AS med "+
+			"FROM (SELECT run_id, queued_at, 1 AS step_count FROM runs) sub ORDER BY queued_at",
+		accountID, testEnvIDForExecuteTest,
+	)
+	require.NoError(t, err)
+
+	result, err := insights.Execute(ctx, db, tr)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 2)
+	require.Equal(t, "run-a", result.Rows[0][0])
+	require.EqualValues(t, 1, result.Rows[0][1])
+	require.Equal(t, "run-b", result.Rows[1][0])
+	require.EqualValues(t, 2, result.Rows[1][1])
+}
+
 func TestExecuteEmptyResultStillReportsColumns(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()

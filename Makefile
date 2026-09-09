@@ -100,6 +100,10 @@ build: docs ## Build release binaries
 gql: ## Generate GraphQL code
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
 
+.PHONY: insights-schema
+insights-schema: ## Dump pkg/duckdb/insights' table/column/function schema as JSON, embedded into the dev server UI
+	go run ./cmd/gen-insights-schema -o ui/apps/dev-server-ui/src/components/Insights/insightsSchema.generated.json
+
 .PHONY: tygo
 tygo: ## Generate TypeScript types from Go structs
 	go run github.com/gzuidhof/tygo@latest generate

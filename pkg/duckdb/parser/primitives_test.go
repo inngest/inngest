@@ -10,7 +10,7 @@ import (
 
 // testAlloc stands in for the evaluator's arena allocator in tests that
 // call a peg.Primitive directly rather than through a full Parse.
-func testAlloc(n peg.Node) *peg.Node { return &n }
+func testAlloc(n peg.Node) *peg.Node { return new(n) }
 
 func testKeywordSets() *KeywordSets {
 	return NewKeywordSets(

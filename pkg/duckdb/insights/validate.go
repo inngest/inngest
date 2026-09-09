@@ -38,7 +38,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 	ctes := outerCTEs
 	if stmt.With != nil {
 		if stmt.With.Recursive {
-			return nil, nil, &ValidationError{Pos: stmt.With.Pos(), Message: "recursive CTEs are not supported"}
+			return nil, nil, &ValidationError{Pos: stmt.With.Pos(), End: stmt.With.End(), Message: "recursive CTEs are not supported"}
 		}
 		merged := make(map[string]logicalTable, len(outerCTEs)+len(stmt.With.CTEs))
 		maps.Copy(merged, outerCTEs)
@@ -68,7 +68,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 		return nil, ctes, nil
 	}
 	if stmt.Values != nil {
-		return nil, nil, &ValidationError{Pos: stmt.Pos(), Message: "VALUES statements are not supported"}
+		return nil, nil, &ValidationError{Pos: stmt.Pos(), End: stmt.End(), Message: "VALUES statements are not supported"}
 	}
 
 	scope, err := resolveScope(stmt.From, ctes)
@@ -328,7 +328,7 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 		return nil
 	case *parser.TableFunctionRef, *parser.ParensTableRef,
 		*parser.PivotRef, *parser.UnpivotRef:
-		v.err = &ValidationError{Pos: n.Pos(), Message: "unsupported FROM clause shape"}
+		v.err = &ValidationError{Pos: n.Pos(), End: n.End(), Message: "unsupported FROM clause shape"}
 	}
 	if v.err != nil {
 		return nil
@@ -351,11 +351,11 @@ func (v *exprValidator) checkIdent(id *parser.Ident) error {
 		// "ambiguous", not folded into "unknown".
 		switch v.scope.columnCount(id.Parts[0]) {
 		case 0:
-			return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("unknown column %q", id.Parts[0])}
+			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unknown column %q", id.Parts[0])}
 		case 1:
 			// known, unambiguous
 		default:
-			return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("ambiguous column %q: qualify with a table name", id.Parts[0])}
+			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("ambiguous column %q: qualify with a table name", id.Parts[0])}
 		}
 	default: // 2 or more parts
 		return v.checkQualifiedIdent(id)
@@ -382,10 +382,10 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 	if tbl, ok := v.scope.lookup(id.Parts[0]); ok {
 		col, ok := tbl.columns[id.Parts[1]]
 		if !ok {
-			return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("unknown column %q on table %q", id.Parts[1], id.Parts[0])}
+			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unknown column %q on table %q", id.Parts[1], id.Parts[0])}
 		}
 		if len(id.Parts) > 2 && col.colType != ColumnTypeJSON {
-			return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("unsupported identifier %q", strings.Join(id.Parts, "."))}
+			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unsupported identifier %q", strings.Join(id.Parts, "."))}
 		}
 		return nil
 	}
@@ -396,15 +396,15 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 		return nil
 	}
 	if len(id.Parts) == 2 {
-		return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("unknown table %q", id.Parts[0])}
+		return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unknown table %q", id.Parts[0])}
 	}
-	return &ValidationError{Pos: id.Pos(), Message: fmt.Sprintf("unsupported identifier %q", strings.Join(id.Parts, "."))}
+	return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unsupported identifier %q", strings.Join(id.Parts, "."))}
 }
 
 func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 	name := strings.ToUpper(strings.Join(f.Name, "."))
-	if !allowedFunctions[name] {
-		return &ValidationError{Pos: f.Pos(), Message: fmt.Sprintf("function %q is not allowed", strings.Join(f.Name, "."))}
+	if _, ok := allowedFunctions[name]; !ok {
+		return &ValidationError{Pos: f.Pos(), End: f.End(), Message: fmt.Sprintf("function %q is not allowed", strings.Join(f.Name, "."))}
 	}
 	return nil
 }
@@ -428,11 +428,11 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 	case 1:
 		tbl, ok := v.scope.lookup(s.Qualifier[0])
 		if !ok {
-			return &ValidationError{Pos: s.Pos(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
 		}
 		tables = []logicalTable{tbl}
 	default:
-		return &ValidationError{Pos: s.Pos(), Message: fmt.Sprintf("unsupported qualifier %q", strings.Join(s.Qualifier, "."))}
+		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported qualifier %q", strings.Join(s.Qualifier, "."))}
 	}
 
 	for _, exclude := range s.Exclude {
@@ -444,7 +444,7 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 			}
 		}
 		if !found {
-			return &ValidationError{Pos: s.Pos(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", exclude)}
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", exclude)}
 		}
 	}
 	return nil
@@ -456,15 +456,15 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 // other allowed path anyway.
 func (v *exprValidator) checkLambda(l *parser.LambdaExpr) error {
 	if len(l.Params) != 1 {
-		return &ValidationError{Pos: l.Pos(), Message: "lambda expressions are not supported"}
+		return &ValidationError{Pos: l.Pos(), End: l.End(), Message: "lambda expressions are not supported"}
 	}
 	switch v.scope.columnCount(l.Params[0]) {
 	case 0:
-		return &ValidationError{Pos: l.Pos(), Message: fmt.Sprintf("unknown column %q", l.Params[0])}
+		return &ValidationError{Pos: l.Pos(), End: l.End(), Message: fmt.Sprintf("unknown column %q", l.Params[0])}
 	case 1:
 		return nil
 	default:
-		return &ValidationError{Pos: l.Pos(), Message: fmt.Sprintf("ambiguous column %q: qualify with a table name", l.Params[0])}
+		return &ValidationError{Pos: l.Pos(), End: l.End(), Message: fmt.Sprintf("ambiguous column %q: qualify with a table name", l.Params[0])}
 	}
 }
 

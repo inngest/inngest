@@ -172,7 +172,7 @@ func unaryExprType(u *parser.UnaryExpr, scope *tableScope) ColumnType {
 	}
 }
 
-// functionReturnType has one case per key in allowedFunctions (tables.go)
+// functionReturnType has one case per key in allowedFunctions (functions.go)
 // — if you add a function there, add its return-type rule here too.
 // "Pick one of my arguments" functions (MIN/MAX/COALESCE/NULLIF/
 // GREATEST/LEAST/ANY_VALUE) preserve their first argument's type rather
@@ -181,24 +181,57 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) Colu
 	switch name {
 	case "COUNT", "LENGTH", "LEN", "ROUND", "ABS",
 		"DATE_PART", "DATE_DIFF", "EPOCH", "JSON_ARRAY_LENGTH", "SUM", "AVG",
-		"YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND":
+		"YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND",
+		// Statistical aggregates that don't preserve their input's type
+		// (unlike MEDIAN/QUANTILE_*, grouped with MIN/MAX below).
+		"STDDEV", "STDDEV_SAMP", "STDDEV_POP", "VARIANCE", "VAR_SAMP", "VAR_POP",
+		"CORR", "COVAR_SAMP", "COVAR_POP", "ENTROPY", "SKEWNESS", "KURTOSIS",
+		"APPROX_QUANTILE", "APPROX_COUNT_DISTINCT", "PRODUCT",
+		// Window functions with no representative argument to preserve.
+		"ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE", "CUME_DIST", "PERCENT_RANK",
+		// Scalar numeric.
+		"INSTR", "ASCII", "UNICODE", "LEVENSHTEIN", "JACCARD", "HASH",
+		"CEIL", "CEILING", "FLOOR", "TRUNC", "SIGN", "POWER", "POW", "SQRT",
+		"EXP", "LN", "LOG", "LOG10", "LOG2", "MOD", "PI", "CBRT",
+		"ISODOW", "ISOYEAR", "WEEK", "QUARTER", "DAYOFWEEK", "DAYOFYEAR",
+		"ARRAY_LENGTH", "LIST_UNIQUE", "LIST_POSITION", "ARRAY_POSITION":
 		return ColumnTypeNumber
 	case "LOWER", "UPPER", "CONCAT", "SUBSTR", "LTRIM",
 		"RTRIM", "REPLACE", "SPLIT_PART", "STRING_AGG", "STRFTIME",
 		"JSON_EXTRACT_STRING", "REGEXP_REPLACE", "REGEXP_EXTRACT",
-		"LPAD", "RPAD", "REVERSE", "REPEAT", "JSON_TYPE", "TYPEOF":
+		"LPAD", "RPAD", "REVERSE", "REPEAT", "JSON_TYPE", "TYPEOF",
+		"LEFT", "RIGHT", "FORMAT", "PRINTF", "MD5", "SHA256", "TRANSLATE",
+		"CHR", "STRIP_ACCENTS", "ARRAY_TO_STRING", "JSON_VALUE":
 		return ColumnTypeString
 	case "DATE_TRUNC", "NOW", "AGE", "MAKE_DATE", "MAKE_TIMESTAMP",
-		"TIMEZONE", "LAST_DAY", "DATE_ADD", "DATE_SUB":
+		"TIMEZONE", "LAST_DAY", "DATE_ADD", "DATE_SUB",
+		"STRPTIME", "TO_TIMESTAMP":
 		return ColumnTypeDatetime
 	case "JSON_VALID", "REGEXP_MATCHES", "STARTS_WITH", "CONTAINS", "ENDS_WITH",
-		"JSON_CONTAINS", "JSON_EXISTS":
+		"JSON_CONTAINS", "JSON_EXISTS",
+		"BOOL_AND", "BOOL_OR", "LIST_CONTAINS", "ARRAY_CONTAINS",
+		"LIST_HAS_ANY", "LIST_HAS_ALL", "REGEXP_FULL_MATCH":
 		return ColumnTypeBoolean
 	case "JSON_EXTRACT", "TO_JSON", "ARRAY_AGG", "LIST", "UNNEST",
 		"JSON_KEYS", "JSON_STRUCTURE", "JSON_MERGE_PATCH", "JSON_QUOTE",
-		"JSON_GROUP_ARRAY", "JSON_GROUP_OBJECT":
+		"JSON_GROUP_ARRAY", "JSON_GROUP_OBJECT",
+		"JSON_ARRAY", "JSON_OBJECT", "JSON_EXTRACT_PATH",
+		"LIST_DISTINCT", "LIST_SORT", "LIST_REVERSE_SORT", "LIST_SLICE",
+		"LIST_CONCAT", "LIST_INTERSECT", "FLATTEN", "LIST_VALUE",
+		"STRING_SPLIT", "REGEXP_SPLIT_TO_ARRAY":
 		return ColumnTypeJSON
-	case "MIN", "MAX", "GREATEST", "LEAST", "ANY_VALUE", "IFNULL", "NVL":
+	// "Pick one of my arguments" functions preserve their representative
+	// argument's type rather than converting it, matching what they
+	// actually do in DuckDB (confirmed empirically for MEDIAN/QUANTILE_*,
+	// which return the input's own type for ordinal types like TIMESTAMP,
+	// not always a DOUBLE) -- FIRST/LAST/ARG_MAX/ARG_MIN/BIT_*/window
+	// functions like LAG/LEAD all behave the same way: the value column
+	// (always args[0]) is the representative type.
+	case "MIN", "MAX", "GREATEST", "LEAST", "ANY_VALUE", "IFNULL", "NVL",
+		"MEDIAN", "MODE", "QUANTILE_CONT", "QUANTILE_DISC",
+		"FIRST", "LAST", "ARG_MAX", "ARG_MIN",
+		"BIT_AND", "BIT_OR", "BIT_XOR",
+		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE":
 		if len(args) == 0 {
 			return ColumnTypeUnknown
 		}
@@ -211,6 +244,26 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) Colu
 			return ColumnTypeUnknown
 		}
 		return inferType(args[1], scope)
+	case "LIST_AGGREGATE", "ARRAY_AGGREGATE":
+		// list_aggregate(list, name) applies the aggregate named by args[1]
+		// (e.g. 'sum', 'string_agg', 'bit_and') to args[0] -- statically
+		// typeable only when that name is a literal string constant (by far
+		// the common case: written directly in the query, not built from an
+		// expression). Recurses into functionReturnType with the resolved
+		// name and args[0] alone, so e.g. list_aggregate(x, 'string_agg')
+		// reports the same type STRING_AGG(x) would, reusing every rule
+		// above instead of duplicating it. A dynamic (non-literal) name, or
+		// one that doesn't match any known aggregate, is genuinely
+		// unknowable without asking DuckDB -- reported as such rather than
+		// guessed.
+		if len(args) < 2 {
+			return ColumnTypeUnknown
+		}
+		lit, ok := args[1].(*parser.Literal)
+		if !ok || lit.Kind != parser.LitString {
+			return ColumnTypeUnknown
+		}
+		return functionReturnType(strings.ToUpper(lit.Text), args[:1], scope)
 	default:
 		return ColumnTypeUnknown
 	}

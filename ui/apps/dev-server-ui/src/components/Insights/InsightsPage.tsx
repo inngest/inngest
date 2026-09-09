@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Resizable } from '@inngest/components/Resizable/Resizable';
 
 import { InsightsQueryTab } from './InsightsQueryTab';
 import { InsightsTabsList } from './InsightsTabsList';
+import { TableSchemaSidebar } from './TableSchemaSidebar';
 
 const DEFAULT_QUERY = 'SELECT * FROM runs LIMIT 10;';
 
@@ -135,7 +137,7 @@ export default function InsightsPage() {
     );
   };
 
-  return (
+  const tabsAndContent = (
     <div className="flex h-full min-h-0 flex-col">
       <InsightsTabsList
         activeTabId={activeTabId}
@@ -162,5 +164,17 @@ export default function InsightsPage() {
         ))}
       </div>
     </div>
+  );
+
+  return (
+    <Resizable
+      orientation="horizontal"
+      defaultSplitPercentage={85}
+      minSplitPercentage={60}
+      maxSplitPercentage={85}
+      splitKey="insights-schema-sidebar-split"
+      first={tabsAndContent}
+      second={<TableSchemaSidebar />}
+    />
   );
 }

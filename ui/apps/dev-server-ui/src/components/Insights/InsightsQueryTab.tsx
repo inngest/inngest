@@ -36,18 +36,20 @@ import {
 } from '@/store/generated';
 import { CellDetail, type CellDetailData } from './CellDetail';
 import { NoResultsState, QueryEmptyState } from './EmptyStates';
+import { INSIGHTS_TABLES } from './insightsSchema';
 import { Section } from './Section';
 
-// The insights query layer's six logical tables (pkg/duckdb/insights);
-// hardcoded here since this basic editor has no live schema introspection.
-const TABLES = [
-  'runs',
-  'events',
-  'metadata',
-  'extended_trace_spans',
-  'steps',
-  'step_attempts',
-];
+// Sourced from the generated schema (make insights-schema) rather than
+// hardcoded, so autocomplete can't drift from pkg/duckdb/insights' real
+// table/column registry the way a hand-maintained list eventually would.
+const TABLES = INSIGHTS_TABLES.map((table) => table.name);
+
+// Deduped across all six tables -- SQLCompletionConfig.columns is a flat
+// list with no table association, so e.g. run_id (shared by several
+// tables) only needs to appear once.
+const COLUMNS = Array.from(
+  new Set(INSIGHTS_TABLES.flatMap((table) => table.columns.map((c) => c.name))),
+);
 
 const KEYWORDS = [
   'SELECT',
@@ -90,7 +92,7 @@ const KEYWORDS = [
 ];
 
 const completionConfig: SQLCompletionConfig = {
-  columns: [],
+  columns: COLUMNS,
   keywords: KEYWORDS,
   functions: [],
   tables: TABLES,

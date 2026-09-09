@@ -1080,3 +1080,23 @@ func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterO
 		Tags:        opts.Tags,
 	})
 }
+
+// IncrInsightsQueryCounter records one duckdbInsightsQuery GQL call, tagged
+// by status ("ok", "parse_error", "validation_error", "execution_error") --
+// the only per-query observability this resolver has today, so this and the
+// two insights histograms (HistogramInsightsQueryDuration/RowCount) are
+// meant to answer "is this new query surface being abused/regressing" from
+// one place rather than requiring a log dive.
+func IncrInsightsQueryCounter(ctx context.Context, status string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "insights_query_total",
+		Description: "Total number of insights queries executed, tagged by outcome status",
+		Tags:        opts.Tags,
+	})
+}

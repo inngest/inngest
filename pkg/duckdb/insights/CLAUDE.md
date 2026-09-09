@@ -23,7 +23,8 @@ beyond `duckdb.DuckLakeAlias` (a string constant) and `duckdb.Open`/
 ## Where things live
 
 ```
-tables.go        the logical table registry: known columns, hints, JSON pathHints, function allowlist
+tables.go        the logical table registry: known columns, hints, JSON pathHints
+functions.go     allowedFunctions — the function-name allowlist
 scope.go         tableScope — resolves a FROM clause to its in-scope logical tables, CTEs included
 derive.go        deriveTable — synthesizes a logicalTable for a CTE/subquery from its validated body
 typecheck.go     inferType — static, allowlist-only expression type inference (backs deriveTable)
@@ -113,7 +114,7 @@ whenever you touch this file.
   can't syntactically distinguish DuckDB's lambda arrow from its JSON
   arrow operator — a bare `col -> 'key'` parses as a single-param
   `*parser.LambdaExpr`, not a `BinaryExpr`. This package's function
-  allowlist (`tables.go`'s `allowedFunctions`) never includes a
+  allowlist (`functions.go`'s `allowedFunctions`) never includes a
   lambda-taking function (`list_transform`, etc.), so every `LambdaExpr`
   `validate`/`buildColumnHints` ever see is necessarily JSON-arrow-shaped
   column access, not a genuine lambda. Don't "fix" this ambiguity by

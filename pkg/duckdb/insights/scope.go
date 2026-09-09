@@ -8,9 +8,14 @@ import (
 )
 
 // ValidationError is returned by validate (Task 3) and resolveScope for
-// any query this package rejects before it reaches DuckDB.
+// any query this package rejects before it reaches DuckDB. End is the
+// offending node's own End() -- zero (equal to Pos) only for the handful of
+// construction sites with no single node to point at (e.g. a query-wide
+// rejection) -- so Diagnostic() can underline the whole offending
+// identifier/clause in the editor instead of a single-character caret.
 type ValidationError struct {
 	Pos     parser.Position
+	End     parser.Position
 	Message string
 }
 
@@ -78,7 +83,7 @@ func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable) e
 	case *parser.TableFunctionRef:
 		return s.addTableFunction(r)
 	default:
-		return &ValidationError{Pos: ref.Pos(), Message: "unsupported FROM clause shape"}
+		return &ValidationError{Pos: ref.Pos(), End: ref.End(), Message: "unsupported FROM clause shape"}
 	}
 }
 
@@ -99,10 +104,10 @@ func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable) e
 func (s *tableScope) addTableFunction(r *parser.TableFunctionRef) error {
 	name := strings.ToUpper(strings.Join(r.Name, "."))
 	if name != "UNNEST" {
-		return &ValidationError{Pos: r.Pos(), Message: fmt.Sprintf("table function %q is not allowed", strings.Join(r.Name, "."))}
+		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("table function %q is not allowed", strings.Join(r.Name, "."))}
 	}
 	if len(r.Args) != 1 {
-		return &ValidationError{Pos: r.Pos(), Message: "UNNEST in a FROM clause takes exactly one argument"}
+		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: "UNNEST in a FROM clause takes exactly one argument"}
 	}
 
 	alias := r.Alias
@@ -125,14 +130,14 @@ func (s *tableScope) addTableFunction(r *parser.TableFunctionRef) error {
 
 func (s *tableScope) addBaseTable(r *parser.BaseTableRef, ctes map[string]logicalTable) error {
 	if len(r.Name) != 1 {
-		return &ValidationError{Pos: r.Pos(), Message: fmt.Sprintf("unknown table %q", strings.Join(r.Name, "."))}
+		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", strings.Join(r.Name, "."))}
 	}
 	tbl, ok := ctes[r.Name[0]]
 	if !ok {
 		tbl, ok = logicalTables[r.Name[0]]
 	}
 	if !ok {
-		return &ValidationError{Pos: r.Pos(), Message: fmt.Sprintf("unknown table %q", r.Name[0])}
+		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", r.Name[0])}
 	}
 	alias := r.Alias
 	if alias == "" {
@@ -148,7 +153,7 @@ func (s *tableScope) addBaseTable(r *parser.BaseTableRef, ctes map[string]logica
 // r.Alias, which DuckDB itself requires a FROM-clause subquery to have.
 func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]logicalTable) error {
 	if r.Alias == "" {
-		return &ValidationError{Pos: r.Pos(), Message: "a subquery in FROM must have an alias"}
+		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: "a subquery in FROM must have an alias"}
 	}
 	var outer *tableScope
 	if r.Lateral {

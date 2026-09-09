@@ -20,8 +20,8 @@ import (
 // specific hook sets.
 func seedRunRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runID ulid.ULID, queuedAt time.Time, status *enums.StepStatus, startedAt, endedAt *time.Time, output *string) {
 	t.Helper()
-	cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "app_name", "function_id", "function_slug", "inputs"}
-	args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn", "[]"}
+	cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "app_name", "function_id", "function_slug", "attributes", "inputs"}
+	args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn", "{}", "[]"}
 	if status != nil {
 		cols = append(cols, "status")
 		args = append(args, status.String())
@@ -91,8 +91,8 @@ func TestGetTraceRunParsesEventIDsArray(t *testing.T) {
 	queuedAt := time.Now().UTC()
 
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusQueued.String(), []string{evt1.String(), evt2.String()},
 	)
@@ -133,8 +133,8 @@ func TestGetTraceRunParsesIsDeferred(t *testing.T) {
 	queuedAt := time.Now().UTC()
 
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, is_deferred)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, is_deferred)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusQueued.String(), true,
 	)
@@ -177,8 +177,8 @@ func TestGetTraceRunsByTriggerIDReturnsMatchingRuns(t *testing.T) {
 
 	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), matchRun.String(), now, now, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusQueued.String(), []string{trigger.String()},
 	)
@@ -187,8 +187,8 @@ func TestGetTraceRunsByTriggerIDReturnsMatchingRuns(t *testing.T) {
 	// A run triggered by a different event must not match.
 	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 	_, err = m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), otherRun.String(), now, now, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusQueued.String(), []string{other.String()},
 	)
@@ -230,8 +230,8 @@ func TestGetTraceRunsByTriggerIDCollapsesToLatestRow(t *testing.T) {
 		{enums.StepStatusRunning, &startedAt, nil},
 		{enums.StepStatusCompleted, &startedAt, &endedAt},
 	} {
-		cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "app_name", "function_id", "function_slug", "inputs", "status", "event_ids"}
-		args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn", "[]", row.status.String(), []string{trigger.String()}}
+		cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "app_name", "function_id", "function_slug", "attributes", "inputs", "status", "event_ids"}
+		args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), "test-app", functionID.String(), "test-fn", "{}", "[]", row.status.String(), []string{trigger.String()}}
 		if row.startedAt != nil {
 			cols = append(cols, "started_at")
 			args = append(args, *row.startedAt)
@@ -478,8 +478,8 @@ func TestGetTraceRunsFiltersByEventID(t *testing.T) {
 
 	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), matchRun.String(), now, now, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusCompleted.String(), []string{evt1.String()},
 	)
@@ -487,8 +487,8 @@ func TestGetTraceRunsFiltersByEventID(t *testing.T) {
 
 	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 	_, err = m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), otherRun.String(), now, now, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusCompleted.String(), []string{unrelatedEvt.String()},
 	)
@@ -509,10 +509,12 @@ func TestGetTraceRunsFiltersByEventID(t *testing.T) {
 }
 
 // TestGetTraceRunsFiltersByIsDeferred proves the IsDeferred filter's
-// "false" branch matches NULL rows, not "= FALSE" — is_deferred is a
-// nullable boolean that's only ever written as TRUE or left NULL (see its
-// migration's own doc comment), matching pkg/cqrs/manager's own
-// spans.is_deferred.IsNull() branch for the same filter.
+// "false" branch matches explicit FALSE rows -- unlike the reference
+// (Postgres/SQLite) manager's spans.is_deferred, which is nullable and
+// treats "not deferred" as NULL (pkg/cqrs/manager/cqrs.go's
+// spans.is_deferred.IsNull() branch), this table's is_deferred is BOOLEAN
+// NOT NULL DEFAULT FALSE (migrations/000001_baseline.sql), so every
+// non-deferred row already has an explicit FALSE to match against.
 func TestGetTraceRunsFiltersByIsDeferred(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
@@ -524,8 +526,8 @@ func TestGetTraceRunsFiltersByIsDeferred(t *testing.T) {
 
 	deferredRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, inputs, status, is_deferred)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, attributes, inputs, status, is_deferred)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', ?, ?);`,
 		accountID.String(), envID.String(), deferredRun.String(), now, now, appID.String(), "test-app", functionID.String(), "test-fn",
 		enums.StepStatusCompleted.String(), true,
 	)
@@ -805,4 +807,76 @@ func TestGetTraceRunsCountRespectsAppNameFilter(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
+}
+
+// TestGetTraceRunsCountAppliesEventCELFilter proves GetTraceRunsCount pushes
+// event.* CEL predicates down into its SQL query exactly like GetTraceRuns,
+// rather than counting every run in the time range regardless of filter.CEL.
+func TestGetTraceRunsCountAppliesEventCELFilter(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	seedInputs := func(t *testing.T, runID ulid.ULID, inputsJSON string) {
+		t.Helper()
+		_, err := m.db.ExecContext(ctx, `UPDATE inngest.runs SET inputs = ? WHERE run_id = ?;`, inputsJSON, runID.String())
+		require.NoError(t, err)
+	}
+
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, matchRun, now, &completed, nil, nil, nil)
+	seedInputs(t, matchRun, `[{"id":"e1","name":"test/match","data":{}}]`)
+
+	noMatchRun := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, noMatchRun, now.Add(time.Millisecond), &completed, nil, nil, nil)
+	seedInputs(t, noMatchRun, `[{"id":"e2","name":"test/other","data":{}}]`)
+
+	count, err := m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+			CEL: `event.name == "test/match"`,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
+// TestGetTraceRunsCountAppliesOutputCELFilter proves GetTraceRunsCount pushes
+// output.*/error.* CEL predicates into its QUALIFY clause exactly like
+// GetTraceRuns.
+func TestGetTraceRunsCountAppliesOutputCELFilter(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	matchOut := `{"data":{"ok":true}}`
+	run1 := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run1, now, &completed, nil, nil, &matchOut)
+
+	noMatchOut := `{"data":{"ok":false}}`
+	run2 := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run2, now, &completed, nil, nil, &noMatchOut)
+
+	count, err := m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+			CEL: "output.ok == true",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }

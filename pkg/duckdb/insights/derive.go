@@ -111,6 +111,6 @@ func outputColumnName(item *parser.SelectItem) (string, error) {
 	case *parser.DotExpr:
 		return e.Field, nil
 	default:
-		return "", &ValidationError{Pos: item.Pos(), Message: "a computed column in a CTE or subquery must have an alias"}
+		return "", &ValidationError{Pos: item.Pos(), End: item.End(), Message: "a computed column in a CTE or subquery must have an alias"}
 	}
 }
