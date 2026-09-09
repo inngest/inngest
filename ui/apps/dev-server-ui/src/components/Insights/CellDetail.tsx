@@ -8,7 +8,6 @@ import {
 import {
   RiArrowDownSLine,
   RiArrowUpSLine,
-  RiCloseLine,
   RiFileCopyLine,
 } from '@remixicon/react';
 import { toast } from 'sonner';
@@ -25,13 +24,14 @@ export type CellDetailData = {
 
 // Mirrors the dashboard Insights feature's
 // InsightsTabManager/InsightsHelperPanel/features/CellDetail/CellDetailView.tsx,
-// adapted to this backend's InsightsColumnType enum and raw (non-normalized) values.
+// adapted to this backend's InsightsColumnType enum and raw (non-normalized)
+// values. Rendered as HelperPanelFrame's content (InsightsPage.tsx) -- the
+// frame itself owns the title bar and close button, so this only needs its
+// own secondary header (column name + type), not a close control of its own.
 export function CellDetail({
   selectedCell,
-  onClose,
 }: {
   selectedCell: CellDetailData | null;
-  onClose: () => void;
 }) {
   if (!selectedCell) {
     return (
@@ -47,17 +47,8 @@ export function CellDetail({
         <div className="text-basis text-sm font-medium">
           {selectedCell.columnId}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
-            {selectedCell.columnType}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted hover:text-basis"
-            aria-label="Close"
-          >
-            <RiCloseLine className="h-4 w-4" />
-          </button>
+        <div className="text-muted rounded px-1.5 py-0.5 text-xs font-medium uppercase">
+          {selectedCell.columnType}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-4 py-1">

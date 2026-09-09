@@ -1,13 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  HelperPanelControl,
+  HelperPanelFrame,
+  type HelperItem,
+} from '@inngest/components/HelperPanelControl';
 import { Resizable } from '@inngest/components/Resizable/Resizable';
+import { RiFunctionLine, RiNodeTree, RiTableLine } from '@remixicon/react';
 
+import { CellDetail, type CellDetailData } from './CellDetail';
 import { InsightsQueryTab } from './InsightsQueryTab';
 import { InsightsTabsList } from './InsightsTabsList';
-import { TableSchemaSidebar } from './TableSchemaSidebar';
+import { FunctionsSidebar, TableSchemaSidebar } from './TableSchemaSidebar';
 
 const DEFAULT_QUERY = 'SELECT * FROM runs LIMIT 10;';
 
 const TABS_STORAGE_KEY = 'duckdb-insights-tabs-state';
+
+// Mirrors the dashboard Insights feature's InsightsHelperPanel/constants.ts:
+// one shared side panel, switched between a fixed set of named views rather
+// than several simultaneously-open panes. Schema and Functions each have
+// their own entry in the vertical icon bar (HelperPanelControl); Cell Detail
+// doesn't -- it's only reached by clicking a result cell (see
+// handleSelectedCellChange below), exactly like the dashboard's own
+// CELL_DETAIL helper.
+const SCHEMA = 'Schema' as const;
+const FUNCTIONS = 'Functions' as const;
+const CELL_DETAIL = 'Cell Detail' as const;
+type HelperTitle = typeof SCHEMA | typeof FUNCTIONS | typeof CELL_DETAIL;
 
 export type InsightsTabData = {
   id: string;
@@ -108,6 +127,14 @@ export default function InsightsPage() {
   const [nextTabNumber, setNextTabNumber] = useState(() =>
     getNextTabNumber(initialState.tabs),
   );
+  // Keyed by tab id rather than a single value, so switching tabs doesn't
+  // show one tab's selected cell over another's results -- each
+  // InsightsQueryTab instance stays mounted (just hidden) while inactive,
+  // so its own entry here persists across tab switches too.
+  const [selectedCellByTab, setSelectedCellByTab] = useState<
+    Record<string, CellDetailData | null>
+  >({});
+  const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
   const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
@@ -129,12 +156,35 @@ export default function InsightsPage() {
     if (tabs.length <= 1) return;
     setActiveTabId((current) => getNewActiveTabAfterClose(tabs, id, current));
     setTabs((prev) => prev.filter((tab) => tab.id !== id));
+    setSelectedCellByTab((prev) => {
+      if (!(id in prev)) return prev;
+      const { [id]: _removed, ...rest } = prev;
+      return rest;
+    });
   };
 
   const handleSqlChange = (id: string, sql: string) => {
     setTabs((prev) =>
       prev.map((tab) => (tab.id === id ? { ...tab, sql } : tab)),
     );
+  };
+
+  // Selecting a cell always switches the shared panel to Cell Detail,
+  // replacing whatever was open (e.g. Schema) -- mirrors the dashboard's
+  // CellDetailProvider onOpenPanel -> setActiveHelper(CELL_DETAIL).
+  // Deselecting (Escape, or clicking the same cell's row out of view)
+  // leaves the panel open on Cell Detail showing its "click a cell" state,
+  // same as the dashboard.
+  const handleSelectedCellChange = (
+    tabId: string,
+    cell: CellDetailData | null,
+  ) => {
+    setSelectedCellByTab((prev) => ({ ...prev, [tabId]: cell }));
+    if (cell) setActiveHelper(CELL_DETAIL);
+  };
+
+  const handleToggleHelper = (title: HelperTitle) => {
+    setActiveHelper((current) => (current === title ? null : title));
   };
 
   const tabsAndContent = (
@@ -159,6 +209,10 @@ export default function InsightsPage() {
             <InsightsQueryTab
               initialSql={tab.sql}
               onSqlChange={(sql) => handleSqlChange(tab.id, sql)}
+              selectedCell={selectedCellByTab[tab.id] ?? null}
+              onSelectedCellChange={(cell) =>
+                handleSelectedCellChange(tab.id, cell)
+              }
             />
           </div>
         ))}
@@ -166,15 +220,67 @@ export default function InsightsPage() {
     </div>
   );
 
-  return (
+  const activeSelectedCell = selectedCellByTab[activeTabId] ?? null;
+  const isHelperPanelOpen = activeHelper !== null;
+
+  const helperItems: HelperItem[] = [
+    {
+      title: SCHEMA,
+      icon: <RiNodeTree size={20} />,
+      action: () => handleToggleHelper(SCHEMA),
+    },
+    {
+      title: FUNCTIONS,
+      icon: <RiFunctionLine size={20} />,
+      action: () => handleToggleHelper(FUNCTIONS),
+    },
+  ];
+
+  // One shared panel switched between named views, rather than several
+  // simultaneously-open panes -- mirrors the dashboard Insights feature's
+  // InsightsTabManager.tsx (Resizable(mainContent, HelperPanelFrame) plus
+  // an always-visible HelperPanelControl icon bar outside it).
+  const mainContent = isHelperPanelOpen ? (
     <Resizable
       orientation="horizontal"
-      defaultSplitPercentage={85}
-      minSplitPercentage={60}
+      defaultSplitPercentage={78}
+      minSplitPercentage={50}
       maxSplitPercentage={85}
-      splitKey="insights-schema-sidebar-split"
+      splitKey="insights-helper-panel-split"
       first={tabsAndContent}
-      second={<TableSchemaSidebar />}
+      second={
+        <HelperPanelFrame
+          title={activeHelper}
+          icon={
+            activeHelper === SCHEMA ? (
+              <RiNodeTree size={20} className="text-subtle" />
+            ) : activeHelper === FUNCTIONS ? (
+              <RiFunctionLine size={20} className="text-subtle" />
+            ) : (
+              <RiTableLine size={20} className="text-subtle" />
+            )
+          }
+          onClose={() => setActiveHelper(null)}
+          contentClassName="overflow-hidden"
+        >
+          {activeHelper === SCHEMA ? (
+            <TableSchemaSidebar />
+          ) : activeHelper === FUNCTIONS ? (
+            <FunctionsSidebar />
+          ) : (
+            <CellDetail selectedCell={activeSelectedCell} />
+          )}
+        </HelperPanelFrame>
+      }
     />
+  ) : (
+    tabsAndContent
+  );
+
+  return (
+    <div className="flex h-full w-full">
+      <div className="h-full min-w-0 flex-1 overflow-hidden">{mainContent}</div>
+      <HelperPanelControl items={helperItems} activeTitle={activeHelper} />
+    </div>
   );
 }

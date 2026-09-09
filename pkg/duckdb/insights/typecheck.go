@@ -41,7 +41,7 @@ func inferType(expr parser.Expr, scope *tableScope) ColumnType {
 	case *parser.CaseExpr:
 		return caseExprType(e, scope)
 	case *parser.FunctionExpr:
-		return functionReturnType(strings.ToUpper(strings.Join(e.Name, ".")), e.Args, scope)
+		return functionReturnType(strings.ToLower(strings.Join(e.Name, ".")), e.Args, scope)
 	case *parser.BinaryExpr:
 		return binaryExprType(e, scope)
 	case *parser.UnaryExpr:
@@ -179,46 +179,46 @@ func unaryExprType(u *parser.UnaryExpr, scope *tableScope) ColumnType {
 // than converting it, matching what they actually do in DuckDB.
 func functionReturnType(name string, args []parser.Expr, scope *tableScope) ColumnType {
 	switch name {
-	case "COUNT", "LENGTH", "LEN", "ROUND", "ABS",
-		"DATE_PART", "DATE_DIFF", "EPOCH", "JSON_ARRAY_LENGTH", "SUM", "AVG",
-		"YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND",
+	case "count", "length", "len", "round", "abs",
+		"date_part", "date_diff", "epoch", "json_array_length", "sum", "avg",
+		"year", "month", "day", "hour", "minute", "second",
 		// Statistical aggregates that don't preserve their input's type
 		// (unlike MEDIAN/QUANTILE_*, grouped with MIN/MAX below).
-		"STDDEV", "STDDEV_SAMP", "STDDEV_POP", "VARIANCE", "VAR_SAMP", "VAR_POP",
-		"CORR", "COVAR_SAMP", "COVAR_POP", "ENTROPY", "SKEWNESS", "KURTOSIS",
-		"APPROX_QUANTILE", "APPROX_COUNT_DISTINCT", "PRODUCT",
+		"stddev", "stddev_samp", "stddev_pop", "variance", "var_samp", "var_pop",
+		"corr", "covar_samp", "covar_pop", "entropy", "skewness", "kurtosis",
+		"approx_quantile", "approx_count_distinct", "product",
 		// Window functions with no representative argument to preserve.
-		"ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE", "CUME_DIST", "PERCENT_RANK",
+		"row_number", "rank", "dense_rank", "ntile", "cume_dist", "percent_rank",
 		// Scalar numeric.
-		"INSTR", "ASCII", "UNICODE", "LEVENSHTEIN", "JACCARD", "HASH",
-		"CEIL", "CEILING", "FLOOR", "TRUNC", "SIGN", "POWER", "POW", "SQRT",
-		"EXP", "LN", "LOG", "LOG10", "LOG2", "MOD", "PI", "CBRT",
-		"ISODOW", "ISOYEAR", "WEEK", "QUARTER", "DAYOFWEEK", "DAYOFYEAR",
-		"ARRAY_LENGTH", "LIST_UNIQUE", "LIST_POSITION", "ARRAY_POSITION":
+		"instr", "ascii", "unicode", "levenshtein", "jaccard", "hash",
+		"ceil", "ceiling", "floor", "trunc", "sign", "power", "pow", "sqrt",
+		"exp", "ln", "log", "log10", "log2", "mod", "pi", "cbrt",
+		"isodow", "isoyear", "week", "quarter", "dayofweek", "dayofyear",
+		"array_length", "list_unique", "list_position", "array_position":
 		return ColumnTypeNumber
-	case "LOWER", "UPPER", "CONCAT", "SUBSTR", "LTRIM",
-		"RTRIM", "REPLACE", "SPLIT_PART", "STRING_AGG", "STRFTIME",
-		"JSON_EXTRACT_STRING", "REGEXP_REPLACE", "REGEXP_EXTRACT",
-		"LPAD", "RPAD", "REVERSE", "REPEAT", "JSON_TYPE", "TYPEOF",
-		"LEFT", "RIGHT", "FORMAT", "PRINTF", "MD5", "SHA256", "TRANSLATE",
-		"CHR", "STRIP_ACCENTS", "ARRAY_TO_STRING", "JSON_VALUE":
+	case "lower", "upper", "concat", "substr", "ltrim",
+		"rtrim", "replace", "split_part", "string_agg", "strftime",
+		"json_extract_string", "regexp_replace", "regexp_extract",
+		"lpad", "rpad", "reverse", "repeat", "json_type", "typeof",
+		"left", "right", "format", "printf", "md5", "sha256", "translate",
+		"chr", "strip_accents", "array_to_string", "json_value":
 		return ColumnTypeString
-	case "DATE_TRUNC", "NOW", "AGE", "MAKE_DATE", "MAKE_TIMESTAMP",
-		"TIMEZONE", "LAST_DAY", "DATE_ADD", "DATE_SUB",
-		"STRPTIME", "TO_TIMESTAMP":
+	case "date_trunc", "now", "age", "make_date", "make_timestamp",
+		"timezone", "last_day", "date_add", "date_sub",
+		"strptime", "to_timestamp":
 		return ColumnTypeDatetime
-	case "JSON_VALID", "REGEXP_MATCHES", "STARTS_WITH", "CONTAINS", "ENDS_WITH",
-		"JSON_CONTAINS", "JSON_EXISTS",
-		"BOOL_AND", "BOOL_OR", "LIST_CONTAINS", "ARRAY_CONTAINS",
-		"LIST_HAS_ANY", "LIST_HAS_ALL", "REGEXP_FULL_MATCH":
+	case "json_valid", "regexp_matches", "starts_with", "contains", "ends_with",
+		"json_contains", "json_exists",
+		"bool_and", "bool_or", "list_contains", "array_contains",
+		"list_has_any", "list_has_all", "regexp_full_match":
 		return ColumnTypeBoolean
-	case "JSON_EXTRACT", "TO_JSON", "ARRAY_AGG", "LIST", "UNNEST",
-		"JSON_KEYS", "JSON_STRUCTURE", "JSON_MERGE_PATCH", "JSON_QUOTE",
-		"JSON_GROUP_ARRAY", "JSON_GROUP_OBJECT",
-		"JSON_ARRAY", "JSON_OBJECT", "JSON_EXTRACT_PATH",
-		"LIST_DISTINCT", "LIST_SORT", "LIST_REVERSE_SORT", "LIST_SLICE",
-		"LIST_CONCAT", "LIST_INTERSECT", "FLATTEN", "LIST_VALUE",
-		"STRING_SPLIT", "REGEXP_SPLIT_TO_ARRAY":
+	case "json_extract", "to_json", "array_agg", "list", "unnest",
+		"json_keys", "json_structure", "json_merge_patch", "json_quote",
+		"json_group_array", "json_group_object",
+		"json_array", "json_object", "json_extract_path",
+		"list_distinct", "list_sort", "list_reverse_sort", "list_slice",
+		"list_concat", "list_intersect", "flatten", "list_value",
+		"string_split", "regexp_split_to_array":
 		return ColumnTypeJSON
 	// "Pick one of my arguments" functions preserve their representative
 	// argument's type rather than converting it, matching what they
@@ -227,16 +227,16 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) Colu
 	// not always a DOUBLE) -- FIRST/LAST/ARG_MAX/ARG_MIN/BIT_*/window
 	// functions like LAG/LEAD all behave the same way: the value column
 	// (always args[0]) is the representative type.
-	case "MIN", "MAX", "GREATEST", "LEAST", "ANY_VALUE", "IFNULL", "NVL",
-		"MEDIAN", "MODE", "QUANTILE_CONT", "QUANTILE_DISC",
-		"FIRST", "LAST", "ARG_MAX", "ARG_MIN",
-		"BIT_AND", "BIT_OR", "BIT_XOR",
-		"LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE", "NTH_VALUE":
+	case "min", "max", "greatest", "least", "any_value", "ifnull", "nvl",
+		"median", "mode", "quantile_cont", "quantile_disc",
+		"first", "last", "arg_max", "arg_min",
+		"bit_and", "bit_or", "bit_xor",
+		"lag", "lead", "first_value", "last_value", "nth_value":
 		if len(args) == 0 {
 			return ColumnTypeUnknown
 		}
 		return inferType(args[0], scope)
-	case "IF":
+	case "if":
 		// IF(condition, then, else) -- the "then" branch (args[1]) is the
 		// representative type, matching how caseExprType treats a CASE's
 		// branches.
@@ -244,7 +244,7 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) Colu
 			return ColumnTypeUnknown
 		}
 		return inferType(args[1], scope)
-	case "LIST_AGGREGATE", "ARRAY_AGGREGATE":
+	case "list_aggregate", "array_aggregate":
 		// list_aggregate(list, name) applies the aggregate named by args[1]
 		// (e.g. 'sum', 'string_agg', 'bit_and') to args[0] -- statically
 		// typeable only when that name is a literal string constant (by far
@@ -263,7 +263,7 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) Colu
 		if !ok || lit.Kind != parser.LitString {
 			return ColumnTypeUnknown
 		}
-		return functionReturnType(strings.ToUpper(lit.Text), args[:1], scope)
+		return functionReturnType(strings.ToLower(lit.Text), args[:1], scope)
 	default:
 		return ColumnTypeUnknown
 	}

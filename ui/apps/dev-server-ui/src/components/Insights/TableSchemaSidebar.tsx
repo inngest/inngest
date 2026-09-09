@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Search } from '@inngest/components/Forms/Search';
+import { Link } from '@inngest/components/Link';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
 import type {
   SchemaNode,
@@ -9,10 +11,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@inngest/components/Tooltip/Tooltip';
-import { RiInformationLine } from '@remixicon/react';
+import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
-import { INSIGHTS_TABLES, type InsightsSchemaTable } from './insightsSchema';
-import { Section } from './Section';
+import {
+  INSIGHTS_FUNCTIONS,
+  INSIGHTS_TABLES,
+  type InsightsSchemaFunction,
+  type InsightsSchemaTable,
+} from './insightsSchema';
 
 function toSchemaNode(table: InsightsSchemaTable): SchemaNode {
   return {
@@ -62,7 +68,12 @@ export function TableSchemaSidebar() {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="text-light inline-flex cursor-help items-center">
+          {/* align-middle overrides ValueRow/TableRow's own wrapping span
+              (align-baseline, shared component -- not ours to edit), which
+              otherwise sinks an SVG icon below the row's text baseline;
+              -translate-y-px nudges it up the rest of the way to visually
+              center against the row's type label. */}
+          <span className="text-light inline-flex -translate-y-px cursor-help items-center align-middle">
             <RiInformationLine className="h-3.5 w-3.5" />
           </span>
         </TooltipTrigger>
@@ -74,16 +85,73 @@ export function TableSchemaSidebar() {
   };
 
   return (
-    <Section className="h-full" title="Schema">
-      <div className="flex h-full flex-col gap-1 overflow-auto p-2">
-        {INSIGHTS_TABLES.map((table) => (
-          <SchemaViewer
-            key={table.name}
-            node={toSchemaNode(table)}
-            renderAdornment={renderAdornment}
-          />
+    <div className="flex h-full flex-col gap-1 overflow-auto p-2">
+      {INSIGHTS_TABLES.map((table) => (
+        <SchemaViewer
+          key={table.name}
+          node={toSchemaNode(table)}
+          renderAdornment={renderAdornment}
+        />
+      ))}
+    </div>
+  );
+}
+
+// A searchable list of every function the SQL editor accepts (functions.go's
+// allowedFunctions) -- its own vertical tab (InsightsPage.tsx), at the same
+// level as Schema, since there's no natural tree structure to a flat
+// function list the way there is for a table's columns.
+export function FunctionsSidebar() {
+  const [search, setSearch] = useState('');
+
+  const matches = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return INSIGHTS_FUNCTIONS;
+    return INSIGHTS_FUNCTIONS.filter((fn) =>
+      fn.name.toLowerCase().includes(term),
+    );
+  }, [search]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2 p-2">
+      <Search
+        inngestSize="base"
+        onUpdate={setSearch}
+        placeholder="Search functions"
+        value={search}
+      />
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
+        {matches.map((fn) => (
+          <FunctionRow key={fn.name} fn={fn} />
         ))}
+        {matches.length === 0 && (
+          <div className="text-light p-2 text-sm">No functions match.</div>
+        )}
       </div>
-    </Section>
+    </div>
+  );
+}
+
+function FunctionRow({ fn }: { fn: InsightsSchemaFunction }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="hover:bg-canvasSubtle flex cursor-help items-center justify-between gap-2 rounded px-1 py-0.5">
+          <span className="text-subtle overflow-hidden text-ellipsis whitespace-nowrap font-mono text-sm">
+            {fn.name}
+          </span>
+          <Link
+            href={fn.docsUrl}
+            target="_blank"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <RiExternalLinkLine className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="max-w-xs">
+        {fn.description}
+      </TooltipContent>
+    </Tooltip>
   );
 }

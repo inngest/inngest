@@ -552,6 +552,91 @@ func BenchmarkRunsCompaction(b *testing.B) {
 	}
 }
 
+// BenchmarkRunsRewriteDataFiles picks up where BenchmarkRunsCompaction
+// leaves off: after seeding benchPartitionSweepRows (interleaved) and
+// running one ducklake_merge_adjacent_files compaction per partition count,
+// it replays batchSeed=0's exact same run_ids through their exact same
+// lifecycle a second time — flat INSERT, MERGE INTO overwrite, and MERGE
+// INTO json_merge_patch each into their own already-compacted table — an
+// "update wave" that, for the two MERGE INTO tables, targets rows that
+// already live inside the just-compacted Parquet file (a brand-new run_id
+// could never do this: a new key always lands in a new small file
+// regardless of compaction state). It then runs DuckLake's own
+// ducklake_rewrite_data_files maintenance call — a distinct operation from
+// ducklake_merge_adjacent_files: rather than merging small files together,
+// it rewrites files whose deleted-row fraction exceeds delete_threshold,
+// physically dropping the tombstoned rows and eliminating their delete
+// files (confirmed via ducklake_table_info: a MERGE INTO UPDATE against a
+// compacted file adds one delete file without changing file_count;
+// ducklake_rewrite_data_files(delete_threshold => 0.0), forced to always
+// fire, brings delete_file_count back to 0). It times the update wave, the
+// ducklake_rewrite_data_files call itself, and benchCompactionQueries
+// before the update wave, after it (delete files present), and after
+// ducklake_rewrite_data_files (delete files cleared).
+func BenchmarkRunsRewriteDataFiles(b *testing.B) {
+	totalRuns := benchPartitionSweepRows / eventsPerRun
+	queries := benchCompactionQueries()
+
+	for _, numPartitions := range benchPartitionCounts {
+		accountIDs := generateAccountIDs(numPartitions)
+		b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
+			db := openMergeBenchDB(b)
+			ctx := b.Context()
+			seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs)
+
+			if _, err := db.ExecContext(ctx, "CALL ducklake_merge_adjacent_files('"+duckdb.DuckLakeAlias+"');"); err != nil {
+				b.Fatalf("initial compaction: %v", err)
+			}
+
+			for _, q := range queries {
+				b.Run(q.name+"/before-update", func(b *testing.B) {
+					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+				})
+			}
+
+			for _, sc := range insertScenarios {
+				b.Run(sc.name+"/update", func(b *testing.B) {
+					for b.Loop() {
+						err := generateInterleavedBatches(0, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
+							return sc.apply(ctx, db, batch)
+						})
+						if err != nil {
+							b.Fatal(err)
+						}
+					}
+					b.ReportMetric(float64(totalRuns*eventsPerRun)*float64(b.N)/b.Elapsed().Seconds(), "rows/sec")
+				})
+			}
+
+			for _, q := range queries {
+				b.Run(q.name+"/after-update-before-rewrite-data-files", func(b *testing.B) {
+					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+				})
+			}
+
+			b.Run("rewrite-data-files", func(b *testing.B) {
+				for b.Loop() {
+					// delete_threshold => 0.0 forces every file with any
+					// deletes at all to be rewritten — DuckLake's default
+					// threshold is high enough that the update wave's ~1
+					// delete file per table/partition wouldn't otherwise
+					// qualify, and we want to measure the operation actually
+					// running, not a no-op skip.
+					if _, err := db.ExecContext(ctx, "CALL ducklake_rewrite_data_files('"+duckdb.DuckLakeAlias+"', delete_threshold => 0.0);"); err != nil {
+						b.Fatalf("rewriting data files: %v", err)
+					}
+				}
+			})
+
+			for _, q := range queries {
+				b.Run(q.name+"/after-rewrite-data-files", func(b *testing.B) {
+					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+				})
+			}
+		})
+	}
+}
+
 // TestRunsMergeTablesMatchFlatLatest guards the write-path semantics both
 // benchmarks assume, against a small dataset (not millions of rows — this
 // only needs to prove correctness, not perf) and a short pipeline depth (so

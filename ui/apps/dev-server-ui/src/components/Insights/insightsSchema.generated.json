@@ -501,879 +501,879 @@
   ],
   "functions": [
     {
-      "name": "ABS",
+      "name": "abs",
       "description": "Absolute value.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#absx"
     },
     {
-      "name": "AGE",
+      "name": "age",
       "description": "Subtract arguments, resulting in the time difference between the two timestamps.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#agetimestamp-timestamp"
     },
     {
-      "name": "ANY_VALUE",
+      "name": "any_value",
       "description": "Returns the first non-NULL value from arg. This function is affected by ordering.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#any_valuearg"
     },
     {
-      "name": "APPROX_COUNT_DISTINCT",
+      "name": "approx_count_distinct",
       "description": "Computes the approximate count of distinct elements using HyperLogLog.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates"
     },
     {
-      "name": "APPROX_QUANTILE",
+      "name": "approx_quantile",
       "description": "Computes the approximate quantile using T-Digest.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates"
     },
     {
-      "name": "ARG_MAX",
+      "name": "arg_max",
       "description": "Finds the row with the maximum val. Calculates the non-NULL arg expression at that row.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#arg_maxarg-val"
     },
     {
-      "name": "ARG_MIN",
+      "name": "arg_min",
       "description": "Finds the row with the minimum val. Calculates the non-NULL arg expression at that row.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#arg_minarg-val"
     },
     {
-      "name": "ARRAY_AGG",
+      "name": "array_agg",
       "description": "Returns a LIST containing all the values of a column.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#listarg"
     },
     {
-      "name": "ARRAY_AGGREGATE",
+      "name": "array_aggregate",
       "description": "Executes the aggregate function function_name on the elements of list.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_aggregatelist-function_name-"
     },
     {
-      "name": "ARRAY_CONTAINS",
+      "name": "array_contains",
       "description": "Returns true if the list contains the element.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_containslist-element"
     },
     {
-      "name": "ARRAY_LENGTH",
+      "name": "array_length",
       "description": "Returns the length of the list.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#lengthlist"
     },
     {
-      "name": "ARRAY_POSITION",
+      "name": "array_position",
       "description": "Returns the index of the element if the list contains the element. If the element is not found, it returns NULL.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_positionlist-element"
     },
     {
-      "name": "ARRAY_TO_STRING",
+      "name": "array_to_string",
       "description": "Concatenates list/array elements using an optional delimiter.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#array_to_stringlist-delimiter"
     },
     {
-      "name": "ASCII",
+      "name": "ascii",
       "description": "Returns an integer that represents the Unicode code point of the first character of the string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#asciistring"
     },
     {
-      "name": "AVG",
+      "name": "avg",
       "description": "Calculates the average value for all tuples in x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#avgarg"
     },
     {
-      "name": "BIT_AND",
+      "name": "bit_and",
       "description": "Returns the bitwise AND of all bits in a given expression.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_andarg"
     },
     {
-      "name": "BIT_OR",
+      "name": "bit_or",
       "description": "Returns the bitwise OR of all bits in a given expression.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_orarg"
     },
     {
-      "name": "BIT_XOR",
+      "name": "bit_xor",
       "description": "Returns the bitwise XOR of all bits in a given expression.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_xorarg"
     },
     {
-      "name": "BOOL_AND",
+      "name": "bool_and",
       "description": "Returns TRUE if every input value is TRUE, otherwise FALSE.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bool_andarg"
     },
     {
-      "name": "BOOL_OR",
+      "name": "bool_or",
       "description": "Returns TRUE if any input value is TRUE, otherwise FALSE.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bool_orarg"
     },
     {
-      "name": "CBRT",
+      "name": "cbrt",
       "description": "Returns the cube root of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#cbrtx"
     },
     {
-      "name": "CEIL",
+      "name": "ceil",
       "description": "Rounds the number up.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#ceilx"
     },
     {
-      "name": "CEILING",
+      "name": "ceiling",
       "description": "Rounds the number up.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#ceilingx"
     },
     {
-      "name": "CHR",
+      "name": "chr",
       "description": "Returns a character which is corresponding the ASCII code value or Unicode code point.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#chrcode_point"
     },
     {
-      "name": "CONCAT",
+      "name": "concat",
       "description": "Concatenates multiple strings or lists. NULL inputs are skipped. See also operator ||.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#concatvalue-"
     },
     {
-      "name": "CONTAINS",
+      "name": "contains",
       "description": "Returns true if search_string is found within string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#containsstring-search_string"
     },
     {
-      "name": "CORR",
+      "name": "corr",
       "description": "Returns the correlation coefficient for non-NULL pairs in a group.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#corry-x"
     },
     {
-      "name": "COUNT",
+      "name": "count",
       "description": "Returns the number of non-NULL values in arg.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#count"
     },
     {
-      "name": "COVAR_POP",
+      "name": "covar_pop",
       "description": "Returns the population covariance of input values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#covar_popy-x"
     },
     {
-      "name": "COVAR_SAMP",
+      "name": "covar_samp",
       "description": "Returns the sample covariance for non-NULL pairs in a group.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#covar_sampy-x"
     },
     {
-      "name": "CUME_DIST",
+      "name": "cume_dist",
       "description": "The number of partition rows preceding or peer with current row / total partition rows.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#cume_distorder-by-ordering"
     },
     {
-      "name": "DATE_ADD",
+      "name": "date_add",
       "description": "Adds an interval to a date, time, or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_adddate-interval"
     },
     {
-      "name": "DATE_DIFF",
+      "name": "date_diff",
       "description": "The number of partition boundaries between the timestamps.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_diffpart-startdate-enddate"
     },
     {
-      "name": "DATE_PART",
+      "name": "date_part",
       "description": "Get subfield (equivalent to extract).",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_partpart-date"
     },
     {
-      "name": "DATE_SUB",
+      "name": "date_sub",
       "description": "The number of complete partitions between the timestamps.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_subpart-startdate-enddate"
     },
     {
-      "name": "DATE_TRUNC",
+      "name": "date_trunc",
       "description": "Truncate to specified precision.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_truncpart-date"
     },
     {
-      "name": "DAY",
+      "name": "day",
       "description": "Extract the day component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#daydate"
     },
     {
-      "name": "DAYOFWEEK",
+      "name": "dayofweek",
       "description": "Extract the dayofweek component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#dayofweekdate"
     },
     {
-      "name": "DAYOFYEAR",
+      "name": "dayofyear",
       "description": "Extract the dayofyear component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#dayofyeardate"
     },
     {
-      "name": "DENSE_RANK",
+      "name": "dense_rank",
       "description": "The rank of the current row without gaps.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#dense_rank"
     },
     {
-      "name": "ENDS_WITH",
+      "name": "ends_with",
       "description": "Returns true if string ends with search_string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#suffixstring-search_string"
     },
     {
-      "name": "ENTROPY",
+      "name": "entropy",
       "description": "Returns the log-2 entropy of count input-values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#entropyx"
     },
     {
-      "name": "EPOCH",
+      "name": "epoch",
       "description": "Extract the epoch component from a temporal type.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#epochtimestamp"
     },
     {
-      "name": "EXP",
+      "name": "exp",
       "description": "Computes e to the power of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#expx"
     },
     {
-      "name": "FIRST",
+      "name": "first",
       "description": "Returns the first value (NULL or non-NULL) from arg. This function is affected by ordering.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#firstarg"
     },
     {
-      "name": "FIRST_VALUE",
+      "name": "first_value",
       "description": "The first value of expr in the frame. Can IGNORE or RESPECT NULLS.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#first_valueexpr-order-by-ordering-ignore-nulls"
     },
     {
-      "name": "FLATTEN",
+      "name": "flatten",
       "description": "Flattens a nested list by one level.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#flattennested_list"
     },
     {
-      "name": "FLOOR",
+      "name": "floor",
       "description": "Rounds the number down.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#floorx"
     },
     {
-      "name": "FORMAT",
+      "name": "format",
       "description": "Formats a string using the fmt syntax.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#formatformat-"
     },
     {
-      "name": "GREATEST",
+      "name": "greatest",
       "description": "Returns the largest value. For strings lexicographical ordering is used. Note that lowercase characters are considered \"larger\" than uppercase characters and collations are not supported.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#greatestarg1-"
     },
     {
-      "name": "HASH",
+      "name": "hash",
       "description": "Returns a UBIGINT with the hash of the value. Note that this is not a cryptographic hash.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#hashvalue"
     },
     {
-      "name": "HOUR",
+      "name": "hour",
       "description": "Extract the hour component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#hourdate"
     },
     {
-      "name": "IF",
+      "name": "if",
       "description": "Returns then if condition evaluates to true, otherwise returns the else value.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#ifa-b-c"
     },
     {
-      "name": "IFNULL",
+      "name": "ifnull",
       "description": "Returns expr1 if it's not NULL, otherwise expr2.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#ifnullexpr-other"
     },
     {
-      "name": "INSTR",
+      "name": "instr",
       "description": "Returns location of first occurrence of search_string in string, counting from 1. Returns 0 if no match found.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#instrstring-search_string"
     },
     {
-      "name": "ISODOW",
+      "name": "isodow",
       "description": "Extract the isodow component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#isodowdate"
     },
     {
-      "name": "ISOYEAR",
+      "name": "isoyear",
       "description": "Extract the isoyear component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#isoyeardate"
     },
     {
-      "name": "JACCARD",
+      "name": "jaccard",
       "description": "The Jaccard similarity between two strings. Characters of different cases (e.g., a and A) are considered different. Returns a number between 0 and 1.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#jaccards1-s2"
     },
     {
-      "name": "JSON_ARRAY",
+      "name": "json_array",
       "description": "Creates a JSON array from a list of arguments.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json"
     },
     {
-      "name": "JSON_ARRAY_LENGTH",
+      "name": "json_array_length",
       "description": "Returns the number of elements in a JSON array, or 0 if not an array.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_CONTAINS",
+      "name": "json_contains",
       "description": "Returns true if a JSON value contains the specified search value.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_EXISTS",
+      "name": "json_exists",
       "description": "Returns true if a JSON path exists in the JSON value.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions"
     },
     {
-      "name": "JSON_EXTRACT",
+      "name": "json_extract",
       "description": "Extracts the JSON value at the given path or key.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions"
     },
     {
-      "name": "JSON_EXTRACT_PATH",
+      "name": "json_extract_path",
       "description": "Extracts the JSON value at the given path (alias for json_extract).",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions"
     },
     {
-      "name": "JSON_EXTRACT_STRING",
+      "name": "json_extract_string",
       "description": "Extracts the value at the given path or key as a string.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions"
     },
     {
-      "name": "JSON_GROUP_ARRAY",
+      "name": "json_group_array",
       "description": "Aggregates values into a JSON array.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-aggregate-functions"
     },
     {
-      "name": "JSON_GROUP_OBJECT",
+      "name": "json_group_object",
       "description": "Aggregates key/value pairs into a JSON object.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-aggregate-functions"
     },
     {
-      "name": "JSON_KEYS",
+      "name": "json_keys",
       "description": "Returns the keys of a JSON object as a list.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_MERGE_PATCH",
+      "name": "json_merge_patch",
       "description": "Merges two JSON documents using RFC 7396 JSON Merge Patch semantics.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json"
     },
     {
-      "name": "JSON_OBJECT",
+      "name": "json_object",
       "description": "Creates a JSON object from a list of key/value argument pairs.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json"
     },
     {
-      "name": "JSON_QUOTE",
+      "name": "json_quote",
       "description": "Converts a value to a quoted JSON value (alias for to_json).",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json"
     },
     {
-      "name": "JSON_STRUCTURE",
+      "name": "json_structure",
       "description": "Returns the structure (a JSON schema-like description) of a JSON value.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_TYPE",
+      "name": "json_type",
       "description": "Returns the type of a JSON value as a string.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_VALID",
+      "name": "json_valid",
       "description": "Returns true if the string is valid JSON.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions"
     },
     {
-      "name": "JSON_VALUE",
+      "name": "json_value",
       "description": "Extracts a JSON scalar value at the given path as a string.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions"
     },
     {
-      "name": "KURTOSIS",
+      "name": "kurtosis",
       "description": "Returns the excess kurtosis (Fisher's definition) of all input values, with a bias correction according to the sample size.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#kurtosisx"
     },
     {
-      "name": "LAG",
+      "name": "lag",
       "description": "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#lagexpr-offset-default-order-by-ordering-ignore-nulls"
     },
     {
-      "name": "LAST",
+      "name": "last",
       "description": "Returns the last value of a column. This function is affected by ordering.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#lastarg"
     },
     {
-      "name": "LAST_DAY",
+      "name": "last_day",
       "description": "Returns the last day of the month.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#last_daydate"
     },
     {
-      "name": "LAST_VALUE",
+      "name": "last_value",
       "description": "The last value of expr in the frame. Can IGNORE or RESPECT NULLS.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#last_valueexpr-order-by-ordering-ignore-nulls"
     },
     {
-      "name": "LEAD",
+      "name": "lead",
       "description": "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#leadexpr-offset-default-order-by-ordering-ignore-nulls"
     },
     {
-      "name": "LEAST",
+      "name": "least",
       "description": "Returns the smallest value. For strings lexicographical ordering is used. Note that uppercase characters are considered \"smaller\" than lowercase characters, and collations are not supported.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#leastarg1-"
     },
     {
-      "name": "LEFT",
+      "name": "left",
       "description": "Extracts the left-most count characters.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#leftstring-count"
     },
     {
-      "name": "LEN",
+      "name": "len",
       "description": "Number of characters in string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lengthstring"
     },
     {
-      "name": "LENGTH",
+      "name": "length",
       "description": "Number of characters in string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lengthstring"
     },
     {
-      "name": "LEVENSHTEIN",
+      "name": "levenshtein",
       "description": "The minimum number of single-character edits (insertions, deletions or substitutions) required to change one string to the other. Characters of different cases (e.g., a and A) are considered different.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#levenshteins1-s2"
     },
     {
-      "name": "LIST",
+      "name": "list",
       "description": "Returns a LIST containing all the values of a column.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#listarg"
     },
     {
-      "name": "LIST_AGGREGATE",
+      "name": "list_aggregate",
       "description": "Executes the aggregate function function_name on the elements of list.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_aggregatelist-function_name-"
     },
     {
-      "name": "LIST_CONCAT",
+      "name": "list_concat",
       "description": "Concatenates lists. NULL inputs are skipped. See also operator ||.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_concatlist_1--list_n"
     },
     {
-      "name": "LIST_CONTAINS",
+      "name": "list_contains",
       "description": "Returns true if the list contains the element.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_containslist-element"
     },
     {
-      "name": "LIST_DISTINCT",
+      "name": "list_distinct",
       "description": "Removes all duplicates and NULL values from a list. Does not preserve the original order.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_distinctlist"
     },
     {
-      "name": "LIST_HAS_ALL",
+      "name": "list_has_all",
       "description": "Returns true if all elements of list2 are in list1. NULLs are ignored.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_has_alllist1-list2"
     },
     {
-      "name": "LIST_HAS_ANY",
+      "name": "list_has_any",
       "description": "Returns true if the lists have any element in common. NULLs are ignored.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_has_anylist1-list2"
     },
     {
-      "name": "LIST_INTERSECT",
+      "name": "list_intersect",
       "description": "Returns a list containing the distinct elements that are present in both list1 and list2.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_intersectlist1-list2"
     },
     {
-      "name": "LIST_POSITION",
+      "name": "list_position",
       "description": "Returns the index of the element if the list contains the element. If the element is not found, it returns NULL.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_positionlist-element"
     },
     {
-      "name": "LIST_REVERSE_SORT",
+      "name": "list_reverse_sort",
       "description": "Sorts the elements of the list in reverse order.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_reverse_sortlist-col1"
     },
     {
-      "name": "LIST_SLICE",
+      "name": "list_slice",
       "description": "Extracts a sublist or substring using slice conventions. Negative values are accepted.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_slicelist-begin-end"
     },
     {
-      "name": "LIST_SORT",
+      "name": "list_sort",
       "description": "Sorts the elements of the list.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_sortlist-col1-col2"
     },
     {
-      "name": "LIST_UNIQUE",
+      "name": "list_unique",
       "description": "Counts the unique elements of a list.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_uniquelist"
     },
     {
-      "name": "LIST_VALUE",
+      "name": "list_value",
       "description": "Creates a LIST containing the argument values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_valuearg-"
     },
     {
-      "name": "LN",
+      "name": "ln",
       "description": "Computes the natural logarithm of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#lnx"
     },
     {
-      "name": "LOG",
+      "name": "log",
       "description": "Computes the logarithm of x to base b. b may be omitted, in which case the default 10.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#logx"
     },
     {
-      "name": "LOG10",
+      "name": "log10",
       "description": "Computes the 10-log of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#log10x"
     },
     {
-      "name": "LOG2",
+      "name": "log2",
       "description": "Computes the 2-log of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#log2x"
     },
     {
-      "name": "LOWER",
+      "name": "lower",
       "description": "Converts string to lower case.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lowerstring"
     },
     {
-      "name": "LPAD",
+      "name": "lpad",
       "description": "Pads the string with the character on the left until it has count characters. Truncates the string on the right if it has more than count characters.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lpadstring-count-character"
     },
     {
-      "name": "LTRIM",
+      "name": "ltrim",
       "description": "Removes any occurrences of any of the characters from the left side of the string. characters defaults to space.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#ltrimstring-characters"
     },
     {
-      "name": "MAKE_DATE",
+      "name": "make_date",
       "description": "The date for the given parts.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#make_dateyear-month-day"
     },
     {
-      "name": "MAKE_TIMESTAMP",
+      "name": "make_timestamp",
       "description": "The timestamp for the given parts.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#make_timestampbigint-bigint-bigint-bigint-bigint-double"
     },
     {
-      "name": "MAX",
+      "name": "max",
       "description": "Returns the maximum value present in arg.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#maxarg"
     },
     {
-      "name": "MD5",
+      "name": "md5",
       "description": "Returns the MD5 hash of the string as a VARCHAR.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#md5string"
     },
     {
-      "name": "MEDIAN",
+      "name": "median",
       "description": "Returns the middle value of the set. NULL values are ignored. For even value counts, interpolate-able types (numeric, date/time) return the average of the two middle values. Non-interpolate-able types (everything else) return the lower of the two middle values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#medianx"
     },
     {
-      "name": "MIN",
+      "name": "min",
       "description": "Returns the minimum value present in arg.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#minarg"
     },
     {
-      "name": "MINUTE",
+      "name": "minute",
       "description": "Extract the minute component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#minutedate"
     },
     {
-      "name": "MOD",
+      "name": "mod",
       "description": "The remainder of x divided by y.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
     },
     {
-      "name": "MODE",
+      "name": "mode",
       "description": "Returns the most frequent value for the values within x. NULL values are ignored.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#modex"
     },
     {
-      "name": "MONTH",
+      "name": "month",
       "description": "Extract the month component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#monthdate"
     },
     {
-      "name": "NOW",
+      "name": "now",
       "description": "Returns the current timestamp.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
     },
     {
-      "name": "NTH_VALUE",
+      "name": "nth_value",
       "description": "The nth value of expr in the frame. Can IGNORE or RESPECT NULLS.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#nth_valueexpr-nth-order-by-ordering-ignore-nulls"
     },
     {
-      "name": "NTILE",
+      "name": "ntile",
       "description": "The row bucket in a window partition for a given bucket count.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#ntilenum_buckets-order-by-ordering"
     },
     {
-      "name": "NVL",
+      "name": "nvl",
       "description": "Returns expr1 if it's not NULL, otherwise expr2 (alias for ifnull).",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#ifnullexpr-other"
     },
     {
-      "name": "PERCENT_RANK",
+      "name": "percent_rank",
       "description": "The relative rank of the current row as a fraction.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#percent_rankorder-by-ordering"
     },
     {
-      "name": "PI",
+      "name": "pi",
       "description": "Returns the value of pi.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#pi"
     },
     {
-      "name": "POW",
+      "name": "pow",
       "description": "Computes x to the power of y.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#powx-y"
     },
     {
-      "name": "POWER",
+      "name": "power",
       "description": "Computes x to the power of y.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#powerx-y"
     },
     {
-      "name": "PRINTF",
+      "name": "printf",
       "description": "Formats a string using printf syntax.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#printfformat-"
     },
     {
-      "name": "PRODUCT",
+      "name": "product",
       "description": "Calculates the product of all tuples in arg.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#productarg"
     },
     {
-      "name": "QUANTILE_CONT",
+      "name": "quantile_cont",
       "description": "Returns the interpolated quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding interpolated quantiles.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_contx-pos"
     },
     {
-      "name": "QUANTILE_DISC",
+      "name": "quantile_disc",
       "description": "Returns the exact quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding exact quantiles.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_discx-pos"
     },
     {
-      "name": "QUARTER",
+      "name": "quarter",
       "description": "Extract the quarter component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#quarterdate"
     },
     {
-      "name": "RANK",
+      "name": "rank",
       "description": "The rank of the current row with gaps.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#rankorder-by-ordering"
     },
     {
-      "name": "REGEXP_EXTRACT",
+      "name": "regexp_extract",
       "description": "If string contains the regex pattern, returns the capturing group specified by optional parameter group; otherwise, returns the empty string. The group must be a constant value. If no group is given, it defaults to 0. A set of optional regex options can be set.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_extractstring-pattern-group--0-options"
     },
     {
-      "name": "REGEXP_FULL_MATCH",
+      "name": "regexp_full_match",
       "description": "Returns true if the entire string matches the regex. A set of optional regex options can be set.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_full_matchstring-regex-options"
     },
     {
-      "name": "REGEXP_MATCHES",
+      "name": "regexp_matches",
       "description": "Returns true if string contains the regex, false otherwise. A set of optional regex options can be set.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_matchesstring-pattern-options"
     },
     {
-      "name": "REGEXP_REPLACE",
+      "name": "regexp_replace",
       "description": "If string contains the regex, replaces the matching part with replacement. A set of optional regex options can be set.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_replacestring-pattern-replacement-options"
     },
     {
-      "name": "REGEXP_SPLIT_TO_ARRAY",
+      "name": "regexp_split_to_array",
       "description": "Splits the string along the regex. A set of optional regex options can be set.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_split_to_arraystring-regex-options"
     },
     {
-      "name": "REPEAT",
+      "name": "repeat",
       "description": "Repeats the string count number of times.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#repeatstring-count"
     },
     {
-      "name": "REPLACE",
+      "name": "replace",
       "description": "Replaces any occurrences of the source with target in string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#replacestring-source-target"
     },
     {
-      "name": "REVERSE",
+      "name": "reverse",
       "description": "Reverses the string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#reversestring"
     },
     {
-      "name": "RIGHT",
+      "name": "right",
       "description": "Extract the right-most count characters.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rightstring-count"
     },
     {
-      "name": "ROUND",
+      "name": "round",
       "description": "Rounds x to s decimal places.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#roundv-numeric-s-integer"
     },
     {
-      "name": "ROW_NUMBER",
+      "name": "row_number",
       "description": "The row number in a window partition.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#row_numberorder-by-ordering"
     },
     {
-      "name": "RPAD",
+      "name": "rpad",
       "description": "Pads the string with the character on the right until it has count characters. Truncates the string on the right if it has more than count characters.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rpadstring-count-character"
     },
     {
-      "name": "RTRIM",
+      "name": "rtrim",
       "description": "Removes any occurrences of any of the characters from the right side of the string. characters defaults to space.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rtrimstring-characters"
     },
     {
-      "name": "SECOND",
+      "name": "second",
       "description": "Extract the second component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#seconddate"
     },
     {
-      "name": "SHA256",
+      "name": "sha256",
       "description": "Returns a VARCHAR with the SHA-256 hash of the value.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#sha256string"
     },
     {
-      "name": "SIGN",
+      "name": "sign",
       "description": "Returns the sign of x as -1, 0 or 1.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#signx"
     },
     {
-      "name": "SKEWNESS",
+      "name": "skewness",
       "description": "Returns the skewness of all input values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#skewnessx"
     },
     {
-      "name": "SPLIT_PART",
+      "name": "split_part",
       "description": "Splits the string along the separator and returns the data at the (1-based) index.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#split_partstring-separator-index"
     },
     {
-      "name": "SQRT",
+      "name": "sqrt",
       "description": "Returns the square root of x.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#sqrtx"
     },
     {
-      "name": "STARTS_WITH",
+      "name": "starts_with",
       "description": "Returns true if string begins with search_string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#starts_withstring-search_string"
     },
     {
-      "name": "STDDEV",
+      "name": "stddev",
       "description": "Returns the sample standard deviation.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_sampx"
     },
     {
-      "name": "STDDEV_POP",
+      "name": "stddev_pop",
       "description": "Returns the population standard deviation.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_popx"
     },
     {
-      "name": "STDDEV_SAMP",
+      "name": "stddev_samp",
       "description": "Returns the sample standard deviation.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_sampx"
     },
     {
-      "name": "STRFTIME",
+      "name": "strftime",
       "description": "Converts a date to a string according to the format string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#strftimedate-format"
     },
     {
-      "name": "STRING_AGG",
+      "name": "string_agg",
       "description": "Concatenates the column string values with an optional separator.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#string_aggarg-sep"
     },
     {
-      "name": "STRING_SPLIT",
+      "name": "string_split",
       "description": "Splits the string along the separator.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#string_splitstring-separator"
     },
     {
-      "name": "STRIP_ACCENTS",
+      "name": "strip_accents",
       "description": "Strips accents from string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#strip_accentsstring"
     },
     {
-      "name": "STRPTIME",
+      "name": "strptime",
       "description": "Converts the string text to timestamp according to the format string. Throws an error on failure. To return NULL on failure, use try_strptime.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#strptimetext-format-list"
     },
     {
-      "name": "SUBSTR",
+      "name": "substr",
       "description": "Extracts substring starting from character start up to the end of the string. If optional argument length is set, extracts a substring of length characters instead. Note that a start value of 1 refers to the first character of the string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#substringstring-start-length"
     },
     {
-      "name": "SUM",
+      "name": "sum",
       "description": "Calculates the sum value for all tuples in arg.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#sumarg"
     },
     {
-      "name": "TIMEZONE",
+      "name": "timezone",
       "description": "Extract the timezone component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#timezonedate"
     },
     {
-      "name": "TO_JSON",
+      "name": "to_json",
       "description": "Converts a value to JSON.",
-      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions"
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json"
     },
     {
-      "name": "TO_TIMESTAMP",
+      "name": "to_timestamp",
       "description": "Converts secs since epoch to a timestamp with time zone.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp"
     },
     {
-      "name": "TRANSLATE",
+      "name": "translate",
       "description": "Replaces each character in string that matches a character in the from set with the corresponding character in the to set. If from is longer than to, occurrences of the extra characters in from are deleted.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#translatestring-from-to"
     },
     {
-      "name": "TRUNC",
+      "name": "trunc",
       "description": "Truncates the number.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#truncx"
     },
     {
-      "name": "TYPEOF",
+      "name": "typeof",
       "description": "Returns the name of the data type of the result of the expression.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#typeofexpression"
     },
     {
-      "name": "UNICODE",
+      "name": "unicode",
       "description": "Returns an INTEGER representing the unicode codepoint of the first character in the string.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#unicodestring"
     },
     {
-      "name": "UNNEST",
+      "name": "unnest",
       "description": "Unnests a list or struct by one level, turning a single row's list into one row per element.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/nested"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#unnestlist"
     },
     {
-      "name": "UPPER",
+      "name": "upper",
       "description": "Converts string to upper case.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#upperstring"
     },
     {
-      "name": "VARIANCE",
-      "description": "Returns the sample variance of all input values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
-    },
-    {
-      "name": "VAR_POP",
+      "name": "var_pop",
       "description": "Returns the population variance.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_popx"
     },
     {
-      "name": "VAR_SAMP",
+      "name": "var_samp",
       "description": "Returns the sample variance of all input values.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_sampx"
     },
     {
-      "name": "WEEK",
+      "name": "variance",
+      "description": "Returns the sample variance of all input values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_sampx"
+    },
+    {
+      "name": "week",
       "description": "Extract the week component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#weekdate"
     },
     {
-      "name": "YEAR",
+      "name": "year",
       "description": "Extract the year component from a date or timestamp.",
-      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart"
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#yeardate"
     }
   ]
 }

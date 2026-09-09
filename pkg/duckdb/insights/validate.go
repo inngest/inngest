@@ -402,7 +402,7 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 }
 
 func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
-	name := strings.ToUpper(strings.Join(f.Name, "."))
+	name := strings.ToLower(strings.Join(f.Name, "."))
 	if _, ok := allowedFunctions[name]; !ok {
 		return &ValidationError{Pos: f.Pos(), End: f.End(), Message: fmt.Sprintf("function %q is not allowed", strings.Join(f.Name, "."))}
 	}

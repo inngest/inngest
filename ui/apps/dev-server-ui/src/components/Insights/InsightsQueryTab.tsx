@@ -34,9 +34,9 @@ import {
   useLazyExecuteInsightsQueryQuery,
   type ExecuteInsightsQueryQuery,
 } from '@/store/generated';
-import { CellDetail, type CellDetailData } from './CellDetail';
+import type { CellDetailData } from './CellDetail';
 import { NoResultsState, QueryEmptyState } from './EmptyStates';
-import { INSIGHTS_TABLES } from './insightsSchema';
+import { INSIGHTS_FUNCTIONS, INSIGHTS_TABLES } from './insightsSchema';
 import { Section } from './Section';
 
 // Sourced from the generated schema (make insights-schema) rather than
@@ -46,11 +46,39 @@ const TABLES = INSIGHTS_TABLES.map((table) => table.name);
 
 // Deduped across all six tables -- SQLCompletionConfig.columns is a flat
 // list with no table association, so e.g. run_id (shared by several
-// tables) only needs to appear once.
-const COLUMNS = Array.from(
-  new Set(INSIGHTS_TABLES.flatMap((table) => table.columns.map((c) => c.name))),
-);
+// tables) only needs to appear once. Keeps the first table's own wording
+// for a shared column's description (they're consistent enough across
+// tables -- e.g. run_id is always "The run this ... belongs to" -- that
+// picking one over another doesn't matter).
+const COLUMNS = (() => {
+  const descriptionByName = new Map<string, string>();
+  for (const table of INSIGHTS_TABLES) {
+    for (const column of table.columns) {
+      if (!descriptionByName.has(column.name)) {
+        descriptionByName.set(column.name, column.description);
+      }
+    }
+  }
+  return Array.from(descriptionByName, ([name, description]) => ({
+    name,
+    description,
+  }));
+})();
 
+// A generic "$1" snippet placeholder between parens -- the schema dump has
+// no per-function argument signature to draw a real one from, but this
+// still lands the cursor in the right place after accepting the
+// suggestion, and gives every function a consistent Function-kind
+// suggestion instead of leaving it out of autocomplete entirely.
+const FUNCTIONS = INSIGHTS_FUNCTIONS.map((fn) => ({
+  name: fn.name,
+  signature: `${fn.name}($1)`,
+  description: fn.description,
+}));
+
+// COUNT/SUM/AVG/MIN/MAX etc. are real entries in FUNCTIONS now (sourced
+// from the same allowedFunctions registry) -- keeping them here too would
+// suggest each one twice.
 const KEYWORDS = [
   'SELECT',
   'FROM',
@@ -84,17 +112,12 @@ const KEYWORDS = [
   'END',
   'ASC',
   'DESC',
-  'COUNT',
-  'SUM',
-  'AVG',
-  'MIN',
-  'MAX',
 ];
 
 const completionConfig: SQLCompletionConfig = {
   columns: COLUMNS,
   keywords: KEYWORDS,
-  functions: [],
+  functions: FUNCTIONS,
   tables: TABLES,
 };
 
@@ -288,15 +311,21 @@ function isAbortError(error: unknown): boolean {
 export function InsightsQueryTab({
   initialSql,
   onSqlChange,
+  selectedCell,
+  onSelectedCellChange,
 }: {
   initialSql: string;
   onSqlChange: (sql: string) => void;
+  // Selection lives in the parent (InsightsPage) rather than local state,
+  // so CellDetail can render as a sibling of the schema sidebar -- both at
+  // the outermost layout level -- instead of nested inside this component.
+  selectedCell: CellDetailData | null;
+  onSelectedCellChange: (cell: CellDetailData | null) => void;
 }) {
   const [sql, setSql] = useState(initialSql);
   const { pathCreator } = usePathCreator();
   const [runQuery, { data, error, isFetching }] =
     useLazyExecuteInsightsQueryQuery();
-  const [selectedCell, setSelectedCell] = useState<CellDetailData | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const activeQueryRef = useRef<ReturnType<typeof runQuery> | null>(null);
   const editorRef = useRef<SQLEditorInstance | null>(null);
@@ -340,9 +369,9 @@ export function InsightsQueryTab({
         result?.columns.findIndex((c) => c.name === columnId) ?? -1;
       const col = colIndex === -1 ? undefined : result?.columns[colIndex];
       if (!col) return;
-      setSelectedCell({ rowIndex, columnId, columnType: col.type, value });
+      onSelectedCellChange({ rowIndex, columnId, columnType: col.type, value });
     },
-    [result],
+    [result, onSelectedCellChange],
   );
 
   // Keyboard navigation: arrow keys move between cells, Escape deselects --
@@ -372,7 +401,7 @@ export function InsightsQueryTab({
           nextColIndex = Math.min(colNames.length - 1, nextColIndex + 1);
           break;
         case 'Escape':
-          setSelectedCell(null);
+          onSelectedCellChange(null);
           return;
         default:
           return;
@@ -385,14 +414,14 @@ export function InsightsQueryTab({
       if (!nextColumnId || !nextCol) return;
 
       const value = rows[nextRow]?.values[nextColIndex] ?? null;
-      setSelectedCell({
+      onSelectedCellChange({
         rowIndex: nextRow,
         columnId: nextColumnId,
         columnType: nextCol.type,
         value,
       });
     },
-    [selectedCell, result, rows],
+    [selectedCell, result, rows, onSelectedCellChange],
   );
 
   useEffect(() => {
@@ -543,26 +572,5 @@ export function InsightsQueryTab({
     />
   );
 
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      {selectedCell ? (
-        <Resizable
-          orientation="horizontal"
-          defaultSplitPercentage={70}
-          minSplitPercentage={30}
-          maxSplitPercentage={85}
-          splitKey="insights-cell-detail-split"
-          first={tabContent}
-          second={
-            <CellDetail
-              selectedCell={selectedCell}
-              onClose={() => setSelectedCell(null)}
-            />
-          }
-        />
-      ) : (
-        tabContent
-      )}
-    </div>
-  );
+  return <div className="flex h-full min-h-0 flex-col">{tabContent}</div>;
 }

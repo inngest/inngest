@@ -30,9 +30,10 @@ export function SQLEditor({
   onMount,
 }: SQLEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   useMonacoWithTheme(wrapperRef);
-  useSQLCompletions(completionConfig);
+  useSQLCompletions(completionConfig, editorRef);
   useSQLFormatter(dialect);
 
   const handleContentChange = useCallback(
@@ -44,6 +45,7 @@ export function SQLEditor({
 
   const handleEditorMount = useCallback(
     (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+      editorRef.current = editorInstance;
       onMount?.(editorInstance, monaco);
     },
     [onMount]
