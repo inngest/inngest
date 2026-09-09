@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient, useQuery } from 'urql';
 
+import {
+  pickSelfServePlans,
+  type SelfServePlan,
+} from '@/components/Billing/Plans/utils';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { latestMetricDataValue } from '@/components/Metrics/metricAggregation';
 import { graphql } from '@/gql';
@@ -25,7 +29,6 @@ import {
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
   isEnterprisePlanName,
-  pickCheapestEnabledProPlanAmount,
   pickInfraConcurrencyAddon,
   sumDataValues,
   sumMetricValues,
@@ -42,7 +45,7 @@ export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
 ];
 
 const cacheTTL = 60 * 60 * 1000;
-const cacheVersion = 4;
+const cacheVersion = 5;
 const functionCountPageSize = 1;
 const topFunctionsUsagePageSize = 1000;
 const topFunctionsLimit = 50;
@@ -66,12 +69,13 @@ type InfraDashboardData = {
   executionsRan: number;
   functionsCount: number;
   functionsRan: number;
+  hobbyPlan: SelfServePlan | null;
   infraPlans: ReturnType<typeof mergeBillingPlanIntoInfraPlans>['plans'];
   hasPaymentMethod: boolean;
   isEnterprisePlan: boolean;
   planName: string;
   placeholders: typeof INFRA_DASHBOARD_PLACEHOLDERS;
-  proPlanAmountCents: number | null;
+  proPlan: SelfServePlan | null;
   sdkRequests: number;
   stepRunning: number;
   topFunctions: ReturnType<typeof buildTopFunctionRows>;
@@ -240,7 +244,10 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     query: InfraDashboardConcurrencyLimitDocument,
     variables: {
       envID: env.id,
-      from: getTimestampDaysAgo({ currentDate: range.until, days: 1 }).toISOString(),
+      from: getTimestampDaysAgo({
+        currentDate: range.until,
+        days: 1,
+      }).toISOString(),
       until: range.until.toISOString(),
     },
   });
@@ -303,15 +310,13 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     );
     const accountConcurrency = volume.data?.accountConcurrency.data ?? [];
     const currentConcurrency = latestMetricDataValue(accountConcurrency);
-    const proPlanAmountCents = pickCheapestEnabledProPlanAmount(
-      availablePlans.data?.plans,
-    );
+    const selfServePlans = pickSelfServePlans(availablePlans.data?.plans);
     const billingPlan = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: currentPlan.data?.account.entitlements,
       defaultSku: INFRA_DASHBOARD_PLACEHOLDERS.defaultPlanSku,
       plan: currentPlan.data?.account.plan,
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
-      proPlanAmountCents,
+      proPlanAmountCents: selfServePlans.pro?.amount,
     });
     const billingPlanReady = Boolean(
       !currentPlan.fetching &&
@@ -324,7 +329,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       appsCount: activeApps.length,
       backlogDepth,
       billingActionsReady: Boolean(
-        !currentPlan.fetching && currentPlan.data?.account.plan,
+        !currentPlan.fetching &&
+          !availablePlans.fetching &&
+          currentPlan.data?.account.plan,
       ),
       billingPlanReady,
       concurrencyAddon: pickInfraConcurrencyAddon({
@@ -344,6 +351,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         lookups.data?.envBySlug?.workflows.data.length ??
         0,
       functionsRan: functionsRan || runsEnded,
+      hobbyPlan: selfServePlans.hobby,
       infraPlans: billingPlan.plans,
       hasPaymentMethod: Boolean(
         currentPlan.data?.account.paymentMethods?.length,
@@ -353,7 +361,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       ),
       planName: currentPlan.data?.account.plan?.name ?? 'Plan',
       placeholders: INFRA_DASHBOARD_PLACEHOLDERS,
-      proPlanAmountCents,
+      proPlan: selfServePlans.pro,
       sdkRequests:
         sumMetricValues(volume.data?.workspace.sdkThroughputStarted.metrics) ||
         sumMetricValues(volume.data?.workspace.sdkThroughputEnded.metrics),

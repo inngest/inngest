@@ -447,6 +447,7 @@ export const plansDocument = graphql(`
   query GetPlans {
     plans {
       id
+      slug
       isLegacy
       isFree
       name
@@ -460,6 +461,9 @@ export const plansDocument = graphql(`
           limit
         }
         history {
+          limit
+        }
+        executions {
           limit
         }
         runCount {
@@ -477,24 +481,14 @@ export const plans = createServerFn({
   method: 'GET',
 }).handler(
   async (): Promise<
-    Array<
-      TransformPlanBillingPeriod<NonNullable<GetPlansQuery['plans'][0]> | null>
-    >
+    Array<TransformPlanBillingPeriod<GetPlansQuery['plans'][number]>>
   > => {
     try {
       const res = await graphqlAPI.request<GetPlansQuery>(plansDocument);
-      return res.plans.map((plan) =>
-        plan
-          ? {
-              ...plan,
-              billingPeriod: plan.billingPeriod as string,
-            }
-          : null,
-      ) as Array<
-        TransformPlanBillingPeriod<NonNullable<
-          GetPlansQuery['plans'][0]
-        > | null>
-      >;
+      return res.plans.map((plan) => ({
+        ...plan,
+        billingPeriod: plan.billingPeriod as string,
+      }));
     } catch (error) {
       console.error('Error fetching plans:', error);
       throw new Error('Failed to fetch plans');

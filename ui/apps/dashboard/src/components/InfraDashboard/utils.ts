@@ -4,11 +4,7 @@ import type {
   MetricsData,
   TimeSeriesPoint,
 } from '@/gql/graphql';
-import {
-  HOBBY_PLAN_SLUG,
-  PRO_PLAN_AMOUNT_CENTS,
-  PRO_PLAN_SLUG,
-} from '@/components/Billing/Plans/constants';
+import type { SelfServePlan } from '@/components/Billing/Plans/utils';
 import { concurrencyLimitReachedBySlot } from '@/components/Functions/concurrency';
 import type { Function as FunctionRow } from '@inngest/components/types/function';
 import type { InfraPlan, InfraPlanSku, InfraTierId } from './placeholderData';
@@ -27,13 +23,6 @@ type WorkflowUsage =
 
 type WorkflowSummary =
   GetFunctionsQuery['workspace']['workflows']['data'][number];
-
-type PlanPriceSource = {
-  amount?: number | null;
-  isFree?: boolean | null;
-  isLegacy?: boolean | null;
-  name?: string | null;
-} | null;
 
 export function formatCompactNumber(value: number): string {
   if (!Number.isFinite(value)) {
@@ -97,6 +86,7 @@ export type BillingPlanSource = {
     functionBacklogSize?: { limit?: number | null } | null;
   } | null;
   isFree?: boolean | null;
+  isLegacy?: boolean | null;
   name?: string | null;
   slug?: string | null;
 };
@@ -106,11 +96,6 @@ type AccountEntitlementsSource = {
   events?: { limit?: number | null } | null;
   functionBacklogSize?: { limit?: number | null } | null;
 };
-
-export const FREE_INFRA_PLAN_SLUG = HOBBY_PLAN_SLUG;
-export const PRO_INFRA_PLAN_SLUG = PRO_PLAN_SLUG;
-
-const PRO_PLAN_BASE_AMOUNT_CENTS = PRO_PLAN_AMOUNT_CENTS;
 
 export type InfraConcurrencyAddonSource = {
   available?: boolean | null;
@@ -157,34 +142,32 @@ export type InfraPlanBillingAction =
 const INFRA_PLAN_BILLING_TARGETS: Record<
   InfraPlanSku,
   {
-    basePlanSlug: string;
-    monthlyAmountCents: number;
+    basePlan: 'hobby' | 'pro';
+    fixedMonthlyAmountCents?: number;
     targetConcurrency: number;
   }
 > = {
   'IN-XS': {
-    basePlanSlug: FREE_INFRA_PLAN_SLUG,
-    monthlyAmountCents: 0,
+    basePlan: 'hobby',
     targetConcurrency: 5,
   },
   'IN-S': {
-    basePlanSlug: PRO_INFRA_PLAN_SLUG,
-    monthlyAmountCents: PRO_PLAN_AMOUNT_CENTS,
+    basePlan: 'pro',
     targetConcurrency: 100,
   },
   'IN-M': {
-    basePlanSlug: PRO_INFRA_PLAN_SLUG,
-    monthlyAmountCents: 24_900,
+    basePlan: 'pro',
+    fixedMonthlyAmountCents: 24_900,
     targetConcurrency: 250,
   },
   'IN-L': {
-    basePlanSlug: PRO_INFRA_PLAN_SLUG,
-    monthlyAmountCents: 59_900,
+    basePlan: 'pro',
+    fixedMonthlyAmountCents: 59_900,
     targetConcurrency: 500,
   },
   'IN-XL': {
-    basePlanSlug: PRO_INFRA_PLAN_SLUG,
-    monthlyAmountCents: 119_900,
+    basePlan: 'pro',
+    fixedMonthlyAmountCents: 119_900,
     targetConcurrency: 1_000,
   },
 };
@@ -225,57 +208,33 @@ export function pickInfraConcurrencyAddon({
 }
 
 function isFreeBillingPlan(plan?: BillingPlanSource | null): boolean {
-  return Boolean(plan?.isFree || plan?.slug === FREE_INFRA_PLAN_SLUG);
+  return Boolean(plan?.isFree);
 }
 
 function isMappedInfraBillingPlan(plan?: BillingPlanSource | null): boolean {
-  return (
-    plan?.slug === FREE_INFRA_PLAN_SLUG || plan?.slug === PRO_INFRA_PLAN_SLUG
+  return Boolean(
+    plan?.isFree || (!plan?.isLegacy && plan?.name?.toLowerCase() === 'pro'),
   );
 }
 
-function buildCheckoutItem(planSlug: string): InfraPlanCheckoutItem {
-  if (planSlug === FREE_INFRA_PLAN_SLUG) {
-    return {
-      amount: 0,
-      name: 'Hobby',
-      planSlug,
-      quantity: 1,
-    };
-  }
-
+function buildCheckoutItem(plan: SelfServePlan): InfraPlanCheckoutItem {
   return {
-    amount: PRO_PLAN_BASE_AMOUNT_CENTS,
-    name: 'Pro',
-    planSlug,
+    amount: plan.amount,
+    name: plan.name,
+    planSlug: plan.slug,
     quantity: 1,
   };
 }
 
 function getTargetMonthlyAmountCents({
-  proPlanAmountCents,
+  basePlan,
   targetSku,
 }: {
-  proPlanAmountCents?: number | null;
+  basePlan: SelfServePlan;
   targetSku: InfraPlanSku;
 }): number {
-  if (targetSku === 'IN-S' && typeof proPlanAmountCents === 'number') {
-    return proPlanAmountCents;
-  }
-
-  return INFRA_PLAN_BILLING_TARGETS[targetSku].monthlyAmountCents;
-}
-
-function buildProCheckoutItem(
-  proPlanAmountCents?: number | null,
-): InfraPlanCheckoutItem {
-  return {
-    ...buildCheckoutItem(PRO_INFRA_PLAN_SLUG),
-    amount:
-      typeof proPlanAmountCents === 'number'
-        ? proPlanAmountCents
-        : PRO_PLAN_BASE_AMOUNT_CENTS,
-  };
+  const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
+  return target.fixedMonthlyAmountCents ?? basePlan.amount;
 }
 
 function buildAddonUpdate({
@@ -387,7 +346,7 @@ function buildStaticAddonUpdate({
   targetSku,
 }: {
   currentConcurrencyLimit?: number | null;
-  proPlanAmountCents?: number | null;
+  proPlanAmountCents: number;
   targetConcurrency: number;
   targetMonthlyAmountCents: number;
   targetSku: InfraPlanSku;
@@ -405,8 +364,7 @@ function buildStaticAddonUpdate({
     addonQuantity,
     estimatedMonthlyAddonCost: Math.max(
       0,
-      targetMonthlyAmountCents -
-        (proPlanAmountCents ?? PRO_PLAN_BASE_AMOUNT_CENTS),
+      targetMonthlyAmountCents - proPlanAmountCents,
     ),
     isIncrease:
       typeof currentConcurrencyLimit !== 'number' ||
@@ -422,34 +380,47 @@ export function getInfraPlanBillingAction({
   currentConcurrencyLimit,
   currentPlan,
   currentPlanSku,
-  proPlanAmountCents,
+  hobbyPlan,
+  proPlan,
   targetSku,
 }: {
   concurrencyAddon?: InfraConcurrencyAddonSource | null;
   currentConcurrencyLimit?: number | null;
   currentPlan?: BillingPlanSource | null;
   currentPlanSku: InfraPlanSku;
-  proPlanAmountCents?: number | null;
+  hobbyPlan?: SelfServePlan | null;
+  proPlan?: SelfServePlan | null;
   targetSku: InfraPlanSku;
 }): InfraPlanBillingAction {
   if (!currentPlan) {
     return { reason: 'Billing plan is still loading.', type: 'unavailable' };
   }
 
-  if (isMappedInfraBillingPlan(currentPlan) && targetSku === currentPlanSku) {
+  const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
+  const basePlan = target.basePlan === 'hobby' ? hobbyPlan : proPlan;
+  if (!basePlan) {
+    return {
+      reason: `${
+        target.basePlan === 'hobby' ? 'Hobby' : 'Pro'
+      } plan is unavailable.`,
+      type: 'unavailable',
+    };
+  }
+
+  const currentIsMappedInfraPlan =
+    currentPlan.slug === hobbyPlan?.slug || currentPlan.slug === proPlan?.slug;
+  if (currentIsMappedInfraPlan && targetSku === currentPlanSku) {
     return { type: 'current' };
   }
 
-  const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
   const targetMonthlyAmountCents = getTargetMonthlyAmountCents({
-    proPlanAmountCents,
+    basePlan,
     targetSku,
   });
   const currentIsFree = isFreeBillingPlan(currentPlan);
-  const currentIsMappedInfraPlan = isMappedInfraBillingPlan(currentPlan);
 
-  if (target.basePlanSlug === FREE_INFRA_PLAN_SLUG) {
-    return currentPlan.slug === FREE_INFRA_PLAN_SLUG
+  if (target.basePlan === 'hobby') {
+    return currentPlan.slug === basePlan.slug
       ? { type: 'current' }
       : {
           addonUpdate: buildAddonRemoval({
@@ -459,16 +430,16 @@ export function getInfraPlanBillingAction({
             targetMonthlyAmountCents,
             targetSku,
           }),
-          item: buildCheckoutItem(FREE_INFRA_PLAN_SLUG),
+          item: buildCheckoutItem(basePlan),
           type: 'cancel-to-free',
         };
   }
 
   if (target.targetConcurrency <= PRO_BASE_CONCURRENCY) {
-    if (currentIsFree || currentPlan?.slug !== PRO_INFRA_PLAN_SLUG) {
+    if (currentIsFree || currentPlan?.slug !== basePlan.slug) {
       return {
         addonUpdate: null,
-        item: buildProCheckoutItem(proPlanAmountCents),
+        item: buildCheckoutItem(basePlan),
         type: 'upgrade-base-plan',
       };
     }
@@ -498,7 +469,7 @@ export function getInfraPlanBillingAction({
     'type' in addonUpdate && !currentIsMappedInfraPlan
       ? buildStaticAddonUpdate({
           currentConcurrencyLimit,
-          proPlanAmountCents,
+          proPlanAmountCents: basePlan.amount,
           targetConcurrency: target.targetConcurrency,
           targetMonthlyAmountCents,
           targetSku,
@@ -509,11 +480,11 @@ export function getInfraPlanBillingAction({
     return resolvedAddonUpdate;
   }
 
-  if (currentIsFree || currentPlan?.slug !== PRO_INFRA_PLAN_SLUG) {
+  if (currentIsFree || currentPlan?.slug !== basePlan.slug) {
     return {
       addonUpdate:
         resolvedAddonUpdate.addonQuantity > 0 ? resolvedAddonUpdate : null,
-      item: buildProCheckoutItem(proPlanAmountCents),
+      item: buildCheckoutItem(basePlan),
       type: 'upgrade-base-plan',
     };
   }
@@ -571,26 +542,6 @@ export function getCurrentInfraTierId(planSku: InfraPlanSku): InfraTierId {
 
 export function isEnterprisePlanName(planName?: string | null): boolean {
   return planName?.toLowerCase().includes('enterprise') ?? false;
-}
-
-export function pickCheapestEnabledProPlanAmount(
-  plans?: PlanPriceSource[],
-): number | null {
-  const proPlans =
-    plans?.filter(
-      (plan) =>
-        plan &&
-        !plan.isFree &&
-        !plan.isLegacy &&
-        plan.name?.toLowerCase().includes('pro') &&
-        typeof plan.amount === 'number',
-    ) ?? [];
-
-  return (
-    proPlans.sort((a, b) => {
-      return (a?.amount ?? Infinity) - (b?.amount ?? Infinity);
-    })[0]?.amount ?? null
-  );
 }
 
 function applyProPlanAmountToInfraPlans({

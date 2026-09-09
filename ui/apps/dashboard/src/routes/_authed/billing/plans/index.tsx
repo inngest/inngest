@@ -8,29 +8,42 @@ import {
   VerticalPlanCard,
 } from '@/components/Billing/Plans/PlanCard';
 import {
-  HOBBY_PLAN_SLUG,
-  PRO_PLAN_AMOUNT_CENTS,
-  PRO_PLAN_SLUG,
-} from '@/components/Billing/Plans/constants';
-import { type Plan } from '@/components/Billing/Plans/utils';
-import { currentPlan as getCurrentPlan } from '@/queries/server/billing';
+  pickSelfServePlans,
+  type Plan,
+} from '@/components/Billing/Plans/utils';
+import {
+  currentPlan as getCurrentPlan,
+  plans as getPlans,
+} from '@/queries/server/billing';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/billing/plans/')({
   component: BillingPlansPage,
   loader: async () => {
-    const { plan: currentPlan } = await getCurrentPlan();
+    const [{ plan: currentPlan }, availablePlans] = await Promise.all([
+      getCurrentPlan(),
+      getPlans(),
+    ]);
 
     if (!currentPlan) throw new Error('Failed to fetch current plan');
+    const selfServePlans = pickSelfServePlans(availablePlans);
+    const availableSelfServePlans = [
+      selfServePlans.hobby,
+      selfServePlans.pro,
+    ].filter((plan) => plan !== null);
+    if (availableSelfServePlans.length === 0) {
+      throw new Error('Failed to fetch available plans');
+    }
 
     return {
+      availableSelfServePlans,
       currentPlan,
     };
   },
 });
 
 function BillingPlansPage() {
-  const { currentPlan } = Route.useLoaderData();
+  const { availableSelfServePlans, currentPlan } = Route.useLoaderData();
   const { isLoaded: orgLoaded, membership } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
@@ -38,37 +51,8 @@ function BillingPlansPage() {
     return await getCurrentPlan();
   };
 
-  //
-  // Hard-coded plan information (mirrors pricing page definitions)
   const plans: Plan[] = [
-    {
-      id: 'n/a',
-      slug: HOBBY_PLAN_SLUG,
-      name: 'Hobby',
-      amount: 0,
-      billingPeriod: 'month',
-      entitlements: {
-        concurrency: { limit: 5 },
-        history: { limit: 1 }, // 24h
-        runCount: { limit: 50_000 },
-      },
-      isLegacy: false,
-      isFree: true,
-    },
-    {
-      id: 'n/a',
-      slug: PRO_PLAN_SLUG,
-      name: 'Pro',
-      amount: PRO_PLAN_AMOUNT_CENTS,
-      billingPeriod: 'month',
-      entitlements: {
-        concurrency: { limit: 100 },
-        history: { limit: 7 },
-        runCount: { limit: 1_000_000 },
-      },
-      isLegacy: false,
-      isFree: false,
-    },
+    ...availableSelfServePlans,
     {
       id: 'n/a',
       slug: 'enterprise',

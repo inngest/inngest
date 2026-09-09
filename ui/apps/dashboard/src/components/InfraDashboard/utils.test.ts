@@ -11,14 +11,13 @@ import {
   formatCentsMonthly,
   formatCompactNumber,
   getCurrentInfraTierId,
-  getInfraPlanBillingAction,
+  getInfraPlanBillingAction as getInfraPlanBillingActionImpl,
   getUtcMonthToDateRange,
   inferInfraPlanSku,
   isEnterprisePlanName,
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
-  pickCheapestEnabledProPlanAmount,
   pickInfraConcurrencyAddon,
   sumMetricValues,
   sumTimeSeriesValues,
@@ -66,18 +65,6 @@ describe('infra dashboard formatters', () => {
     expect(isEnterprisePlanName('Legacy ENTERPRISE Plus')).toBe(true);
     expect(isEnterprisePlanName('Pro')).toBe(false);
     expect(isEnterprisePlanName(null)).toBe(false);
-  });
-
-  it('picks the cheapest enabled Pro plan amount from GQL plans', () => {
-    expect(
-      pickCheapestEnabledProPlanAmount([
-        { amount: 19_900, isFree: false, isLegacy: false, name: 'Pro Plus' },
-        { amount: 0, isFree: true, isLegacy: false, name: 'Pro Trial' },
-        { amount: 4_900, isFree: false, isLegacy: true, name: 'Legacy Pro' },
-        { amount: 7_500, isFree: false, isLegacy: false, name: 'Pro' },
-        { amount: 2_500, isFree: false, isLegacy: false, name: 'Basic' },
-      ]),
-    ).toBe(7_500);
   });
 });
 
@@ -273,16 +260,44 @@ describe('infra dashboard billing actions', () => {
   };
   const freePlan = {
     amount: 0,
+    billingPeriod: 'month',
+    entitlements: {
+      concurrency: { limit: 5 },
+      eventSize: { limit: 256 },
+      executions: { limit: 50_000 },
+      history: { limit: 1 },
+      runCount: { limit: null },
+      stepCount: { limit: null },
+    },
+    id: 'hobby-plan',
     isFree: true,
+    isLegacy: false,
     name: 'Hobby',
     slug: 'hobby-free-2025-08-08',
   };
   const proPlan = {
     amount: 9_900,
+    billingPeriod: 'month',
+    entitlements: {
+      concurrency: { limit: 100 },
+      eventSize: { limit: 3_072 },
+      executions: { limit: 1_000_000 },
+      history: { limit: 7 },
+      runCount: { limit: null },
+      stepCount: { limit: null },
+    },
+    id: 'pro-plan',
     isFree: false,
+    isLegacy: false,
     name: 'Pro',
     slug: 'pro-2026-06-29',
   };
+  const getInfraPlanBillingAction = (
+    args: Omit<
+      Parameters<typeof getInfraPlanBillingActionImpl>[0],
+      'hobbyPlan' | 'proPlan'
+    >,
+  ) => getInfraPlanBillingActionImpl({ ...args, hobbyPlan: freePlan, proPlan });
 
   it('opens Pro checkout when a free account selects IN-S', () => {
     expect(
@@ -305,20 +320,21 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
-  it('uses the live Pro plan amount when selecting IN-S', () => {
+  it('uses the backend Pro plan when selecting IN-S', () => {
     expect(
-      getInfraPlanBillingAction({
+      getInfraPlanBillingActionImpl({
         concurrencyAddon,
         currentConcurrencyLimit: 5,
         currentPlan: freePlan,
         currentPlanSku: 'IN-XS',
-        proPlanAmountCents: 6_500,
+        hobbyPlan: freePlan,
+        proPlan: { ...proPlan, amount: 6_500, slug: 'pro-from-api' },
         targetSku: 'IN-S',
       }),
     ).toMatchObject({
       item: {
         amount: 6_500,
-        planSlug: 'pro-2026-06-29',
+        planSlug: 'pro-from-api',
       },
       type: 'upgrade-base-plan',
     });
@@ -337,6 +353,64 @@ describe('infra dashboard billing actions', () => {
       addonUpdate: null,
       type: 'upgrade-base-plan',
     });
+  });
+
+  it('allows checkout for an available plan when the other plan is missing', () => {
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        hobbyPlan: null,
+        proPlan,
+        targetSku: 'IN-S',
+      }),
+    ).toMatchObject({
+      item: { planSlug: proPlan.slug },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        hobbyPlan: freePlan,
+        proPlan: null,
+        targetSku: 'IN-XS',
+      }),
+    ).toMatchObject({
+      item: { planSlug: freePlan.slug },
+      type: 'cancel-to-free',
+    });
+  });
+
+  it('disables only checkout actions backed by a missing plan', () => {
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        hobbyPlan: null,
+        proPlan,
+        targetSku: 'IN-XS',
+      }),
+    ).toEqual({ reason: 'Hobby plan is unavailable.', type: 'unavailable' });
+
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        hobbyPlan: freePlan,
+        proPlan: null,
+        targetSku: 'IN-S',
+      }),
+    ).toEqual({ reason: 'Pro plan is unavailable.', type: 'unavailable' });
   });
 
   it('opens Pro checkout with a follow-up addon quantity for IN-L', () => {
