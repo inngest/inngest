@@ -40,6 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
@@ -5625,6 +5626,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
 			ScheduleBatchPayload: batch.ScheduleBatchPayload{
 				BatchID:         batchID,
+				BatchCluster:    result.BatchCluster,
+				BatchGeneration: result.BatchGeneration,
 				AccountID:       bi.AccountID,
 				WorkspaceID:     bi.WorkspaceID,
 				AppID:           bi.AppID,
@@ -5649,6 +5652,8 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointerKey,
+			BatchCluster:    result.BatchCluster,
+			BatchGeneration: result.BatchGeneration,
 			AccountID:       bi.AccountID,
 			WorkspaceID:     bi.WorkspaceID,
 			AppID:           bi.AppID,
@@ -5680,6 +5685,8 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
+	ctx = batch.WithBatchCluster(ctx, payload.BatchCluster)
+	ctx = redis_state.WithBatchGeneration(ctx, payload.BatchGeneration)
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
 	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
 

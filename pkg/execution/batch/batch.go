@@ -214,6 +214,8 @@ type BatchAppendResult struct {
 	Status          enums.Batch `json:"status"`
 	BatchID         string      `json:"batchID,omitempty"`
 	BatchPointerKey string      `json:"batchPointerKey"`
+	BatchCluster    string      `json:"batchCluster,omitempty"`
+	BatchGeneration string      `json:"batchGeneration,omitempty"`
 }
 
 type ScheduleBatchOpts struct {
