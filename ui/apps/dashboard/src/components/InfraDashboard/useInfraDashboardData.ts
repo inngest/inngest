@@ -314,9 +314,10 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     const billingPlan = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: currentPlan.data?.account.entitlements,
       defaultSku: INFRA_DASHBOARD_PLACEHOLDERS.defaultPlanSku,
+      hobbyPlan: selfServePlans.hobby,
       plan: currentPlan.data?.account.plan,
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
-      proPlanAmountCents: selfServePlans.pro?.amount,
+      proPlan: selfServePlans.pro,
     });
     const billingPlanReady = Boolean(
       !currentPlan.fetching &&

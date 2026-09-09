@@ -15,6 +15,17 @@ function plan(
 ): SelfServePlan {
   return {
     ...values,
+    addons: {
+      concurrency: {
+        available: false,
+        baseValue: null,
+        maxValue: 100_000,
+        name: 'concurrency',
+        price: null,
+        purchaseCount: 0,
+        quantityPer: 25,
+      },
+    },
     billingPeriod: 'month',
     entitlements: {
       concurrency: { limit: values.isFree ? 5 : 100 },

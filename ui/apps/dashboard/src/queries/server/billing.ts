@@ -453,6 +453,17 @@ export const plansDocument = graphql(`
       name
       amount
       billingPeriod
+      addons {
+        concurrency {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+      }
       entitlements {
         concurrency {
           limit
