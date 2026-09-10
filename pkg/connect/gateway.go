@@ -96,12 +96,13 @@ type connectionHandler struct {
 
 	remoteAddr string
 
-	// controlCh carries high-priority messages (heartbeats, pause, ready).
-	// dataCh carries data messages (replies, acks, lease extensions).
-	// Separate consumer goroutines service each channel so control messages
-	// are never queued behind slow data handlers.
-	controlCh chan *connectpb.ConnectMessage
-	dataCh    chan *connectpb.ConnectMessage
+	// controlCh carries connection lifecycle messages (heartbeats, pause, ready).
+	// protocolCh carries request ACKs and lease extensions.
+	// dataCh carries replies and status updates. Separate consumers prevent
+	// slow reply handling from delaying connection or request liveness traffic.
+	controlCh  chan *connectpb.ConnectMessage
+	protocolCh chan *connectpb.ConnectMessage
+	dataCh     chan *connectpb.ConnectMessage
 
 	// draining is set to true when a WORKER_PAUSE message is received.
 	// Once set, heartbeats must not reset the connection status to READY.
@@ -324,6 +325,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			remoteAddr:     remoteAddr,
 			stopForwarding: make(chan struct{}),
 			controlCh:      make(chan *connectpb.ConnectMessage, 10),
+			protocolCh:     make(chan *connectpb.ConnectMessage, 50),
 			dataCh:         make(chan *connectpb.ConnectMessage, 50),
 		}
 		ch.markHandshaking("websocket accepted")
@@ -729,6 +731,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					case <-runLoopCtx.Done():
 						return nil
 					}
+				case connectpb.GatewayMessageType_WORKER_REQUEST_ACK,
+					connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE:
+					select {
+					case ch.protocolCh <- &msg:
+					case <-runLoopCtx.Done():
+						return nil
+					}
 				default:
 					select {
 					case ch.dataCh <- &msg:
@@ -751,6 +760,25 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						cancelRunLoopContext()
 						return serr
 					}
+				}
+			}
+		})
+
+		eg.Go(func() error {
+			p := pool.New().WithErrors().WithFirstError().WithMaxGoroutines(5)
+			for {
+				select {
+				case <-runLoopCtx.Done():
+					return p.Wait()
+				case msg := <-ch.protocolCh:
+					p.Go(func() error {
+						if serr := ch.handleIncomingWebSocketMessage(msg); serr != nil {
+							c.closeWithConnectError(ws, serr)
+							cancelRunLoopContext()
+							return serr
+						}
+						return nil
+					})
 				}
 			}
 		})
@@ -1329,43 +1357,6 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		return fmt.Errorf("could not save response: %w", err)
 	}
 
-	{
-		// Send a best-effort gRPC message to fast-track the response,
-		// this should be reliable enough but we still combine it with a reliable store like the buffer above.
-		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
-
-		switch {
-		case err == nil:
-			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
-			if err != nil {
-				tags := c.svc.metricsTags()
-				tags["reason"] = "reply_error"
-				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    tags,
-				})
-				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
-			} else if result == nil || !result.Success {
-				tags := c.svc.metricsTags()
-				tags["reason"] = "reply_rejected"
-				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags:    tags,
-				})
-			}
-		case errors.Is(err, state.ErrExecutorNotFound):
-			l.Debug("executor not found in lease, reply was likely picked up by polling")
-		default:
-			tags := c.svc.metricsTags()
-			tags["reason"] = "client_creation"
-			metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
-			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
-		}
-	}
-
 	replyAck, err := proto.Marshal(&connectpb.WorkerReplyAckData{
 		RequestId: data.RequestId,
 	})
@@ -1385,6 +1376,46 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 	}); err != nil {
 		l.Warn("could not send worker reply ack after response was buffered", "err", err)
 	}
+
+	// The buffer is the reliable delivery path and the worker has now been
+	// acknowledged. Keep the optional gRPC fast path out of the message handler
+	// so an unreachable executor cannot block subsequent worker messages.
+	go func() {
+		notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer notifyCancel()
+
+		grpcClient, err := c.svc.getOrCreateGRPCClient(notifyCtx, c.conn.EnvID, data.RequestId)
+		switch {
+		case err == nil:
+			result, err := grpcClient.Reply(notifyCtx, &connectpb.ReplyRequest{Data: data})
+			if err != nil {
+				tags := c.svc.metricsTags()
+				tags["reason"] = "reply_error"
+				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(notifyCtx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
+			} else if result == nil || !result.Success {
+				tags := c.svc.metricsTags()
+				tags["reason"] = "reply_rejected"
+				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(notifyCtx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
+			}
+		case errors.Is(err, state.ErrExecutorNotFound):
+			l.Debug("executor not found in lease, reply was likely picked up by polling")
+		default:
+			tags := c.svc.metricsTags()
+			tags["reason"] = "client_creation"
+			metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(notifyCtx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
+			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
+		}
+	}()
 
 	return nil
 }
