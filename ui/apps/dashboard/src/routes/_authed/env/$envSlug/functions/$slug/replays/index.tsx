@@ -35,16 +35,21 @@ function RouteComponent() {
     },
   });
   const functionIsPaused = data?.environment.function?.isPaused || false;
+  const functionID = data?.environment.function?.id;
 
   return (
     <>
-      {!env.isArchived && !functionIsPaused && (
+      {!env.isArchived && !functionIsPaused && functionID && (
         <div className="flex items-center justify-end px-5">
-          <NewReplayButton functionSlug={functionSlug} />
+          <NewReplayButton
+            functionID={functionID}
+            functionSlug={functionSlug}
+          />
         </div>
       )}
       <div className="h-full overflow-y-auto">
         <ReplayList
+          functionID={functionID}
           functionSlug={functionSlug}
           disableNewReplay={env.isArchived || functionIsPaused}
         />
