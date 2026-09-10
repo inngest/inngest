@@ -3,6 +3,7 @@ package deletion
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -677,5 +678,120 @@ func TestDeleteManager(t *testing.T) {
 			err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
 			require.NoError(t, err, "Should succeed even with invalid payload type")
 		})
+	})
+}
+
+// stubShard satisfies queue.QueueShard for the final RemoveQueueItem step.
+type stubShard struct {
+	queue.QueueShard
+}
+
+func (stubShard) RemoveQueueItem(context.Context, queue.Scope, string, string) error { return nil }
+
+// recordingBatchManager records the arguments and context pins that reach
+// DeleteKeys so we can assert the batch location survives payload decoding.
+type recordingBatchManager struct {
+	batch.BatchManager
+
+	called     bool
+	functionID uuid.UUID
+	batchID    ulid.ULID
+	cluster    string
+	generation string
+}
+
+func (m *recordingBatchManager) DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error {
+	m.called = true
+	m.functionID = functionID
+	m.batchID = batchID
+	m.cluster = batch.BatchCluster(ctx)
+	m.generation = redis_state.BatchGeneration(ctx)
+	return nil
+}
+
+// TestDeleteQueueItemDecodesPersistedPayloads covers the shape a queue item
+// actually has once it has been read back from the queue: queue.Item.Payload is
+// a json.RawMessage for every kind that decodePayloadForKind does not decode,
+// which includes KindScheduleBatch. A plain type assertion silently skipped
+// cleanup for all of those items.
+func TestDeleteQueueItemDecodesPersistedPayloads(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	payload := batch.ScheduleBatchPayload{
+		BatchID:         batchID,
+		BatchPointer:    "pointer",
+		BatchCluster:    "valkey-batching-a",
+		BatchGeneration: "01K0T21HZW9DHDZ5P5TQKBN1E6",
+		FunctionID:      functionID,
+	}
+
+	t.Run("json.RawMessage payload still deletes batch keys", func(t *testing.T) {
+		raw, err := json.Marshal(payload)
+		require.NoError(t, err)
+
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data: queue.Item{
+				Kind:       queue.KindScheduleBatch,
+				Identifier: state.Identifier{WorkflowID: functionID},
+				Payload:    json.RawMessage(raw),
+			},
+		})
+		require.NoError(t, err)
+
+		require.True(t, bm.called, "DeleteKeys must run for a persisted payload")
+		require.Equal(t, functionID, bm.functionID)
+		require.Equal(t, batchID, bm.batchID)
+		require.Equal(t, "valkey-batching-a", bm.cluster, "cluster pin must reach DeleteKeys")
+		require.Equal(t, "01K0T21HZW9DHDZ5P5TQKBN1E6", bm.generation, "generation pin must reach DeleteKeys")
+	})
+
+	t.Run("struct payload keeps working", func(t *testing.T) {
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data: queue.Item{
+				Kind:       queue.KindScheduleBatch,
+				Identifier: state.Identifier{WorkflowID: functionID},
+				Payload:    payload,
+			},
+		})
+		require.NoError(t, err)
+		require.True(t, bm.called)
+		require.Equal(t, "valkey-batching-a", bm.cluster)
+	})
+
+	t.Run("legacy payload without pins selects the default namespace", func(t *testing.T) {
+		legacy := payload
+		legacy.BatchCluster = ""
+		legacy.BatchGeneration = ""
+		raw, err := json.Marshal(legacy)
+		require.NoError(t, err)
+
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data: queue.Item{
+				Kind:       queue.KindScheduleBatch,
+				Identifier: state.Identifier{WorkflowID: functionID},
+				Payload:    json.RawMessage(raw),
+			},
+		})
+		require.NoError(t, err)
+		require.True(t, bm.called)
+		require.Empty(t, bm.cluster)
+		require.Empty(t, bm.generation)
 	})
 }

@@ -2,13 +2,51 @@ package deletion
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 )
+
+// itemPayload returns the typed payload for a queue item.
+//
+// Payloads reach us in two shapes. An item enqueued in-process still holds the
+// concrete struct, while an item read back from the queue holds a
+// json.RawMessage for every kind that queue.decodePayloadForKind does not
+// decode. KindDebounce and KindScheduleBatch are both in the latter group --
+// queue cannot import the debounce or batch packages without an import cycle --
+// so a plain type assertion silently fails for every persisted item and skips
+// its cleanup.
+func itemPayload[T any](payload any) (T, bool) {
+	var out T
+	if typed, ok := payload.(T); ok {
+		return typed, true
+	}
+
+	var raw []byte
+	switch v := payload.(type) {
+	case json.RawMessage:
+		raw = v
+	case []byte:
+		raw = v
+	case string:
+		raw = []byte(v)
+	default:
+		return out, false
+	}
+
+	if len(raw) == 0 {
+		return out, false
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return out, false
+	}
+	return out, true
+}
 
 type ItemHandler func(ctx context.Context, shard queue.QueueShard, qi *queue.QueueItem) error
 
@@ -57,7 +95,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		payload, ok := item.Data.Payload.(debounce.DebouncePayload)
+		payload, ok := itemPayload[debounce.DebouncePayload](item.Data.Payload)
 		if !ok {
 			break
 		}
@@ -86,12 +124,18 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		payload, ok := item.Data.Payload.(batch.ScheduleBatchPayload)
+		payload, ok := itemPayload[batch.ScheduleBatchPayload](item.Data.Payload)
 		if !ok {
 			break
 		}
 
-		err := d.batch.DeleteKeys(ctx, payload.FunctionID, payload.BatchID)
+		// Pin cleanup to the backend and key namespace that own this batch.
+		// Empty values select the legacy pre-routing namespace on the default
+		// backend, which is correct for jobs enqueued before batch routing.
+		batchCtx := batch.WithBatchCluster(ctx, payload.BatchCluster)
+		batchCtx = redis_state.WithBatchGeneration(batchCtx, payload.BatchGeneration)
+
+		err := d.batch.DeleteKeys(batchCtx, payload.FunctionID, payload.BatchID)
 		if err != nil {
 			return fmt.Errorf("could not delete batch: %w", err)
 		}
