@@ -624,10 +624,14 @@ func (x *CreateStateRequest) GetStepsInputs() [][]byte {
 }
 
 type CreateStateResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *Metadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Events        [][]byte               `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
-	Steps         map[string][]byte      `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Metadata *Metadata              `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Events   [][]byte               `protobuf:"bytes,2,rep,name=events,proto3" json:"events,omitempty"`
+	Steps    map[string][]byte      `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// True when the idempotency key matched an existing run. The response carries
+	// that run's state so callers can handle the duplicate without carrying state
+	// in gRPC error details.
+	AlreadyExists bool `protobuf:"varint,4,opt,name=already_exists,json=alreadyExists,proto3" json:"already_exists,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -681,6 +685,13 @@ func (x *CreateStateResponse) GetSteps() map[string][]byte {
 		return x.Steps
 	}
 	return nil
+}
+
+func (x *CreateStateResponse) GetAlreadyExists() bool {
+	if x != nil {
+		return x.AlreadyExists
+	}
+	return false
 }
 
 type DeleteStateRequest struct {
@@ -2522,11 +2533,12 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\fR\x06events\x12\x14\n" +
 	"\x05steps\x18\x03 \x03(\fR\x05steps\x12!\n" +
-	"\fsteps_inputs\x18\x04 \x03(\fR\vstepsInputs\"\xd7\x01\n" +
+	"\fsteps_inputs\x18\x04 \x03(\fR\vstepsInputs\"\xfe\x01\n" +
 	"\x13CreateStateResponse\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\x12\x16\n" +
 	"\x06events\x18\x02 \x03(\fR\x06events\x12>\n" +
-	"\x05steps\x18\x03 \x03(\v2(.state.v2.CreateStateResponse.StepsEntryR\x05steps\x1a8\n" +
+	"\x05steps\x18\x03 \x03(\v2(.state.v2.CreateStateResponse.StepsEntryR\x05steps\x12%\n" +
+	"\x0ealready_exists\x18\x04 \x01(\bR\ralreadyExists\x1a8\n" +
 	"\n" +
 	"StepsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
