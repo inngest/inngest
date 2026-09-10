@@ -3,6 +3,7 @@ package deletion
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -10,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 // itemPayload returns the typed payload for a queue item.
@@ -21,7 +23,12 @@ import (
 // queue cannot import the debounce or batch packages without an import cycle --
 // so a plain type assertion silently fails for every persisted item and skips
 // its cleanup.
-func itemPayload[T any](payload any) (T, bool) {
+//
+// A false return means the caller cannot identify the associated state, so it
+// skips cleanup and still removes the queue item. That drops the only pointer
+// to the orphaned state, so a payload that is present but undecodable is
+// logged rather than passing silently.
+func itemPayload[T any](ctx context.Context, kind string, payload any) (T, bool) {
 	var out T
 	if typed, ok := payload.(T); ok {
 		return typed, true
@@ -33,8 +40,6 @@ func itemPayload[T any](payload any) (T, bool) {
 		raw = v
 	case []byte:
 		raw = v
-	case string:
-		raw = []byte(v)
 	default:
 		return out, false
 	}
@@ -43,6 +48,11 @@ func itemPayload[T any](payload any) (T, bool) {
 		return out, false
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
+		logger.StdlibLogger(ctx).Warn(
+			"could not decode queue item payload for cleanup; associated state may be orphaned",
+			"kind", kind,
+			"error", err,
+		)
 		return out, false
 	}
 	return out, true
@@ -95,7 +105,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		payload, ok := itemPayload[debounce.DebouncePayload](item.Data.Payload)
+		payload, ok := itemPayload[debounce.DebouncePayload](ctx, item.Data.Kind, item.Data.Payload)
 		if !ok {
 			break
 		}
@@ -106,6 +116,13 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			FunctionID: payload.FunctionID,
 		}
 		di, err := d.deb.GetDebounceItem(ctx, scope, payload.DebounceID)
+		if errors.Is(err, debounce.ErrDebounceNotFound) {
+			// Absence reports as an error rather than a nil item, and is an
+			// expected state for a stale timeout job. Treat it as cleanup
+			// already done so the queue item can still be removed; returning
+			// here would retry the item forever.
+			break
+		}
 		if err != nil {
 			return fmt.Errorf("could not get debounce item: %w", err)
 		}
@@ -124,7 +141,7 @@ func (d *deleteManager) DeleteQueueItem(ctx context.Context, shard queue.QueueSh
 			break
 		}
 
-		payload, ok := itemPayload[batch.ScheduleBatchPayload](item.Data.Payload)
+		payload, ok := itemPayload[batch.ScheduleBatchPayload](ctx, item.Data.Kind, item.Data.Payload)
 		if !ok {
 			break
 		}

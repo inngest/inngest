@@ -727,9 +727,21 @@ func TestDeleteQueueItemDecodesPersistedPayloads(t *testing.T) {
 		FunctionID:      functionID,
 	}
 
-	t.Run("json.RawMessage payload still deletes batch keys", func(t *testing.T) {
-		raw, err := json.Marshal(payload)
+	// Round-trip through the real queue.Item codec rather than hand-building a
+	// json.RawMessage, so this breaks if decodePayloadForKind ever starts
+	// decoding KindScheduleBatch and the runtime payload shape changes.
+	t.Run("queue round-tripped payload still deletes batch keys", func(t *testing.T) {
+		encoded, err := json.Marshal(queue.Item{
+			Kind:       queue.KindScheduleBatch,
+			Identifier: state.Identifier{WorkflowID: functionID},
+			Payload:    payload,
+		})
 		require.NoError(t, err)
+
+		var decoded queue.Item
+		require.NoError(t, json.Unmarshal(encoded, &decoded))
+		_, isRaw := decoded.Payload.(json.RawMessage)
+		require.True(t, isRaw, "queue decoding must leave KindScheduleBatch as json.RawMessage")
 
 		bm := &recordingBatchManager{}
 		dm, err := NewDeleteManager(WithBatchManager(bm))
@@ -737,11 +749,7 @@ func TestDeleteQueueItemDecodesPersistedPayloads(t *testing.T) {
 
 		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
 			FunctionID: functionID,
-			Data: queue.Item{
-				Kind:       queue.KindScheduleBatch,
-				Identifier: state.Identifier{WorkflowID: functionID},
-				Payload:    json.RawMessage(raw),
-			},
+			Data:       decoded,
 		})
 		require.NoError(t, err)
 
@@ -794,4 +802,50 @@ func TestDeleteQueueItemDecodesPersistedPayloads(t *testing.T) {
 		require.Empty(t, bm.cluster)
 		require.Empty(t, bm.generation)
 	})
+}
+
+// notFoundDebouncer reports an absent debounce the way the real debouncer does:
+// an ErrDebounceNotFound error rather than a nil item.
+type notFoundDebouncer struct {
+	debounce.Debouncer
+	deleted bool
+}
+
+func (d *notFoundDebouncer) GetDebounceItem(context.Context, queue.Scope, ulid.ULID) (*debounce.DebounceItem, error) {
+	return nil, debounce.ErrDebounceNotFound
+}
+
+func (d *notFoundDebouncer) DeleteDebounceItem(context.Context, queue.Scope, ulid.ULID, debounce.DebounceItem) error {
+	d.deleted = true
+	return nil
+}
+
+// TestDeleteQueueItemAbsentDebounce guards against the queue item becoming
+// undeletable. GetDebounceItem reports absence as ErrDebounceNotFound, which is
+// expected for a stale timeout job, so cleanup must treat it as already done
+// and still remove the queue item instead of retrying forever.
+func TestDeleteQueueItemAbsentDebounce(t *testing.T) {
+	functionID := uuid.New()
+	raw, err := json.Marshal(debounce.DebouncePayload{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+		DebounceID:  ulid.MustNew(ulid.Now(), rand.Reader),
+	})
+	require.NoError(t, err)
+
+	deb := &notFoundDebouncer{}
+	dm, err := NewDeleteManager(WithDebouncer(deb))
+	require.NoError(t, err)
+
+	err = dm.DeleteQueueItem(context.Background(), stubShard{}, &queue.QueueItem{
+		FunctionID: functionID,
+		Data: queue.Item{
+			Kind:       queue.KindDebounce,
+			Identifier: state.Identifier{WorkflowID: functionID},
+			Payload:    json.RawMessage(raw),
+		},
+	})
+	require.NoError(t, err, "an absent debounce must not make the queue item undeletable")
+	require.False(t, deb.deleted, "nothing to delete when the debounce is already gone")
 }
