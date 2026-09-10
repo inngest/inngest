@@ -12,6 +12,11 @@ import (
 // asking the database. ctes is needed here only for a top-level
 // UNION/INTERSECT/EXCEPT statement, whose operands resolve their own scope
 // independently.
+//
+// This is now purely an internal helper for unionColumnPathHints' own
+// reconciliation -- buildColumnPathHints (below) is every other caller's
+// (Transpile's, ultimately Execute's/the GQL layer's) single source of
+// hint information, root (whole-value) hint included.
 func buildColumnHints(stmt *parser.SelectStatement, scope *tableScope, ctes map[string]logicalTable) []ColumnHint {
 	if stmt.SetOp != parser.SetOpNone {
 		return unionColumnHints(stmt, ctes)
@@ -20,13 +25,103 @@ func buildColumnHints(stmt *parser.SelectStatement, scope *tableScope, ctes map[
 	for _, item := range stmt.Columns {
 		if star, ok := item.Expr.(*parser.StarExpr); ok {
 			for _, sc := range resolveStarColumns(star, scope) {
-				hints = append(hints, sc.col.hint)
+				hints = append(hints, sc.col.hint())
 			}
 			continue
 		}
 		hints = append(hints, resolveItemHint(item.Expr, scope))
 	}
 	return hints
+}
+
+// buildColumnPathHints returns one column's-worth of pathHints per output
+// column, positionally aligned with the *executed* query's own result set
+// -- nil for a position with neither a whole-value hint nor any known
+// JSON sub-path hint.
+//
+// Every entry's whole-value (empty-Path) hint is folded in directly
+// (withRootHint), from the exact same resolution resolveItemHint/
+// unionColumnHints already do for any expression shape this package
+// resolves a hint for at all (a bare/qualified column, a JSON sub-path
+// access, UNNEST(...)/a single index, an arrayOfStructs field, ...) --
+// this is the *only* place a whole-column hint is computed; there's no
+// separate ColumnHints-shaped result living alongside this one anymore.
+// A star or bare/qualified column reference layers that on top of the
+// column's *other* pathHints entries too (sc.col.pathHints/
+// resolveColumnPathHints), verbatim from tables.go; anything else (a
+// computed expression, an already-indexed/dotted sub-access) gets at
+// most the one root entry.
+//
+// A caller (the GQL layer, ultimately a UI) needing to resolve a specific
+// JSON value found inside a column's own data reads the non-root entries
+// the same way this package's own resolveArrayElementHint/
+// resolveSubPathHint do: a {wc}-only Path describes every element of an
+// unnested/indexed array, {wc, seg(field)} one field of every struct
+// element, any other Path a direct JSON sub-path off the column's own
+// top-level value.
+func buildColumnPathHints(stmt *parser.SelectStatement, scope *tableScope, ctes map[string]logicalTable) [][]PathHint {
+	if stmt.SetOp != parser.SetOpNone {
+		return unionColumnPathHints(stmt, ctes)
+	}
+	var pathHints [][]PathHint
+	for _, item := range stmt.Columns {
+		if star, ok := item.Expr.(*parser.StarExpr); ok {
+			for _, sc := range resolveStarColumns(star, scope) {
+				pathHints = append(pathHints, sc.col.pathHints)
+			}
+			continue
+		}
+		ph := resolveColumnPathHints(item.Expr, scope)
+		pathHints = append(pathHints, withRootHint(ph, resolveItemHint(item.Expr, scope)))
+	}
+	return pathHints
+}
+
+// unionColumnPathHints is buildColumnPathHints' UNION/INTERSECT/EXCEPT
+// counterpart: reconciling two operands' full pathHints isn't attempted
+// (unionColumnHints' own doc comment explains why even the simpler
+// whole-value case only trusts an exact agreement), so each position gets
+// at most the one root entry unionColumnHints already agrees on.
+func unionColumnPathHints(stmt *parser.SelectStatement, ctes map[string]logicalTable) [][]PathHint {
+	hints := unionColumnHints(stmt, ctes)
+	pathHints := make([][]PathHint, len(hints))
+	for i, h := range hints {
+		pathHints[i] = rootHint(h)
+	}
+	return pathHints
+}
+
+// resolveColumnPathHints returns the full []PathHint for a bare or
+// table-qualified reference to exactly one known table column -- nil for
+// anything else (a JSON sub-path access, an array index, a computed
+// expression, an unknown/ambiguous reference). Mirrors resolveIdentHint's
+// own case-1/case-2 structure (a bare column always wins over an
+// unqualified table lookup), returning the column's pathHints instead of
+// its single hint.
+func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
+	id, ok := expr.(*parser.Ident)
+	if !ok {
+		return nil
+	}
+	switch len(id.Parts) {
+	case 1:
+		col, ok := scope.uniqueColumn(id.Parts[0])
+		if !ok {
+			return nil
+		}
+		return col.pathHints
+	case 2:
+		if tbl, ok := scope.lookup(id.Parts[0]); ok {
+			col, ok := tbl.columns[id.Parts[1]]
+			if !ok {
+				return nil
+			}
+			return col.pathHints
+		}
+		return nil
+	default:
+		return nil
+	}
 }
 
 // unionColumnHints reconciles a UNION/INTERSECT/EXCEPT statement's two
@@ -38,11 +133,11 @@ func buildColumnHints(stmt *parser.SelectStatement, scope *tableScope, ctes map[
 // SetOp statement (its From is always nil; each leaf level resolves its
 // own real scope here).
 func unionColumnHints(stmt *parser.SelectStatement, ctes map[string]logicalTable) []ColumnHint {
-	leftScope, err := resolveScope(stmt.SetLeft.From, ctes)
+	leftScope, err := resolveScope(stmt.SetLeft.From, ctes, nil)
 	if err != nil {
 		return nil
 	}
-	rightScope, err := resolveScope(stmt.SetRight.From, ctes)
+	rightScope, err := resolveScope(stmt.SetRight.From, ctes, nil)
 	if err != nil {
 		return nil
 	}
@@ -131,12 +226,12 @@ func resolveItemHint(expr parser.Expr, scope *tableScope) ColumnHint {
 // operand, or a FROM-clause UNNEST's argument, all of which extract
 // exactly one array element.
 //
-// This only ever consults an explicit "<path>[*]" pathHints entry — there
+// This only ever consults an explicit {..., wc} pathHints entry — there
 // is no fallback to x's own whole-value hint. That whole-value hint can
 // describe something else entirely (a JSON object with a hinted sub-field,
 // or a plain scalar that isn't an array at all), so only a column/path
-// that explicitly declares "[*]" is asserted to hold multiple values of
-// that hinted type.
+// that explicitly declares a trailing wc is asserted to hold multiple
+// values of that hinted type.
 func resolveArrayElementHint(x parser.Expr, scope *tableScope) ColumnHint {
 	if id, ok := x.(*parser.Ident); ok {
 		return arrayElementHintForIdent(id, scope)
@@ -146,12 +241,12 @@ func resolveArrayElementHint(x parser.Expr, scope *tableScope) ColumnHint {
 		if !ok {
 			return HintNone
 		}
-		return known.pathHints[normalizeJSONPath(path)+"[*]"]
+		return known.lookupPath(append(queryPath(path), wc))
 	}
 	return HintNone
 }
 
-// arrayElementHintForIdent resolves id's explicit "[*]" pathHints entry —
+// arrayElementHintForIdent resolves id's explicit {wc} pathHints entry —
 // a bare column or a table-qualified one — mirroring resolveIdentHint's own
 // case-1/case-2 precedence (a bare column always wins over an unqualified
 // table lookup).
@@ -162,14 +257,14 @@ func arrayElementHintForIdent(id *parser.Ident, scope *tableScope) ColumnHint {
 		if !ok {
 			return HintNone
 		}
-		return col.pathHints["[*]"]
+		return col.lookupPath([]PathSegment{wc})
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
 			col, ok := tbl.columns[id.Parts[1]]
 			if !ok {
 				return HintNone
 			}
-			return col.pathHints["[*]"]
+			return col.lookupPath([]PathSegment{wc})
 		}
 		return HintNone
 	default:
@@ -196,14 +291,14 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		if !ok {
 			return HintNone
 		}
-		return col.hint
+		return col.hint()
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
 			col, ok := tbl.columns[id.Parts[1]]
 			if !ok {
 				return HintNone
 			}
-			return col.hint
+			return col.hint()
 		}
 		// Not a table qualifier: check whether Parts[0] is itself an
 		// arrayOfStructs column (e.g. sessions.field), matching
@@ -227,7 +322,7 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		if !ok || !col.arrayOfStructs {
 			return HintNone
 		}
-		return col.pathHints["[*]."+id.Parts[2]]
+		return col.lookupPath([]PathSegment{wc, seg(id.Parts[2])})
 	default:
 		return HintNone
 	}
@@ -236,22 +331,21 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 // arrayOfStructsFieldHint resolves colName.field's hint when colName is a
 // knownColumn.arrayOfStructs column in scope — see rewriteIdent
 // (rewrite.go), which rewrites this exact shape into the JSONPath
-// wildcard form the "[*].field" pathHints key convention (tables.go)
-// mirrors.
+// wildcard form the {wc, seg(field)} pathHints entry (tables.go) mirrors.
 func arrayOfStructsFieldHint(colName, field string, scope *tableScope) ColumnHint {
 	col, ok := scope.uniqueColumn(colName)
 	if !ok || !col.arrayOfStructs {
 		return HintNone
 	}
-	return col.pathHints["[*]."+field]
+	return col.lookupPath([]PathSegment{wc, seg(field)})
 }
 
 func resolveSubPathHint(id *parser.Ident, path string, scope *tableScope) ColumnHint {
 	col, ok := resolveKnownColumn(id, scope)
-	if !ok || col.pathHints == nil {
+	if !ok {
 		return HintNone
 	}
-	return col.pathHints[normalizeJSONPath(path)]
+	return col.lookupPath(queryPath(path))
 }
 
 // resolveKnownColumn resolves id to its knownColumn, whether id is a bare
@@ -275,13 +369,4 @@ func resolveKnownColumn(id *parser.Ident, scope *tableScope) (knownColumn, bool)
 	default:
 		return knownColumn{}, false
 	}
-}
-
-// normalizeJSONPath strips path's optional leading "$" — DuckDB accepts a
-// JSONPath operand either way ('$[*].field' or '[*].field'), but this
-// package's pathHints keys are always stored without it (tables.go), so
-// every lookup site normalizes through here rather than each caller
-// re-deriving the same rule.
-func normalizeJSONPath(path string) string {
-	return strings.TrimPrefix(path, "$")
 }

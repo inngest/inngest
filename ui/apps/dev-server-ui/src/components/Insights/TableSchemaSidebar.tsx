@@ -138,7 +138,7 @@ function FunctionRow({ fn }: { fn: InsightsSchemaFunction }) {
       <TooltipTrigger asChild>
         <div className="hover:bg-canvasSubtle flex cursor-help items-center justify-between gap-2 rounded px-1 py-0.5">
           <span className="text-subtle overflow-hidden text-ellipsis whitespace-nowrap font-mono text-sm">
-            {fn.name}
+            {fn.signature}
           </span>
           <Link
             href={fn.docsUrl}
@@ -149,8 +149,12 @@ function FunctionRow({ fn }: { fn: InsightsSchemaFunction }) {
           </Link>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="left" className="max-w-xs">
-        {fn.description}
+      <TooltipContent side="left" className="flex max-w-xs flex-col gap-1">
+        {/* The row's own label truncates a long signature (text-ellipsis
+            whitespace-nowrap) -- repeat it here in full, since the tooltip
+            has room to wrap instead of clipping it. */}
+        <div className="font-mono text-xs font-semibold">{fn.signature}</div>
+        <div>{fn.description}</div>
       </TooltipContent>
     </Tooltip>
   );

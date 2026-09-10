@@ -137,7 +137,7 @@ func newTableSchema(tbl logicalTable) TableSchema {
 	cols := make([]ColumnSchema, len(tbl.columnOrder))
 	for i, colName := range tbl.columnOrder {
 		col := tbl.columns[colName]
-		cols[i] = ColumnSchema{Name: colName, Type: col.colType, Hint: col.hint, Description: col.description}
+		cols[i] = ColumnSchema{Name: colName, Type: col.colType, Hint: col.hint(), Description: col.description}
 	}
 	return TableSchema{Name: tbl.name, Description: tbl.description, Columns: cols}
 }

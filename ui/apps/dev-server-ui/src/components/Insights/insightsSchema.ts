@@ -29,6 +29,10 @@ export type InsightsSchemaFunction = {
   name: string;
   description: string;
   docsUrl: string;
+  // The function's call signature (e.g. "concat_ws(separator, string,
+  // ...)") -- always present; see functionInfo.signature (functions.go)
+  // for how a function with no per-function docs anchor still gets one.
+  signature: string;
 };
 
 type InsightsSchema = {

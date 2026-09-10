@@ -45,6 +45,7 @@ type functionDump struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	DocsURL     string `json:"docsUrl"`
+	Signature   string `json:"signature"`
 }
 
 func main() {
@@ -108,7 +109,7 @@ func functionDumps() []functionDump {
 	fns := insights.AllFunctionSchemas()
 	out := make([]functionDump, len(fns))
 	for i, fn := range fns {
-		out[i] = functionDump{Name: fn.Name, Description: fn.Description, DocsURL: fn.DocsURL}
+		out[i] = functionDump{Name: fn.Name, Description: fn.Description, DocsURL: fn.DocsURL, Signature: fn.Signature}
 	}
 	return out
 }

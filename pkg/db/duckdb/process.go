@@ -337,8 +337,15 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 // (see Connector.Connect); the primary connection keeps its usual
 // restart-on-crash handling via p.exec, but a session returned here does
 // not — a crash invalidates it outright, which database/sql surfaces as a
-// query error on that connection rather than a transparent retry. Acceptable
-// for cmd/duckdbseed's short-lived, opt-in use; not used by dual-write.
+// query error on that connection rather than a transparent retry, and
+// database/sql may hand any caller (including dual-write's own writes,
+// once QuackConns > 1) one of these instead of the restart-managed primary
+// connection — there's no way to pin a specific caller to connection #1.
+// Accepted deliberately: a genuine subprocess crash (as opposed to a
+// caller's ctx merely ending, which runWithRestartLocked no longer treats
+// as crash-worthy at all — see its own doc comment) is rare, and losing
+// one write to it without a retry is a smaller cost than serializing every
+// write behind however long an unrelated ad hoc Insights query takes.
 func (p *process) openQuackConn(ctx context.Context) (sqlExecer, error) {
 	p.mu.Lock()
 	url, token := p.quackListenURL, p.quackToken
@@ -484,8 +491,14 @@ func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
 	}
 
 	rowLimit := opts.DataInliningRowLimit
-	if rowLimit <= 0 {
+	switch {
+	case rowLimit == 0:
 		rowLimit = DefaultDataInliningRowLimit
+	case rowLimit < 0:
+		// A negative value means "explicitly disable inlining" — distinct
+		// from the zero value, which means "unset, use the default". See
+		// DataInliningRowLimit's doc comment.
+		rowLimit = 0
 	}
 
 	stmts := []string{
@@ -607,10 +620,44 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 		return err
 	}
 
-	// Everything else means the pipe broke, the subprocess died, or the
-	// caller's ctx was cancelled mid-statement (leaving the session
-	// protocol-desynced). All three are only recoverable by respawning.
 	l := logger.StdlibLogger(ctx)
+
+	// A session left mid-statement-desynced (jsonlines only — see
+	// errSessionDesynced's doc comment) can never be trusted again no
+	// matter what ctx says: the subprocess's own stdout stream still has
+	// the abandoned statement's output queued on it, which would
+	// misattribute to whatever statement runs next unless the whole
+	// subprocess respawns. Everything below this assumes err does NOT wrap
+	// errSessionDesynced.
+	if !errors.Is(err, errSessionDesynced) && ctx.Err() != nil {
+		// The caller's own context ended (cancelled or timed out), and the
+		// transport in use doesn't leave anything behind that needs fixing
+		// for that: quack's HTTP transport is a self-contained request per
+		// statement, so an aborted request doesn't desync anything for a
+		// later request on this same connection, or for any other caller
+		// sharing it — verified empirically (a fresh query on the same
+		// connection succeeds in ~1ms after an abort). quackSession.query's
+		// own watchForCancel already sent the server a real CancelRequest
+		// for this statement the moment ctx ended (verified empirically to
+		// actually stop the abandoned query's CPU usage server-side, not
+		// just abandon the wait for it — see encodeQuackCancelRequest's doc
+		// comment), so there's nothing left for a restart to clean up here.
+		// Restarting the whole subprocess would actively hurt a caller
+		// sharing this connection with another workload (dual-write, say):
+		// every other in-flight or queued statement gets torn down for a
+		// failure that was never the subprocess's fault. It would also be
+		// pure waste — the ctx.Err() check further down already skips the
+		// retry once the context is done, so today's restart-then-give-up
+		// pays the full cost of a restart for zero benefit in exactly this
+		// case.
+		l.Warn("duckdb: statement failed because its context ended; surfacing the error without restarting the subprocess", "error", err)
+		return err
+	}
+
+	// Everything else means the pipe broke, the subprocess died, or (for
+	// jsonlines specifically) the caller's ctx was cancelled mid-statement,
+	// leaving that session protocol-desynced. Both are only recoverable by
+	// respawning.
 	if errors.Is(err, errSessionDesynced) {
 		l.Warn("duckdb: session desynced by a cancelled context; respawning subprocess to resync", "error", err)
 	} else {
@@ -710,7 +757,10 @@ type DuckLakeOptions struct {
 	// (ducklake_test.go's TestDuckLakeInlinesSmallInsertsUpToRowLimit):
 	// without any limit, five separate 200-row inserts produce five Parquet
 	// files; with it set high enough, the same rows stay fully inlined.
-	// Leave at the zero value to use DefaultDataInliningRowLimit.
+	// Leave at the zero value to use DefaultDataInliningRowLimit. Set to a
+	// negative value to disable inlining entirely (DATA_INLINING_ROW_LIMIT
+	// 0) — the zero value itself can't mean that, since it already means
+	// "unset" for every caller that doesn't set this field at all.
 	DataInliningRowLimit int
 }
 
@@ -756,7 +806,11 @@ type Options struct {
 	// against the quack HTTP listener rather than serialized through
 	// process.exec's mutex. Requires QuackAddr to be set; Open returns an
 	// error otherwise. Leave at the zero value (0 or 1) for the original
-	// single-connection behavior — dual-write's own Options never sets this.
+	// single-connection behavior. See openQuackConn's doc comment for what
+	// a caller (dual-write included, as of this field's use in
+	// pkg/devserver/dualwrite.go) trades away by raising this: every
+	// connection beyond the first loses process.exec's restart-on-crash
+	// handling, and database/sql may hand any given caller either kind.
 	QuackConns int
 }
 

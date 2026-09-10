@@ -22,10 +22,15 @@ type TranspileResult struct {
 	// no usable position -- see ExecutionError's own doc comment for why
 	// this is the whole query, not something more precise.
 	Start, End parser.Position
-	// ColumnHints has one entry per output column for a non-UNION query,
-	// and is empty for a UNION/INTERSECT/EXCEPT query. An index beyond
-	// this slice's length is treated as HintNone.
-	ColumnHints []ColumnHint
+	// ColumnPathHints has one column's-worth of pathHints per output
+	// column, left to right, for a non-UNION query; only a root
+	// (empty-Path) entry, if any, for a UNION/INTERSECT/EXCEPT query's
+	// reconciled operands. An index beyond this slice's length, or a nil
+	// entry, means no hint at all. See buildColumnPathHints' own doc
+	// comment for exactly what's covered (including the empty-Path entry
+	// that used to be a separate ColumnHints result) and the non-root
+	// entries' own path-segment conventions.
+	ColumnPathHints [][]PathHint
 	// Diagnostics is every non-fatal note a pipeline stage produced.
 	// Ordered by pipeline stage, not by source position.
 	Diagnostics []Diagnostic
@@ -43,7 +48,7 @@ type pipelineState struct {
 	scope       *tableScope
 	ctes        map[string]logicalTable
 	info        QueryInfo
-	hints       []ColumnHint
+	pathHints   [][]PathHint
 	args        []any
 	limited     bool
 	diagnostics []Diagnostic
@@ -70,7 +75,8 @@ var pipeline = []stage{
 // already handles that case. ctes lets stageBuildColumnHints resolve a
 // UNION operand's own scope independently.
 func stageValidate(ps *pipelineState) error {
-	scope, ctes, err := validate(ps.stmt)
+	scope, ctes, diags, err := validate(ps.stmt)
+	ps.diagnostics = append(ps.diagnostics, diags...)
 	if err != nil {
 		return err
 	}
@@ -85,7 +91,7 @@ func stageExtractQueryInfo(ps *pipelineState) error {
 }
 
 func stageBuildColumnHints(ps *pipelineState) error {
-	ps.hints = buildColumnHints(ps.stmt, ps.scope, ps.ctes)
+	ps.pathHints = buildColumnPathHints(ps.stmt, ps.scope, ps.ctes)
 	return nil
 }
 
@@ -138,14 +144,14 @@ func Transpile(sql string, accountID, envID uuid.UUID) (*TranspileResult, error)
 	}
 
 	return &TranspileResult{
-		SQL:          parser.String(ps.stmt),
-		Args:         ps.args,
-		Start:        stmt.Pos(),
-		End:          stmt.End(),
-		PrimaryTable: ps.info.PrimaryTable,
-		Tables:       ps.info.Tables,
-		Limited:      ps.limited,
-		ColumnHints:  ps.hints,
-		Diagnostics:  ps.diagnostics,
+		SQL:             parser.String(ps.stmt),
+		Args:            ps.args,
+		Start:           stmt.Pos(),
+		End:             stmt.End(),
+		PrimaryTable:    ps.info.PrimaryTable,
+		Tables:          ps.info.Tables,
+		Limited:         ps.limited,
+		ColumnPathHints: ps.pathHints,
+		Diagnostics:     ps.diagnostics,
 	}, nil
 }

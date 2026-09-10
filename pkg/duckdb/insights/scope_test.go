@@ -16,7 +16,7 @@ func mustParse(t *testing.T, sql string) *parser.SelectStatement {
 
 func TestResolveScopeBaseTable(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM runs")
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 
 	tbl, ok := scope.lookup("runs")
@@ -29,14 +29,14 @@ func TestResolveScopeBaseTable(t *testing.T) {
 func TestResolveScopeColumnCountAmbiguous(t *testing.T) {
 	// run_id exists on both runs and extended_trace_spans.
 	stmt := mustParse(t, "SELECT run_id FROM runs JOIN extended_trace_spans ON runs.run_id = extended_trace_spans.run_id")
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, 2, scope.columnCount("run_id"))
 }
 
 func TestResolveScopeAlias(t *testing.T) {
 	stmt := mustParse(t, "SELECT r.run_id FROM runs r")
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 
 	_, ok := scope.lookup("runs")
@@ -48,7 +48,7 @@ func TestResolveScopeAlias(t *testing.T) {
 
 func TestResolveScopeJoin(t *testing.T) {
 	stmt := mustParse(t, "SELECT * FROM runs JOIN events ON runs.run_id = events.id")
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 
 	_, ok := scope.lookup("runs")
@@ -59,7 +59,7 @@ func TestResolveScopeJoin(t *testing.T) {
 
 func TestResolveScopeUnknownTable(t *testing.T) {
 	stmt := mustParse(t, "SELECT * FROM nonexistent_table")
-	_, err := resolveScope(stmt.From, nil)
+	_, err := resolveScope(stmt.From, nil, nil)
 	require.Error(t, err)
 	var verr *ValidationError
 	require.ErrorAs(t, err, &verr)
@@ -67,12 +67,12 @@ func TestResolveScopeUnknownTable(t *testing.T) {
 
 func TestResolveScopeUniqueColumn(t *testing.T) {
 	stmt := mustParse(t, "SELECT * FROM runs")
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 
 	col, ok := scope.uniqueColumn("run_id")
 	require.True(t, ok)
-	require.Equal(t, HintRunID, col.hint)
+	require.Equal(t, HintRunID, col.hint())
 
 	_, ok = scope.uniqueColumn("nonexistent")
 	require.False(t, ok)

@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -34,6 +35,13 @@ type Service struct {
 	scores         ScoreProvider
 	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
+	// duckDB is the dual-write DuckDB connection QueryInsights runs
+	// against -- nil unless --duckdb dual-write started successfully, same
+	// connection as coreapi.Options.DuckDB / queryResolver.DuckDB
+	// (pkg/coreapi/graph/resolvers/resolver.go). A nil duckDB means
+	// QueryInsights errors clearly rather than resolving empty, matching
+	// that resolver's own precedent.
+	duckDB *sql.DB
 }
 
 // ServiceOptions contains configuration for the V2 service
@@ -51,6 +59,9 @@ type ServiceOptions struct {
 	MaxEventSize        int
 	Scores              ScoreProvider
 	RateLimitProvider   RateLimitProvider
+	// DuckDB is the dual-write DuckDB connection backing QueryInsights --
+	// see Service.duckDB.
+	DuckDB *sql.DB
 }
 
 func NewService(opts ServiceOptions) *Service {
@@ -77,6 +88,7 @@ func NewService(opts ServiceOptions) *Service {
 		scores:         opts.Scores,
 		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),
+		duckDB:         opts.DuckDB,
 	}
 }
 

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardFunctionsRouteRouteImport } from './routes/_dashboard/functions/route'
+import { Route as DashboardSessionsIndexRouteImport } from './routes/_dashboard/sessions/index'
 import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
 import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
 import { Route as DashboardInsightsIndexRouteImport } from './routes/_dashboard/insights/index'
@@ -19,6 +20,7 @@ import { Route as DashboardEventsIndexRouteImport } from './routes/_dashboard/ev
 import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/event/index'
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
+import { Route as DashboardSessionsSessionKeyIndexRouteImport } from './routes/_dashboard/sessions/$sessionKey/index'
 import { Route as DashboardMcpSetupIndexRouteImport } from './routes/_dashboard/mcp/setup/index'
 import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
 import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
@@ -26,6 +28,7 @@ import { Route as DashboardAiScoresIndexRouteImport } from './routes/_dashboard/
 import { Route as DashboardAiExperimentsIndexRouteImport } from './routes/_dashboard/ai/experiments/index'
 import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
 import { Route as DashboardAppsOnboardingChooseFrameworkRouteImport } from './routes/_dashboard/apps/_onboarding/choose-framework'
+import { Route as DashboardSessionsSessionKeySessionIdIndexRouteImport } from './routes/_dashboard/sessions/$sessionKey/$sessionId/index'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/_dashboard',
@@ -39,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardFunctionsRouteRoute = DashboardFunctionsRouteRouteImport.update({
   id: '/functions',
   path: '/functions',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSessionsIndexRoute = DashboardSessionsIndexRouteImport.update({
+  id: '/sessions/',
+  path: '/sessions/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
@@ -75,6 +83,12 @@ const DashboardAppsOnboardingRouteRoute =
   DashboardAppsOnboardingRouteRouteImport.update({
     id: '/apps/_onboarding',
     path: '/apps',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardSessionsSessionKeyIndexRoute =
+  DashboardSessionsSessionKeyIndexRouteImport.update({
+    id: '/sessions/$sessionKey/',
+    path: '/sessions/$sessionKey/',
     getParentRoute: () => DashboardRoute,
   } as any)
 const DashboardMcpSetupIndexRoute = DashboardMcpSetupIndexRouteImport.update({
@@ -116,6 +130,12 @@ const DashboardAppsOnboardingChooseFrameworkRoute =
     path: '/choose-framework',
     getParentRoute: () => DashboardAppsOnboardingRouteRoute,
   } as any)
+const DashboardSessionsSessionKeySessionIdIndexRoute =
+  DashboardSessionsSessionKeySessionIdIndexRouteImport.update({
+    id: '/sessions/$sessionKey/$sessionId/',
+    path: '/sessions/$sessionKey/$sessionId/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -127,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/insights/': typeof DashboardInsightsIndexRoute
   '/run/': typeof DashboardRunIndexRoute
   '/runs/': typeof DashboardRunsIndexRoute
+  '/sessions/': typeof DashboardSessionsIndexRoute
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/ai/experiments/': typeof DashboardAiExperimentsIndexRoute
@@ -134,6 +155,8 @@ export interface FileRoutesByFullPath {
   '/apps/app/': typeof DashboardAppsAppIndexRoute
   '/functions/config/': typeof DashboardFunctionsConfigIndexRoute
   '/mcp/setup/': typeof DashboardMcpSetupIndexRoute
+  '/sessions/$sessionKey/': typeof DashboardSessionsSessionKeyIndexRoute
+  '/sessions/$sessionKey/$sessionId/': typeof DashboardSessionsSessionKeySessionIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -144,6 +167,7 @@ export interface FileRoutesByTo {
   '/insights': typeof DashboardInsightsIndexRoute
   '/run': typeof DashboardRunIndexRoute
   '/runs': typeof DashboardRunsIndexRoute
+  '/sessions': typeof DashboardSessionsIndexRoute
   '/apps/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/apps/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/ai/experiments': typeof DashboardAiExperimentsIndexRoute
@@ -151,6 +175,8 @@ export interface FileRoutesByTo {
   '/apps/app': typeof DashboardAppsAppIndexRoute
   '/functions/config': typeof DashboardFunctionsConfigIndexRoute
   '/mcp/setup': typeof DashboardMcpSetupIndexRoute
+  '/sessions/$sessionKey': typeof DashboardSessionsSessionKeyIndexRoute
+  '/sessions/$sessionKey/$sessionId': typeof DashboardSessionsSessionKeySessionIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -164,6 +190,7 @@ export interface FileRoutesById {
   '/_dashboard/insights/': typeof DashboardInsightsIndexRoute
   '/_dashboard/run/': typeof DashboardRunIndexRoute
   '/_dashboard/runs/': typeof DashboardRunsIndexRoute
+  '/_dashboard/sessions/': typeof DashboardSessionsIndexRoute
   '/_dashboard/apps/_onboarding/choose-framework': typeof DashboardAppsOnboardingChooseFrameworkRoute
   '/_dashboard/apps/_onboarding/choose-template': typeof DashboardAppsOnboardingChooseTemplateRoute
   '/_dashboard/ai/experiments/': typeof DashboardAiExperimentsIndexRoute
@@ -171,6 +198,8 @@ export interface FileRoutesById {
   '/_dashboard/apps/app/': typeof DashboardAppsAppIndexRoute
   '/_dashboard/functions/config/': typeof DashboardFunctionsConfigIndexRoute
   '/_dashboard/mcp/setup/': typeof DashboardMcpSetupIndexRoute
+  '/_dashboard/sessions/$sessionKey/': typeof DashboardSessionsSessionKeyIndexRoute
+  '/_dashboard/sessions/$sessionKey/$sessionId/': typeof DashboardSessionsSessionKeySessionIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -184,6 +213,7 @@ export interface FileRouteTypes {
     | '/insights/'
     | '/run/'
     | '/runs/'
+    | '/sessions/'
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/ai/experiments/'
@@ -191,6 +221,8 @@ export interface FileRouteTypes {
     | '/apps/app/'
     | '/functions/config/'
     | '/mcp/setup/'
+    | '/sessions/$sessionKey/'
+    | '/sessions/$sessionKey/$sessionId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -201,6 +233,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/run'
     | '/runs'
+    | '/sessions'
     | '/apps/choose-framework'
     | '/apps/choose-template'
     | '/ai/experiments'
@@ -208,6 +241,8 @@ export interface FileRouteTypes {
     | '/apps/app'
     | '/functions/config'
     | '/mcp/setup'
+    | '/sessions/$sessionKey'
+    | '/sessions/$sessionKey/$sessionId'
   id:
     | '__root__'
     | '/'
@@ -220,6 +255,7 @@ export interface FileRouteTypes {
     | '/_dashboard/insights/'
     | '/_dashboard/run/'
     | '/_dashboard/runs/'
+    | '/_dashboard/sessions/'
     | '/_dashboard/apps/_onboarding/choose-framework'
     | '/_dashboard/apps/_onboarding/choose-template'
     | '/_dashboard/ai/experiments/'
@@ -227,6 +263,8 @@ export interface FileRouteTypes {
     | '/_dashboard/apps/app/'
     | '/_dashboard/functions/config/'
     | '/_dashboard/mcp/setup/'
+    | '/_dashboard/sessions/$sessionKey/'
+    | '/_dashboard/sessions/$sessionKey/$sessionId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -255,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/functions'
       fullPath: '/functions'
       preLoaderRoute: typeof DashboardFunctionsRouteRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/sessions/': {
+      id: '/_dashboard/sessions/'
+      path: '/sessions'
+      fullPath: '/sessions/'
+      preLoaderRoute: typeof DashboardSessionsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/runs/': {
@@ -306,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAppsOnboardingRouteRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/sessions/$sessionKey/': {
+      id: '/_dashboard/sessions/$sessionKey/'
+      path: '/sessions/$sessionKey'
+      fullPath: '/sessions/$sessionKey/'
+      preLoaderRoute: typeof DashboardSessionsSessionKeyIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/mcp/setup/': {
       id: '/_dashboard/mcp/setup/'
       path: '/mcp/setup'
@@ -355,6 +407,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAppsOnboardingChooseFrameworkRouteImport
       parentRoute: typeof DashboardAppsOnboardingRouteRoute
     }
+    '/_dashboard/sessions/$sessionKey/$sessionId/': {
+      id: '/_dashboard/sessions/$sessionKey/$sessionId/'
+      path: '/sessions/$sessionKey/$sessionId'
+      fullPath: '/sessions/$sessionKey/$sessionId/'
+      preLoaderRoute: typeof DashboardSessionsSessionKeySessionIdIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
@@ -399,10 +458,13 @@ interface DashboardRouteChildren {
   DashboardInsightsIndexRoute: typeof DashboardInsightsIndexRoute
   DashboardRunIndexRoute: typeof DashboardRunIndexRoute
   DashboardRunsIndexRoute: typeof DashboardRunsIndexRoute
+  DashboardSessionsIndexRoute: typeof DashboardSessionsIndexRoute
   DashboardAiExperimentsIndexRoute: typeof DashboardAiExperimentsIndexRoute
   DashboardAiScoresIndexRoute: typeof DashboardAiScoresIndexRoute
   DashboardAppsAppIndexRoute: typeof DashboardAppsAppIndexRoute
   DashboardMcpSetupIndexRoute: typeof DashboardMcpSetupIndexRoute
+  DashboardSessionsSessionKeyIndexRoute: typeof DashboardSessionsSessionKeyIndexRoute
+  DashboardSessionsSessionKeySessionIdIndexRoute: typeof DashboardSessionsSessionKeySessionIdIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -415,10 +477,14 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardInsightsIndexRoute: DashboardInsightsIndexRoute,
   DashboardRunIndexRoute: DashboardRunIndexRoute,
   DashboardRunsIndexRoute: DashboardRunsIndexRoute,
+  DashboardSessionsIndexRoute: DashboardSessionsIndexRoute,
   DashboardAiExperimentsIndexRoute: DashboardAiExperimentsIndexRoute,
   DashboardAiScoresIndexRoute: DashboardAiScoresIndexRoute,
   DashboardAppsAppIndexRoute: DashboardAppsAppIndexRoute,
   DashboardMcpSetupIndexRoute: DashboardMcpSetupIndexRoute,
+  DashboardSessionsSessionKeyIndexRoute: DashboardSessionsSessionKeyIndexRoute,
+  DashboardSessionsSessionKeySessionIdIndexRoute:
+    DashboardSessionsSessionKeySessionIdIndexRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(

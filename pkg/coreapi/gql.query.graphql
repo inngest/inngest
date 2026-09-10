@@ -40,6 +40,18 @@ type Query {
 
   insights(sql: String!): InsightsQueryResult!
 
+  sessionKeys(search: String): [SessionKey!]!
+  sessions(
+    sessionKey: String!
+    sessionIdSearch: String
+    timeRange: TimeRangeInput
+  ): [SessionGroup!]!
+  sessionRuns(
+    sessionKey: String!
+    sessionId: String!
+    timeRange: TimeRangeInput
+  ): [SessionRun!]!
+
   workerConnections(
     first: Int! = 100
     after: String
@@ -77,6 +89,11 @@ input FunctionRunQuery {
 
 input FunctionRunsQuery {
   workspaceId: ID! = "local"
+}
+
+input TimeRangeInput {
+  from: Time!
+  until: Time
 }
 
 input StreamQuery {

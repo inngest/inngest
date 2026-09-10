@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { NewCodeBlock } from '@inngest/components/NewCodeBlock/NewCodeBlock';
 import {
+  usePathCreator,
+  type PathCreator,
+} from '@inngest/components/SharedContext/usePathCreator';
+import {
   format,
   formatInTimeZone,
   isValidDate,
@@ -14,11 +18,13 @@ import { toast } from 'sonner';
 
 import { InsightsColumnType } from '@/store/generated';
 import { getFormattedJSONObjectOrArrayString } from './json';
+import { buildPathHintMonacoLinks, type PathHintLike } from './pathHints';
 
 export type CellDetailData = {
   rowIndex: number;
   columnId: string;
   columnType: InsightsColumnType;
+  columnPathHints: readonly PathHintLike[] | null | undefined;
   value: unknown;
 };
 
@@ -33,6 +39,8 @@ export function CellDetail({
 }: {
   selectedCell: CellDetailData | null;
 }) {
+  const { pathCreator } = usePathCreator();
+
   if (!selectedCell) {
     return (
       <div className="text-muted flex h-full items-center justify-center text-sm">
@@ -54,7 +62,9 @@ export function CellDetail({
       <div className="min-h-0 flex-1 overflow-auto px-4 py-1">
         <CellValueDisplay
           columnType={selectedCell.columnType}
+          columnPathHints={selectedCell.columnPathHints}
           value={selectedCell.value}
+          pathCreator={pathCreator}
         />
       </div>
       <div className="border-subtle flex items-center gap-1.5 border-t px-4 py-3">
@@ -76,10 +86,14 @@ export function CellDetail({
 
 function CellValueDisplay({
   columnType,
+  columnPathHints,
   value,
+  pathCreator,
 }: {
   columnType: InsightsColumnType;
+  columnPathHints: readonly PathHintLike[] | null | undefined;
   value: unknown;
+  pathCreator: PathCreator;
 }) {
   const { content, language } = useMemo(() => {
     if (value == null) {
@@ -106,11 +120,29 @@ function CellValueDisplay({
     return <DateDisplay value={value} />;
   }
 
+  // A hinted value can be the column's own whole value (a bare scalar
+  // cell, e.g. a plain-text run_id column, or a whole array --
+  // pkg/duckdb/insights/tables.go's event_ids/sessions comments -- whose
+  // elements the hint describes) or a value found at some JSON sub-path
+  // of it (e.g. an OTel attribute key inside `attributes`, or a field of
+  // each element inside `inputs`) -- buildPathHintMonacoLinks resolves
+  // every pathHints entry the same way the backend itself does. Either
+  // way, the text still renders exactly as it does today (plaintext or
+  // JSON); only plain-click link overlays are added (NewCodeBlock's
+  // monacoLinks).
+  const monacoLinks = buildPathHintMonacoLinks(
+    columnPathHints,
+    value,
+    columnType,
+    pathCreator,
+  );
+
   return (
     <div className="bg-codeEditor border-subtle h-full overflow-hidden rounded-lg border">
       <NewCodeBlock
         tab={{ content, language, readOnly: true }}
         scrollbarOptions={{ vertical: 'auto', horizontal: 'auto' }}
+        monacoLinks={monacoLinks}
       />
     </div>
   );
@@ -130,15 +162,18 @@ function DateDisplay({ value }: { value: unknown }) {
 
   return (
     <div className="bg-canvasSubtle flex flex-col gap-3 rounded p-2 text-sm">
-      <DateRow label="ISO 8601" value={isoString} />
-      <DateRow label="UTC" value={utcString} />
-      <DateRow label="LOCAL" value={localString} />
-      <DateRow label="UNIX MS" value={unixMs} />
+      <CopyableRow label="ISO 8601" value={isoString} />
+      <CopyableRow label="UTC" value={utcString} />
+      <CopyableRow label="LOCAL" value={localString} />
+      <CopyableRow label="UNIX MS" value={unixMs} />
     </div>
   );
 }
 
-function DateRow({ label, value }: { label: string; value: string }) {
+// Shared by DateDisplay's ISO/UTC/LOCAL/UNIX rows and HintedArrayItem's
+// unlinked fallback (a session with no pathCreator.session, or a value
+// that doesn't actually look like {key, id}).
+function CopyableRow({ label, value }: { label: string; value: string }) {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(value);
     toast.success('Copied to clipboard');

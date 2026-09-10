@@ -36,7 +36,9 @@ import {
 } from '@/store/generated';
 import type { CellDetailData } from './CellDetail';
 import { NoResultsState, QueryEmptyState } from './EmptyStates';
+import { badgeHintHref, idHintHref } from './hintLinks';
 import { INSIGHTS_FUNCTIONS, INSIGHTS_TABLES } from './insightsSchema';
+import { rootHint } from './pathHints';
 import { Section } from './Section';
 
 // Sourced from the generated schema (make insights-schema) rather than
@@ -47,33 +49,40 @@ const TABLES = INSIGHTS_TABLES.map((table) => table.name);
 // Deduped across all six tables -- SQLCompletionConfig.columns is a flat
 // list with no table association, so e.g. run_id (shared by several
 // tables) only needs to appear once. Keeps the first table's own wording
-// for a shared column's description (they're consistent enough across
-// tables -- e.g. run_id is always "The run this ... belongs to" -- that
-// picking one over another doesn't matter).
+// for a shared column's description and type (they're consistent enough
+// across tables -- e.g. run_id is always a "The run this ... belongs to"
+// STRING -- that picking one over another doesn't matter).
 const COLUMNS = (() => {
-  const descriptionByName = new Map<string, string>();
+  const byName = new Map<string, { description: string; type: string }>();
   for (const table of INSIGHTS_TABLES) {
     for (const column of table.columns) {
-      if (!descriptionByName.has(column.name)) {
-        descriptionByName.set(column.name, column.description);
+      if (!byName.has(column.name)) {
+        byName.set(column.name, {
+          description: column.description,
+          type: column.type,
+        });
       }
     }
   }
-  return Array.from(descriptionByName, ([name, description]) => ({
+  return Array.from(byName, ([name, { description, type }]) => ({
     name,
     description,
+    type,
   }));
 })();
 
-// A generic "$1" snippet placeholder between parens -- the schema dump has
-// no per-function argument signature to draw a real one from, but this
-// still lands the cursor in the right place after accepting the
-// suggestion, and gives every function a consistent Function-kind
-// suggestion instead of leaving it out of autocomplete entirely.
+// `signature` here is deliberately just a generic "$1" snippet placeholder
+// between parens, not fn.signature's own real parameter names -- it only
+// needs to land the cursor in the right place after accepting the
+// suggestion, and a fixed shape works the same for every function
+// regardless of its real arity. fn.signature (the real, docs-scraped call
+// signature, e.g. "concat_ws(separator, string, ...)") is shown as the
+// suggestion's own `detail` instead, the same way a column's type is.
 const FUNCTIONS = INSIGHTS_FUNCTIONS.map((fn) => ({
   name: fn.name,
   signature: `${fn.name}($1)`,
   description: fn.description,
+  detail: fn.signature,
 }));
 
 // COUNT/SUM/AVG/MIN/MAX etc. are real entries in FUNCTIONS now (sourced
@@ -137,26 +146,6 @@ type ResultRow = { id: string; values: unknown[] };
 // element (see pkg/duckdb/insights/tables.go's event_ids comment). Cap how
 // many of those we link so one wide array can't blow out a row's height.
 const MAX_HINTED_LIST_ITEMS = 1;
-
-function idHintHref(
-  hint: InsightsColumnHint.RunId | InsightsColumnHint.EventId,
-  pathCreator: PathCreator,
-  id: string,
-): string {
-  return hint === InsightsColumnHint.RunId
-    ? pathCreator.runPopout({ runID: id })
-    : pathCreator.eventPopout({ eventID: id });
-}
-
-function badgeHintHref(
-  hint: InsightsColumnHint.AppId | InsightsColumnHint.FunctionId,
-  pathCreator: PathCreator,
-  value: string,
-): string {
-  return hint === InsightsColumnHint.AppId
-    ? pathCreator.app({ externalAppID: value })
-    : pathCreator.function({ functionSlug: value });
-}
 
 // App/function ID columns actually carry the app's name / function's slug
 // (see pkg/duckdb/insights/tables.go), so they render as a clickable badge
@@ -352,7 +341,12 @@ export function InsightsQueryTab({
         header: column.name,
         accessorFn: (row: ResultRow) => row.values[i],
         cell: (info) =>
-          renderCell(info.getValue(), column.type, column.hint, pathCreator),
+          renderCell(
+            info.getValue(),
+            column.type,
+            rootHint(column.pathHints),
+            pathCreator,
+          ),
         minSize: COLUMN_SIZE_BY_TYPE[column.type] ?? DEFAULT_COLUMN_SIZE,
       })),
     [result?.columns, pathCreator],
@@ -369,7 +363,13 @@ export function InsightsQueryTab({
         result?.columns.findIndex((c) => c.name === columnId) ?? -1;
       const col = colIndex === -1 ? undefined : result?.columns[colIndex];
       if (!col) return;
-      onSelectedCellChange({ rowIndex, columnId, columnType: col.type, value });
+      onSelectedCellChange({
+        rowIndex,
+        columnId,
+        columnType: col.type,
+        columnPathHints: col.pathHints,
+        value,
+      });
     },
     [result, onSelectedCellChange],
   );
@@ -418,6 +418,7 @@ export function InsightsQueryTab({
         rowIndex: nextRow,
         columnId: nextColumnId,
         columnType: nextCol.type,
+        columnPathHints: nextCol.pathHints,
         value,
       });
     },

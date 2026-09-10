@@ -73,7 +73,7 @@ func TestQuackDecodeErrorResponse(t *testing.T) {
 }
 
 func TestQuackEncodePrepareRequest(t *testing.T) {
-	msg := encodeQuackPrepareRequest("conn-1", "SELECT 1")
+	msg := encodeQuackPrepareRequest("conn-1", "SELECT 1", randomQuackHugeint())
 	r := newQuackReader(msg)
 	hdr, err := decodeQuackMessageHeader(r)
 	require.NoError(t, err)
@@ -112,6 +112,52 @@ func buildFlatIntegerChunk(t *testing.T, value int32) []byte {
 	w.endObject()
 	w.endObject()
 	return w.bytes()
+}
+
+// buildFlatDateChunk constructs the wire bytes for a single-column,
+// single-row DataChunk of LogicalTypeId Date with a Flat vector — same shape
+// as buildFlatIntegerChunk, but days-since-epoch is DATE's physical value.
+func buildFlatDateChunk(t *testing.T, days int32) []byte {
+	t.Helper()
+	w := &quackWriter{}
+	w.beginObject()
+	w.writeUint64(100, 1) // rows
+	w.writeFieldID(101)
+	w.beginList(1)
+	w.beginObject()
+	w.writeByte(100, quackLogicalTypeDate)
+	w.endObject()
+	w.writeFieldID(102)
+	w.beginList(1)
+	w.beginObject()
+	w.writeBool(100, false)
+	w.writeFieldID(102)
+	data := make([]byte, 4)
+	data[0] = byte(days)
+	data[1] = byte(days >> 8)
+	data[2] = byte(days >> 16)
+	data[3] = byte(days >> 24)
+	w.writeData(data)
+	w.endObject()
+	w.endObject()
+	return w.bytes()
+}
+
+func TestQuackDecodeChunkFlatDate(t *testing.T) {
+	want := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	days := int32(want.Sub(time.Unix(0, 0).UTC()).Hours() / 24)
+
+	body := buildFlatDateChunk(t, days)
+	r := newQuackReader(body)
+	c, err := decodeQuackDataChunk(r)
+	require.NoError(t, err)
+	require.Equal(t, 1, c.rowCount)
+	require.Len(t, c.columns, 1)
+	require.Equal(t, quackLogicalTypeDate, c.columns[0].typeID)
+
+	values, err := c.columns[0].values()
+	require.NoError(t, err)
+	require.Equal(t, []any{want}, values)
 }
 
 func TestQuackDecodeChunkFlatInteger(t *testing.T) {

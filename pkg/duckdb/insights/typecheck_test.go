@@ -9,7 +9,7 @@ import (
 func typeOfFirstColumn(t *testing.T, sql string) ColumnType {
 	t.Helper()
 	stmt := mustParse(t, sql)
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 	return inferType(stmt.Columns[0].Expr, scope)
 }

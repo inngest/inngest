@@ -39,8 +39,8 @@ func TestExecuteReturnsTypedColumnsAndRows(t *testing.T) {
 	require.Len(t, result.Columns, 2)
 	require.Equal(t, "run_id", result.Columns[0].Name)
 	require.Equal(t, insights.ColumnTypeString, result.Columns[0].Type)
-	require.Equal(t, insights.HintRunID, result.Columns[0].Hint)
-	require.Equal(t, insights.HintNone, result.Columns[1].Hint)
+	require.Equal(t, insights.HintRunID, result.Columns[0].Hint())
+	require.Equal(t, insights.HintNone, result.Columns[1].Hint())
 
 	require.Len(t, result.Rows, 1)
 	require.Equal(t, runID, result.Rows[0][0])
@@ -114,5 +114,5 @@ func TestExecuteEmptyResultStillReportsColumns(t *testing.T) {
 	// still report its column, not silently drop it.
 	require.Len(t, result.Columns, 1)
 	require.Equal(t, "run_id", result.Columns[0].Name)
-	require.Equal(t, insights.HintRunID, result.Columns[0].Hint)
+	require.Equal(t, insights.HintRunID, result.Columns[0].Hint())
 }

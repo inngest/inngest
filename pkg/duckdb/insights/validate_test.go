@@ -58,11 +58,12 @@ func TestValidateAccepts(t *testing.T) {
 		"SELECT ISODOW(queued_at), WEEK(queued_at), QUARTER(queued_at) FROM runs",
 		"SELECT JSON_OBJECT('run', run_id), JSON_ARRAY(1, 2) FROM runs",
 		"SELECT LIST_CONTAINS(event_ids, 'x'), ARRAY_LENGTH(event_ids) FROM runs",
+		"SELECT TODAY(), CURRENT_DATE() FROM runs",
 	}
 	for _, q := range queries {
 		t.Run(q, func(t *testing.T) {
 			stmt := mustParse(t, q)
-			_, _, err := validate(stmt)
+			_, _, _, err := validate(stmt)
 			require.NoError(t, err)
 		})
 	}
@@ -70,7 +71,7 @@ func TestValidateAccepts(t *testing.T) {
 
 func TestValidateAcceptsNamedWindowClause(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id, SUM(1) OVER w FROM runs WINDOW w AS (PARTITION BY app_id ORDER BY run_id)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -83,7 +84,7 @@ func TestValidateAcceptsNamedWindowClause(t *testing.T) {
 // named window's PARTITION BY/ORDER BY through completely unchecked.
 func TestValidateRejectsUnknownColumnInNamedWindowClause(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id, SUM(1) OVER w FROM runs WINDOW w AS (PARTITION BY nonexistent_evil_column)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -94,7 +95,7 @@ func TestValidateRejectsUnknownColumnInNamedWindowClause(t *testing.T) {
 // editor instead of the whole bad identifier.
 func TestValidateErrorSpansOffendingIdentifier(t *testing.T) {
 	stmt := mustParse(t, "SELECT nonexistent_evil_column FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 
 	verr, ok := err.(*ValidationError)
@@ -105,7 +106,7 @@ func TestValidateErrorSpansOffendingIdentifier(t *testing.T) {
 
 func TestValidateAcceptsDistinctOn(t *testing.T) {
 	stmt := mustParse(t, "SELECT DISTINCT ON (app_id) run_id FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -113,14 +114,14 @@ func TestValidateAcceptsDistinctOn(t *testing.T) {
 // is a separate top-level field collectExprs didn't walk.
 func TestValidateRejectsUnknownColumnInDistinctOn(t *testing.T) {
 	stmt := mustParse(t, "SELECT DISTINCT ON (nonexistent_evil_column) run_id FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
 func TestValidateAcceptsGroupingSets(t *testing.T) {
 	stmt := mustParse(t, "SELECT app_id, function_id, COUNT(*) FROM runs GROUP BY GROUPING SETS ((app_id), (function_id))")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -129,14 +130,14 @@ func TestValidateAcceptsGroupingSets(t *testing.T) {
 // one of its sets bypassed validation entirely.
 func TestValidateRejectsUnknownColumnInGroupingSets(t *testing.T) {
 	stmt := mustParse(t, "SELECT app_id, COUNT(*) FROM runs GROUP BY GROUPING SETS ((app_id), (nonexistent_evil_column))")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
 func TestValidateAcceptsStarExclude(t *testing.T) {
 	stmt := mustParse(t, "SELECT * EXCLUDE (run_id) FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -146,21 +147,21 @@ func TestValidateAcceptsStarExclude(t *testing.T) {
 // column set at all.
 func TestValidateRejectsUnknownColumnInStarExclude(t *testing.T) {
 	stmt := mustParse(t, "SELECT * EXCLUDE (nonexistent_evil_column) FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
 func TestValidateRejectsUnknownQualifierInStar(t *testing.T) {
 	stmt := mustParse(t, "SELECT bogus_alias.* FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown table")
 }
 
 func TestValidateRejectsUnknownTable(t *testing.T) {
 	stmt := mustParse(t, "SELECT * FROM nonexistent_table")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown table")
 }
@@ -177,7 +178,7 @@ func TestValidateRejectsNonUnnestTableFunctions(t *testing.T) {
 	for _, q := range queries {
 		t.Run(q, func(t *testing.T) {
 			stmt := mustParse(t, q)
-			_, _, err := validate(stmt)
+			_, _, _, err := validate(stmt)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "not allowed")
 		})
@@ -186,7 +187,7 @@ func TestValidateRejectsNonUnnestTableFunctions(t *testing.T) {
 
 func TestValidateRejectsUnnestWithWrongArgCount(t *testing.T) {
 	stmt := mustParse(t, "SELECT * FROM runs, UNNEST(run_id, app_id)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "exactly one argument")
 }
@@ -196,7 +197,7 @@ func TestValidateRejectsUnnestArgumentToUnknownColumn(t *testing.T) {
 	// bogus_column doesn't exist, so this must fail rather than reach
 	// remapTables/DuckDB unchecked.
 	stmt := mustParse(t, "SELECT * FROM runs, UNNEST(bogus_column)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -206,7 +207,7 @@ func TestValidateRejectsDotAccessOnNonJSONColumn(t *testing.T) {
 	// run_id.foo must still fail as an unknown table rather than being
 	// silently accepted as a JSON path extraction.
 	stmt := mustParse(t, "SELECT run_id.foo FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `unknown table "run_id"`)
 }
@@ -215,28 +216,28 @@ func TestValidateRejectsDeepDotAccessOnNonJSONQualifiedColumn(t *testing.T) {
 	// runs.run_id is a real, known column, but it's a string, not JSON,
 	// so a path past it must still be rejected.
 	stmt := mustParse(t, "SELECT runs.run_id.foo FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported identifier")
 }
 
 func TestValidateRejectsUnknownColumn(t *testing.T) {
 	stmt := mustParse(t, "SELECT nonexistent_column FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
 func TestValidateRejectsDisallowedFunction(t *testing.T) {
 	stmt := mustParse(t, "SELECT read_csv('/etc/passwd') FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not allowed")
 }
 
 func TestValidateAcceptsSubquery(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM runs)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -247,7 +248,7 @@ func TestValidateAcceptsCorrelatedSubquery(t *testing.T) {
 	// "runs" even though the subquery's own FROM is "events", which has
 	// no "status" column of its own. See tableScope.outer's doc comment.
 	stmt := mustParse(t, "SELECT run_id FROM runs WHERE run_id IN (SELECT id FROM events WHERE status = runs.status)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -257,7 +258,7 @@ func TestValidateRejectsCorrelatedSubqueryToGenuinelyUnknownColumn(t *testing.T)
 	// correlation fallback finds nothing to resolve to, it doesn't ever
 	// silently succeed.
 	stmt := mustParse(t, "SELECT run_id FROM runs WHERE run_id IN (SELECT id FROM events WHERE bogus_evil_column = 1)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -267,7 +268,7 @@ func TestValidateAcceptsMultiLevelCorrelatedSubquery(t *testing.T) {
 	// can still reach the outermost query's own scope, not just its
 	// immediate parent's.
 	stmt := mustParse(t, "SELECT run_id FROM runs WHERE EXISTS (SELECT 1 FROM events WHERE EXISTS (SELECT 1 FROM extended_trace_spans WHERE extended_trace_spans.run_id = runs.run_id))")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -277,7 +278,7 @@ func TestValidateAcceptsLateralFromSubquery(t *testing.T) {
 	// reference columns from FROM items that appear strictly *before* it
 	// in the same FROM clause.
 	stmt := mustParse(t, "SELECT run_id FROM runs, LATERAL (SELECT id FROM events WHERE events.id = runs.run_id) AS sub")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -288,7 +289,7 @@ func TestValidateRejectsNonLateralFromSubqueryCorrelation(t *testing.T) {
 	// unresolvable qualifier is reported as "unknown table", same as any
 	// other bogus qualifier (TestValidateRejectsUnknownQualifierInStar).
 	stmt := mustParse(t, "SELECT run_id FROM runs, (SELECT id FROM events WHERE events.id = runs.run_id) AS sub")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown table")
 }
@@ -298,39 +299,39 @@ func TestValidateRejectsLateralFromSubqueryCorrelatingToLaterItem(t *testing.T) 
 	// can't see a FROM item that appears *after* it, even though that
 	// item is otherwise in scope for the enclosing query as a whole.
 	stmt := mustParse(t, "SELECT run_id FROM LATERAL (SELECT id FROM events WHERE events.id = runs.run_id) AS sub, runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown table")
 }
 
 func TestValidateAcceptsCTE(t *testing.T) {
 	stmt := mustParse(t, "WITH x AS (SELECT run_id FROM runs) SELECT * FROM x")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateAcceptsSequentialCTEs(t *testing.T) {
 	stmt := mustParse(t, "WITH a AS (SELECT run_id, app_id FROM runs), b AS (SELECT run_id FROM a) SELECT * FROM b")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateAcceptsFromSubquery(t *testing.T) {
 	stmt := mustParse(t, "SELECT sub.run_id FROM (SELECT run_id FROM runs) AS sub")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateRejectsFromSubqueryWithoutAlias(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM (SELECT run_id FROM runs)")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "alias")
 }
 
 func TestValidateRejectsCTEUnknownColumn(t *testing.T) {
 	stmt := mustParse(t, "WITH x AS (SELECT nonexistent_evil_column FROM runs) SELECT * FROM x")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -339,7 +340,7 @@ func TestValidateRejectsReferenceToOuterColumnFromCTEBody(t *testing.T) {
 	// A CTE's own body only ever sees its own FROM scope plus earlier
 	// CTEs -- never anything from whatever eventually consumes it.
 	stmt := mustParse(t, "WITH x AS (SELECT run_id FROM runs WHERE run_id = outer_alias.run_id) SELECT * FROM x, runs AS outer_alias")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown")
 }
@@ -349,41 +350,41 @@ func TestValidateRejectsSelfReferencingCTE(t *testing.T) {
 	// themselves -- x isn't yet a known table while its own body is being
 	// validated.
 	stmt := mustParse(t, "WITH x AS (SELECT run_id FROM x) SELECT * FROM x")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown table")
 }
 
 func TestValidateRejectsRecursiveCTE(t *testing.T) {
 	stmt := mustParse(t, "WITH RECURSIVE x AS (SELECT run_id FROM runs) SELECT * FROM x")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "recursive")
 }
 
 func TestValidateRejectsUnaliasedComputedColumnInCTE(t *testing.T) {
 	stmt := mustParse(t, "WITH x AS (SELECT COUNT(*) FROM runs) SELECT * FROM x")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must have an alias")
 }
 
 func TestValidateAcceptsCTEReferencedTwice(t *testing.T) {
 	stmt := mustParse(t, "WITH x AS (SELECT run_id, app_id FROM runs) SELECT a.run_id FROM x a JOIN x b ON a.app_id = b.app_id")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateRejectsLambdaOnUnknownColumn(t *testing.T) {
 	stmt := mustParse(t, "SELECT bogus -> 'x' FROM extended_trace_spans")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
 func TestValidateRejectsMultiParamLambda(t *testing.T) {
 	stmt := mustParse(t, "SELECT list_transform([1,2], (x, y) -> x + y) FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 }
 
@@ -391,13 +392,13 @@ func TestValidateAcceptsListComprehension(t *testing.T) {
 	// e is a loop variable bound by the comprehension itself, not a real
 	// column of runs -- it must resolve without ever consulting scope.
 	stmt := mustParse(t, "SELECT [UPPER(e) FOR e IN event_ids] FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateAcceptsListComprehensionWithFilter(t *testing.T) {
 	stmt := mustParse(t, "SELECT [e FOR e IN event_ids IF e IS NOT NULL] FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
@@ -407,13 +408,13 @@ func TestValidateAcceptsNestedListComprehension(t *testing.T) {
 	// again before the outer one (x) is pushed, or the two would bleed
 	// into each other.
 	stmt := mustParse(t, "SELECT [x FOR x IN [y FOR y IN event_ids]] FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.NoError(t, err)
 }
 
 func TestValidateRejectsListComprehensionUnknownColumnInSource(t *testing.T) {
 	stmt := mustParse(t, "SELECT [e FOR e IN nonexistent_evil_column] FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -422,7 +423,7 @@ func TestValidateRejectsListComprehensionUnknownColumnInBody(t *testing.T) {
 	// nonexistent_evil_column is neither a real column nor the
 	// comprehension's own bound variable (e) -- still rejected.
 	stmt := mustParse(t, "SELECT [nonexistent_evil_column FOR e IN event_ids] FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
@@ -432,7 +433,7 @@ func TestValidateRejectsListComprehensionVariableLeakingOutsideItsScope(t *testi
 	// validation moves past it, a bare "e" outside must still fail as
 	// unknown, proving the binding doesn't leak into the rest of the query.
 	stmt := mustParse(t, "SELECT [e FOR e IN event_ids], e FROM runs")
-	_, _, err := validate(stmt)
+	_, _, _, err := validate(stmt)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }

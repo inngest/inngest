@@ -118,9 +118,9 @@ func toInsightsQueryResult(tr *insights.TranspileResult, result *insights.Result
 	columns := make([]*models.InsightsQueryColumn, len(result.Columns))
 	for i, c := range result.Columns {
 		columns[i] = &models.InsightsQueryColumn{
-			Name: c.Name,
-			Type: toGQLColumnType(c.Type),
-			Hint: toGQLColumnHint(c.Hint),
+			Name:      c.Name,
+			Type:      toGQLColumnType(c.Type),
+			PathHints: toGQLPathHints(c.PathHints),
 		}
 	}
 
@@ -204,6 +204,42 @@ func toGQLColumnType(t insights.ColumnType) models.InsightsColumnType {
 	}
 }
 
+// toGQLPathHints converts a column's whole []insights.PathHint verbatim --
+// see gql.schema.graphql's InsightsPathHint/InsightsPathSegment doc
+// comments for how a consumer (a UI cell-detail renderer, ultimately)
+// reads path/wildcard entries the same way pkg/duckdb/insights' own
+// resolveSubPathHint/resolveArrayElementHint do. A HintNone entry (never
+// actually produced by pkg/duckdb/insights, whose own hint() lookups
+// treat "not found" as HintNone without materializing an entry for it)
+// is skipped defensively rather than surfaced as a meaningless hint.
+func toGQLPathHints(hints []insights.PathHint) []*models.InsightsPathHint {
+	out := make([]*models.InsightsPathHint, 0, len(hints))
+	for _, ph := range hints {
+		hint := toGQLColumnHint(ph.Hint)
+		if hint == nil {
+			continue
+		}
+		out = append(out, &models.InsightsPathHint{
+			Path: toGQLPathSegments(ph.Path),
+			Hint: *hint,
+		})
+	}
+	return out
+}
+
+func toGQLPathSegments(path []insights.PathSegment) []*models.InsightsPathSegment {
+	segs := make([]*models.InsightsPathSegment, len(path))
+	for i, s := range path {
+		seg := &models.InsightsPathSegment{Wildcard: s.Wildcard}
+		if !s.Wildcard {
+			key := s.Key
+			seg.Key = &key
+		}
+		segs[i] = seg
+	}
+	return segs
+}
+
 func toGQLColumnHint(h insights.ColumnHint) *models.InsightsColumnHint {
 	var hint models.InsightsColumnHint
 	switch h {
@@ -215,6 +251,8 @@ func toGQLColumnHint(h insights.ColumnHint) *models.InsightsColumnHint {
 		hint = models.InsightsColumnHintRunID
 	case insights.HintEventID:
 		hint = models.InsightsColumnHintEventID
+	case insights.HintSession:
+		hint = models.InsightsColumnHintSession
 	default:
 		return nil
 	}

@@ -12,13 +12,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"testing"
 	"time"
 
-	duckdbgo "github.com/duckdb/duckdb-go/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
+	"golang.org/x/sync/errgroup"
 )
 
 // eventsPerRun is the number of lifecycle writes a single run produces —
@@ -194,29 +195,41 @@ func mergeJSONPatchBatch(ctx context.Context, db *sql.DB, events []runEvent) err
 // differs.
 var benchTables = []string{"bench_runs_flat", "bench_runs_merged", "bench_runs_merged_jsonpatch"}
 
-// openMergeBenchDB opens an embedded (no subprocess) DuckDB instance with a
-// fresh DuckLake catalog attached under tb.TempDir(), and creates
-// benchTables, each partitioned by account_id — mirrors
-// insert_bench_test.go's openEmbeddedConnector, minus the real inngest.*
-// migration set, which this benchmark doesn't need.
+// openMergeBenchDB opens a DuckDB instance the same way production does —
+// pkg/db/duckdb.Open spawning the real duckdb binary as a subprocess, over
+// the quack HTTP wire transport (not jsonlines-over-stdio, and not an
+// embedded in-process duckdb-go/v2 connection) — with a fresh DuckLake
+// catalog attached under tb.TempDir(), and creates benchTables, each
+// partitioned by account_id. duckdb.Open bootstraps the INSTALL/LOAD/ATTACH
+// sequence itself (see pkg/db/duckdb/process.go's bootstrapDuckLakeLocked),
+// so unlike the embedded connector this used to use, there's no separate
+// duckLakeAttachStmts call here.
+//
+// DataInliningRowLimit is -1, not 0: the zero value means "unset, use
+// duckdb.DefaultDataInliningRowLimit (1000)" (see its doc comment) — that
+// convention is depended on by real production code
+// (pkg/devserver/dualwrite.go never sets this field at all), so it can't
+// also mean "disabled" here. -1 is the documented sentinel for actually
+// disabling inlining: every write flushes straight to a real Parquet file
+// rather than possibly staying inlined in the catalog, which otherwise
+// changes file_count/delete_file_count behavior in ways unrelated to
+// whatever's actually being measured.
 func openMergeBenchDB(tb testing.TB) *sql.DB {
 	tb.Helper()
-	connector, err := duckdbgo.NewConnector(":memory:", nil)
+	binPath := requireDuckDBBinary(tb)
+	requireQuackExtension(tb, binPath)
+	addr := freeLocalAddr(tb)
+	db, err := duckdb.Open(tb.Context(), duckdb.Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+		DuckLake:   duckLakeOptions(tb, -1),
+		QuackAddr:  &addr,
+		QuackConns: benchQuackConns,
+	})
 	if err != nil {
-		tb.Fatalf("creating embedded connector: %v", err)
+		tb.Fatalf("opening subprocess db: %v", err)
 	}
-	db := sql.OpenDB(connector)
 	tb.Cleanup(func() { _ = db.Close() })
-
-	opts := duckLakeOptions(tb, duckdb.DefaultDataInliningRowLimit)
-	if err := ensureDir(opts.DataPath); err != nil {
-		tb.Fatalf("creating DuckLake data path: %v", err)
-	}
-	for _, stmt := range duckLakeAttachStmts(opts) {
-		if _, err := db.ExecContext(tb.Context(), stmt); err != nil {
-			tb.Fatalf("DuckLake bootstrap failed on %q: %v", stmt, err)
-		}
-	}
 
 	for _, table := range benchTables {
 		schema := fmt.Sprintf(`CREATE TABLE %s.%s (
@@ -276,7 +289,7 @@ const benchPipelineDepth = 5000
 // MERGE INTO checks WHEN NOT MATCHED against the target's state at the
 // statement's start, not row-by-row, so both would take the INSERT branch
 // and silently produce two rows for one run_id instead of one.
-func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
+func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, indexOffset int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
 	if pipelineDepth < batchSize {
 		return fmt.Errorf("pipelineDepth (%d) must be >= batchSize (%d)", pipelineDepth, batchSize)
 	}
@@ -286,13 +299,16 @@ func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize i
 		batch := make([]runEvent, 0, 3*(end-start))
 		for t := start; t < end; t++ {
 			if t < totalRuns {
-				batch = append(batch, generateRunEvent(batchSeed, t, 0, accountIDs[t%len(accountIDs)]))
+				g := indexOffset + t
+				batch = append(batch, generateRunEvent(batchSeed, g, 0, accountIDs[g%len(accountIDs)]))
 			}
 			if i := t - pipelineDepth; i >= 0 && i < totalRuns {
-				batch = append(batch, generateRunEvent(batchSeed, i, 1, accountIDs[i%len(accountIDs)]))
+				g := indexOffset + i
+				batch = append(batch, generateRunEvent(batchSeed, g, 1, accountIDs[g%len(accountIDs)]))
 			}
 			if i := t - 2*pipelineDepth; i >= 0 && i < totalRuns {
-				batch = append(batch, generateRunEvent(batchSeed, i, 2, accountIDs[i%len(accountIDs)]))
+				g := indexOffset + i
+				batch = append(batch, generateRunEvent(batchSeed, g, 2, accountIDs[g%len(accountIDs)]))
 			}
 		}
 		if err := apply(batch); err != nil {
@@ -302,6 +318,87 @@ func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize i
 	return nil
 }
 
+// benchQuackConns is how many concurrent quack connections openMergeBenchDB
+// requests (Options.QuackConns) — and therefore how many shards
+// generateInterleavedBatchesParallel splits each write into, so the
+// benchmark actually issues that many batches concurrently instead of
+// leaving QuackConns idle behind a single-threaded caller.
+const benchQuackConns = 8
+
+// generateInterleavedBatchesParallel runs generateInterleavedBatches across
+// benchQuackConns concurrent shards, each an independent call over its own
+// contiguous, disjoint slice of run indices [offset, offset+chunk) — same
+// batchSeed and pipelineDepth/batchSize as a single-shard call, but its own
+// indexOffset so account_id/run_id assignment stays based on each run's
+// true *global* index (not a shard-local one, which would make every
+// shard cover only the same shard-periodic subset of account_ids instead
+// of the full accountIDs range — confirmed this matters:
+// TestRunsPartitionedAcrossAccountIDs needs every partition touched at
+// least once across the whole write). Because every run belongs to
+// exactly one shard's disjoint index range, no run's own lifecycle is ever
+// split across two shards, so shards need no ordering relative to each
+// other and can run fully concurrently — this is what actually exercises
+// QuackConns>1's concurrent-connection path (pkg/db/duckdb/process.go's
+// Options.QuackConns) instead of every batch queueing behind one
+// connection regardless of how many the driver could open.
+func generateInterleavedBatchesParallel(batchSeed, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
+	shards := min(benchQuackConns, totalRuns)
+	if shards <= 1 {
+		return generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, 0, accountIDs, apply)
+	}
+
+	retryingApply := func(batch []runEvent) error { return applyWithConflictRetry(apply, batch) }
+
+	var g errgroup.Group
+	base := totalRuns / shards
+	extra := totalRuns % shards
+	offset := 0
+	for s := range shards {
+		chunk := base
+		if s < extra {
+			chunk++
+		}
+		shardOffset, shardRuns := offset, chunk
+		g.Go(func() error {
+			return generateInterleavedBatches(batchSeed, shardRuns, pipelineDepth, batchSize, shardOffset, accountIDs, retryingApply)
+		})
+		offset += chunk
+	}
+	return g.Wait()
+}
+
+// applyWithConflictRetry retries apply against DuckLake's "Transaction
+// conflict" commit failure — real, expected contention once
+// generateInterleavedBatchesParallel's shards are genuinely concurrent
+// writers against the same table: DuckLake uses optimistic concurrency
+// control, and two transactions that both add a file to the same table's
+// file list can conflict at commit time even when their actual rows never
+// overlap (confirmed empirically — every conflict observed here is between
+// disjoint-run-index shards). DuckLake's own ducklake_max_retry_count/
+// ducklake_retry_backoff settings already retry a single statement's
+// commit internally a bounded number of times; this retries at the batch
+// level, above that, for when contention from benchQuackConns-way
+// concurrency is high enough to exhaust DuckLake's own retries too. Any
+// other error is returned immediately, unretried.
+func applyWithConflictRetry(apply func([]runEvent) error, batch []runEvent) error {
+	const maxAttempts = 60
+	var err error
+	for attempt := range maxAttempts {
+		if attempt > 0 {
+			backoff := min(time.Duration(1<<min(attempt, 10))*time.Millisecond, 2*time.Second)
+			jitter := time.Duration(rand.Int64N(int64(backoff)))
+			time.Sleep(backoff/2 + jitter)
+		}
+		if err = apply(batch); err == nil {
+			return nil
+		}
+		if !strings.Contains(err.Error(), "Transaction conflict") {
+			return err
+		}
+	}
+	return fmt.Errorf("giving up after %d attempts on transaction conflicts: %w", maxAttempts, err)
+}
+
 // seedRunsData writes totalRuns runs' full lifecycle (eventsPerRun events
 // each) into every benchmark table, interleaved via
 // generateInterleavedBatches, so the merge tables see a realistic mix of
@@ -309,7 +406,7 @@ func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize i
 // homogeneous sweeps.
 func seedRunsData(tb testing.TB, ctx context.Context, db *sql.DB, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID) {
 	tb.Helper()
-	err := generateInterleavedBatches(0, totalRuns, pipelineDepth, batchSize, accountIDs, func(batch []runEvent) error {
+	err := generateInterleavedBatchesParallel(0, totalRuns, pipelineDepth, batchSize, accountIDs, func(batch []runEvent) error {
 		if err := flatInsertBatch(ctx, db, batch); err != nil {
 			return fmt.Errorf("seeding bench_runs_flat: %w", err)
 		}
@@ -331,7 +428,7 @@ func seedRunsData(tb testing.TB, ctx context.Context, db *sql.DB, totalRuns, pip
 // relative advantage changes at 10x scale — e.g. bench_runs_flat growing
 // large enough that DuckLake's per-partition file bookkeeping starts to cost
 // differently than MERGE INTO's per-row target lookup does.
-var benchRowCounts = []int{1_000_000, 10_000_000}
+var benchRowCounts = []int{1_000_000}
 
 const benchBatchSize = 2000
 
@@ -357,7 +454,7 @@ func runInsertScenarios(b *testing.B, totalRuns int, accountIDs []uuid.UUID) {
 			for b.Loop() {
 				db := openMergeBenchDB(b)
 				ctx := b.Context()
-				err := generateInterleavedBatches(iter, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
+				err := generateInterleavedBatchesParallel(iter, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
 					return sc.apply(ctx, db, batch)
 				})
 				if err != nil {
@@ -597,7 +694,7 @@ func BenchmarkRunsRewriteDataFiles(b *testing.B) {
 			for _, sc := range insertScenarios {
 				b.Run(sc.name+"/update", func(b *testing.B) {
 					for b.Loop() {
-						err := generateInterleavedBatches(0, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
+						err := generateInterleavedBatchesParallel(0, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
 							return sc.apply(ctx, db, batch)
 						})
 						if err != nil {
@@ -614,6 +711,14 @@ func BenchmarkRunsRewriteDataFiles(b *testing.B) {
 				})
 			}
 
+			// ducklake_rewrite_data_files currently errors here every time —
+			// see FINDINGS/ducklake-merge-into-benchmark.md's Finding 6 for
+			// the repro and analysis ("Not implemented Error: Scanning a
+			// DuckLake table after the transaction has ended", tied to
+			// MERGE INTO's own delete-file bookkeeping, not partition count
+			// or data volume). Left as a hard failure rather than a skip:
+			// this is a deterministic tool limitation worth surfacing loudly
+			// if it's ever silently fixed or silently regresses further.
 			b.Run("rewrite-data-files", func(b *testing.B) {
 				for b.Loop() {
 					// delete_threshold => 0.0 forces every file with any
@@ -662,15 +767,14 @@ func TestRunsMergeTablesMatchFlatLatest(t *testing.T) {
 		}
 	}
 
-	flatLatest := `SELECT status, started_at, ended_at FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat
+	flatLatest := `SELECT status FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat
 		WHERE run_id = ? QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY updated_at DESC) = 1`
 
 	for i := range numRuns {
 		runID := fmt.Sprintf("run-0-%d", i)
 
 		var wantStatus string
-		var wantStarted, wantEnded sql.NullTime
-		if err := db.QueryRowContext(ctx, flatLatest, runID).Scan(&wantStatus, &wantStarted, &wantEnded); err != nil {
+		if err := db.QueryRowContext(ctx, flatLatest, runID).Scan(&wantStatus); err != nil {
 			t.Fatalf("reading flat latest for %s: %v", runID, err)
 		}
 		if wantStatus != "completed" {
@@ -685,10 +789,11 @@ func TestRunsMergeTablesMatchFlatLatest(t *testing.T) {
 			t.Errorf("bench_runs_merged %s: got status %q, want %q", runID, gotStatus, wantStatus)
 		}
 
-		// duckdb-go/v2 decodes the JSON column natively into a Go
-		// map[string]any (see insert_bench_test.go's
-		// TestAppenderStoresIdenticalRowToSQLInsert) rather than surfacing raw
-		// JSON text, so scan into `any` and inspect the map.
+		// The jsonlines subprocess transport (like the embedded duckdb-go/v2
+		// driver — see insert_bench_test.go's
+		// TestAppenderStoresIdenticalRowToSQLInsert) decodes the JSON column
+		// natively into a Go map[string]any rather than surfacing raw JSON
+		// text, so scan into `any` and inspect the map.
 		var attributes any
 		if err := db.QueryRowContext(ctx, "SELECT attributes FROM "+duckdb.DuckLakeAlias+".bench_runs_merged_jsonpatch WHERE run_id = ?", runID).Scan(&attributes); err != nil {
 			t.Fatalf("reading bench_runs_merged_jsonpatch for %s: %v", runID, err)

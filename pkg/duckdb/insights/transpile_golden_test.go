@@ -60,9 +60,16 @@ func TestTranspileGolden(t *testing.T) {
 			if err != nil {
 				out.Error = err.Error()
 			} else {
-				hints := make([]int, len(tr.ColumnHints))
-				for i, h := range tr.ColumnHints {
-					hints[i] = int(h)
+				// columnHints is derived from ColumnPathHints' own
+				// root (empty-Path) entry per column -- there's no
+				// separate ColumnHints result anymore (see
+				// buildColumnPathHints' own doc comment) -- kept as its
+				// own golden JSON field since it's the simple case a
+				// reader of these fixtures can check without parsing
+				// path-segment shapes.
+				hints := make([]int, len(tr.ColumnPathHints))
+				for i, ph := range tr.ColumnPathHints {
+					hints[i] = int(Column{PathHints: ph}.Hint())
 				}
 				diags := make([]diagnosticGoldenCase, len(tr.Diagnostics))
 				for i, d := range tr.Diagnostics {

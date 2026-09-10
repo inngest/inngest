@@ -7,6 +7,7 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 import { ScoresIcon } from '@inngest/components/icons/sections/Scores';
+import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 
 export type NavItemConfig = {
   label: string;
@@ -39,6 +40,15 @@ export const insightsNavItem: NavItemConfig = {
   label: 'Insights',
   href: '/insights',
   Icon: InsightsIcon,
+};
+
+// Sessions reads from the same DuckDB dual-write store as Insights
+// (pkg/duckdb/dashboards), so it's gated behind the same "duckdb-insights"
+// flag -- see Navigation.tsx.
+export const sessionsNavItem: NavItemConfig = {
+  label: 'Sessions',
+  href: '/sessions',
+  Icon: SessionsIcon,
 };
 
 // Item order matches the cloud dashboard's AI section.

@@ -16,15 +16,21 @@ import "github.com/inngest/inngest/pkg/duckdb/parser"
 //
 // name is the CTE name or subquery alias, used only for error messages.
 // explicitCols, if non-empty, is a WITH x(a, b, ...) explicit column list
-// overriding inferred names positionally.
-func deriveTable(stmt *parser.SelectStatement, name string, explicitCols []string, ctes map[string]logicalTable, outerScope *tableScope) (logicalTable, error) {
-	_, _, err := validateWithCTEs(stmt, ctes, outerScope)
+// overriding inferred names positionally. diags is validateWithCTEs' own
+// diagnostics accumulator, passed straight through to stmt's own
+// validation -- the second resolveScope call below (for leafScope) always
+// passes nil instead, since it re-resolves the very same FROM clause
+// validateWithCTEs just validated, and reusing diags there would collect
+// (and so surface) every one of that FROM clause's function-call
+// diagnostics a second time.
+func deriveTable(stmt *parser.SelectStatement, name string, explicitCols []string, ctes map[string]logicalTable, outerScope *tableScope, diags *[]Diagnostic) (logicalTable, error) {
+	_, _, err := validateWithCTEs(stmt, ctes, outerScope, diags)
 	if err != nil {
 		return logicalTable{}, err
 	}
 
 	leaf := leftmostOperand(stmt)
-	leafScope, err := resolveScope(leaf.From, ctes)
+	leafScope, err := resolveScope(leaf.From, ctes, nil)
 	if err != nil {
 		return logicalTable{}, err
 	}
@@ -82,8 +88,8 @@ func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explici
 			return nil, nil, err
 		}
 		add(name, knownColumn{
-			colType: inferType(item.Expr, scope),
-			hint:    resolveItemHint(item.Expr, scope),
+			colType:   inferType(item.Expr, scope),
+			pathHints: rootHint(resolveItemHint(item.Expr, scope)),
 		})
 	}
 

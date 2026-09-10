@@ -44,7 +44,24 @@ func (e *ExecutionError) Diagnostic() Diagnostic {
 type Column struct {
 	Name string
 	Type ColumnType
-	Hint ColumnHint
+	// PathHints is TranspileResult.ColumnPathHints' entry for this
+	// column, positioned the same way -- see buildColumnPathHints' own
+	// doc comment for its shape. An entry with an empty Path is this
+	// column's own whole-value hint, exactly like
+	// knownColumn.pathHints/hint() in tables.go. Nil when this column
+	// carries no hint at all.
+	PathHints []PathHint
+}
+
+// Hint returns c's whole-column hint (its empty-Path PathHints entry),
+// HintNone if it has none.
+func (c Column) Hint() ColumnHint {
+	for _, ph := range c.PathHints {
+		if len(ph.Path) == 0 {
+			return ph.Hint
+		}
+	}
+	return HintNone
 }
 
 // Result is Execute's output: the executed query's columns and every row,
@@ -60,9 +77,10 @@ type Result struct {
 // rows.ColumnTypes(), not a separate DESCRIBE call — the driver derives it
 // unconditionally rather than by sniffing the first returned row, so this
 // reports every column correctly even when the query matches zero rows.
-// Combines that column list with tr.ColumnHints positionally, never by
-// name. An index beyond len(tr.ColumnHints) (e.g. a UNION query, whose
-// ColumnHints is always empty) gets HintNone rather than a panic or guess.
+// Combines that column list with tr.ColumnPathHints positionally, never
+// by name. An index beyond len(tr.ColumnPathHints) (e.g. a UNION query
+// past its reconciled column count) gets no hint at all rather than a
+// panic or guess.
 func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, error) {
 	rows, err := db.QueryContext(ctx, tr.SQL, tr.Args...)
 	if err != nil {
@@ -70,7 +88,7 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 	}
 	defer rows.Close()
 
-	columns, err := resultColumns(rows, tr.ColumnHints)
+	columns, err := resultColumns(rows, tr.ColumnPathHints)
 	if err != nil {
 		return nil, &ExecutionError{Err: err, Start: tr.Start, End: tr.End}
 	}
@@ -94,8 +112,8 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 }
 
 // resultColumns builds Execute's []Column from rows.ColumnTypes(), combined
-// with hints positionally.
-func resultColumns(rows *sql.Rows, hints []ColumnHint) ([]Column, error) {
+// with pathHints positionally.
+func resultColumns(rows *sql.Rows, pathHints [][]PathHint) ([]Column, error) {
 	colTypes, err := rows.ColumnTypes()
 	if err != nil {
 		return nil, fmt.Errorf("reading column types: %w", err)
@@ -103,11 +121,15 @@ func resultColumns(rows *sql.Rows, hints []ColumnHint) ([]Column, error) {
 
 	columns := make([]Column, len(colTypes))
 	for i, ct := range colTypes {
-		hint := HintNone
-		if i < len(hints) {
-			hint = hints[i]
+		var colPathHints []PathHint
+		if i < len(pathHints) {
+			colPathHints = pathHints[i]
 		}
-		columns[i] = Column{Name: ct.Name(), Type: DuckDBToColumnType(ct.DatabaseTypeName()), Hint: hint}
+		columns[i] = Column{
+			Name:      ct.Name(),
+			Type:      DuckDBToColumnType(ct.DatabaseTypeName()),
+			PathHints: colPathHints,
+		}
 	}
 	return columns, nil
 }

@@ -309,11 +309,13 @@ export function useSQLCompletions(
         columns.forEach((column) => {
           const name = typeof column === 'string' ? column : column.name;
           const description = typeof column === 'string' ? undefined : column.description;
+          const type = typeof column === 'string' ? undefined : column.type;
           if (labelMatchesPrefix(name, currentWord)) {
             suggestions.push({
               kind: monaco.languages.CompletionItemKind.Field,
               insertText: name,
               label: name,
+              detail: type,
               documentation: description,
               range,
             });
@@ -327,6 +329,7 @@ export function useSQLCompletions(
               insertText: func.signature,
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               label: func.name,
+              detail: func.detail,
               documentation: func.description,
               range,
             });

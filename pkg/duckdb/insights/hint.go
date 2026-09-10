@@ -13,6 +13,14 @@ const (
 	HintFunctionID
 	HintRunID
 	HintEventID
+	// HintSession marks a value as a session reference -- unlike the other
+	// hints (each a bare ID string), the hinted value is a
+	// STRUCT(key VARCHAR, id VARCHAR) object (runs.sessions' element type),
+	// carrying both the session key and its per-key id together -- a UI
+	// needs both to build a working link (pathCreator.session({sessionKey,
+	// sessionId}), ui/apps/dev-server-ui), so this hints the whole element
+	// rather than one bare scalar sub-field.
+	HintSession
 )
 
 // String is the same label the GQL layer's InsightsColumnHint enum uses
@@ -30,6 +38,8 @@ func (h ColumnHint) String() string {
 		return "RUN_ID"
 	case HintEventID:
 		return "EVENT_ID"
+	case HintSession:
+		return "SESSION"
 	default:
 		return ""
 	}

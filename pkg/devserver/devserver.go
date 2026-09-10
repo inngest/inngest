@@ -827,6 +827,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionTraces:      NewFunctionTraceReader(gqlData),
 		Executor:            exec,
 		EventPublisher:      runner,
+		// Same dwDB dual-write succeeded/failed against as coreapi.Options.DuckDB
+		// above -- nil means QueryInsights errors clearly instead of resolving empty.
+		DuckDB: dwDB,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
 			return ds.HandleEvent(ctx, evt, nil)
 		},

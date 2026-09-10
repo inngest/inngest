@@ -31,7 +31,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 			if err != nil {
 				return diagnostics, err
 			}
-			tbl, err := deriveTable(cte.Select, cte.Name, cte.ColumnNames, merged, nil)
+			tbl, err := deriveTable(cte.Select, cte.Name, cte.ColumnNames, merged, nil, nil)
 			if err != nil {
 				return diagnostics, err
 			}
@@ -51,7 +51,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 		return diagnostics, err
 	}
 
-	scope, err := resolveScope(stmt.From, mergedCTEs)
+	scope, err := resolveScope(stmt.From, mergedCTEs, nil)
 	if err != nil {
 		return diagnostics, err
 	}
@@ -125,7 +125,7 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 		if r.On != nil {
 			// r.On is evaluated against both sides of the join together —
 			// resolveScope on r itself gives exactly that combined scope.
-			scope, err := resolveScope(&parser.FromClause{Refs: []parser.TableRef{r}}, ctes)
+			scope, err := resolveScope(&parser.FromClause{Refs: []parser.TableRef{r}}, ctes, nil)
 			if err != nil {
 				return diagnostics, err
 			}

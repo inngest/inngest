@@ -131,7 +131,7 @@ func TestQuackSessionFetchAfterResultClosedMapsToErrStatementFailed(t *testing.T
 	require.NoError(t, err)
 
 	staleUUID := quackHugeint{}
-	hdr, r, err := sess.send(context.Background(), encodeQuackFetchRequest(sess.connectionID, staleUUID))
+	hdr, r, err := sess.send(context.Background(), encodeQuackFetchRequest(sess.connectionID, staleUUID, 0))
 	require.NoError(t, err)
 	require.Equal(t, byte(quackMsgErrorResponse), hdr.Type)
 

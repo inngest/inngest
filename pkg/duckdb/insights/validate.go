@@ -13,28 +13,44 @@ import (
 // success it returns stmt's own resolved scope (nil for a top-level
 // UNION/INTERSECT/EXCEPT statement, which has no FROM clause of its own —
 // each operand is validated, and scoped, independently), so callers never
-// need to call resolveScope a second time. See validateWithCTEs for CTEs.
-func validate(stmt *parser.SelectStatement) (*tableScope, map[string]logicalTable, error) {
-	return validateWithCTEs(stmt, nil, nil)
+// need to call resolveScope a second time, plus every non-fatal Diagnostic
+// (e.g. a function called with too few arguments) noted along the way. See
+// validateWithCTEs for CTEs.
+func validate(stmt *parser.SelectStatement) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
+	var diags []Diagnostic
+	scope, ctes, err := validateWithCTEs(stmt, nil, nil, &diags)
+	return scope, ctes, diags, err
 }
 
 // validateWithCTEs is validate's real implementation, parameterized by
 // outerCTEs — the CTEs already visible at this lexical point (nil/empty at
-// the true top level) — and outerScope, the enclosing query's own resolved
+// the true top level) — outerScope, the enclosing query's own resolved
 // scope when stmt is an expression-position subquery (scalar/IN/EXISTS),
 // so a correlated reference to an outer column resolves instead of
-// failing as unknown. nil for the true top level and for every CTE body,
-// which can never correlate. Returns the merged CTE set back out so a
-// caller like deriveTable can pass it down into a nested CTE/subquery's
-// own validation, and so stageValidate can hand it to
-// stageBuildColumnHints without recomputing.
+// failing as unknown (nil for the true top level and for every CTE body,
+// which can never correlate) — and diags, the accumulator every nested
+// call appends its own function-call diagnostics into.
+//
+// diags is a pointer, not a second return value threaded through every
+// caller's own tuple, because this function's own call graph (CTEs,
+// FROM-clause subqueries via resolveScope/addSubquery/deriveTable,
+// expression-position subqueries) is deep and mutually recursive across
+// several files -- passing nil from every call site that isn't part of
+// stageValidate's own top-level walk (columnhints.go, rewrite.go,
+// derive.go's own leafScope re-resolution) means those re-resolutions
+// don't re-collect (and duplicate) diagnostics validate already gathered
+// once for the same nodes.
+//
+// Returns the merged CTE set back out so a caller like deriveTable can
+// pass it down into a nested CTE/subquery's own validation, and so
+// stageValidate can hand it to stageBuildColumnHints without recomputing.
 //
 // CTEs are handled before the SetOp check below, not after: a statement
 // can have both With != nil and SetOp != SetOpNone on the same node ("WITH
 // x AS (...) SELECT ... FROM x UNION SELECT ... FROM y" attaches its WITH
 // clause to the outermost/UNION node) — checking SetOp first would skip
 // CTE processing for exactly that shape.
-func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logicalTable, outerScope *tableScope) (*tableScope, map[string]logicalTable, error) {
+func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logicalTable, outerScope *tableScope, diags *[]Diagnostic) (*tableScope, map[string]logicalTable, error) {
 	ctes := outerCTEs
 	if stmt.With != nil {
 		if stmt.With.Recursive {
@@ -49,7 +65,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 			// referencing its own name (self-reference without RECURSIVE)
 			// fails as "unknown table" by construction. outerScope is
 			// always nil here: a CTE body can never correlate.
-			tbl, err := deriveTable(cte.Select, cte.Name, cte.ColumnNames, merged, nil)
+			tbl, err := deriveTable(cte.Select, cte.Name, cte.ColumnNames, merged, nil, diags)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -59,10 +75,10 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 	}
 
 	if stmt.SetOp != parser.SetOpNone {
-		if _, _, err := validateWithCTEs(stmt.SetLeft, ctes, outerScope); err != nil {
+		if _, _, err := validateWithCTEs(stmt.SetLeft, ctes, outerScope, diags); err != nil {
 			return nil, nil, err
 		}
-		if _, _, err := validateWithCTEs(stmt.SetRight, ctes, outerScope); err != nil {
+		if _, _, err := validateWithCTEs(stmt.SetRight, ctes, outerScope, diags); err != nil {
 			return nil, nil, err
 		}
 		return nil, ctes, nil
@@ -71,7 +87,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 		return nil, nil, &ValidationError{Pos: stmt.Pos(), End: stmt.End(), Message: "VALUES statements are not supported"}
 	}
 
-	scope, err := resolveScope(stmt.From, ctes)
+	scope, err := resolveScope(stmt.From, ctes, diags)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +102,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 	// reuse it for traversals that must still see every expression.
 	skipAliasExprs := groupByOrderByAliasExprs(stmt, scope)
 
-	v := &exprValidator{scope: scope, ctes: ctes}
+	v := &exprValidator{scope: scope, ctes: ctes, diags: diags}
 	for _, n := range collectExprs(stmt) {
 		if skipAliasExprs[n] {
 			continue
@@ -283,6 +299,12 @@ type exprValidator struct {
 	scope *tableScope
 	ctes  map[string]logicalTable
 	err   error
+	// diags is the same accumulator pointer validateWithCTEs was given --
+	// checkFunction appends any Diagnostic a function's own returnType
+	// rule produces about its call. May be nil (see validateWithCTEs'
+	// doc comment on when callers pass nil deliberately), in which case
+	// diagnostic collection is just skipped.
+	diags *[]Diagnostic
 	// boundVars is a stack of list-comprehension loop variables currently
 	// in scope, innermost last. Shadows any real column of the same name,
 	// matching DuckDB's own comprehension scoping.
@@ -322,7 +344,7 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 		// (tableScope.addSubquery, scope.go). Returning nil (not v) stops
 		// parser.Walk from also descending into x's own Children() using
 		// our own scope, which would be wrong twice over.
-		if _, _, err := validateWithCTEs(x, v.ctes, v.scope); err != nil {
+		if _, _, err := validateWithCTEs(x, v.ctes, v.scope, v.diags); err != nil {
 			v.err = err
 		}
 		return nil
@@ -401,10 +423,37 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 	return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unsupported identifier %q", strings.Join(id.Parts, "."))}
 }
 
+// checkFunction rejects any function name outside allowedFunctions, then
+// always runs that function's own returnType rule to check for a
+// DiagnosticError-severity Diagnostic -- one DuckDB itself would
+// unconditionally reject too (a confirmed wrong argument count or type;
+// see tooFewArgsDiagnostic/tooManyArgsDiagnostic/wrongArgTypeDiagnostic,
+// functions.go), promoted here into a real *ValidationError that rejects
+// the query outright, rather than letting it reach DuckDB only to fail
+// there instead. This check runs regardless of whether v.diags is nil: a
+// genuinely invalid call must reject the query no matter which
+// re-derivation pass notices it first, unlike the softer diagnostics
+// below.
+//
+// Any lower-severity Diagnostic (a note, not a rejection) only rides into
+// the pipeline's Diagnostics when v.diags is non-nil, position-anchored
+// to this call site since returnType itself only ever sees the function's
+// resolved name and arguments, never the node itself.
 func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 	name := strings.ToLower(strings.Join(f.Name, "."))
-	if _, ok := allowedFunctions[name]; !ok {
+	info, ok := allowedFunctions[name]
+	if !ok {
 		return &ValidationError{Pos: f.Pos(), End: f.End(), Message: fmt.Sprintf("function %q is not allowed", strings.Join(f.Name, "."))}
+	}
+	_, diags := info.returnType(name, f.Args, v.scope)
+	for _, d := range diags {
+		d.Start, d.End = f.Pos(), f.End()
+		if d.Severity == DiagnosticError {
+			return &ValidationError{Pos: d.Start, End: d.End, Message: d.Message}
+		}
+		if v.diags != nil {
+			*v.diags = append(*v.diags, d)
+		}
 	}
 	return nil
 }

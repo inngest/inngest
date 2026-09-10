@@ -9,7 +9,7 @@ import (
 func hintsFor(t *testing.T, sql string) []ColumnHint {
 	t.Helper()
 	stmt := mustParse(t, sql)
-	scope, err := resolveScope(stmt.From, nil)
+	scope, err := resolveScope(stmt.From, nil, nil)
 	require.NoError(t, err)
 	return buildColumnHints(stmt, scope, nil)
 }
@@ -27,7 +27,11 @@ func TestBuildColumnHintsAliasedColumn(t *testing.T) {
 }
 
 func TestBuildColumnHintsEventIDsArray(t *testing.T) {
-	require.Equal(t, []ColumnHint{HintEventID}, hintsFor(t, "SELECT event_ids FROM runs"))
+	// event_ids' hint describes each element (its only pathHints entry is
+	// {wc}), not the array value itself -- selecting the whole array
+	// bare must not inherit it (same policy as
+	// TestBuildColumnHintsWholeArrayOfObjectsGetsNoHint).
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT event_ids FROM runs"))
 }
 
 func TestBuildColumnHintsEventsID(t *testing.T) {
@@ -36,6 +40,46 @@ func TestBuildColumnHintsEventsID(t *testing.T) {
 
 func TestBuildColumnHintsEventsNameNoHint(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT name FROM events"))
+}
+
+// TestBuildColumnHintsSessionsArray mirrors TestBuildColumnHintsEventIDsArray:
+// runs.sessions' only pathHints entry is {wc} (its elements' hint), so a
+// bare column reference to the whole array gets no hint.
+func TestBuildColumnHintsSessionsArray(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT sessions FROM runs"))
+}
+
+func TestBuildColumnHintsSessionsUnnest(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession}, hintsFor(t, "SELECT UNNEST(sessions) FROM runs"))
+}
+
+func TestBuildColumnHintsSessionsIndex(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession}, hintsFor(t, "SELECT sessions[1] FROM runs"))
+}
+
+// TestBuildColumnHintsSessionsFieldNoHint confirms a specific struct field
+// off one session element (e.g. sessions[1].id) is NOT separately hinted --
+// unlike the other ID hints, HintSession describes the whole {key,id}
+// object, since a UI needs both fields together to build a session link.
+func TestBuildColumnHintsSessionsFieldNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT sessions[1].id FROM runs"))
+}
+
+func TestBuildColumnHintsEventMetaSessions(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession}, hintsFor(t, "SELECT meta.sessions FROM events"))
+}
+
+func TestBuildColumnHintsEventMetaSessionsJSONArrow(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession}, hintsFor(t, "SELECT meta ->> 'sessions' FROM events"))
+}
+
+// TestBuildColumnHintsRunInputsMetaSessions mirrors
+// TestBuildColumnHintsRunInputsParentRunID (data._inngest.parent_run_id):
+// inputs' elements are full marshaled event.Event objects, so meta.sessions
+// sits one level deeper here than on events.meta directly.
+func TestBuildColumnHintsRunInputsMetaSessions(t *testing.T) {
+	hints := hintsFor(t, "SELECT inputs ->> '$[*].meta.sessions' FROM runs")
+	require.Equal(t, []ColumnHint{HintSession}, hints)
 }
 
 func TestBuildColumnHintsNoHintForComputedExpr(t *testing.T) {
@@ -58,7 +102,7 @@ func TestBuildColumnHintsStarExpandsInOrder(t *testing.T) {
 	tbl := logicalTables["runs"]
 	require.Len(t, hints, len(tbl.columnOrder))
 	for i, col := range tbl.columnOrder {
-		require.Equalf(t, tbl.columns[col].hint, hints[i], "column %d (%s)", i, col)
+		require.Equalf(t, tbl.columns[col].hint(), hints[i], "column %d (%s)", i, col)
 	}
 }
 
@@ -93,8 +137,14 @@ func TestBuildColumnHintsSubPathBareArrow(t *testing.T) {
 }
 
 func TestBuildColumnHintsSubPathJSONExtractString(t *testing.T) {
+	// _inngest.event.ids is itself a JSON array -- unlike a scalar
+	// sub-path, extracting its whole value (rather than UNNEST-ing it,
+	// TestBuildColumnHintsUnnestOfHintedArray-style) must not inherit its
+	// elements' own hint (spanAttrPathHints declares only a {seg(...), wc}
+	// entry for it, no whole-value entry -- same policy as
+	// runs.event_ids).
 	hints := hintsFor(t, "SELECT json_extract_string(attributes, '_inngest.event.ids') FROM extended_trace_spans")
-	require.Equal(t, []ColumnHint{HintEventID}, hints)
+	require.Equal(t, []ColumnHint{HintNone}, hints)
 }
 
 func TestBuildColumnHintsSubPathQuotedDotAccess(t *testing.T) {
@@ -107,9 +157,18 @@ func TestBuildColumnHintsSubPathQuotedDotAccess(t *testing.T) {
 }
 
 func TestBuildColumnHintsSubPathEveryKnownKey(t *testing.T) {
-	for path, want := range spanAttrPathHints {
+	for _, ph := range spanAttrPathHints {
+		// A one-segment Path is one flat literal key, reachable directly
+		// via attributes ->> '<key>'. A {seg(...), wc} entry (event.ids,
+		// defer.parent_run_ids) describes an array's elements, not the
+		// key's own whole value -- TestBuildColumnHintsUnnestOfHintedArray
+		// and friends already cover those via UNNEST(...) instead.
+		if len(ph.Path) != 1 {
+			continue
+		}
+		path := ph.Path[0].Key
 		hints := hintsFor(t, "SELECT attributes ->> '"+path+"' FROM extended_trace_spans")
-		require.Equalf(t, []ColumnHint{want}, hints, "path %q", path)
+		require.Equalf(t, []ColumnHint{ph.Hint}, hints, "path %q", path)
 	}
 }
 
@@ -220,8 +279,14 @@ func TestBuildColumnHintsArrayOfObjectsFieldWithDollarPrefix(t *testing.T) {
 }
 
 func TestBuildColumnHintsArrayOfObjectsFieldWithoutDollarPrefix(t *testing.T) {
+	// Confirmed against DuckDB directly: a JSON path operand only gets
+	// structural ("."/"[*]" as real steps) treatment with a leading "$" --
+	// '[*].data...' (or '[0]', or any other bare string) is always one
+	// literal top-level key, and there is no key by that literal name, so
+	// this must resolve to no hint, not the same as the "$"-prefixed form
+	// TestBuildColumnHintsArrayOfObjectsFieldWithDollarPrefix covers.
 	hints := hintsFor(t, "SELECT inputs ->> '[*].data._inngest.parent_run_id' FROM runs")
-	require.Equal(t, []ColumnHint{HintRunID}, hints)
+	require.Equal(t, []ColumnHint{HintNone}, hints)
 }
 
 func TestBuildColumnHintsArrayOfObjectsUnknownFieldNoHint(t *testing.T) {
@@ -246,7 +311,7 @@ func TestBuildColumnHintsExplicitArrayElementHintTakesPrecedence(t *testing.T) {
 	scope := &tableScope{entries: []scopeEntry{{alias: "t", table: logicalTable{
 		name: "t",
 		columns: map[string]knownColumn{
-			"arr": {colType: ColumnTypeJSON, hint: HintAppID, pathHints: map[string]ColumnHint{"[*]": HintRunID}},
+			"arr": {colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintAppID), hint(HintRunID, wc)}},
 		},
 	}}}}
 	stmt := mustParse(t, "SELECT UNNEST(arr)")
@@ -265,7 +330,7 @@ func TestBuildColumnHintsArrayOfStructsFieldHint(t *testing.T) {
 	scope := &tableScope{entries: []scopeEntry{{alias: "t", table: logicalTable{
 		name: "t",
 		columns: map[string]knownColumn{
-			"arr": {colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: map[string]ColumnHint{"[*].id": HintRunID}},
+			"arr": {colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: []PathHint{hint(HintRunID, wc, seg("id"))}},
 		},
 	}}}}
 	stmt := mustParse(t, "SELECT arr.id")
@@ -276,7 +341,7 @@ func TestBuildColumnHintsArrayOfStructsFieldHintTableQualified(t *testing.T) {
 	scope := &tableScope{entries: []scopeEntry{{alias: "t", table: logicalTable{
 		name: "t",
 		columns: map[string]knownColumn{
-			"arr": {colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: map[string]ColumnHint{"[*].id": HintRunID}},
+			"arr": {colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: []PathHint{hint(HintRunID, wc, seg("id"))}},
 		},
 	}}}}
 	stmt := mustParse(t, "SELECT t.arr.id")
@@ -321,7 +386,7 @@ func TestBuildColumnHintsExplicitArrayElementHintSingleIndexTakesPrecedence(t *t
 	scope := &tableScope{entries: []scopeEntry{{alias: "t", table: logicalTable{
 		name: "t",
 		columns: map[string]knownColumn{
-			"arr": {colType: ColumnTypeJSON, hint: HintAppID, pathHints: map[string]ColumnHint{"[*]": HintRunID}},
+			"arr": {colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintAppID), hint(HintRunID, wc)}},
 		},
 	}}}}
 	stmt := mustParse(t, "SELECT arr[1]")

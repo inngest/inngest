@@ -14,7 +14,7 @@ func TestTranspileHappyPath(t *testing.T) {
 	require.Equal(t, "runs", tr.PrimaryTable)
 	require.Equal(t, []string{"runs"}, tr.Tables)
 	require.True(t, tr.Limited)
-	require.Equal(t, []ColumnHint{HintRunID, HintAppID}, tr.ColumnHints)
+	require.Equal(t, [][]PathHint{{{Hint: HintRunID}}, {{Hint: HintAppID}}}, tr.ColumnPathHints)
 	require.Contains(t, tr.SQL, "inngest.insights_runs")
 	require.Contains(t, tr.SQL, "LIMIT 1000")
 

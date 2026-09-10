@@ -56,30 +56,34 @@ type tableScope struct {
 // ctes is whatever CTEs are visible at this lexical point, checked before
 // the static logicalTables registry, so a CTE can shadow a real table
 // name, matching standard SQL.
-func resolveScope(from *parser.FromClause, ctes map[string]logicalTable) (*tableScope, error) {
+// diags is passed straight through to any FROM-clause subquery's own
+// deriveTable call (addSubquery below) -- nil from every caller except
+// stageValidate's own top-level walk (validateWithCTEs), matching that
+// function's own doc comment on why a re-resolution passes nil instead.
+func resolveScope(from *parser.FromClause, ctes map[string]logicalTable, diags *[]Diagnostic) (*tableScope, error) {
 	s := &tableScope{}
 	if from == nil {
 		return s, nil
 	}
 	for _, ref := range from.Refs {
-		if err := s.addRef(ref, ctes); err != nil {
+		if err := s.addRef(ref, ctes, diags); err != nil {
 			return nil, err
 		}
 	}
 	return s, nil
 }
 
-func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable) error {
+func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable, diags *[]Diagnostic) error {
 	switch r := ref.(type) {
 	case *parser.BaseTableRef:
 		return s.addBaseTable(r, ctes)
 	case *parser.JoinRef:
-		if err := s.addRef(r.Left, ctes); err != nil {
+		if err := s.addRef(r.Left, ctes, diags); err != nil {
 			return err
 		}
-		return s.addRef(r.Right, ctes)
+		return s.addRef(r.Right, ctes, diags)
 	case *parser.TableSubqueryRef:
-		return s.addSubquery(r, ctes)
+		return s.addSubquery(r, ctes, diags)
 	case *parser.TableFunctionRef:
 		return s.addTableFunction(r)
 	default:
@@ -122,7 +126,7 @@ func (s *tableScope) addTableFunction(r *parser.TableFunctionRef) error {
 	tbl := logicalTable{
 		name:        alias,
 		columnOrder: []string{"unnest"},
-		columns:     map[string]knownColumn{"unnest": {colType: ColumnTypeJSON, hint: resolveArrayElementHint(r.Args[0], s)}},
+		columns:     map[string]knownColumn{"unnest": {colType: ColumnTypeJSON, pathHints: rootHint(resolveArrayElementHint(r.Args[0], s))}},
 	}
 	s.entries = append(s.entries, scopeEntry{alias: alias, table: tbl})
 	return nil
@@ -151,7 +155,7 @@ func (s *tableScope) addBaseTable(r *parser.BaseTableRef, ctes map[string]logica
 // which case s itself (built so far from strictly earlier FROM items)
 // becomes its outer scope — and exposes its inferred output columns under
 // r.Alias, which DuckDB itself requires a FROM-clause subquery to have.
-func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]logicalTable) error {
+func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]logicalTable, diags *[]Diagnostic) error {
 	if r.Alias == "" {
 		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: "a subquery in FROM must have an alias"}
 	}
@@ -159,7 +163,7 @@ func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]log
 	if r.Lateral {
 		outer = s
 	}
-	tbl, err := deriveTable(r.Select, r.Alias, nil, ctes, outer)
+	tbl, err := deriveTable(r.Select, r.Alias, nil, ctes, outer, diags)
 	if err != nil {
 		return err
 	}

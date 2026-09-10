@@ -354,13 +354,16 @@ func openQuackAppend(rowLimit int) func(testing.TB) spanInserter {
 // INSTALL/LOAD/ATTACH sequence pkg/db/duckdb/process.go's
 // bootstrapDuckLakeLocked runs, so the embedded path attaches the same way
 // the subprocess paths do — same extension, same DATA_INLINING_ROW_LIMIT
-// zero-value fallback (opts.DataInliningRowLimit <= 0 uses
-// duckdb.DefaultDataInliningRowLimit, matching bootstrapDuckLakeLocked
-// exactly).
+// zero-value-means-default/negative-means-disabled handling, matching
+// bootstrapDuckLakeLocked exactly (see DuckLakeOptions.DataInliningRowLimit's
+// doc comment).
 func duckLakeAttachStmts(opts *duckdb.DuckLakeOptions) []string {
 	rowLimit := opts.DataInliningRowLimit
-	if rowLimit <= 0 {
+	switch {
+	case rowLimit == 0:
 		rowLimit = duckdb.DefaultDataInliningRowLimit
+	case rowLimit < 0:
+		rowLimit = 0
 	}
 	return []string{
 		"INSTALL ducklake;",

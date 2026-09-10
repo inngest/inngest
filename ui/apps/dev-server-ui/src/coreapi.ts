@@ -728,7 +728,13 @@ export const EXECUTE_INSIGHTS_QUERY = gql`
       columns {
         name
         type
-        hint
+        pathHints {
+          path {
+            key
+            wildcard
+          }
+          hint
+        }
       }
       rows
       info {

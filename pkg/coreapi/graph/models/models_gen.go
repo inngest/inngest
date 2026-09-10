@@ -298,10 +298,20 @@ type InsightsDiagnosticPosition struct {
 	Column int `json:"column"`
 }
 
+type InsightsPathHint struct {
+	Path []*InsightsPathSegment `json:"path"`
+	Hint InsightsColumnHint     `json:"hint"`
+}
+
+type InsightsPathSegment struct {
+	Key      *string `json:"key,omitempty"`
+	Wildcard bool    `json:"wildcard"`
+}
+
 type InsightsQueryColumn struct {
-	Name string              `json:"name"`
-	Type InsightsColumnType  `json:"type"`
-	Hint *InsightsColumnHint `json:"hint,omitempty"`
+	Name      string              `json:"name"`
+	Type      InsightsColumnType  `json:"type"`
+	PathHints []*InsightsPathHint `json:"pathHints"`
 }
 
 type InsightsQueryInfo struct {
@@ -415,6 +425,36 @@ type SDKFeatureStatus struct {
 	Reason *int `json:"reason,omitempty"`
 }
 
+type SessionFunction struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
+type SessionGroup struct {
+	SessionKey     string             `json:"sessionKey"`
+	SessionID      string             `json:"sessionId"`
+	RunCount       int                `json:"runCount"`
+	FailedRunCount int                `json:"failedRunCount"`
+	FailureRate    float64            `json:"failureRate"`
+	LastActiveAt   time.Time          `json:"lastActiveAt"`
+	Functions      []*SessionFunction `json:"functions"`
+}
+
+type SessionKey struct {
+	SessionKey string    `json:"sessionKey"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type SessionRun struct {
+	ID           string     `json:"id"`
+	FunctionSlug string     `json:"functionSlug"`
+	EventName    *string    `json:"eventName,omitempty"`
+	Status       string     `json:"status"`
+	QueuedAt     time.Time  `json:"queuedAt"`
+	StartedAt    *time.Time `json:"startedAt,omitempty"`
+	EndedAt      *time.Time `json:"endedAt,omitempty"`
+}
+
 type SingletonConfiguration struct {
 	Mode SingletonMode `json:"mode"`
 	Key  *string       `json:"key,omitempty"`
@@ -480,6 +520,11 @@ type ThrottleConfiguration struct {
 	Key    *string `json:"key,omitempty"`
 	Limit  int     `json:"limit"`
 	Period string  `json:"period"`
+}
+
+type TimeRangeInput struct {
+	From  time.Time  `json:"from"`
+	Until *time.Time `json:"until,omitempty"`
 }
 
 type UpdateAppInput struct {
@@ -972,6 +1017,7 @@ const (
 	InsightsColumnHintFunctionID InsightsColumnHint = "FUNCTION_ID"
 	InsightsColumnHintRunID      InsightsColumnHint = "RUN_ID"
 	InsightsColumnHintEventID    InsightsColumnHint = "EVENT_ID"
+	InsightsColumnHintSession    InsightsColumnHint = "SESSION"
 )
 
 var AllInsightsColumnHint = []InsightsColumnHint{
@@ -979,11 +1025,12 @@ var AllInsightsColumnHint = []InsightsColumnHint{
 	InsightsColumnHintFunctionID,
 	InsightsColumnHintRunID,
 	InsightsColumnHintEventID,
+	InsightsColumnHintSession,
 }
 
 func (e InsightsColumnHint) IsValid() bool {
 	switch e {
-	case InsightsColumnHintAppID, InsightsColumnHintFunctionID, InsightsColumnHintRunID, InsightsColumnHintEventID:
+	case InsightsColumnHintAppID, InsightsColumnHintFunctionID, InsightsColumnHintRunID, InsightsColumnHintEventID, InsightsColumnHintSession:
 		return true
 	}
 	return false

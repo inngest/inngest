@@ -49,12 +49,17 @@ func TestTableDumpsMatchesRegistry(t *testing.T) {
 
 func TestFunctionDumpsMatchesRegistry(t *testing.T) {
 	fns := functionDumps()
-	require.Len(t, fns, 175)
+	require.Len(t, fns, 207)
+	byName := make(map[string]functionDump, len(fns))
 	for _, fn := range fns {
 		require.NotEmptyf(t, fn.Name, "a function has no name")
 		require.NotEmptyf(t, fn.Description, "function %q has no description", fn.Name)
 		require.NotEmptyf(t, fn.DocsURL, "function %q has no docsUrl", fn.Name)
+		require.NotEmptyf(t, fn.Signature, "function %q has no signature", fn.Name)
+		byName[fn.Name] = fn
 	}
+
+	require.Equal(t, "abs(x)", byName["abs"].Signature)
 }
 
 // TestSchemaDumpIsValidJSON proves the whole dump round-trips through the

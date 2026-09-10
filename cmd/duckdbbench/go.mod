@@ -6,6 +6,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/google/uuid v1.6.0
 	github.com/inngest/inngest v0.0.0-00010101000000-000000000000
+	golang.org/x/sync v0.21.0
 )
 
 require (
@@ -67,7 +68,6 @@ require (
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260508192327-42602be52be6 // indirect
 	golang.org/x/text v0.38.0 // indirect

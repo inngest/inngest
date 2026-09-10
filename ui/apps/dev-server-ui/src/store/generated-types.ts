@@ -452,6 +452,7 @@ export enum InsightsColumnHint {
   EventId = 'EVENT_ID',
   FunctionId = 'FUNCTION_ID',
   RunId = 'RUN_ID',
+  Session = 'SESSION',
 }
 
 export enum InsightsColumnType {
@@ -484,10 +485,22 @@ export enum InsightsDiagnosticSeverity {
   Warning = 'WARNING',
 }
 
+export type InsightsPathHint = {
+  __typename?: 'InsightsPathHint';
+  hint: InsightsColumnHint;
+  path: Array<InsightsPathSegment>;
+};
+
+export type InsightsPathSegment = {
+  __typename?: 'InsightsPathSegment';
+  key: Maybe<Scalars['String']>;
+  wildcard: Scalars['Boolean'];
+};
+
 export type InsightsQueryColumn = {
   __typename?: 'InsightsQueryColumn';
-  hint: Maybe<InsightsColumnHint>;
   name: Scalars['String'];
+  pathHints: Array<InsightsPathHint>;
   type: InsightsColumnType;
 };
 
@@ -593,6 +606,9 @@ export type Query = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsV2Connection;
+  sessionKeys: Array<SessionKey>;
+  sessionRuns: Array<SessionRun>;
+  sessions: Array<SessionGroup>;
   stream: Array<StreamItem>;
   workerConnection: Maybe<ConnectV1WorkerConnection>;
   workerConnections: ConnectV1WorkerConnectionsConnection;
@@ -657,6 +673,22 @@ export type QueryRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
+};
+
+export type QuerySessionKeysArgs = {
+  search: InputMaybe<Scalars['String']>;
+};
+
+export type QuerySessionRunsArgs = {
+  sessionId: Scalars['String'];
+  sessionKey: Scalars['String'];
+  timeRange: InputMaybe<TimeRangeInput>;
+};
+
+export type QuerySessionsArgs = {
+  sessionIdSearch: InputMaybe<Scalars['String']>;
+  sessionKey: Scalars['String'];
+  timeRange: InputMaybe<TimeRangeInput>;
 };
 
 export type QueryStreamArgs = {
@@ -916,6 +948,40 @@ export type SdkFeatureStatus = {
   reason: Maybe<Scalars['Int']>;
 };
 
+export type SessionFunction = {
+  __typename?: 'SessionFunction';
+  name: Scalars['String'];
+  slug: Scalars['String'];
+};
+
+export type SessionGroup = {
+  __typename?: 'SessionGroup';
+  failedRunCount: Scalars['Int'];
+  failureRate: Scalars['Float'];
+  functions: Array<SessionFunction>;
+  lastActiveAt: Scalars['Time'];
+  runCount: Scalars['Int'];
+  sessionId: Scalars['String'];
+  sessionKey: Scalars['String'];
+};
+
+export type SessionKey = {
+  __typename?: 'SessionKey';
+  createdAt: Scalars['Time'];
+  sessionKey: Scalars['String'];
+};
+
+export type SessionRun = {
+  __typename?: 'SessionRun';
+  endedAt: Maybe<Scalars['Time']>;
+  eventName: Maybe<Scalars['String']>;
+  functionSlug: Scalars['String'];
+  id: Scalars['String'];
+  queuedAt: Scalars['Time'];
+  startedAt: Maybe<Scalars['Time']>;
+  status: Scalars['String'];
+};
+
 export type SingletonConfiguration = {
   __typename?: 'SingletonConfiguration';
   key: Maybe<Scalars['String']>;
@@ -1020,6 +1086,11 @@ export type ThrottleConfiguration = {
   key: Maybe<Scalars['String']>;
   limit: Scalars['Int'];
   period: Scalars['String'];
+};
+
+export type TimeRangeInput = {
+  from: Scalars['Time'];
+  until?: InputMaybe<Scalars['Time']>;
 };
 
 export type UpdateAppInput = {
@@ -2470,7 +2541,15 @@ export type ExecuteInsightsQueryQuery = {
       __typename?: 'InsightsQueryColumn';
       name: string;
       type: InsightsColumnType;
-      hint: InsightsColumnHint | null;
+      pathHints: Array<{
+        __typename?: 'InsightsPathHint';
+        hint: InsightsColumnHint;
+        path: Array<{
+          __typename?: 'InsightsPathSegment';
+          key: string | null;
+          wildcard: boolean;
+        }>;
+      }>;
     }>;
     info: {
       __typename?: 'InsightsQueryInfo';

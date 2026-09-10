@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 // quackClientVersion and quackClientPlatform are sent in the ConnectionRequest
@@ -32,6 +34,12 @@ const quackHeartbeatTimeoutSeconds = 9223372036854775
 func newQuackHTTPClient() *http.Client {
 	return &http.Client{Timeout: 30 * time.Second}
 }
+
+// quackCancelRequestTimeout bounds the CancelRequest query.watchForCancel
+// fires once a caller's ctx ends mid-statement — a fresh, short-lived
+// context detached from that (already-done) ctx, since the request needs to
+// go out regardless of why the caller gave up.
+const quackCancelRequestTimeout = 5 * time.Second
 
 // quackSession implements sqlExecer (see conn.go) over DuckDB's quack wire
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
@@ -108,8 +116,21 @@ func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string,
 // cols and types both come from the PrepareResponse's metadata, populated
 // even for zero-row results; unlike the jsonlines transport in rows.go,
 // quack never needs a separate DESCRIBE statement to get types.
+//
+// A caller whose ctx ends mid-statement doesn't just stop waiting: a
+// watchForCancel goroutine (started immediately below) fires a real
+// CancelRequest for this statement's queryID, which the server turns into
+// an actual DuckDB Connection::Interrupt() — see encodeQuackCancelRequest's
+// doc comment for the wire format and quack_server.cpp's CANCEL_REQUEST
+// handler (verified against the real extension: this is what actually
+// stops the abandoned statement from continuing to burn CPU server-side,
+// which simply not waiting for the response never did on its own).
 func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error) {
-	hdr, r, err := s.send(ctx, encodeQuackPrepareRequest(s.connectionID, sqlText))
+	queryID := randomQuackHugeint()
+	stopCancelWatch := s.watchForCancel(ctx, queryID)
+	defer stopCancelWatch()
+
+	hdr, r, err := s.send(ctx, encodeQuackPrepareRequest(s.connectionID, sqlText, queryID))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -126,8 +147,26 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 		return nil, nil, nil, fmt.Errorf("duckdb: quack: decoding prepare response: %w", err)
 	}
 
+	// nextBatchIndex starts at 1, not 0: confirmed by reading the real quack
+	// extension binary's disassembly (no source is vendored in this repo) —
+	// the server deserializes batch_index as a plain optional int with no
+	// separate "was it present" flag surviving past deserialization, so a
+	// present-but-zero value and an absent value both collapse to the same
+	// in-memory 0, and the validation that produces "FETCH_REQUEST is
+	// missing its batch index" treats stored-zero as "missing" regardless
+	// of which case it actually was. 0 is therefore never a usable request
+	// value, confirmed empirically (still fails with a constant or
+	// incrementing-from-0 index; succeeds starting from 1). Advances to
+	// whatever batchIndex the previous FetchResponse says it just
+	// delivered, plus one — trusting the server's own count rather than
+	// assuming this loop's iteration number always matches it.
+	// Function-local and never shared across goroutines: each query() call
+	// (even concurrent ones on different pooled quackSessions, see
+	// Options.QuackConns) runs its own independent fetch loop, so this
+	// needs no synchronization.
+	nextBatchIndex := uint64(1)
 	for needsMoreFetch {
-		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID))
+		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -138,12 +177,13 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 			return nil, nil, nil, fmt.Errorf("duckdb: quack: unexpected response message type %d", hdr.Type)
 		}
 
-		fetchedRows, chunkCount, ferr := decodeQuackFetchResponseBody(r, cols)
+		fetchedRows, chunkCount, batchIndex, ferr := decodeQuackFetchResponseBody(r, cols)
 		if ferr != nil {
 			return nil, nil, nil, fmt.Errorf("duckdb: quack: decoding fetch response: %w", ferr)
 		}
 		rows = append(rows, fetchedRows...)
 		needsMoreFetch = chunkCount > 0
+		nextBatchIndex = batchIndex + 1
 	}
 
 	types = make([]string, len(quackTypes))
@@ -151,6 +191,48 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 		types[i] = lt.typeName()
 	}
 	return cols, types, rows, nil
+}
+
+// watchForCancel starts a goroutine that sends a CancelRequest for queryID
+// as soon as ctx ends, and returns a stop func the caller must defer
+// immediately (before ctx can end) to retire that goroutine once query()'s
+// own request(s) are done — success or any other error. Without stop, the
+// goroutine would leak for the life of ctx (which, for a long-lived
+// context, is far longer than this one statement).
+//
+// Sending the cancel late (after query() already returned) is harmless, not
+// just wasteful: the server rejects a CancelRequest whose query_uuid
+// doesn't match whatever is currently running on the connection (see
+// encodeQuackCancelRequest), so a stray cancel racing the statement's own
+// natural completion — or racing a *new* statement already started on the
+// same connection by the time it arrives — can never interrupt the wrong
+// query. stop exists purely to avoid the noise/latency of sending a cancel
+// nobody needs, not for correctness.
+//
+// The cancel request itself runs under quackCancelRequestTimeout, detached
+// from ctx (already done by the time this fires) — its own result is
+// logged, not returned: query()'s caller already gets ctx's own error back
+// regardless of whether the server managed to actually interrupt anything.
+func (s *quackSession) watchForCancel(ctx context.Context, queryID quackHugeint) (stop func()) {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			cancelCtx, cancel := context.WithTimeout(context.Background(), quackCancelRequestTimeout)
+			defer cancel()
+			hdr, r, err := s.send(cancelCtx, encodeQuackCancelRequest(s.connectionID, queryID))
+			l := logger.StdlibLogger(context.WithoutCancel(ctx))
+			switch {
+			case err != nil:
+				l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)
+			case hdr.Type == quackMsgErrorResponse:
+				msg, _ := decodeQuackErrorResponseBody(r)
+				l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", msg)
+			}
+		case <-done:
+		}
+	}()
+	return func() { close(done) }
 }
 
 // decodeQuackStatementError decodes an ErrorResponse body into an error

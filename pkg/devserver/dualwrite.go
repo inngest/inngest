@@ -27,6 +27,22 @@ type syncLifecycleCloser interface {
 	Close(ctx context.Context) error
 }
 
+// dualWriteQuackConns is the *sql.DB connection cap setupDualWrite opens
+// with (duckdb.Options.QuackConns), shared by dual-write's own writes and
+// every caller reading through the same handle (Insights, and
+// duckdbquery.Wrap when --duckdb-reads is on). Above 1, database/sql can
+// run that many statements genuinely concurrently instead of serializing
+// every one of them (write or read) behind a single mutex — see
+// duckdb.Connector's doc comments (openQuackConn, Options.QuackConns) for
+// the one thing this trades away: only the very first connection ever
+// opened keeps process.exec's automatic restart-on-crash handling, so a
+// write that happens to land on one of the others during a genuine
+// subprocess crash (rare, and distinct from a caller's ctx merely ending —
+// see runWithRestartLocked) fails outright rather than transparently
+// retrying after a respawn. Sized for "a handful of simultaneously open
+// Insights tabs plus dual-write's own batch flushes," not production load.
+const dualWriteQuackConns = 16
+
 // setupDualWrite starts the duckdb subprocess, runs migrations, and returns
 // the dual-write listener devserver.go registers with the executor/runner,
 // along with the same *sql.DB handle dual-write writes through — needed so
@@ -128,6 +144,7 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		DBFile:     dbFile,
 		DuckLake:   duckLake,
 		QuackAddr:  &quackAddr,
+		QuackConns: dualWriteQuackConns,
 	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)
