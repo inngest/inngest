@@ -71,6 +71,7 @@ export function CancelFunctionModal(props: Props) {
   }
 
   const countRes = useRunCount(runCountInput);
+  const functionNotFound = countRes.kind === 'function-not-found';
 
   return (
     <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
@@ -134,7 +135,15 @@ export function CancelFunctionModal(props: Props) {
 
           {countRes.error && (
             <Alert severity="error" className="text-sm">
-              Failed to query run count: {countRes.error.message}
+              {functionNotFound ? (
+                <>Function not found, unable to create cancellation.</>
+              ) : (
+                <>
+                  Failed to fetch an accurate run count. Select a shorter time
+                  range for an accurate estimate, or submit anyway to create the
+                  bulk cancellation.
+                </>
+              )}
             </Alert>
           )}
 
@@ -159,7 +168,12 @@ export function CancelFunctionModal(props: Props) {
           onClick={onClose}
         />
         <Button
-          disabled={isCreating || !timeRange || (countRes.data ?? 0) === 0}
+          disabled={
+            isCreating ||
+            !timeRange ||
+            functionNotFound ||
+            (!countRes.error && (countRes.data ?? 0) === 0)
+          }
           kind="danger"
           label="Submit"
           onClick={onSubmit}
