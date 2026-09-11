@@ -580,7 +580,7 @@ func TestGetBatchInfo(t *testing.T) {
 			EventBatch: &inngest.EventBatchConfig{
 				MaxSize: 10,
 				Timeout: "60s",
-				Key:     strPtr("event.data.user_id"),
+				Key:     new("event.data.user_id"),
 			},
 		}
 
@@ -669,10 +669,6 @@ func TestGetBatchInfo(t *testing.T) {
 		require.Empty(t, info.Items)
 		require.Equal(t, "none", info.Status)
 	})
-}
-
-func strPtr(s string) *string {
-	return &s
 }
 
 // TestPerEventIdempotenceKeys verifies that per-event SET keys are used for dedup
@@ -1017,7 +1013,7 @@ func TestDeleteBatch(t *testing.T) {
 			EventBatch: &inngest.EventBatchConfig{
 				MaxSize: 10,
 				Timeout: "60s",
-				Key:     strPtr("event.data.tenant_id"),
+				Key:     new("event.data.tenant_id"),
 			},
 		}
 

@@ -101,9 +101,10 @@ function FunctionComponent() {
           onClose={() => setCancelOpen(false)}
         />
       )}
-      {replayOpen && (
+      {replayOpen && fn && (
         <NewReplayModal
           isOpen={replayOpen}
+          functionID={fn.id}
           functionSlug={functionSlug}
           onClose={() => setReplayOpen(false)}
         />

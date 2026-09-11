@@ -18,15 +18,23 @@ type requeueRoutingShard struct {
 	requeueByIDErr   error
 	requeueCalls     int
 	requeueByIDCalls int
+	onRequeue        func()
+	onRequeueByID    func()
 }
 
 func (s *requeueRoutingShard) Name() string { return s.name }
 func (s *requeueRoutingShard) Requeue(context.Context, QueueItem, time.Time, ...RequeueOptionFn) error {
 	s.requeueCalls++
+	if s.onRequeue != nil {
+		s.onRequeue()
+	}
 	return s.requeueErr
 }
 func (s *requeueRoutingShard) RequeueByJobID(context.Context, string, time.Time) error {
 	s.requeueByIDCalls++
+	if s.onRequeueByID != nil {
+		s.onRequeueByID()
+	}
 	return s.requeueByIDErr
 }
 
@@ -147,4 +155,57 @@ func TestProducerRequeueByJobIDUsesCurrentShardWithSourceFallback(t *testing.T) 
 			require.Equal(t, tt.wantDestCalls, destination.requeueByIDCalls)
 		})
 	}
+}
+
+func TestProducerRequeueRetriesCurrentShardAfterMigrationHandoff(t *testing.T) {
+	functionID := uuid.New()
+	item := QueueItem{
+		ID:         "job-1",
+		FunctionID: functionID,
+		Data: Item{Identifier: state.Identifier{
+			WorkflowID:  functionID,
+			WorkspaceID: uuid.New(),
+			AccountID:   uuid.New(),
+		}},
+	}
+
+	source := &requeueRoutingShard{name: "source", requeueErr: ErrQueueItemNotFound}
+	destination := &requeueRoutingShard{name: "destination", requeueErr: ErrQueueItemNotFound}
+	source.onRequeue = func() {
+		// The migration handoff commits after the destination miss and before the
+		// source miss returns. The item is now available only at the destination.
+		destination.requeueErr = nil
+	}
+	registry := mustShardRegistry(t,
+		map[string]QueueShard{"source": source, "destination": destination},
+		WithShardSelector(func(context.Context, Scope, *string) (QueueShard, error) {
+			return destination, nil
+		}),
+	)
+	producer := &queueProducer{shards: registry}
+
+	require.NoError(t, producer.Requeue(context.Background(), source.Name(), item, time.Now()))
+	require.Equal(t, 1, source.requeueCalls)
+	require.Equal(t, 2, destination.requeueCalls)
+}
+
+func TestProducerRequeueByJobIDRetriesCurrentShardAfterMigrationHandoff(t *testing.T) {
+	scope := Scope{AccountID: uuid.New(), EnvID: uuid.New(), FunctionID: uuid.New()}
+	source := &requeueRoutingShard{name: "source", requeueByIDErr: ErrQueueItemNotFound}
+	destination := &requeueRoutingShard{name: "destination", requeueByIDErr: ErrQueueItemNotFound}
+	source.onRequeueByID = func() {
+		// Simulate the atomic ownership flip completing between the two misses.
+		destination.requeueByIDErr = nil
+	}
+	registry := mustShardRegistry(t,
+		map[string]QueueShard{"source": source, "destination": destination},
+		WithShardSelector(func(context.Context, Scope, *string) (QueueShard, error) {
+			return destination, nil
+		}),
+	)
+	producer := &queueProducer{shards: registry}
+
+	require.NoError(t, producer.RequeueByJobID(context.Background(), scope, source.Name(), "job-1", time.Now()))
+	require.Equal(t, 1, source.requeueByIDCalls)
+	require.Equal(t, 2, destination.requeueByIDCalls)
 }

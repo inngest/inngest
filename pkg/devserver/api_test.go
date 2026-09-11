@@ -29,7 +29,6 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
-	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
 
@@ -316,7 +315,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 			// change function config in each iteration
 			sdkFunction1.Timeouts = &inngest.Timeouts{
-				Start: inngestgo.StrPtr(fmt.Sprintf("%dm", i)),
+				Start: new(fmt.Sprintf("%dm", i)),
 			}
 			req.Functions[0] = sdkFunction1
 
@@ -397,7 +396,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 		// update fn config for sdkFunction1
 		sdkFunction1.Timeouts = &inngest.Timeouts{
-			Start: inngestgo.StrPtr("2m"),
+			Start: new("2m"),
 		}
 		req.Functions[0] = sdkFunction1
 

@@ -60,7 +60,7 @@ func TestSDKSteps(t *testing.T) {
 			Op:          enums.OpcodeStepRun,
 			ID:          hashes["first step"],
 			Name:        "first step",
-			DisplayName: inngestgo.StrPtr("first step"),
+			DisplayName: new("first step"),
 			Data:        []byte(`"first step"`),
 		}}),
 		// Stack is updated
@@ -80,7 +80,7 @@ func TestSDKSteps(t *testing.T) {
 			ID:          hashes["sleep"],
 			Data:        json.RawMessage("null"),
 			Name:        "2s",
-			DisplayName: inngestgo.StrPtr("for 2s"),
+			DisplayName: new("for 2s"),
 		}}),
 		// Update stack and state
 		test.AddRequestStack(driver.FunctionStack{
@@ -96,7 +96,7 @@ func TestSDKSteps(t *testing.T) {
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeStepRun,
 			ID:          hashes["second step"],
-			DisplayName: inngestgo.StrPtr("second step"),
+			DisplayName: new("second step"),
 			Name:        "second step",
 			Data:        json.RawMessage(`{"first":"first step","second":true}`),
 		}}),

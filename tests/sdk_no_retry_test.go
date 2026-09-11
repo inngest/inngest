@@ -42,7 +42,7 @@ func TestSDKNoRetry(t *testing.T) {
 			Op:          enums.OpcodeStepError,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
 			Name:        "first step",
-			DisplayName: inngestgo.StrPtr(`first step`),
+			DisplayName: new(`first step`),
 			Error: &state.UserError{
 				Name:    "NonRetriableError",
 				Message: "no retry plz",

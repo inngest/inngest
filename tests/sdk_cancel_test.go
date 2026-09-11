@@ -54,7 +54,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				Op:          enums.OpcodeSleep,
 				ID:          hashes["Sleep 10s"],
 				Name:        "10s",
-				DisplayName: inngestgo.StrPtr("sleep"),
+				DisplayName: new("sleep"),
 				Data:        json.RawMessage("null"),
 			}}),
 
@@ -85,7 +85,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				Op:          enums.OpcodeStepRun,
 				ID:          hashes["After the sleep"],
 				Name:        "After the sleep",
-				DisplayName: inngestgo.StrPtr("After the sleep"),
+				DisplayName: new("After the sleep"),
 				Data:        []byte(`"This should be cancelled if a matching cancel event is received"`),
 			}}),
 
@@ -157,7 +157,7 @@ func TestSDKCancelReceived(t *testing.T) {
 				Op:          enums.OpcodeSleep,
 				ID:          "c3ca5f787365eae0dea86250e27d476406956478",
 				Name:        "10s",
-				DisplayName: inngestgo.StrPtr("sleep"),
+				DisplayName: new("sleep"),
 				Data:        json.RawMessage("null"),
 			}}),
 

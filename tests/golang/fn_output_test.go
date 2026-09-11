@@ -29,7 +29,7 @@ func TestFnOutputTooLarge(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "my-fn",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {

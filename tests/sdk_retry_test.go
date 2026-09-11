@@ -50,7 +50,7 @@ func TestSDKRetry(t *testing.T) {
 			Op:          enums.OpcodeStepError,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
 			Name:        "first step",
-			DisplayName: inngestgo.StrPtr(`first step`),
+			DisplayName: new(`first step`),
 			Error: &state.UserError{
 				Name:    "Error",
 				Message: "broken",
@@ -67,7 +67,7 @@ func TestSDKRetry(t *testing.T) {
 			Op:          enums.OpcodeStepRun,
 			ID:          hashes["first step"],
 			Name:        "first step",
-			DisplayName: inngestgo.StrPtr("first step"),
+			DisplayName: new("first step"),
 			Data:        []byte(`"yes: 2"`),
 		}}),
 		// Stack is updated

@@ -23,7 +23,7 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 				Scope: mapScope(conc.Scope),
 				Limit: &ConcurrencyLimitConfiguration{
 					Value:       concLimit,
-					IsPlanLimit: boolPtr(concLimit == planConcurrencyLimit),
+					IsPlanLimit: new(concLimit == planConcurrencyLimit),
 				},
 				Key: conc.Key,
 			}
@@ -34,7 +34,7 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 				Scope: ConcurrencyScopeAccount,
 				Limit: &ConcurrencyLimitConfiguration{
 					Value:       planConcurrencyLimit, // TODO: render -1 as infinite on frontend?
-					IsPlanLimit: boolPtr(true),
+					IsPlanLimit: new(true),
 				},
 			},
 		}
@@ -72,7 +72,7 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 		Cancellations: mapCancellations(fn.Cancel),
 		Retries: &RetryConfiguration{
 			Value:     fn.Steps[0].RetryCount(),
-			IsDefault: boolPtr(fn.Steps[0].RetryCount() == consts.DefaultRetryCount),
+			IsDefault: new(fn.Steps[0].RetryCount() == consts.DefaultRetryCount),
 		},
 		Priority:    priority,
 		EventsBatch: mapEventsBatch(fn.EventBatch),
@@ -152,8 +152,4 @@ func mapSingletonMode(internalEnum enums.SingletonMode) SingletonMode {
 	}
 
 	return SingletonModeSkip
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

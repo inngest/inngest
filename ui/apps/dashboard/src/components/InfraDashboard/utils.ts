@@ -4,6 +4,11 @@ import type {
   MetricsData,
   TimeSeriesPoint,
 } from '@/gql/graphql';
+import {
+  HOBBY_PLAN_SLUG,
+  PRO_PLAN_AMOUNT_CENTS,
+  PRO_PLAN_SLUG,
+} from '@/components/Billing/Plans/constants';
 import { concurrencyLimitReachedBySlot } from '@/components/Functions/concurrency';
 import type { Function as FunctionRow } from '@inngest/components/types/function';
 import type { InfraPlan, InfraPlanSku, InfraTierId } from './placeholderData';
@@ -102,10 +107,10 @@ type AccountEntitlementsSource = {
   functionBacklogSize?: { limit?: number | null } | null;
 };
 
-export const FREE_INFRA_PLAN_SLUG = 'hobby-free-2025-08-08';
-export const PRO_INFRA_PLAN_SLUG = 'pro-2025-08-08';
+export const FREE_INFRA_PLAN_SLUG = HOBBY_PLAN_SLUG;
+export const PRO_INFRA_PLAN_SLUG = PRO_PLAN_SLUG;
 
-const PRO_PLAN_BASE_AMOUNT_CENTS = 7_500;
+const PRO_PLAN_BASE_AMOUNT_CENTS = PRO_PLAN_AMOUNT_CENTS;
 
 export type InfraConcurrencyAddonSource = {
   available?: boolean | null;
@@ -164,7 +169,7 @@ const INFRA_PLAN_BILLING_TARGETS: Record<
   },
   'IN-S': {
     basePlanSlug: PRO_INFRA_PLAN_SLUG,
-    monthlyAmountCents: 9_900,
+    monthlyAmountCents: PRO_PLAN_AMOUNT_CENTS,
     targetConcurrency: 100,
   },
   'IN-M': {

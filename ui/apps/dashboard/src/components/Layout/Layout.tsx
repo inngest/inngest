@@ -4,6 +4,7 @@ import { type ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
 import SideBar from './SideBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
+import { ExecutionLimitPill } from '../ExecutionLimit/ExecutionLimitPill';
 import IncidentBanner from '../Incident/IncidentBanner';
 import { PaymentStatusBanner } from '../PaymentStatusBanner/PaymentStatusBanner';
 
@@ -36,7 +37,7 @@ export default function Layout({
 
         {/* disabled by Dan 11/22/2025 for performance reasons */}
         <Suspense>{/* <BillingBanner /> */}</Suspense>
-        <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
+        <ExecutionLimitPill />
 
         {children}
       </div>

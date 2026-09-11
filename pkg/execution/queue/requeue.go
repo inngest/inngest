@@ -26,7 +26,19 @@ func (q *queueProducer) Requeue(ctx context.Context, shardName string, i QueueIt
 		}
 		return err
 	}
-	return source.Requeue(ctx, i, at, opts...)
+	err = source.Requeue(ctx, i, at, opts...)
+	if err == nil || !errors.Is(err, ErrQueueItemNotFound) {
+		return err
+	}
+
+	// Ownership can flip after the first current-shard attempt but before the
+	// source fallback. Resolve once more so that handoff window cannot lose an
+	// acknowledged requeue on both sides of the migration.
+	current, resolveErr = q.selectShard(ctx, "", i)
+	if resolveErr != nil || current.Name() == source.Name() {
+		return err
+	}
+	return current.Requeue(ctx, i, at, opts...)
 }
 
 // RequeueByJobID requires scope to include account, environment, and function
@@ -52,5 +64,16 @@ func (q *queueProducer) RequeueByJobID(ctx context.Context, scope Scope, shardNa
 		}
 		return err
 	}
-	return source.RequeueByJobID(ctx, jobID, at)
+	err = source.RequeueByJobID(ctx, jobID, at)
+	if err == nil || !errors.Is(err, ErrQueueItemNotFound) {
+		return err
+	}
+
+	// The routing handoff may have committed between the destination and source
+	// attempts. One re-resolution closes that single-transaction race window.
+	current, resolveErr = q.shards.Resolve(ctx, scope, nil)
+	if resolveErr != nil || current.Name() == source.Name() {
+		return err
+	}
+	return current.RequeueByJobID(ctx, jobID, at)
 }

@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 
 import type { ProfileDisplayType } from '@/queries/server/profile';
@@ -13,10 +13,12 @@ export default function TopBar({
   activeEnv,
   profile,
   showOnboardingWidget,
+  children,
 }: {
   activeEnv?: Environment;
   profile?: ProfileDisplayType;
   showOnboardingWidget: () => void;
+  children?: ReactNode;
 }) {
   return (
     <header className="bg-canvasSubtle relative z-[60] flex h-[48px] shrink-0 items-center justify-between gap-3 px-5">
@@ -41,6 +43,7 @@ export default function TopBar({
           <Environments activeEnv={activeEnv} collapsed={false} />
         </Suspense>
       </div>
+      {children}
       <div className="flex items-center gap-3">
         <SearchTrigger
           envSlug={activeEnv?.slug ?? 'production'}
