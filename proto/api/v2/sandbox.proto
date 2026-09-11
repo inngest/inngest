@@ -82,6 +82,10 @@ message CreateSandboxRequest {
   uint32 memory_mb = 3;
   map<string, string> environment = 4;
   optional string snapshot_id = 5;
+  // Environment variable name to workspace secret UUID. Values are fetched at
+  // launch and may remain in the guest and its snapshots. Cannot overlap with
+  // environment or be supplied with snapshot_id.
+  map<string, string> secrets = 6;
 }
 
 message ListSandboxesRequest {
