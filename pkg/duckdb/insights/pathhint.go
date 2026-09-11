@@ -83,16 +83,55 @@ func withRootHint(pathHints []PathHint, hint ColumnHint) []PathHint {
 	return append([]PathHint{{Hint: hint}}, pathHints...)
 }
 
-// lookupPath returns the hint declared for exactly this path among c's
-// pathHints, HintNone if none matches. A linear scan is fine — no
-// knownColumn declares more than a handful of entries.
-func (c knownColumn) lookupPath(path []PathSegment) ColumnHint {
-	for _, ph := range c.pathHints {
+// lookupPathIn returns the hint declared for exactly this path among
+// pathHints, HintNone if none matches -- the []PathHint-general
+// counterpart of knownColumn.lookupPath below, for a result (e.g.
+// resolveColumnPathHints', for a computed LIST()/ARRAY_AGG() call) that
+// isn't a knownColumn at all. A linear scan is fine — no pathHints slice
+// this package produces has more than a handful of entries.
+func lookupPathIn(pathHints []PathHint, path []PathSegment) ColumnHint {
+	for _, ph := range pathHints {
 		if pathsEqual(ph.Path, path) {
 			return ph.Hint
 		}
 	}
 	return HintNone
+}
+
+// rootHintOf returns pathHints' empty-Path (whole-value) entry's hint,
+// HintNone if it has none.
+func rootHintOf(pathHints []PathHint) ColumnHint {
+	return lookupPathIn(pathHints, nil)
+}
+
+// projectPathHints returns pathHints' entries whose Path begins with
+// prefix, that prefix stripped off each -- the general "reach one level
+// (or more) further into an already-resolved []PathHint" primitive both
+// UNNEST(...)/a single-index "[n]" access (prefix == {wc}, unwrapping one
+// array level) and a JSON sub-path access on a computed base (prefix ==
+// queryPath(path)) share, so a chain of these composes to arbitrary
+// nesting depth: rootHintOf(projectPathHints(ph, prefix)) is exactly "the
+// hint declared for prefix itself" (what a single lookupPathIn call
+// already gives directly), while the full non-root result is itself a
+// valid []PathHint a further layer can project again -- e.g.
+// UNNEST(list(inputs))'s own pathHints are
+// projectPathHints(list(inputs)'s pathHints, {wc}), and a further
+// ->'meta.sessions' on top of that projects once more.
+func projectPathHints(pathHints []PathHint, prefix []PathSegment) []PathHint {
+	var projected []PathHint
+	for _, ph := range pathHints {
+		if len(ph.Path) < len(prefix) || !pathsEqual(ph.Path[:len(prefix)], prefix) {
+			continue
+		}
+		projected = append(projected, PathHint{Path: ph.Path[len(prefix):], Hint: ph.Hint})
+	}
+	return projected
+}
+
+// lookupPath returns the hint declared for exactly this path among c's
+// pathHints, HintNone if none matches.
+func (c knownColumn) lookupPath(path []PathSegment) ColumnHint {
+	return lookupPathIn(c.pathHints, path)
 }
 
 // hint returns c's whole-column hint (its empty-Path pathHints entry),

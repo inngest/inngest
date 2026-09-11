@@ -116,3 +116,24 @@ func TestExecuteEmptyResultStillReportsColumns(t *testing.T) {
 	require.Equal(t, "run_id", result.Columns[0].Name)
 	require.Equal(t, insights.HintRunID, result.Columns[0].Hint())
 }
+
+// TestExecuteComparesNowAgainstTimestampColumn proves rewriteTZFunctions'
+// now()::TIMESTAMP cast (transpile.go's stageCastTZFunctions) doesn't just
+// transpile but actually runs: without the cast, DuckDB itself rejects
+// this comparison with "Cannot compare values of type TIMESTAMP_MS and
+// type TIMESTAMP WITH TIME ZONE" (queued_at is TIMESTAMP_MS, now() is
+// TIMESTAMP WITH TIME ZONE) -- see rewritetz.go's doc comment.
+func TestExecuteComparesNowAgainstTimestampColumn(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	accountID, envID, runID := seedOneCompletedRun(t, db)
+
+	tr, err := insights.Transpile("SELECT run_id FROM runs WHERE queued_at > now() - INTERVAL 1 MINUTE", accountID, envID)
+	require.NoError(t, err)
+
+	result, err := insights.Execute(ctx, db, tr)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+	require.Equal(t, runID, result.Rows[0][0])
+}

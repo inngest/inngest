@@ -445,7 +445,7 @@ func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 	if !ok {
 		return &ValidationError{Pos: f.Pos(), End: f.End(), Message: fmt.Sprintf("function %q is not allowed", strings.Join(f.Name, "."))}
 	}
-	_, diags := info.returnType(name, f.Args, v.scope)
+	_, _, diags := info.returnType(name, f.Args, v.scope)
 	for _, d := range diags {
 		d.Start, d.End = f.Pos(), f.End()
 		if d.Severity == DiagnosticError {

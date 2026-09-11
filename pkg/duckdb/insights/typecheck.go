@@ -45,7 +45,7 @@ func inferType(expr parser.Expr, scope *tableScope) ColumnType {
 		// for CTE/subquery column derivation, and every FunctionExpr this
 		// package can reach is also independently walked (and its
 		// diagnostics collected) by validate's own exprValidator.
-		t, _ := functionReturnType(strings.ToLower(strings.Join(e.Name, ".")), e.Args, scope)
+		t, _, _ := functionReturnType(strings.ToLower(strings.Join(e.Name, ".")), e.Args, scope)
 		return t
 	case *parser.BinaryExpr:
 		return binaryExprType(e, scope)
@@ -178,16 +178,19 @@ func unaryExprType(u *parser.UnaryExpr, scope *tableScope) ColumnType {
 }
 
 // functionReturnType looks up name's returnType rule in allowedFunctions
-// (functions.go) and evaluates it against args/scope, also returning any
-// non-fatal Diagnostics that rule produced about this call (e.g. a wrong
-// argument count). That field is the single source of truth for a
-// function's return type, colocated with its description/docsURL --
-// there's no separate switch to keep in sync when adding a function
+// (functions.go) and evaluates it against args/scope, also returning that
+// call's result pathHints (nil for the overwhelming majority of
+// functions -- see functionInfo.returnType's own doc comment for which
+// ones report one) and any non-fatal Diagnostics that rule produced about
+// this call (e.g. a wrong argument count). That field is the single
+// source of truth for a function's return type and result pathHints,
+// colocated with its description/docsURL -- there's no separate switch,
+// or separate hint-only lookup, to keep in sync when adding a function
 // anymore.
-func functionReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic) {
+func functionReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 	info, ok := allowedFunctions[name]
 	if !ok {
-		return ColumnTypeUnknown, nil
+		return ColumnTypeUnknown, nil, nil
 	}
 	return info.returnType(name, args, scope)
 }

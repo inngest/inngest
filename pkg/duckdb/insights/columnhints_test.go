@@ -90,6 +90,148 @@ func TestBuildColumnHintsNoHintForAggregate(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT COUNT(*) FROM runs"))
 }
 
+// TestBuildColumnHints{Max,Min,AnyValue,ArgMax}PreservesArgHint cover
+// preservesArgTypeAndHint's family (functionInfo's own doc comment):
+// these functions report one of their input rows' own actual,
+// unmodified values, so the result carries that value's own hint too --
+// same policy as a bare column reference, just reached through an
+// aggregate/window call.
+func TestBuildColumnHintsMaxPreservesArgHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT max(run_id) FROM runs"))
+}
+
+func TestBuildColumnHintsMinPreservesArgHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT min(run_id) FROM runs"))
+}
+
+func TestBuildColumnHintsAnyValuePreservesArgHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT any_value(run_id) FROM runs"))
+}
+
+// TestBuildColumnHintsArgMaxPreservesRepresentativeArgHint confirms the
+// hint is always taken from args[0] (the "arg" to report), not args[1]
+// (arg_max's "val" the row is chosen by) -- mirroring preservesArgType's
+// own type-inference precedent for the same family.
+func TestBuildColumnHintsArgMaxPreservesRepresentativeArgHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT arg_max(run_id, queued_at) FROM runs"))
+}
+
+// TestBuildColumnHintsNestedAggregatesPreserveHint confirms the
+// recursion through exprPathHints composes: MAX(FIRST(run_id)) resolves
+// FIRST(run_id)'s own hint the same way a bare run_id would, then MAX
+// reports that back unmodified too.
+func TestBuildColumnHintsNestedAggregatesPreserveHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT max(first(run_id)) FROM runs"))
+}
+
+// TestBuildColumnHints{Greatest,Median}GetNoHint cover the two exclusion
+// reasons functionInfo's own doc comment names: GREATEST picks between
+// independently-sourced expressions row-by-row rather than accumulating
+// one column, and MEDIAN can interpolate a value that was never actually
+// present in the input -- both stay plain preservesArgType (type only,
+// no hint), unlike MAX/MIN/ANY_VALUE above.
+func TestBuildColumnHintsGreatestGetsNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT greatest(run_id, app_id) FROM runs"))
+}
+
+func TestBuildColumnHintsMedianGetsNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT median(run_id) FROM runs"))
+}
+
+// TestBuildColumnHints{List,ArrayAgg}WholeValueGetsNoHint: LIST()/
+// ARRAY_AGG()'s result is a LIST value, not itself a run_id -- only its
+// elements (TestBuildColumnPathHints{List,ArrayAgg}ElementsInheritArgHint,
+// below) carry the hint.
+func TestBuildColumnHintsListWholeValueGetsNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT list(run_id) FROM runs"))
+}
+
+func TestBuildColumnHintsArrayAggWholeValueGetsNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT array_agg(run_id) FROM runs"))
+}
+
+// pathHintsFor mirrors hintsFor, for buildColumnPathHints' fuller
+// []PathHint result -- needed to see a non-root (e.g. {wc}) entry
+// hintsFor's plain ColumnHint result can't represent.
+func pathHintsFor(t *testing.T, sql string) [][]PathHint {
+	t.Helper()
+	stmt := mustParse(t, sql)
+	scope, err := resolveScope(stmt.From, nil, nil)
+	require.NoError(t, err)
+	return buildColumnPathHints(stmt, scope, nil)
+}
+
+// TestBuildColumnPathHints{List,ArrayAgg}ElementsInheritArgHint is
+// listReturnType's own case: LIST(run_id)/ARRAY_AGG(run_id)'s *elements*
+// -- not the LIST value itself, see the WholeValueGetsNoHint tests above
+// -- carry run_id's own hint, one array-wildcard segment deeper, exactly
+// like runs.event_ids' own declared {wc} pathHints entry (tables.go).
+func TestBuildColumnPathHintsListElementsInheritArgHint(t *testing.T) {
+	require.Equal(t, [][]PathHint{{hint(HintRunID, wc)}}, pathHintsFor(t, "SELECT list(run_id) FROM runs"))
+}
+
+func TestBuildColumnPathHintsArrayAggElementsInheritArgHint(t *testing.T) {
+	require.Equal(t, [][]PathHint{{hint(HintRunID, wc)}}, pathHintsFor(t, "SELECT array_agg(run_id) FROM runs"))
+}
+
+// TestBuildColumnHintsUnnestOfListStillArrayShapedGetsNoHint:
+// list(sessions) aggregates each row's own sessions *array* into an outer
+// LIST, so it's genuinely a LIST of arrays (two wc segments deep --
+// TestBuildColumnPathHintsListElementsInheritArgHint-style, but wrapping
+// an already-array-typed column instead of a scalar one). A single
+// UNNEST(...) only strips the outer (aggregation-added) wc, leaving one
+// of the original per-row sessions arrays -- still array-shaped, so its
+// own root/whole-value hint is None, exactly like a bare `sessions`
+// reference itself (TestBuildColumnHintsSessionsArray).
+func TestBuildColumnHintsUnnestOfListStillArrayShapedGetsNoHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT UNNEST(list(sessions)) FROM runs"))
+}
+
+// TestBuildColumnHintsDoubleUnnestOfListPreservesArgHint: a *second*
+// UNNEST strips the remaining (sessions' own) wc, landing on an
+// individual session -- proving unnestReturnType's projection composes
+// through repeated application, symmetric with
+// TestBuildColumnPathHintsListElementsInheritArgHint's own composition
+// going the other direction.
+func TestBuildColumnHintsDoubleUnnestOfListPreservesArgHint(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession}, hintsFor(t, "SELECT UNNEST(UNNEST(list(sessions))) FROM runs"))
+}
+
+// TestBuildColumnHintsListOfAlreadyArrayColumnDoubleWildcard confirms a
+// LIST()/ARRAY_AGG() over a column that's *already* array-typed produces
+// a genuinely double-nested pathHints entry (two wc segments deep, one
+// for the aggregation and one for inputs' own array-ness), and that a
+// JSON sub-path access naming both wildcards explicitly
+// ("$[*][*].meta.sessions") resolves against it correctly -- exercising
+// resolveColumnPathHints' jsonPathAccess case recursing through a
+// FunctionExpr base (list(inputs)) rather than a bare column.
+func TestBuildColumnHintsListOfAlreadyArrayColumnDoubleWildcard(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession},
+		hintsFor(t, "SELECT list(inputs) -> '$[*][*].meta.sessions' FROM runs"))
+}
+
+// TestBuildColumnHintsUnnestOfDoubleWildcardJSONPathStillResolves proves
+// the {wc} sibling projectJSONSubPathHints (columnhints.go) adds for a
+// wildcard-collapsed JSON sub-path access survives a further UNNEST --
+// confirmed against real DuckDB that "[*][*]..." flattens into a single
+// result array rather than nesting, so UNNEST(...) directly reaches an
+// individual session in one step, exactly like
+// TestBuildColumnHintsListOfAlreadyArrayColumnDoubleWildcard's own
+// (non-UNNESTed) root hint says it should.
+func TestBuildColumnHintsUnnestOfDoubleWildcardJSONPathStillResolves(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession},
+		hintsFor(t, "SELECT UNNEST(list(inputs) -> '$[*][*].meta.sessions') FROM runs"))
+}
+
+// TestBuildColumnHintsUnnestOfSingleWildcardJSONPathStillResolves is the
+// same proof one wildcard level down -- inputs itself (not an
+// aggregated list(inputs)) already has its own {wc, meta, sessions}
+// pathHints entry, so a single "[*]" here is enough.
+func TestBuildColumnHintsUnnestOfSingleWildcardJSONPathStillResolves(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintSession},
+		hintsFor(t, "SELECT UNNEST(inputs ->> '$[*].meta.sessions') FROM runs"))
+}
+
 func TestBuildColumnHintsNoHintForAmbiguousJoin(t *testing.T) {
 	// run_id exists on both runs and extended_trace_spans -- a bare
 	// reference in a joined query can't resolve to exactly one.

@@ -25,15 +25,15 @@ func dummyArgs(n int) []parser.Expr {
 // range.
 func TestWithArityBounds(t *testing.T) {
 	var calledWith []parser.Expr
-	next := func(_ string, args []parser.Expr, _ *tableScope) (ColumnType, []Diagnostic) {
+	next := func(_ string, args []parser.Expr, _ *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 		calledWith = args
-		return ColumnTypeNumber, nil
+		return ColumnTypeNumber, nil, nil
 	}
 
 	t.Run("fewer than min rejects without calling next", func(t *testing.T) {
 		calledWith = nil
 		wrapped := withArity(2, 4, next)
-		ct, diags := wrapped("foo", dummyArgs(1), nil)
+		ct, _, diags := wrapped("foo", dummyArgs(1), nil)
 		require.Equal(t, ColumnTypeUnknown, ct)
 		require.Len(t, diags, 1)
 		require.Equal(t, DiagnosticError, diags[0].Severity)
@@ -47,7 +47,7 @@ func TestWithArityBounds(t *testing.T) {
 	t.Run("more than max rejects without calling next", func(t *testing.T) {
 		calledWith = nil
 		wrapped := withArity(1, 2, next)
-		ct, diags := wrapped("bar", dummyArgs(3), nil)
+		ct, _, diags := wrapped("bar", dummyArgs(3), nil)
 		require.Equal(t, ColumnTypeUnknown, ct)
 		require.Len(t, diags, 1)
 		require.Equal(t, DiagnosticError, diags[0].Severity)
@@ -60,7 +60,7 @@ func TestWithArityBounds(t *testing.T) {
 	t.Run("within bounds calls next", func(t *testing.T) {
 		calledWith = nil
 		wrapped := withArity(1, 3, next)
-		ct, diags := wrapped("baz", dummyArgs(2), nil)
+		ct, _, diags := wrapped("baz", dummyArgs(2), nil)
 		require.Equal(t, ColumnTypeNumber, ct)
 		require.Empty(t, diags)
 		require.Len(t, calledWith, 2)
@@ -68,14 +68,14 @@ func TestWithArityBounds(t *testing.T) {
 
 	t.Run("at exactly min and exactly max both succeed", func(t *testing.T) {
 		wrapped := withArity(2, 2, next)
-		ct, diags := wrapped("exact", dummyArgs(2), nil)
+		ct, _, diags := wrapped("exact", dummyArgs(2), nil)
 		require.Equal(t, ColumnTypeNumber, ct)
 		require.Empty(t, diags)
 	})
 
 	t.Run("negative max means unbounded -- no upper rejection ever", func(t *testing.T) {
 		wrapped := withArity(1, -1, next)
-		ct, diags := wrapped("unbounded", dummyArgs(50), nil)
+		ct, _, diags := wrapped("unbounded", dummyArgs(50), nil)
 		require.Equal(t, ColumnTypeNumber, ct)
 		require.Empty(t, diags)
 	})

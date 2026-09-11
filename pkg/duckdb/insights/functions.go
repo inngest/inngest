@@ -54,6 +54,14 @@ func AllFunctionSchemas() []FunctionSchema {
 // Captured against DuckDB's docs as published when this was written --
 // not re-verified on every build, so a doc site restructure could stale
 // these without this package noticing.
+// functionTypeResolver computes one allowed function's result ColumnType,
+// result pathHints, and any non-fatal Diagnostics about a specific call
+// (name, args, scope) -- functionInfo.returnType's own type, named so
+// withArity and every returnType implementation (fixedType,
+// preservesArgType, ...) share one spelling instead of repeating this
+// three-return-value signature at each definition site.
+type functionTypeResolver func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic)
+
 type functionInfo struct {
 	description string
 	docsURL     string
@@ -101,21 +109,44 @@ type functionInfo struct {
 	// length-validated) arguments and report a fixed bucket with no further
 	// diagnostics (fixedType); a few are genuinely a function of their
 	// arguments -- preservesArgType for "pick one of my arguments"
-	// functions (MIN/MAX/COALESCE-like), ifReturnType for IF's then-branch
-	// and condition-type check, listAggregateReturnType for
-	// LIST_AGGREGATE/ARRAY_AGGREGATE's dynamic dispatch and name-type
+	// functions (MIN/MAX/COALESCE-like), preservesArgTypeAndHint for the
+	// subset of that same family whose result also carries args[0]'s own
+	// pathHints verbatim, listReturnType for LIST/ARRAY_AGG (whose result
+	// pathHints describe the aggregated LIST's *elements*, one
+	// array-wildcard segment deeper than args[0]'s own), ifReturnType for
+	// IF's then-branch and condition-type check, listAggregateReturnType
+	// for LIST_AGGREGATE/ARRAY_AGGREGATE's dynamic dispatch and name-type
 	// check. This is the single source of truth for a function's return
-	// type -- functionReturnType (typecheck.go) is just
-	// allowedFunctions[name].returnType(name, args, scope); there's no
-	// separate switch to keep in sync anymore.
-	returnType func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic)
+	// type *and* its result pathHints -- functionReturnType (typecheck.go)
+	// is just allowedFunctions[name].returnType(name, args, scope); there's
+	// no separate switch, or separate hint-only lookup, to keep in sync.
+	//
+	// The []PathHint result is nil for the overwhelming majority of
+	// entries (fixedType, plain preservesArgType, ifReturnType,
+	// listAggregateReturnType) -- correct for anything that computes a
+	// genuinely new value from its inputs rather than reporting one of
+	// them back unmodified. It's only ever non-nil for a genuine
+	// aggregate/window function that returns one of its input rows'
+	// actual, unmodified values (preservesArgTypeAndHint: ANY_VALUE,
+	// ARG_MAX/MIN, FIRST(_VALUE), LAG/LEAD, LAST(_VALUE), MAX/MIN, MODE,
+	// NTH_VALUE, QUANTILE_DISC) or LIST/ARRAY_AGG (listReturnType).
+	// Deliberately left plain (no hint) on every other preservesArgType
+	// entry: BIT_AND/OR/XOR computes a new value, not one of its inputs;
+	// GREATEST/LEAST/IFNULL pick between independently-sourced expressions
+	// row-by-row rather than accumulating one column (whichever one wins
+	// usually isn't semantically "the same column" a hint could describe);
+	// MEDIAN/QUANTILE_CONT can interpolate a value that was never actually
+	// present in the input for an even-sized/non-discrete distribution, so
+	// their output no longer reliably means whatever the input hint
+	// claimed.
+	returnType functionTypeResolver
 }
 
 // fixedType returns a returnType function that ignores its arguments and
-// always reports t with no diagnostics -- the common case, for every
-// function whose return type doesn't depend on its arguments.
-func fixedType(t ColumnType) func(string, []parser.Expr, *tableScope) (ColumnType, []Diagnostic) {
-	return func(string, []parser.Expr, *tableScope) (ColumnType, []Diagnostic) { return t, nil }
+// always reports t with no pathHints or diagnostics -- the common case,
+// for every function whose return type doesn't depend on its arguments.
+func fixedType(t ColumnType) functionTypeResolver {
+	return func(string, []parser.Expr, *tableScope) (ColumnType, []PathHint, []Diagnostic) { return t, nil, nil }
 }
 
 // tooFewArgsDiagnostic notes a call to name with fewer than min arguments
@@ -166,16 +197,13 @@ func tooManyArgsDiagnostic(name string, max, got int) Diagnostic {
 // this reason. IF/IFNULL/UNNEST aren't in the catalog under those names at
 // all (special parser-level forms, not real catalog functions) and are
 // hand-verified the same way.
-func withArity(
-	min, max int,
-	next func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic),
-) func(string, []parser.Expr, *tableScope) (ColumnType, []Diagnostic) {
-	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic) {
+func withArity(min, max int, next functionTypeResolver) functionTypeResolver {
+	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 		if len(args) < min {
-			return ColumnTypeUnknown, []Diagnostic{tooFewArgsDiagnostic(name, min, len(args))}
+			return ColumnTypeUnknown, nil, []Diagnostic{tooFewArgsDiagnostic(name, min, len(args))}
 		}
 		if max >= 0 && len(args) > max {
-			return ColumnTypeUnknown, []Diagnostic{tooManyArgsDiagnostic(name, max, len(args))}
+			return ColumnTypeUnknown, nil, []Diagnostic{tooManyArgsDiagnostic(name, max, len(args))}
 		}
 		return next(name, args, scope)
 	}
@@ -224,8 +252,43 @@ var duckDBBoolLiterals = map[string]bool{
 // 1 -- every allowedFunctions entry using this wraps it in withArity with
 // a real minimum of at least 1, so this never needs its own arg-count
 // check.
-func preservesArgType(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic) {
-	return inferType(args[0], scope), nil
+func preservesArgType(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	return inferType(args[0], scope), nil, nil
+}
+
+// preservesArgTypeAndHint extends preservesArgType with pathHint
+// propagation, for the subset of that same "pick one of my arguments"
+// family whose result is genuinely one of args[0]'s own actual,
+// unmodified values (functionInfo's own doc comment names exactly which,
+// and why the rest stay plain preservesArgType). Reports args[0]'s full
+// pathHints -- root/whole-value hint included -- exactly as if args[0]
+// itself were the SELECT list item in this position (exprPathHints,
+// columnhints.go).
+func preservesArgTypeAndHint(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	t, _, diags := preservesArgType(name, args, scope)
+	return t, exprPathHints(args[0], scope), diags
+}
+
+// listReturnType is LIST()/ARRAY_AGG()'s returnType: always ColumnTypeJSON
+// (a LIST value), but its result pathHints describe the aggregated LIST's
+// *elements* -- not the LIST value itself, which carries no hint of its
+// own -- carrying args[0]'s own hint/pathHints one array-wildcard segment
+// deeper (wrapArrayElementPathHints, columnhints.go).
+func listReturnType(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	return ColumnTypeJSON, wrapArrayElementPathHints(exprPathHints(args[0], scope)), nil
+}
+
+// unnestReturnType is UNNEST(list)'s returnType: always ColumnTypeJSON,
+// but its result pathHints describe the single element UNNEST extracts --
+// args[0]'s own pathHints (exprPathHints, columnhints.go) with one
+// leading wc segment stripped (projectPathHints, pathhint.go). This is
+// the exact inverse of listReturnType's own "one wc segment prepended,"
+// so UNNEST(list(x)) round-trips back to x's own pathHints, and both
+// compose to arbitrary nesting depth (UNNEST(list(list(x))), a JSON
+// sub-path access layered on top of either, ...) since each is just
+// another []PathHint-to-[]PathHint transform over the same shape.
+func unnestReturnType(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	return ColumnTypeJSON, projectPathHints(exprPathHints(args[0], scope), []PathSegment{wc}), nil
 }
 
 // ifReturnType is IF's returnType: IF(condition, then, else) -- the "then"
@@ -245,13 +308,13 @@ func preservesArgType(_ string, args []parser.Expr, scope *tableScope) (ColumnTy
 // Error). A column reference or other dynamic expression's actual runtime
 // value can't be checked statically, so those are never rejected either,
 // matching this package's "never reject on a guess" rule.
-func ifReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic) {
+func ifReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 	if lit, ok := args[0].(*parser.Literal); ok && lit.Kind == parser.LitString {
 		if !duckDBBoolLiterals[strings.ToLower(lit.Text)] {
-			return ColumnTypeUnknown, []Diagnostic{wrongArgTypeDiagnostic(name, 1, ColumnTypeBoolean, ColumnTypeString)}
+			return ColumnTypeUnknown, nil, []Diagnostic{wrongArgTypeDiagnostic(name, 1, ColumnTypeBoolean, ColumnTypeString)}
 		}
 	}
-	return inferType(args[1], scope), nil
+	return inferType(args[1], scope), nil, nil
 }
 
 // literalColumnType is a Literal's own ColumnType bucket, by Kind -- used
@@ -296,13 +359,13 @@ func literalColumnType(kind parser.LiteralKind) ColumnType {
 // this function's real minimum (a 1-argument call is a Binder Error) with
 // no real maximum (extra arguments are forwarded to the named aggregate,
 // e.g. list_aggregate(x, 'string_agg', ',')).
-func listAggregateReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []Diagnostic) {
+func listAggregateReturnType(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
 	lit, ok := args[1].(*parser.Literal)
 	if !ok {
-		return ColumnTypeUnknown, nil
+		return ColumnTypeUnknown, nil, nil
 	}
 	if lit.Kind != parser.LitString {
-		return ColumnTypeUnknown, []Diagnostic{wrongArgTypeDiagnostic(name, 2, ColumnTypeString, literalColumnType(lit.Kind))}
+		return ColumnTypeUnknown, nil, []Diagnostic{wrongArgTypeDiagnostic(name, 2, ColumnTypeString, literalColumnType(lit.Kind))}
 	}
 	return functionReturnType(strings.ToLower(lit.Text), args[:1], scope)
 }
@@ -368,7 +431,7 @@ func init() {
 			description: "Returns the first non-NULL value from arg. This function is affected by ordering.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#any_valuearg",
 			signature:   "any_value(arg)",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"approx_count_distinct": {
 			description: "Computes the approximate count of distinct elements using HyperLogLog.",
@@ -386,19 +449,19 @@ func init() {
 			description: "Finds the row with the maximum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_maxarg-val",
 			signature:   "arg_max(arg, val)",
-			returnType:  withArity(2, 3, preservesArgType),
+			returnType:  withArity(2, 3, preservesArgTypeAndHint),
 		},
 		"arg_min": {
 			description: "Finds the row with the minimum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_minarg-val",
 			signature:   "arg_min(arg, val)",
-			returnType:  withArity(2, 3, preservesArgType),
+			returnType:  withArity(2, 3, preservesArgTypeAndHint),
 		},
 		"array_agg": {
 			description: "Returns a LIST containing all the values of a column.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#listarg",
 			signature:   "array_agg(arg)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeJSON)),
+			returnType:  withArity(1, 1, listReturnType),
 		},
 		"array_aggregate": {
 			description: "Executes the aggregate function function_name on the elements of list.",
@@ -705,13 +768,13 @@ func init() {
 			description: "Returns the first value (NULL or non-NULL) from arg. This function is affected by ordering.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#firstarg",
 			signature:   "first(arg)",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"first_value": {
 			description: "The first value of expr in the frame. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#first_valueexpr-order-by-ordering-ignore-nulls",
 			signature:   "first_value(expr[ ORDER BY ordering][ IGNORE NULLS])",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"flatten": {
 			description: "Flattens a nested list by one level.",
@@ -903,13 +966,13 @@ func init() {
 			description: "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#lagexpr-offset-default-order-by-ordering-ignore-nulls",
 			signature:   "lag(expr[, offset[, default]][ ORDER BY ordering][ IGNORE NULLS])",
-			returnType:  withArity(1, 3, preservesArgType),
+			returnType:  withArity(1, 3, preservesArgTypeAndHint),
 		},
 		"last": {
 			description: "Returns the last value of a column. This function is affected by ordering.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#lastarg",
 			signature:   "last(arg)",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"last_day": {
 			description: "Returns the last day of the month.",
@@ -921,13 +984,13 @@ func init() {
 			description: "The last value of expr in the frame. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#last_valueexpr-order-by-ordering-ignore-nulls",
 			signature:   "last_value(expr[ ORDER BY ordering][ IGNORE NULLS])",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"lead": {
 			description: "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#leadexpr-offset-default-order-by-ordering-ignore-nulls",
 			signature:   "lead(expr[, offset[, default]][ ORDER BY ordering][ IGNORE NULLS])",
-			returnType:  withArity(1, 3, preservesArgType),
+			returnType:  withArity(1, 3, preservesArgTypeAndHint),
 		},
 		"least": {
 			description: "Returns the smallest value. For strings lexicographical ordering is used. Note that uppercase characters are considered \"smaller\" than lowercase characters, and collations are not supported.",
@@ -963,7 +1026,7 @@ func init() {
 			description: "Returns a LIST containing all the values of a column.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#listarg",
 			signature:   "list(arg)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeJSON)),
+			returnType:  withArity(1, 1, listReturnType),
 		},
 		"list_aggregate": {
 			description: "Executes the aggregate function function_name on the elements of list.",
@@ -1125,7 +1188,7 @@ func init() {
 			description: "Returns the maximum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#maxarg",
 			signature:   "max(arg)",
-			returnType:  withArity(1, 2, preservesArgType),
+			returnType:  withArity(1, 2, preservesArgTypeAndHint),
 		},
 		"md5": {
 			description: "Returns the MD5 hash of the string as a VARCHAR.",
@@ -1143,7 +1206,7 @@ func init() {
 			description: "Returns the minimum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#minarg",
 			signature:   "min(arg)",
-			returnType:  withArity(1, 2, preservesArgType),
+			returnType:  withArity(1, 2, preservesArgTypeAndHint),
 		},
 		"minute": {
 			description: "Extract the minute component from a date or timestamp.",
@@ -1161,7 +1224,7 @@ func init() {
 			description: "Returns the most frequent value for the values within x. NULL values are ignored.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#modex",
 			signature:   "mode(x)",
-			returnType:  withArity(1, 1, preservesArgType),
+			returnType:  withArity(1, 1, preservesArgTypeAndHint),
 		},
 		"month": {
 			description: "Extract the month component from a date or timestamp.",
@@ -1179,7 +1242,7 @@ func init() {
 			description: "The nth value of expr in the frame. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#nth_valueexpr-nth-order-by-ordering-ignore-nulls",
 			signature:   "nth_value(expr, nth[ ORDER BY ordering][ IGNORE NULLS])",
-			returnType:  withArity(2, 2, preservesArgType),
+			returnType:  withArity(2, 2, preservesArgTypeAndHint),
 		},
 		"ntile": {
 			description: "The row bucket in a window partition for a given bucket count.",
@@ -1233,7 +1296,7 @@ func init() {
 			description: "Returns the exact quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding exact quantiles.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_discx-pos",
 			signature:   "quantile_disc(x, pos)",
-			returnType:  withArity(1, 2, preservesArgType),
+			returnType:  withArity(1, 2, preservesArgTypeAndHint),
 		},
 		"quarter": {
 			description: "Extract the quarter component from a date or timestamp.",
@@ -1551,7 +1614,7 @@ func init() {
 			description: "Unnests a list or struct by one level, turning a single row's list into one row per element.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/list#unnestlist",
 			signature:   "unnest(list)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeJSON)),
+			returnType:  withArity(1, 1, unnestReturnType),
 		},
 		"upper": {
 			description: "Converts string to upper case.",

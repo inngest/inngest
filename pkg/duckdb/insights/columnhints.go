@@ -71,10 +71,44 @@ func buildColumnPathHints(stmt *parser.SelectStatement, scope *tableScope, ctes 
 			}
 			continue
 		}
-		ph := resolveColumnPathHints(item.Expr, scope)
-		pathHints = append(pathHints, withRootHint(ph, resolveItemHint(item.Expr, scope)))
+		pathHints = append(pathHints, exprPathHints(item.Expr, scope))
 	}
 	return pathHints
+}
+
+// exprPathHints returns expr's full pathHints exactly as buildColumnPathHints
+// would report them for a SELECT list item of this same shape -- root
+// (whole-value) entry included whenever resolveItemHint finds one.
+// Factored out of buildColumnPathHints' own per-item loop so a
+// hintTransform (preservesArgHint, listElementHint; functions.go) can
+// compute "this representative argument's own top-level pathHints"
+// without duplicating that combination logic -- MAX(FIRST(run_id)), say,
+// resolves by recursing through this same function at each level.
+func exprPathHints(expr parser.Expr, scope *tableScope) []PathHint {
+	return withRootHint(resolveColumnPathHints(expr, scope), resolveItemHint(expr, scope))
+}
+
+// wrapArrayElementPathHints wraps every entry of ph (as returned by
+// exprPathHints for a LIST/ARRAY_AGG call's own argument) one array
+// -wildcard segment deeper, for listElementHint (functions.go): ph's own
+// root (empty-Path) entry -- the argument's own whole-value hint --
+// becomes the {wc} entry describing every element of the aggregated
+// LIST, and any deeper entry (a JSON sub-path the argument column
+// already declared) gets wc prepended the same way, matching how a
+// knownColumn.arrayOfStructs field's own pathHints entries are shaped
+// (tables.go).
+func wrapArrayElementPathHints(ph []PathHint) []PathHint {
+	if len(ph) == 0 {
+		return nil
+	}
+	wrapped := make([]PathHint, len(ph))
+	for i, p := range ph {
+		path := make([]PathSegment, 0, len(p.Path)+1)
+		path = append(path, wc)
+		path = append(path, p.Path...)
+		wrapped[i] = PathHint{Path: path, Hint: p.Hint}
+	}
+	return wrapped
 }
 
 // unionColumnPathHints is buildColumnPathHints' UNION/INTERSECT/EXCEPT
@@ -92,13 +126,35 @@ func unionColumnPathHints(stmt *parser.SelectStatement, ctes map[string]logicalT
 }
 
 // resolveColumnPathHints returns the full []PathHint for a bare or
-// table-qualified reference to exactly one known table column -- nil for
-// anything else (a JSON sub-path access, an array index, a computed
-// expression, an unknown/ambiguous reference). Mirrors resolveIdentHint's
-// own case-1/case-2 structure (a bare column always wins over an
-// unqualified table lookup), returning the column's pathHints instead of
-// its single hint.
+// table-qualified reference to exactly one known table column, a call to
+// a function whose returnType (functions.go) reports one (LIST/
+// ARRAY_AGG/UNNEST today), a JSON sub-path access (jsonPathAccess,
+// projected through its base's own pathHints), or a single-index "[n]"
+// access -- nil for anything else (some other computed expression, an
+// unknown/ambiguous reference). Mirrors resolveIdentHint's own
+// case-1/case-2 structure (a bare column always wins over an unqualified
+// table lookup) for the Ident case, returning the column's pathHints
+// instead of its single hint.
+//
+// Every non-Ident case above is expressed as a []PathHint-to-[]PathHint
+// transform over some base's own (recursively resolved) pathHints --
+// projectJSONSubPathHints/projectPathHints (pathhint.go) for a JSON
+// sub-path access or a single-index access (prefix {wc}, unwrapping one
+// array level), a function's own returnType for anything else -- so this
+// composes to arbitrary nesting: list(inputs) -> '$[*][*].meta.sessions'
+// recurses through the FunctionExpr case (listReturnType) and then this
+// same jsonPathAccess case again for its own base.
 func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
+	if base, path, ok := jsonPathAccess(expr); ok {
+		return projectJSONSubPathHints(resolveColumnPathHints(base, scope), queryPath(path))
+	}
+	if f, ok := expr.(*parser.FunctionExpr); ok {
+		_, ph, _ := functionReturnType(strings.ToLower(strings.Join(f.Name, ".")), f.Args, scope)
+		return ph
+	}
+	if s, ok := expr.(*parser.SliceExpr); ok && isSingleIndex(s) {
+		return projectPathHints(resolveColumnPathHints(s.X, scope), []PathSegment{wc})
+	}
 	id, ok := expr.(*parser.Ident)
 	if !ok {
 		return nil
@@ -122,6 +178,61 @@ func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
 	default:
 		return nil
 	}
+}
+
+// projectJSONSubPathHints is resolveColumnPathHints' jsonPathAccess case:
+// baseHints (base's own pathHints) projected through this access's own
+// queryPath (projectPathHints) -- plus, when path contains a wildcard
+// segment anywhere, a duplicate {wc}-tagged sibling for every resulting
+// root (whole-value) entry.
+//
+// DuckDB's own JSONPath wildcard extraction always collects its matches
+// into a JSON array -- confirmed empirically against a real duckdb,
+// including for multiple "[*]"s in one path, which flatten into a single
+// combined result array rather than nesting further
+// (list(inputs) -> '$[*][*].meta' returns one flat array of .meta
+// values, not an array of arrays of them). This package's own
+// convention (established well before this function --
+// TestBuildColumnHintsRunInputsMetaSessions et al) *also* reports that
+// array's element hint directly at this expression's own root level, for
+// a UI's convenience: a bare `inputs ->> '$[*].meta.sessions'` SELECT
+// item shows HintSession without requiring a further UNNEST. Reporting
+// only that root entry would make the hint silently vanish the moment a
+// caller *does* still UNNEST/index into the expression, even though the
+// underlying value is genuinely still array-shaped -- the {wc} sibling
+// added here is exactly what unnestReturnType/a single-index access
+// (via resolveColumnPathHints' own cases above) needs to find there.
+//
+// A literal (non-"$"-prefixed) path -- a plain top-level JSON key, not a
+// JSONPath expression at all (queryPath's own doc comment) -- never
+// triggers this: only a real "[*]" wildcard implies DuckDB collected
+// multiple matches into an array. attributes -> '_inngest.defer.parent_run_ids'
+// (TestBuildColumnHintsUnnestOfHintedArray) doesn't need this special
+// case at all -- attributes' own declared entry already carries an
+// explicit trailing wc past that literal key, so projectPathHints alone
+// already leaves a {wc} entry (not a root one) for UNNEST to find.
+func projectJSONSubPathHints(baseHints []PathHint, path []PathSegment) []PathHint {
+	projected := projectPathHints(baseHints, path)
+	if !pathHasWildcard(path) {
+		return projected
+	}
+	out := make([]PathHint, len(projected), len(projected)+1)
+	copy(out, projected)
+	for _, ph := range projected {
+		if len(ph.Path) == 0 {
+			out = append(out, PathHint{Path: []PathSegment{wc}, Hint: ph.Hint})
+		}
+	}
+	return out
+}
+
+func pathHasWildcard(path []PathSegment) bool {
+	for _, s := range path {
+		if s.Wildcard {
+			return true
+		}
+	}
+	return false
 }
 
 // unionColumnHints reconciles a UNION/INTERSECT/EXCEPT statement's two
@@ -201,79 +312,36 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 // sub-path on a known column, returning HintNone when it isn't a bare/
 // aliased/qualified reference to exactly one.
 //
-// UNNEST(...) and a single-index "[n]" access both extract exactly one
-// array element, so both defer to resolveArrayElementHint rather than
-// inheriting whatever hint the array itself carries — a column/path's own
-// hint describes its own value, not necessarily "each element".
+// Every non-Ident shape (a JSON sub-path access, UNNEST(...), a
+// single-index "[n]" access, any other function call) defers to
+// resolveColumnPathHints' own recursive resolution and just reads its
+// root/whole-value entry, if it has one -- UNNEST(...)/a single-index
+// access aren't special-cased here at all: they extract exactly one array
+// element, which resolveColumnPathHints' own projectPathHints({wc}, ...)
+// case already expresses as "strip one leading wc," landing on a root
+// entry exactly when the element itself isn't still array-shaped. A
+// column/path's own whole-value hint is deliberately not inherited by
+// either of those two shapes for the same reason -- it describes the
+// array itself, not necessarily "each element" -- which is why this is a
+// projection (only a path that explicitly declares a leading wc
+// contributes anything), not a fallback.
 func resolveItemHint(expr parser.Expr, scope *tableScope) ColumnHint {
 	if id, ok := expr.(*parser.Ident); ok {
 		return resolveIdentHint(id, scope)
 	}
-	if col, path, ok := jsonPathAccess(expr); ok {
-		return resolveSubPathHint(col, path, scope)
-	}
-	if f, ok := expr.(*parser.FunctionExpr); ok && isUnnest(f) {
-		return resolveArrayElementHint(f.Args[0], scope)
-	}
-	if s, ok := expr.(*parser.SliceExpr); ok && isSingleIndex(s) {
-		return resolveArrayElementHint(s.X, scope)
-	}
-	return HintNone
+	return rootHintOf(resolveColumnPathHints(expr, scope))
 }
 
 // resolveArrayElementHint resolves the hint for one element of the array x
-// evaluates to — x is UNNEST(...)'s argument, a single-index "[n]" access's
-// operand, or a FROM-clause UNNEST's argument, all of which extract
-// exactly one array element.
-//
-// This only ever consults an explicit {..., wc} pathHints entry — there
-// is no fallback to x's own whole-value hint. That whole-value hint can
-// describe something else entirely (a JSON object with a hinted sub-field,
-// or a plain scalar that isn't an array at all), so only a column/path
-// that explicitly declares a trailing wc is asserted to hold multiple
-// values of that hinted type.
+// evaluates to -- x is a FROM-clause UNNEST's argument (scope.go's
+// addTableFunction; an expression-position UNNEST(...)/single-index
+// access instead reaches the same projection through resolveItemHint's
+// generic resolveColumnPathHints fallback above, now that UNNEST has its
+// own returnType, functions.go's unnestReturnType). Kept as its own named
+// entry point since scope.go has no FunctionExpr/SliceExpr of its own to
+// hand resolveColumnPathHints -- just r.Args[0] directly.
 func resolveArrayElementHint(x parser.Expr, scope *tableScope) ColumnHint {
-	if id, ok := x.(*parser.Ident); ok {
-		return arrayElementHintForIdent(id, scope)
-	}
-	if col, path, ok := jsonPathAccess(x); ok {
-		known, ok := resolveKnownColumn(col, scope)
-		if !ok {
-			return HintNone
-		}
-		return known.lookupPath(append(queryPath(path), wc))
-	}
-	return HintNone
-}
-
-// arrayElementHintForIdent resolves id's explicit {wc} pathHints entry —
-// a bare column or a table-qualified one — mirroring resolveIdentHint's own
-// case-1/case-2 precedence (a bare column always wins over an unqualified
-// table lookup).
-func arrayElementHintForIdent(id *parser.Ident, scope *tableScope) ColumnHint {
-	switch len(id.Parts) {
-	case 1:
-		col, ok := scope.uniqueColumn(id.Parts[0])
-		if !ok {
-			return HintNone
-		}
-		return col.lookupPath([]PathSegment{wc})
-	case 2:
-		if tbl, ok := scope.lookup(id.Parts[0]); ok {
-			col, ok := tbl.columns[id.Parts[1]]
-			if !ok {
-				return HintNone
-			}
-			return col.lookupPath([]PathSegment{wc})
-		}
-		return HintNone
-	default:
-		return HintNone
-	}
-}
-
-func isUnnest(f *parser.FunctionExpr) bool {
-	return len(f.Args) == 1 && len(f.Name) == 1 && strings.EqualFold(f.Name[0], "UNNEST")
+	return rootHintOf(projectPathHints(resolveColumnPathHints(x, scope), []PathSegment{wc}))
 }
 
 // isSingleIndex reports whether s is a single-element index ("expr[n]"),
@@ -340,33 +408,11 @@ func arrayOfStructsFieldHint(colName, field string, scope *tableScope) ColumnHin
 	return col.lookupPath([]PathSegment{wc, seg(field)})
 }
 
-func resolveSubPathHint(id *parser.Ident, path string, scope *tableScope) ColumnHint {
-	col, ok := resolveKnownColumn(id, scope)
-	if !ok {
-		return HintNone
-	}
-	return col.lookupPath(queryPath(path))
-}
-
-// resolveKnownColumn resolves id to its knownColumn, whether id is a bare
-// column name (scope.uniqueColumn — errors on ambiguity across a JOIN
-// rather than guessing) or a table-qualified one (e.g.
-// extended_trace_spans.attributes, needed once two joined tables both
-// declare that column name and a bare reference would be ambiguous) —
-// mirroring resolveIdentHint's own case-1/case-2 lookup, but for
-// jsonPathAccess's callers rather than a plain column reference.
-func resolveKnownColumn(id *parser.Ident, scope *tableScope) (knownColumn, bool) {
-	switch len(id.Parts) {
-	case 1:
-		return scope.uniqueColumn(id.Parts[0])
-	case 2:
-		tbl, ok := scope.lookup(id.Parts[0])
-		if !ok {
-			return knownColumn{}, false
-		}
-		col, ok := tbl.columns[id.Parts[1]]
-		return col, ok
-	default:
-		return knownColumn{}, false
-	}
+// resolveSubPathHint resolves a JSON sub-path access's hint: base's own
+// declared/computed pathHints (resolveColumnPathHints -- a bare/qualified
+// column's knownColumn.pathHints, or a LIST()/ARRAY_AGG() call's own
+// result pathHints, functions.go's listReturnType) looked up at path,
+// exactly matching whatever nesting the query itself named (queryPath).
+func resolveSubPathHint(base parser.Expr, path string, scope *tableScope) ColumnHint {
+	return lookupPathIn(resolveColumnPathHints(base, scope), queryPath(path))
 }
