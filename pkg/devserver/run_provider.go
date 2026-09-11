@@ -244,7 +244,7 @@ func functionRunFromSpan(ctx context.Context, reader runSpanReader, runID ulid.U
 		root.Attributes = &meta.ExtractedValues{}
 	}
 
-	span, err := loader.ConvertRunSpan(ctx, root)
+	span, err := loader.ConvertRunSpanFor(ctx, reader, root)
 	if err != nil {
 		return nil, fmt.Errorf("error converting run span: %w", err)
 	}

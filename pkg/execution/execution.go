@@ -121,6 +121,16 @@ type Executor interface {
 	// registered LifecycleListener.
 	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
 
+	// RunStepRunFinishedLifecycle fans OnStepRunFinished out to every
+	// registered SyncLifecycleListener. Exported so callers outside this
+	// package (e.g. pkg/execution/checkpoint, which builds its own
+	// executor.step span directly via TracerProvider.CreateSpan rather than
+	// through this package's own generator handling) can still notify sync
+	// listeners for a step.run/step opcode they process themselves. now is
+	// the caller's own "this just happened" timestamp — see
+	// SyncLifecycleListener.OnFunctionFinished.
+	RunStepRunFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, edge inngest.Edge, gen state.GeneratorOpcode, now time.Time)
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)

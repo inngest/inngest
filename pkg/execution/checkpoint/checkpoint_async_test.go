@@ -162,6 +162,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			TracerProvider:  mocks.tracer,
 			Queue:           mocks.queue,
 			MetricsProvider: mocks.metrics,
+			Executor:        mocks.executor,
 		})
 
 		expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}
@@ -423,6 +424,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			TracerProvider:  &mockTracerProvider{},
 			Queue:           &mockQueue{},
 			MetricsProvider: &mockMetricsProvider{},
+			Executor:        &mockExecutor{},
 		})
 
 		err := checkpointer.CheckpointAsyncSteps(ctx, asyncCheckpoint)
@@ -627,10 +629,11 @@ func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool
 
 	// Create mock dependencies
 	mocks := &testMocks{
-		state:   &mockRunService{},
-		tracer:  &mockTracerProvider{},
-		queue:   &mockQueue{},
-		metrics: &mockMetricsProvider{},
+		state:    &mockRunService{},
+		tracer:   &mockTracerProvider{},
+		queue:    &mockQueue{},
+		metrics:  &mockMetricsProvider{},
+		executor: &mockExecutor{},
 	}
 
 	// Create test IDs
@@ -678,6 +681,7 @@ func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		Executor:        mocks.executor,
 		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
 			return validationEnabled
 		},
@@ -841,10 +845,11 @@ func (m *mockMetricsProvider) OnFnFinished(ctx context.Context, mc MetricCardina
 // Test helper types and functions
 
 type testMocks struct {
-	state   *mockRunService
-	tracer  *mockTracerProvider
-	queue   *mockQueue
-	metrics *mockMetricsProvider
+	state    *mockRunService
+	tracer   *mockTracerProvider
+	queue    *mockQueue
+	metrics  *mockMetricsProvider
+	executor *mockExecutor
 }
 
 type testData struct {

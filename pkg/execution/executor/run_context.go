@@ -34,6 +34,13 @@ type runInstance struct {
 	// This span will be updated once the SDK responds.
 	execSpan *meta.SpanReference
 
+	// reqStart is captured immediately before the SDK request is sent — the
+	// same timestamp execSpan itself is opened with (see ExecutePre) — so
+	// callers needing "when did this specific request begin" (e.g.
+	// OnStepFinished's sync listeners) get the real value instead of
+	// approximating it by subtracting the response's own reported Duration.
+	reqStart time.Time
+
 	// If specified, this is the span reference for the parent discovery call.
 	//
 	// This is necessary to properly tie the parent span to queue items for eg.

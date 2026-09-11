@@ -3,11 +3,12 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
-	"time"
 )
 
 func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.EventV2, error) {
@@ -27,8 +28,6 @@ func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.Eve
 }
 
 func (er eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*models.FunctionRunV2, error) {
-	// convert cqrs TraceRun to FunctionRunV2
-
 	// This is an N+1, currently also an N+1 on cloud in the form of multiple calls to the metrics service
 	// we cannot currently use a data loader due to current db schema and https://github.com/sqlc-dev/sqlc/issues/1830
 	traceRuns, err := er.Data.GetTraceRunsByTriggerID(ctx, obj.ID)
@@ -38,50 +37,11 @@ func (er eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*mod
 
 	functionRuns := make([]*models.FunctionRunV2, 0, len(traceRuns))
 	for _, r := range traceRuns {
-		// TODO dedupe cqrs.TraceRun to models.FunctionRunV2 transformation
-		var (
-			started   *time.Time
-			ended     *time.Time
-			sourceID  *string
-			output    *string
-			batchTime *time.Time
-		)
-
-		if r.StartedAt.UnixMilli() > 0 {
-			started = &r.StartedAt
-		}
-		if r.EndedAt.UnixMilli() > 0 {
-			ended = &r.EndedAt
-		}
-		if len(r.SourceID) > 0 {
-			sourceID = &r.SourceID
-		}
-		if len(r.Output) > 0 {
-			s := string(r.Output)
-			output = &s
-		}
-		runID := ulid.MustParse(r.RunID)
-		status, err := models.ToFunctionRunStatus(r.Status)
+		fr, err := models.MakeFunctionRunV2(r)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("error converting run: %w", err)
 		}
-
-		functionRuns = append(functionRuns, &models.FunctionRunV2{
-			ID:             runID,
-			AppID:          r.AppID,
-			FunctionID:     r.FunctionID,
-			TraceID:        r.TraceID,
-			QueuedAt:       r.QueuedAt,
-			StartedAt:      started,
-			EndedAt:        ended,
-			SourceID:       sourceID,
-			Status:         status,
-			Output:         output,
-			IsBatch:        r.IsBatch,
-			BatchCreatedAt: batchTime,
-			CronSchedule:   r.CronSchedule,
-			HasAi:          r.HasAI,
-		})
+		functionRuns = append(functionRuns, fr)
 	}
 	return functionRuns, nil
 }
