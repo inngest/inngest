@@ -240,7 +240,15 @@ export default function InsightsPage() {
   // simultaneously-open panes -- mirrors the dashboard Insights feature's
   // InsightsTabManager.tsx (Resizable(mainContent, HelperPanelFrame) plus
   // an always-visible HelperPanelControl icon bar outside it).
-  const mainContent = isHelperPanelOpen ? (
+  //
+  // <Resizable> is always rendered here, with `second` collapsing to null
+  // when no helper is open, rather than conditionally swapping between
+  // <Resizable> and `tabsAndContent` alone. `tabsAndContent` (via `first`)
+  // must stay at a stable position in the tree: toggling the helper panel
+  // previously changed the element type at this spot (div vs <Resizable>),
+  // which made React unmount and remount every InsightsQueryTab -- wiping
+  // out its in-flight/last query result -- the moment a cell was selected.
+  const mainContent = (
     <Resizable
       orientation="horizontal"
       defaultSplitPercentage={78}
@@ -249,32 +257,32 @@ export default function InsightsPage() {
       splitKey="insights-helper-panel-split"
       first={tabsAndContent}
       second={
-        <HelperPanelFrame
-          title={activeHelper}
-          icon={
-            activeHelper === SCHEMA ? (
-              <RiNodeTree size={20} className="text-subtle" />
+        isHelperPanelOpen ? (
+          <HelperPanelFrame
+            title={activeHelper}
+            icon={
+              activeHelper === SCHEMA ? (
+                <RiNodeTree size={20} className="text-subtle" />
+              ) : activeHelper === FUNCTIONS ? (
+                <RiFunctionLine size={20} className="text-subtle" />
+              ) : (
+                <RiTableLine size={20} className="text-subtle" />
+              )
+            }
+            onClose={() => setActiveHelper(null)}
+            contentClassName="overflow-hidden"
+          >
+            {activeHelper === SCHEMA ? (
+              <TableSchemaSidebar />
             ) : activeHelper === FUNCTIONS ? (
-              <RiFunctionLine size={20} className="text-subtle" />
+              <FunctionsSidebar />
             ) : (
-              <RiTableLine size={20} className="text-subtle" />
-            )
-          }
-          onClose={() => setActiveHelper(null)}
-          contentClassName="overflow-hidden"
-        >
-          {activeHelper === SCHEMA ? (
-            <TableSchemaSidebar />
-          ) : activeHelper === FUNCTIONS ? (
-            <FunctionsSidebar />
-          ) : (
-            <CellDetail selectedCell={activeSelectedCell} />
-          )}
-        </HelperPanelFrame>
+              <CellDetail selectedCell={activeSelectedCell} />
+            )}
+          </HelperPanelFrame>
+        ) : null
       }
     />
-  ) : (
-    tabsAndContent
   );
 
   return (

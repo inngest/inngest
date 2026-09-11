@@ -22,9 +22,15 @@ import {
   type PathCreator,
 } from '@inngest/components/SharedContext/usePathCreator';
 import { LinkCell, Table, TextCell, TimeCell } from '@inngest/components/Table';
-import { RiCodeBlock, RiPlayLine, RiStopLine } from '@remixicon/react';
+import {
+  RiCodeBlock,
+  RiFileCopyLine,
+  RiPlayLine,
+  RiStopLine,
+} from '@remixicon/react';
 import type { Monaco } from '@monaco-editor/react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { toast } from 'sonner';
 import { duckdb } from 'sql-formatter';
 
 import {
@@ -176,17 +182,54 @@ function renderHintedIdList(
 ) {
   const visible = values.slice(0, MAX_HINTED_LIST_ITEMS);
   return (
-    <TextCell className="font-mono">
-      {visible.map((value, i) => (
-        <Fragment key={i}>
-          {i > 0 && ', '}
-          <LinkCell href={idHintHref(hint, pathCreator, String(value))}>
-            {String(value)}
-          </LinkCell>
-        </Fragment>
-      ))}
-      {values.length > MAX_HINTED_LIST_ITEMS && ', …'}
-    </TextCell>
+    <CopyableCell value={values.map(String).join(', ')}>
+      <TextCell className="font-mono">
+        {visible.map((value, i) => (
+          <Fragment key={i}>
+            {i > 0 && ', '}
+            <LinkCell href={idHintHref(hint, pathCreator, String(value))}>
+              {String(value)}
+            </LinkCell>
+          </Fragment>
+        ))}
+        {values.length > MAX_HINTED_LIST_ITEMS && ', …'}
+      </TextCell>
+    </CopyableCell>
+  );
+}
+
+// Hover-revealed copy icon docked to the cell's right edge -- mirrors
+// CellDetail.tsx's CopyableRow. Datetime cells go through here too (TimeCell
+// is rendered with copyable={false}) so every column has exactly one copy
+// mechanism.
+//
+// The content wrapper is flex-1 + min-w-0 so it fills the rest of the row
+// (pushing the icon to the far edge of the <td>, which is often wider than
+// the content itself -- this table's columns are dynamically sized to fill
+// the available width via enableColumnDynamicSizing) while still shrinking
+// to truncate when content IS wider than the column.
+export function CopyableCell({
+  value,
+  children,
+}: React.PropsWithChildren<{ value: string }>) {
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(value);
+    toast.success('Copied to clipboard');
+  };
+
+  return (
+    <div className="group flex w-full items-center gap-1">
+      <div className="min-w-0 flex-1 overflow-hidden">{children}</div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          copyToClipboard();
+        }}
+        className="text-subtle hover:text-basis shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+      >
+        <RiFileCopyLine className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 
@@ -203,7 +246,11 @@ export function renderCell(
   pathCreator: PathCreator,
 ) {
   if (value === null || value === undefined) {
-    return <TextCell>ᴺᵁᴸᴸ</TextCell>;
+    return (
+      <CopyableCell value="null">
+        <TextCell>ᴺᵁᴸᴸ</TextCell>
+      </CopyableCell>
+    );
   }
   if (
     hint === InsightsColumnHint.RunId ||
@@ -213,27 +260,47 @@ export function renderCell(
       return renderHintedIdList(value, hint, pathCreator);
     }
     return (
-      <LinkCell
-        className="font-mono"
-        href={idHintHref(hint, pathCreator, String(value))}
-      >
-        {String(value)}
-      </LinkCell>
+      <CopyableCell value={String(value)}>
+        <LinkCell
+          className="font-mono"
+          href={idHintHref(hint, pathCreator, String(value))}
+        >
+          {String(value)}
+        </LinkCell>
+      </CopyableCell>
     );
   }
   if (
     hint === InsightsColumnHint.AppId ||
     hint === InsightsColumnHint.FunctionId
   ) {
-    return renderBadgeCell(String(value), hint, pathCreator);
+    return (
+      <CopyableCell value={String(value)}>
+        {renderBadgeCell(String(value), hint, pathCreator)}
+      </CopyableCell>
+    );
   }
   switch (type) {
-    case InsightsColumnType.Datetime:
-      return <TimeCell date={new Date(String(value))} />;
+    case InsightsColumnType.Datetime: {
+      const date = new Date(String(value));
+      return (
+        <CopyableCell value={date.toISOString()}>
+          <TimeCell date={date} copyable={false} />
+        </CopyableCell>
+      );
+    }
     case InsightsColumnType.Json:
-      return <TextCell>{JSON.stringify(value)}</TextCell>;
+      return (
+        <CopyableCell value={JSON.stringify(value)}>
+          <TextCell>{JSON.stringify(value)}</TextCell>
+        </CopyableCell>
+      );
     default:
-      return <TextCell>{String(value)}</TextCell>;
+      return (
+        <CopyableCell value={String(value)}>
+          <TextCell>{String(value)}</TextCell>
+        </CopyableCell>
+      );
   }
 }
 
