@@ -179,7 +179,7 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 		for _, run := range runs {
 			rootSpan, err := a.opts.TraceReader.GetSpansByRunID(ctx, run.RunID)
 			if err != nil {
-				_ = publicerr.WriteHTTP(w, err)
+				_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Unable to query run status"))
 				return
 			}
 			if rootSpan == nil {
