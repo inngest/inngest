@@ -152,3 +152,71 @@ func TestDeviceLoginAndLogout(t *testing.T) {
 	_, err = manager.Store().Metadata()
 	require.ErrorIs(t, err, cliauth.ErrNotLoggedIn)
 }
+
+func TestLogoutWaitsForRefresh(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	refreshStarted := make(chan struct{})
+	releaseRefresh := make(chan struct{})
+	revoked := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Error(err)
+			return
+		}
+		switch r.URL.Path {
+		case "/oauth/token":
+			close(refreshStarted)
+			select {
+			case <-releaseRefresh:
+			case <-ctx.Done():
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "new-access", "refresh_token": "new-refresh",
+				"token_type": "Bearer", "expires_in": 3600,
+			})
+		case "/oauth/revoke":
+			revoked <- r.PostForm.Get("token")
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	manager, err := cliauth.NewManager()
+	require.NoError(t, err)
+	metadata := cliauth.Metadata{
+		Issuer: server.URL, Resource: server.URL + "/v2", ClientID: cliauth.ClientID,
+		SessionID: "session", SessionExpiresAt: time.Now().Add(time.Hour),
+	}
+	require.NoError(t, manager.Store().Save(metadata, cliauth.Credential{
+		AccessToken: "old-access", RefreshToken: "old-refresh", Expiry: time.Now().Add(-time.Minute),
+	}, true))
+	refreshDone := make(chan error, 1)
+	go func() {
+		_, _, err := manager.AccessToken(ctx, metadata.Resource)
+		refreshDone <- err
+	}()
+	select {
+	case <-refreshStarted:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	var output bytes.Buffer
+	command := &cli.Command{Name: "inngest", Writer: &output, Commands: []*cli.Command{LogoutCommand()}}
+	logoutDone := make(chan error, 1)
+	go func() { logoutDone <- command.Run(ctx, []string{"inngest", "logout"}) }()
+	select {
+	case <-revoked:
+		t.Fatal("logout raced with refresh")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(releaseRefresh)
+	require.NoError(t, <-refreshDone)
+	require.NoError(t, <-logoutDone)
+	require.Equal(t, "new-refresh", <-revoked)
+	_, err = manager.Store().Metadata()
+	require.ErrorIs(t, err, cliauth.ErrNotLoggedIn)
+}

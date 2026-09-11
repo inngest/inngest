@@ -19,6 +19,29 @@ func TestDefaultScopes(t *testing.T) {
 	require.Equal(t, apiv2oauth.CLIScopes(), DefaultScopes())
 }
 
+func TestOAuthRequestsDoNotFollowRedirects(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	for _, status := range []int{http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var forwarded atomic.Bool
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				forwarded.Store(true)
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer target.Close()
+			source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, target.URL, status)
+			}))
+			defer source.Close()
+			manager, err := NewManager()
+			require.NoError(t, err)
+			err = manager.Revoke(context.Background(), &Metadata{Issuer: source.URL, ClientID: ClientID}, &Credential{RefreshToken: "secret"})
+			require.ErrorContains(t, err, "must not redirect")
+			require.False(t, forwarded.Load())
+		})
+	}
+}
+
 func TestIssuer(t *testing.T) {
 	tests := map[string]struct {
 		host    string

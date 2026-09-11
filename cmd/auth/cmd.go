@@ -69,7 +69,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	resource := cliauth.Resource(issuer)
-	previousMetadata, previousCredential, loadErr := manager.Store().Load()
+	_, _, loadErr := manager.Store().Load()
 	if !cmd.Bool("force") {
 		if loadErr == nil {
 			accessToken, metadata, tokenErr := manager.AccessToken(ctx, resource)
@@ -108,6 +108,14 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Bool("insecure-storage") && !cmd.Bool("json") {
 		_, _ = fmt.Fprintln(writer(cmd), "Warning: storing credentials in a plaintext user-only file. Use this only on a trusted machine or ephemeral environment.")
 	}
+	unlock, err := manager.Store().Lock(ctx)
+	if err != nil {
+		_ = manager.Revoke(ctx, metadata, credential)
+		return err
+	}
+	defer unlock()
+	// the stored login may have changed while the browser was open
+	previousMetadata, previousCredential, loadErr := manager.Store().Load()
 	// save the new login before revoking the old one
 	if err := manager.Store().Save(*metadata, *credential, cmd.Bool("insecure-storage")); err != nil {
 		// do not leave an unusable server session behind
@@ -139,6 +147,11 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	unlock, err := manager.Store().Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	metadata, credential, err := manager.Store().Load()
 	if errors.Is(err, cliauth.ErrNotLoggedIn) {
 		if cmd.Bool("json") {

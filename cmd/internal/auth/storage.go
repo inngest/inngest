@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/zalando/go-keyring"
 )
 
@@ -84,6 +86,22 @@ func NewStore() (*Store, error) {
 
 func newStore(dir string, keyring keyringStore) *Store {
 	return &Store{dir: dir, keyring: keyring, writeFile: writeJSONFile}
+}
+
+// login, logout, and refresh share one lock so they cannot overwrite each other
+func (s *Store) Lock(ctx context.Context) (func(), error) {
+	if err := os.MkdirAll(s.dir, 0o700); err != nil {
+		return nil, err
+	}
+	lock := flock.New(s.refreshLockPath())
+	locked, err := lock.TryLockContext(ctx, 50*time.Millisecond)
+	if err != nil {
+		return nil, fmt.Errorf("lock OAuth credentials: %w", err)
+	}
+	if !locked {
+		return nil, errors.New("lock OAuth credentials")
+	}
+	return func() { _ = lock.Unlock() }, nil
 }
 
 func (s *Store) Save(metadata Metadata, credential Credential, insecure bool) error {

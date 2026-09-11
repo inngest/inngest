@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofrs/flock"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2oauth"
 	"golang.org/x/oauth2"
 )
@@ -34,9 +33,15 @@ func NewManager() (*Manager, error) {
 		return nil, err
 	}
 	return &Manager{
-		store:      store,
-		httpClient: &http.Client{Timeout: httpTimeout},
-		now:        time.Now,
+		store: store,
+		httpClient: &http.Client{
+			Timeout: httpTimeout,
+			// redirects must not forward codes or tokens to another endpoint
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return errors.New("OAuth endpoints must not redirect")
+			},
+		},
+		now: time.Now,
 	}, nil
 }
 
@@ -103,15 +108,11 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 		return credential.AccessToken, metadata, nil
 	}
 
-	refreshLock := flock.New(m.store.refreshLockPath())
-	locked, err := refreshLock.TryLockContext(ctx, 50*time.Millisecond)
+	unlock, err := m.store.Lock(ctx)
 	if err != nil {
-		return "", metadata, fmt.Errorf("lock OAuth refresh: %w", err)
+		return "", metadata, err
 	}
-	if !locked {
-		return "", metadata, errors.New("lock OAuth refresh")
-	}
-	defer func() { _ = refreshLock.Unlock() }()
+	defer unlock()
 
 	// another cli may have refreshed while this one waited
 	metadata, credential, err = m.loadToken(target)
