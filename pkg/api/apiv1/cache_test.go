@@ -6,16 +6,56 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/coocood/freecache"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	freecachestore "github.com/eko/gocache/store/freecache/v4"
 	"github.com/go-chi/chi/v5"
-	"github.com/golang/mock/gomock"
 	"github.com/inngest/inngest/pkg/api/apiv1"
 	"github.com/stretchr/testify/require"
 )
+
+type cacheTestStore struct {
+	data map[any]any
+}
+
+func (s *cacheTestStore) Get(_ context.Context, key any) (any, error) {
+	value, ok := s.data[key]
+	if !ok {
+		return nil, store.NotFound{}
+	}
+	return value, nil
+}
+
+func (s *cacheTestStore) GetWithTTL(ctx context.Context, key any) (any, time.Duration, error) {
+	value, err := s.Get(ctx, key)
+	return value, 0, err
+}
+
+func (s *cacheTestStore) Set(_ context.Context, key, value any, _ ...store.Option) error {
+	s.data[key] = value
+	return nil
+}
+
+func (s *cacheTestStore) Delete(_ context.Context, key any) error {
+	delete(s.data, key)
+	return nil
+}
+
+func (s *cacheTestStore) Invalidate(ctx context.Context, _ ...store.InvalidateOption) error {
+	return s.Clear(ctx)
+}
+
+func (s *cacheTestStore) Clear(context.Context) error {
+	clear(s.data)
+	return nil
+}
+
+func (*cacheTestStore) GetType() string {
+	return "test"
+}
 
 func newCacheTestHandler(t *testing.T, next http.Handler) http.Handler {
 	t.Helper()
@@ -114,10 +154,7 @@ func TestCacheMiddlewareCachesOnlyOKResponses(t *testing.T) {
 }
 
 func TestCacheMiddlewareSupportsStringCacheValues(t *testing.T) {
-	cacheStore := store.NewMockStoreInterface(gomock.NewController(t))
-	cacheStore.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, store.NotFound{})
-	cacheStore.EXPECT().Set(gomock.Any(), gomock.Any(), `{"cached":true}`, gomock.Any()).Return(nil)
-	cacheStore.EXPECT().Get(gomock.Any(), gomock.Any()).Return(`{"cached":true}`, nil)
+	cacheStore := &cacheTestStore{data: map[any]any{}}
 	handler := apiv1.NewCacheMiddleware(cache.New[string](cacheStore)).Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Cache-Control", "private, max-age=60")
 		_, err := w.Write([]byte(`{"cached":true}`))
