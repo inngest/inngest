@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -20,6 +21,106 @@ import (
 
 type recordedBatchDelete struct {
 	residencyDuration time.Duration
+}
+
+type recordingBatchQueue struct {
+	item queue.Item
+}
+
+func (q *recordingBatchQueue) Enqueue(_ context.Context, item queue.Item, _ time.Time, _ queue.EnqueueOpts) error {
+	q.item = item
+	return nil
+}
+
+func (*recordingBatchQueue) Requeue(context.Context, string, queue.QueueItem, time.Time, ...queue.RequeueOptionFn) error {
+	return nil
+}
+
+func (*recordingBatchQueue) RequeueByJobID(context.Context, queue.Scope, string, string, time.Time) error {
+	return nil
+}
+
+func TestScheduleBatchPayloadBatchClusterJSON(t *testing.T) {
+	payload := ScheduleBatchPayload{
+		BatchID:         ulid.MustNew(ulid.Now(), rand.Reader),
+		BatchCluster:    "valkey-batching-a",
+		BatchGeneration: "01K0T21HZW9DHDZ5P5TQKBN1E6",
+	}
+
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"batchCluster":"valkey-batching-a"`)
+	require.Contains(t, string(raw), `"batchGeneration":"01K0T21HZW9DHDZ5P5TQKBN1E6"`)
+
+	var decoded ScheduleBatchPayload
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.Equal(t, payload.BatchCluster, decoded.BatchCluster)
+	require.Equal(t, payload.BatchGeneration, decoded.BatchGeneration)
+}
+
+func TestAppendBatchIDsAreSharedAcrossBackends(t *testing.T) {
+	primaryRedis := miniredis.RunT(t)
+	mirrorRedis := miniredis.RunT(t)
+	primaryClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{primaryRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer primaryClient.Close()
+	mirrorClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{mirrorRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer mirrorClient.Close()
+
+	primary := NewRedisBatchManager(redis_state.NewBatchClient(primaryClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	mirror := NewRedisBatchManager(redis_state.NewBatchClient(mirrorClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	functionID := uuid.New()
+	newID := ulid.Make()
+	ctx := WithAppendBatchIDs(context.Background(), newID, ulid.Make())
+	item := BatchItem{
+		AccountID:       uuid.New(),
+		WorkspaceID:     uuid.New(),
+		AppID:           uuid.New(),
+		FunctionID:      functionID,
+		FunctionVersion: 1,
+		EventID:         ulid.Make(),
+		Event:           event.Event{ID: "event-1", Name: "test/event"},
+	}
+	fn := inngest.Function{ID: functionID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+
+	primaryResult, err := primary.Append(ctx, item, fn)
+	require.NoError(t, err)
+	mirrorResult, err := mirror.Append(ctx, item, fn)
+	require.NoError(t, err)
+	require.Equal(t, newID.String(), primaryResult.BatchID)
+	require.Equal(t, primaryResult.BatchID, mirrorResult.BatchID)
+}
+
+func TestBulkAppendBatchIDsAreSharedAcrossBackends(t *testing.T) {
+	primaryRedis := miniredis.RunT(t)
+	mirrorRedis := miniredis.RunT(t)
+	primaryClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{primaryRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer primaryClient.Close()
+	mirrorClient, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{mirrorRedis.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer mirrorClient.Close()
+
+	primary := NewRedisBatchManager(redis_state.NewBatchClient(primaryClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	mirror := NewRedisBatchManager(redis_state.NewBatchClient(mirrorClient, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+	functionID := uuid.New()
+	newID, overflowID := ulid.Make(), ulid.Make()
+	ctx := WithAppendBatchIDs(context.Background(), newID, overflowID)
+	fn := inngest.Function{ID: functionID, EventBatch: &inngest.EventBatchConfig{MaxSize: 1, Timeout: "60s"}}
+	items := []BatchItem{
+		{AccountID: uuid.New(), FunctionID: functionID, EventID: ulid.Make(), Event: event.Event{ID: "event-1", Name: "test/event"}},
+		{AccountID: uuid.New(), FunctionID: functionID, EventID: ulid.Make(), Event: event.Event{ID: "event-2", Name: "test/event"}},
+	}
+
+	primaryResult, err := primary.BulkAppend(ctx, items, fn)
+	require.NoError(t, err)
+	mirrorResult, err := mirror.BulkAppend(ctx, items, fn)
+	require.NoError(t, err)
+	require.Equal(t, newID.String(), primaryResult.BatchID)
+	require.Equal(t, primaryResult.BatchID, mirrorResult.BatchID)
+	require.Equal(t, overflowID.String(), primaryResult.NextBatchID)
+	require.Equal(t, primaryResult.NextBatchID, mirrorResult.NextBatchID)
 }
 
 type recordingBatchMetricRecorder struct {
@@ -984,5 +1085,42 @@ func TestRunBatch(t *testing.T) {
 		require.False(t, result.Scheduled)
 		require.Equal(t, "", result.BatchID)
 		require.Equal(t, 0, result.ItemCount)
+	})
+
+	t.Run("preserves batch cluster in scheduled payload", func(t *testing.T) {
+		functionID := uuid.New()
+		fn := inngest.Function{
+			ID:         functionID,
+			EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"},
+		}
+		queue := &recordingBatchQueue{}
+		bm := NewRedisBatchManager(bc, queue, WithoutBuffer())
+
+		_, err := bm.Append(context.Background(), BatchItem{
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+			FunctionID:      functionID,
+			FunctionVersion: 1,
+			EventID:         ulid.MustNew(ulid.Now(), rand.Reader),
+			Event:           event.Event{Name: "test/event"},
+		}, fn)
+		require.NoError(t, err)
+
+		result, err := bm.RunBatch(context.Background(), RunBatchOpts{
+			FunctionID:      functionID,
+			BatchCluster:    "valkey-batching-a",
+			BatchGeneration: "01JGENERATION",
+			AccountID:       accountId,
+			WorkspaceID:     workspaceId,
+			AppID:           appId,
+		})
+		require.NoError(t, err)
+		require.True(t, result.Scheduled)
+
+		payload, ok := queue.item.Payload.(ScheduleBatchPayload)
+		require.True(t, ok)
+		require.Equal(t, "valkey-batching-a", payload.BatchCluster)
+		require.Equal(t, "01JGENERATION", payload.BatchGeneration)
 	})
 }

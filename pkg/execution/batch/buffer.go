@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -76,7 +77,8 @@ type batchBuffer struct {
 	pendingResults map[string]*pendingResult // Local dedup + result sharing
 	timer          *time.Timer
 	fn             inngest.Function // Function config for batch settings
-	createdAt      time.Time        // set when first item appended, reset in reset()
+	generation     string
+	createdAt      time.Time // set when first item appended, reset in reset()
 }
 
 // newAppendBuffer creates a new appendBuffer with the given configuration.
@@ -115,7 +117,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	}
 	key := bufferKey{FunctionID: fn.ID, BatchPointer: batchPointer}
 
-	buf := ab.getOrCreateBuffer(key, fn)
+	buf := ab.getOrCreateBuffer(key, fn, redis_state.BatchGeneration(ctx))
 	buf.mu.Lock()
 
 	eventIDStr := bi.EventID.String()
@@ -240,7 +242,7 @@ func (ab *appendBuffer) flushDuration(fn inngest.Function) time.Duration {
 }
 
 // getOrCreateBuffer returns the buffer for the given key, creating it if needed.
-func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *batchBuffer {
+func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function, generation string) *batchBuffer {
 	ab.mu.Lock()
 	defer ab.mu.Unlock()
 
@@ -250,6 +252,7 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 
 	buf := &batchBuffer{
 		key:            key,
+		generation:     generation,
 		items:          make([]pendingItem, 0),
 		pendingResults: make(map[string]*pendingResult),
 		fn:             fn,
@@ -306,7 +309,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	buf.reset()
 	buf.mu.Unlock()
 
-	ctx := context.Background()
+	ctx := redis_state.WithBatchGeneration(context.Background(), buf.generation)
 	triggerTags := map[string]any{"trigger": trigger}
 
 	// Decrement pending items and record gauge
@@ -406,7 +409,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 			continue
 		}
 
-		if err := ab.handleScheduling(bulkResult, fn, chunk[0], mgr); err != nil {
+		if err := ab.handleScheduling(ctx, bulkResult, fn, chunk[0], mgr); err != nil {
 			for _, p := range chunkPending {
 				p.pending.err = err
 				close(p.pending.done)
@@ -467,14 +470,12 @@ func (ab *appendBuffer) mapBulkStatus(bulkStatus string, itemIndex int) enums.Ba
 }
 
 // handleScheduling schedules batch execution based on the bulk append result.
-func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Function, firstItem BatchItem, mgr BatchManager) error {
+func (ab *appendBuffer) handleScheduling(ctx context.Context, result *BulkAppendResult, fn inngest.Function, firstItem BatchItem, mgr BatchManager) error {
 	timeout, err := time.ParseDuration(fn.EventBatch.Timeout)
 	if err != nil {
 		ab.log.Error("failed to parse batch timeout", "error", err, "timeout", fn.EventBatch.Timeout)
 		timeout = 60 * time.Second // fallback
 	}
-
-	ctx := context.Background()
 
 	// For new batches, schedule an execution after the batch timeout.
 	//
@@ -535,6 +536,8 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 		ScheduleBatchPayload: ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointer,
+			BatchCluster:    BatchCluster(ctx),
+			BatchGeneration: redis_state.BatchGeneration(ctx),
 			AccountID:       firstItem.AccountID,
 			WorkspaceID:     firstItem.WorkspaceID,
 			AppID:           firstItem.AppID,

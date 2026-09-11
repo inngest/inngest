@@ -50,6 +50,38 @@ func (m scheduleErrorBatchManager) ScheduleExecution(context.Context, ScheduleBa
 	return m.err
 }
 
+type recordingScheduleBatchManager struct {
+	BatchManager
+	opts ScheduleBatchOpts
+}
+
+func (m *recordingScheduleBatchManager) ScheduleExecution(_ context.Context, opts ScheduleBatchOpts) error {
+	m.opts = opts
+	return nil
+}
+
+func TestScheduleBatchExecutionPersistsGeneration(t *testing.T) {
+	buffer := newAppendBuffer(time.Second, 1, 1, logger.VoidLogger())
+	manager := &recordingScheduleBatchManager{}
+	batchID := ulid.Make()
+	generation := "01K0T21HZW9DHDZ5P5TQKBN1E6"
+
+	ctx := WithBatchCluster(redis_state.WithBatchGeneration(context.Background(), generation), "valkey-b")
+	err := buffer.scheduleBatchExecution(
+		ctx,
+		manager,
+		batchID.String(),
+		&BulkAppendResult{BatchPointer: "pointer"},
+		BatchItem{},
+		inngest.Function{ID: uuid.New()},
+		time.Now(),
+		"new",
+	)
+	require.NoError(t, err)
+	require.Equal(t, "valkey-b", manager.opts.BatchCluster)
+	require.Equal(t, generation, manager.opts.BatchGeneration)
+}
+
 func TestScheduleBatchExecutionErrorLog(t *testing.T) {
 	var output bytes.Buffer
 	log := logger.FromSlog(slog.New(slog.NewJSONHandler(&output, nil)), slog.LevelDebug)
@@ -344,6 +376,28 @@ func TestBufferedBatchManager(t *testing.T) {
 		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
 		require.Len(t, info.Items, 1)
+	})
+
+	t.Run("timer flush preserves the batch generation", func(t *testing.T) {
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(10*time.Millisecond, 100),
+		)
+		defer buffered.Close()
+
+		fnID := uuid.New()
+		fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+		generation := "01K0T21HZW9DHDZ5P5TQKBN1E6"
+		_, err := buffered.Append(redis_state.WithBatchGeneration(context.Background(), generation), BatchItem{
+			AccountID: uuid.New(), FunctionID: fnID, EventID: ulid.Make(), Event: event.Event{Name: "test/event"},
+		}, fn)
+		require.NoError(t, err)
+
+		generated, err := buffered.GetBatchInfo(redis_state.WithBatchGeneration(context.Background(), generation), fnID, "")
+		require.NoError(t, err)
+		require.Len(t, generated.Items, 1)
+		legacy, err := buffered.GetBatchInfo(context.Background(), fnID, "")
+		require.NoError(t, err)
+		require.Empty(t, legacy.BatchID)
 	})
 
 	t.Run("blocking append with size flush", func(t *testing.T) {
