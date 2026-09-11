@@ -1,0 +1,14 @@
+INPUT
+event.id == "abc"
+
+EVENT SQL
+((x->>'$.id') = ?)
+
+EVENT ARGS
+[abc]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

@@ -1,0 +1,14 @@
+INPUT
+event.name == "test/hello" && event.ts > 1727291508963
+
+EVENT SQL
+(((x->>'$.name') = ?) AND (CAST((x->>'$.ts') AS DOUBLE) > ?))
+
+EVENT ARGS
+[test/hello 1727291508963]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

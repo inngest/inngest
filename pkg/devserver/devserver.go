@@ -159,7 +159,10 @@ type StartOpts struct {
 	// EnableDuckDB opts into the experimental DuckDB dual-write POC, gated
 	// behind the `--duckdb` flag (or INNGEST_DUCKDB env var) on both
 	// `inngest dev` and `inngest start`. Off by default. Controls writing
-	// only -- see EnableDuckDBReads for reading.
+	// only -- see EnableDuckDBReads for reading. Enabling this alone always
+	// dual-writes to an in-memory catalog; writing an on-disk catalog that
+	// outlives the process additionally requires --persist AND the
+	// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE feature flag (see start()).
 	EnableDuckDB bool `json:"enable_duckdb"`
 
 	// EnableDuckDBReads opts into serving the GQL API and REST trace/run
@@ -358,6 +361,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
 	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
 	enableAsyncDispatchValidation := os.Getenv("EXPERIMENTAL_ASYNC_DISPATCH_VALIDATION") == "true"
+	// The in-memory dual-write catalog (--duckdb without --persist) stays
+	// available regardless of this flag -- only the on-disk DuckLake catalog
+	// (data that outlives the process) is gated, since that's the behavior
+	// with real operational impact (disk usage, accumulating state).
+	enableDuckDBPersistence := os.Getenv("EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE") == "true"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -559,7 +567,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		// EnableDuckDBReads (which only affects gqlData) is also set.
 		dwDB *sql.DB
 	)
-	if dwListener, db := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist, "", opts.SQLiteDir); dwListener != nil {
+	// opts.Persist alone (--persist) is not enough to write an on-disk DuckLake
+	// catalog: that also requires enableDuckDBPersistence
+	// (EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE), so --duckdb without that env
+	// var still dual-writes, just against an in-memory catalog.
+	if dwListener, db := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && enableDuckDBPersistence, "", opts.SQLiteDir); dwListener != nil {
 		dwDB = db
 		l.Info("dual-write enabled: syncing executions to DuckDB subprocess")
 		syncListeners = append(syncListeners, dwListener)
@@ -815,6 +827,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionTraces:      NewFunctionTraceReader(gqlData),
 		Executor:            exec,
 		EventPublisher:      runner,
+		// Same dwDB dual-write succeeded/failed against as coreapi.Options.DuckDB
+		// above -- nil means QueryInsights errors clearly instead of resolving empty.
+		DuckDB: dwDB,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
 			return ds.HandleEvent(ctx, evt, nil)
 		},

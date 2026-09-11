@@ -1,0 +1,14 @@
+INPUT
+event.data.foo == "bar"
+
+EVENT SQL
+((x->>'$.data.foo') = ?)
+
+EVENT ARGS
+[bar]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

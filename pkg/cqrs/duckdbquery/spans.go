@@ -3,11 +3,14 @@ package duckdbquery
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 )
@@ -21,24 +24,16 @@ const spanColumns = "span_id, trace_id, parent_span_id, start_time, end_time, na
 const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_time, s.end_time, s.name, s.attributes, s.run_id, s.app_id, s.function_id, s.output, s.input"
 
 // GetSpansByRunID builds the run's span tree from inngest.run_trace_spans.
-// Unlike pkg/cqrs/manager's dynamic/fragment-merged model, this table is
-// flat — one physical row is one logical span — so there is no
-// dynamic_span_id fragment-merge step: every row is scanned once, and
-// children are attached to their parent by span_id/parent_span_id, in two
-// passes (build every span first, then link) so a child's parent — however
-// it happens to be ordered by start_time, which can tie for point-in-time
-// spans — is always already present in the lookup map before it's needed.
+// This table is flat — one physical row is one logical span — so there's
+// no fragment-merge step: every row is scanned once in two passes (build,
+// then link) so a child's parent is always already in the lookup map by
+// the time it's needed.
 //
-// Metadata (inngest.run_metadata) is aggregated in SQL rather than scanned
-// as a second round trip or a row-multiplying join: the latest_metadata CTE
-// LEFT JOINs it on (account_id, env_id, run_id, span_id) and collapses
+// Metadata (inngest.run_metadata) is aggregated in SQL rather than a
+// second round trip: the latest_metadata CTE LEFT JOINs it and collapses
 // multiple emissions of the same (span_id, kind) to the latest by
-// created_at via QUALIFY — see execution.MetadataEntry's doc comment on why
-// "op" isn't stored, so there's no per-key fragment folding to replay, only
-// a last-write-wins pick — then the outer query GROUPs BY every span column
-// and aggregates the (already-collapsed) metadata rows into one
-// LIST(STRUCT(scope, kind, values, created_at)) column per span, so this
-// function still gets exactly one result row per span.
+// created_at via QUALIFY, then the outer query GROUPs BY every span column
+// and aggregates metadata into one LIST(STRUCT(...)) column per span.
 func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	query := fmt.Sprintf(
 		`WITH latest_metadata AS (
@@ -99,11 +94,9 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 				continue
 			}
 			// Orphaned, not rootless: parent_span_id is set but that row
-			// hasn't landed — e.g. a still-running function's
-			// executor.run.queued/executor.run.started span, whose true
-			// parent (executor.run) isn't written until OnFunctionFinished
-			// (see listener.go). Kept as a fallback root candidate, not
-			// promoted outright: a genuinely rootless span always wins.
+			// hasn't landed yet (e.g. a still-running function's true root
+			// span isn't written until OnFunctionFinished). Kept as a
+			// fallback candidate — a genuinely rootless span always wins.
 			candidates = append(candidates, rootCandidate{span: span})
 			continue
 		}
@@ -119,20 +112,16 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 
 type rootCandidate struct {
 	span *cqrs.OtelSpan
-	// genuineRoot is true when the span's own parent_span_id was empty
-	// outright (e.g. "executor.run", the run's real root, written once at
-	// OnFunctionFinished) rather than merely unresolved.
+	// genuineRoot is true when parent_span_id was empty outright, not
+	// merely unresolved.
 	genuineRoot bool
 }
 
 // selectRootSpan picks the run's root from every span with no resolvable
-// parent. A genuinely rootless span always wins when present. Before a run
-// finishes, none exists yet, so without this the tree would be mis-rooted by
-// whichever orphaned executor.run.queued/executor.run.started span the query
-// happened to return first — both point-in-time-tie on start_time (queuedAt)
-// while queued, so scan order there is otherwise arbitrary. Deterministically
-// prefer executor.run.started (the more advanced, more representative point
-// in a still-running function's lifecycle) over executor.run.queued.
+// parent. A genuinely rootless span always wins. Before a run finishes,
+// none exists yet, so the tree would otherwise be mis-rooted by whichever
+// orphaned span the query happened to scan first; deterministically prefer
+// executor.run.started over executor.run.queued instead.
 func selectRootSpan(candidates []rootCandidate) *cqrs.OtelSpan {
 	var started, queued, first *cqrs.OtelSpan
 	for _, c := range candidates {
@@ -162,10 +151,9 @@ func selectRootSpan(candidates []rootCandidate) *cqrs.OtelSpan {
 	return first
 }
 
-// GetSpanOutput backs Query.RunTraceSpanOutputByID's preview path
-// (runs_v2.go's `id.Preview` branch). output/input are stored directly on
-// the row by the dual-write span exporter, so this is a direct
-// (run_id, span_id) lookup — no separate output-span indirection to chase.
+// GetSpanOutput backs Query.RunTraceSpanOutputByID's preview path.
+// output/input are stored directly on the row, so this is a direct
+// (run_id, span_id) lookup — no separate output-span indirection.
 func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
 	if id.SpanID == "" {
 		return nil, fmt.Errorf("span ID is required to retrieve output")
@@ -294,12 +282,8 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		return nil, "", err
 	}
 
-	// A span's own row carries its output/input directly (see GetSpanOutput's
-	// doc comment) — no separate output-span indirection to resolve, unlike
-	// the rollup path's fragment-merged model. So "appropriate" here mirrors
-	// pkg/cqrs/manager/cqrs.go's own rule ("if this span has finished, set a
-	// preliminary output ID") applied to the span's own ID for both output
-	// and input: set OutputID whenever either column is non-NULL.
+	// Set OutputID whenever either column is non-NULL — a span's own row
+	// carries its output/input directly, so this is always its own ID.
 	output, err := asJSON(rawOutput, "output")
 	if err != nil {
 		return nil, "", err
@@ -327,9 +311,68 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 }
 
 // scanSpanMetadata decodes GetSpansByRunID's aggregated
-// LIST(STRUCT(scope, kind, values, created_at)) metadata column -- raw is
-// nil for a span with no metadata at all (an empty list also decodes to a
-// zero-length, non-nil slice; both are treated as "no metadata").
+// LIST(STRUCT(scope, kind, values, created_at)) metadata column. Both
+// transports decode a DuckDB LIST/STRUCT the same way any other JSON value
+// decodes -- a []any of map[string]any, not a native Go struct -- so this
+// reads exactly like asMap/asJSON's handling of any other JSON-typed
+// column, just one level deeper. A NULL/empty list (a span the query's own
+// `FILTER (WHERE kind IS NOT NULL)` found no metadata for) decodes to a nil
+// slice, which this returns as-is, matching cqrs.OtelSpan.Metadata's
+// nil-means-none convention.
 func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
-	return nil, nil // XXX: Implemented in PR that'll get merged into this
+	if raw == nil {
+		return nil, nil
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("duckdbquery: expected list for column %q, got %T (%v)", "metadata", raw, raw)
+	}
+
+	out := make([]*cqrs.SpanMetadata, 0, len(items))
+	for _, item := range items {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("duckdbquery: expected object in metadata list, got %T (%v)", item, item)
+		}
+
+		scopeStr, err := asString(entry["scope"], "metadata.scope")
+		if err != nil {
+			return nil, err
+		}
+		scope, err := enums.MetadataScopeString(scopeStr)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbquery: parsing metadata.scope: %w", err)
+		}
+
+		kind, err := asString(entry["kind"], "metadata.kind")
+		if err != nil {
+			return nil, err
+		}
+
+		updatedAt, err := asTimestamp(entry["created_at"], "metadata.created_at")
+		if err != nil {
+			return nil, err
+		}
+
+		values, err := asMap(entry["values"], "metadata.values")
+		if err != nil {
+			return nil, err
+		}
+		mv := make(metadata.Values, len(values))
+		for k, v := range values {
+			b, err := json.Marshal(v)
+			if err != nil {
+				return nil, fmt.Errorf("duckdbquery: re-marshaling metadata.values[%q]: %w", k, err)
+			}
+			mv[k] = b
+		}
+
+		out = append(out, &cqrs.SpanMetadata{
+			Scope:     scope,
+			Kind:      metadata.Kind(kind),
+			Values:    mv,
+			UpdatedAt: updatedAt,
+		})
+	}
+	return out, nil
 }

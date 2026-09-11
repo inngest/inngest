@@ -33,6 +33,13 @@ export default function EventsPage({
     'polling-disabled',
     false,
   );
+  // CEL event search is only wired up against the duckdb-backed events
+  // query (see pkg/cqrs/duckdbquery/events.go); the SQLite/Postgres path
+  // rejects a CEL query outright, so only enable the search button here.
+  const { value: duckdbInsightsEnabled } = booleanFlag(
+    'duckdb-insights',
+    false,
+  );
   const navigate = useNavigate();
   const [autoRefresh, setAutoRefresh] = useState(true);
   const { isModalVisible, selectedEvent, openModal, closeModal } =
@@ -86,6 +93,7 @@ export default function EventsPage({
         }}
         pollInterval={pollInterval}
         autoRefresh={autoRefresh}
+        celSearchEnabled={duckdbInsightsEnabled}
         emptyActions={
           <>
             <Button

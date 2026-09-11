@@ -1,0 +1,14 @@
+INPUT
+output.success == true
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+((output->>'$.data.success') = ?)
+
+OUTPUT ARGS
+[true]

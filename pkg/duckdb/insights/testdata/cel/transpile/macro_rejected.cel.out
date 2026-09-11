@@ -1,0 +1,8 @@
+INPUT
+has(event.name)
+
+EVENT ERROR
+insights: macros are not supported in CEL expression "has(event.name)"
+
+OUTPUT ERROR
+insights: macros are not supported in CEL expression "has(event.name)"

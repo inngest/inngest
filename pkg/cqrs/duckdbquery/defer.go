@@ -18,32 +18,20 @@ import (
 
 // GetRunDefers returns the deferred child runs each of runIDs scheduled,
 // reconstructed from run_trace_spans' executor.defer rows. Multiple
-// physical rows can back one logical defer (an Add row, and later an Abort
-// row from OnDeferAbort) — run_trace_spans requires span_id stay unique per
-// row (see OnDeferAdd/OnDeferAbort's own doc comments), so those rows are
-// grouped by the defer.hashed_id attribute instead, which is already unique
-// per (run_id, defer) with no extra dynamic-span-identity attribute needed
-// the way SQLite/Postgres's own dynamic_span_id column requires (see
-// pkg/cqrs/manager's own GetRunDefers, which merges dynamic_span_id
-// fragments the same conceptual way via mapSpanFromRow).
+// physical rows can back one logical defer (an Add row, then later an
+// Abort row), so rows are grouped by the defer.hashed_id attribute, which
+// is already unique per (run_id, defer).
 //
-// The merge itself happens entirely in SQL: LAST_VALUE(... IGNORE NULLS)
-// OVER a (run_id, hashed_id)-partitioned, start_time-ordered window
-// forward-fills each field from the most recent row that actually set it —
-// so an Abort row's absent fn_slug/userland_id never blanks out the values
-// an earlier Add row set, while its status=Aborted still overwrites Add's
-// status=AfterRun — and QUALIFY's ROW_NUMBER() = 1 then keeps only the
-// final, fully-forward-filled row per group. defer.* attributes live inside
-// the attributes JSON blob and a run has at most consts.MaxDefersPerRun (20)
-// distinct defers, so this costs nothing an equivalent Go-side fold
-// wouldn't, without needing to buffer or reconstruct rows in Go at all.
+// The merge happens in SQL: LAST_VALUE(... IGNORE NULLS) OVER a
+// (run_id, hashed_id)-partitioned, start_time-ordered window forward-fills
+// each field from the most recent row that set it, so an Abort row's
+// absent fn_slug/userland_id doesn't blank out values an earlier Add row
+// set, while its status still overwrites Add's. QUALIFY ROW_NUMBER() = 1
+// then keeps only the final row per group.
 //
-// The child run ID isn't one of the merged fields: it's resolved separately,
-// by resolveDeferChildRunIDs, from each defer's own defer.event_id (present
-// from the defer's very first Add row onward, since it's a pure function of
-// (parent run ID, hashedID) — see event.DeferEventID) rather than a value
-// some later write has to stamp back onto this span once/if the child
-// actually gets scheduled.
+// The child run ID is resolved separately by resolveDeferChildRunIDs, from
+// each defer's own defer.event_id, rather than a value some later write
+// stamps back onto this span once the child schedules.
 func (m *Manager) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]cqrs.RunDefer, error) {
 	if len(runIDs) == 0 {
 		return map[ulid.ULID][]cqrs.RunDefer{}, nil
@@ -63,10 +51,8 @@ func (m *Manager) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[uli
 	statusExpr := fmt.Sprintf("attributes->>'%s'", meta.Attrs.DeferStatus.Key())
 	eventIDExpr := fmt.Sprintf("attributes->>'%s'", meta.Attrs.DeferEventID.Key())
 
-	// hashed_id IS NOT NULL pre-window excludes any row that isn't one of
-	// ours: every span OnDeferAdd/OnDeferAbort create sets defer.hashed_id
-	// unconditionally, so its absence means this row belongs to some other
-	// (impossible, given name = ?) writer.
+	// hashed_id IS NOT NULL excludes any row that isn't ours; every defer
+	// span sets it unconditionally.
 	query := fmt.Sprintf(`
 SELECT
   run_id,
@@ -89,9 +75,8 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, %s ORDER BY start_time DESC) = 1
 	}
 	defer rows.Close()
 
-	// pendingChildLink defers resolveDeferChildRunIDs's one batched lookup
-	// until every defer row has been read, then patches RunID back onto the
-	// exact out[runID][idx] slot it came from.
+	// pendingChildLink batches resolveDeferChildRunIDs into one lookup after
+	// all rows are read, then patches RunID back onto its out[runID][idx] slot.
 	type pendingChildLink struct {
 		runID   ulid.ULID
 		idx     int
@@ -112,9 +97,8 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, %s ORDER BY start_time DESC) = 1
 		if err != nil {
 			return nil, err
 		}
-		// No row for this hashed_id ever set a status — shouldn't happen
-		// (OnDeferAdd always sets it), but skip rather than surface a
-		// half-formed defer.
+		// No row for this hashed_id set a status — shouldn't happen, but
+		// skip rather than surface a half-formed defer.
 		if !status.Valid {
 			continue
 		}
@@ -154,9 +138,8 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, %s ORDER BY start_time DESC) = 1
 		}
 	}
 
-	// Row order within a (run_id) partition isn't guaranteed across calls;
-	// sort by HashedDeferID so repeated queries return identical orderings —
-	// matches pkg/cqrs/manager's own GetRunDefers.
+	// Row order within a run_id partition isn't guaranteed across calls;
+	// sort by HashedDeferID for a stable result.
 	for runID := range out {
 		slices.SortFunc(out[runID], func(a, b cqrs.RunDefer) int {
 			return cmp.Compare(a.HashedDeferID, b.HashedDeferID)
@@ -167,25 +150,17 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, %s ORDER BY start_time DESC) = 1
 
 // resolveDeferChildRunIDs resolves every event ID in eventIDs to the run
 // inngest.runs recorded as triggered by that event. A deferred child is
-// scheduled directly off the inngest/deferred.schedule event whose
-// deterministic ID event.DeferEventID(parentRunID, hashedID) computes, so
-// checking inngest.runs.event_ids for that same ID (the list_contains
-// pattern latestRunsCTE already uses for GetTraceRunFilter.EventID) is
-// exactly the parent->child link — nothing needs to be written back onto
-// the parent's own span once the child schedules. A defer whose event was
-// never published (e.g. Aborted before scheduling) or whose child hasn't
-// been scheduled yet simply has no matching run, the same "nil RunID"
-// result GetRunDefers's caller already expects.
+// scheduled off the deterministic event.DeferEventID(parentRunID, hashedID),
+// so checking inngest.runs.event_ids for that ID is exactly the
+// parent->child link. A defer whose event was never published or scheduled
+// yet simply has no matching run.
 func (m *Manager) resolveDeferChildRunIDs(ctx context.Context, eventIDs map[ulid.ULID]struct{}) (map[ulid.ULID]ulid.ULID, error) {
 	if len(eventIDs) == 0 {
 		return nil, nil
 	}
 
-	// list_has_any(event_ids, ?) checks the whole search list in one call —
-	// pkg/db/duckdb/literal.go's encodeLiteral has a []string case that
-	// encodes a bound Go slice as a real DuckDB array literal ('['a', 'b']'),
-	// so a single []string arg works fine here; no per-ID list_contains OR
-	// chain is needed.
+	// list_has_any(event_ids, ?) checks the whole search list in one call;
+	// encodeLiteral encodes the bound []string as a DuckDB array literal.
 	ids := make([]string, 0, len(eventIDs))
 	for id := range eventIDs {
 		ids = append(ids, id.String())
@@ -210,9 +185,7 @@ func (m *Manager) resolveDeferChildRunIDs(ctx context.Context, eventIDs map[ulid
 		if err != nil {
 			return nil, err
 		}
-		// event_ids is a real VARCHAR[] (NULL for cron-only runs) — the
-		// driver hands it back as []any regardless of transport (see
-		// runs.go's own event_ids decode for the same shape).
+		// event_ids is a VARCHAR[] (NULL for cron-only runs), decoded as []any.
 		items, ok := rawEventIDs.([]any)
 		if !ok {
 			continue
@@ -240,9 +213,8 @@ func (m *Manager) resolveDeferChildRunIDs(ctx context.Context, eventIDs map[ulid
 
 // GetRunDeferredFrom returns the parent run(s) that scheduled each of
 // runIDs via defer() — read from the child's own executor.run.queued
-// marker span, which pkg/execution/dualwrite's OnFunctionScheduled stamps
-// with DeferParentRunIDs/DeferParentFnSlug exactly once, at schedule time,
-// for every deferred child (see that hook's addDeferParentAttrs). Unlike
+// marker span, which OnFunctionScheduled stamps with
+// DeferParentRunIDs/DeferParentFnSlug once at schedule time. Unlike
 // GetRunDefers, this needs no collapse: those attrs are written once and
 // never revised.
 func (m *Manager) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]cqrs.RunDeferredFrom, error) {

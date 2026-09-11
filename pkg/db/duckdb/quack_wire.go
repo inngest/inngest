@@ -11,16 +11,10 @@ import (
 // uint16 0xFFFF written where a field id would otherwise appear.
 const quackTerminatorFieldID = 0xFFFF
 
-// quackWriter and quackReader implement the wire codec DuckDB's own
-// BinarySerializer/BinaryDeserializer use (see
-// src/common/serializer/binary_serializer.cpp and binary_deserializer.cpp in
-// duckdb/duckdb), which the quack extension reuses verbatim for its
-// ConnectionRequest/PrepareRequest/etc. message bodies. Ported via the
-// quack-net .NET client (Apache-2.0), which documents the exact wire rules
-// per field: signed integers are sign-extending LEB128 (not ZigZag),
-// unsigned integers are standard LEB128, strings/blobs are an unsigned-LEB128
-// byte count followed by raw bytes, and every object ends with a raw uint16
-// 0xFFFF terminator in place of the next field id.
+// quackWriter and quackReader implement DuckDB's BinarySerializer wire
+// codec: signed ints are sign-extending LEB128 (not ZigZag), unsigned ints
+// are standard LEB128, strings/blobs are an unsigned-LEB128 length prefix
+// plus raw bytes, and every object ends with a raw uint16 0xFFFF terminator.
 type quackWriter struct {
 	buf bytes.Buffer
 }
@@ -85,11 +79,8 @@ func (w *quackWriter) writeUint64(id uint16, v uint64) {
 	w.writeUnsignedLeb128(v)
 }
 
-// writeHugeint writes a hugeint_t field: sign-extending LEB128 for the upper
-// 64 bits followed by standard LEB128 for the lower 64 bits — the same
-// layout decodeQuackPrepareResponseBody reads for result_uuid. Always
-// present on the wire (not default-omit), matching DuckDB's plain
-// WriteProperty<hugeint_t> (as opposed to WritePropertyWithDefault).
+// writeHugeint writes hi as signed LEB128 and lo as unsigned LEB128; always
+// present on the wire, never default-omitted.
 func (w *quackWriter) writeHugeint(id uint16, v quackHugeint) {
 	w.writeFieldID(id)
 	w.writeSignedLeb128(v.hi)
@@ -116,27 +107,24 @@ func (w *quackWriter) writeStringDefault(id uint16, v string) {
 	w.writeString(id, v)
 }
 
-// writeData writes a WriteDataPtr-style value: an unsigned-LEB128 byte count
-// followed by the raw bytes. Used for the top-level ConnectionRequest body
-// only in this client (see quack_wire_test.go); DataChunk payloads read this
-// shape but this client never writes one.
+// writeData writes an unsigned-LEB128 length prefix followed by data. Used
+// for the top-level ConnectionRequest body; this client never writes a
+// DataChunk payload, only reads them.
 func (w *quackWriter) writeData(data []byte) {
 	w.writeUnsignedLeb128(uint64(len(data)))
 	w.buf.Write(data)
 }
 
-// beginList writes a list's element count. There is no corresponding
-// endList: DuckDB's wire format has no list terminator, only a leading count.
+// beginList writes a list's element count; there is no endList since the
+// wire format has no list terminator.
 func (w *quackWriter) beginList(count uint64) {
 	w.writeUnsignedLeb128(count)
 }
 
-// quackReader parses a byte slice produced by quackWriter (or, in practice,
-// by the duckdb quack server). Field ids are read one token ahead
-// (peek/consume) so tryBeginProperty can implement DuckDB's default-omit
-// property convention: a missing optional field is signalled by the next
-// field id being greater than expected, in which case the reader leaves it
-// buffered for the next call instead of consuming it.
+// quackReader parses messages from the duckdb quack server. Field ids are
+// read one token ahead (peek/consume) so tryBeginProperty can detect a
+// default-omitted optional field (next id greater than expected) without
+// consuming it.
 type quackReader struct {
 	data          []byte
 	pos           int
@@ -266,10 +254,9 @@ func (r *quackReader) beginProperty(id uint16) error {
 	return nil
 }
 
-// tryBeginProperty reports whether the next field id matches id (and
-// consumes it). It returns false, nil if the next field is past id (leaving
-// it buffered) or is the object terminator. It errors if the next field id is
-// below id, which indicates an out-of-order or corrupted stream.
+// tryBeginProperty reports whether the next field matches id, consuming it
+// if so. Returns false without consuming if the field is past id (optional
+// field omitted) or is the terminator; errors if it's below id (corrupt stream).
 func (r *quackReader) tryBeginProperty(id uint16) (bool, error) {
 	next, err := r.peekField()
 	if err != nil {
@@ -322,8 +309,6 @@ func (r *quackReader) readString() (string, error) {
 	return string(b), nil
 }
 
-// readData reads a WriteDataPtr-style value: an unsigned-LEB128 byte count
-// followed by that many raw bytes.
 func (r *quackReader) readData() ([]byte, error) {
 	n, err := r.readUnsignedLeb128()
 	if err != nil {

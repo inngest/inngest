@@ -1,0 +1,1 @@
+output.result == null || error.message != null

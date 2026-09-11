@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useMonaco } from '@monaco-editor/react';
-import type { languages } from 'monaco-editor';
+import type { editor, languages } from 'monaco-editor';
 
 import type { SQLCompletionConfig } from '../types';
 
-export function useSQLCompletions(config: SQLCompletionConfig) {
+export function useSQLCompletions(
+  config: SQLCompletionConfig,
+  editorRef: MutableRefObject<editor.IStandaloneCodeEditor | null>
+) {
   const monaco = useMonaco();
   const pendingRequestsRef = useRef<Map<string, Promise<string[]>>>(new Map());
   const pendingSchemaRequestsRef = useRef<
@@ -122,6 +125,16 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
 
     const disposable = monaco.languages.registerCompletionItemProvider('sql', {
       provideCompletionItems: async (model, position) => {
+        // Monaco's completion registry is global per language, not scoped to
+        // one editor -- if several SQL editors are mounted at once (e.g.
+        // background query tabs kept alive to preserve their state), every
+        // instance's provider would otherwise answer for every editor,
+        // returning the same suggestions once per mounted editor. Only
+        // answer for this instance's own model.
+        if (editorRef.current && model !== editorRef.current.getModel()) {
+          return { suggestions: [] };
+        }
+
         // Get text before cursor to detect context
         const textBeforeCursor = model.getValueInRange({
           startLineNumber: position.lineNumber,
@@ -294,11 +307,16 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
         // Default autocomplete (keywords, tables, functions, columns)
 
         columns.forEach((column) => {
-          if (labelMatchesPrefix(column, currentWord)) {
+          const name = typeof column === 'string' ? column : column.name;
+          const description = typeof column === 'string' ? undefined : column.description;
+          const type = typeof column === 'string' ? undefined : column.type;
+          if (labelMatchesPrefix(name, currentWord)) {
             suggestions.push({
               kind: monaco.languages.CompletionItemKind.Field,
-              insertText: column,
-              label: column,
+              insertText: name,
+              label: name,
+              detail: type,
+              documentation: description,
               range,
             });
           }
@@ -311,6 +329,8 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
               insertText: func.signature,
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               label: func.name,
+              detail: func.detail,
+              documentation: func.description,
               range,
             });
           }
@@ -349,7 +369,7 @@ export function useSQLCompletions(config: SQLCompletionConfig) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [monaco, config]);
+  }, [monaco, config, editorRef]);
 }
 
 function labelMatchesPrefix(label: string, prefix: string): boolean {

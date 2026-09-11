@@ -12,48 +12,28 @@ import (
 )
 
 // This file builds the DataChunk bytes QuackAppender bulk-loads into a
-// table; quack_senddata.go drives the actual wire request. It exists
-// because every write this client otherwise makes goes through
-// PrepareRequest (a real SQL PREPARE over fully-interpolated literal text —
-// see quack_session.go's exec doc comment), and binding a single INSERT's
-// giant literal VALUES list scales far worse than linearly with statement
-// size (empirically: jsonlines holds ~42µs/row from a 1,000- to a
-// 10,000-row batch; quack via PrepareRequest goes from ~9µs/row-marginal to
-// ~860µs/row). The bulk path sidesteps that: DataChunk's binary columnar
-// wire shape carries no SQL parsing/binding cost at all.
+// table; quack_senddata.go drives the actual wire request. It exists because
+// every other write goes through PrepareRequest (a real SQL PREPARE over
+// interpolated literal text), and binding a giant literal VALUES list scales
+// far worse than linearly with statement size. DataChunk's binary columnar
+// wire shape sidesteps that: no SQL parsing/binding cost at all.
 //
-// Through DuckDB v1.5.5's quack extension, this went out as
-// MessageType.APPEND_REQUEST: a single, standalone (schema_name,
-// table_name, DataChunk) RPC, applied directly with no query behind it at
-// all. DuckDB v2.1.0-alpha's quack extension (protocol version 3) removed
-// that message type entirely — confirmed against the real duckdb-quack
-// source (github.com/duckdb/duckdb-quack, main branch): it isn't in
-// quack_message.hpp/.json/serialize_quack_message.cpp, and every
-// AppendRequest this client sent against a real v2.1.0-alpha40409
-// subprocess got back a bodyless HTTP 500 (a real one gets a clean,
-// decodable ErrorResponse instead — see quack_senddata.go). In its place is
-// SEND_DATA_REQUEST/RESPONSE, a mechanism driven by the server's own query
-// executor rather than a self-contained RPC — see quack_senddata.go's
-// package doc comment for the full mechanism and how this client drives it.
+// DuckDB v1.5.5's quack extension sent this as a standalone
+// MessageType.APPEND_REQUEST RPC. DuckDB v2.1.0-alpha (protocol version 3)
+// removed that message type; in its place is SEND_DATA_REQUEST/RESPONSE, a
+// mechanism driven by the server's query executor rather than a
+// self-contained RPC (see quack_senddata.go).
 //
-// Wire shapes below (DataChunk's fields 100/101/102) are taken directly
-// from duckdb-quack's quack_message.cpp/serialize_quack_message.cpp, and
-// from this file's own decode-side counterparts
-// (quack_protocol.go's decodeQuackDataChunk/decodeQuackVector/
-// decodeFlatVector), which are already verified against a real duckdb
-// subprocess — the wire format is symmetric, so encoding mirrors decoding
-// field-for-field; this is also the exact shape one bare chunk in
-// SEND_DATA_REQUEST's trailing blob needs (see
-// DecodeQuackChunkBlob/QuackChunkPayloadWriter::AppendChunk in the real
-// source: no DataChunkWrapper field-300 wrapping the way
-// PrepareResponse's chunks get, just the chunk's own object, back-to-back
-// per chunk in the blob).
+// Wire shapes below (DataChunk's fields 100/101/102) mirror this file's own
+// decode-side counterparts in quack_protocol.go
+// (decodeQuackDataChunk/decodeQuackVector/decodeFlatVector) field-for-field;
+// this is also the exact shape one bare chunk in SEND_DATA_REQUEST's
+// trailing blob needs — no DataChunkWrapper field-300 wrapping the way
+// PrepareResponse's chunks get.
 //
-// Type coverage is intentionally scoped to exactly what inngest.run_trace_spans
-// uses today (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMP_MS) — extend as
-// new callers need new types, matching the read-side decode's own
-// established "implement only what's been exercised" pattern (the JSON,
-// NULL-validity, and UUID decode gaps were each found and fixed in turn).
+// Type coverage is scoped to exactly what inngest.run_trace_spans uses today
+// (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMP_MS) — extend as new
+// callers need new types.
 
 // QuackColumnKind identifies one column's physical wire type for
 // QuackAppender.AppendRow.
@@ -74,26 +54,12 @@ const (
 // wireID returns this kind's LogicalTypeId and, for QuackColumnJSON, its
 // wire alias.
 //
-// A native LIST wire type (for e.g. inngest.runs.event_ids, VARCHAR[]) was
-// prototyped here and reverted: the client-side encoding round-tripped
-// correctly through this file's own decoder, but the real duckdb-quack
-// server (v1.5-variegata branch) returns an empty-bodied HTTP 500 for any
-// AppendRequest containing a LIST-typed column — verified down to the
-// minimal single-row, single-element case, and confirmed via
-// duckdb-quack's own server source (quack_server.cpp) that the crash
-// happens before the append handler's try/catch (which does gracefully
-// convert a std::exception to an ErrorResponse), most likely during
-// DuckDB core's DataChunk::Deserialize for the LIST vector. duckdb-quack's
-// own test suite has no LIST/array coverage for the append/DML path
-// either. Not fixable from this client alone.
-//
-// The actual need (event_ids) doesn't require the native LIST type at all:
-// DuckDB's Appender does implicit VARCHAR->LIST casting from array-literal
-// text (e.g. `["a","b"]`, or `[]` for empty, or nil for NULL) — verified
-// empirically against a real duckdb-quack server for the empty/NULL/
-// multi-element cases. Callers needing a VARCHAR[]-typed column should
-// encode it as QuackColumnVarchar (or QuackColumnJSON) array-literal text
-// instead.
+// A native LIST wire type was prototyped and reverted: the real duckdb-quack
+// server crashes (empty-bodied HTTP 500) on any AppendRequest containing a
+// LIST-typed column, not fixable from this client alone. Callers needing a
+// VARCHAR[] column should instead encode QuackColumnVarchar (or
+// QuackColumnJSON) array-literal text (e.g. `["a","b"]`) — DuckDB's Appender
+// implicit-casts that to LIST.
 func (k QuackColumnKind) wireID() (id byte, alias string) {
 	switch k {
 	case QuackColumnUUID:
@@ -110,11 +76,7 @@ func (k QuackColumnKind) wireID() (id byte, alias string) {
 
 // QuackAppender bulk-loads rows into one table over quack's
 // SEND_DATA_REQUEST mechanism (see quack_senddata.go). AppendRow buffers
-// rows in memory; Flush sends everything buffered as one batch (one
-// DataChunk covering every buffered row — unlike a plain PrepareRequest
-// INSERT, whose cost grows worse than linearly with statement size, this
-// carries columnar binary data with no parse/bind step, so there is no
-// equivalent reason to chunk a large buffer before flushing). Not safe for
+// rows in memory; Flush sends everything buffered as one batch. Not safe for
 // concurrent use.
 type QuackAppender struct {
 	session *quackSession
@@ -125,27 +87,19 @@ type QuackAppender struct {
 }
 
 // NewQuackAppender returns a QuackAppender for catalog.schema.table, reading
-// db's underlying quack session directly (via *sql.Conn.Raw, so this works
-// against any *sql.DB opened by duckdb.Open — the type assertion below is
-// what rejects a jsonlines-only connection). db must have been opened with
-// Options.QuackAddr set; otherwise this returns an error rather than
-// silently falling back to a slower transport.
+// db's underlying quack session directly (via *sql.Conn.Raw — the type
+// assertion below rejects a jsonlines-only connection). db must have been
+// opened with Options.QuackAddr set; otherwise this returns an error rather
+// than silently falling back to a slower transport.
 //
-// AppendRequestMessage's wire shape has no catalog field (see
-// quack_append.go's package doc comment) — it resolves schema.table against
-// whatever the target quack connection's *default* catalog happens to be.
-// Confirmed empirically that this is genuinely per-connection, not shared
-// with whatever the bootstrapping CLI session (process.go's
-// bootstrapDuckLakeLocked) did: appending against a DuckLake-attached table
-// fails with "Table main.<table> does not exist" — a graceful ErrorResponse,
-// not a crash — until this connection's own default catalog is switched.
-// So, when catalog is non-empty, NewQuackAppender issues "USE <catalog>;"
-// once on the resolved session before returning. This is a real, global
-// mutation of that session's default catalog for every later statement, not
-// scoped to this appender — safe here only because every other caller in
-// this codebase already fully qualifies table names with DuckLakeAlias (see
-// e.g. cmd/duckdbseed/insert.go), so nothing relies on unqualified names
-// resolving to any other catalog.
+// The wire protocol has no catalog field: it resolves schema.table against
+// the target connection's own default catalog, which is per-connection, not
+// shared with the bootstrapping CLI session. So when catalog is non-empty,
+// NewQuackAppender issues "USE <catalog>;" once on the resolved session
+// before returning. This is a real, global mutation of that session's
+// default catalog for every later statement — safe here only because every
+// other caller already fully qualifies table names with DuckLakeAlias (see
+// cmd/duckdbseed/insert.go).
 func NewQuackAppender(ctx context.Context, db *sql.DB, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
 	sqlConn, err := db.Conn(ctx)
 	if err != nil {
@@ -166,16 +120,12 @@ func NewQuackAppender(ctx context.Context, db *sql.DB, catalog, schema, table st
 }
 
 // NewQuackAppenderFromConn is NewQuackAppender for a driver.Conn the caller
-// already owns outright — typically one obtained via Connector.Connect
-// directly (see OpenConnector), rather than one *sql.DB.Conn hands out from
-// its pool. Unlike a pooled *sql.Conn, this driverConn is never returned to
-// anything: the caller must Close it itself once done with the appender.
-// This is the mechanism for genuinely parallel Appenders — one dedicated
-// connection per worker, held for the worker's whole lifetime — since
-// *sql.DB's pool checks a connection back in (available for a different
-// caller's db.Conn to receive next) the moment NewQuackAppender's own
-// sqlConn.Close() runs, which would risk two callers racing over what they
-// each believe is "their" connection.
+// already owns outright — typically via Connector.Connect directly (see
+// OpenConnector), rather than one *sql.DB.Conn hands out from its pool. The
+// caller must Close driverConn itself once done with the appender. This is
+// the mechanism for genuinely parallel Appenders (one dedicated connection
+// per worker), since a pooled *sql.Conn would be returned to the pool — and
+// available to a different caller — the moment NewQuackAppender closed it.
 func NewQuackAppenderFromConn(ctx context.Context, driverConn driver.Conn, catalog, schema, table string, columns []QuackColumnKind) (*QuackAppender, error) {
 	return newQuackAppenderFromDriverConn(ctx, driverConn, catalog, schema, table, columns)
 }
@@ -190,9 +140,8 @@ func newQuackAppenderFromDriverConn(ctx context.Context, driverConn any, catalog
 	}
 
 	// The primary connection's sess is *process (crash-restart handling
-	// wraps the real transport — see process.go), not a bare *quackSession
-	// directly; an additional connection opened via Options.QuackConns > 1
-	// (process.openQuackConn) is already a bare *quackSession. Handle both.
+	// wraps the real transport); an extra connection from Options.QuackConns
+	// > 1 is already a bare *quackSession. Handle both.
 	var sess *quackSession
 	switch s := c.sess.(type) {
 	case *quackSession:
@@ -274,9 +223,8 @@ func encodeQuackDataChunk(cols []QuackColumnKind, rows [][]any) ([]byte, error) 
 }
 
 // encodeQuackLogicalType writes one LogicalType object body: field100 id,
-// and — only when alias is non-empty — field101 type_info, wrapped in the
-// same field-id/presence-byte/object shape decodeQuackLogicalType expects
-// (mirrors quack_wire_test.go's buildVarcharJSONChunk fixture exactly).
+// and — only when alias is non-empty — field101 type_info, in the shape
+// decodeQuackLogicalType expects.
 func encodeQuackLogicalType(w *quackWriter, id byte, alias string) {
 	w.beginObject()
 	w.writeByte(100, id)
@@ -296,13 +244,9 @@ func encodeQuackLogicalType(w *quackWriter, id byte, alias string) {
 // index colIdx across every row, dispatching on kind's physical shape.
 func encodeQuackVectorColumn(w *quackWriter, kind QuackColumnKind, rows [][]any, colIdx int) error {
 	n := len(rows)
-	// DuckDB's ValidityMask is physically an array of uint64_t words
-	// (src/include/duckdb/common/types/validity_mask.hpp), not a tightly
-	// packed byte array — the mask buffer must be padded to a multiple of 8
-	// bytes (one 64-bit word) or the server's deserializer reads past the
-	// end of a too-short buffer. Confirmed empirically: a 1-byte mask for a
-	// single-row column crashes the server (HTTP 500, connection dropped)
-	// where an 8-byte mask for the same row succeeds.
+	// DuckDB's ValidityMask is an array of uint64_t words, not a tightly
+	// packed byte array — the mask must be padded to a multiple of 8 bytes or
+	// the server's deserializer reads past the end of a too-short buffer.
 	mask := make([]byte, ((n+63)/64)*8)
 	hasNull := false
 	for i, row := range rows {
@@ -364,17 +308,14 @@ func encodeQuackVectorColumn(w *quackWriter, kind QuackColumnKind, rows [][]any,
 }
 
 // encodeQuackVarcharVectorData writes a VARCHAR Vector's data fields (100
-// has_validity / 101 validity mask already written by the caller), new as of
-// quack protocol version 3 — the exact inverse of
-// decodeQuackVarcharFlatVector's field107/108/109 shape, confirmed by round-
-// tripping through that decoder in TestQuackEncodeDataChunkDecodesBackToOriginalValues:
+// has_validity / 101 validity mask already written by the caller): the
+// inverse of decodeQuackVarcharFlatVector's field107/108/109 shape.
 //
 //   - field107: total byte length of every row's string data added together.
 //   - field108: one little-endian uint32 byte-length per row, in row order —
-//     a NULL row gets a real zero-length entry (never omitted), matching
-//     field101's validity mask being the only NULL signal.
-//   - field109: every row's string bytes concatenated back-to-back in row
-//     order, no separator.
+//     a NULL row gets a real zero-length entry, never omitted.
+//   - field109: every row's string bytes concatenated back-to-back, no
+//     separator.
 func encodeQuackVarcharVectorData(w *quackWriter, rows [][]any, colIdx int) error {
 	lengths := make([]byte, len(rows)*4)
 	var allData []byte
@@ -424,11 +365,7 @@ type timeLike interface{ UnixMilli() int64 }
 
 // quackEncodeUUID is the exact inverse of quack_protocol.go's
 // quackUUIDToString: reverse the 16 bytes, then flip the top bit of the
-// resulting last byte (equivalently: byte 15 of the wire form is id[0]^0x80,
-// and wire byte j = id[15-j] for j = 0..14). Round-trip-verified in
-// quack_append_test.go against the exact wire-byte pair
-// quack_protocol_test.go's TestQuackDecodeChunkUUIDDecodesToStandardString
-// already pins.
+// resulting last byte.
 func quackEncodeUUID(id uuid.UUID) [16]byte {
 	var b [16]byte
 	for i := range b {
@@ -439,11 +376,10 @@ func quackEncodeUUID(id uuid.UUID) [16]byte {
 }
 
 // quackIdentifier double-quotes a DuckDB identifier, doubling any embedded
-// double quote — the standard SQL identifier-escaping rule. Used only for
-// the "USE <catalog>;" statement NewQuackAppender issues; every value that
-// reaches it in this codebase is DuckLakeAlias, not external input, but this
-// is still treated as injection-sensitive per this package's convention (see
-// literal.go's encodeLiteral doc comment).
+// double quote. Used only for the "USE <catalog>;" statement
+// NewQuackAppender issues; treated as injection-sensitive per this package's
+// convention even though every caller passes DuckLakeAlias, not external
+// input.
 func quackIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
@@ -454,4 +390,3 @@ func putLE64(dst []byte, v uint64) {
 		dst[i] = byte(v >> (8 * i))
 	}
 }
-

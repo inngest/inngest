@@ -30,6 +30,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
 type capturingCronSyncer struct {
@@ -671,6 +672,44 @@ func TestDevEndpoint_ReturnsInfoInDevMode(t *testing.T) {
 	var info InfoResponse
 	err := json.Unmarshal(w.Body.Bytes(), &info)
 	require.NoError(t, err)
+}
+
+func TestDevEndpoint_DuckdbInsightsFlagReflectsDuckDBConnection(t *testing.T) {
+	t.Run("false when DuckDB is nil", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		ds.Opts = StartOpts{Config: config.Config{ServerKind: headers.ServerKindDev}}
+
+		noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+		api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+		req := httptest.NewRequest("GET", "/dev", nil)
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, req)
+
+		var info InfoResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &info))
+		require.False(t, info.Features["duckdb-insights"])
+	})
+
+	t.Run("true when DuckDB is set", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		ds.Opts = StartOpts{Config: config.Config{ServerKind: headers.ServerKindDev}}
+		db, err := sql.Open("sqlite", ":memory:")
+		require.NoError(t, err)
+		defer db.Close()
+		ds.DuckDB = db
+
+		noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+		api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+		req := httptest.NewRequest("GET", "/dev", nil)
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, req)
+
+		var info InfoResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &info))
+		require.True(t, info.Features["duckdb-insights"])
+	})
 }
 
 func TestRegister_DuplicateAppCleanup(t *testing.T) {

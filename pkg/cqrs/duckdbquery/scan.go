@@ -12,9 +12,8 @@ import (
 )
 
 // asString type-asserts a scanned column value as a string — used by
-// uuidColumn/ulidColumn, whose columns always come back that way (both the
-// jsonlines and quack transports render UUID/ULID columns as their
-// canonical string form — see pkg/db/duckdb/rows.go and quack_protocol.go).
+// uuidColumn/ulidColumn, since both transports render UUID/ULID columns as
+// their canonical string form.
 func asString(v any, col string) (string, error) {
 	s, ok := v.(string)
 	if !ok {
@@ -62,15 +61,11 @@ func ulidColumn(v any, col string) (ulid.ULID, error) {
 	return id, nil
 }
 
-// asMap requires the column's already-decoded JSON value (the driver
-// auto-decodes JSON-typed columns into Go values) to be a JSON object, or
-// SQL/JSON null — used for columns like events.event_data. A SQL NULL, or
-// json.Marshal(nil) having written the literal JSON "null" (e.g. an event
-// with no Data payload at all — see OnEventReceived), both decode to a Go
-// nil here and mean "no data", so they map to an empty object rather than
-// erroring; any other non-object shape (an array, a string, a number)
-// indicates real data corruption worth surfacing rather than silently
-// masking.
+// asMap requires the column's already-decoded JSON value to be an object,
+// or SQL/JSON null — used for columns like events.event_data. Both a SQL
+// NULL and a stored JSON "null" decode to a Go nil and mean "no data", so
+// they map to an empty object; any other non-object shape is real
+// corruption worth surfacing.
 func asMap(v any, col string) (map[string]any, error) {
 	if v == nil {
 		return map[string]any{}, nil
@@ -82,10 +77,9 @@ func asMap(v any, col string) (map[string]any, error) {
 	return m, nil
 }
 
-// asJSON re-marshals a JSON column's already-decoded Go value (the driver
-// auto-decodes JSON-typed columns into map[string]any/[]any/etc.) back into
-// raw bytes, so callers can treat it exactly like a TEXT/BLOB column read
-// from any other backend. Returns nil, nil for a SQL NULL column.
+// asJSON re-marshals a JSON column's already-decoded Go value back into raw
+// bytes, so callers can treat it like a TEXT/BLOB column from any other
+// backend. Returns nil, nil for a SQL NULL column.
 func asJSON(v any, col string) ([]byte, error) {
 	if v == nil {
 		return nil, nil
@@ -107,10 +101,9 @@ func asTimestamp(v any, col string) (time.Time, error) {
 	return ts, nil
 }
 
-// asNullableTimestamp returns the zero time.Time (not an error) when the
-// column is SQL NULL — matching cqrs.TraceRun's convention of a zero-value
-// StartedAt/EndedAt meaning "not yet set" (see runs_v2.go's
-// `if r.StartedAt.UnixMilli() > 0`).
+// asNullableTimestamp returns the zero time.Time (not an error) for a SQL
+// NULL column — matching cqrs.TraceRun's convention that a zero
+// StartedAt/EndedAt means "not yet set".
 func asNullableTimestamp(v any, col string) (time.Time, error) {
 	if v == nil {
 		return time.Time{}, nil
@@ -118,11 +111,10 @@ func asNullableTimestamp(v any, col string) (time.Time, error) {
 	return asTimestamp(v, col)
 }
 
-// asNullableBool returns false (not an error) for a SQL NULL column —
-// matching the nullable-boolean, TRUE/NULL-only convention used by
-// inngest.runs.is_deferred (see its migration's own doc comment): a
-// deferred run's row carries `is_deferred = TRUE`, everything else leaves
-// the column NULL rather than explicitly FALSE.
+// asNullableBool returns false (not an error) for a SQL NULL column. Its
+// only caller, is_deferred, is BOOLEAN NOT NULL DEFAULT FALSE so this
+// branch shouldn't be reachable in practice, but costs nothing to keep as a
+// defensive default rather than erroring on an unexpected NULL.
 func asNullableBool(v any, col string) (bool, error) {
 	if v == nil {
 		return false, nil

@@ -285,6 +285,48 @@ type FunctionTrigger struct {
 	Condition *string              `json:"condition,omitempty"`
 }
 
+type InsightsDiagnostic struct {
+	Start    *InsightsDiagnosticPosition `json:"start"`
+	End      *InsightsDiagnosticPosition `json:"end"`
+	Severity InsightsDiagnosticSeverity  `json:"severity"`
+	Code     string                      `json:"code"`
+	Message  string                      `json:"message"`
+}
+
+type InsightsDiagnosticPosition struct {
+	Line   int `json:"line"`
+	Column int `json:"column"`
+}
+
+type InsightsPathHint struct {
+	Path []*InsightsPathSegment `json:"path"`
+	Hint InsightsColumnHint     `json:"hint"`
+}
+
+type InsightsPathSegment struct {
+	Key      *string `json:"key,omitempty"`
+	Wildcard bool    `json:"wildcard"`
+}
+
+type InsightsQueryColumn struct {
+	Name      string              `json:"name"`
+	Type      InsightsColumnType  `json:"type"`
+	PathHints []*InsightsPathHint `json:"pathHints"`
+}
+
+type InsightsQueryInfo struct {
+	PrimaryTable *string  `json:"primaryTable,omitempty"`
+	Tables       []string `json:"tables"`
+	Limited      bool     `json:"limited"`
+}
+
+type InsightsQueryResult struct {
+	Columns     []*InsightsQueryColumn `json:"columns"`
+	Rows        [][]interface{}        `json:"rows"`
+	Info        *InsightsQueryInfo     `json:"info"`
+	Diagnostics []*InsightsDiagnostic  `json:"diagnostics"`
+}
+
 type InvokeStepInfo struct {
 	TriggeringEventID ulid.ULID  `json:"triggeringEventID"`
 	FunctionID        string     `json:"functionID"`
@@ -383,6 +425,36 @@ type SDKFeatureStatus struct {
 	Reason *int `json:"reason,omitempty"`
 }
 
+type SessionFunction struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
+type SessionGroup struct {
+	SessionKey     string             `json:"sessionKey"`
+	SessionID      string             `json:"sessionId"`
+	RunCount       int                `json:"runCount"`
+	FailedRunCount int                `json:"failedRunCount"`
+	FailureRate    float64            `json:"failureRate"`
+	LastActiveAt   time.Time          `json:"lastActiveAt"`
+	Functions      []*SessionFunction `json:"functions"`
+}
+
+type SessionKey struct {
+	SessionKey string    `json:"sessionKey"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type SessionRun struct {
+	ID           string     `json:"id"`
+	FunctionSlug string     `json:"functionSlug"`
+	EventName    *string    `json:"eventName,omitempty"`
+	Status       string     `json:"status"`
+	QueuedAt     time.Time  `json:"queuedAt"`
+	StartedAt    *time.Time `json:"startedAt,omitempty"`
+	EndedAt      *time.Time `json:"endedAt,omitempty"`
+}
+
 type SingletonConfiguration struct {
 	Mode SingletonMode `json:"mode"`
 	Key  *string       `json:"key,omitempty"`
@@ -448,6 +520,11 @@ type ThrottleConfiguration struct {
 	Key    *string `json:"key,omitempty"`
 	Limit  int     `json:"limit"`
 	Period string  `json:"period"`
+}
+
+type TimeRangeInput struct {
+	From  time.Time  `json:"from"`
+	Until *time.Time `json:"until,omitempty"`
 }
 
 type UpdateAppInput struct {
@@ -930,6 +1007,145 @@ func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsColumnHint string
+
+const (
+	InsightsColumnHintAppID      InsightsColumnHint = "APP_ID"
+	InsightsColumnHintFunctionID InsightsColumnHint = "FUNCTION_ID"
+	InsightsColumnHintRunID      InsightsColumnHint = "RUN_ID"
+	InsightsColumnHintEventID    InsightsColumnHint = "EVENT_ID"
+	InsightsColumnHintSession    InsightsColumnHint = "SESSION"
+)
+
+var AllInsightsColumnHint = []InsightsColumnHint{
+	InsightsColumnHintAppID,
+	InsightsColumnHintFunctionID,
+	InsightsColumnHintRunID,
+	InsightsColumnHintEventID,
+	InsightsColumnHintSession,
+}
+
+func (e InsightsColumnHint) IsValid() bool {
+	switch e {
+	case InsightsColumnHintAppID, InsightsColumnHintFunctionID, InsightsColumnHintRunID, InsightsColumnHintEventID, InsightsColumnHintSession:
+		return true
+	}
+	return false
+}
+
+func (e InsightsColumnHint) String() string {
+	return string(e)
+}
+
+func (e *InsightsColumnHint) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsColumnHint(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsColumnHint", str)
+	}
+	return nil
+}
+
+func (e InsightsColumnHint) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsColumnType string
+
+const (
+	InsightsColumnTypeString   InsightsColumnType = "STRING"
+	InsightsColumnTypeNumber   InsightsColumnType = "NUMBER"
+	InsightsColumnTypeBoolean  InsightsColumnType = "BOOLEAN"
+	InsightsColumnTypeDatetime InsightsColumnType = "DATETIME"
+	InsightsColumnTypeJSON     InsightsColumnType = "JSON"
+	InsightsColumnTypeUnknown  InsightsColumnType = "UNKNOWN"
+)
+
+var AllInsightsColumnType = []InsightsColumnType{
+	InsightsColumnTypeString,
+	InsightsColumnTypeNumber,
+	InsightsColumnTypeBoolean,
+	InsightsColumnTypeDatetime,
+	InsightsColumnTypeJSON,
+	InsightsColumnTypeUnknown,
+}
+
+func (e InsightsColumnType) IsValid() bool {
+	switch e {
+	case InsightsColumnTypeString, InsightsColumnTypeNumber, InsightsColumnTypeBoolean, InsightsColumnTypeDatetime, InsightsColumnTypeJSON, InsightsColumnTypeUnknown:
+		return true
+	}
+	return false
+}
+
+func (e InsightsColumnType) String() string {
+	return string(e)
+}
+
+func (e *InsightsColumnType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsColumnType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsColumnType", str)
+	}
+	return nil
+}
+
+func (e InsightsColumnType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type InsightsDiagnosticSeverity string
+
+const (
+	InsightsDiagnosticSeverityInfo    InsightsDiagnosticSeverity = "INFO"
+	InsightsDiagnosticSeverityWarning InsightsDiagnosticSeverity = "WARNING"
+	InsightsDiagnosticSeverityError   InsightsDiagnosticSeverity = "ERROR"
+)
+
+var AllInsightsDiagnosticSeverity = []InsightsDiagnosticSeverity{
+	InsightsDiagnosticSeverityInfo,
+	InsightsDiagnosticSeverityWarning,
+	InsightsDiagnosticSeverityError,
+}
+
+func (e InsightsDiagnosticSeverity) IsValid() bool {
+	switch e {
+	case InsightsDiagnosticSeverityInfo, InsightsDiagnosticSeverityWarning, InsightsDiagnosticSeverityError:
+		return true
+	}
+	return false
+}
+
+func (e InsightsDiagnosticSeverity) String() string {
+	return string(e)
+}
+
+func (e *InsightsDiagnosticSeverity) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = InsightsDiagnosticSeverity(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid InsightsDiagnosticSeverity", str)
+	}
+	return nil
+}
+
+func (e InsightsDiagnosticSeverity) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

@@ -1,0 +1,1747 @@
+{
+  "tables": [
+    {
+      "name": "events",
+      "description": "Events sent to Inngest.",
+      "columns": [
+        {
+          "name": "id",
+          "type": "STRING",
+          "hint": "EVENT_ID",
+          "description": "The unique ID of the event."
+        },
+        {
+          "name": "name",
+          "type": "STRING",
+          "description": "The event's name."
+        },
+        {
+          "name": "data",
+          "type": "JSON",
+          "description": "The event's payload."
+        },
+        {
+          "name": "v",
+          "type": "STRING",
+          "description": "The event's version, if one was set when it was sent."
+        },
+        {
+          "name": "ts",
+          "type": "DATETIME",
+          "description": "The timestamp included with the event when it was sent."
+        },
+        {
+          "name": "meta",
+          "type": "JSON",
+          "description": "Additional metadata Inngest recorded about the event."
+        },
+        {
+          "name": "received_at",
+          "type": "DATETIME",
+          "description": "When Inngest received the event."
+        }
+      ]
+    },
+    {
+      "name": "extended_trace_spans",
+      "description": "Custom trace events your code recorded during a run.",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "STRING",
+          "hint": "RUN_ID",
+          "description": "The run this event belongs to."
+        },
+        {
+          "name": "run_queued_at",
+          "type": "DATETIME",
+          "description": "When the run was queued."
+        },
+        {
+          "name": "app_id",
+          "type": "STRING",
+          "hint": "APP_ID",
+          "description": "The app that owns the function this run belongs to."
+        },
+        {
+          "name": "function_id",
+          "type": "STRING",
+          "hint": "FUNCTION_ID",
+          "description": "The function this run belongs to."
+        },
+        {
+          "name": "trace_id",
+          "type": "STRING",
+          "description": "Identifies the full execution trace this event belongs to."
+        },
+        {
+          "name": "span_id",
+          "type": "STRING",
+          "description": "The unique ID of this event."
+        },
+        {
+          "name": "parent_span_id",
+          "type": "STRING",
+          "description": "The step or event this one is nested under, if any."
+        },
+        {
+          "name": "name",
+          "type": "STRING",
+          "description": "The name given to this trace event."
+        },
+        {
+          "name": "start_time",
+          "type": "DATETIME",
+          "description": "When this event started."
+        },
+        {
+          "name": "end_time",
+          "type": "DATETIME",
+          "description": "When this event ended."
+        },
+        {
+          "name": "attributes",
+          "type": "JSON",
+          "description": "Additional details recorded with this event."
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "description": "Custom metadata your code recorded during the run."
+        },
+        {
+          "name": "inngest",
+          "type": "JSON",
+          "description": "Metadata Inngest recorded automatically during the run."
+        }
+      ]
+    },
+    {
+      "name": "metadata",
+      "description": "Custom and automatic metadata recorded during runs.",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "STRING",
+          "hint": "RUN_ID",
+          "description": "The run this metadata belongs to."
+        },
+        {
+          "name": "run_queued_at",
+          "type": "DATETIME",
+          "description": "When the run was queued."
+        },
+        {
+          "name": "span_id",
+          "type": "STRING",
+          "description": "Identifies which part of the run (the run itself, a step, or a request) this metadata belongs to."
+        },
+        {
+          "name": "scope",
+          "type": "STRING",
+          "description": "What this metadata was recorded for: the run, a step, a step attempt, or a request."
+        },
+        {
+          "name": "step_id",
+          "type": "STRING",
+          "description": "The step this metadata belongs to, if any."
+        },
+        {
+          "name": "step_index",
+          "type": "NUMBER",
+          "description": "The step's position within the run, if this metadata belongs to a step."
+        },
+        {
+          "name": "step_attempt",
+          "type": "NUMBER",
+          "description": "The attempt number this metadata belongs to, if any."
+        },
+        {
+          "name": "inngest",
+          "type": "JSON",
+          "description": "Metadata Inngest recorded automatically."
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "description": "Custom metadata your code recorded."
+        }
+      ]
+    },
+    {
+      "name": "runs",
+      "description": "Your function runs, one row per run.",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "STRING",
+          "hint": "RUN_ID",
+          "description": "The unique ID of the run."
+        },
+        {
+          "name": "queued_at",
+          "type": "DATETIME",
+          "description": "When the run was queued."
+        },
+        {
+          "name": "scheduled_at",
+          "type": "DATETIME",
+          "description": "When the run is scheduled to start, if it was scheduled for later."
+        },
+        {
+          "name": "started_at",
+          "type": "DATETIME",
+          "description": "When the run started executing."
+        },
+        {
+          "name": "ended_at",
+          "type": "DATETIME",
+          "description": "When the run finished (succeeded, failed, or was cancelled)."
+        },
+        {
+          "name": "app_id",
+          "type": "STRING",
+          "hint": "APP_ID",
+          "description": "The app that owns the function this run belongs to."
+        },
+        {
+          "name": "function_id",
+          "type": "STRING",
+          "hint": "FUNCTION_ID",
+          "description": "The function that was run."
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "description": "The run's current status: Queued, Running, Completed, Failed, or Cancelled."
+        },
+        {
+          "name": "event_ids",
+          "type": "JSON",
+          "hint": "EVENT_ID",
+          "description": "The event(s) that triggered this run."
+        },
+        {
+          "name": "sessions",
+          "type": "JSON",
+          "hint": "SESSION",
+          "description": "Session identifiers carried by the triggering event(s), if any."
+        },
+        {
+          "name": "attributes",
+          "type": "JSON",
+          "description": "Additional details recorded about the run."
+        },
+        {
+          "name": "inputs",
+          "type": "JSON",
+          "description": "The event(s) that were sent to the function when it ran."
+        },
+        {
+          "name": "output",
+          "type": "JSON",
+          "description": "The run's final output, once it completes successfully."
+        },
+        {
+          "name": "is_deferred",
+          "type": "BOOLEAN",
+          "description": "Whether this run continues another run that deferred to it, rather than being triggered directly by an event."
+        },
+        {
+          "name": "defer_parent_function_id",
+          "type": "STRING",
+          "hint": "FUNCTION_ID",
+          "description": "The function of the run that deferred to this one, if is_deferred is true."
+        },
+        {
+          "name": "defer_parent_run_ids",
+          "type": "JSON",
+          "hint": "RUN_ID",
+          "description": "The run(s) that deferred to this run, if is_deferred is true."
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "description": "Custom metadata your code recorded during the run."
+        },
+        {
+          "name": "inngest",
+          "type": "JSON",
+          "description": "Metadata Inngest recorded automatically during the run."
+        }
+      ]
+    },
+    {
+      "name": "step_attempts",
+      "description": "Every attempt of every step run during your functions.",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "STRING",
+          "hint": "RUN_ID",
+          "description": "The run this step belongs to."
+        },
+        {
+          "name": "run_queued_at",
+          "type": "DATETIME",
+          "description": "When the run was queued."
+        },
+        {
+          "name": "app_id",
+          "type": "STRING",
+          "hint": "APP_ID",
+          "description": "The app that owns the function this run belongs to."
+        },
+        {
+          "name": "function_id",
+          "type": "STRING",
+          "hint": "FUNCTION_ID",
+          "description": "The function this run belongs to."
+        },
+        {
+          "name": "span_id",
+          "type": "STRING",
+          "description": "The unique ID of this step attempt."
+        },
+        {
+          "name": "trace_id",
+          "type": "STRING",
+          "description": "Identifies the full execution trace this step belongs to."
+        },
+        {
+          "name": "parent_span_id",
+          "type": "STRING",
+          "description": "The step or event this one is nested under, if any."
+        },
+        {
+          "name": "name",
+          "type": "STRING",
+          "description": "The internal name recorded for this step."
+        },
+        {
+          "name": "start_time",
+          "type": "DATETIME",
+          "description": "When this step attempt started."
+        },
+        {
+          "name": "end_time",
+          "type": "DATETIME",
+          "description": "When this step attempt ended."
+        },
+        {
+          "name": "output",
+          "type": "JSON",
+          "description": "The step's output, once this attempt completes successfully."
+        },
+        {
+          "name": "input",
+          "type": "JSON",
+          "description": "The input passed to this step attempt."
+        },
+        {
+          "name": "attributes",
+          "type": "JSON",
+          "description": "Additional details recorded about this step attempt."
+        },
+        {
+          "name": "step_id",
+          "type": "STRING",
+          "description": "The unique ID of the step, shared across every attempt."
+        },
+        {
+          "name": "step_index",
+          "type": "NUMBER",
+          "description": "The step's position within the run."
+        },
+        {
+          "name": "step_attempt",
+          "type": "NUMBER",
+          "description": "The attempt number for this step, starting at 0."
+        },
+        {
+          "name": "step_max_attempts",
+          "type": "NUMBER",
+          "description": "The maximum number of attempts configured for this step."
+        },
+        {
+          "name": "step_type",
+          "type": "STRING",
+          "description": "The kind of step this is (e.g. run, sleep, wait for event, invoke)."
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "description": "This step attempt's status."
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "description": "Custom metadata your code recorded during the run."
+        },
+        {
+          "name": "inngest",
+          "type": "JSON",
+          "description": "Metadata Inngest recorded automatically during the run."
+        }
+      ]
+    },
+    {
+      "name": "steps",
+      "description": "The steps run during your functions, showing each step's most recent attempt.",
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "STRING",
+          "hint": "RUN_ID",
+          "description": "The run this step belongs to."
+        },
+        {
+          "name": "run_queued_at",
+          "type": "DATETIME",
+          "description": "When the run was queued."
+        },
+        {
+          "name": "app_id",
+          "type": "STRING",
+          "hint": "APP_ID",
+          "description": "The app that owns the function this run belongs to."
+        },
+        {
+          "name": "function_id",
+          "type": "STRING",
+          "hint": "FUNCTION_ID",
+          "description": "The function this run belongs to."
+        },
+        {
+          "name": "span_id",
+          "type": "STRING",
+          "description": "The unique ID of this step attempt."
+        },
+        {
+          "name": "trace_id",
+          "type": "STRING",
+          "description": "Identifies the full execution trace this step belongs to."
+        },
+        {
+          "name": "parent_span_id",
+          "type": "STRING",
+          "description": "The step or event this one is nested under, if any."
+        },
+        {
+          "name": "name",
+          "type": "STRING",
+          "description": "The internal name recorded for this step."
+        },
+        {
+          "name": "start_time",
+          "type": "DATETIME",
+          "description": "When this step attempt started."
+        },
+        {
+          "name": "end_time",
+          "type": "DATETIME",
+          "description": "When this step attempt ended."
+        },
+        {
+          "name": "output",
+          "type": "JSON",
+          "description": "The step's output, once this attempt completes successfully."
+        },
+        {
+          "name": "input",
+          "type": "JSON",
+          "description": "The input passed to this step attempt."
+        },
+        {
+          "name": "attributes",
+          "type": "JSON",
+          "description": "Additional details recorded about this step attempt."
+        },
+        {
+          "name": "step_id",
+          "type": "STRING",
+          "description": "The unique ID of the step, shared across every attempt."
+        },
+        {
+          "name": "step_index",
+          "type": "NUMBER",
+          "description": "The step's position within the run."
+        },
+        {
+          "name": "step_attempt",
+          "type": "NUMBER",
+          "description": "The attempt number for this step, starting at 0."
+        },
+        {
+          "name": "step_max_attempts",
+          "type": "NUMBER",
+          "description": "The maximum number of attempts configured for this step."
+        },
+        {
+          "name": "step_type",
+          "type": "STRING",
+          "description": "The kind of step this is (e.g. run, sleep, wait for event, invoke)."
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "description": "This step attempt's status."
+        },
+        {
+          "name": "metadata",
+          "type": "JSON",
+          "description": "Custom metadata your code recorded during the run."
+        },
+        {
+          "name": "inngest",
+          "type": "JSON",
+          "description": "Metadata Inngest recorded automatically during the run."
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "name": "abs",
+      "description": "Absolute value.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#absx",
+      "signature": "abs(x)"
+    },
+    {
+      "name": "acos",
+      "description": "Computes the arccosine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#acosx",
+      "signature": "acos(x)"
+    },
+    {
+      "name": "acosh",
+      "description": "Computes the inverse hyperbolic cosine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#acoshx",
+      "signature": "acosh(x)"
+    },
+    {
+      "name": "age",
+      "description": "Subtract arguments, resulting in the time difference between the two timestamps.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#agetimestamp-timestamp",
+      "signature": "age(timestamp, timestamp)"
+    },
+    {
+      "name": "any_value",
+      "description": "Returns the first non-NULL value from arg. This function is affected by ordering.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#any_valuearg",
+      "signature": "any_value(arg)"
+    },
+    {
+      "name": "approx_count_distinct",
+      "description": "Computes the approximate count of distinct elements using HyperLogLog.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates",
+      "signature": "approx_count_distinct(x)"
+    },
+    {
+      "name": "approx_quantile",
+      "description": "Computes the approximate quantile using T-Digest.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates",
+      "signature": "approx_quantile(x, pos)"
+    },
+    {
+      "name": "arg_max",
+      "description": "Finds the row with the maximum val. Calculates the non-NULL arg expression at that row.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#arg_maxarg-val",
+      "signature": "arg_max(arg, val)"
+    },
+    {
+      "name": "arg_min",
+      "description": "Finds the row with the minimum val. Calculates the non-NULL arg expression at that row.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#arg_minarg-val",
+      "signature": "arg_min(arg, val)"
+    },
+    {
+      "name": "array_agg",
+      "description": "Returns a LIST containing all the values of a column.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#listarg",
+      "signature": "array_agg(arg)"
+    },
+    {
+      "name": "array_aggregate",
+      "description": "Executes the aggregate function function_name on the elements of list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_aggregatelist-function_name-",
+      "signature": "array_aggregate(list, function_name, ...)"
+    },
+    {
+      "name": "array_contains",
+      "description": "Returns true if the list contains the element.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_containslist-element",
+      "signature": "array_contains(list, element)"
+    },
+    {
+      "name": "array_length",
+      "description": "Returns the length of the list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#lengthlist",
+      "signature": "array_length(list)"
+    },
+    {
+      "name": "array_position",
+      "description": "Returns the index of the element if the list contains the element. If the element is not found, it returns NULL.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_positionlist-element",
+      "signature": "array_position(list, element)"
+    },
+    {
+      "name": "array_to_string",
+      "description": "Concatenates list/array elements using an optional delimiter.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#array_to_stringlist-delimiter",
+      "signature": "array_to_string(list, delimiter)"
+    },
+    {
+      "name": "ascii",
+      "description": "Returns an integer that represents the Unicode code point of the first character of the string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#asciistring",
+      "signature": "ascii(string)"
+    },
+    {
+      "name": "asin",
+      "description": "Computes the arcsine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#asinx",
+      "signature": "asin(x)"
+    },
+    {
+      "name": "asinh",
+      "description": "Computes the inverse hyperbolic sine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#asinhx",
+      "signature": "asinh(x)"
+    },
+    {
+      "name": "atan",
+      "description": "Computes the arctangent of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#atanx",
+      "signature": "atan(x)"
+    },
+    {
+      "name": "atan2",
+      "description": "Computes the arctangent (y, x).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#atan2y-x",
+      "signature": "atan2(y, x)"
+    },
+    {
+      "name": "atanh",
+      "description": "Computes the inverse hyperbolic tangent of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#atanhx",
+      "signature": "atanh(x)"
+    },
+    {
+      "name": "avg",
+      "description": "Calculates the average value for all tuples in x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#avgarg",
+      "signature": "avg(arg)"
+    },
+    {
+      "name": "bit_and",
+      "description": "Returns the bitwise AND of all bits in a given expression.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_andarg",
+      "signature": "bit_and(arg)"
+    },
+    {
+      "name": "bit_or",
+      "description": "Returns the bitwise OR of all bits in a given expression.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_orarg",
+      "signature": "bit_or(arg)"
+    },
+    {
+      "name": "bit_xor",
+      "description": "Returns the bitwise XOR of all bits in a given expression.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bit_xorarg",
+      "signature": "bit_xor(arg)"
+    },
+    {
+      "name": "bool_and",
+      "description": "Returns TRUE if every input value is TRUE, otherwise FALSE.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bool_andarg",
+      "signature": "bool_and(arg)"
+    },
+    {
+      "name": "bool_or",
+      "description": "Returns TRUE if any input value is TRUE, otherwise FALSE.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#bool_orarg",
+      "signature": "bool_or(arg)"
+    },
+    {
+      "name": "cbrt",
+      "description": "Returns the cube root of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#cbrtx",
+      "signature": "cbrt(x)"
+    },
+    {
+      "name": "ceil",
+      "description": "Rounds the number up.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#ceilx",
+      "signature": "ceil(x)"
+    },
+    {
+      "name": "ceiling",
+      "description": "Rounds the number up.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#ceilingx",
+      "signature": "ceiling(x)"
+    },
+    {
+      "name": "chr",
+      "description": "Returns a character which is corresponding the ASCII code value or Unicode code point.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#chrcode_point",
+      "signature": "chr(code_point)"
+    },
+    {
+      "name": "concat",
+      "description": "Concatenates multiple strings or lists. NULL inputs are skipped. See also operator ||.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#concatvalue-",
+      "signature": "concat(value, ...)"
+    },
+    {
+      "name": "concat_ws",
+      "description": "Concatenates multiple strings, separated by separator. NULL inputs are skipped.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#concat_wsseparator-string-",
+      "signature": "concat_ws(separator, string, ...)"
+    },
+    {
+      "name": "contains",
+      "description": "Returns true if search_string is found within string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#containsstring-search_string",
+      "signature": "contains(string, search_string)"
+    },
+    {
+      "name": "corr",
+      "description": "Returns the correlation coefficient for non-NULL pairs in a group.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#corry-x",
+      "signature": "corr(y, x)"
+    },
+    {
+      "name": "cos",
+      "description": "Computes the cosine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#cosx",
+      "signature": "cos(x)"
+    },
+    {
+      "name": "cosh",
+      "description": "Computes the hyperbolic cosine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric",
+      "signature": "cosh(x)"
+    },
+    {
+      "name": "cot",
+      "description": "Computes the cotangent of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#cotx",
+      "signature": "cot(x)"
+    },
+    {
+      "name": "count",
+      "description": "Returns the number of non-NULL values in arg.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#count",
+      "signature": "count()"
+    },
+    {
+      "name": "count_if",
+      "description": "Counts the total number of TRUE values for a boolean column.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates",
+      "signature": "count_if(arg)"
+    },
+    {
+      "name": "covar_pop",
+      "description": "Returns the population covariance of input values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#covar_popy-x",
+      "signature": "covar_pop(y, x)"
+    },
+    {
+      "name": "covar_samp",
+      "description": "Returns the sample covariance for non-NULL pairs in a group.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#covar_sampy-x",
+      "signature": "covar_samp(y, x)"
+    },
+    {
+      "name": "cume_dist",
+      "description": "The number of partition rows preceding or peer with current row / total partition rows.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#cume_distorder-by-ordering",
+      "signature": "cume_dist([ORDER BY ordering])"
+    },
+    {
+      "name": "current_date",
+      "description": "Current date (start of current transaction) in the local time zone (alias for today()).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#today",
+      "signature": "current_date()"
+    },
+    {
+      "name": "date_add",
+      "description": "Adds an interval to a date, time, or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_adddate-interval",
+      "signature": "date_add(date, interval)"
+    },
+    {
+      "name": "date_diff",
+      "description": "The number of partition boundaries between the timestamps.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_diffpart-startdate-enddate",
+      "signature": "date_diff(part, startdate, enddate)"
+    },
+    {
+      "name": "date_part",
+      "description": "Get subfield (equivalent to extract).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_partpart-date",
+      "signature": "date_part(part, date)"
+    },
+    {
+      "name": "date_sub",
+      "description": "The number of complete partitions between the timestamps.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_subpart-startdate-enddate",
+      "signature": "date_sub(part, startdate, enddate)"
+    },
+    {
+      "name": "date_trunc",
+      "description": "Truncate to specified precision.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#date_truncpart-date",
+      "signature": "date_trunc(part, date)"
+    },
+    {
+      "name": "day",
+      "description": "Extract the day component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#daydate",
+      "signature": "day(date)"
+    },
+    {
+      "name": "dayofweek",
+      "description": "Extract the dayofweek component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#dayofweekdate",
+      "signature": "dayofweek(date)"
+    },
+    {
+      "name": "dayofyear",
+      "description": "Extract the dayofyear component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#dayofyeardate",
+      "signature": "dayofyear(date)"
+    },
+    {
+      "name": "degrees",
+      "description": "Converts radians to degrees.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#degreesx",
+      "signature": "degrees(x)"
+    },
+    {
+      "name": "dense_rank",
+      "description": "The rank of the current row without gaps.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#dense_rank",
+      "signature": "dense_rank()"
+    },
+    {
+      "name": "ends_with",
+      "description": "Returns true if string ends with search_string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#suffixstring-search_string",
+      "signature": "ends_with(string, search_string)"
+    },
+    {
+      "name": "entropy",
+      "description": "Returns the log-2 entropy of count input-values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#entropyx",
+      "signature": "entropy(x)"
+    },
+    {
+      "name": "epoch",
+      "description": "Extract the epoch component from a temporal type.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#epochtimestamp",
+      "signature": "epoch(timestamp)"
+    },
+    {
+      "name": "epoch_ms",
+      "description": "Extract the epoch component in milliseconds from a temporal type.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#epoch_mstimestamp",
+      "signature": "epoch_ms(timestamp)"
+    },
+    {
+      "name": "exp",
+      "description": "Computes e to the power of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#expx",
+      "signature": "exp(x)"
+    },
+    {
+      "name": "first",
+      "description": "Returns the first value (NULL or non-NULL) from arg. This function is affected by ordering.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#firstarg",
+      "signature": "first(arg)"
+    },
+    {
+      "name": "first_value",
+      "description": "The first value of expr in the frame. Can IGNORE or RESPECT NULLS.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#first_valueexpr-order-by-ordering-ignore-nulls",
+      "signature": "first_value(expr[ ORDER BY ordering][ IGNORE NULLS])"
+    },
+    {
+      "name": "flatten",
+      "description": "Flattens a nested list by one level.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#flattennested_list",
+      "signature": "flatten(nested_list)"
+    },
+    {
+      "name": "floor",
+      "description": "Rounds the number down.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#floorx",
+      "signature": "floor(x)"
+    },
+    {
+      "name": "format",
+      "description": "Formats a string using the fmt syntax.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#formatformat-",
+      "signature": "format(format, ...)"
+    },
+    {
+      "name": "generate_series",
+      "description": "Creates a list of values between start and stop - the stop parameter is inclusive.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#generate_seriesstart-stop-step",
+      "signature": "generate_series(start[, stop][, step])"
+    },
+    {
+      "name": "greatest",
+      "description": "Returns the largest value. For strings lexicographical ordering is used. Note that lowercase characters are considered \"larger\" than uppercase characters and collations are not supported.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#greatestarg1-",
+      "signature": "greatest(arg1, ...)"
+    },
+    {
+      "name": "hash",
+      "description": "Returns a UBIGINT with the hash of the value. Note that this is not a cryptographic hash.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#hashvalue",
+      "signature": "hash(value)"
+    },
+    {
+      "name": "hour",
+      "description": "Extract the hour component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#hourdate",
+      "signature": "hour(date)"
+    },
+    {
+      "name": "if",
+      "description": "Returns then if condition evaluates to true, otherwise returns the else value.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#ifa-b-c",
+      "signature": "if(a, b, c)"
+    },
+    {
+      "name": "ifnull",
+      "description": "Returns expr1 if it's not NULL, otherwise expr2.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#ifnullexpr-other",
+      "signature": "ifnull(expr, other)"
+    },
+    {
+      "name": "instr",
+      "description": "Returns location of first occurrence of search_string in string, counting from 1. Returns 0 if no match found.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#instrstring-search_string",
+      "signature": "instr(string, search_string)"
+    },
+    {
+      "name": "isodow",
+      "description": "Extract the isodow component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#isodowdate",
+      "signature": "isodow(date)"
+    },
+    {
+      "name": "isoyear",
+      "description": "Extract the isoyear component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#isoyeardate",
+      "signature": "isoyear(date)"
+    },
+    {
+      "name": "jaccard",
+      "description": "The Jaccard similarity between two strings. Characters of different cases (e.g., a and A) are considered different. Returns a number between 0 and 1.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#jaccards1-s2",
+      "signature": "jaccard(s1, s2)"
+    },
+    {
+      "name": "json_array",
+      "description": "Creates a JSON array from a list of arguments.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json",
+      "signature": "json_array(any, ...)"
+    },
+    {
+      "name": "json_array_length",
+      "description": "Returns the number of elements in a JSON array, or 0 if not an array.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_array_length(json[, path])"
+    },
+    {
+      "name": "json_contains",
+      "description": "Returns true if a JSON value contains the specified search value.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_contains(json_haystack, json_needle)"
+    },
+    {
+      "name": "json_exists",
+      "description": "Returns true if a JSON path exists in the JSON value.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
+      "signature": "json_exists(json, path)"
+    },
+    {
+      "name": "json_extract",
+      "description": "Extracts the JSON value at the given path or key.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
+      "signature": "json_extract(json, path)"
+    },
+    {
+      "name": "json_extract_path",
+      "description": "Extracts the JSON value at the given path (alias for json_extract).",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
+      "signature": "json_extract_path(json, path)"
+    },
+    {
+      "name": "json_extract_string",
+      "description": "Extracts the value at the given path or key as a string.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
+      "signature": "json_extract_string(json, path)"
+    },
+    {
+      "name": "json_group_array",
+      "description": "Aggregates values into a JSON array.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-aggregate-functions",
+      "signature": "json_group_array(any)"
+    },
+    {
+      "name": "json_group_object",
+      "description": "Aggregates key/value pairs into a JSON object.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-aggregate-functions",
+      "signature": "json_group_object(key, value)"
+    },
+    {
+      "name": "json_keys",
+      "description": "Returns the keys of a JSON object as a list.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_keys(json[, path])"
+    },
+    {
+      "name": "json_merge_patch",
+      "description": "Merges two JSON documents using RFC 7396 JSON Merge Patch semantics.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json",
+      "signature": "json_merge_patch(json, json)"
+    },
+    {
+      "name": "json_object",
+      "description": "Creates a JSON object from a list of key/value argument pairs.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json",
+      "signature": "json_object(key, value, ...)"
+    },
+    {
+      "name": "json_quote",
+      "description": "Converts a value to a quoted JSON value (alias for to_json).",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json",
+      "signature": "json_quote(any)"
+    },
+    {
+      "name": "json_structure",
+      "description": "Returns the structure (a JSON schema-like description) of a JSON value.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_structure(json)"
+    },
+    {
+      "name": "json_type",
+      "description": "Returns the type of a JSON value as a string.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_type(json[, path])"
+    },
+    {
+      "name": "json_valid",
+      "description": "Returns true if the string is valid JSON.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-scalar-functions",
+      "signature": "json_valid(json)"
+    },
+    {
+      "name": "json_value",
+      "description": "Extracts a JSON scalar value at the given path as a string.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
+      "signature": "json_value(json, path)"
+    },
+    {
+      "name": "kurtosis",
+      "description": "Returns the excess kurtosis (Fisher's definition) of all input values, with a bias correction according to the sample size.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#kurtosisx",
+      "signature": "kurtosis(x)"
+    },
+    {
+      "name": "lag",
+      "description": "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#lagexpr-offset-default-order-by-ordering-ignore-nulls",
+      "signature": "lag(expr[, offset[, default]][ ORDER BY ordering][ IGNORE NULLS])"
+    },
+    {
+      "name": "last",
+      "description": "Returns the last value of a column. This function is affected by ordering.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#lastarg",
+      "signature": "last(arg)"
+    },
+    {
+      "name": "last_day",
+      "description": "Returns the last day of the month.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#last_daydate",
+      "signature": "last_day(date)"
+    },
+    {
+      "name": "last_value",
+      "description": "The last value of expr in the frame. Can IGNORE or RESPECT NULLS.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#last_valueexpr-order-by-ordering-ignore-nulls",
+      "signature": "last_value(expr[ ORDER BY ordering][ IGNORE NULLS])"
+    },
+    {
+      "name": "lead",
+      "description": "The value of expr n rows after the current row, or the default. Can IGNORE or RESPECT NULLS.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#leadexpr-offset-default-order-by-ordering-ignore-nulls",
+      "signature": "lead(expr[, offset[, default]][ ORDER BY ordering][ IGNORE NULLS])"
+    },
+    {
+      "name": "least",
+      "description": "Returns the smallest value. For strings lexicographical ordering is used. Note that uppercase characters are considered \"smaller\" than lowercase characters, and collations are not supported.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#leastarg1-",
+      "signature": "least(arg1, ...)"
+    },
+    {
+      "name": "left",
+      "description": "Extracts the left-most count characters.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#leftstring-count",
+      "signature": "left(string, count)"
+    },
+    {
+      "name": "len",
+      "description": "Number of characters in string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lengthstring",
+      "signature": "len(string)"
+    },
+    {
+      "name": "length",
+      "description": "Number of characters in string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lengthstring",
+      "signature": "length(string)"
+    },
+    {
+      "name": "levenshtein",
+      "description": "The minimum number of single-character edits (insertions, deletions or substitutions) required to change one string to the other. Characters of different cases (e.g., a and A) are considered different.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#levenshteins1-s2",
+      "signature": "levenshtein(s1, s2)"
+    },
+    {
+      "name": "list",
+      "description": "Returns a LIST containing all the values of a column.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#listarg",
+      "signature": "list(arg)"
+    },
+    {
+      "name": "list_aggregate",
+      "description": "Executes the aggregate function function_name on the elements of list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_aggregatelist-function_name-",
+      "signature": "list_aggregate(list, function_name, ...)"
+    },
+    {
+      "name": "list_concat",
+      "description": "Concatenates lists. NULL inputs are skipped. See also operator ||.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_concatlist_1--list_n",
+      "signature": "list_concat(list_1, ..., list_n)"
+    },
+    {
+      "name": "list_contains",
+      "description": "Returns true if the list contains the element.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_containslist-element",
+      "signature": "list_contains(list, element)"
+    },
+    {
+      "name": "list_distinct",
+      "description": "Removes all duplicates and NULL values from a list. Does not preserve the original order.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_distinctlist",
+      "signature": "list_distinct(list)"
+    },
+    {
+      "name": "list_has_all",
+      "description": "Returns true if all elements of list2 are in list1. NULLs are ignored.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_has_alllist1-list2",
+      "signature": "list_has_all(list1, list2)"
+    },
+    {
+      "name": "list_has_any",
+      "description": "Returns true if the lists have any element in common. NULLs are ignored.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_has_anylist1-list2",
+      "signature": "list_has_any(list1, list2)"
+    },
+    {
+      "name": "list_intersect",
+      "description": "Returns a list containing the distinct elements that are present in both list1 and list2.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_intersectlist1-list2",
+      "signature": "list_intersect(list1, list2)"
+    },
+    {
+      "name": "list_position",
+      "description": "Returns the index of the element if the list contains the element. If the element is not found, it returns NULL.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_positionlist-element",
+      "signature": "list_position(list, element)"
+    },
+    {
+      "name": "list_reverse_sort",
+      "description": "Sorts the elements of the list in reverse order.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_reverse_sortlist-col1",
+      "signature": "list_reverse_sort(list[, col1])"
+    },
+    {
+      "name": "list_slice",
+      "description": "Extracts a sublist or substring using slice conventions. Negative values are accepted.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_slicelist-begin-end",
+      "signature": "list_slice(list, begin, end)"
+    },
+    {
+      "name": "list_sort",
+      "description": "Sorts the elements of the list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_sortlist-col1-col2",
+      "signature": "list_sort(list[, col1][, col2])"
+    },
+    {
+      "name": "list_unique",
+      "description": "Counts the unique elements of a list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_uniquelist",
+      "signature": "list_unique(list)"
+    },
+    {
+      "name": "list_value",
+      "description": "Creates a LIST containing the argument values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#list_valuearg-",
+      "signature": "list_value(arg, ...)"
+    },
+    {
+      "name": "ln",
+      "description": "Computes the natural logarithm of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#lnx",
+      "signature": "ln(x)"
+    },
+    {
+      "name": "log",
+      "description": "Computes the logarithm of x to base b. b may be omitted, in which case the default 10.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#logx",
+      "signature": "log(x)"
+    },
+    {
+      "name": "log10",
+      "description": "Computes the 10-log of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#log10x",
+      "signature": "log10(x)"
+    },
+    {
+      "name": "log2",
+      "description": "Computes the 2-log of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#log2x",
+      "signature": "log2(x)"
+    },
+    {
+      "name": "lower",
+      "description": "Converts string to lower case.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lowerstring",
+      "signature": "lower(string)"
+    },
+    {
+      "name": "lpad",
+      "description": "Pads the string with the character on the left until it has count characters. Truncates the string on the right if it has more than count characters.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#lpadstring-count-character",
+      "signature": "lpad(string, count, character)"
+    },
+    {
+      "name": "ltrim",
+      "description": "Removes any occurrences of any of the characters from the left side of the string. characters defaults to space.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#ltrimstring-characters",
+      "signature": "ltrim(string[, characters])"
+    },
+    {
+      "name": "make_date",
+      "description": "The date for the given parts.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#make_dateyear-month-day",
+      "signature": "make_date(year, month, day)"
+    },
+    {
+      "name": "make_timestamp",
+      "description": "The timestamp for the given parts.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#make_timestampbigint-bigint-bigint-bigint-bigint-double",
+      "signature": "make_timestamp(bigint, bigint, bigint, bigint, bigint, double)"
+    },
+    {
+      "name": "make_timestamp_ms",
+      "description": "Constructs a timestamp from the given number of milliseconds since the epoch.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#make_timestamp_msmilliseconds",
+      "signature": "make_timestamp_ms(milliseconds)"
+    },
+    {
+      "name": "map_entries",
+      "description": "Returns the map entries as a list of keys/values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/map#map_entriesmap",
+      "signature": "map_entries(map)"
+    },
+    {
+      "name": "map_extract",
+      "description": "Returns a list containing the value for a given key, or an empty list if the key is not contained in the map.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/map#map_extractmap-key",
+      "signature": "map_extract(map, key)"
+    },
+    {
+      "name": "map_keys",
+      "description": "Returns the keys of a map as a list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/map#map_keysmap",
+      "signature": "map_keys(map)"
+    },
+    {
+      "name": "max",
+      "description": "Returns the maximum value present in arg.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#maxarg",
+      "signature": "max(arg)"
+    },
+    {
+      "name": "md5",
+      "description": "Returns the MD5 hash of the string as a VARCHAR.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#md5string",
+      "signature": "md5(string)"
+    },
+    {
+      "name": "median",
+      "description": "Returns the middle value of the set. NULL values are ignored. For even value counts, interpolate-able types (numeric, date/time) return the average of the two middle values. Non-interpolate-able types (everything else) return the lower of the two middle values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#medianx",
+      "signature": "median(x)"
+    },
+    {
+      "name": "min",
+      "description": "Returns the minimum value present in arg.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#minarg",
+      "signature": "min(arg)"
+    },
+    {
+      "name": "minute",
+      "description": "Extract the minute component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#minutedate",
+      "signature": "minute(date)"
+    },
+    {
+      "name": "mod",
+      "description": "The remainder of x divided by y.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric",
+      "signature": "mod(x, y)"
+    },
+    {
+      "name": "mode",
+      "description": "Returns the most frequent value for the values within x. NULL values are ignored.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#modex",
+      "signature": "mode(x)"
+    },
+    {
+      "name": "month",
+      "description": "Extract the month component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#monthdate",
+      "signature": "month(date)"
+    },
+    {
+      "name": "now",
+      "description": "Returns the current timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date",
+      "signature": "now()"
+    },
+    {
+      "name": "nth_value",
+      "description": "The nth value of expr in the frame. Can IGNORE or RESPECT NULLS.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#nth_valueexpr-nth-order-by-ordering-ignore-nulls",
+      "signature": "nth_value(expr, nth[ ORDER BY ordering][ IGNORE NULLS])"
+    },
+    {
+      "name": "ntile",
+      "description": "The row bucket in a window partition for a given bucket count.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#ntilenum_buckets-order-by-ordering",
+      "signature": "ntile(num_buckets[ ORDER BY ordering])"
+    },
+    {
+      "name": "percent_rank",
+      "description": "The relative rank of the current row as a fraction.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#percent_rankorder-by-ordering",
+      "signature": "percent_rank([ORDER BY ordering])"
+    },
+    {
+      "name": "pi",
+      "description": "Returns the value of pi.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#pi",
+      "signature": "pi()"
+    },
+    {
+      "name": "pow",
+      "description": "Computes x to the power of y.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#powx-y",
+      "signature": "pow(x, y)"
+    },
+    {
+      "name": "power",
+      "description": "Computes x to the power of y.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#powerx-y",
+      "signature": "power(x, y)"
+    },
+    {
+      "name": "printf",
+      "description": "Formats a string using printf syntax.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#printfformat-",
+      "signature": "printf(format, ...)"
+    },
+    {
+      "name": "product",
+      "description": "Calculates the product of all tuples in arg.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#productarg",
+      "signature": "product(arg)"
+    },
+    {
+      "name": "quantile_cont",
+      "description": "Returns the interpolated quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding interpolated quantiles.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_contx-pos",
+      "signature": "quantile_cont(x, pos)"
+    },
+    {
+      "name": "quantile_disc",
+      "description": "Returns the exact quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding exact quantiles.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_discx-pos",
+      "signature": "quantile_disc(x, pos)"
+    },
+    {
+      "name": "quarter",
+      "description": "Extract the quarter component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#quarterdate",
+      "signature": "quarter(date)"
+    },
+    {
+      "name": "radians",
+      "description": "Converts degrees to radians.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#radiansx",
+      "signature": "radians(x)"
+    },
+    {
+      "name": "range",
+      "description": "Creates a list of values between start and stop - the stop parameter is exclusive.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#rangestart-stop-step",
+      "signature": "range(start[, stop][, step])"
+    },
+    {
+      "name": "rank",
+      "description": "The rank of the current row with gaps.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#rankorder-by-ordering",
+      "signature": "rank([ORDER BY ordering])"
+    },
+    {
+      "name": "regexp_extract",
+      "description": "If string contains the regex pattern, returns the capturing group specified by optional parameter group; otherwise, returns the empty string. The group must be a constant value. If no group is given, it defaults to 0. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_extractstring-pattern-group--0-options",
+      "signature": "regexp_extract(string, pattern[, group = 0][, options])"
+    },
+    {
+      "name": "regexp_extract_all",
+      "description": "Finds non-overlapping occurrences of the regex in the string and returns the corresponding values of the capturing group. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_extract_allstring-regex-group--0-options",
+      "signature": "regexp_extract_all(string, regex[, group = 0][, options])"
+    },
+    {
+      "name": "regexp_full_match",
+      "description": "Returns true if the entire string matches the regex. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_full_matchstring-regex-options",
+      "signature": "regexp_full_match(string, regex[, options])"
+    },
+    {
+      "name": "regexp_matches",
+      "description": "Returns true if string contains the regex, false otherwise. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_matchesstring-pattern-options",
+      "signature": "regexp_matches(string, pattern[, options])"
+    },
+    {
+      "name": "regexp_replace",
+      "description": "If string contains the regex, replaces the matching part with replacement. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_replacestring-pattern-replacement-options",
+      "signature": "regexp_replace(string, pattern, replacement[, options])"
+    },
+    {
+      "name": "regexp_split_to_array",
+      "description": "Splits the string along the regex. A set of optional regex options can be set.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/regular_expressions#regexp_split_to_arraystring-regex-options",
+      "signature": "regexp_split_to_array(string, regex[, options])"
+    },
+    {
+      "name": "repeat",
+      "description": "Repeats the string count number of times.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#repeatstring-count",
+      "signature": "repeat(string, count)"
+    },
+    {
+      "name": "replace",
+      "description": "Replaces any occurrences of the source with target in string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#replacestring-source-target",
+      "signature": "replace(string, source, target)"
+    },
+    {
+      "name": "reverse",
+      "description": "Reverses the string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#reversestring",
+      "signature": "reverse(string)"
+    },
+    {
+      "name": "right",
+      "description": "Extract the right-most count characters.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rightstring-count",
+      "signature": "right(string, count)"
+    },
+    {
+      "name": "round",
+      "description": "Rounds x to s decimal places.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#roundv-numeric-s-integer",
+      "signature": "round(v NUMERIC, s INTEGER)"
+    },
+    {
+      "name": "row_number",
+      "description": "The row number in a window partition.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#row_numberorder-by-ordering",
+      "signature": "row_number([ORDER BY ordering])"
+    },
+    {
+      "name": "rpad",
+      "description": "Pads the string with the character on the right until it has count characters. Truncates the string on the right if it has more than count characters.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rpadstring-count-character",
+      "signature": "rpad(string, count, character)"
+    },
+    {
+      "name": "rtrim",
+      "description": "Removes any occurrences of any of the characters from the right side of the string. characters defaults to space.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#rtrimstring-characters",
+      "signature": "rtrim(string[, characters])"
+    },
+    {
+      "name": "second",
+      "description": "Extract the second component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#seconddate",
+      "signature": "second(date)"
+    },
+    {
+      "name": "sha256",
+      "description": "Returns a VARCHAR with the SHA-256 hash of the value.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#sha256string",
+      "signature": "sha256(string)"
+    },
+    {
+      "name": "sign",
+      "description": "Returns the sign of x as -1, 0 or 1.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#signx",
+      "signature": "sign(x)"
+    },
+    {
+      "name": "sin",
+      "description": "Computes the sine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#sinx",
+      "signature": "sin(x)"
+    },
+    {
+      "name": "sinh",
+      "description": "Computes the hyperbolic sine of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric",
+      "signature": "sinh(x)"
+    },
+    {
+      "name": "skewness",
+      "description": "Returns the skewness of all input values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#skewnessx",
+      "signature": "skewness(x)"
+    },
+    {
+      "name": "split_part",
+      "description": "Splits the string along the separator and returns the data at the (1-based) index.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#split_partstring-separator-index",
+      "signature": "split_part(string, separator, index)"
+    },
+    {
+      "name": "sqrt",
+      "description": "Returns the square root of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#sqrtx",
+      "signature": "sqrt(x)"
+    },
+    {
+      "name": "starts_with",
+      "description": "Returns true if string begins with search_string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#starts_withstring-search_string",
+      "signature": "starts_with(string, search_string)"
+    },
+    {
+      "name": "stddev",
+      "description": "Returns the sample standard deviation.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_sampx",
+      "signature": "stddev(x)"
+    },
+    {
+      "name": "stddev_pop",
+      "description": "Returns the population standard deviation.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_popx",
+      "signature": "stddev_pop(x)"
+    },
+    {
+      "name": "stddev_samp",
+      "description": "Returns the sample standard deviation.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#stddev_sampx",
+      "signature": "stddev_samp(x)"
+    },
+    {
+      "name": "strftime",
+      "description": "Converts a date to a string according to the format string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#strftimedate-format",
+      "signature": "strftime(date, format)"
+    },
+    {
+      "name": "string_agg",
+      "description": "Concatenates the column string values with an optional separator.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#string_aggarg-sep",
+      "signature": "string_agg(arg)"
+    },
+    {
+      "name": "string_split",
+      "description": "Splits the string along the separator.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#string_splitstring-separator",
+      "signature": "string_split(string, separator)"
+    },
+    {
+      "name": "strip_accents",
+      "description": "Strips accents from string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#strip_accentsstring",
+      "signature": "strip_accents(string)"
+    },
+    {
+      "name": "strptime",
+      "description": "Converts the string text to timestamp according to the format string. Throws an error on failure. To return NULL on failure, use try_strptime.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#strptimetext-format-list",
+      "signature": "strptime(text, format-list)"
+    },
+    {
+      "name": "struct_extract",
+      "description": "Extract the named entry from the STRUCT.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/struct#struct_extractstruct-entry",
+      "signature": "struct_extract(struct, 'entry')"
+    },
+    {
+      "name": "struct_keys",
+      "description": "Returns the field names of a STRUCT as a list.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/struct",
+      "signature": "struct_keys(struct)"
+    },
+    {
+      "name": "struct_pack",
+      "description": "Create a STRUCT containing the argument values. The entry name will be the bound variable name.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/struct#struct_packname--any-",
+      "signature": "struct_pack(name := any, ...)"
+    },
+    {
+      "name": "substr",
+      "description": "Extracts substring starting from character start up to the end of the string. If optional argument length is set, extracts a substring of length characters instead. Note that a start value of 1 refers to the first character of the string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#substringstring-start-length",
+      "signature": "substr(string, start[, length])"
+    },
+    {
+      "name": "sum",
+      "description": "Calculates the sum value for all tuples in arg.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#sumarg",
+      "signature": "sum(arg)"
+    },
+    {
+      "name": "tan",
+      "description": "Computes the tangent of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#tanx",
+      "signature": "tan(x)"
+    },
+    {
+      "name": "tanh",
+      "description": "Computes the hyperbolic tangent of x.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric",
+      "signature": "tanh(x)"
+    },
+    {
+      "name": "time_bucket",
+      "description": "Truncate TIMESTAMPTZ by the specified interval bucket_width, aligned relative to an origin (defaults to 2000-01-03 for sub-month buckets, 2000-01-01 for month/year buckets).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#time_bucketbucket_width-timestamp-origin",
+      "signature": "time_bucket(bucket_width, timestamp[, origin])"
+    },
+    {
+      "name": "timezone",
+      "description": "Extract the timezone component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#timezonedate",
+      "signature": "timezone(date)"
+    },
+    {
+      "name": "to_json",
+      "description": "Converts a value to JSON.",
+      "docsUrl": "https://duckdb.org/docs/current/data/json/creating_json",
+      "signature": "to_json(any)"
+    },
+    {
+      "name": "to_timestamp",
+      "description": "Converts secs since epoch to a timestamp with time zone.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp",
+      "signature": "to_timestamp(sec)"
+    },
+    {
+      "name": "today",
+      "description": "Current date (start of current transaction) in the local time zone.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/date#today",
+      "signature": "today()"
+    },
+    {
+      "name": "translate",
+      "description": "Replaces each character in string that matches a character in the from set with the corresponding character in the to set. If from is longer than to, occurrences of the extra characters in from are deleted.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#translatestring-from-to",
+      "signature": "translate(string, from, to)"
+    },
+    {
+      "name": "trunc",
+      "description": "Truncates the number.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#truncx",
+      "signature": "trunc(x)"
+    },
+    {
+      "name": "try_strptime",
+      "description": "Converts the string text to timestamp according to the format string. Returns NULL on failure (unlike strptime, which errors).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/timestamp#try_strptimetext-format-list",
+      "signature": "try_strptime(text, format-list)"
+    },
+    {
+      "name": "typeof",
+      "description": "Returns the name of the data type of the result of the expression.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#typeofexpression",
+      "signature": "typeof(expression)"
+    },
+    {
+      "name": "unicode",
+      "description": "Returns an INTEGER representing the unicode codepoint of the first character in the string.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#unicodestring",
+      "signature": "unicode(string)"
+    },
+    {
+      "name": "unnest",
+      "description": "Unnests a list or struct by one level, turning a single row's list into one row per element.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/list#unnestlist",
+      "signature": "unnest(list)"
+    },
+    {
+      "name": "upper",
+      "description": "Converts string to upper case.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#upperstring",
+      "signature": "upper(string)"
+    },
+    {
+      "name": "var_pop",
+      "description": "Returns the population variance.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_popx",
+      "signature": "var_pop(x)"
+    },
+    {
+      "name": "var_samp",
+      "description": "Returns the sample variance of all input values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_sampx",
+      "signature": "var_samp(x)"
+    },
+    {
+      "name": "variance",
+      "description": "Returns the sample variance of all input values.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#var_sampx",
+      "signature": "variance(arg, val)"
+    },
+    {
+      "name": "week",
+      "description": "Extract the week component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#weekdate",
+      "signature": "week(date)"
+    },
+    {
+      "name": "year",
+      "description": "Extract the year component from a date or timestamp.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/datepart#yeardate",
+      "signature": "year(date)"
+    }
+  ]
+}

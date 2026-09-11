@@ -1,0 +1,8 @@
+INPUT
+event.data.nested.value == "x"
+
+EVENTS SQL
+((event_data->>'$.nested.value') = ?)
+
+EVENTS ARGS
+[x]

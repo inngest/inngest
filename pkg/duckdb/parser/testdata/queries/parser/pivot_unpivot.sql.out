@@ -1,0 +1,67 @@
+-- SELECT * FROM sales PIVOT (sum(amount) FOR quarter IN (q1, q2, q3, q4))
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    PivotRef(groupBy=[],alias=)
+      BaseTableRef(sales,alias=)
+      SelectItem()
+        FunctionExpr(sum,distinct=false)
+          Ident(amount)
+      PivotColumn(in=[q1 q2 q3 q4])
+        Ident(quarter)
+
+-- SELECT * FROM sales PIVOT (sum(amount) FOR quarter IN (q1, q2) GROUP BY region)
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    PivotRef(groupBy=[region],alias=)
+      BaseTableRef(sales,alias=)
+      SelectItem()
+        FunctionExpr(sum,distinct=false)
+          Ident(amount)
+      PivotColumn(in=[q1 q2])
+        Ident(quarter)
+
+-- SELECT * FROM wide UNPIVOT (amount FOR quarter IN (q1, q2, q3, q4))
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    UnpivotRef(header=[amount],names=[quarter],alias=)
+      BaseTableRef(wide,alias=)
+      SelectItem()
+        Ident(q1)
+      SelectItem()
+        Ident(q2)
+      SelectItem()
+        Ident(q3)
+      SelectItem()
+        Ident(q4)
+
+-- PIVOT sales ON quarter USING sum(amount)
+SelectStatement
+  FromClause
+    PivotRef(groupBy=[],alias=)
+      BaseTableRef(sales,alias=)
+      SelectItem()
+        FunctionExpr(sum,distinct=false)
+          Ident(amount)
+      PivotColumn(in=[])
+        Ident(quarter)
+
+-- UNPIVOT wide ON q1, q2, q3, q4;
+SelectStatement
+  FromClause
+    UnpivotRef(header=[],names=[],alias=)
+      BaseTableRef(wide,alias=)
+      SelectItem()
+        Ident(q1)
+      SelectItem()
+        Ident(q2)
+      SelectItem()
+        Ident(q3)
+      SelectItem()
+        Ident(q4)
+

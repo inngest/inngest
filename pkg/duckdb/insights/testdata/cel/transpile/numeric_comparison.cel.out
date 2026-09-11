@@ -1,0 +1,14 @@
+INPUT
+output.count >= 3
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+(CAST((output->>'$.data.count') AS DOUBLE) >= ?)
+
+OUTPUT ARGS
+[3]
