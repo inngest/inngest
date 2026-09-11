@@ -31,8 +31,16 @@ const supportedQuackVersion = 3
 // calls, so it requests the server's maximum.
 const quackHeartbeatTimeoutSeconds = 9223372036854775
 
+// newQuackHTTPClient has no Timeout of its own: every request already goes
+// out via http.NewRequestWithContext(ctx, ...) in send(), so the caller's own
+// context is the sole timeout authority. A fixed client-level Timeout would
+// double-constrain that — and did, in practice: a 30s cap here killed a
+// ducklake_merge_adjacent_files compaction call on a large (1M-row,
+// 200-partition) lake with "context deadline exceeded" well before the
+// caller's own context did, even though compaction is expected to take
+// longer as data volume grows.
 func newQuackHTTPClient() *http.Client {
-	return &http.Client{Timeout: 30 * time.Second}
+	return &http.Client{}
 }
 
 // quackCancelRequestTimeout bounds the CancelRequest query.watchForCancel

@@ -289,7 +289,7 @@ const benchPipelineDepth = 5000
 // MERGE INTO checks WHEN NOT MATCHED against the target's state at the
 // statement's start, not row-by-row, so both would take the INSERT branch
 // and silently produce two rows for one run_id instead of one.
-func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, indexOffset int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
+func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, indexOffset int, accountFor func(g int) uuid.UUID, apply func(batch []runEvent) error) error {
 	if pipelineDepth < batchSize {
 		return fmt.Errorf("pipelineDepth (%d) must be >= batchSize (%d)", pipelineDepth, batchSize)
 	}
@@ -300,15 +300,15 @@ func generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, 
 		for t := start; t < end; t++ {
 			if t < totalRuns {
 				g := indexOffset + t
-				batch = append(batch, generateRunEvent(batchSeed, g, 0, accountIDs[g%len(accountIDs)]))
+				batch = append(batch, generateRunEvent(batchSeed, g, 0, accountFor(g)))
 			}
 			if i := t - pipelineDepth; i >= 0 && i < totalRuns {
 				g := indexOffset + i
-				batch = append(batch, generateRunEvent(batchSeed, g, 1, accountIDs[g%len(accountIDs)]))
+				batch = append(batch, generateRunEvent(batchSeed, g, 1, accountFor(g)))
 			}
 			if i := t - 2*pipelineDepth; i >= 0 && i < totalRuns {
 				g := indexOffset + i
-				batch = append(batch, generateRunEvent(batchSeed, g, 2, accountIDs[g%len(accountIDs)]))
+				batch = append(batch, generateRunEvent(batchSeed, g, 2, accountFor(g)))
 			}
 		}
 		if err := apply(batch); err != nil {
@@ -341,10 +341,18 @@ const benchQuackConns = 8
 // QuackConns>1's concurrent-connection path (pkg/db/duckdb/process.go's
 // Options.QuackConns) instead of every batch queueing behind one
 // connection regardless of how many the driver could open.
+//
+// account_id is assigned round-robin (accountFor: g -> accountIDs[g%len(accountIDs)]),
+// so a single batch's rows are scattered across up to
+// min(batchSize, len(accountIDs)) different account_ids/partitions — this
+// is the "interleaved" write pattern in insertModes. See
+// generatePartitionAlignedBatchesParallel for the counterpart where every
+// batch's rows share one account_id.
 func generateInterleavedBatchesParallel(batchSeed, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
+	accountFor := func(g int) uuid.UUID { return accountIDs[g%len(accountIDs)] }
 	shards := min(benchQuackConns, totalRuns)
 	if shards <= 1 {
-		return generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, 0, accountIDs, apply)
+		return generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, 0, accountFor, apply)
 	}
 
 	retryingApply := func(batch []runEvent) error { return applyWithConflictRetry(apply, batch) }
@@ -360,39 +368,142 @@ func generateInterleavedBatchesParallel(batchSeed, totalRuns, pipelineDepth, bat
 		}
 		shardOffset, shardRuns := offset, chunk
 		g.Go(func() error {
-			return generateInterleavedBatches(batchSeed, shardRuns, pipelineDepth, batchSize, shardOffset, accountIDs, retryingApply)
+			return generateInterleavedBatches(batchSeed, shardRuns, pipelineDepth, batchSize, shardOffset, accountFor, retryingApply)
 		})
 		offset += chunk
 	}
 	return g.Wait()
 }
 
-// applyWithConflictRetry retries apply against DuckLake's "Transaction
-// conflict" commit failure — real, expected contention once
+// generatePartitionAlignedBatchesParallel replays totalRuns runs' full
+// lifecycle the same way generateInterleavedBatchesParallel does (same
+// batchSeed/pipelineDepth/batchSize, same eventsPerRun-lifecycle interleave
+// within each block), except account_id assignment is partition-major
+// instead of round-robin: every account_id in accountIDs owns one
+// contiguous, disjoint block of the global run-index range (the same
+// "split totalRuns into disjoint chunks" shape
+// generateInterleavedBatchesParallel uses for its shards, but keyed on
+// accountIDs instead of a fixed shard count), and every run in a block is
+// generated with that block's fixed account_id regardless of its index.
+// Since generateInterleavedBatches never crosses a block boundary here —
+// each block gets its own call, with its own indexOffset and totalRuns
+// scoped to just that block — every batch it produces holds rows for
+// exactly one account_id, so every INSERT/MERGE INTO statement in
+// insertScenarios lands in exactly one DuckLake partition, never scattered
+// across many the way generateInterleavedBatchesParallel's batches are.
+// This is the "partition-aligned" write pattern in insertModes — writes
+// batched per-tenant/partition rather than interleaved across all of them.
+//
+// Concurrency is bounded at benchQuackConns via errgroup.SetLimit rather
+// than one goroutine per account_id, since len(accountIDs) commonly
+// exceeds benchQuackConns (e.g. benchNumPartitions=200 vs. QuackConns=8).
+func generatePartitionAlignedBatchesParallel(batchSeed, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error {
+	blocks := len(accountIDs)
+	if blocks <= 1 {
+		acct := accountIDs[0]
+		accountFor := func(int) uuid.UUID { return acct }
+		return generateInterleavedBatches(batchSeed, totalRuns, pipelineDepth, batchSize, 0, accountFor, apply)
+	}
+
+	retryingApply := func(batch []runEvent) error { return applyWithConflictRetry(apply, batch) }
+
+	var g errgroup.Group
+	g.SetLimit(benchQuackConns)
+	base := totalRuns / blocks
+	extra := totalRuns % blocks
+	offset := 0
+	for idx := range blocks {
+		chunk := base
+		if idx < extra {
+			chunk++
+		}
+		blockOffset, blockRuns, acct := offset, chunk, accountIDs[idx]
+		accountFor := func(int) uuid.UUID { return acct }
+		g.Go(func() error {
+			return generateInterleavedBatches(batchSeed, blockRuns, pipelineDepth, batchSize, blockOffset, accountFor, retryingApply)
+		})
+		offset += chunk
+	}
+	return g.Wait()
+}
+
+// batchGenerator is the shape shared by generateInterleavedBatchesParallel
+// and generatePartitionAlignedBatchesParallel, letting every benchmark that
+// sweeps write scenarios (insertScenarios) also sweep write mode
+// (insertModes) without duplicating its body.
+type batchGenerator func(batchSeed, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, apply func(batch []runEvent) error) error
+
+// insertModes are the two ways benchmark writes are spread across
+// accountIDs — see generateInterleavedBatchesParallel and
+// generatePartitionAlignedBatchesParallel's doc comments for what each one
+// produces.
+var insertModes = []struct {
+	name string
+	gen  batchGenerator
+}{
+	{"interleaved", generateInterleavedBatchesParallel},
+	{"partition-aligned", generatePartitionAlignedBatchesParallel},
+}
+
+// duckLakeConflictMarkers are the substrings DuckLake's own commit-conflict
+// errors are known to contain: "Transaction conflict" (the message returned
+// directly on conflict), and the more general "Failed to commit DuckLake
+// transaction"/"Exceeded the maximum retry count" wrapper surfaced once
+// ducklake_max_retry_count's own internal retries (bounded at 10 by
+// default) are exhausted first — confirmed via two different real
+// BenchmarkRunsCompaction/partition-aligned/partitions=200 failures at 100k
+// rows (every shard writes a disjoint account_id block, but all still
+// contend on the same three tables' file lists/snapshot ids), whose inner
+// cause varied run to run ("Conflict on update!" vs. a
+// `Duplicate key "snapshot_id: ..."` constraint violation) even though both
+// are the same underlying optimistic-concurrency contention — so match on
+// the stable outer wrapper rather than enumerate every inner variant.
+var duckLakeConflictMarkers = []string{
+	"Transaction conflict",
+	"Failed to commit DuckLake transaction",
+	"Exceeded the maximum retry count",
+}
+
+func isDuckLakeConflictError(err error) bool {
+	for _, marker := range duckLakeConflictMarkers {
+		if strings.Contains(err.Error(), marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// applyWithConflictRetry retries apply against DuckLake's commit-conflict
+// errors (isDuckLakeConflictError) — real, expected contention once
 // generateInterleavedBatchesParallel's shards are genuinely concurrent
 // writers against the same table: DuckLake uses optimistic concurrency
 // control, and two transactions that both add a file to the same table's
 // file list can conflict at commit time even when their actual rows never
 // overlap (confirmed empirically — every conflict observed here is between
-// disjoint-run-index shards). DuckLake's own ducklake_max_retry_count/
-// ducklake_retry_backoff settings already retry a single statement's
-// commit internally a bounded number of times; this retries at the batch
-// level, above that, for when contention from benchQuackConns-way
-// concurrency is high enough to exhaust DuckLake's own retries too. Any
-// other error is returned immediately, unretried.
+// disjoint-run-index/disjoint-account_id shards). DuckLake's own
+// ducklake_max_retry_count/ducklake_retry_backoff settings already retry a
+// single statement's commit internally a bounded number of times; this
+// retries at the batch level, above that, for when contention from
+// benchQuackConns-way concurrency is high enough to exhaust DuckLake's own
+// retries too. Any other error is returned immediately, unretried.
 func applyWithConflictRetry(apply func([]runEvent) error, batch []runEvent) error {
-	const maxAttempts = 60
+	// 60 attempts capped at a 2s backoff (worst case ~120s) was enough at
+	// 100k rows but not at 1M: heavier per-MERGE cost widens each
+	// transaction's conflict window, so 8-way contention needs more retry
+	// headroom — confirmed by a real "giving up after 60 attempts" failure
+	// in BenchmarkRunsRewriteDataFiles/partitions=100 at 1M rows.
+	const maxAttempts = 120
 	var err error
 	for attempt := range maxAttempts {
 		if attempt > 0 {
-			backoff := min(time.Duration(1<<min(attempt, 10))*time.Millisecond, 2*time.Second)
+			backoff := min(time.Duration(1<<min(attempt, 10))*time.Millisecond, 5*time.Second)
 			jitter := time.Duration(rand.Int64N(int64(backoff)))
 			time.Sleep(backoff/2 + jitter)
 		}
 		if err = apply(batch); err == nil {
 			return nil
 		}
-		if !strings.Contains(err.Error(), "Transaction conflict") {
+		if !isDuckLakeConflictError(err) {
 			return err
 		}
 	}
@@ -404,9 +515,9 @@ func applyWithConflictRetry(apply func([]runEvent) error, batch []runEvent) erro
 // generateInterleavedBatches, so the merge tables see a realistic mix of
 // inserts and UPDATE-in-place upserts within each batch rather than
 // homogeneous sweeps.
-func seedRunsData(tb testing.TB, ctx context.Context, db *sql.DB, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID) {
+func seedRunsData(tb testing.TB, ctx context.Context, db *sql.DB, totalRuns, pipelineDepth, batchSize int, accountIDs []uuid.UUID, genFn batchGenerator) {
 	tb.Helper()
-	err := generateInterleavedBatchesParallel(0, totalRuns, pipelineDepth, batchSize, accountIDs, func(batch []runEvent) error {
+	err := genFn(0, totalRuns, pipelineDepth, batchSize, accountIDs, func(batch []runEvent) error {
 		if err := flatInsertBatch(ctx, db, batch); err != nil {
 			return fmt.Errorf("seeding bench_runs_flat: %w", err)
 		}
@@ -428,7 +539,7 @@ func seedRunsData(tb testing.TB, ctx context.Context, db *sql.DB, totalRuns, pip
 // relative advantage changes at 10x scale — e.g. bench_runs_flat growing
 // large enough that DuckLake's per-partition file bookkeeping starts to cost
 // differently than MERGE INTO's per-row target lookup does.
-var benchRowCounts = []int{1_000_000}
+var benchRowCounts = []int{1_000_000, 10_000_000}
 
 const benchBatchSize = 2000
 
@@ -444,17 +555,18 @@ var insertScenarios = []struct {
 }
 
 // runInsertScenarios times each of insertScenarios writing totalRuns runs'
-// full interleaved lifecycle against accountIDs' partition cardinality,
-// reporting rows/sec for each so the three insertion strategies are directly
-// comparable at whatever (totalRuns, accountIDs) the caller is sweeping.
-func runInsertScenarios(b *testing.B, totalRuns int, accountIDs []uuid.UUID) {
+// full lifecycle (spread across accountIDs via genFn) against accountIDs'
+// partition cardinality, reporting rows/sec for each so the three insertion
+// strategies are directly comparable at whatever (totalRuns, accountIDs)
+// the caller is sweeping.
+func runInsertScenarios(b *testing.B, totalRuns int, accountIDs []uuid.UUID, genFn batchGenerator) {
 	for _, sc := range insertScenarios {
 		b.Run(sc.name, func(b *testing.B) {
 			iter := 0
 			for b.Loop() {
 				db := openMergeBenchDB(b)
 				ctx := b.Context()
-				err := generateInterleavedBatchesParallel(iter, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
+				err := genFn(iter, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
 					return sc.apply(ctx, db, batch)
 				})
 				if err != nil {
@@ -471,14 +583,19 @@ func runInsertScenarios(b *testing.B, totalRuns int, accountIDs []uuid.UUID) {
 // runs * eventsPerRun events, for each of benchRowCounts) into a fresh
 // DuckLake-backed table partitioned across benchNumPartitions account_ids —
 // see BenchmarkRunsInsertByPartitions for the effect of varying that
-// partition count instead of the row count. Writes are interleaved
-// (generateInterleavedBatches), not lifecycle-sorted — every batch mixes
-// inserts and updates the way production traffic would.
+// partition count instead of the row count. Sweeps insertModes: every
+// batch mixes inserts and updates the way production traffic would either
+// way, but "interleaved" scatters a batch's rows across many account_ids
+// while "partition-aligned" confines each batch to one.
 func BenchmarkRunsInsert(b *testing.B) {
-	for _, totalWrites := range benchRowCounts {
-		totalRuns := totalWrites / eventsPerRun
-		b.Run(fmt.Sprintf("rows=%d", totalWrites), func(b *testing.B) {
-			runInsertScenarios(b, totalRuns, benchAccountIDs)
+	for _, mode := range insertModes {
+		b.Run(mode.name, func(b *testing.B) {
+			for _, totalWrites := range benchRowCounts {
+				totalRuns := totalWrites / eventsPerRun
+				b.Run(fmt.Sprintf("rows=%d", totalWrites), func(b *testing.B) {
+					runInsertScenarios(b, totalRuns, benchAccountIDs, mode.gen)
+				})
+			}
 		})
 	}
 }
@@ -498,63 +615,73 @@ const benchPartitionSweepRows = 1_000_000
 // BenchmarkRunsInsertByPartitions times the same three insert strategies as
 // BenchmarkRunsInsert, holding row count fixed at benchPartitionSweepRows
 // and instead sweeping how many distinct account_ids (i.e. DuckLake
-// partitions) those rows spread across.
+// partitions) those rows spread across, and (like BenchmarkRunsInsert) both
+// insertModes.
 func BenchmarkRunsInsertByPartitions(b *testing.B) {
 	totalRuns := benchPartitionSweepRows / eventsPerRun
-	for _, numPartitions := range benchPartitionCounts {
-		accountIDs := generateAccountIDs(numPartitions)
-		b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
-			runInsertScenarios(b, totalRuns, accountIDs)
+	for _, mode := range insertModes {
+		b.Run(mode.name, func(b *testing.B) {
+			for _, numPartitions := range benchPartitionCounts {
+				accountIDs := generateAccountIDs(numPartitions)
+				b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
+					runInsertScenarios(b, totalRuns, accountIDs, mode.gen)
+				})
+			}
 		})
 	}
 }
 
-// BenchmarkRunsQuery seeds every table once per benchRowCounts scale with
-// totalRuns runs' full interleaved lifecycle, then times representative read
-// patterns against each: a full "current state of every run" scan, a single
-// run_id point lookup, and a status-grouped count. The flat/* queries pay
-// the QUALIFY ROW_NUMBER()-per-run_id collapse pkg/cqrs/duckdbquery/runs.go's
+// BenchmarkRunsQuery seeds every table once per benchRowCounts scale (per
+// insertModes write mode — see runInsertScenarios/BenchmarkRunsInsert) with
+// totalRuns runs' full lifecycle, then times representative read patterns
+// against each: a full "current state of every run" scan, a single run_id
+// point lookup, and a status-grouped count. The flat/* queries pay the
+// QUALIFY ROW_NUMBER()-per-run_id collapse pkg/cqrs/duckdbquery/runs.go's
 // real queries already require; the merge/* queries are plain reads against
 // the already-collapsed table. bench_runs_merged_jsonpatch isn't queried
 // here separately — it has the same one-row-per-run_id shape and row count
 // as bench_runs_merged, so its read cost is identical; json_merge_patch's
 // extra cost only shows up in BenchmarkRunsInsert.
 func BenchmarkRunsQuery(b *testing.B) {
-	for _, totalWrites := range benchRowCounts {
-		totalRuns := totalWrites / eventsPerRun
-		b.Run(fmt.Sprintf("rows=%d", totalWrites), func(b *testing.B) {
-			db := openMergeBenchDB(b)
-			ctx := b.Context()
-			seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, benchAccountIDs)
+	for _, mode := range insertModes {
+		b.Run(mode.name, func(b *testing.B) {
+			for _, totalWrites := range benchRowCounts {
+				totalRuns := totalWrites / eventsPerRun
+				b.Run(fmt.Sprintf("rows=%d", totalWrites), func(b *testing.B) {
+					db := openMergeBenchDB(b)
+					ctx := b.Context()
+					seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, benchAccountIDs, mode.gen)
 
-			flatLatestSubquery := `
-				SELECT run_id, status, queued_at, started_at, ended_at
-				FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat
-				QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY updated_at DESC) = 1`
+					flatLatestSubquery := `
+						SELECT run_id, status, queued_at, started_at, ended_at
+						FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat
+						QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY updated_at DESC) = 1`
 
-			lookupRunID := fmt.Sprintf("run-0-%d", totalRuns/2)
+					lookupRunID := fmt.Sprintf("run-0-%d", totalRuns/2)
 
-			queries := []struct {
-				name string
-				sql  string
-				args []any
-			}{
-				{"flat/latest-per-run", flatLatestSubquery, nil},
-				{"merge/all-rows", `SELECT run_id, status, queued_at, started_at, ended_at FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged`, nil},
-				{
-					"flat/point-lookup",
-					`SELECT status FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat WHERE run_id = ?
-					 QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY updated_at DESC) = 1`,
-					[]any{lookupRunID},
-				},
-				{"merge/point-lookup", `SELECT status FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged WHERE run_id = ?`, []any{lookupRunID}},
-				{"flat/status-count", `SELECT status, count(*) FROM (` + flatLatestSubquery + `) GROUP BY status`, nil},
-				{"merge/status-count", `SELECT status, count(*) FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged GROUP BY status`, nil},
-			}
+					queries := []struct {
+						name string
+						sql  string
+						args []any
+					}{
+						{"flat/latest-per-run", flatLatestSubquery, nil},
+						{"merge/all-rows", `SELECT run_id, status, queued_at, started_at, ended_at FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged`, nil},
+						{
+							"flat/point-lookup",
+							`SELECT status FROM ` + duckdb.DuckLakeAlias + `.bench_runs_flat WHERE run_id = ?
+							 QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY updated_at DESC) = 1`,
+							[]any{lookupRunID},
+						},
+						{"merge/point-lookup", `SELECT status FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged WHERE run_id = ?`, []any{lookupRunID}},
+						{"flat/status-count", `SELECT status, count(*) FROM (` + flatLatestSubquery + `) GROUP BY status`, nil},
+						{"merge/status-count", `SELECT status, count(*) FROM ` + duckdb.DuckLakeAlias + `.bench_runs_merged GROUP BY status`, nil},
+					}
 
-			for _, q := range queries {
-				b.Run(q.name, func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, q.args)
+					for _, q := range queries {
+						b.Run(q.name, func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, q.args)
+						})
+					}
 				})
 			}
 		})
@@ -607,10 +734,10 @@ func benchCompactionQueries() []struct {
 }
 
 // BenchmarkRunsCompaction seeds every benchmark table at
-// benchPartitionSweepRows (interleaved) for each of benchPartitionCounts,
-// times the two benchCompactionQueries reads before compaction (with
-// however many small Parquet files interleaved writes at that partition
-// count produced), times DuckLake's own `ducklake_merge_adjacent_files`
+// benchPartitionSweepRows for each of benchPartitionCounts and each of
+// insertModes, times the two benchCompactionQueries reads before compaction
+// (with however many small Parquet files that write mode/partition count
+// produced), times DuckLake's own `ducklake_merge_adjacent_files`
 // maintenance call itself, then times the same two reads again after
 // compaction (against whatever single/few files it produced) — showing
 // whether the write-side file fragmentation Finding 2/3 measured is also a
@@ -619,30 +746,34 @@ func BenchmarkRunsCompaction(b *testing.B) {
 	totalRuns := benchPartitionSweepRows / eventsPerRun
 	queries := benchCompactionQueries()
 
-	for _, numPartitions := range benchPartitionCounts {
-		accountIDs := generateAccountIDs(numPartitions)
-		b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
-			db := openMergeBenchDB(b)
-			ctx := b.Context()
-			seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs)
+	for _, mode := range insertModes {
+		b.Run(mode.name, func(b *testing.B) {
+			for _, numPartitions := range benchPartitionCounts {
+				accountIDs := generateAccountIDs(numPartitions)
+				b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
+					db := openMergeBenchDB(b)
+					ctx := b.Context()
+					seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, mode.gen)
 
-			for _, q := range queries {
-				b.Run(q.name+"/before-compaction", func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
-				})
-			}
-
-			b.Run("compact", func(b *testing.B) {
-				for b.Loop() {
-					if _, err := db.ExecContext(ctx, "CALL ducklake_merge_adjacent_files('"+duckdb.DuckLakeAlias+"');"); err != nil {
-						b.Fatalf("compacting: %v", err)
+					for _, q := range queries {
+						b.Run(q.name+"/before-compaction", func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+						})
 					}
-				}
-			})
 
-			for _, q := range queries {
-				b.Run(q.name+"/after-compaction", func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+					b.Run("compact", func(b *testing.B) {
+						for b.Loop() {
+							if _, err := db.ExecContext(ctx, "CALL ducklake_merge_adjacent_files('"+duckdb.DuckLakeAlias+"');"); err != nil {
+								b.Fatalf("compacting: %v", err)
+							}
+						}
+					})
+
+					for _, q := range queries {
+						b.Run(q.name+"/after-compaction", func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+						})
+					}
 				})
 			}
 		})
@@ -650,16 +781,17 @@ func BenchmarkRunsCompaction(b *testing.B) {
 }
 
 // BenchmarkRunsRewriteDataFiles picks up where BenchmarkRunsCompaction
-// leaves off: after seeding benchPartitionSweepRows (interleaved) and
-// running one ducklake_merge_adjacent_files compaction per partition count,
-// it replays batchSeed=0's exact same run_ids through their exact same
-// lifecycle a second time — flat INSERT, MERGE INTO overwrite, and MERGE
-// INTO json_merge_patch each into their own already-compacted table — an
-// "update wave" that, for the two MERGE INTO tables, targets rows that
-// already live inside the just-compacted Parquet file (a brand-new run_id
-// could never do this: a new key always lands in a new small file
-// regardless of compaction state). It then runs DuckLake's own
-// ducklake_rewrite_data_files maintenance call — a distinct operation from
+// leaves off: after seeding benchPartitionSweepRows and running one
+// ducklake_merge_adjacent_files compaction per partition count (for each of
+// insertModes), it replays batchSeed=0's exact same run_ids through their
+// exact same lifecycle a second time, using that same write mode — flat
+// INSERT, MERGE INTO overwrite, and MERGE INTO json_merge_patch each into
+// their own already-compacted table — an "update wave" that, for the two
+// MERGE INTO tables, targets rows that already live inside the
+// just-compacted Parquet file (a brand-new run_id could never do this: a
+// new key always lands in a new small file regardless of compaction
+// state). It then runs DuckLake's own ducklake_rewrite_data_files
+// maintenance call — a distinct operation from
 // ducklake_merge_adjacent_files: rather than merging small files together,
 // it rewrites files whose deleted-row fraction exceeds delete_threshold,
 // physically dropping the tombstoned rows and eliminating their delete
@@ -674,68 +806,72 @@ func BenchmarkRunsRewriteDataFiles(b *testing.B) {
 	totalRuns := benchPartitionSweepRows / eventsPerRun
 	queries := benchCompactionQueries()
 
-	for _, numPartitions := range benchPartitionCounts {
-		accountIDs := generateAccountIDs(numPartitions)
-		b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
-			db := openMergeBenchDB(b)
-			ctx := b.Context()
-			seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs)
+	for _, mode := range insertModes {
+		b.Run(mode.name, func(b *testing.B) {
+			for _, numPartitions := range benchPartitionCounts {
+				accountIDs := generateAccountIDs(numPartitions)
+				b.Run(fmt.Sprintf("partitions=%d", numPartitions), func(b *testing.B) {
+					db := openMergeBenchDB(b)
+					ctx := b.Context()
+					seedRunsData(b, ctx, db, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, mode.gen)
 
-			if _, err := db.ExecContext(ctx, "CALL ducklake_merge_adjacent_files('"+duckdb.DuckLakeAlias+"');"); err != nil {
-				b.Fatalf("initial compaction: %v", err)
-			}
+					if _, err := db.ExecContext(ctx, "CALL ducklake_merge_adjacent_files('"+duckdb.DuckLakeAlias+"');"); err != nil {
+						b.Fatalf("initial compaction: %v", err)
+					}
 
-			for _, q := range queries {
-				b.Run(q.name+"/before-update", func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
-				})
-			}
-
-			for _, sc := range insertScenarios {
-				b.Run(sc.name+"/update", func(b *testing.B) {
-					for b.Loop() {
-						err := generateInterleavedBatchesParallel(0, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
-							return sc.apply(ctx, db, batch)
+					for _, q := range queries {
+						b.Run(q.name+"/before-update", func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
 						})
-						if err != nil {
-							b.Fatal(err)
+					}
+
+					for _, sc := range insertScenarios {
+						b.Run(sc.name+"/update", func(b *testing.B) {
+							for b.Loop() {
+								err := mode.gen(0, totalRuns, benchPipelineDepth, benchBatchSize, accountIDs, func(batch []runEvent) error {
+									return sc.apply(ctx, db, batch)
+								})
+								if err != nil {
+									b.Fatal(err)
+								}
+							}
+							b.ReportMetric(float64(totalRuns*eventsPerRun)*float64(b.N)/b.Elapsed().Seconds(), "rows/sec")
+						})
+					}
+
+					for _, q := range queries {
+						b.Run(q.name+"/after-update-before-rewrite-data-files", func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+						})
+					}
+
+					// ducklake_rewrite_data_files currently errors here every time —
+					// see FINDINGS/ducklake-merge-into-benchmark.md's Finding 6 for
+					// the repro and analysis ("Not implemented Error: Scanning a
+					// DuckLake table after the transaction has ended", tied to
+					// MERGE INTO's own delete-file bookkeeping, not partition count
+					// or data volume). Left as a hard failure rather than a skip:
+					// this is a deterministic tool limitation worth surfacing loudly
+					// if it's ever silently fixed or silently regresses further.
+					b.Run("rewrite-data-files", func(b *testing.B) {
+						for b.Loop() {
+							// delete_threshold => 0.0 forces every file with any
+							// deletes at all to be rewritten — DuckLake's default
+							// threshold is high enough that the update wave's ~1
+							// delete file per table/partition wouldn't otherwise
+							// qualify, and we want to measure the operation actually
+							// running, not a no-op skip.
+							if _, err := db.ExecContext(ctx, "CALL ducklake_rewrite_data_files('"+duckdb.DuckLakeAlias+"', delete_threshold => 0.0);"); err != nil {
+								b.Fatalf("rewriting data files: %v", err)
+							}
 						}
+					})
+
+					for _, q := range queries {
+						b.Run(q.name+"/after-rewrite-data-files", func(b *testing.B) {
+							runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
+						})
 					}
-					b.ReportMetric(float64(totalRuns*eventsPerRun)*float64(b.N)/b.Elapsed().Seconds(), "rows/sec")
-				})
-			}
-
-			for _, q := range queries {
-				b.Run(q.name+"/after-update-before-rewrite-data-files", func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
-				})
-			}
-
-			// ducklake_rewrite_data_files currently errors here every time —
-			// see FINDINGS/ducklake-merge-into-benchmark.md's Finding 6 for
-			// the repro and analysis ("Not implemented Error: Scanning a
-			// DuckLake table after the transaction has ended", tied to
-			// MERGE INTO's own delete-file bookkeeping, not partition count
-			// or data volume). Left as a hard failure rather than a skip:
-			// this is a deterministic tool limitation worth surfacing loudly
-			// if it's ever silently fixed or silently regresses further.
-			b.Run("rewrite-data-files", func(b *testing.B) {
-				for b.Loop() {
-					// delete_threshold => 0.0 forces every file with any
-					// deletes at all to be rewritten — DuckLake's default
-					// threshold is high enough that the update wave's ~1
-					// delete file per table/partition wouldn't otherwise
-					// qualify, and we want to measure the operation actually
-					// running, not a no-op skip.
-					if _, err := db.ExecContext(ctx, "CALL ducklake_rewrite_data_files('"+duckdb.DuckLakeAlias+"', delete_threshold => 0.0);"); err != nil {
-						b.Fatalf("rewriting data files: %v", err)
-					}
-				}
-			})
-
-			for _, q := range queries {
-				b.Run(q.name+"/after-rewrite-data-files", func(b *testing.B) {
-					runQueryBenchmark(b, db, ctx, q.name, q.sql, nil)
 				})
 			}
 		})
@@ -755,7 +891,7 @@ func TestRunsMergeTablesMatchFlatLatest(t *testing.T) {
 
 	db := openMergeBenchDB(t)
 	ctx := t.Context()
-	seedRunsData(t, ctx, db, numRuns, 7, 7, benchAccountIDs) // odd batch size to exercise a partial final batch; pipelineDepth == batchSize is the minimum safe value
+	seedRunsData(t, ctx, db, numRuns, 7, 7, benchAccountIDs, generateInterleavedBatchesParallel) // odd batch size to exercise a partial final batch; pipelineDepth == batchSize is the minimum safe value
 
 	for _, table := range []string{"bench_runs_merged", "bench_runs_merged_jsonpatch"} {
 		var count int
@@ -821,7 +957,7 @@ func TestRunsPartitionedAcrossAccountIDs(t *testing.T) {
 	ctx := t.Context()
 	// > DefaultDataInliningRowLimit so every table is forced to flush real
 	// partitioned Parquet files instead of staying inlined in the catalog.
-	seedRunsData(t, ctx, db, 4*benchNumPartitions, 500, 500, benchAccountIDs)
+	seedRunsData(t, ctx, db, 4*benchNumPartitions, 500, 500, benchAccountIDs, generateInterleavedBatchesParallel)
 
 	for _, table := range benchTables {
 		var count int
@@ -832,6 +968,40 @@ func TestRunsPartitionedAcrossAccountIDs(t *testing.T) {
 		}
 		if count != benchNumPartitions {
 			t.Errorf("%s: got %d distinct account_id values, want %d", table, count, benchNumPartitions)
+		}
+	}
+}
+
+// TestGeneratePartitionAlignedBatchesStayWithinOnePartition guards
+// generatePartitionAlignedBatchesParallel's core invariant — the one
+// generateInterleavedBatchesParallel's batches deliberately don't have —
+// against a small, DB-free dataset: every batch it produces must hold
+// events for exactly one account_id, and across all batches every
+// account_id in accountIDs must have been used at least once.
+func TestGeneratePartitionAlignedBatchesStayWithinOnePartition(t *testing.T) {
+	accountIDs := generateAccountIDs(5)
+	seen := make(map[uuid.UUID]bool)
+
+	err := generatePartitionAlignedBatchesParallel(0, 100, 7, 7, accountIDs, func(batch []runEvent) error {
+		if len(batch) == 0 {
+			return nil
+		}
+		want := batch[0].accountID
+		for _, e := range batch {
+			if e.accountID != want {
+				return fmt.Errorf("batch mixes account_ids %s and %s", want, e.accountID)
+			}
+		}
+		seen[want] = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range accountIDs {
+		if !seen[id] {
+			t.Errorf("account_id %s never appeared in any batch", id)
 		}
 	}
 }

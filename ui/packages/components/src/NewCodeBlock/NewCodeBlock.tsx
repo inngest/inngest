@@ -63,17 +63,24 @@ interface CodeBlockProps {
   // does today (no separate tree/list view). Deliberately not Monaco's
   // built-in registerLinkProvider: that only activates on Cmd/Ctrl+click
   // (hardcoded into Monaco's own LinkDetector, not configurable), so this
-  // instead applies its own underline decorations and a plain mousedown
+  // instead applies its own underline decorations and a plain click
   // handler that navigates directly -- see applyMonacoLinkDecorations.
-  // Each entry's `text` is located as a literal substring of the editor's
-  // own live text -- the caller is responsible for matching whatever
-  // quoting/formatting `tab.content` actually renders (e.g.
-  // JSON.stringify(value) for one element of a JSON array, or the bare
-  // value itself for a plaintext scalar cell). Entries may be given in
-  // any order (matching tolerates e.g. an object field appearing before
-  // or after a sibling field, whichever order the driver/JSON serializer
-  // actually produced).
-  monacoLinks?: { text: string; href: string }[];
+  //
+  // Two ways to locate an entry's range: `startOffset`/`endOffset` (an
+  // exact character range into `tab.content`, 0-based, end-exclusive) is
+  // unambiguous and should be preferred whenever the caller already knows
+  // exactly where its value renders (e.g. from its own JSON
+  // serialization pass); `text` instead searches `tab.content` for a
+  // literal substring match, which is only safe when that substring can't
+  // also appear somewhere unrelated in the same content (a plain scalar
+  // cell whose whole content *is* the value, say) -- two `text` entries
+  // may be given in any order (matching tolerates e.g. an object field
+  // appearing before or after a sibling field), and non-overlapping
+  // "first available occurrence" resolution still applies among them.
+  monacoLinks?: (
+    | { text: string; href: string }
+    | { startOffset: number; endOffset: number; href: string }
+  )[];
 }
 
 function buildJsonPath(keyPath: readonly (string | number)[]): string {
@@ -115,20 +122,22 @@ function safeNavigationUrl(href: string): string | null {
 // Computes underline decorations for `links` against ed's own current
 // model text and applies them via decorationsCollection.set (replacing
 // whatever was there before). Also updates activeLinksRef, which the
-// plain mousedown handler (registered once in onMount) reads to resolve a
+// plain click handler (registered once in onMount) reads to resolve a
 // click position back to a URL.
 //
-// Each entry's `text` is located as a literal substring of the model's
-// own live text (caller-supplied verbatim -- see CodeBlockProps.
-// monacoLinks' own doc comment on quoting). Matches are resolved by
-// first-available occurrence with non-overlapping-range tracking
-// (`claimed`), not a strictly-advancing cursor -- entries can be given in
-// any order (e.g. a {key, id} pair's two entries don't need to know which
-// field the underlying JSON serializer happened to emit first).
+// A `startOffset`/`endOffset` entry converts directly via
+// model.getPositionAt -- no search, so it can never resolve to the wrong
+// occurrence of a value that happens to appear more than once in the
+// content. A `text` entry instead searches the model's own live text for
+// that literal substring (caller-supplied verbatim -- see
+// CodeBlockProps.monacoLinks' own doc comment on quoting/when this is
+// safe), resolved by first-available occurrence with non-overlapping-
+// range tracking (`claimed`, shared with other `text` entries only) --
+// entries can be given in any order.
 function applyMonacoLinkDecorations(
   ed: editor.IStandaloneCodeEditor,
   monacoInstance: Monaco,
-  links: { text: string; href: string }[] | undefined,
+  links: NonNullable<CodeBlockProps['monacoLinks']> | undefined,
   decorationsCollection: editor.IEditorDecorationsCollection,
   activeLinksRef: { current: ActiveMonacoLink[] }
 ) {
@@ -146,10 +155,33 @@ function applyMonacoLinkDecorations(
   const decorations: editor.IModelDeltaDecoration[] = [];
   const activeLinks: ActiveMonacoLink[] = [];
 
-  for (const { text: needle, href } of links) {
-    const url = safeNavigationUrl(href);
+  const addDecoration = (start: number, end: number, url: string) => {
+    const startPos = model.getPositionAt(start);
+    const stopPos = model.getPositionAt(end);
+    const range = new monacoInstance.Range(
+      startPos.lineNumber,
+      startPos.column,
+      stopPos.lineNumber,
+      stopPos.column
+    );
+    decorations.push({
+      range,
+      options: { inlineClassName: 'text-link underline cursor-pointer' },
+    });
+    activeLinks.push({ range, url });
+  };
+
+  for (const link of links) {
+    const url = safeNavigationUrl(link.href);
     if (!url) continue;
 
+    if ('startOffset' in link) {
+      if (link.endOffset <= link.startOffset) continue;
+      addDecoration(link.startOffset, link.endOffset, url);
+      continue;
+    }
+
+    const needle = link.text;
     if (!needle) continue;
 
     let searchFrom = 0;
@@ -167,20 +199,7 @@ function applyMonacoLinkDecorations(
 
     const end = idx + needle.length;
     claimed.push([idx, end]);
-
-    const start = model.getPositionAt(idx);
-    const stop = model.getPositionAt(end);
-    const range = new monacoInstance.Range(
-      start.lineNumber,
-      start.column,
-      stop.lineNumber,
-      stop.column
-    );
-    decorations.push({
-      range,
-      options: { inlineClassName: 'text-link underline cursor-pointer' },
-    });
-    activeLinks.push({ range, url });
+    addDecoration(idx, end, url);
   }
 
   decorationsCollection.set(decorations);
@@ -318,7 +337,7 @@ export const NewCodeBlock = ({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoInstanceRef = useRef<Monaco | null>(null);
   const linkDecorationsRef = useRef<editor.IEditorDecorationsCollection | null>(null);
-  // Read by the plain mousedown handler (registered once in onMount) to
+  // Read by the plain mouseUp handler (registered once in onMount) to
   // resolve a click position back to a URL -- kept up to date by
   // applyMonacoLinkDecorations, called both on mount and from the effect
   // below whenever monacoLinks/content change.
@@ -534,10 +553,10 @@ export const NewCodeBlock = ({
                   onMount={(ed, monacoInstance) => {
                     editorRef.current = ed;
                     monacoInstanceRef.current = monacoInstance;
+
                     if (language === 'json') {
                       ed.onDidChangeCursorPosition((e) => {
-                        const text = ed.getValue();
-                        setCursorPath(getJsonPathAtLine(text, e.position.lineNumber));
+                        setCursorPath(getJsonPathAtLine(ed.getValue(), e.position.lineNumber));
                       });
                     }
 
@@ -555,11 +574,22 @@ export const NewCodeBlock = ({
                     // lands inside one of the currently-decorated ranges.
                     // noopener/noreferrer: the opened page must not get a
                     // handle back to this window (reverse tabnabbing).
-                    ed.onMouseDown((e) => {
+                    //
+                    // Resolved on mouseUp, not mouseDown: navigating on
+                    // mouseDown fires before the user can drag a text
+                    // selection starting on (or through) a linked range,
+                    // breaking click-and-drag copy over any hinted value.
+                    // A non-empty selection at mouseUp means the gesture
+                    // was a drag-select, not a click, so it's left alone.
+                    ed.onMouseUp((e) => {
                       if (
                         e.target.type !== monacoInstance.editor.MouseTargetType.CONTENT_TEXT ||
                         !e.target.position
                       ) {
+                        return;
+                      }
+                      const selection = ed.getSelection();
+                      if (selection && !selection.isEmpty()) {
                         return;
                       }
                       const position = e.target.position;
@@ -609,15 +639,31 @@ export const NewCodeBlock = ({
                       </span>
                     )}
                   </code>
-                  {cursorPath && (
+                  {/* Always mounted (never conditionally added/removed
+                      the way `{cursorPath && <CopyButton />}` used to),
+                      hidden via `invisible` instead -- this bar's height
+                      must never change once the editor first renders.
+                      cursorPath starts null and flips to a real value on
+                      the very first cursor-position event, which fires as
+                      part of a click *or* the start of a drag-select;
+                      conditionally mounting this button right then
+                      resized the editor's own container (a flex sibling
+                      of this status bar), and a container resize mid-drag
+                      permanently breaks Monaco's own mouse-drag-selection
+                      tracking for the rest of that gesture -- confirmed
+                      empirically: it happens regardless of whether that
+                      resize is (or isn't) followed by an editor.layout()
+                      call, so the fix is to never let the resize happen
+                      in the first place, not to react to it faster. */}
+                  <div className={cn(!cursorPath && 'invisible')}>
                     <CopyButton
                       size="small"
-                      code={cursorPath}
+                      code={cursorPath ?? ''}
                       isCopying={isPathCopying}
                       handleCopyClick={handlePathCopyClick}
                       appearance="outlined"
                     />
-                  )}
+                  </div>
                 </div>
               )}
             </div>

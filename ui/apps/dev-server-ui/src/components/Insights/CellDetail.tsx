@@ -17,8 +17,11 @@ import {
 import { toast } from 'sonner';
 
 import { InsightsColumnType } from '@/store/generated';
-import { getFormattedJSONObjectOrArrayString } from './json';
-import { buildPathHintMonacoLinks, type PathHintLike } from './pathHints';
+import {
+  buildJsonCellRender,
+  buildScalarPathHintLink,
+  type PathHintLike,
+} from './pathHints';
 
 export type CellDetailData = {
   rowIndex: number;
@@ -95,47 +98,41 @@ function CellValueDisplay({
   value: unknown;
   pathCreator: PathCreator;
 }) {
-  const { content, language } = useMemo(() => {
-    if (value == null) {
-      return { content: 'null', language: 'plaintext' };
-    }
-
-    if (columnType === InsightsColumnType.Json) {
-      // JSON columns come through as either a raw JSON string or an
-      // already-decoded object/array, depending on the driver -- handle
-      // both rather than assuming one (String()-ing an object here would
-      // print "[object Object]").
-      if (typeof value !== 'string') {
-        return { content: JSON.stringify(value, null, 2), language: 'json' };
-      }
-      const formatted = getFormattedJSONObjectOrArrayString(value);
-      return { content: formatted ?? value, language: 'json' };
-    }
-
-    // dates are rendered by DateDisplay below instead.
-    return { content: String(value), language: 'plaintext' };
-  }, [columnType, value]);
-
-  if (columnType === InsightsColumnType.Datetime && value != null) {
-    return <DateDisplay value={value} />;
-  }
-
   // A hinted value can be the column's own whole value (a bare scalar
   // cell, e.g. a plain-text run_id column, or a whole array --
   // pkg/duckdb/insights/tables.go's event_ids/sessions comments -- whose
   // elements the hint describes) or a value found at some JSON sub-path
   // of it (e.g. an OTel attribute key inside `attributes`, or a field of
-  // each element inside `inputs`) -- buildPathHintMonacoLinks resolves
-  // every pathHints entry the same way the backend itself does. Either
-  // way, the text still renders exactly as it does today (plaintext or
-  // JSON); only plain-click link overlays are added (NewCodeBlock's
-  // monacoLinks).
-  const monacoLinks = buildPathHintMonacoLinks(
-    columnPathHints,
-    value,
-    columnType,
-    pathCreator,
-  );
+  // each element inside `inputs`). For a JSON column, content and
+  // monacoLinks come from the *same* stringifyWithSpans pass over the
+  // *same* parsed value (buildJsonCellRender), so a link's range is
+  // always exactly the value that produced it -- never a substring
+  // search that could resolve to an unrelated occurrence of the same
+  // literal text elsewhere in the document. Either way, the text still
+  // renders exactly as it does today (plaintext or JSON); only
+  // plain-click link overlays are added (NewCodeBlock's monacoLinks).
+  const { content, language, monacoLinks } = useMemo(() => {
+    if (value == null) {
+      return { content: 'null', language: 'plaintext', monacoLinks: undefined };
+    }
+
+    if (columnType === InsightsColumnType.Json) {
+      const rendered = buildJsonCellRender(columnPathHints, value, pathCreator);
+      return { ...rendered, language: 'json' };
+    }
+
+    // dates are rendered by DateDisplay below instead.
+    const text = String(value);
+    return {
+      content: text,
+      language: 'plaintext',
+      monacoLinks: buildScalarPathHintLink(columnPathHints, text, pathCreator),
+    };
+  }, [columnType, value, columnPathHints, pathCreator]);
+
+  if (columnType === InsightsColumnType.Datetime && value != null) {
+    return <DateDisplay value={value} />;
+  }
 
   return (
     <div className="bg-codeEditor border-subtle h-full overflow-hidden rounded-lg border">

@@ -1,7 +1,18 @@
 import type { PathCreator } from '@inngest/components/SharedContext/usePathCreator';
 
-import { InsightsColumnHint, InsightsColumnType } from '@/store/generated';
-import { badgeHintHref, idHintHref, isSessionHintValue } from './hintLinks';
+import { InsightsColumnHint } from '@/store/generated';
+import {
+  badgeHintHref,
+  idHintHref,
+  isSessionHintValue,
+  sessionPairs,
+} from './hintLinks';
+import {
+  resolvedPathKey,
+  stringifyWithSpans,
+  type JsonSpans,
+  type ResolvedPathSegment,
+} from './jsonSpans';
 
 // Structural mirror of pkg/duckdb/insights.PathSegment/PathHint (surfaced
 // via GQL as InsightsPathSegment/InsightsPathHint) -- generated.ts inlines
@@ -11,6 +22,18 @@ export type PathSegmentLike = { key: string | null; wildcard: boolean };
 export type PathHintLike = {
   path: readonly PathSegmentLike[];
   hint: InsightsColumnHint;
+};
+
+// OffsetLink is NewCodeBlock's exact-range monacoLinks entry shape -- an
+// explicit character range into its rendered content, rather than a
+// literal substring to search for. Built from a structural (path-based)
+// match, not text content, so two occurrences of the identical string
+// value at different JSON paths (e.g. an unrelated field that happens to
+// equal a nearby session ID) can never be confused with one another.
+export type OffsetLink = {
+  startOffset: number;
+  endOffset: number;
+  href: string;
 };
 
 // rootHint returns a column's own whole-value hint -- the pathHints entry
@@ -23,123 +46,223 @@ export function rootHint(
   return pathHints?.find((ph) => ph.path.length === 0)?.hint ?? null;
 }
 
+type PathMatch = { value: unknown; path: ResolvedPathSegment[] };
+
 // collectAtPath walks value along path (root to leaf, exactly like
 // pkg/duckdb/insights' own resolveSubPathHint/resolveArrayElementHint
-// read a PathHint's Path), returning every value found there -- a
-// wildcard step fans out over an array (one result per element, or none
-// for a non-array), a key step reads that literal object field (one
-// result, or none for a non-object/missing field). An empty path (the
-// column's own whole value) returns [value] unconditionally, matching
-// PathHint's own "empty Path is the whole-value hint" convention.
+// read a PathHint's Path), returning every value found there together
+// with the *concrete* path (real array indices/object keys, no
+// wildcards) that reached it -- a wildcard step fans out over an array
+// (one result per element), a key step reads that literal object field
+// (one result, or none for a non-object/missing field). An empty path
+// (the column's own whole value) returns [{value, path: resolvedSoFar}]
+// unconditionally, matching PathHint's own "empty Path is the
+// whole-value hint" convention. The resolved path is what makes a match
+// locatable in a JsonSpans -- resolvedPathKey(match.path) is exactly the
+// key stringifyWithSpans recorded that same node's own range under, since
+// both walk the identical value using the identical path-building rule.
 function collectAtPath(
   value: unknown,
   path: readonly PathSegmentLike[],
-): unknown[] {
-  if (path.length === 0) return [value];
+  resolvedSoFar: ResolvedPathSegment[] = [],
+): PathMatch[] {
+  if (path.length === 0) return [{ value, path: resolvedSoFar }];
   const [step, ...rest] = path as [PathSegmentLike, ...PathSegmentLike[]];
 
   if (step.wildcard) {
     if (!Array.isArray(value)) return [];
-    return value.flatMap((item) => collectAtPath(item, rest));
+    return value.flatMap((item, i) =>
+      collectAtPath(item, rest, [...resolvedSoFar, i]),
+    );
   }
   if (step.key == null || value == null || typeof value !== 'object') {
     return [];
   }
-  return collectAtPath((value as Record<string, unknown>)[step.key], rest);
+  return collectAtPath((value as Record<string, unknown>)[step.key], rest, [
+    ...resolvedSoFar,
+    step.key,
+  ]);
 }
 
-// parsedJSONValue returns value ready for collectAtPath to walk -- the
-// driver can report a JSON column as either an already-decoded object/
-// array or a raw JSON string (CellValueDisplay's own content computation
-// handles the same ambiguity), so a string is parsed first. Falls back to
-// the original string on a parse failure rather than throwing.
-function parsedJSONValue(value: unknown): unknown {
+// parsedJSONValue returns value ready for collectAtPath/stringifyWithSpans
+// to walk -- the driver can report a JSON column as either an
+// already-decoded object/array or a raw JSON string, so a string that
+// looks like one (cheap prefix/suffix check, mirroring json.ts's own
+// mayBeJSONArray/mayBeJSONObject) is parsed first. Returns null --
+// meaning "render as opaque text, no path hints applicable" -- for a
+// string that doesn't look like JSON or fails to parse.
+function parsedJSONValue(value: unknown): unknown | null {
   if (typeof value !== 'string') return value;
+  const looksLikeJson =
+    (value.startsWith('[') && value.endsWith(']')) ||
+    (value.startsWith('{') && value.endsWith('}'));
+  if (!looksLikeJson) return null;
   try {
     return JSON.parse(value);
   } catch {
-    return value;
+    return null;
   }
 }
 
-// linksForHintedValue builds every monacoLinks entry for one hinted value
-// found at some pathHints entry's path -- e.g. one array_ids[i], one
-// attributes["_inngest.app.name"], or (isJson false) the whole scalar
-// cell value itself. text is JSON.stringify'd when isJson (matching how
-// the value actually appears in CellValueDisplay's pretty-printed JSON
-// content) or the raw string otherwise (a plaintext-rendered scalar
-// column, e.g. a bare run_id column).
-function linksForHintedValue(
-  hint: InsightsColumnHint,
-  value: unknown,
-  isJson: boolean,
-  pathCreator: PathCreator,
-): { text: string; href: string }[] {
-  if (value == null) return [];
-  const text = (v: unknown) => (isJson ? JSON.stringify(v) : String(v));
+function pushLink(
+  links: OffsetLink[],
+  ranges: Map<string, [number, number]>,
+  atPath: readonly ResolvedPathSegment[],
+  href: string | undefined,
+) {
+  if (!href) return;
+  const range = ranges.get(resolvedPathKey(atPath));
+  if (!range) return;
+  links.push({ startOffset: range[0], endOffset: range[1], href });
+}
 
-  if (hint === InsightsColumnHint.Session) {
-    // A session-hinted value is always a {key, id} object (runs.sessions'
-    // element shape / event meta.sessions' per-key entry), never a bare
-    // scalar -- two link entries, one for each field, since either
-    // pathCreator method may be unavailable on its own.
-    if (!isSessionHintValue(value)) return [];
-    const links: { text: string; href: string }[] = [];
-    const keysHref = pathCreator.sessions?.({ sessionKey: value.key });
-    if (keysHref) links.push({ text: text(value.key), href: keysHref });
-    const sessionHref = pathCreator.session?.({
-      sessionKey: value.key,
-      sessionId: value.id,
-    });
-    if (sessionHref) links.push({ text: text(value.id), href: sessionHref });
+// sessionLinksForMatch handles HintSession's two distinct value shapes
+// (pkg/duckdb/insights/tables.go's own doc comments): one {key, id}
+// STRUCT (runs.sessions' array element -- collectAtPath's wildcard step
+// already isolated one element, so its own literal "key"/"id" fields are
+// linked directly), or the whole per-run/per-event sessions map
+// (events.meta.sessions / runs.inputs[*].meta.sessions -- a Go map has no
+// array-wildcard pathHints step to isolate one entry at a time, so the
+// match is the entire map and every one of its own entries -- located by
+// its own dynamic object key, not a declared PathHint path -- is a
+// session pair in its own right).
+function sessionLinksForMatch(
+  value: unknown,
+  path: readonly ResolvedPathSegment[],
+  spans: Pick<JsonSpans, 'valueRange' | 'keyRange'>,
+  pathCreator: PathCreator,
+): OffsetLink[] {
+  const links: OffsetLink[] = [];
+
+  if (isSessionHintValue(value)) {
+    pushLink(
+      links,
+      spans.valueRange,
+      [...path, 'key'],
+      pathCreator.sessions?.({ sessionKey: value.key }),
+    );
+    pushLink(
+      links,
+      spans.valueRange,
+      [...path, 'id'],
+      pathCreator.session?.({ sessionKey: value.key, sessionId: value.id }),
+    );
     return links;
   }
 
+  for (const pair of sessionPairs(value)) {
+    pushLink(
+      links,
+      spans.keyRange,
+      [...path, pair.key],
+      pathCreator.sessions?.({ sessionKey: pair.key }),
+    );
+    pushLink(
+      links,
+      spans.valueRange,
+      [...path, pair.key],
+      pathCreator.session?.({ sessionKey: pair.key, sessionId: pair.id }),
+    );
+  }
+  return links;
+}
+
+function linksForMatch(
+  hint: InsightsColumnHint,
+  match: PathMatch,
+  spans: Pick<JsonSpans, 'valueRange' | 'keyRange'>,
+  pathCreator: PathCreator,
+): OffsetLink[] {
+  const { value, path } = match;
+  if (value == null) return [];
+
+  if (hint === InsightsColumnHint.Session) {
+    return sessionLinksForMatch(value, path, spans, pathCreator);
+  }
+
+  const links: OffsetLink[] = [];
   if (
     hint === InsightsColumnHint.AppId ||
     hint === InsightsColumnHint.FunctionId
   ) {
-    return [
-      {
-        text: text(value),
-        href: badgeHintHref(hint, pathCreator, String(value)),
-      },
-    ];
-  }
-  if (
+    pushLink(
+      links,
+      spans.valueRange,
+      path,
+      badgeHintHref(hint, pathCreator, String(value)),
+    );
+  } else if (
     hint === InsightsColumnHint.RunId ||
     hint === InsightsColumnHint.EventId
   ) {
-    return [
-      { text: text(value), href: idHintHref(hint, pathCreator, String(value)) },
-    ];
+    pushLink(
+      links,
+      spans.valueRange,
+      path,
+      idHintHref(hint, pathCreator, String(value)),
+    );
   }
-  return [];
+  return links;
 }
 
-// buildPathHintMonacoLinks resolves every pathHints entry (root and
-// sub-path alike) against value, producing NewCodeBlock's monacoLinks for
-// every hinted value actually found -- a bare hinted scalar column (one
-// root entry, one match), a hinted array column (one wildcard entry, one
-// match per element), or a hinted value nested anywhere inside a JSON
-// column's own data (e.g. attributes' OTel keys, inputs' per-element
-// fields), all resolved the same way this package's own
-// resolveSubPathHint/resolveArrayElementHint do on the backend.
-export function buildPathHintMonacoLinks(
+// buildJsonCellRender is a JSON-typed cell's single source of truth for
+// both its rendered text and its monacoLinks: both come from the *same*
+// stringifyWithSpans pass over the *same* parsed value, so a link's
+// offsets are always exactly the range of the value that produced it --
+// never a separately-computed, potentially out-of-sync search. Returns
+// monacoLinks: undefined (with the raw string as content, unformatted)
+// when rawValue is a string that isn't actually valid/JSON-shaped.
+export function buildJsonCellRender(
   pathHints: readonly PathHintLike[] | null | undefined,
-  value: unknown,
-  columnType: InsightsColumnType,
+  rawValue: unknown,
   pathCreator: PathCreator,
-): { text: string; href: string }[] | undefined {
-  if (!pathHints || pathHints.length === 0 || value == null) return undefined;
+): { content: string; monacoLinks: OffsetLink[] | undefined } {
+  const parsed = parsedJSONValue(rawValue);
+  if (parsed === null && typeof rawValue === 'string') {
+    return { content: rawValue, monacoLinks: undefined };
+  }
 
-  const isJson = columnType === InsightsColumnType.Json;
-  const root = isJson ? parsedJSONValue(value) : value;
+  const spans = stringifyWithSpans(parsed);
+  if (!pathHints || pathHints.length === 0) {
+    return { content: spans.text, monacoLinks: undefined };
+  }
 
   const links = pathHints.flatMap((ph) =>
-    collectAtPath(root, ph.path).flatMap((match) =>
-      linksForHintedValue(ph.hint, match, isJson, pathCreator),
+    collectAtPath(parsed, ph.path).flatMap((match) =>
+      linksForMatch(ph.hint, match, spans, pathCreator),
     ),
   );
-  return links.length > 0 ? links : undefined;
+  return {
+    content: spans.text,
+    monacoLinks: links.length > 0 ? links : undefined,
+  };
+}
+
+// buildScalarPathHintLink is a plaintext (non-JSON) cell's monacoLinks --
+// e.g. a bare run_id column. Only a column's own whole-value (root) hint
+// can ever apply here (a sub-path hint only means something inside real
+// JSON structure), and the whole rendered text is the value, so there's
+// at most one link covering it entirely. Session has no scalar shape
+// (pkg/duckdb/insights/tables.go), so it never produces one here.
+export function buildScalarPathHintLink(
+  pathHints: readonly PathHintLike[] | null | undefined,
+  text: string,
+  pathCreator: PathCreator,
+): OffsetLink[] | undefined {
+  const hint = rootHint(pathHints);
+  if (!hint) return undefined;
+
+  let href: string | undefined;
+  if (
+    hint === InsightsColumnHint.AppId ||
+    hint === InsightsColumnHint.FunctionId
+  ) {
+    href = badgeHintHref(hint, pathCreator, text);
+  } else if (
+    hint === InsightsColumnHint.RunId ||
+    hint === InsightsColumnHint.EventId
+  ) {
+    href = idHintHref(hint, pathCreator, text);
+  }
+  return href ? [{ startOffset: 0, endOffset: text.length, href }] : undefined;
 }
