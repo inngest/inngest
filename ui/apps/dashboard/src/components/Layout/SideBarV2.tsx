@@ -7,6 +7,7 @@ import type { Environment } from '@/utils/environments';
 import AnnouncementStack from '../NavigationV2/Announcements/AnnouncementStack';
 import Navigation from '../NavigationV2/Navigation';
 import OnboardingWidget from '../NavigationV2/OnboardingWidget';
+import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 
 export default function SideBar({
@@ -92,6 +93,7 @@ export default function SideBar({
         </div>
 
         <div className="shrink-0 pl-3 pr-3">
+          <ExecutionLimitCard collapsed={collapsed} />
           <SeatOverageWidget collapsed={collapsed} />
           {/* The onboarding widget takes priority over marketing announcements. */}
           {isWidgetOpen ? (

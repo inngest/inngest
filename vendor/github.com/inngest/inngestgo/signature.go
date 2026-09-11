@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	ErrExpiredSignature = fmt.Errorf("expired signature")
-	ErrInvalidSignature = fmt.Errorf("invalid signature")
-	ErrInvalidTimestamp = fmt.Errorf("invalid timestamp")
+	ErrExpiredSignature  = fmt.Errorf("expired signature")
+	ErrInvalidSignature  = fmt.Errorf("invalid signature")
+	ErrInvalidTimestamp  = fmt.Errorf("invalid timestamp")
+	ErrMissingSigningKey = fmt.Errorf("missing signing key")
 
 	keyRegexp             = regexp.MustCompile(`^signkey-\w+-`)
 	signatureTimeDeltaMax = 5 * time.Minute
@@ -119,21 +120,29 @@ func ValidateRequestSignature(
 		return true, correctKey, nil
 	}
 
-	valid, err := validateRequestSignature(ctx, sig, []byte(signingKey), body)
-	if !valid {
-		if signingKeyFallback != "" {
-			// Validation failed with the primary key, so try the fallback key
-			valid, err := validateRequestSignature(ctx, sig, []byte(signingKeyFallback), body)
-			if valid {
-				correctKey = signingKeyFallback
-			}
-			return valid, correctKey, err
-		}
-	} else {
-		correctKey = signingKey
+	// Never attempt HMAC validation with an empty key; in cloud mode, a missing
+	// signing key is a configuration error, not an anonymous shared secret.
+	keys := []string{}
+	if signingKey != "" {
+		keys = append(keys, signingKey)
+	}
+	if signingKeyFallback != "" {
+		keys = append(keys, signingKeyFallback)
+	}
+	if len(keys) == 0 {
+		return false, correctKey, ErrMissingSigningKey
 	}
 
-	return valid, correctKey, err
+	var err error
+	for _, key := range keys {
+		var valid bool
+		valid, err = validateRequestSignature(ctx, sig, []byte(key), body)
+		if valid {
+			return true, key, nil
+		}
+	}
+
+	return false, correctKey, err
 }
 
 // ValidateResponseSignature validates the response signature. It's the same as

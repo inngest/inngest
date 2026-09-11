@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -2059,74 +2057,6 @@ type traceRunCursorFilter struct {
 	Value int64
 }
 
-func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
-	spans, err := w.q.GetTraceSpans(ctx, dbpkg.GetTraceSpansParams{
-		TraceID: id.TraceID,
-		RunID:   id.RunID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := []*cqrs.Span{}
-	seen := map[string]bool{}
-	for _, s := range spans {
-		// identifier to used for checking if this span is seen already
-		m := map[string]any{
-			"ts":  s.Timestamp.UnixMilli(),
-			"tid": s.TraceID,
-			"sid": s.SpanID,
-		}
-		byt, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		ident := base64.StdEncoding.EncodeToString(byt)
-		if _, ok := seen[ident]; ok {
-			// already seen, so continue
-			continue
-		}
-
-		span := &cqrs.Span{
-			Timestamp:    s.Timestamp,
-			TraceID:      string(s.TraceID),
-			SpanID:       string(s.SpanID),
-			SpanName:     s.SpanName,
-			SpanKind:     s.SpanKind,
-			ServiceName:  s.ServiceName,
-			ScopeName:    s.ScopeName,
-			ScopeVersion: s.ScopeVersion,
-			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
-			StatusCode:   s.StatusCode,
-			RunID:        &s.RunID,
-		}
-
-		if s.StatusMessage.Valid {
-			span.StatusMessage = &s.StatusMessage.String
-		}
-
-		if s.ParentSpanID.Valid {
-			span.ParentSpanID = &s.ParentSpanID.String
-		}
-		if s.TraceState.Valid {
-			span.TraceState = &s.TraceState.String
-		}
-
-		var resourceAttr, spanAttr map[string]string
-		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
-			span.ResourceAttributes = resourceAttr
-		}
-		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
-			span.SpanAttributes = spanAttr
-		}
-
-		res = append(res, span)
-		seen[ident] = true
-	}
-
-	return res, nil
-}
-
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
 	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
 	if err == nil {
@@ -2976,11 +2906,11 @@ func (w wrapper) GetWorkerConnection(ctx context.Context, id cqrs.WorkerConnecti
 
 	var disconnectedAt, lastHeartbeatAt *time.Time
 	if conn.DisconnectedAt.Valid {
-		disconnectedAt = ptr.Time(time.UnixMilli(conn.DisconnectedAt.Int64))
+		disconnectedAt = new(time.UnixMilli(conn.DisconnectedAt.Int64))
 	}
 
 	if conn.LastHeartbeatAt.Valid {
-		lastHeartbeatAt = ptr.Time(time.UnixMilli(conn.LastHeartbeatAt.Int64))
+		lastHeartbeatAt = new(time.UnixMilli(conn.LastHeartbeatAt.Int64))
 	}
 
 	var appVersion *string
@@ -3300,10 +3230,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 
 		var disconnectedAt, lastHeartbeatAt *time.Time
 		if data.DisconnectedAt.Valid {
-			disconnectedAt = ptr.Time(time.UnixMilli(data.DisconnectedAt.Int64))
+			disconnectedAt = new(time.UnixMilli(data.DisconnectedAt.Int64))
 		}
 		if data.LastHeartbeatAt.Valid {
-			lastHeartbeatAt = ptr.Time(time.UnixMilli(data.LastHeartbeatAt.Int64))
+			lastHeartbeatAt = new(time.UnixMilli(data.LastHeartbeatAt.Int64))
 		}
 
 		var appVersion *string
@@ -3862,15 +3792,17 @@ func spanRunCELFilters(
 		run.WithExpressionSQLConverter(h.CELConverter()),
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
+	// CEL parsing can succeed for identifiers this SQL backend cannot filter on.
+	// Reject those expressions instead of silently returning unfiltered runs.
 	if !expHandler.HasFilters() {
-		return celFilters, useJoin, nil
+		return nil, false, fmt.Errorf("%w: expression has no supported predicates", cqrs.ErrInvalidRunExpression)
 	}
 
 	celFilters, err = expHandler.ToSQLFilters(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
 	useJoin = needsEventJoin(opt.Filter.CEL)
 

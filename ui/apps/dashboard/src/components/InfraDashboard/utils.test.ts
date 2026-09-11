@@ -105,7 +105,7 @@ describe('infra dashboard billing plan merge', () => {
       inferInfraPlanSku({
         concurrencyLimit: 56,
         defaultSku: 'IN-S',
-        plan: { isFree: false, name: 'Pro', slug: 'pro-2025-08-08' },
+        plan: { isFree: false, name: 'Pro', slug: 'pro-2026-06-29' },
         plans,
       }),
     ).toBe('IN-XS');
@@ -120,7 +120,7 @@ describe('infra dashboard billing plan merge', () => {
       },
       defaultSku: 'IN-S',
       plan: {
-        amount: 7_500,
+        amount: 9_900,
         entitlements: {
           concurrency: { limit: 100 },
           events: { limit: 1_000_000 },
@@ -128,7 +128,7 @@ describe('infra dashboard billing plan merge', () => {
         },
         isFree: false,
         name: 'Pro',
-        slug: 'pro-2025-08-08',
+        slug: 'pro-2026-06-29',
       },
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
     });
@@ -141,7 +141,7 @@ describe('infra dashboard billing plan merge', () => {
       execConcurrency: '256',
       execConcurrencyLimit: 256,
       isCurrent: true,
-      priceMonthly: '$75',
+      priceMonthly: '$99',
       queueDepth: '5M',
       queueDepthLimit: 5_000_000,
       sku: 'IN-M',
@@ -246,11 +246,11 @@ describe('infra dashboard billing plan merge', () => {
         slug: 'hobby-free-2025-08-08',
       },
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
-      proPlanAmountCents: 7_500,
+      proPlanAmountCents: 9_900,
     });
 
     expect(result.plans.find((plan) => plan.sku === 'IN-S')).toMatchObject({
-      priceMonthly: '$75',
+      priceMonthly: '$99',
     });
   });
 
@@ -278,10 +278,10 @@ describe('infra dashboard billing actions', () => {
     slug: 'hobby-free-2025-08-08',
   };
   const proPlan = {
-    amount: 7_500,
+    amount: 9_900,
     isFree: false,
     name: 'Pro',
-    slug: 'pro-2025-08-08',
+    slug: 'pro-2026-06-29',
   };
 
   it('opens Pro checkout when a free account selects IN-S', () => {
@@ -296,9 +296,9 @@ describe('infra dashboard billing actions', () => {
     ).toEqual({
       addonUpdate: null,
       item: {
-        amount: 7_500,
+        amount: 9_900,
         name: 'Pro',
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
         quantity: 1,
       },
       type: 'upgrade-base-plan',
@@ -318,7 +318,7 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       item: {
         amount: 6_500,
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });
@@ -522,7 +522,7 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-L',
       },
       item: {
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });
@@ -562,7 +562,7 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       addonUpdate: null,
       item: {
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });
@@ -584,7 +584,7 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-M',
       },
       item: {
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });
@@ -606,7 +606,7 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-L',
       },
       item: {
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });
@@ -628,7 +628,7 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-XL',
       },
       item: {
-        planSlug: 'pro-2025-08-08',
+        planSlug: 'pro-2026-06-29',
       },
       type: 'upgrade-base-plan',
     });

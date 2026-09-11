@@ -25,7 +25,7 @@ func TestStepErrors(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("test/fail", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -84,7 +84,7 @@ func TestStepErrorCalledOnce(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
-			Retries: inngestgo.IntPtr(2),
+			Retries: new(2),
 		},
 		inngestgo.EventTrigger("test/fail", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

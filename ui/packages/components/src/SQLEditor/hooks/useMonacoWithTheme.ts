@@ -5,7 +5,7 @@ import { createColors, createRules } from '../../utils/monaco';
 import { isDark } from '../../utils/theme';
 
 // TODO: Remove this hook and use the NewCodeBlock component when it's ready.
-export function useMonacoWithTheme(wrapperRef: React.RefObject<HTMLDivElement>) {
+export function useMonacoWithTheme(wrapperRef: React.RefObject<HTMLDivElement | null>) {
   const [dark, setDark] = useState(isDark());
   const monaco = useMonaco();
 

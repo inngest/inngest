@@ -33,15 +33,13 @@ func main() {
 	addr := getenv("PORT", defaultAddr)
 	eventKey := getenv("INNGEST_EVENT_KEY", "test")
 	signingKey := getenv("INNGEST_SIGNING_KEY", "7468697320697320612074657374206b6579")
-	allowInBandSync := true
 	devMode := true
 
 	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
-		AppID:           appID,
-		EventKey:        inngestgo.StrPtr(eventKey),
-		SigningKey:      inngestgo.StrPtr(signingKey),
-		AllowInBandSync: &allowInBandSync,
-		Dev:             &devMode,
+		AppID:      appID,
+		EventKey:   new(eventKey),
+		SigningKey: new(signingKey),
+		Dev:        &devMode,
 	})
 	if err != nil {
 		log.Fatalf("create client: %v", err)
@@ -138,7 +136,7 @@ func registerFunctions(client inngestgo.Client) {
 	mustCreate(client, inngestgo.FunctionOpts{
 		ID: "test-suite-cancel-test",
 		Cancel: []inngestgo.ConfigCancel{
-			{Event: "cancel/please", If: inngestgo.StrPtr("async.data.request_id == event.data.request_id")},
+			{Event: "cancel/please", If: new("async.data.request_id == event.data.request_id")},
 		},
 	},
 		inngestgo.EventTrigger("tests/cancel.test", nil),
@@ -164,7 +162,7 @@ func registerFunctions(client inngestgo.Client) {
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			payload, err := step.WaitForEvent[map[string]any](ctx, "wait", step.WaitForEventOpts{
 				Event:   "test/resume",
-				If:      inngestgo.StrPtr("async.data.resume == true && async.data.id == event.data.id"),
+				If:      new("async.data.resume == true && async.data.id == event.data.id"),
 				Timeout: 10 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {

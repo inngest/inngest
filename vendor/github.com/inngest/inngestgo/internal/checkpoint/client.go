@@ -9,12 +9,15 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/inngest/inngestgo/pkg/version"
 )
 
 type Client struct {
 	primaryKey  string
 	fallbackKey string
 	apiBaseURL  string
+	environment string
 	httpClient  *http.Client
 	useFallback *atomic.Bool
 }
@@ -54,6 +57,10 @@ func (c *Client) do(ctx context.Context, req AsyncRequest) error {
 
 	hr.Header.Set("Content-Type", "application/json")
 	hr.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.getCurrentSigningKey()))
+	hr.Header.Set("X-Inngest-SDK", fmt.Sprintf("go:v%s", version.SDKVersion))
+	if c.environment != "" {
+		hr.Header.Set("X-Inngest-Env", c.environment)
+	}
 
 	resp, err := c.httpClient.Do(hr)
 	if err != nil {

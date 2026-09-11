@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -179,7 +178,7 @@ func TestDebounce(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -473,7 +472,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -979,7 +978,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		ID: functionId,
 		Debounce: &inngest.Debounce{
 			Period:  "4s",
-			Timeout: util.StrPtr("6s"),
+			Timeout: new("6s"),
 		},
 	}
 
@@ -1287,6 +1286,108 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	})
 }
 
+func TestDebounceUpdateMissingQueueItemPreservesNewerEvent(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
+	require.NoError(t, err)
+	kg := shard.Client().KeyGenerator()
+
+	fakeClock := clockwork.NewFakeClock()
+
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           shardRegistry,
+		PrimaryShardName: shard.Name(),
+		Queue:            q,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	redisDebouncer := deb.(debouncer)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID: functionId,
+		Debounce: &inngest.Debounce{
+			Key:    nil,
+			Period: "10s",
+		},
+	}
+
+	newerEventTime := fakeClock.Now().Add(2 * time.Second)
+	newerEventId := ulid.MustNew(ulid.Timestamp(newerEventTime), rand.Reader)
+	newerDi := DebounceItem{
+		AccountID:   accountId,
+		WorkspaceID: workspaceId,
+		AppID:       appId,
+		FunctionID:  functionId,
+		EventID:     newerEventId,
+		Event: event.Event{
+			Name:      "future",
+			ID:        newerEventId.String(),
+			Timestamp: newerEventTime.UnixMilli(),
+		},
+	}
+
+	debounceID := requireDebounce(t, redisDebouncer, ctx, newerDi, fn)
+	unshardedCluster.HDel(kg.QueueItem(), queue.HashID(ctx, debounceID.String()))
+
+	olderEventTime := fakeClock.Now()
+	olderEventId := ulid.MustNew(ulid.Timestamp(olderEventTime), rand.Reader)
+	olderDi := DebounceItem{
+		AccountID:   accountId,
+		WorkspaceID: workspaceId,
+		AppID:       appId,
+		FunctionID:  functionId,
+		EventID:     olderEventId,
+		Event: event.Event{
+			Name:      "now",
+			ID:        olderEventId.String(),
+			Timestamp: olderEventTime.UnixMilli(),
+		},
+	}
+
+	require.NoError(t, redisDebouncer.updateDebounce(ctx, olderDi, fn, 10*time.Second, *debounceID, false))
+
+	queueItemID := queue.HashID(ctx, debounceID.String())
+	recoveredQueueItem, err := shard.LoadQueueItem(ctx, queueItemID)
+	require.NoError(t, err)
+	require.Equal(t, queue.KindDebounce, recoveredQueueItem.Data.Kind)
+
+	rawPayload, ok := recoveredQueueItem.Data.Payload.(json.RawMessage)
+	require.True(t, ok)
+	var payload DebouncePayload
+	require.NoError(t, json.Unmarshal(rawPayload, &payload))
+	require.Equal(t, *debounceID, payload.DebounceID)
+
+	di, err := redisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), *debounceID)
+	require.NoError(t, err)
+	di.Event.ClearSize()
+	require.Equal(t, newerDi, *di)
+
+	require.NoError(t, redisDebouncer.StartExecution(ctx, *di, fn, payload.DebounceID))
+}
+
 func TestDebouncePrimaryChooser(t *testing.T) {
 	unshardedCluster := miniredis.RunT(t)
 	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -1520,7 +1621,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -1724,7 +1825,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		Debounce: &inngest.Debounce{
 			Key:     nil,
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -1901,7 +2002,7 @@ func TestRollbackPreparedMigrationKeepsMigratingFlagWhenPointerRestoreFails(t *t
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2010,7 +2111,7 @@ func TestFinalizePreparedMigrationCommitsWhenPrimaryReadyAfterError(t *testing.T
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2142,7 +2243,7 @@ func TestCompletePreparedMigrationKeepsMigratingFlagWhenSecondaryCleanupFails(t 
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 	key := functionID.String()
@@ -2275,7 +2376,7 @@ func TestDebounceMigrationFailurePreservesExistingDebounce(t *testing.T) {
 		ID: functionID,
 		Debounce: &inngest.Debounce{
 			Period:  "10s",
-			Timeout: util.StrPtr("60s"),
+			Timeout: new("60s"),
 		},
 	}
 
@@ -2394,7 +2495,7 @@ func TestGetDebounceInfo(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil, // Uses function ID as key
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2433,9 +2534,9 @@ func TestGetDebounceInfo(t *testing.T) {
 		fn := inngest.Function{
 			ID: customFnId,
 			Debounce: &inngest.Debounce{
-				Key:     util.StrPtr("event.data.debounce_key"),
+				Key:     new("event.data.debounce_key"),
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2478,7 +2579,7 @@ func TestGetDebounceInfo(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2582,7 +2683,7 @@ func TestDeleteDebounce(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2677,7 +2778,7 @@ func TestRunDebounce(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 
@@ -2758,7 +2859,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 			Debounce: &inngest.Debounce{
 				Key:     nil,
 				Period:  "10s",
-				Timeout: util.StrPtr("60s"),
+				Timeout: new("60s"),
 			},
 		}
 

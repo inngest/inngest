@@ -61,7 +61,7 @@ func TestV2InvokeFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      fnID,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -112,7 +112,7 @@ func TestV2InvokeFunctionIdempotency(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      fnID,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

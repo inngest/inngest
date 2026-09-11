@@ -20,13 +20,22 @@ type Request struct {
 	CallCtx CallCtx `json:"ctx"`
 	// UseAPI indicates whether the input request is too large (> 4MB) to be pushed
 	// to each function run, and should instead be fetched from the API on run.
+	//
+	// Deprecated: this is moved into CallCtx for V3+/non-TypeScript SDKs.
 	UseAPI bool `json:"use_api"`
+}
+
+// UsesAPI reports whether the request data should be fetched from the API.
+// It supports both the current context field and the deprecated top-level field.
+func (r Request) UsesAPI() bool {
+	return r.CallCtx.UseAPI || r.UseAPI
 }
 
 // CallCtx represents context for individual function calls.  This logs the function ID, the
 // specific run ID, and sep information.
 type CallCtx struct {
 	DisableImmediateExecution bool      `json:"disable_immediate_execution"`
+	UseAPI                    bool      `json:"use_api"`
 	Env                       string    `json:"env"`
 	FunctionID                uuid.UUID `json:"fn_id"`
 	RunID                     string    `json:"run_id"`

@@ -7,6 +7,11 @@ import {
   HorizontalPlanCard,
   VerticalPlanCard,
 } from '@/components/Billing/Plans/PlanCard';
+import {
+  HOBBY_PLAN_SLUG,
+  PRO_PLAN_AMOUNT_CENTS,
+  PRO_PLAN_SLUG,
+} from '@/components/Billing/Plans/constants';
 import { type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan } from '@/queries/server/billing';
 import { pathCreator } from '@/utils/urls';
@@ -38,7 +43,7 @@ function BillingPlansPage() {
   const plans: Plan[] = [
     {
       id: 'n/a',
-      slug: 'hobby-free-2025-08-08',
+      slug: HOBBY_PLAN_SLUG,
       name: 'Hobby',
       amount: 0,
       billingPeriod: 'month',
@@ -52,9 +57,9 @@ function BillingPlansPage() {
     },
     {
       id: 'n/a',
-      slug: 'pro-2026-06-29',
+      slug: PRO_PLAN_SLUG,
       name: 'Pro',
-      amount: 9900,
+      amount: PRO_PLAN_AMOUNT_CENTS,
       billingPeriod: 'month',
       entitlements: {
         concurrency: { limit: 100 },
