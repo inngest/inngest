@@ -11,19 +11,70 @@ import {
   formatCentsMonthly,
   formatCompactNumber,
   getCurrentInfraTierId,
-  getInfraPlanBillingAction,
+  getInfraPlanBillingAction as getInfraPlanBillingActionImpl,
   getUtcMonthToDateRange,
   inferInfraPlanSku,
   isEnterprisePlanName,
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
-  pickCheapestEnabledProPlanAmount,
   pickInfraConcurrencyAddon,
   sumMetricValues,
   sumTimeSeriesValues,
 } from './utils';
 import { INFRA_DASHBOARD_PLACEHOLDERS } from './placeholderData';
+
+const concurrencyAddon = {
+  available: true,
+  baseValue: 100,
+  maxValue: 1_000,
+  name: 'concurrency',
+  price: 2_500,
+  purchaseCount: 0,
+  quantityPer: 25,
+};
+const freePlan = {
+  addons: {
+    concurrency: {
+      ...concurrencyAddon,
+      available: false,
+      baseValue: 5,
+    },
+  },
+  amount: 0,
+  billingPeriod: 'month',
+  entitlements: {
+    concurrency: { limit: 5 },
+    eventSize: { limit: 256 },
+    executions: { limit: 50_000 },
+    history: { limit: 1 },
+    runCount: { limit: null },
+    stepCount: { limit: null },
+  },
+  id: 'hobby-plan',
+  isFree: true,
+  isLegacy: false,
+  name: 'Hobby',
+  slug: 'hobby-free-2025-08-08',
+};
+const proPlan = {
+  addons: { concurrency: concurrencyAddon },
+  amount: 9_900,
+  billingPeriod: 'month',
+  entitlements: {
+    concurrency: { limit: 100 },
+    eventSize: { limit: 3_072 },
+    executions: { limit: 1_000_000 },
+    history: { limit: 7 },
+    runCount: { limit: null },
+    stepCount: { limit: null },
+  },
+  id: 'pro-plan',
+  isFree: false,
+  isLegacy: false,
+  name: 'Pro',
+  slug: 'pro-2026-06-29',
+};
 
 describe('infra dashboard formatters', () => {
   it('formats compact numbers and bytes', () => {
@@ -66,18 +117,6 @@ describe('infra dashboard formatters', () => {
     expect(isEnterprisePlanName('Legacy ENTERPRISE Plus')).toBe(true);
     expect(isEnterprisePlanName('Pro')).toBe(false);
     expect(isEnterprisePlanName(null)).toBe(false);
-  });
-
-  it('picks the cheapest enabled Pro plan amount from GQL plans', () => {
-    expect(
-      pickCheapestEnabledProPlanAmount([
-        { amount: 19_900, isFree: false, isLegacy: false, name: 'Pro Plus' },
-        { amount: 0, isFree: true, isLegacy: false, name: 'Pro Trial' },
-        { amount: 4_900, isFree: false, isLegacy: true, name: 'Legacy Pro' },
-        { amount: 7_500, isFree: false, isLegacy: false, name: 'Pro' },
-        { amount: 2_500, isFree: false, isLegacy: false, name: 'Basic' },
-      ]),
-    ).toBe(7_500);
   });
 });
 
@@ -235,10 +274,11 @@ describe('infra dashboard billing plan merge', () => {
     expect(result.currentPlanSku).toBe('IN-XL');
   });
 
-  it('uses the live Pro plan amount for the IN-S row price', () => {
+  it('uses live plan and add-on prices for infra row prices', () => {
     const result = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: null,
       defaultSku: 'IN-S',
+      hobbyPlan: freePlan,
       plan: {
         amount: 0,
         isFree: true,
@@ -246,11 +286,23 @@ describe('infra dashboard billing plan merge', () => {
         slug: 'hobby-free-2025-08-08',
       },
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
-      proPlanAmountCents: 9_900,
+      proPlan,
     });
 
+    expect(result.plans.find((plan) => plan.sku === 'IN-XS')).toMatchObject({
+      priceMonthly: '$0',
+    });
     expect(result.plans.find((plan) => plan.sku === 'IN-S')).toMatchObject({
       priceMonthly: '$99',
+    });
+    expect(result.plans.find((plan) => plan.sku === 'IN-M')).toMatchObject({
+      priceMonthly: '$249',
+    });
+    expect(result.plans.find((plan) => plan.sku === 'IN-L')).toMatchObject({
+      priceMonthly: '$499',
+    });
+    expect(result.plans.find((plan) => plan.sku === 'IN-XL')).toMatchObject({
+      priceMonthly: '$999',
     });
   });
 
@@ -262,27 +314,12 @@ describe('infra dashboard billing plan merge', () => {
 });
 
 describe('infra dashboard billing actions', () => {
-  const concurrencyAddon = {
-    available: true,
-    baseValue: 100,
-    maxValue: 1_000,
-    name: 'concurrency',
-    price: 9_900,
-    purchaseCount: 0,
-    quantityPer: 100,
-  };
-  const freePlan = {
-    amount: 0,
-    isFree: true,
-    name: 'Hobby',
-    slug: 'hobby-free-2025-08-08',
-  };
-  const proPlan = {
-    amount: 9_900,
-    isFree: false,
-    name: 'Pro',
-    slug: 'pro-2026-06-29',
-  };
+  const getInfraPlanBillingAction = (
+    args: Omit<
+      Parameters<typeof getInfraPlanBillingActionImpl>[0],
+      'hobbyPlan' | 'proPlan'
+    >,
+  ) => getInfraPlanBillingActionImpl({ ...args, hobbyPlan: freePlan, proPlan });
 
   it('opens Pro checkout when a free account selects IN-S', () => {
     expect(
@@ -305,20 +342,21 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
-  it('uses the live Pro plan amount when selecting IN-S', () => {
+  it('uses the backend Pro plan when selecting IN-S', () => {
     expect(
-      getInfraPlanBillingAction({
+      getInfraPlanBillingActionImpl({
         concurrencyAddon,
         currentConcurrencyLimit: 5,
         currentPlan: freePlan,
         currentPlanSku: 'IN-XS',
-        proPlanAmountCents: 6_500,
+        hobbyPlan: freePlan,
+        proPlan: { ...proPlan, amount: 6_500, slug: 'pro-from-api' },
         targetSku: 'IN-S',
       }),
     ).toMatchObject({
       item: {
         amount: 6_500,
-        planSlug: 'pro-2026-06-29',
+        planSlug: 'pro-from-api',
       },
       type: 'upgrade-base-plan',
     });
@@ -339,6 +377,64 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
+  it('allows checkout for an available plan when the other plan is missing', () => {
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        hobbyPlan: null,
+        proPlan,
+        targetSku: 'IN-S',
+      }),
+    ).toMatchObject({
+      item: { planSlug: proPlan.slug },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        hobbyPlan: freePlan,
+        proPlan: null,
+        targetSku: 'IN-XS',
+      }),
+    ).toMatchObject({
+      item: { planSlug: freePlan.slug },
+      type: 'cancel-to-free',
+    });
+  });
+
+  it('disables only checkout actions backed by a missing plan', () => {
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        hobbyPlan: null,
+        proPlan,
+        targetSku: 'IN-XS',
+      }),
+    ).toEqual({ reason: 'Hobby plan is unavailable.', type: 'unavailable' });
+
+    expect(
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        hobbyPlan: freePlan,
+        proPlan: null,
+        targetSku: 'IN-S',
+      }),
+    ).toEqual({ reason: 'Pro plan is unavailable.', type: 'unavailable' });
+  });
+
   it('opens Pro checkout with a follow-up addon quantity for IN-L', () => {
     expect(
       getInfraPlanBillingAction({
@@ -351,8 +447,8 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       addonUpdate: {
         addonName: 'concurrency',
-        addonQuantity: 4,
-        targetMonthlyAmountCents: 59_900,
+        addonQuantity: 16,
+        targetMonthlyAmountCents: 49_900,
         targetConcurrency: 500,
         targetSku: 'IN-L',
       },
@@ -371,8 +467,8 @@ describe('infra dashboard billing actions', () => {
       }),
     ).toEqual({
       addonName: 'concurrency',
-      addonQuantity: 2,
-      estimatedMonthlyAddonCost: 19_800,
+      addonQuantity: 6,
+      estimatedMonthlyAddonCost: 15_000,
       isIncrease: true,
       targetConcurrency: 250,
       targetMonthlyAmountCents: 24_900,
@@ -381,7 +477,7 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
-  it('calculates addon quantity from Pro base concurrency instead of addon base value', () => {
+  it('uses Pro plan add-on metadata instead of current account metadata', () => {
     expect(
       getInfraPlanBillingAction({
         concurrencyAddon: { ...concurrencyAddon, baseValue: 0 },
@@ -391,7 +487,7 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-M',
       }),
     ).toMatchObject({
-      addonQuantity: 2,
+      addonQuantity: 6,
       targetConcurrency: 250,
       targetMonthlyAmountCents: 24_900,
       type: 'update-concurrency-addon',
@@ -517,7 +613,7 @@ describe('infra dashboard billing actions', () => {
       }),
     ).toMatchObject({
       addonUpdate: {
-        addonQuantity: 4,
+        addonQuantity: 16,
         targetConcurrency: 500,
         targetSku: 'IN-L',
       },
@@ -543,7 +639,7 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
-  it('allows legacy plans to select every paid SKU without addon metadata', () => {
+  it('uses Pro plan add-on metadata when account metadata is unavailable', () => {
     const legacyPlan = {
       amount: 49_900,
       isFree: false,
@@ -578,7 +674,7 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       addonUpdate: {
         addonName: 'concurrency',
-        addonQuantity: 2,
+        addonQuantity: 6,
         targetConcurrency: 250,
         targetMonthlyAmountCents: 24_900,
         targetSku: 'IN-M',
@@ -600,9 +696,9 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       addonUpdate: {
         addonName: 'concurrency',
-        addonQuantity: 4,
+        addonQuantity: 16,
         targetConcurrency: 500,
-        targetMonthlyAmountCents: 59_900,
+        targetMonthlyAmountCents: 49_900,
         targetSku: 'IN-L',
       },
       item: {
@@ -622,9 +718,9 @@ describe('infra dashboard billing actions', () => {
     ).toMatchObject({
       addonUpdate: {
         addonName: 'concurrency',
-        addonQuantity: 9,
+        addonQuantity: 36,
         targetConcurrency: 1_000,
-        targetMonthlyAmountCents: 119_900,
+        targetMonthlyAmountCents: 99_900,
         targetSku: 'IN-XL',
       },
       item: {
@@ -636,20 +732,34 @@ describe('infra dashboard billing actions', () => {
 
   it('returns unavailable for missing addon data or targets above addon max', () => {
     expect(
-      getInfraPlanBillingAction({
-        concurrencyAddon: { ...concurrencyAddon, price: null },
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
         currentConcurrencyLimit: 100,
         currentPlan: proPlan,
         currentPlanSku: 'IN-S',
+        hobbyPlan: freePlan,
+        proPlan: {
+          ...proPlan,
+          addons: {
+            concurrency: { ...concurrencyAddon, price: null },
+          },
+        },
         targetSku: 'IN-M',
       }),
     ).toMatchObject({ type: 'unavailable' });
     expect(
-      getInfraPlanBillingAction({
-        concurrencyAddon: { ...concurrencyAddon, maxValue: 500 },
+      getInfraPlanBillingActionImpl({
+        concurrencyAddon,
         currentConcurrencyLimit: 500,
         currentPlan: proPlan,
         currentPlanSku: 'IN-L',
+        hobbyPlan: freePlan,
+        proPlan: {
+          ...proPlan,
+          addons: {
+            concurrency: { ...concurrencyAddon, maxValue: 500 },
+          },
+        },
         targetSku: 'IN-XL',
       }),
     ).toMatchObject({ type: 'unavailable' });
