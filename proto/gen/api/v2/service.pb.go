@@ -997,6 +997,7 @@ type FunctionRef struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	App           *AppRef                `protobuf:"bytes,3,opt,name=app,proto3" json:"app,omitempty"`
+	Slug          *string                `protobuf:"bytes,4,opt,name=slug,proto3,oneof" json:"slug,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1050,6 +1051,13 @@ func (x *FunctionRef) GetApp() *AppRef {
 		return x.App
 	}
 	return nil
+}
+
+func (x *FunctionRef) GetSlug() string {
+	if x != nil && x.Slug != nil {
+		return *x.Slug
+	}
+	return ""
 }
 
 type AppRef struct {
@@ -2072,6 +2080,8 @@ type FunctionRun struct {
 	DurationMs    *uint64                `protobuf:"varint,8,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
 	Trigger       *RunTrigger            `protobuf:"bytes,9,opt,name=trigger,proto3" json:"trigger,omitempty"`
 	Output        *structpb.Struct       `protobuf:"bytes,10,opt,name=output,proto3,oneof" json:"output,omitempty"`
+	IsDeferred    *bool                  `protobuf:"varint,11,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
+	HasAi         *bool                  `protobuf:"varint,12,opt,name=has_ai,json=hasAi,proto3,oneof" json:"has_ai,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2174,6 +2184,20 @@ func (x *FunctionRun) GetOutput() *structpb.Struct {
 		return x.Output
 	}
 	return nil
+}
+
+func (x *FunctionRun) GetIsDeferred() bool {
+	if x != nil && x.IsDeferred != nil {
+		return *x.IsDeferred
+	}
+	return false
+}
+
+func (x *FunctionRun) GetHasAi() bool {
+	if x != nil && x.HasAi != nil {
+		return *x.HasAi
+	}
+	return false
 }
 
 type GetFunctionRunRequest struct {
@@ -8365,6 +8389,7 @@ type ListRunsRequest struct {
 	FunctionId    []string               `protobuf:"bytes,9,rep,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
 	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	Query         *string                `protobuf:"bytes,12,opt,name=query,proto3,oneof" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8476,6 +8501,13 @@ func (x *ListRunsRequest) GetOrder() string {
 	return ""
 }
 
+func (x *ListRunsRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
+	}
+	return ""
+}
+
 type ListFunctionRunsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
@@ -8489,6 +8521,7 @@ type ListFunctionRunsRequest struct {
 	Status        []string               `protobuf:"bytes,9,rep,name=status,proto3" json:"status,omitempty"`
 	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
 	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	Query         *string                `protobuf:"bytes,12,opt,name=query,proto3,oneof" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8596,6 +8629,13 @@ func (x *ListFunctionRunsRequest) GetIsDeferred() bool {
 func (x *ListFunctionRunsRequest) GetOrder() string {
 	if x != nil {
 		return x.Order
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
 	}
 	return ""
 }
@@ -8886,11 +8926,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"time_range\x18\x03 \x01(\v2\x11.api.v2.TimeRangeR\ttimeRange\"m\n" +
 	"\tTimeRange\x12.\n" +
 	"\x04from\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x120\n" +
-	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"S\n" +
+	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"u\n" +
 	"\vFunctionRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\x03app\x18\x03 \x01(\v2\x0e.api.v2.AppRefR\x03app\"\x18\n" +
+	"\x03app\x18\x03 \x01(\v2\x0e.api.v2.AppRefR\x03app\x12\x17\n" +
+	"\x04slug\x18\x04 \x01(\tH\x00R\x04slug\x88\x01\x01B\a\n" +
+	"\x05_slug\"\x18\n" +
 	"\x06AppRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"O\n" +
 	"\vFunctionApp\x12\x0e\n" +
@@ -8989,7 +9031,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\rcron_schedule\x18\x05 \x01(\tH\x02R\fcronSchedule\x88\x01\x01B\r\n" +
 	"\v_event_nameB\v\n" +
 	"\t_batch_idB\x10\n" +
-	"\x0e_cron_schedule\"\x99\x04\n" +
+	"\x0e_cron_schedule\"\xf6\x04\n" +
 	"\vFunctionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
 	"\bfunction\x18\x02 \x01(\v2\x13.api.v2.FunctionRefR\bfunction\x12 \n" +
@@ -9003,11 +9045,16 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"durationMs\x88\x01\x01\x12,\n" +
 	"\atrigger\x18\t \x01(\v2\x12.api.v2.RunTriggerR\atrigger\x124\n" +
 	"\x06output\x18\n" +
-	" \x01(\v2\x17.google.protobuf.StructH\x03R\x06output\x88\x01\x01B\r\n" +
+	" \x01(\v2\x17.google.protobuf.StructH\x03R\x06output\x88\x01\x01\x12$\n" +
+	"\vis_deferred\x18\v \x01(\bH\x04R\n" +
+	"isDeferred\x88\x01\x01\x12\x1a\n" +
+	"\x06has_ai\x18\f \x01(\bH\x05R\x05hasAi\x88\x01\x01B\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\x0e\n" +
 	"\f_duration_msB\t\n" +
-	"\a_output\"m\n" +
+	"\a_outputB\x0e\n" +
+	"\f_is_deferredB\t\n" +
+	"\a_has_ai\"m\n" +
 	"\x15GetFunctionRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
 	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
@@ -9571,7 +9618,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xf5\b\n" +
+	"\t_ended_at\"\xe3\t\n" +
 	"\x0fListRunsRequest\x12*\n" +
 	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
@@ -9587,13 +9634,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vis_deferred\x18\n" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
-	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01B\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
-	"\f_is_deferred\"\xc6\b\n" +
+	"\f_is_deferredB\b\n" +
+	"\x06_query\"\xb4\t\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
@@ -9609,13 +9658,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vis_deferred\x18\n" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
-	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01B\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
-	"\f_is_deferred\"\x93\x01\n" +
+	"\f_is_deferredB\b\n" +
+	"\x06_query\"\x93\x01\n" +
 	"\x10ListRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
@@ -10850,6 +10901,7 @@ func file_api_v2_service_proto_init() {
 	}
 	file_api_v2_sandbox_proto_init()
 	file_api_v2_options_proto_init()
+	file_api_v2_service_proto_msgTypes[8].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[11].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[13].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[14].OneofWrappers = []any{}

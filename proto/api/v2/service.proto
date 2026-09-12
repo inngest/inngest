@@ -2217,6 +2217,7 @@ message FunctionRef {
   string id = 1;
   string name = 2;
   AppRef app = 3;
+  optional string slug = 4;
 }
 
 message AppRef {
@@ -2353,6 +2354,8 @@ message FunctionRun {
   optional uint64 duration_ms = 8;
   RunTrigger trigger = 9;
   optional google.protobuf.Struct output = 10;
+  optional bool is_deferred = 11;
+  optional bool has_ai = 12;
 }
 
 message GetFunctionRunRequest {
@@ -3615,6 +3618,11 @@ message ListRunsRequest {
       default: "DESC"
     }
   ];
+  optional string query = 12 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "CEL expression used to filter runs by event, output, or error data"
+    }
+  ];
 }
 
 message ListFunctionRunsRequest {
@@ -3662,6 +3670,11 @@ message ListFunctionRunsRequest {
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Sort direction. Accepts ASC or DESC."
       default: "DESC"
+    }
+  ];
+  optional string query = 12 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "CEL expression used to filter runs by event, output, or error data"
     }
   ];
 }

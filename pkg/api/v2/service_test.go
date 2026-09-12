@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -1044,6 +1046,7 @@ func TestService_ListRuns(t *testing.T) {
 	from := startedAt.Add(-time.Hour)
 	until := startedAt.Add(time.Hour)
 	isDeferred := false
+	hasAI := true
 	limit := int32(1)
 	pageCursor, err := (&cqrs.TracePageCursor{
 		ID: runID.String(),
@@ -1062,7 +1065,11 @@ func TestService_ListRuns(t *testing.T) {
 		EndedAt:      &endedAt,
 		FunctionID:   "test-fn",
 		FunctionName: "Test function",
+		FunctionSlug: "test-fn-slug",
 		AppID:        "my-app",
+		EventName:    "app/tested",
+		IsDeferred:   &isDeferred,
+		HasAI:        &hasAI,
 	}
 
 	t.Run("returns mapped runs with filters", func(t *testing.T) {
@@ -1079,7 +1086,8 @@ func TestService_ListRuns(t *testing.T) {
 			FunctionIDs:   []string{"test-fn"},
 			IsDeferred:    &isDeferred,
 			Order:         OrderDirectionAsc,
-		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
+			CEL:           `event.data.userId == "123"`,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, Cursor: pageCursor, HasMore: true}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
 		})
@@ -1097,19 +1105,24 @@ func TestService_ListRuns(t *testing.T) {
 			FunctionId:    []string{"test-fn"},
 			IsDeferred:    &isDeferred,
 			Order:         "asc",
+			Query:         new(`event.data.userId == "123"`),
 		})
 
 		require.NoError(t, err)
 		require.Len(t, resp.Data, 1)
 		require.Equal(t, runID.String(), resp.Data[0].Id)
 		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
+		require.Equal(t, "test-fn-slug", resp.Data[0].Function.GetSlug())
 		require.Equal(t, "my-app", resp.Data[0].App.Id)
+		require.Equal(t, "app/tested", resp.Data[0].Trigger.GetEventName())
+		require.False(t, resp.Data[0].GetIsDeferred())
+		require.True(t, resp.Data[0].GetHasAi())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
 		require.NotNil(t, resp.Metadata.TimeRange)
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
 		require.Equal(t, until, resp.Metadata.TimeRange.Until.AsTime())
 		require.True(t, resp.Page.HasMore)
-		require.Equal(t, "opaque-cursor", resp.Page.GetCursor())
+		require.Equal(t, pageCursor, resp.Page.GetCursor())
 		require.Equal(t, int32(1), resp.Page.Limit)
 	})
 
@@ -1153,6 +1166,44 @@ func TestService_ListRuns(t *testing.T) {
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Cursor is invalid")
 	})
+
+	t.Run("uses a provider cursor for an empty continuing page", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(&GetRunsResult{
+			Cursor:  "provider-cursor",
+			HasMore: true,
+		}, nil).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: new(`event.name == "app/test"`),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, resp.Data)
+		require.True(t, resp.Page.HasMore)
+		require.Equal(t, "provider-cursor", resp.Page.GetCursor())
+	})
+
+	t.Run("maps expression errors", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("compile CEL: %w", ErrExpressionInvalid)).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: new("not valid"),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, apiv2base.ErrorExpressionInvalid)
+	})
+
+	t.Run("rejects queries over 2048 bytes", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Runs: &mockRunProvider{}}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: new(strings.Repeat("é", maxRunsCELBytes/2+1)),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, apiv2base.ErrorQueryTooLong)
+	})
 }
 
 func TestService_ListFunctionRuns(t *testing.T) {
@@ -1180,6 +1231,7 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		AppIDs:      []string{"inngest ai"},
 		FunctionIDs: []string{"hello/world"},
 		Order:       OrderDirectionDesc,
+		CEL:         `output.status == "sent"`,
 	}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
 	t.Cleanup(func() {
 		reader.AssertExpectations(t)
@@ -1190,6 +1242,7 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		AppId:      "inngest%20ai",
 		FunctionId: "hello%2Fworld",
 		Limit:      &limit,
+		Query:      new(`output.status == "sent"`),
 	})
 
 	require.NoError(t, err)
@@ -1197,6 +1250,17 @@ func TestService_ListFunctionRuns(t *testing.T) {
 	require.Equal(t, runID.String(), resp.Data[0].Id)
 	require.Equal(t, "hello-world", resp.Data[0].Function.Id)
 	require.Equal(t, "inngest-ai", resp.Data[0].App.Id)
+
+	t.Run("rejects queries over 2048 bytes", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Runs: &mockRunProvider{}}).ListFunctionRuns(t.Context(), &apiv2.ListFunctionRunsRequest{
+			AppId:      "my-app",
+			FunctionId: "test-fn",
+			Query:      new(strings.Repeat("é", maxRunsCELBytes/2+1)),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, apiv2base.ErrorQueryTooLong)
+	})
 }
 
 func TestRunStatusesFromAPI(t *testing.T) {

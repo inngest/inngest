@@ -111,6 +111,7 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 			From:         from,
 			Until:        until,
 			Status:       opts.Status,
+			CEL:          opts.CEL,
 			IsDeferred:   opts.IsDeferred,
 		},
 		Order: []cqrs.GetTraceRunOrder{{
@@ -122,6 +123,9 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		IncludeOutput: opts.IncludeOutput,
 	})
 	if err != nil {
+		if errors.Is(err, cqrs.ErrInvalidRunExpression) {
+			return nil, fmt.Errorf("%w: %v", apiv2.ErrExpressionInvalid, err)
+		}
 		return nil, err
 	}
 
@@ -303,8 +307,10 @@ func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput bool) *apiv2.RunListI
 		Cursor:       row.Cursor,
 		RunStartedAt: row.StartedAt,
 		FunctionID:   row.FunctionID.String(),
+		FunctionSlug: row.FunctionSlug,
 		AppID:        row.AppID.String(),
 		Status:       row.Status,
+		IsDeferred:   &row.IsDeferred,
 	}
 	if len(row.TriggerIDs) > 0 {
 		run.EventID, _ = ulid.Parse(row.TriggerIDs[0])
