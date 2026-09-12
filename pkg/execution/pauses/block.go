@@ -962,6 +962,25 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 		return
 	}
 
+	// Before writing, verify the block still exists in the index.  A concurrent
+	// deleteBlock call may have removed it while we were computing the compacted
+	// version.  Writing here would resurrect the block.
+	score, err := b.pc.Client().Do(
+		ctx,
+		b.pc.Client().B().Zscore().Key(blockIndexKey(index)).Member(blockID.String()).Build(),
+	).AsFloat64()
+	if err != nil || score == 0 {
+		if rueidis.IsRedisNil(err) {
+			l.Debug("block removed from index during compaction, skipping write", "block_id", blockID)
+			status = "skipped"
+			return
+		}
+		if err != nil {
+			l.ReportError(err, "error checking block index before compaction write", blockIDTags)
+			return
+		}
+	}
+
 	key := b.BlockKey(index, blockID)
 	if err := b.bucket.WriteAll(ctx, key, byt, nil); err != nil {
 		l.ReportError(err, "error writing compacted block to storage", blockIDTags)
@@ -1267,6 +1286,16 @@ func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.
 	err = b.bucket.Delete(ctx, blobKey)
 	if err != nil {
 		return fmt.Errorf("error removing block from blob storage: %w", err)
+	}
+
+	// Guard against a concurrent compactBlock re-adding the block to the index
+	// between our ZREM above and now.  If the block reappeared, remove it again
+	// along with any metadata or delete-tracking that was recreated.
+	reappeared, _ := b.pc.Client().Do(ctx, b.pc.Client().B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
+	if reappeared > 0 {
+		_ = b.pc.Client().Do(ctx, b.pc.Client().B().Zrem().Key(indexKey).Member(blockID.String()).Build()).Error()
+		_ = b.pc.Client().Do(ctx, b.pc.Client().B().Hdel().Key(metadataKey).Field(blockID.String()).Build()).Error()
+		_ = b.pc.Client().Do(ctx, b.pc.Client().B().Del().Key(deleteKey).Build()).Error()
 	}
 
 	return nil
