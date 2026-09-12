@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -299,8 +298,6 @@ type QueuePartitionReader interface {
 	// PartitionSize returns the point-in-time ready queue size of a partition.
 	PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error)
 
-	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 	// PartitionByID retrieves the partition by the partition ID
 	PartitionByID(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error)
 }
@@ -312,10 +309,6 @@ type QueueBacklogReader interface {
 	// by summing the size of all backlogs in that partition.
 	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
 
-	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
 	// BacklogByID retrieves a single backlog by its ID
