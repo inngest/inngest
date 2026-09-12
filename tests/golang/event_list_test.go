@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
@@ -671,6 +673,50 @@ func TestEventList(t *testing.T) {
 			return e.Node.Name == eventName
 		}))
 
+	})
+
+	t.Run("limit exceeds max returns 400", func(t *testing.T) {
+		r := require.New(t)
+		c := client.New(t)
+
+		for _, limit := range []int{cqrs.MaxEvents + 1, 1000, -1} {
+			req, err := c.NewRequest(http.MethodGet, fmt.Sprintf("/v1/events?limit=%d", limit), nil)
+			r.NoError(err)
+
+			resp, err := c.Do(req)
+			r.NoError(err)
+			defer resp.Body.Close()
+
+			var body struct {
+				Error  string `json:"error"`
+				Status int    `json:"status"`
+			}
+			r.NoError(json.NewDecoder(resp.Body).Decode(&body))
+			r.Equal(http.StatusBadRequest, body.Status, "limit=%d should return 400, got %d: %s", limit, body.Status, body.Error)
+			r.NotEmpty(body.Error)
+		}
+	})
+
+	t.Run("limit within max returns 200", func(t *testing.T) {
+		r := require.New(t)
+		c := client.New(t)
+
+		for _, limit := range []int{1, 25, cqrs.MaxEvents} {
+			req, err := c.NewRequest(http.MethodGet, fmt.Sprintf("/v1/events?limit=%d", limit), nil)
+			r.NoError(err)
+
+			resp, err := c.Do(req)
+			r.NoError(err)
+			defer resp.Body.Close()
+
+			var body struct {
+				Data     json.RawMessage `json:"data"`
+				Metadata json.RawMessage `json:"metadata"`
+			}
+			r.NoError(json.NewDecoder(resp.Body).Decode(&body))
+			r.NotNil(body.Data, "limit=%d should return data", limit)
+			r.NotNil(body.Metadata, "limit=%d should return metadata", limit)
+		}
 	})
 
 }
