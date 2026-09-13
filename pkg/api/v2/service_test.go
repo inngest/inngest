@@ -1076,7 +1076,7 @@ func TestService_ListRuns(t *testing.T) {
 			From:          &from,
 			Until:         &until,
 			TimeField:     RunTimeFieldStartedAt,
-			Status:        []enums.RunStatus{enums.RunStatusCompleted},
+			Status:        []apiv2.FunctionRunStatus{apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED},
 			AppIDs:        []string{"my-app"},
 			FunctionIDs:   []string{"test-fn"},
 			IsDeferred:    &isDeferred,
@@ -1187,6 +1187,20 @@ func TestService_ListRuns(t *testing.T) {
 		require.ErrorContains(t, err, apiv2base.ErrorExpressionInvalid)
 	})
 
+	t.Run("maps unsupported paused status errors", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(nil, ErrPausedRunStatusNotSupported).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Status: []string{"PAUSED"},
+		})
+
+		require.Nil(t, resp)
+		require.Equal(t, codes.Unimplemented, status.Code(err))
+		require.ErrorContains(t, err, apiv2base.ErrorNotImplemented)
+		require.ErrorContains(t, err, "Filtering runs by PAUSED status is not implemented")
+	})
+
 	t.Run("rejects queries over 2048 bytes", func(t *testing.T) {
 		resp, err := NewService(ServiceOptions{Runs: &mockRunProvider{}}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
 			Query: new(strings.Repeat("é", maxRunsCELBytes/2+1)),
@@ -1218,7 +1232,7 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		Cursor:      "",
 		Limit:       20,
 		TimeField:   RunTimeFieldQueuedAt,
-		Status:      []enums.RunStatus{},
+		Status:      []apiv2.FunctionRunStatus{},
 		AppIDs:      []string{"inngest ai"},
 		FunctionIDs: []string{"hello/world"},
 		Order:       OrderDirectionDesc,
@@ -1255,14 +1269,16 @@ func TestService_ListFunctionRuns(t *testing.T) {
 }
 
 func TestRunStatusesFromAPI(t *testing.T) {
-	got, err := runStatusesFromAPI([]string{"COMPLETED", "failed", "RUNNING", " queued "})
+	got, err := runStatusesFromAPI([]string{"COMPLETED", "failed", "PAUSED", "RUNNING", " queued ", "SKIPPED"})
 
 	require.NoError(t, err)
-	require.Equal(t, []enums.RunStatus{
-		enums.RunStatusCompleted,
-		enums.RunStatusFailed,
-		enums.RunStatusRunning,
-		enums.RunStatusScheduled,
+	require.Equal(t, []apiv2.FunctionRunStatus{
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED,
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED,
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED,
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING,
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED,
+		apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED,
 	}, got)
 
 	_, err = runStatusesFromAPI([]string{"FUNCTION_RUN_STATUS_COMPLETED"})

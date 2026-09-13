@@ -35,6 +35,9 @@ const (
 	FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED   FunctionRunStatus = 3
 	FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED      FunctionRunStatus = 4
 	FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED   FunctionRunStatus = 5
+	FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED     FunctionRunStatus = 6
+	// PAUSED is synthetic: the run is RUNNING, but its function is paused.
+	FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED FunctionRunStatus = 7
 )
 
 // Enum value maps for FunctionRunStatus.
@@ -46,6 +49,8 @@ var (
 		3: "FUNCTION_RUN_STATUS_COMPLETED",
 		4: "FUNCTION_RUN_STATUS_FAILED",
 		5: "FUNCTION_RUN_STATUS_CANCELLED",
+		6: "FUNCTION_RUN_STATUS_SKIPPED",
+		7: "FUNCTION_RUN_STATUS_PAUSED",
 	}
 	FunctionRunStatus_value = map[string]int32{
 		"FUNCTION_RUN_STATUS_UNSPECIFIED": 0,
@@ -54,6 +59,8 @@ var (
 		"FUNCTION_RUN_STATUS_COMPLETED":   3,
 		"FUNCTION_RUN_STATUS_FAILED":      4,
 		"FUNCTION_RUN_STATUS_CANCELLED":   5,
+		"FUNCTION_RUN_STATUS_SKIPPED":     6,
+		"FUNCTION_RUN_STATUS_PAUSED":      7,
 	}
 )
 
@@ -9587,7 +9594,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xe3\t\n" +
+	"\t_ended_at\"\xf5\t\n" +
 	"\x0fListRunsRequest\x12*\n" +
 	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
@@ -9595,8 +9602,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
 	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB(\x92A%2#Inclusive end of the run time rangeH\x04R\x05until\x88\x01\x01\x12\xe0\x01\n" +
 	"\n" +
-	"time_field\x18\x06 \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x87\x01\n" +
-	"\x06status\x18\a \x03(\tBo\x92Al2jStatuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLEDR\x06status\x12.\n" +
+	"time_field\x18\x06 \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x99\x01\n" +
+	"\x06status\x18\a \x03(\tB\x80\x01\x92A}2{Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, CANCELLED, SKIPPED, or PAUSEDR\x06status\x12.\n" +
 	"\x06app_id\x18\b \x03(\tB\x17\x92A\x142\x12App IDs to includeR\x05appId\x12=\n" +
 	"\vfunction_id\x18\t \x03(\tB\x1c\x92A\x192\x17Function IDs to includeR\n" +
 	"functionId\x12`\n" +
@@ -9611,7 +9618,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
 	"\f_is_deferredB\b\n" +
-	"\x06_query\"\xb4\t\n" +
+	"\x06_query\"\xc6\t\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
@@ -9622,8 +9629,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04from\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
 	"\x05until\x18\a \x01(\v2\x1a.google.protobuf.TimestampB(\x92A%2#Inclusive end of the run time rangeH\x04R\x05until\x88\x01\x01\x12\xe0\x01\n" +
 	"\n" +
-	"time_field\x18\b \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x87\x01\n" +
-	"\x06status\x18\t \x03(\tBo\x92Al2jStatuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLEDR\x06status\x12`\n" +
+	"time_field\x18\b \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x99\x01\n" +
+	"\x06status\x18\t \x03(\tB\x80\x01\x92A}2{Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, CANCELLED, SKIPPED, or PAUSEDR\x06status\x12`\n" +
 	"\vis_deferred\x18\n" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
@@ -9650,14 +9657,16 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.CancelRunDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"[\n" +
 	"\rCancelRunData\x12J\n" +
-	"\x06run_id\x18\x01 \x01(\tB3\x92A02\x10Cancelled run IDJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId*\xdf\x01\n" +
+	"\x06run_id\x18\x01 \x01(\tB3\x92A02\x10Cancelled run IDJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId*\xa0\x02\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
 	"\x1bFUNCTION_RUN_STATUS_RUNNING\x10\x02\x12!\n" +
 	"\x1dFUNCTION_RUN_STATUS_COMPLETED\x10\x03\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_FAILED\x10\x04\x12!\n" +
-	"\x1dFUNCTION_RUN_STATUS_CANCELLED\x10\x05*\xed\x01\n" +
+	"\x1dFUNCTION_RUN_STATUS_CANCELLED\x10\x05\x12\x1f\n" +
+	"\x1bFUNCTION_RUN_STATUS_SKIPPED\x10\x06\x12\x1e\n" +
+	"\x1aFUNCTION_RUN_STATUS_PAUSED\x10\a*\xed\x01\n" +
 	"\x0fTraceSpanStatus\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_UNKNOWN\x10\x00\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_RUNNING\x10\x01\x12\x1f\n" +

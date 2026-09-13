@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -97,7 +98,7 @@ type GetRunsOpts struct {
 	From          *time.Time
 	Until         *time.Time
 	TimeField     RunTimeField
-	Status        []enums.RunStatus
+	Status        []v2pb.FunctionRunStatus
 	AppIDs        []string
 	FunctionIDs   []string
 	IsDeferred    *bool
@@ -133,7 +134,9 @@ type RunListItem struct {
 
 	FunctionID   string
 	FunctionName string
-	AppID        string
+	// FunctionPaused carries function state that is not stored on the run itself.
+	FunctionPaused bool
+	AppID          string
 }
 
 type GetRunsResult struct {

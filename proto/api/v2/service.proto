@@ -2190,6 +2190,9 @@ enum FunctionRunStatus {
   FUNCTION_RUN_STATUS_COMPLETED = 3;
   FUNCTION_RUN_STATUS_FAILED = 4;
   FUNCTION_RUN_STATUS_CANCELLED = 5;
+  FUNCTION_RUN_STATUS_SKIPPED = 6;
+  // PAUSED is synthetic: the run is RUNNING, but its function is paused.
+  FUNCTION_RUN_STATUS_PAUSED = 7;
 }
 
 enum TraceSpanStatus {
@@ -3591,7 +3594,7 @@ message ListRunsRequest {
   ];
   repeated string status = 7 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLED"
+      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, CANCELLED, SKIPPED, or PAUSED"
     }
   ];
   repeated string app_id = 8 [
@@ -3655,7 +3658,7 @@ message ListFunctionRunsRequest {
   ];
   repeated string status = 9 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLED"
+      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, CANCELLED, SKIPPED, or PAUSED"
     }
   ];
   optional bool is_deferred = 10 [

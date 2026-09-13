@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -319,7 +320,7 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
 			Limit:       3,
 			TimeField:   RunTimeFieldStartedAt,
-			Status:      []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed},
+			Status:      []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
 			AppIDs:      []string{"my-app"},
 			FunctionIDs: []string{"test-fn"},
 			IsDeferred:  &isDeferred,
@@ -343,7 +344,7 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
 			Limit:       defaultRunsLimit,
 			TimeField:   RunTimeFieldQueuedAt,
-			Status:      []enums.RunStatus{},
+			Status:      []v2pb.FunctionRunStatus{},
 			AppIDs:      []string{"my-app"},
 			FunctionIDs: []string{"test-fn"},
 			Order:       OrderDirectionDesc,
