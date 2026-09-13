@@ -98,6 +98,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const [excludeDeferred = false] = useBooleanSearchParam('excludeDeferred');
+  const [forceRestRuns] = useBooleanSearchParam('forceRestRuns');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -152,7 +153,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   );
 
   const shouldUseREST =
-    restRunsEnabled &&
+    (forceRestRuns ?? restRunsEnabled) &&
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
