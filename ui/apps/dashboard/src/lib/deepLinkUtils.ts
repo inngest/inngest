@@ -3,6 +3,7 @@ export type DashboardDeepLinkSearchParams = {
   org?: string;
   expires?: string;
   sig?: string;
+  forceRestRuns?: string | boolean;
 };
 
 export type AgentDeepLinkSearch = {
@@ -100,6 +101,11 @@ export function validateDashboardDeepLinkSearch(
     org: typeof search.org === 'string' ? search.org : undefined,
     expires: typeof search.expires === 'string' ? search.expires : undefined,
     sig: typeof search.sig === 'string' ? search.sig : undefined,
+    forceRestRuns:
+      typeof search.forceRestRuns === 'string' ||
+      typeof search.forceRestRuns === 'boolean'
+        ? search.forceRestRuns
+        : undefined,
   };
 }
 
