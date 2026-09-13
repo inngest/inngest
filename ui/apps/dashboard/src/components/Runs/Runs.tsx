@@ -18,7 +18,8 @@ import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
-import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
+import { RunsOrderByField } from '@/gql/graphql';
+import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
@@ -43,9 +44,12 @@ type EnvProps = {
 
 type Props = FnProps | EnvProps;
 
-const parseCelSearchError = (combinedError: CombinedError | undefined) => {
-  return combinedError?.graphQLErrors.find(
-    (error) => error.extensions.code == 'expression_invalid',
+const parseCelSearchError = (error: CombinedError | Error | undefined) => {
+  // REST returns Error subclasses while URQL returns CombinedError. Check each
+  // shape before reading transport-specific fields.
+  if (!(error instanceof CombinedError)) return;
+  return error.graphQLErrors.find(
+    (item) => item.extensions.code === 'expression_invalid',
   );
 };
 
@@ -55,13 +59,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 ) {
   const env = useEnvironment();
 
-  const [{ data: pauseData }] = useQuery({
+  const [{ data: functionData }] = useFunction({
+    functionSlug: functionSlug ?? '',
     pause: scope !== 'fn',
-    query: GetFunctionPauseStateDocument,
-    variables: {
-      environmentID: env.id,
-      functionSlug: functionSlug ?? '',
-    },
   });
 
   const [appsRes] = useQuery({
@@ -75,6 +75,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const { value: tracePreviewEnabled } = booleanFlag(
     'traces-preview',
     true,
+    true,
+  );
+  const { value: restRunsEnabled } = booleanFlag(
+    'rest-runs-table',
+    false,
     true,
   );
   const [appIDs] = useStringArraySearchParam('filterApp');
@@ -112,6 +117,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       timeField,
       celQuery: search,
       isDeferred: excludeDeferred ? false : null,
+      environmentSlug: environment.slug,
+      functionAppID: functionData?.workspace.workflow?.app.externalID ?? null,
     }),
     [
       appIDs,
@@ -123,8 +130,15 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       timeField,
       search,
       excludeDeferred,
+      environment.slug,
+      functionData?.workspace.workflow?.app.externalID,
     ],
   );
+
+  const shouldUseREST =
+    restRunsEnabled &&
+    !search &&
+    (scope === 'env' || commonQueryVars.functionAppID !== null);
 
   // Use the new hook to manage pagination
   const {
@@ -138,6 +152,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   } = useRunsPagination({
     commonQueryVars,
     tracePreviewEnabled,
+    shouldUseREST,
   });
 
   const [countRes, countRefetch] = useQuery({
@@ -196,7 +211,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       onRefresh={onRefresh}
       onScrollToTop={onScrollToTop}
       getTrigger={getTrigger}
-      functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
+      functionIsPaused={functionData?.workspace.workflow?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
