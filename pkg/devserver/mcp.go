@@ -286,6 +286,17 @@ func (h *MCPHandler) addCompatibilityTools(server *mcp.Server) {
 		Name:        "send_event",
 		Title:       "Send event (deprecated)",
 		Description: "Deprecated compatibility tool retained for existing dev server integrations. Send an event to the Inngest dev server and return the event ID and any run IDs it creates. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name":        map[string]any{"type": "string"},
+				"data":        map[string]any{},
+				"user":        map[string]any{},
+				"eventIdSeed": map[string]any{"type": "string"},
+			},
+			"required":             []string{"name"},
+			"additionalProperties": false,
+		},
 	}, h.sendEvent)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -304,6 +315,17 @@ func (h *MCPHandler) addCompatibilityTools(server *mcp.Server) {
 		Name:        "invoke_function_sync",
 		Title:       "Invoke function synchronously (deprecated)",
 		Description: "Deprecated compatibility tool retained for existing dev server integrations. Use invoke_function for the shared asynchronous Cloud and dev server contract. This tool waits for completion and returns the function output. Parameters: functionId (required string - function slug, ID, or name), data (optional - function input data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"functionId": map[string]any{"type": "string"},
+				"data":       map[string]any{},
+				"user":       map[string]any{},
+				"timeout":    map[string]any{"type": "integer"},
+			},
+			"required":             []string{"functionId"},
+			"additionalProperties": false,
+		},
 	}, h.invokeFunction)
 }
 
@@ -359,16 +381,16 @@ func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpo
 // SendEventArgs represents the arguments for sending an event
 type SendEventArgs struct {
 	Name        string `json:"name"`
-	Data        any    `json:"data,omitempty" jsonschema:"true"`
-	User        any    `json:"user,omitempty" jsonschema:"true"`
+	Data        any    `json:"data,omitempty"`
+	User        any    `json:"user,omitempty"`
 	EventIDSeed string `json:"eventIdSeed,omitempty"`
 }
 
 // InvokeFunctionArgs represents the arguments for invoking a function
 type InvokeFunctionArgs struct {
 	FunctionID string `json:"functionId"`
-	Data       any    `json:"data,omitempty" jsonschema:"true"`
-	User       any    `json:"user,omitempty" jsonschema:"true"`
+	Data       any    `json:"data,omitempty"`
+	User       any    `json:"user,omitempty"`
 	Timeout    int    `json:"timeout,omitempty"`
 }
 
