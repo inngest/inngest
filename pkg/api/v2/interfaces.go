@@ -134,9 +134,13 @@ type RunListItem struct {
 
 	FunctionID   string
 	FunctionName string
+	FunctionSlug string
 	// FunctionPaused carries function state that is not stored on the run itself.
 	FunctionPaused bool
 	AppID          string
+	EventName      string
+	IsDeferred     *bool
+	HasAI          *bool
 }
 
 type GetRunsResult struct {
