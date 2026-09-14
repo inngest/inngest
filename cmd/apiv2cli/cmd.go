@@ -155,7 +155,7 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Auth",
 			Name:     "env",
-			Usage:    "Environment name; required for environment-specific requests with all-environment credentials",
+			Usage:    "Environment slug; required for environment-specific requests with all-environment credentials",
 			Sources:  cli.EnvVars("INNGEST_ENV"),
 		},
 		&cli.DurationFlag{
@@ -349,7 +349,7 @@ func endpointDescription(ep endpoint) string {
 		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
-		"  --env                   Environment name or INNGEST_ENV; required for environment-specific requests with all-environment credentials",
+		"  --env                   Environment slug or INNGEST_ENV; required for environment-specific requests with all-environment credentials",
 		"  --raw                   Print the response body without formatting",
 		"",
 		"Authentication: https://api-docs.inngest.com/authentication",

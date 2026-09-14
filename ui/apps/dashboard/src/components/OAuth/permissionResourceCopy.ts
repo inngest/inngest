@@ -62,7 +62,8 @@ const RESOURCE_COPY: Record<string, PermissionResourceCopy> = {
   },
   webhooks: {
     label: 'Webhooks',
-    description: null,
+    description:
+      'Read access includes URLs that can send events. Copied URLs still work after logout or session revocation. Revoke the webhook to disable them.',
   },
 };
 

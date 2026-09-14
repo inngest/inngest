@@ -90,6 +90,9 @@ func newStore(dir string, keyring keyringStore) *Store {
 
 // login, logout, and refresh share one lock so they cannot overwrite each other
 func (s *Store) Lock(ctx context.Context) (func(), error) {
+	// another process may be waiting on an OS credential prompt
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
 		return nil, err
 	}

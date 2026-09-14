@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,6 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zalando/go-keyring"
 )
+
+func TestCredentialLockHonorsDeadline(t *testing.T) {
+	store := newStore(t.TempDir(), newMemoryKeyring())
+	unlock, err := store.Lock(context.Background())
+	require.NoError(t, err)
+	defer unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err = store.Lock(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
 
 type memoryKeyring struct {
 	values map[string]string

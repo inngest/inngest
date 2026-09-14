@@ -43,9 +43,7 @@ export function PermissionPicker({
                 {copy.label}
               </span>
               {copy.description && (
-                <span className="text-subtle truncate text-xs">
-                  {copy.description}
-                </span>
+                <span className="text-subtle text-xs">{copy.description}</span>
               )}
             </div>
 
