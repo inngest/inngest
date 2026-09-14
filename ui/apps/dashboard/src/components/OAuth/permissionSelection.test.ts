@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bulkPermissionLevels,
   requestedPermissionLevels,
   selectedPermissionGrants,
 } from './permissionSelection';
@@ -12,6 +13,27 @@ const groups: PermissionGroup[] = [
 ];
 
 describe('permission selection', () => {
+  it.each<{
+    level: PermissionLevel;
+    expected: Record<string, PermissionLevel>;
+  }>([
+    { level: 'none', expected: { apps: 'none', runs: 'none', events: 'none' } },
+    { level: 'read', expected: { apps: 'read', runs: 'read', events: 'none' } },
+    {
+      level: 'write',
+      expected: { apps: 'write', runs: 'read', events: 'write' },
+    },
+  ])(
+    '$level shortcut selects only available permissions',
+    ({ level, expected }) => {
+      const catalog = [
+        ...groups,
+        { resource: 'events', read: [], write: ['events:write:*'] },
+      ];
+      expect(bulkPermissionLevels(catalog, level)).toEqual(expected);
+    },
+  );
+
   it.each<{ level: PermissionLevel; grants: string[] }>([
     { level: 'none', grants: [] },
     { level: 'read', grants: ['apps:read:*'] },

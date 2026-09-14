@@ -1,5 +1,21 @@
 import type { PermissionGroup, PermissionLevel } from './PermissionPicker';
 
+export function bulkPermissionLevels(
+  groups: PermissionGroup[],
+  level: PermissionLevel,
+): Record<string, PermissionLevel> {
+  return Object.fromEntries(
+    groups.map((group) => [
+      group.resource,
+      level === 'write' && group.write.length > 0
+        ? 'write'
+        : level !== 'none' && group.read.length > 0
+        ? 'read'
+        : 'none',
+    ]),
+  );
+}
+
 export function selectedPermissionGrants(
   groups: PermissionGroup[],
   levels: Record<string, PermissionLevel>,

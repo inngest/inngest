@@ -331,11 +331,11 @@ function DeviceAuthorizationForm() {
         </p>
       </div>
 
-      <div className="border-subtle bg-canvasSubtle flex items-center justify-between gap-4 rounded border p-3">
+      <div className="border-subtle bg-canvasSubtle flex flex-col gap-2 rounded border p-3">
         <p className="text-subtle text-sm">
-          Make sure this code matches the code shown by your CLI.
+          Check this matches the code in your terminal. Cancel if it does not.
         </p>
-        <code className="text-basis whitespace-nowrap text-lg font-semibold tracking-widest">
+        <code className="text-basis whitespace-nowrap text-2xl tracking-widest">
           {details.user_code}
         </code>
       </div>
@@ -367,12 +367,7 @@ function DeviceAuthorizationForm() {
             groups={details.permission_groups}
             levels={permissionLevels}
             disabled={submitting}
-            onChange={(resource, level) =>
-              setPermissionLevels((current) => ({
-                ...current,
-                [resource]: level,
-              }))
-            }
+            onChange={setPermissionLevels}
           />
         }
         selectedResourceCount={
@@ -394,13 +389,6 @@ function DeviceAuthorizationForm() {
         actions={
           <>
             <Button
-              appearance="outlined"
-              kind="secondary"
-              label="Deny"
-              onClick={deny}
-              disabled={submitting}
-            />
-            <Button
               kind="primary"
               label="Approve"
               onClick={approve}
@@ -414,6 +402,13 @@ function DeviceAuthorizationForm() {
                     Boolean(environmentsError)))
               }
             />
+            <Button
+              appearance="outlined"
+              kind="secondary"
+              label="Cancel"
+              onClick={deny}
+              disabled={submitting}
+            />
           </>
         }
       />
@@ -423,7 +418,7 @@ function DeviceAuthorizationForm() {
 
 function Page({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 py-8">
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 py-8 sm:px-0">
       {children}
     </main>
   );
