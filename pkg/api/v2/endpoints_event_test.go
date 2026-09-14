@@ -64,7 +64,7 @@ func TestService_SendEvent(t *testing.T) {
 		Name: "app/user.created",
 		Data: data,
 		User: user,
-		Id:   stringPointer("event-idempotency-key"),
+		Id:   new("event-idempotency-key"),
 		Ts:   &timestamp,
 	})
 
@@ -108,7 +108,7 @@ func TestService_SendEventValidation(t *testing.T) {
 			name: "timestamp too old",
 			request: &apiv2.SendEventRequest{
 				Name: "test/event",
-				Ts:   int64Pointer(time.Date(1979, 12, 31, 23, 59, 59, 0, time.UTC).UnixMilli()),
+				Ts:   new(time.Date(1979, 12, 31, 23, 59, 59, 0, time.UTC).UnixMilli()),
 			},
 			error: "timestamp is before Jan 1, 1980",
 		},
@@ -216,6 +216,33 @@ func TestHTTPGateway_SendEvent(t *testing.T) {
 	require.Equal(t, map[string]any{"message": "hello"}, sender.event.Data)
 }
 
+func TestHTTPGateway_SendEventRejectsQueryForBodyMappedField(t *testing.T) {
+	sender := &testEventSender{}
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v2/events?name=query/event",
+		strings.NewReader(`{"name":"body/event"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	require.Nil(t, sender.event)
+	var response errorResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Len(t, response.Errors, 1)
+	require.Equal(
+		t,
+		`query parameter "name" is mapped to the request body or path and cannot be set in the query string`,
+		response.Errors[0].Message,
+	)
+}
+
 func TestHTTPGateway_SendEventNullFields(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -313,12 +340,4 @@ func TestHTTPGateway_SendEventBodyLimitDoesNotApplyToOtherRoutes(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 
 	require.NotEqual(t, http.StatusRequestEntityTooLarge, recorder.Code)
-}
-
-func stringPointer(value string) *string {
-	return &value
-}
-
-func int64Pointer(value int64) *int64 {
-	return &value
 }

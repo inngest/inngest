@@ -231,8 +231,8 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	}
 
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, new(auth.AccountID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, new(auth.WorkspaceID()))
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &stateMetadata.ID.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &stateMetadata.ID.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &stateMetadata.ID.Tenant.AppID)
@@ -384,8 +384,8 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 	}
 
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, new(auth.AccountID()))
+		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, new(auth.WorkspaceID()))
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &parentSpan.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &parentSpan.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)

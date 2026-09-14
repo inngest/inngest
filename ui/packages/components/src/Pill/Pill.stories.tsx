@@ -1,3 +1,4 @@
+import { RiArrowRightLine, RiErrorWarningFill } from '@remixicon/react';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { Pill } from './Pill';
@@ -21,6 +22,22 @@ export const Default: Story = {};
 
 export const WithLink: Story = {
   args: {
-    href: new URL('http://inngest.com'),
+    href: 'https://inngest.com',
+  },
+};
+
+export const WithAction: Story = {
+  args: {
+    appearance: 'outlined',
+    kind: 'error',
+    icon: <RiErrorWarningFill className="h-3.5 w-3.5" />,
+    iconSide: 'left',
+    children: 'Hobby account execution limit reached. Upgrade your plan to continue using Inngest.',
+    action: (
+      <button className="flex items-center gap-0.5 underline underline-offset-2">
+        Upgrade
+        <RiArrowRightLine className="h-3.5 w-3.5" />
+      </button>
+    ),
   },
 };

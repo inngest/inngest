@@ -139,7 +139,7 @@ func TestThrottle(t *testing.T) {
 			inngestgo.FunctionOpts{
 				ID: "throttle-test-with-keys",
 				Throttle: &inngestgo.ConfigThrottle{
-					Key:    inngestgo.StrPtr("event.data.id"),
+					Key:    new("event.data.id"),
 					Limit:  1,
 					Period: 3 * time.Second,
 				},

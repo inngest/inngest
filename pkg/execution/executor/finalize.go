@@ -26,7 +26,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -678,12 +677,12 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 	compactHeaders := headers.Compact(headers.Redact(h))
 
 	rawAttrs := meta.NewAttrSet()
-	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
+	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, new(true))
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &compactHeaders)
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &res.StatusCode)
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(res.Body)))
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, new(len(res.Body)))
 	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap([]byte(res.Body))))
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, new(util.DataWrap([]byte(res.Body))))
 
 	return rawAttrs
 }
@@ -691,11 +690,11 @@ func apiAttributes(res apiresult.APIResult) *meta.SerializableAttrs {
 func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
-	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200)) // Must be to have this code.  It's an async fn.
-	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(gen.Data)))
+	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, new(true))
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, new(200)) // Must be to have this code.  It's an async fn.
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, new(len(gen.Data)))
 	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, new(util.DataWrap(gen.Data)))
 
 	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
 

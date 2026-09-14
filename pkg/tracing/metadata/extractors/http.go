@@ -5,7 +5,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
-	"github.com/inngest/inngest/pkg/util"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -83,23 +82,23 @@ func (e *HTTPMetadataExtractor) extractHTTPMetadata(span *tracev1.Span) HTTPMeta
 	for _, attr := range span.Attributes {
 		switch attr.Key {
 		case "http.request.header.content-type":
-			metadata.RequestContentType = util.ToPtr(attr.Value.GetStringValue())
+			metadata.RequestContentType = new(attr.Value.GetStringValue())
 		case "http.response.header.content-type":
-			metadata.ResponseContentType = util.ToPtr(attr.Value.GetStringValue())
+			metadata.ResponseContentType = new(attr.Value.GetStringValue())
 		case "http.request.method":
 			metadata.Method = attr.Value.GetStringValue()
 		case "http.request.size":
-			metadata.RequestSize = util.ToPtr(attr.Value.GetIntValue())
+			metadata.RequestSize = new(attr.Value.GetIntValue())
 		case "http.response.size":
-			metadata.ResponseSize = util.ToPtr(attr.Value.GetIntValue())
+			metadata.ResponseSize = new(attr.Value.GetIntValue())
 		case "http.response.status_code":
-			metadata.ResponseStatus = util.ToPtr(attr.Value.GetIntValue())
+			metadata.ResponseStatus = new(attr.Value.GetIntValue())
 		case "url.domain":
-			metadata.Domain = util.ToPtr(attr.Value.GetStringValue())
+			metadata.Domain = new(attr.Value.GetStringValue())
 		case "server.address":
-			metadata.Domain = util.ToPtr(attr.Value.GetStringValue())
+			metadata.Domain = new(attr.Value.GetStringValue())
 		case "url.path":
-			metadata.Path = util.ToPtr(attr.Value.GetStringValue())
+			metadata.Path = new(attr.Value.GetStringValue())
 		}
 	}
 

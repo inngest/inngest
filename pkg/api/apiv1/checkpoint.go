@@ -278,7 +278,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			}},
 			realtime.NewJWTOpts{
 				// Add a minute buffer just in case.
-				Expiry: util.ToPtr(realtime.MaxDurpStreamingRun + time.Minute),
+				Expiry: new(realtime.MaxDurpStreamingRun + time.Minute),
 			},
 		)
 		if err != nil {

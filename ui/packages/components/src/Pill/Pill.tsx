@@ -10,6 +10,27 @@ import { RiTimeLine } from '@remixicon/react';
 export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error' | 'secondary';
 export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
 
+export type PillProps = {
+  children: React.ReactNode;
+  className?: string;
+  href?: LinkProps['href'];
+  to?: LinkProps['to'];
+  appearance?: PillAppearance;
+  kind?: PillKind;
+  icon?: React.ReactNode;
+  iconSide?: 'right' | 'left' | 'iconOnly';
+  /**
+   * A separately interactive element rendered after the pill's content. Do not
+   * combine this with `href` or `to`, since that would nest interactive links.
+   */
+  action?: React.ReactNode;
+  /**
+   * Use this when you want one of the sides to be flat. The other sides will be
+   * rounded.
+   */
+  flatSide?: 'left' | 'right';
+};
+
 export function Pill({
   children,
   className = '',
@@ -20,28 +41,15 @@ export function Pill({
   flatSide,
   icon,
   iconSide,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  href?: LinkProps['href'];
-  to?: LinkProps['to'];
-  appearance?: PillAppearance;
-  kind?: PillKind;
-  icon?: React.ReactNode;
-  iconSide?: 'right' | 'left' | 'iconOnly';
-  /**
-   * Use this when you want one of the sides to be flat. The other sides will be
-   * rounded.
-   */
-  flatSide?: 'left' | 'right';
-}) {
+  action,
+}: PillProps) {
   const pillRef = useRef<HTMLSpanElement | HTMLAnchorElement | null>(null);
-  const hiddenTextRef = useRef<HTMLSpanElement | null>(null);
+  const contentRef = useRef<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
   const pillColors = getPillColors({ kind, appearance, clickable: !!href || !!to });
   const classNames = cn(
-    'inline-flex items-center gap-0.5 h-5 px-2 text-xs leading-none font-medium truncate max-w-full',
+    'inline-flex h-5 max-w-full items-center gap-0.5 whitespace-nowrap px-2 text-xs font-medium leading-none',
     pillColors,
     className
   );
@@ -54,21 +62,17 @@ export function Pill({
 
   useEffect(() => {
     const checkTruncation = () => {
-      if (!pillRef.current || !hiddenTextRef.current) return;
-
-      // Get the actual width of the pill and its hidden text content
-      const pillWidth = pillRef.current.offsetWidth;
-      const fullTextWidth = hiddenTextRef.current.offsetWidth;
-
-      setIsTruncated(fullTextWidth > pillWidth);
+      if (!contentRef.current) return;
+      setIsTruncated(contentRef.current.scrollWidth > contentRef.current.clientWidth);
     };
 
     checkTruncation();
     const resizeObserver = new ResizeObserver(checkTruncation);
     if (pillRef.current) resizeObserver.observe(pillRef.current);
+    if (contentRef.current) resizeObserver.observe(contentRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [children]);
+  }, [action, children]);
 
   const extractText = (node: React.ReactNode): string => {
     return Children.toArray(node)
@@ -84,20 +88,31 @@ export function Pill({
 
   const tooltipText = extractText(children);
 
+  const pillContent = (
+    <>
+      {icon && iconSide === 'left' && <span className="shrink-0">{icon}</span>}
+      {icon && iconSide === 'iconOnly' ? (
+        icon
+      ) : (
+        <span ref={contentRef} className="min-w-0 truncate">
+          {children}
+        </span>
+      )}
+      {icon && iconSide === 'right' && <span className="shrink-0">{icon}</span>}
+      {action && <span className="ml-4 shrink-0">{action}</span>}
+    </>
+  );
+
   const pillWrapper =
     href || to ? (
       <Link href={href} to={to} className="flex" onClick={(e) => e.stopPropagation()}>
         <span ref={pillRef} className={cn('rounded', classNames)}>
-          {icon && iconSide === 'left' && icon}
-          {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
-          {icon && iconSide === 'right' && icon}
+          {pillContent}
         </span>
       </Link>
     ) : (
       <span ref={pillRef} className={cn(roundedClasses, classNames)}>
-        {icon && iconSide === 'left' && icon}
-        {icon && iconSide === 'iconOnly' ? icon : <span className="truncate">{children}</span>}
-        {icon && iconSide === 'right' && icon}
+        {pillContent}
       </span>
     );
   return (
@@ -112,15 +127,6 @@ export function Pill({
       ) : (
         pillWrapper
       )}
-
-      {/* Hidden text element to measure actual content width */}
-      <span
-        ref={hiddenTextRef}
-        className={cn(classNames, 'invisible absolute left-0 top-0 whitespace-nowrap')}
-        aria-hidden="true"
-      >
-        <span>{children}</span>
-      </span>
     </>
   );
 }

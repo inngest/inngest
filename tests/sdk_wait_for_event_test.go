@@ -66,7 +66,7 @@ func TestSDKWaitForEvent_WithEvent(t *testing.T) {
 				Op:          enums.OpcodeWaitForEvent,
 				ID:          hashes["wait"],
 				Name:        "test/resume",
-				DisplayName: inngestgo.StrPtr("test/resume"),
+				DisplayName: new("test/resume"),
 				Data:        json.RawMessage("null"),
 				Opts: map[string]any{
 					"if":      "async.data.resume == true && async.data.id == event.data.id",
@@ -160,7 +160,7 @@ func TestSDKWaitForEvent_NoEvent(t *testing.T) {
 				Op:          enums.OpcodeWaitForEvent,
 				ID:          hashes["wait"],
 				Name:        "test/resume",
-				DisplayName: inngestgo.StrPtr("test/resume"),
+				DisplayName: new("test/resume"),
 				Data:        json.RawMessage("null"),
 				Opts: map[string]any{
 					"if":      "async.data.resume == true && async.data.id == event.data.id",

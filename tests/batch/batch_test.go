@@ -127,7 +127,7 @@ func TestMunsonRepro(t *testing.T) {
 		// 	-event.data.promotional
 		//  -event.data.notificationNotMeeting
 		//  -event.data.notificationMeeting
-		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("!( (has(event.data.promotional) && event.data.promotional) || (has(event.data.notificationNotMeeting) && event.data.notificationNotMeeting) || (has(event.data.notificationMeeting) && event.data.notificationMeeting) )")),
+		inngestgo.EventTrigger("test/batch", new("!( (has(event.data.promotional) && event.data.promotional) || (has(event.data.notificationNotMeeting) && event.data.notificationNotMeeting) || (has(event.data.notificationMeeting) && event.data.notificationMeeting) )")),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
@@ -181,7 +181,7 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second}},
-		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("has(event.data.num) && int(event.data.num) % 2 == 0")),
+		inngestgo.EventTrigger("test/batch", new("has(event.data.num) && int(event.data.num) % 2 == 0")),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
@@ -224,7 +224,7 @@ func TestConditionalBatching(t *testing.T) {
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		// only even values of event.data.num are eligible for batching. Other events are scheduled for execution immediately.
-		inngestgo.FunctionOpts{ID: "conditional-batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: inngestgo.StrPtr("int(event.data.num) % 2 == 0")}},
+		inngestgo.FunctionOpts{ID: "conditional-batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: new("int(event.data.num) % 2 == 0")}},
 		inngestgo.EventTrigger("test/batch", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
@@ -269,8 +269,8 @@ func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "conditional-batch-test-with-event-trigger", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: inngestgo.StrPtr("has(event.data.num) && int(event.data.num) % 2 == 0")}},
-		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("event.data.promotional")),
+		inngestgo.FunctionOpts{ID: "conditional-batch-test-with-event-trigger", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: new("has(event.data.num) && int(event.data.num) % 2 == 0")}},
+		inngestgo.EventTrigger("test/batch", new("event.data.promotional")),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID

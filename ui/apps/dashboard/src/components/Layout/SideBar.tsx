@@ -8,6 +8,7 @@ import { Profile } from '../Navigation/Profile';
 import { Integrations } from '../Navigation/Integrations';
 import { Help } from '../Navigation/Help';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
+import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
 import OnboardingWidget from '../Navigation/OnboardingWidget';
 
@@ -70,6 +71,7 @@ export default function SideBar({
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
         <div className="mx-4">
+          <ExecutionLimitCard collapsed={collapsed} />
           <SeatOverageWidget collapsed={collapsed} />
           {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />

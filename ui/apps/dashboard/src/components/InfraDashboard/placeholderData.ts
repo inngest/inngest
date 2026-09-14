@@ -59,6 +59,9 @@ export type InfraDashboardPlaceholders = {
   };
 };
 
+// Displayed until accurate plan and add-on pricing is loaded from the backend.
+const PRICE_PLACEHOLDER = '—';
+
 // These values are present in the target design but are not exposed by the
 // current dashboard GraphQL schema. Keep them isolated until API fields exist.
 export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
@@ -113,6 +116,8 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
   monthlyTracesReceived: 0,
   monthlyScoresProcessed: 0,
   defaultPlanSku: 'IN-S',
+  // Prices are populated from the available billing plans and concurrency
+  // add-on metadata returned by GraphQL.
   infraPlans: [
     {
       sku: 'IN-XS',
@@ -123,7 +128,7 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       queueDepthLimit: 100_000,
       execConcurrency: '5',
       execConcurrencyLimit: 5,
-      priceMonthly: '$0',
+      priceMonthly: PRICE_PLACEHOLDER,
     },
     {
       sku: 'IN-S',
@@ -134,7 +139,7 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       queueDepthLimit: 1_000_000,
       execConcurrency: '100',
       execConcurrencyLimit: 100,
-      priceMonthly: '$99',
+      priceMonthly: PRICE_PLACEHOLDER,
     },
     {
       sku: 'IN-M',
@@ -145,7 +150,7 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       queueDepthLimit: 5_000_000,
       execConcurrency: '250',
       execConcurrencyLimit: 250,
-      priceMonthly: '$249',
+      priceMonthly: PRICE_PLACEHOLDER,
     },
     {
       sku: 'IN-L',
@@ -156,7 +161,7 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       queueDepthLimit: 10_000_000,
       execConcurrency: '500',
       execConcurrencyLimit: 500,
-      priceMonthly: '$599',
+      priceMonthly: PRICE_PLACEHOLDER,
     },
     {
       sku: 'IN-XL',
@@ -167,7 +172,7 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       queueDepthLimit: 25_000_000,
       execConcurrency: '1K',
       execConcurrencyLimit: 1_000,
-      priceMonthly: '$1,199',
+      priceMonthly: PRICE_PLACEHOLDER,
     },
   ],
   deltas: {

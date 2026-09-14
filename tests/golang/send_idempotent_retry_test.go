@@ -67,7 +67,7 @@ func TestSendIdempotentRetry(t *testing.T) {
 		t,
 		randomSuffix("app"),
 		func(h *inngestgo.ClientOpts) {
-			h.EventURL = inngestgo.Ptr(strings.TrimSuffix(proxyURL.String(), "/"))
+			h.EventURL = new(strings.TrimSuffix(proxyURL.String(), "/"))
 		},
 	)
 	defer server.Close()

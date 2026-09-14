@@ -215,7 +215,7 @@ func TestJSONToStruct(t *testing.T) {
 }
 
 func TestOptionalString(t *testing.T) {
-	value := optionalString("value")
+	value := new("value")
 
 	require.NotNil(t, value)
 	require.Equal(t, "value", *value)
@@ -259,8 +259,8 @@ func TestToFunctionTraceReturnsConvertError(t *testing.T) {
 		},
 		RunID: runID,
 		Attributes: &meta.ExtractedValues{
-			IsUserland:   boolPtr(true),
-			UserlandName: strPtr("userland"),
+			IsUserland:   new(true),
+			UserlandName: new("userland"),
 		},
 	}, false)
 

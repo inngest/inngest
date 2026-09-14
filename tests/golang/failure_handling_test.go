@@ -23,7 +23,7 @@ func TestFunctionFailureHandling(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID:      "always-fail",
 			Name:    "Always fail",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("test/fail", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -42,10 +42,10 @@ func TestFunctionFailureHandling(t *testing.T) {
 	require.NoError(t, err)
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "handle-failures", Retries: inngestgo.IntPtr(0)},
+		inngestgo.FunctionOpts{ID: "handle-failures", Retries: new(0)},
 		inngestgo.EventTrigger(
 			"inngest/function.finished",
-			inngestgo.StrPtr("event.data.function_id == 'fail-app-always-fail'"),
+			new("event.data.function_id == 'fail-app-always-fail'"),
 		),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			evt := input.Event
@@ -100,7 +100,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "failed",
-			RateLimit: &inngestgo.ConfigRateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+			RateLimit: &inngestgo.ConfigRateLimit{Limit: 1, Period: 24 * time.Hour, Key: new("event.data.number")},
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -114,9 +114,9 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "failed-failure",
-			RateLimit: &inngestgo.ConfigRateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+			RateLimit: &inngestgo.ConfigRateLimit{Limit: 1, Period: 24 * time.Hour, Key: new("event.data.number")},
 		},
-		inngestgo.EventTrigger("inngest/function.failed", inngestgo.StrPtr(`event.data.function_id == "failed-rate-limit-failed"`)),
+		inngestgo.EventTrigger("inngest/function.failed", new(`event.data.function_id == "failed-rate-limit-failed"`)),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			atomic.AddInt32(&handled, 1)
 			return "handled", nil

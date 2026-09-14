@@ -52,7 +52,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 					{
 						Limit: 1,
 						Scope: enums.ConcurrencyScopeAccount,
-						Key:   inngestgo.StrPtr("'global'"),
+						Key:   new("'global'"),
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 					{
 						Limit: 1,
 						Scope: enums.ConcurrencyScopeAccount,
-						Key:   inngestgo.StrPtr("'global'"),
+						Key:   new("'global'"),
 					},
 				},
 			},

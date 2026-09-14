@@ -4,6 +4,9 @@
     "timeout": "10m"
   },
   "linters": {
+    "enable": [
+      "modernize"
+    ],
     "exclusions": {
       "paths": [
         "vendor"
@@ -25,6 +28,35 @@
       ]
     },
     "settings": {
+      "modernize": {
+        "disable": [
+          "any",
+          "atomictypes",
+          "embedlit",
+          "errorsastype",
+          "forvar",
+          "importcomment",
+          "mapsloop",
+          "minmax",
+          "omitzero",
+          "plusbuild",
+          "rangeint",
+          "reflecttypeassert",
+          "reflecttypefor",
+          "slicesbackward",
+          "slicesclip",
+          "slicescontains",
+          "slicessort",
+          "stditerators",
+          "stringsbuilder",
+          "stringscut",
+          "stringscutprefix",
+          "stringsseq",
+          "testingcontext",
+          "unsafefuncs",
+          "waitgroupgo"
+        ]
+      },
       "staticcheck": {
         "checks": [
           "all",

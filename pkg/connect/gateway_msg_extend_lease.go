@@ -94,7 +94,7 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 
 	var newLeaseIDStr *string
 	if newLeaseID != nil {
-		newLeaseIDStr = proto.String(newLeaseID.String())
+		newLeaseIDStr = new(newLeaseID.String())
 	}
 
 	serr := c.writeWorkerRequestExtendLeaseAck(&data, newLeaseIDStr, "failed to marshal nack payload")

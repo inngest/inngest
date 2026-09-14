@@ -25,7 +25,7 @@ func TestEventList(t *testing.T) {
 
 		ic, err := inngestgo.NewClient(inngestgo.ClientOpts{
 			AppID: "app",
-			Dev:   toPtr(true),
+			Dev:   new(true),
 		})
 		r.NoError(err)
 
@@ -100,7 +100,7 @@ func TestEventList(t *testing.T) {
 
 		ic, err := inngestgo.NewClient(inngestgo.ClientOpts{
 			AppID: "app",
-			Dev:   toPtr(true),
+			Dev:   new(true),
 		})
 		r.NoError(err)
 		event1Name := randomSuffix("foo")
@@ -173,7 +173,7 @@ func TestEventList(t *testing.T) {
 			PageSize: 10,
 			Filter: models.EventsFilter{
 				From:  time.Now().Add(-2 * time.Hour),
-				Until: toPtr(time.Now().Add(-time.Hour)),
+				Until: new(time.Now().Add(-time.Hour)),
 			},
 		})
 		r.NoError(err)
@@ -189,7 +189,7 @@ func TestEventList(t *testing.T) {
 
 			inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
 				AppID: "app",
-				Dev:   toPtr(true),
+				Dev:   new(true),
 			})
 			r.NoError(err)
 			eventName := randomSuffix("evt")
@@ -238,7 +238,7 @@ func TestEventList(t *testing.T) {
 
 			inngestClient, err := inngestgo.NewClient(inngestgo.ClientOpts{
 				AppID: "app",
-				Dev:   toPtr(true),
+				Dev:   new(true),
 			})
 			r.NoError(err)
 

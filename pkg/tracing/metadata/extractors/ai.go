@@ -13,7 +13,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 )
 
@@ -128,14 +127,14 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		aiMd,
 		&HTTPMetadata{
 			Method:             http.MethodPost,
-			Domain:             util.ToPtr(u.Host),
-			Path:               util.ToPtr(u.Path),
-			RequestContentType: util.ToPtr("application/json"),
-			RequestSize:        util.ToPtr(int64(len(req.Body))),
+			Domain:             new(u.Host),
+			Path:               new(u.Path),
+			RequestContentType: new("application/json"),
+			RequestSize:        new(int64(len(req.Body))),
 
-			ResponseContentType: util.ToPtr("application/json"),
-			ResponseSize:        util.ToPtr(int64(len(resp))),
-			ResponseStatus:      util.ToPtr(int64(respStatus)),
+			ResponseContentType: new("application/json"),
+			ResponseSize:        new(int64(len(resp))),
+			ResponseStatus:      new(int64(respStatus)),
 		},
 	}, nil
 }

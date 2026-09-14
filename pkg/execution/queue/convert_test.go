@@ -604,7 +604,7 @@ func TestQueueItemFromProtoInvalidIDs(t *testing.T) {
 	_, err = QueueItemFromProto(&pb.QueueItem{
 		FunctionId:  uuid.NewString(),
 		WorkspaceId: uuid.NewString(),
-		LeaseId:     protoStringPtr("not-a-ulid"),
+		LeaseId:     new("not-a-ulid"),
 	})
 	require.ErrorContains(t, err, "queue item lease_id")
 }
@@ -748,17 +748,17 @@ func TestIdentifierFromProtoInvalidIDs(t *testing.T) {
 		},
 		{
 			name:    "batch id",
-			mutate:  func(msg *pb.Identifier) { msg.BatchId = protoStringPtr("bad") },
+			mutate:  func(msg *pb.Identifier) { msg.BatchId = new("bad") },
 			wantErr: "identifier batch_id",
 		},
 		{
 			name:    "original run id",
-			mutate:  func(msg *pb.Identifier) { msg.OriginalRunId = protoStringPtr("bad") },
+			mutate:  func(msg *pb.Identifier) { msg.OriginalRunId = new("bad") },
 			wantErr: "identifier original_run_id",
 		},
 		{
 			name:    "replay id",
-			mutate:  func(msg *pb.Identifier) { msg.ReplayId = protoStringPtr("bad") },
+			mutate:  func(msg *pb.Identifier) { msg.ReplayId = new("bad") },
 			wantErr: "identifier replay_id",
 		},
 		{
@@ -1206,10 +1206,6 @@ func assertItemEqual(t *testing.T, expected, actual Item) {
 	require.Equal(t, expected.RunInfo.CapacityLease.LeaseID, actual.RunInfo.CapacityLease.LeaseID)
 	require.Equal(t, expected.RunInfo.CapacityLease.IssuedAtMS, actual.RunInfo.CapacityLease.IssuedAtMS)
 	require.Equal(t, expected.RunInfo.ScavengeCount, actual.RunInfo.ScavengeCount)
-}
-
-func protoStringPtr(value string) *string {
-	return &value
 }
 
 func validIdentifierProto() *pb.Identifier {

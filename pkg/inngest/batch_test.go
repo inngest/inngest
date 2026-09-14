@@ -129,7 +129,7 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 		{
 			name: "should return error if key expression is invalid",
 			config: &EventBatchConfig{
-				Key:     strptr("me-bad"),
+				Key:     new("me-bad"),
 				MaxSize: 10,
 				Timeout: "2s",
 			},
@@ -140,7 +140,7 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 			config: &EventBatchConfig{
 				MaxSize: 10,
 				Timeout: "2s",
-				If:      strptr("event.data.num = 5"),
+				If:      new("event.data.num = 5"),
 			},
 			expected: errors.New("conditional batch expression is invalid"),
 		},

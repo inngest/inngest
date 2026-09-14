@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
@@ -96,7 +95,7 @@ func TestLeaseRenewal(t *testing.T) {
 		AppName:        res.appName,
 		FunctionId:     res.fnID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RequestPayload: []byte("hello world"),
 		RunId:          res.runID.String(),
 		LeaseId:        leaseID.String(),
@@ -174,7 +173,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 		AppName:        res.appName,
 		FunctionId:     res.fnID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RequestPayload: []byte("hello world"),
 		RunId:          res.runID.String(),
 		LeaseId:        leaseID.String(),
@@ -284,7 +283,7 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 		AppName:        res.appName,
 		FunctionId:     res.fnID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RequestPayload: []byte("hello world"),
 		RunId:          res.runID.String(),
 		LeaseId:        leaseID.String(),
@@ -392,7 +391,7 @@ func TestExecutorMessageForwardingGRPC(t *testing.T) {
 		AppName:        res.appName,
 		FunctionId:     res.fnID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RequestPayload: []byte("hello world"),
 		RunId:          res.runID.String(),
 		LeaseId:        "lease-test",
@@ -1192,7 +1191,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	testApp := &connect.AppConfiguration{
 		AppName:    appName,
-		AppVersion: ptr.String("v1"),
+		AppVersion: new("v1"),
 		Functions:  fns,
 	}
 

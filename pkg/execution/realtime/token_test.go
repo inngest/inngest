@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,7 +49,7 @@ func TestNewJWT_CustomExpiry(t *testing.T) {
 		Name:    streamingtypes.TopicNameStream,
 		EnvID:   envID,
 	}}, NewJWTOpts{
-		Expiry: util.ToPtr(customExpiry),
+		Expiry: new(customExpiry),
 	})
 	r.NoError(err)
 	r.NotEmpty(token)

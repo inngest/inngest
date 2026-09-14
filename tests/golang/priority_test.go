@@ -38,7 +38,7 @@ func TestFunctionPriorityRun(t *testing.T) {
 				},
 			}},
 			Priority: &inngestgo.ConfigPriority{
-				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
+				Run: new(`event.data.priority == "high" ? 5 : 0`),
 			},
 		},
 		inngestgo.EventTrigger("test/priority", nil),

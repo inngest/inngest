@@ -32,7 +32,7 @@ func TestInvoke(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      invokedFnName,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -128,7 +128,7 @@ func TestInvokeGroup(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      invokedFnName,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -277,7 +277,7 @@ func TestInvokeTimeout(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      invokedFnName,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -391,7 +391,7 @@ func TestInvokeRateLimit(t *testing.T) {
 				Limit:  1,
 				Period: 1 * time.Minute,
 			},
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -405,7 +405,7 @@ func TestInvokeRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "main-fn",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -468,7 +468,7 @@ func TestInvokeInProgressRunID(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      invokedFnName,
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -484,7 +484,7 @@ func TestInvokeInProgressRunID(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "main-fn",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {

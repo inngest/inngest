@@ -58,7 +58,7 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 				Op:          enums.OpcodeSleep,
 				ID:          hashes["Sleep 10s"],
-				DisplayName: inngestgo.StrPtr("sleep"),
+				DisplayName: new("sleep"),
 				Data:        json.RawMessage("null"),
 				Name:        "10s",
 			}}),

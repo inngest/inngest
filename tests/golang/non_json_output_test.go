@@ -46,7 +46,7 @@ func TestNonJSONOutput(t *testing.T) {
 			inngestgo.ClientOpts{
 				AppID:       "my-app",
 				Logger:      slog.Default(),
-				RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+				RegisterURL: new(fmt.Sprintf("%s/fn/register", DEV_URL)),
 				URL:         proxyURL,
 				EventKey:    &ekey,
 			},
@@ -56,7 +56,7 @@ func TestNonJSONOutput(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID:      "my-fn",
-				Retries: inngestgo.IntPtr(0),
+				Retries: new(0),
 			},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

@@ -28,8 +28,8 @@ func TestMultiTriggerExpressions(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "multi-trigger-expression-test"},
 		inngestgo.MultipleTriggers{
-			inngestgo.EventTrigger("user.created", inngestgo.StrPtr("event.data.type == 'premium'")),
-			inngestgo.EventTrigger("user.updated", inngestgo.StrPtr("event.data.type == 'standard'")),
+			inngestgo.EventTrigger("user.created", new("event.data.type == 'premium'")),
+			inngestgo.EventTrigger("user.updated", new("event.data.type == 'standard'")),
 		},
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			atomic.AddInt32(&executionCount, 1)
@@ -106,7 +106,7 @@ func TestMultiTriggerExpressions(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{ID: "mixed-expression-test"},
 			inngestgo.MultipleTriggers{
-				inngestgo.EventTrigger("order.created", inngestgo.StrPtr("event.data.amount > 100")),
+				inngestgo.EventTrigger("order.created", new("event.data.amount > 100")),
 				inngestgo.EventTrigger("order.cancelled", nil), // No expression
 			},
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {

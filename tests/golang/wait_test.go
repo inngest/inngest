@@ -337,7 +337,7 @@ func TestWaitInvalidExpression(t *testing.T) {
 				ctx,
 				"wait",
 				step.WaitForEventOpts{
-					If:      inngestgo.StrPtr("invalid"),
+					If:      new("invalid"),
 					Name:    "dummy",
 					Timeout: 30 * time.Second,
 				},
@@ -381,7 +381,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 				ctx,
 				"wait",
 				step.WaitForEventOpts{
-					If:      inngestgo.StrPtr("event.data.userId === async.data.userId"),
+					If:      new("event.data.userId === async.data.userId"),
 					Name:    "test/continue",
 					Timeout: 30 * time.Second,
 				},
@@ -447,7 +447,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 				ctx,
 				"wait",
 				step.WaitForEventOpts{
-					If:      inngestgo.StrPtr(exp),
+					If:      new(exp),
 					Name:    "match-event",
 					Timeout: time.Minute,
 				},

@@ -11,6 +11,7 @@ plugins:
     opt:
       - paths=source_relative
       - allow_delete_body=true
+      - reject_body_without_mapping=true
   - plugin: openapiv2
     out: docs/openapi/v2
     opt:

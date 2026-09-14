@@ -256,7 +256,7 @@ func TestParallelSequential(t *testing.T) {
 	rid := NewRunID()
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+		inngestgo.FunctionOpts{ID: "fn", Retries: new(0)},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			rid.Send(input.InputCtx.RunID)
@@ -354,7 +354,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		rid := NewRunID()
 		_, err := inngestgo.CreateFunction(
 			inngestClient,
-			inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+			inngestgo.FunctionOpts{ID: "fn", Retries: new(0)},
 			inngestgo.EventTrigger(eventName, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				rid.Send(input.InputCtx.RunID)
@@ -458,7 +458,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				rid := NewRunID()
 				_, err := inngestgo.CreateFunction(
 					inngestClient,
-					inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+					inngestgo.FunctionOpts{ID: "fn", Retries: new(0)},
 					inngestgo.EventTrigger(eventName, nil),
 					func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 						atomic.AddInt32(&counterRequest, 1)
@@ -550,7 +550,7 @@ func TestParallelStepsDuplicatePlan(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "fn",
-			Retries: inngestgo.Ptr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -629,7 +629,7 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      functionID,
-			Retries: inngestgo.Ptr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -668,11 +668,11 @@ func TestParallelStepFailuresOnFailureDeduplication(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      handlerID,
-			Retries: inngestgo.Ptr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(
 			"inngest/function.failed",
-			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", expectedFunctionID)),
+			new(fmt.Sprintf("event.data.function_id == '%s'", expectedFunctionID)),
 		),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			atomic.AddInt32(&failureCount, 1)

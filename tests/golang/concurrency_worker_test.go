@@ -48,7 +48,7 @@ func TestWorkerConcurrency(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:      "worker-concurrency-test",
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -73,7 +73,7 @@ func TestWorkerConcurrency(t *testing.T) {
 	// Connect with MaxWorkerConcurrency=1
 	maxConcurrency := int64(1)
 	_, err = inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
-		InstanceID:           inngestgo.StrPtr("worker-concurrency-test"),
+		InstanceID:           new("worker-concurrency-test"),
 		Apps:                 []inngestgo.Client{inngestClient},
 		MaxWorkerConcurrency: &maxConcurrency,
 	})

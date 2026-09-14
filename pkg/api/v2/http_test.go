@@ -98,6 +98,104 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_RejectsUnexpectedRequestBodyFields(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		path string
+		body string
+	}{
+		{
+			name: "top-level field",
+			path: "/api/v2/envs",
+			body: `{"name":"test","unexpected":"secret-value"}`,
+		},
+		{
+			name: "nested field",
+			path: "/api/v2/runs/01hp1zx8m3ng9vp6qn0xk7j4cy/rerun",
+			body: `{"fromStep":{"stepId":"step-1","unexpected":"secret-value"}}`,
+		},
+		{
+			name: "field-specific body binding",
+			path: "/api/v2/runs/01hp1zx8m3ng9vp6qn0xk7j4cy/scores",
+			body: `[{"name":"accuracy","value":0.5,"unexpected":"secret-value"}]`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var body errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Equal(t, []errorItem{{
+				Code:    apiv2base.ErrorInvalidRequest,
+				Message: `Unexpected request body field "unexpected"`,
+			}}, body.Errors)
+			require.NotContains(t, rec.Body.String(), "secret-value")
+		})
+	}
+}
+
+func TestHTTPGateway_RejectsUnknownRequestFields(t *testing.T) {
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		method      string
+		path        string
+		body        string
+		wantMessage string
+	}{
+		{
+			name:        "unknown query parameter alongside a mapped parameter",
+			method:      http.MethodGet,
+			path:        "/api/v2/apps?limit=10&unsupportedQueryParam=value",
+			wantMessage: `unknown query parameter \"unsupportedQueryParam\"`,
+		},
+		{
+			name:        "one query parameter on a queryless endpoint",
+			method:      http.MethodGet,
+			path:        "/api/v2/health?unsupportedQueryParam=value",
+			wantMessage: `unknown query parameter \"unsupportedQueryParam\"`,
+		},
+		{
+			name:        "one body field on a bodyless endpoint",
+			method:      http.MethodPost,
+			path:        "/api/v2/sandboxes/sandbox-id/processes/process-id/wait",
+			body:        `{"unsupportedField":"value"}`,
+			wantMessage: "request body is not allowed for this HTTP binding",
+		},
+		{
+			name:        "unknown body field on an endpoint with a body mapping",
+			method:      http.MethodPost,
+			path:        "/api/v2/events",
+			body:        `{"name":"test/event","unsupportedField":"value"}`,
+			wantMessage: `Unexpected request body field \"unsupportedField\"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			if tt.body != "" {
+				request.Header.Set("Content-Type", "application/json")
+			}
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+			require.Contains(t, response.Body.String(), tt.wantMessage)
+		})
+	}
+}
+
 func TestHTTPGateway_SandboxesNotImplementedInDevServer(t *testing.T) {
 	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
 	require.NoError(t, err)

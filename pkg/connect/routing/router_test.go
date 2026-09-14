@@ -143,7 +143,7 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 
 	app1Config := &connectpb.AppConfiguration{
 		AppName:    appName,
-		AppVersion: util.StrPtr("v1"),
+		AppVersion: new("v1"),
 		Functions:  fnBytes,
 	}
 

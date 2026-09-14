@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { RangePicker } from '@inngest/components/DatePicker';
@@ -81,6 +82,7 @@ type SelectableStatuses =
   | ReplayRunStatus.SkippedPaused;
 
 type NewReplayModalProps = {
+  functionID: string;
   functionSlug: string;
   isOpen: boolean;
   onClose: () => void;
@@ -92,7 +94,20 @@ export type DateRange = {
   key?: string;
 };
 
+function hasReplayableSelection({
+  runCountsFailed,
+  selectedRunsCount,
+}: {
+  runCountsFailed: boolean;
+  selectedRunsCount: number;
+}) {
+  // The count is only a preview, so a failed request shouldn't block replay
+  // creation. Only block when the request succeeds with a confirmed zero count.
+  return runCountsFailed || selectedRunsCount > 0;
+}
+
 export default function NewReplayModal({
+  functionID,
   functionSlug,
   isOpen,
   onClose,
@@ -112,7 +127,11 @@ export default function NewReplayModal({
   const logRetention = planData?.account.entitlements.history.limit || 7;
   const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
 
-  const { data, isLoading } = useSkippableGraphQLQuery({
+  const {
+    data,
+    error: runCountsError,
+    isLoading,
+  } = useSkippableGraphQLQuery({
     query: GetReplayRunCountsDocument,
     variables: {
       environmentID: environment.id,
@@ -133,6 +152,10 @@ export default function NewReplayModal({
     data?.environment.function?.replayCounts.completedCount ?? 0;
   const pausedRunsCount =
     data?.environment.function?.replayCounts.skippedPausedCount ?? 0;
+  const functionNotFound = Boolean(
+    timeRange && !isLoading && !runCountsError && !data?.environment.function,
+  );
+  const runCountsUnavailable = Boolean(runCountsError || functionNotFound);
 
   const statusCounts: Record<SelectableStatuses, number> = {
     [ReplayRunStatus.Failed]: failedRunsCount,
@@ -153,16 +176,19 @@ export default function NewReplayModal({
       return;
     }
 
-    if (selectedRunsCount === 0) {
+    if (
+      !hasReplayableSelection({
+        runCountsFailed: Boolean(runCountsError),
+        selectedRunsCount,
+      })
+    ) {
       toast.error(
         'No runs selected. Please specify a filter with at least one run.',
       );
       return;
     }
 
-    const functionID = data?.environment.function?.id;
-
-    if (!functionID) {
+    if (functionNotFound) {
       toast.error('Could not find function. Please try again later.');
       return;
     }
@@ -310,19 +336,36 @@ export default function NewReplayModal({
                     >
                       {isLoading ? (
                         <span>Loading</span>
+                      ) : runCountsUnavailable ? (
+                        <span>Unavailable</span>
                       ) : (
                         count.toLocaleString(undefined, {
                           notation: 'compact',
                           compactDisplay: 'short',
                         })
                       )}{' '}
-                      runs {isLoading ? '...' : undefined}
+                      {!runCountsUnavailable && (
+                        <> runs {isLoading ? '...' : undefined}</>
+                      )}
                     </p>
                   )}
                 </ToggleGroup.Item>
               </div>
             ))}
           </ToggleGroup.Root>
+
+          {runCountsError && (
+            <Alert severity="error" className="text-sm">
+              Failed to fetch run counts. Select a shorter time range for an
+              accurate estimate, or replay anyway using the selected statuses.
+            </Alert>
+          )}
+
+          {functionNotFound && (
+            <Alert severity="error" className="text-sm">
+              Could not find function. Please try again later.
+            </Alert>
+          )}
         </div>
         <div className="px-6 py-4">
           <div className="text-muted bg-canvasSubtle rounded-md px-6 py-4 text-sm">
@@ -342,7 +385,7 @@ export default function NewReplayModal({
         </div>
         <div className="border-subtle flex items-center justify-between gap-2 border-t px-5 py-4">
           {!timeRange && <p></p>}
-          {timeRange && !isLoading && (
+          {timeRange && !isLoading && !runCountsUnavailable && (
             <div className="flex items-center gap-2">
               <p className="text-muted inline-flex items-center gap-1.5 text-sm">
                 <RiInformationLine className="h-5 w-5" />A total of{' '}
@@ -368,7 +411,15 @@ export default function NewReplayModal({
               label="Replay Function"
               kind="primary"
               type="submit"
-              disabled={isCreatingFunctionReplay}
+              disabled={
+                isCreatingFunctionReplay ||
+                isLoading ||
+                functionNotFound ||
+                !hasReplayableSelection({
+                  runCountsFailed: Boolean(runCountsError),
+                  selectedRunsCount,
+                })
+              }
             />
           </div>
         </div>

@@ -204,7 +204,7 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 			AppId:          "my-app",
 			FunctionId:     "my-app-hello-world",
 			Data:           data,
-			IdempotencyKey: stringPtr("test-key-123"),
+			IdempotencyKey: new("test-key-123"),
 		}
 
 		resp, err := client.InvokeFunction(ctx, req)
@@ -300,12 +300,6 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Contains(t, err.Error(), "not_implemented")
 	})
 }
-
-// Helper function to create string pointer for optional fields
-func stringPtr(s string) *string {
-	return &s
-}
-
 func BenchmarkGRPCIntegration_Health(b *testing.B) {
 	client, cleanup := setupGRPCTestServer(b)
 	defer cleanup()

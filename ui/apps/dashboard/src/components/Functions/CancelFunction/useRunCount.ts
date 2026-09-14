@@ -38,19 +38,33 @@ export function useRunCount(input?: RunCountInput) {
     },
   });
 
+  if (res.error) {
+    return {
+      ...baseInitialFetchFailed,
+      error: res.error,
+      kind: 'count-error' as const,
+      refetch: res.refetch,
+    };
+  }
+
   if (res.data) {
     if (!res.data.environment.function) {
       return {
         ...baseInitialFetchFailed,
         error: new Error('function not found'),
+        kind: 'function-not-found' as const,
       };
     }
 
     return {
       ...res,
       data: res.data.environment.function.cancellationRunCount,
+      kind: 'success' as const,
     };
   }
 
-  return res;
+  return {
+    ...res,
+    kind: res.isSkipped ? ('skipped' as const) : ('loading' as const),
+  };
 }

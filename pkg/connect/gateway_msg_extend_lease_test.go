@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/smithy-go/ptr"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/syscode"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -27,7 +26,7 @@ func TestHandleWorkerRequestExtendLeaseExtendsLease(t *testing.T) {
 		EnvId:          res.envID.String(),
 		AppId:          res.appID.String(),
 		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
+		StepId:         new("step"),
 		RunId:          res.runID.String(),
 		LeaseId:        leaseID.String(),
 		SystemTraceCtx: []byte("system"),

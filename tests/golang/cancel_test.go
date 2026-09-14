@@ -40,7 +40,7 @@ func TestEventCancellation(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID: "test-cancel",
 			Cancel: []inngestgo.ConfigCancel{
-				{Event: cancelEvtName, If: inngestgo.StrPtr("async.data.cancel == event.data.cancel")},
+				{Event: cancelEvtName, If: new("async.data.cancel == event.data.cancel")},
 			},
 		},
 		inngestgo.EventTrigger(triggerEvtName, nil),
@@ -70,7 +70,7 @@ func TestEventCancellation(t *testing.T) {
 		inngestgo.FunctionOpts{ID: "handle-cancel"},
 		inngestgo.EventTrigger(
 			"inngest/function.cancelled",
-			inngestgo.StrPtr(fmt.Sprintf(
+			new(fmt.Sprintf(
 				"event.data.function_id == '%s-test-cancel'",
 				appName,
 			)),

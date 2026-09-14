@@ -44,7 +44,7 @@ func TestFnConcurrency(t *testing.T) {
 					},
 				},
 			},
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -135,11 +135,11 @@ func TestFnConcurrency_Key(t *testing.T) {
 				Fn: []inngestgo.ConfigFnConcurrency{
 					{
 						Limit: 1,
-						Key:   inngestgo.StrPtr("event.data.customer_id"),
+						Key:   new("event.data.customer_id"),
 					},
 				},
 			},
-			Retries: inngestgo.IntPtr(0),
+			Retries: new(0),
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
