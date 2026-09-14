@@ -3,7 +3,7 @@ const skipReasonLabels: Record<string, string> = {
   FunctionPaused: 'Function is paused',
   FunctionDrained: 'Function is draining',
   FunctionBacklogSizeLimitHit: 'Backlog limit reached',
-  AccountExecutionCapHit: 'Execution cap reached', // TODO: better wordin'
+  AccountExecutionCapHit: 'Execution cap reached',
 };
 
 export function formatSkipReason(reason?: string): string {
