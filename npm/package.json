@@ -26,7 +26,7 @@
     "node": "24.13.0"
   },
   "dependencies": {
-    "adm-zip": "^0.5.10",
+    "adm-zip": "^0.6.0",
     "debug": "^4.3.4",
     "node-fetch": "^2.6.7",
     "tar": "^7.5.3"
