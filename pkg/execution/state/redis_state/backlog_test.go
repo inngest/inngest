@@ -1159,7 +1159,7 @@ func TestBacklogsByPartition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
@@ -1202,7 +1202,7 @@ func TestBacklogsByPartition(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			items, err := q.BacklogsByPartition(ctx, shard, fnID.String(), tc.from, tc.until,
+			items, err := shard.BacklogsByPartition(ctx, fnID.String(), tc.from, tc.until,
 				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
