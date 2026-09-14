@@ -14,7 +14,6 @@ import {
   GetCurrentPlanDocument,
   GetFunctionsDocument,
   GetFunctionsUsageDocument,
-  GetPlansDocument,
   MetricsLookupsDocument,
   MetricsScope,
   VolumeMetricsDocument,
@@ -199,7 +198,10 @@ function writeCache(
   }
 }
 
-export function useInfraDashboardData(timeRange: TimeRangeOption) {
+export function useInfraDashboardData(
+  timeRange: TimeRangeOption,
+  availablePlans: SelfServePlan[],
+) {
   const env = useEnvironment();
   const client = useClient();
   const range = useMemo(() => getUtcMonthToDateRange(), [timeRange.id]);
@@ -284,9 +286,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const [currentPlan, refetchCurrentPlan] = useQuery({
     query: GetCurrentPlanDocument,
   });
-  const [availablePlans, refetchAvailablePlans] = useQuery({
-    query: GetPlansDocument,
-  });
 
   const liveData = useMemo<InfraDashboardData>(() => {
     const activeApps =
@@ -310,7 +309,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     );
     const accountConcurrency = volume.data?.accountConcurrency.data ?? [];
     const currentConcurrency = latestMetricDataValue(accountConcurrency);
-    const selfServePlans = pickSelfServePlans(availablePlans.data?.plans);
+    const selfServePlans = pickSelfServePlans(availablePlans);
     const billingPlan = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: currentPlan.data?.account.entitlements,
       defaultSku: INFRA_DASHBOARD_PLACEHOLDERS.defaultPlanSku,
@@ -330,9 +329,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       appsCount: activeApps.length,
       backlogDepth,
       billingActionsReady: Boolean(
-        !currentPlan.fetching &&
-          !availablePlans.fetching &&
-          currentPlan.data?.account.plan,
+        !currentPlan.fetching && currentPlan.data?.account.plan,
       ),
       billingPlanReady,
       concurrencyAddon: pickInfraConcurrencyAddon({
@@ -383,7 +380,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       totalAccountConcurrency: sumDataValues(accountConcurrency),
     };
   }, [
-    availablePlans.data?.plans,
+    availablePlans,
     billableExecutions.data?.usage,
     currentPlan.data?.account.addons?.concurrency,
     currentPlan.data?.account.entitlements,
@@ -417,15 +414,13 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       volume.data &&
       billableExecutions.data &&
       currentPlan.data &&
-      availablePlans.data &&
       !lookups.fetching &&
       !functions.fetching &&
       !functionUsage.fetching &&
       !events.fetching &&
       !volume.fetching &&
       !billableExecutions.fetching &&
-      !currentPlan.fetching &&
-      !availablePlans.fetching,
+      !currentPlan.fetching,
   );
   const liveError =
     lookups.error ||
@@ -435,8 +430,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     events.error ||
     volume.error ||
     billableExecutions.error ||
-    currentPlan.error ||
-    availablePlans.error;
+    currentPlan.error;
   const isUsingCachedData = Boolean(cached && !liveDataReady);
   const data = isUsingCachedData && cached ? cached.data : liveData;
   const fetching =
@@ -447,8 +441,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       functionConcurrencyLimit.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
-      currentPlan.fetching ||
-      availablePlans.fetching);
+      currentPlan.fetching);
   const loading = isUsingCachedData
     ? {
         backlog: false,
@@ -461,7 +454,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       }
     : {
         backlog: volume.fetching,
-        billing: currentPlan.fetching || availablePlans.fetching,
+        billing: currentPlan.fetching,
         eventsReceived: events.fetching,
         executionsRan:
           billableExecutions.fetching ||
@@ -500,11 +493,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       await client
         .query(GetCurrentPlanDocument, {}, { requestPolicy: 'network-only' })
         .toPromise();
-      await client
-        .query(GetPlansDocument, {}, { requestPolicy: 'network-only' })
-        .toPromise();
       refetchCurrentPlan({ requestPolicy: 'network-only' });
-      refetchAvailablePlans({ requestPolicy: 'network-only' });
     },
   };
 }
