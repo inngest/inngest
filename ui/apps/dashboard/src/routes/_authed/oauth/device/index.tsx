@@ -25,6 +25,7 @@ type Search = {
 };
 
 type AuthorizationDetails = {
+  client_id: string;
   client_name: string;
   user_code?: string;
   flow: 'device' | 'authorization_code';
@@ -359,6 +360,11 @@ function OAuthAuthorizationForm({
     <Page>
       <div className="flex flex-col gap-1">
         <h1 className="text-basis text-2xl">Connect {details.client_name}</h1>
+        {details.flow === 'authorization_code' && details.client_id && (
+          <p className="text-basis break-all text-sm">
+            Client ID: {details.client_id}
+          </p>
+        )}
         <p className="text-subtle">
           Grant access to{' '}
           <strong className="text-basis font-medium">
