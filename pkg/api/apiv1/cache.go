@@ -73,6 +73,8 @@ func (c cacheMiddleware[T]) Middleware(next http.Handler) http.Handler {
 					PkgName: pkgName,
 					Tags:    map[string]any{"route": route},
 				})
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(data)
 				return
 			}
@@ -83,23 +85,26 @@ func (c cacheMiddleware[T]) Middleware(next http.Handler) http.Handler {
 		// Record the response from the handler itself.
 		rec := httptest.NewRecorder()
 		next.ServeHTTP(rec, r)
+		result := rec.Result()
+		defer result.Body.Close()
 
 		// Write headers to the actual response, inspecting the max-age HTTP
 		// header which determines cacheability in the result itself.
 		maxAge := int32(0)
-		for key, result := range rec.Result().Header {
-			if key == "Cache-Control" && len(result) == 1 {
-				if res, err := cacheobject.ParseResponseCacheControl(result[0]); err == nil {
+		for key, values := range result.Header {
+			if key == "Cache-Control" && len(values) == 1 {
+				if res, err := cacheobject.ParseResponseCacheControl(values[0]); err == nil {
 					maxAge = int32(res.MaxAge)
 				}
 			}
-			for _, item := range result {
+			for _, item := range values {
 				w.Header().Add(key, item)
 			}
 		}
+		w.WriteHeader(result.StatusCode)
 
-		if maxAge == 0 {
-			// If there's no max-age header, we cannot cache the response.
+		if maxAge == 0 || result.StatusCode != http.StatusOK {
+			// If there's no max-age header or the response is not OK, we cannot cache it.
 			// Ignore.
 			if _, err := io.Copy(w, rec.Body); err != nil {
 				logger.StdlibLogger(ctx).Error("error writing api response", "error", err)
