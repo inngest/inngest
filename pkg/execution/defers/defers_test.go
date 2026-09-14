@@ -136,7 +136,7 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			fake := &fakeRunService{saveDeferErr: tc.saveDeferErr}
 			op := deferAddOp(t, "hash-"+tc.name, tc.opts)
 
-			err := SaveFromOp(context.Background(), fake, nil, logger.VoidLogger(), runMetadata(), op)
+			err := SaveFromOp(context.Background(), fake, nil, nil, logger.VoidLogger(), runMetadata(), op)
 
 			if tc.wantSurfaceErr {
 				r.Error(err)
@@ -166,7 +166,7 @@ func TestAbortFromOp(t *testing.T) {
 	t.Run("surfaces parse error from missing TargetHashedID", func(t *testing.T) {
 		r := require.New(t)
 		fake := &fakeRunService{}
-		err := AbortFromOp(context.Background(), fake, nil, logger.VoidLogger(), runMetadata(),
+		err := AbortFromOp(context.Background(), fake, nil, nil, logger.VoidLogger(), runMetadata(),
 			abortOp(t, state.DeferAbortOpts{}))
 
 		r.Error(err)

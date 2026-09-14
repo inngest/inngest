@@ -96,6 +96,13 @@ type Opts struct {
 
 	// MetadataOpts represents the required opts for the metadadata API
 	MetadataOpts MetadataOpts
+
+	// SyncLifecycleListeners are notified synchronously (see
+	// execution.SyncLifecycleListener) when a userland (extended-trace) span
+	// is committed via OTLP ingestion -- see traces.go's commitSpan. Nil/empty
+	// is a no-op; only a caller wiring DuckDB dual-write
+	// (pkg/execution/dualwrite) sets this today.
+	SyncLifecycleListeners []execution.SyncLifecycleListener
 }
 
 type checkpointQueue struct {
