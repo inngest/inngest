@@ -4,12 +4,15 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InfraDashboard } from '@/components/InfraDashboard/InfraDashboard';
 import { useNavigationV2State } from '@/components/Layout/useNavigationV2';
+import { plans as getPlans } from '@/queries/server/billing';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/')({
   component: EnvHome,
+  loader: async () => ({ availablePlans: await getPlans() }),
 });
 
 function EnvHome() {
+  const { availablePlans } = Route.useLoaderData();
   const { envSlug } = Route.useParams();
   const navigate = useNavigate();
   const navigation = useNavigationV2State();
@@ -34,5 +37,5 @@ function EnvHome() {
     );
   }
 
-  return <InfraDashboard />;
+  return <InfraDashboard availablePlans={availablePlans} />;
 }

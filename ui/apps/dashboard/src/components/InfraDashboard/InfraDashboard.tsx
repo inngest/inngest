@@ -28,6 +28,7 @@ import CheckoutModal, {
   type CheckoutItem,
 } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
+import type { SelfServePlan } from '@/components/Billing/Plans/utils';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { UpdateAccountAddonQuantityDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -66,10 +67,14 @@ function formatCacheAge(cachedAt: number) {
   return `${minutes}m`;
 }
 
-export function InfraDashboard() {
+export function InfraDashboard({
+  availablePlans,
+}: {
+  availablePlans: SelfServePlan[];
+}) {
   const env = useEnvironment();
   const { cacheStatus, data, loading, refetchBillingData } =
-    useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
+    useInfraDashboardData(TIME_RANGE_OPTIONS[0], availablePlans);
   const cacheAge = cacheStatus.cachedAt
     ? formatCacheAge(cacheStatus.cachedAt)
     : null;
@@ -102,10 +107,11 @@ export function InfraDashboard() {
             currentConcurrencyLimit={data.accountConcurrencyLimit}
             currentPlanSku={data.currentInfraPlanSku}
             hasPaymentMethod={data.hasPaymentMethod}
+            hobbyPlan={data.hobbyPlan}
             onBillingChange={refetchBillingData}
             isEnterprisePlan={data.isEnterprisePlan}
             plans={data.infraPlans}
-            proPlanAmountCents={data.proPlanAmountCents}
+            proPlan={data.proPlan}
             selectedPlan={selectedPlan}
           />
           <div className="text-muted flex w-full items-center justify-between gap-3 text-xs">
@@ -244,10 +250,11 @@ function InfraPlanDropdown({
   currentConcurrencyLimit,
   currentPlanSku,
   hasPaymentMethod,
+  hobbyPlan,
   isEnterprisePlan,
   onBillingChange,
   plans,
-  proPlanAmountCents,
+  proPlan,
   selectedPlan,
 }: {
   billingActionsReady: boolean;
@@ -257,10 +264,11 @@ function InfraPlanDropdown({
   currentConcurrencyLimit?: number | null;
   currentPlanSku: InfraPlanSku;
   hasPaymentMethod: boolean;
+  hobbyPlan?: SelfServePlan | null;
   isEnterprisePlan: boolean;
   onBillingChange: () => Promise<void>;
   plans: InfraPlan[];
-  proPlanAmountCents?: number | null;
+  proPlan?: SelfServePlan | null;
   selectedPlan: InfraPlan;
 }) {
   const router = useRouter();
@@ -341,7 +349,8 @@ function InfraPlanDropdown({
         currentConcurrencyLimit,
         currentPlan: currentBillingPlan,
         currentPlanSku,
-        proPlanAmountCents,
+        hobbyPlan,
+        proPlan,
         targetSku: plan.sku,
       });
 
@@ -389,7 +398,8 @@ function InfraPlanDropdown({
       currentConcurrencyLimit,
       currentPlanSku,
       hasPaymentMethod,
-      proPlanAmountCents,
+      hobbyPlan,
+      proPlan,
     ],
   );
 
@@ -466,7 +476,8 @@ function InfraPlanDropdown({
                       currentConcurrencyLimit,
                       currentPlan: currentBillingPlan,
                       currentPlanSku,
-                      proPlanAmountCents,
+                      hobbyPlan,
+                      proPlan,
                       targetSku: plan.sku,
                     })
                   : ({

@@ -127,6 +127,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	gwmux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newResponseEnumMarshaler()),
 		runtime.WithErrorHandler(base.CustomErrorHandler()),
+		runtime.SetQueryParameterParser(&runtime.DefaultQueryParser{RejectUnknownFields: true}),
 		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
 			// forward standard headers
 			if strings.HasPrefix(strings.ToLower(key), "x-") || key == "authorization" {
