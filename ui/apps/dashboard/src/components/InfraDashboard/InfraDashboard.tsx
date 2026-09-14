@@ -67,10 +67,14 @@ function formatCacheAge(cachedAt: number) {
   return `${minutes}m`;
 }
 
-export function InfraDashboard() {
+export function InfraDashboard({
+  availablePlans,
+}: {
+  availablePlans: SelfServePlan[];
+}) {
   const env = useEnvironment();
   const { cacheStatus, data, loading, refetchBillingData } =
-    useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
+    useInfraDashboardData(TIME_RANGE_OPTIONS[0], availablePlans);
   const cacheAge = cacheStatus.cachedAt
     ? formatCacheAge(cacheStatus.cachedAt)
     : null;
