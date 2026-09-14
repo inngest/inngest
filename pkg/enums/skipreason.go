@@ -21,7 +21,6 @@ const (
 	// SkipReasonFunctionBacklogSizeLimitHit indicates the function backlog size limit was reached
 	SkipReasonFunctionBacklogSizeLimitHit
 
-	// TODO: should this just be SkipReasonExecutionCapHit?
 	// SkipReasonAccountExecutionCapHit indicates that the account has exceeded their entitled number of executions
 	SkipReasonAccountExecutionCapHit
 )

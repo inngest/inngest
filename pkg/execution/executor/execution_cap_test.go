@@ -25,12 +25,19 @@ func TestScheduleAccountExecutionCap(t *testing.T) {
 	tests := []struct {
 		name       string
 		capFn      ExecutionCapFn
+		eventName  string
 		pausedAt   *time.Time
 		wantReason enums.SkipReason
 	}{
 		{
 			name:       "exceeded and enforced skips with cap reason",
 			capFn:      capDecision(ExecutionCapLimitDecision{Exceeded: true, Enforce: true}),
+			wantReason: enums.SkipReasonAccountExecutionCapHit,
+		},
+		{
+			name:       "enforced cap skips invokes without creating or deleting state",
+			capFn:      capDecision(ExecutionCapLimitDecision{Exceeded: true, Enforce: true}),
+			eventName:  event.InvokeFnName,
 			wantReason: enums.SkipReasonAccountExecutionCapHit,
 		},
 		{
@@ -55,6 +62,7 @@ func TestScheduleAccountExecutionCap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := newRecordingTracerProvider()
+			// Leave smv2 nil so any state access, including Create or Delete, fails.
 			e := &executor{
 				log:                 logger.From(context.Background()),
 				tracerProvider:      rec,
@@ -64,9 +72,16 @@ func TestScheduleAccountExecutionCap(t *testing.T) {
 
 			req := capScheduleRequest(nil)
 			req.FunctionPausedAt = tt.pausedAt
+			if tt.eventName != "" {
+				evt := req.Events[0].(event.InternalEvent)
+				evt.Event.Name = tt.eventName
+				req.Events[0] = evt
+			}
 
-			_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+			runID, md, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 			require.ErrorIs(t, err, ErrFunctionSkipped)
+			require.Nil(t, runID)
+			require.Nil(t, md)
 
 			var skipped SkippedError
 			require.True(t, errors.As(err, &skipped))
