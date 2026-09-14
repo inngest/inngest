@@ -26,7 +26,12 @@ const (
 	maxEventRunsLimit     = 40
 	defaultRunsLimit      = 20
 	maxRunsLimit          = 100
+	// This is an intentionally arbitrary, conservative URL compatibility limit,
+	// not a constraint imposed by CEL or the run storage backend.
+	maxRunsCELBytes = 2048
 )
+
+var runsCELTooLongMessage = fmt.Sprintf("Query cannot exceed %d bytes", maxRunsCELBytes)
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
 	if req.RunId == "" {
@@ -67,6 +72,10 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 }
 
 func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*apiv2.ListRunsResponse, error) {
+	if len(req.GetQuery()) > maxRunsCELBytes {
+		return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorQueryTooLong, runsCELTooLongMessage)
+	}
+
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_ListRuns_FullMethodName); result.Limited {
 		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
 			"API rate limit exceeded. The request was rejected and no runs were fetched.")
@@ -85,6 +94,10 @@ func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*ap
 }
 
 func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionRunsRequest) (*apiv2.ListFunctionRunsResponse, error) {
+	if len(req.GetQuery()) > maxRunsCELBytes {
+		return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorQueryTooLong, runsCELTooLongMessage)
+	}
+
 	if req.AppId == "" || req.FunctionId == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
 	}
@@ -110,6 +123,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		FunctionId:    []string{decodePathParam(req.FunctionId)},
 		IsDeferred:    req.IsDeferred,
 		Order:         req.Order,
+		Query:         req.Query,
 	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
@@ -129,6 +143,12 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 func (s *Service) listRuns(ctx context.Context, opts GetRunsOpts) (*apiv2.ListRunsResponse, error) {
 	result, err := s.runs.GetRuns(ctx, opts)
 	if err != nil {
+		switch {
+		case errors.Is(err, ErrExpressionInvalid):
+			return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorExpressionInvalid, "Query expression is invalid")
+		case errors.Is(err, ErrPausedRunStatusNotSupported):
+			return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Filtering runs by PAUSED status is not implemented")
+		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch runs")
 	}
 	if result == nil {
@@ -139,11 +159,17 @@ func (s *Service) listRuns(ctx context.Context, opts GetRunsOpts) (*apiv2.ListRu
 	for _, run := range result.Runs {
 		data = append(data, toAPIRunListItem(run))
 	}
+	page := runsPage(result.Runs, opts.Limit, result.HasMore)
+	// Cloud's RunProvider.GetRuns may return a scan cursor that does not
+	// correspond to a returned run. Pass it through even when the page is empty.
+	if result.Cursor != "" {
+		page.Cursor = &result.Cursor
+	}
 
 	return &apiv2.ListRunsResponse{
 		Data:     data,
 		Metadata: runsResponseMetadata(opts.From, opts.Until),
-		Page:     runsPage(result.Runs, opts.Limit, result.HasMore),
+		Page:     page,
 	}, nil
 }
 
@@ -302,6 +328,7 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		FunctionIDs:   req.GetFunctionId(),
 		IsDeferred:    req.IsDeferred,
 		Order:         order,
+		CEL:           req.GetQuery(),
 	}, nil
 }
 
@@ -380,6 +407,7 @@ func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
 		Limit:   int32(limit),
 	}
 	if hasMore && len(runs) > 0 {
+		// OSS pagination continues from the last returned matching run.
 		nextCursor := runs[len(runs)-1].Cursor
 		page.Cursor = &nextCursor
 	}
@@ -397,20 +425,24 @@ func optionalTimestamp(ts *timestamppb.Timestamp, field string) (*time.Time, err
 	return &value, nil
 }
 
-func runStatusesFromAPI(statuses []string) ([]enums.RunStatus, error) {
-	result := make([]enums.RunStatus, 0, len(statuses))
+func runStatusesFromAPI(statuses []string) ([]apiv2.FunctionRunStatus, error) {
+	result := make([]apiv2.FunctionRunStatus, 0, len(statuses))
 	for _, status := range statuses {
 		switch strings.ToUpper(strings.TrimSpace(status)) {
 		case "QUEUED":
-			result = append(result, enums.RunStatusScheduled)
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED)
 		case "RUNNING":
-			result = append(result, enums.RunStatusRunning)
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING)
+		case "PAUSED":
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED)
 		case "COMPLETED":
-			result = append(result, enums.RunStatusCompleted)
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED)
 		case "FAILED":
-			result = append(result, enums.RunStatusFailed)
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED)
 		case "CANCELLED":
-			result = append(result, enums.RunStatusCancelled)
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED)
+		case "SKIPPED":
+			result = append(result, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED)
 		default:
 			return nil, fmt.Errorf("Status is invalid")
 		}
@@ -500,7 +532,7 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.Fu
 		App: &apiv2.AppRef{
 			Id: appRefID(fn),
 		},
-		Status:    toFunctionRunStatus(run.Status),
+		Status:    toFunctionRunStatus(run.Status, !fn.PausedAt.IsZero() && fn.PausedAt.Before(time.Now())),
 		QueuedAt:  queuedAt,
 		StartedAt: startedAt,
 		Trigger: &apiv2.RunTrigger{
@@ -539,13 +571,21 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 		App: &apiv2.AppRef{
 			Id: run.AppID,
 		},
-		Status:    toFunctionRunStatus(run.Status),
+		Status:    toFunctionRunStatus(run.Status, run.FunctionPaused),
 		QueuedAt:  queuedAt,
 		StartedAt: startedAt,
 		Trigger: &apiv2.RunTrigger{
 			EventIds: []string{run.EventID.String()},
 			IsBatch:  run.BatchID != nil,
 		},
+		IsDeferred: run.IsDeferred,
+		HasAi:      run.HasAI,
+	}
+	if run.FunctionSlug != "" {
+		result.Function.Slug = new(run.FunctionSlug)
+	}
+	if run.EventName != "" {
+		result.Trigger.EventName = new(run.EventName)
 	}
 
 	if run.BatchID != nil {
@@ -580,7 +620,7 @@ func appRefID(fn inngest.DeployedFunction) string {
 	return fn.AppID.String()
 }
 
-func toFunctionRunStatus(status enums.RunStatus) apiv2.FunctionRunStatus {
+func toFunctionRunStatus(status enums.RunStatus, functionPaused bool) apiv2.FunctionRunStatus {
 	switch status {
 	case enums.RunStatusCompleted:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED
@@ -589,7 +629,13 @@ func toFunctionRunStatus(status enums.RunStatus) apiv2.FunctionRunStatus {
 	case enums.RunStatusCancelled:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED
 	case enums.RunStatusRunning:
+		// paused is currently not stored on the run directly, so we must infer it from the function state
+		if functionPaused {
+			return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED
+		}
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING
+	case enums.RunStatusSkipped:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED
 	default:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED
 	}

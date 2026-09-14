@@ -20,6 +20,7 @@ import (
 	state "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
+	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -87,6 +88,11 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		return nil, err
 	}
 
+	statuses, err := runStatusesForCQRS(opts.Status)
+	if err != nil {
+		return nil, err
+	}
+
 	from := time.Time{}
 	if opts.From != nil {
 		from = *opts.From
@@ -110,7 +116,8 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 			TimeField:    timeField,
 			From:         from,
 			Until:        until,
-			Status:       opts.Status,
+			Status:       statuses,
+			CEL:          opts.CEL,
 			IsDeferred:   opts.IsDeferred,
 		},
 		Order: []cqrs.GetTraceRunOrder{{
@@ -122,6 +129,9 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		IncludeOutput: opts.IncludeOutput,
 	})
 	if err != nil {
+		if errors.Is(err, cqrs.ErrInvalidRunExpression) {
+			return nil, fmt.Errorf("%w: %v", apiv2.ErrExpressionInvalid, err)
+		}
 		return nil, err
 	}
 
@@ -139,6 +149,33 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		Runs:    runs,
 		HasMore: hasMore,
 	}, nil
+}
+
+func runStatusesForCQRS(statuses []v2pb.FunctionRunStatus) ([]enums.RunStatus, error) {
+	result := make([]enums.RunStatus, 0, len(statuses))
+	for _, status := range statuses {
+		switch status {
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED:
+			result = append(result, enums.RunStatusScheduled)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING:
+			result = append(result, enums.RunStatusRunning)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED:
+			result = append(result, enums.RunStatusCompleted)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED:
+			result = append(result, enums.RunStatusFailed)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED:
+			result = append(result, enums.RunStatusCancelled)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED:
+			result = append(result, enums.RunStatusSkipped)
+		case v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED:
+			// PAUSED is function state, not a persisted run status. Cloud can query
+			// RUNNING rows and post-filter using persisted function pause state. Although
+			// the shared DeployedFunction exposes PausedAt, the dev server's cqrs.Function
+			// has no pause field, so this provider cannot do the same.
+			return nil, apiv2.ErrPausedRunStatusNotSupported
+		}
+	}
+	return result, nil
 }
 
 func cqrsRunTimeField(field apiv2.RunTimeField) (enums.TraceRunTime, error) {
@@ -303,8 +340,10 @@ func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput bool) *apiv2.RunListI
 		Cursor:       row.Cursor,
 		RunStartedAt: row.StartedAt,
 		FunctionID:   row.FunctionID.String(),
+		FunctionSlug: row.FunctionSlug,
 		AppID:        row.AppID.String(),
 		Status:       row.Status,
+		IsDeferred:   &row.IsDeferred,
 	}
 	if len(row.TriggerIDs) > 0 {
 		run.EventID, _ = ulid.Parse(row.TriggerIDs[0])
