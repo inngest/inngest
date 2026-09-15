@@ -171,7 +171,24 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	finalizationClaim := e.claimFinalization(ctx, opts.Metadata)
 
-	// Delete the function state in every case.
+	// finalizeEvents creates function finished events, and also attempts to fast-resume
+	// any parent function that invoked this run. Defer events are published as
+	// part of the same finishHandler call.
+	if finalizationClaim.Claimed() {
+		if err := e.finalizeEvents(ctx, opts, deferEvents); err != nil {
+			if releaseErr := finalizationClaim.Release(ctx); releaseErr != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"error releasing finalization claim after failed publish",
+					"error", releaseErr,
+					"run_id", opts.Metadata.ID.RunID,
+				)
+				return errors.Join(err, releaseErr)
+			}
+			return err
+		}
+	}
+
+	// Delete the function state in every case after event publishing succeeds.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
 	deleteStatus := runStateDeleteStatusSuccess
 	if err != nil {
@@ -202,23 +219,6 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	e.finalizeRemoveJobs(ctx, opts)
 
-	// finalizeEvents creates function finished events, and also attempts to fast-resume
-	// any parent function that invoked this run. Defer events are published as
-	// part of the same finishHandler call.
-	if !finalizationClaim.Claimed() {
-		return nil
-	}
-	if err := e.finalizeEvents(ctx, opts, deferEvents); err != nil {
-		if releaseErr := finalizationClaim.Release(ctx); releaseErr != nil {
-			logger.StdlibLogger(ctx).Warn(
-				"error releasing finalization claim after failed publish",
-				"error", releaseErr,
-				"run_id", opts.Metadata.ID.RunID,
-			)
-			return errors.Join(err, releaseErr)
-		}
-		return err
-	}
 	return nil
 }
 
