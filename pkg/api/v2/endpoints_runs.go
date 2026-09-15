@@ -636,6 +636,8 @@ func toFunctionRunStatus(status enums.RunStatus, functionPaused bool) apiv2.Func
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING
 	case enums.RunStatusSkipped:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED
+	case enums.RunStatusUnknown:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_UNKNOWN
 	default:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED
 	}

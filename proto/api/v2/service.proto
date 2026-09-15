@@ -2193,6 +2193,8 @@ enum FunctionRunStatus {
   FUNCTION_RUN_STATUS_SKIPPED = 6;
   // PAUSED is synthetic: the run is RUNNING, but its function is paused.
   FUNCTION_RUN_STATUS_PAUSED = 7;
+  // UNKNOWN is returned when the persisted run status cannot be recognized.
+  FUNCTION_RUN_STATUS_UNKNOWN = 8;
 }
 
 enum TraceSpanStatus {

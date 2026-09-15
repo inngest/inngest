@@ -1292,6 +1292,9 @@ func TestRunStatusesFromAPI(t *testing.T) {
 
 	_, err = runStatusesFromAPI([]string{"FUNCTION_RUN_STATUS_COMPLETED"})
 	require.ErrorContains(t, err, "Status is invalid")
+
+	_, err = runStatusesFromAPI([]string{"UNKNOWN"})
+	require.ErrorContains(t, err, "Status is invalid")
 }
 
 func TestRunTimeFieldFromAPI(t *testing.T) {

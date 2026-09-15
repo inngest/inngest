@@ -38,6 +38,8 @@ const (
 	FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED     FunctionRunStatus = 6
 	// PAUSED is synthetic: the run is RUNNING, but its function is paused.
 	FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED FunctionRunStatus = 7
+	// UNKNOWN is returned when the persisted run status cannot be recognized.
+	FunctionRunStatus_FUNCTION_RUN_STATUS_UNKNOWN FunctionRunStatus = 8
 )
 
 // Enum value maps for FunctionRunStatus.
@@ -51,6 +53,7 @@ var (
 		5: "FUNCTION_RUN_STATUS_CANCELLED",
 		6: "FUNCTION_RUN_STATUS_SKIPPED",
 		7: "FUNCTION_RUN_STATUS_PAUSED",
+		8: "FUNCTION_RUN_STATUS_UNKNOWN",
 	}
 	FunctionRunStatus_value = map[string]int32{
 		"FUNCTION_RUN_STATUS_UNSPECIFIED": 0,
@@ -61,6 +64,7 @@ var (
 		"FUNCTION_RUN_STATUS_CANCELLED":   5,
 		"FUNCTION_RUN_STATUS_SKIPPED":     6,
 		"FUNCTION_RUN_STATUS_PAUSED":      7,
+		"FUNCTION_RUN_STATUS_UNKNOWN":     8,
 	}
 )
 
@@ -9688,7 +9692,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.CancelRunDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"[\n" +
 	"\rCancelRunData\x12J\n" +
-	"\x06run_id\x18\x01 \x01(\tB3\x92A02\x10Cancelled run IDJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId*\xa0\x02\n" +
+	"\x06run_id\x18\x01 \x01(\tB3\x92A02\x10Cancelled run IDJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId*\xc1\x02\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
@@ -9697,7 +9701,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1aFUNCTION_RUN_STATUS_FAILED\x10\x04\x12!\n" +
 	"\x1dFUNCTION_RUN_STATUS_CANCELLED\x10\x05\x12\x1f\n" +
 	"\x1bFUNCTION_RUN_STATUS_SKIPPED\x10\x06\x12\x1e\n" +
-	"\x1aFUNCTION_RUN_STATUS_PAUSED\x10\a*\xed\x01\n" +
+	"\x1aFUNCTION_RUN_STATUS_PAUSED\x10\a\x12\x1f\n" +
+	"\x1bFUNCTION_RUN_STATUS_UNKNOWN\x10\b*\xed\x01\n" +
 	"\x0fTraceSpanStatus\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_UNKNOWN\x10\x00\x12\x1d\n" +
 	"\x19TRACE_SPAN_STATUS_RUNNING\x10\x01\x12\x1f\n" +
