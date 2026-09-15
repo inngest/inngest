@@ -5,9 +5,11 @@ import type { InngestAPIFetch } from '@/queries/useInngestAPIFetch';
 import {
   decodeRunsFrontier,
   fetchRunsPage,
+  getRestAppIDs,
   restFunctionRunToTableRun,
   restRunsRefetchInterval,
 } from './restRuns';
+import { fetchRestRuns } from './useRunsPagination';
 
 const apiFetch: InngestAPIFetch = (pathname, init) =>
   fetch(new URL(pathname, 'https://api.example.com'), init);
@@ -88,12 +90,58 @@ describe('restFunctionRunToTableRun', () => {
 describe('restRunsRefetchInterval', () => {
   it.each([
     { name: 'before the first page', hasCEL: false, pages: 0, want: false },
-    { name: 'while only the first page is cached', hasCEL: false, pages: 1, want: 1000 },
+    {
+      name: 'while only the first page is cached',
+      hasCEL: false,
+      pages: 1,
+      want: 1000,
+    },
     { name: 'after pagination begins', hasCEL: false, pages: 2, want: false },
     { name: 'during CEL search', hasCEL: true, pages: 1, want: false },
   ])('$name', ({ hasCEL, pages, want }) => {
     expect(restRunsRefetchInterval(hasCEL, pages)).toBe(want);
   });
+});
+
+it('translates selected app IDs for the REST request', async () => {
+  const apiFetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({ data: [], page: { hasMore: false, limit: 40 } }),
+        { status: 200 },
+      ),
+    );
+  const restAppIDs = getRestAppIDs(
+    ['internal-app-id'],
+    [{ id: 'internal-app-id', externalID: 'public-app-id' }],
+  );
+
+  await fetchRestRuns(
+    apiFetch,
+    {
+      appIDs: ['internal-app-id'],
+      restAppIDs,
+      environmentID: 'environment-id',
+      functionSlug: null,
+      startTime: '2026-08-31T10:00:00Z',
+      endTime: '2026-08-31T11:00:00Z',
+      status: ['RUNNING'],
+      timeField: 'STARTED_AT',
+      celQuery: undefined,
+      isDeferred: false,
+      environmentSlug: 'production',
+      functionAppID: null,
+    },
+    'next-page',
+    new AbortController().signal,
+  );
+
+  expect(apiFetch).toHaveBeenCalledOnce();
+  expect(apiFetch).toHaveBeenCalledWith(
+    '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
+    { signal: expect.any(AbortSignal) },
+  );
 });
 
 it('decodes the selected cursor frontier', () => {

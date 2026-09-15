@@ -23,7 +23,7 @@ import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
-import { decodeRunsFrontier, RunsAPIError } from './restRuns';
+import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -112,11 +112,19 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     return toRunStatuses(rawFilteredStatus ?? []);
   }, [rawFilteredStatus]);
 
+  // TODO: Once REST is fully rolled out, store external app IDs in filterApp
+  // and remove this translation, even though that will break old bookmarks.
+  const restAppIDs = useMemo(
+    () => getRestAppIDs(appIDs, appsRes.data?.env?.apps),
+    [appIDs, appsRes.data?.env?.apps],
+  );
+
   const environment = useEnvironment();
 
   const commonQueryVars = useMemo(
     () => ({
       appIDs: appIDs ?? null,
+      restAppIDs,
       environmentID: environment.id,
       functionSlug: functionSlug ?? null,
       startTime: calculatedStartTime.toISOString(),
@@ -130,6 +138,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     }),
     [
       appIDs,
+      restAppIDs,
       environment.id,
       functionSlug,
       calculatedStartTime,
@@ -145,6 +154,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const shouldUseREST =
     (forceRestRuns ?? restRunsEnabled) &&
+    restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
   // Use the new hook to manage pagination
