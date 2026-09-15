@@ -65,6 +65,25 @@ func TestToFunctionRun(t *testing.T) {
 	require.Nil(t, result.Output)
 }
 
+func TestToFunctionRunInfersPausedStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		pausedAt time.Time
+		want     apiv2.FunctionRunStatus
+	}{
+		{name: "active pause", pausedAt: time.Now().Add(-time.Hour), want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED},
+		{name: "future pause", pausedAt: time.Now().Add(time.Hour), want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := toFunctionRun(&cqrs.FunctionRun{
+				Status: enums.RunStatusRunning,
+			}, inngest.DeployedFunction{PausedAt: tc.pausedAt})
+
+			require.Equal(t, tc.want, result.Status)
+		})
+	}
+}
+
 func TestRunCancellability(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -162,19 +181,22 @@ func TestAppRefID(t *testing.T) {
 
 func TestToFunctionRunStatus(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		status enums.RunStatus
-		want   apiv2.FunctionRunStatus
+		name           string
+		status         enums.RunStatus
+		functionPaused bool
+		want           apiv2.FunctionRunStatus
 	}{
 		{name: "completed", status: enums.RunStatusCompleted, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED},
 		{name: "failed", status: enums.RunStatusFailed, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
 		{name: "cancelled", status: enums.RunStatusCancelled, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED},
 		{name: "running", status: enums.RunStatusRunning, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING},
+		{name: "paused", status: enums.RunStatusRunning, functionPaused: true, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED},
+		{name: "skipped", status: enums.RunStatusSkipped, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED},
 		{name: "scheduled", status: enums.RunStatusScheduled, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED},
 		{name: "unknown", status: enums.RunStatusUnknown, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.want, toFunctionRunStatus(tc.status))
+			require.Equal(t, tc.want, toFunctionRunStatus(tc.status, tc.functionPaused))
 		})
 	}
 }

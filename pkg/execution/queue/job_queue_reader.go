@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"fmt"
-	"iter"
 	"sync/atomic"
 	"time"
 
@@ -75,33 +74,13 @@ func (r *shardBackedReaders) BacklogByID(ctx context.Context, shard QueueShard, 
 	return reader.BacklogByID(ctx, backlogID)
 }
 
-// BacklogsByPartition implements QueueBacklogReader.
-func (r *shardBackedReaders) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	reader, err := backlogOperations(shard)
-	if err != nil {
-		return nil, err
-	}
-	return reader.BacklogsByPartition(ctx, partitionID, from, until, opts...)
-}
 
 // ItemExists implements QueueItemReader.
 func (r *shardBackedReaders) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
 	return shard.ItemExists(ctx, scope, jobID)
 }
 
-// ItemsByBacklog implements QueueBacklogReader.
-func (r *shardBackedReaders) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
-	reader, err := backlogOperations(shard)
-	if err != nil {
-		return nil, err
-	}
-	return reader.ItemsByBacklog(ctx, backlogID, from, until, opts...)
-}
 
-// ItemsByPartition implements QueuePartitionReader.
-func (r *shardBackedReaders) ItemsByPartition(ctx context.Context, shard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
-	return shard.ItemsByPartition(ctx, scope, partitionID, from, until, opts...)
-}
 
 // ItemsByRunID implements RunQueueReader.
 func (r *shardBackedReaders) ItemsByRunID(ctx context.Context, shard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
