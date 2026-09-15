@@ -85,6 +85,22 @@ describe('restFunctionRunToTableRun', () => {
       }),
     ).toThrow('missing required');
   });
+
+  it('computes elapsed duration for an unfinished run', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-31T10:04:45Z'));
+
+    const row = restFunctionRunToTableRun({
+      id: 'run-1',
+      function: { id: 'fn-id', name: 'Function' },
+      app: { id: 'app' },
+      status: 'RUNNING',
+      queuedAt: '2026-08-31T10:01:00Z',
+      startedAt: '2026-08-31T10:01:30Z',
+    });
+
+    expect(row.durationMS).toBe(195_000);
+  });
 });
 
 describe('restRunsRefetchInterval', () => {

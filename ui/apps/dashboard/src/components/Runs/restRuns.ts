@@ -96,6 +96,16 @@ function rateLimitDelay(error: RunsAPIError, attempt: number) {
   return 1000 * 2 ** attempt;
 }
 
+function getOrComputeRunDurationMS(
+  run: Pick<RestFunctionRun, 'durationMs' | 'startedAt' | 'endedAt'>,
+): number | null {
+  if (run.durationMs !== undefined) return Number(run.durationMs);
+  if (run.startedAt && !run.endedAt) {
+    return Date.now() - Date.parse(run.startedAt);
+  }
+  return null;
+}
+
 // Adapt protobuf JSON to the GraphQL-shaped model currently consumed by the
 // runs table. Nested or renamed fields change shape; defaults normalize values
 // that protobuf JSON omits.
@@ -120,7 +130,7 @@ export function restFunctionRunToTableRun(run: RestFunctionRun): Run {
       slug: run.function.slug || run.function.id,
     },
     status: run.status,
-    durationMS: run.durationMs === undefined ? null : Number(run.durationMs),
+    durationMS: getOrComputeRunDurationMS(run),
     eventName: run.trigger?.eventName ?? null,
     isBatch: run.trigger?.isBatch ?? false,
     cronSchedule: run.trigger?.cronSchedule ?? null,
