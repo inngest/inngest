@@ -450,6 +450,28 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	if err != nil {
 		return fmt.Errorf("could not resolve shard: %w", err)
 	}
+	if shouldMigrate && !di.isSecondary && d.hasSecondary() {
+		secondary, err := d.secondaryShard()
+		if err != nil {
+			return fmt.Errorf("could not resolve secondary shard before starting debounce: %w", err)
+		}
+		if _, err := secondary.DebounceGetItem(ctx, scopeForDebounceItem(di), debounceID); err == nil {
+			// Migration makes the primary copy durable before deleting the secondary
+			// copy. If the process exits between those steps, the same debounce and
+			// its timeout remain on both shards. Finish that interrupted cleanup before
+			// allowing the primary timeout to execute.
+			logger.StdlibLogger(ctx).Warn("secondary debounce still exists before primary execution; completing interrupted migration",
+				"debounce_id", debounceID.String(),
+				"primary_shard", queueShard.Name(),
+				"secondary_shard", secondary.Name(),
+			)
+			if err := d.completePreparedMigration(ctx, di, fn, &preparedMigration{debounceID: debounceID}); err != nil {
+				return fmt.Errorf("could not complete debounce migration before execution: %w", err)
+			}
+		} else if !errors.Is(err, ErrDebounceNotFound) {
+			return fmt.Errorf("could not inspect secondary debounce before execution: %w", err)
+		}
+	}
 
 	status := "unknown"
 	defer func() {

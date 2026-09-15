@@ -90,6 +90,119 @@ func (s *startExecutionQueueShard) DebounceStartExecution(
 	return queue.DebounceStartStarted, nil
 }
 
+type migrationCleanupQueueShard struct {
+	queue.QueueShard
+
+	name                 string
+	item                 []byte
+	getItemErr           error
+	deleteItemsCalls     int
+	removeQueueItemCalls int
+	deleteGuardCalls     int
+	deletePointerCalls   int
+}
+
+func (s *migrationCleanupQueueShard) Name() string { return s.name }
+
+func (s *migrationCleanupQueueShard) DebounceGetItem(context.Context, queue.Scope, ulid.ULID) ([]byte, error) {
+	if s.getItemErr != nil {
+		return nil, s.getItemErr
+	}
+	if s.item == nil {
+		return nil, queue.ErrDebounceNotFound
+	}
+	return s.item, nil
+}
+
+func (s *migrationCleanupQueueShard) DebounceDeleteItems(context.Context, queue.Scope, ...ulid.ULID) error {
+	s.deleteItemsCalls++
+	s.item = nil
+	return nil
+}
+
+func (s *migrationCleanupQueueShard) RemoveQueueItem(context.Context, queue.Scope, string, string) error {
+	s.removeQueueItemCalls++
+	return nil
+}
+
+func (s *migrationCleanupQueueShard) DebounceDeleteMigratingFlag(context.Context, queue.Scope, ulid.ULID) error {
+	s.deleteGuardCalls++
+	return nil
+}
+
+func (s *migrationCleanupQueueShard) DebounceDeletePointer(context.Context, queue.Scope, string) error {
+	s.deletePointerCalls++
+	return nil
+}
+
+func TestStartExecutionFailsBeforePrimaryWhenSecondaryCannotBeInspected(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	primary := &startExecutionQueueShard{name: "primary"}
+	secondaryErr := errors.New("secondary unavailable")
+	secondary := &migrationCleanupQueueShard{name: "secondary", getItemErr: secondaryErr}
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{primary.Name(): primary, secondary.Name(): secondary},
+		queue.WithShardSelector(migrationShardSelector(secondary, primary)),
+		queue.WithPrimary(primary),
+	)
+	require.NoError(t, err)
+
+	manager := debouncer{
+		shards:             registry,
+		primaryShardName:   primary.Name(),
+		secondaryShardName: secondary.Name(),
+		shouldMigrate:      func(context.Context, uuid.UUID) bool { return true },
+	}
+	item := DebounceItem{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+	}
+
+	err = manager.StartExecution(ctx, item, inngest.Function{ID: functionID}, ulid.Make())
+	require.ErrorIs(t, err, secondaryErr)
+	require.ErrorContains(t, err, "could not inspect secondary debounce before execution")
+	require.Empty(t, primary.debounceKey)
+}
+
+func TestStartExecutionCompletesCrashedMigrationBeforeRunningPrimary(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	primary := &startExecutionQueueShard{name: "primary"}
+	secondary := &migrationCleanupQueueShard{name: "secondary", item: []byte(`{"e":{}}`)}
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{primary.Name(): primary, secondary.Name(): secondary},
+		queue.WithShardSelector(migrationShardSelector(secondary, primary)),
+		queue.WithPrimary(primary),
+	)
+	require.NoError(t, err)
+
+	manager := debouncer{
+		shards:             registry,
+		primaryShardName:   primary.Name(),
+		secondaryShardName: secondary.Name(),
+		shouldMigrate:      func(context.Context, uuid.UUID) bool { return true },
+	}
+	item := DebounceItem{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+	}
+
+	require.NoError(t, manager.StartExecution(ctx, item, inngest.Function{ID: functionID}, ulid.Make()))
+	require.Equal(t, 1, secondary.deleteItemsCalls)
+	require.Equal(t, 1, secondary.removeQueueItemCalls)
+	require.Equal(t, 1, secondary.deleteGuardCalls)
+	require.Equal(t, 1, secondary.deletePointerCalls)
+	require.Equal(t, functionID.String(), primary.debounceKey)
+
+	// Retrying the durable timeout after cleanup remains safe and does not try
+	// to clean the already-removed source state again.
+	require.NoError(t, manager.StartExecution(ctx, item, inngest.Function{ID: functionID}, ulid.Make()))
+	require.Equal(t, 1, secondary.deleteItemsCalls)
+}
+
 type setPointerFailingShard struct {
 	queue.QueueShard
 	err                  error
@@ -2449,6 +2562,14 @@ func TestDebounceMigrationFailurePreservesExistingDebounce(t *testing.T) {
 
 	require.False(t, newSystemCluster.Exists(newSystemDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, functionID.String())))
 	require.False(t, newSystemCluster.Exists(newSystemDebounceClient.KeyGenerator().Debounce(ctx)))
+
+	// Rollback clears the guard and restores the source as the sole executable
+	// copy when the primary create fails.
+	parsedDebounceID, err := ulid.Parse(originalDebounceID)
+	require.NoError(t, err)
+	status, err := defaultQueueShard.DebounceStartExecution(ctx, testScope(accountID, workspaceID, functionID), functionID.String(), ulid.Make(), parsedDebounceID)
+	require.NoError(t, err)
+	require.Equal(t, queue.DebounceStartStarted, status)
 }
 
 func TestGetDebounceInfo(t *testing.T) {
