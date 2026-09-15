@@ -5,7 +5,7 @@ const executionLimitQuery = graphql(`
   query ExecutionLimitCheck {
     account {
       id
-      entitlements {
+      entitlements: effectiveEntitlements {
         executions {
           usage
           limit
