@@ -85,7 +85,7 @@ export const entitlementUsageDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: effectiveEntitlements {
         # Disable entitlements here as it queries the usage table as well - see monorepo for now
         #executions {
         # DISABLE USAGE FOR NOW - SEE EXE-1011
@@ -202,7 +202,7 @@ export const entitlementUsageWithMetricsDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: effectiveEntitlements {
         executions {
           usage
           limit
@@ -310,7 +310,7 @@ export const currentPlanDocument = graphql(`
         name
         amount
         billingPeriod
-        entitlements {
+        entitlements: configuredEntitlements {
           concurrency {
             limit
           }
@@ -366,7 +366,7 @@ export const currentPlanDocument = graphql(`
           }
         }
       }
-      entitlements {
+      entitlements: effectiveEntitlements {
         concurrency {
           limit
         }
@@ -464,7 +464,7 @@ export const plansDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: configuredEntitlements {
         concurrency {
           limit
         }

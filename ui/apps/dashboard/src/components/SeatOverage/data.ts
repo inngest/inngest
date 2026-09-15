@@ -5,7 +5,7 @@ const seatOverageQuery = graphql(`
   query SeatOverageCheck {
     account {
       id
-      entitlements {
+      entitlements: effectiveEntitlements {
         userCount {
           usage
           limit

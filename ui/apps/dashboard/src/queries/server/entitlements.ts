@@ -6,7 +6,7 @@ const metricsEntitlementsDocument = graphql(`
   query MetricsEntitlements {
     account {
       id
-      entitlements {
+      entitlements: effectiveEntitlements {
         metricsExport {
           enabled
         }
