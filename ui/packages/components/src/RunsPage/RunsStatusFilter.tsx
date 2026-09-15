@@ -26,6 +26,9 @@ export default function RunsStatusFilter({
       return false;
     } else if (status === 'WAITING') {
       return false;
+    } else if (status === 'UNKNOWN') {
+      // UNKNOWN is an output fallback, not a meaningful run query filter.
+      return false;
     }
     return true;
   });
