@@ -26,7 +26,7 @@ type AuthzOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Whether this endpoint requires authorization middleware
 	RequireAuthz bool `protobuf:"varint,1,opt,name=require_authz,json=requireAuthz,proto3" json:"require_authz,omitempty"`
-	// Permission required to call this endpoint when authorized by an API key.
+	// permission required when using an API key or OAuth token
 	Permission    string `protobuf:"bytes,2,opt,name=permission,proto3" json:"permission,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
