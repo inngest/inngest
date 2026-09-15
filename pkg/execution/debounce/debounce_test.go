@@ -95,6 +95,7 @@ type migrationCleanupQueueShard struct {
 
 	name                 string
 	item                 []byte
+	getItemErr           error
 	deleteItemsCalls     int
 	removeQueueItemCalls int
 	deleteGuardCalls     int
@@ -104,6 +105,9 @@ type migrationCleanupQueueShard struct {
 func (s *migrationCleanupQueueShard) Name() string { return s.name }
 
 func (s *migrationCleanupQueueShard) DebounceGetItem(context.Context, queue.Scope, ulid.ULID) ([]byte, error) {
+	if s.getItemErr != nil {
+		return nil, s.getItemErr
+	}
 	if s.item == nil {
 		return nil, queue.ErrDebounceNotFound
 	}
@@ -129,6 +133,37 @@ func (s *migrationCleanupQueueShard) DebounceDeleteMigratingFlag(context.Context
 func (s *migrationCleanupQueueShard) DebounceDeletePointer(context.Context, queue.Scope, string) error {
 	s.deletePointerCalls++
 	return nil
+}
+
+func TestStartExecutionFailsBeforePrimaryWhenSecondaryCannotBeInspected(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	primary := &startExecutionQueueShard{name: "primary"}
+	secondaryErr := errors.New("secondary unavailable")
+	secondary := &migrationCleanupQueueShard{name: "secondary", getItemErr: secondaryErr}
+	registry, err := queue.NewShardRegistry(
+		map[string]queue.QueueShard{primary.Name(): primary, secondary.Name(): secondary},
+		queue.WithShardSelector(migrationShardSelector(secondary, primary)),
+		queue.WithPrimary(primary),
+	)
+	require.NoError(t, err)
+
+	manager := debouncer{
+		shards:             registry,
+		primaryShardName:   primary.Name(),
+		secondaryShardName: secondary.Name(),
+		shouldMigrate:      func(context.Context, uuid.UUID) bool { return true },
+	}
+	item := DebounceItem{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+	}
+
+	err = manager.StartExecution(ctx, item, inngest.Function{ID: functionID}, ulid.Make())
+	require.ErrorIs(t, err, secondaryErr)
+	require.ErrorContains(t, err, "could not inspect secondary debounce before execution")
+	require.Empty(t, primary.debounceKey)
 }
 
 func TestStartExecutionCompletesCrashedMigrationBeforeRunningPrimary(t *testing.T) {
