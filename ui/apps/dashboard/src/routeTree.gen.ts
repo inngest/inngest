@@ -40,6 +40,7 @@ import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index'
 import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
 import { Route as AuthedOauthDeviceIndexRouteImport } from './routes/_authed/oauth/device/index'
+import { Route as AuthedOauthAuthorizeIndexRouteImport } from './routes/_authed/oauth/authorize/index'
 import { Route as AuthedMcpSetupIndexRouteImport } from './routes/_authed/mcp/setup/index'
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index'
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index'
@@ -275,6 +276,12 @@ const AuthedOauthDeviceIndexRoute = AuthedOauthDeviceIndexRouteImport.update({
   path: '/oauth/device/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedOauthAuthorizeIndexRoute =
+  AuthedOauthAuthorizeIndexRouteImport.update({
+    id: '/oauth/authorize/',
+    path: '/oauth/authorize/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedMcpSetupIndexRoute = AuthedMcpSetupIndexRouteImport.update({
   id: '/mcp/setup/',
   path: '/mcp/setup/',
@@ -763,6 +770,7 @@ export interface FileRoutesByFullPath {
   '/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/mcp/setup/': typeof AuthedMcpSetupIndexRoute
+  '/oauth/authorize/': typeof AuthedOauthAuthorizeIndexRoute
   '/oauth/device/': typeof AuthedOauthDeviceIndexRoute
   '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
@@ -865,6 +873,7 @@ export interface FileRoutesByTo {
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/mcp/setup': typeof AuthedMcpSetupIndexRoute
+  '/oauth/authorize': typeof AuthedOauthAuthorizeIndexRoute
   '/oauth/device': typeof AuthedOauthDeviceIndexRoute
   '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute
@@ -966,6 +975,7 @@ export interface FileRoutesById {
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/_authed/mcp/setup/': typeof AuthedMcpSetupIndexRoute
+  '/_authed/oauth/authorize/': typeof AuthedOauthAuthorizeIndexRoute
   '/_authed/oauth/device/': typeof AuthedOauthDeviceIndexRoute
   '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
@@ -1075,6 +1085,7 @@ export interface FileRouteTypes {
     | '/intent/create-webhook/'
     | '/intent/setup-aws-marketplace/'
     | '/mcp/setup/'
+    | '/oauth/authorize/'
     | '/oauth/device/'
     | '/settings/api-keys/'
     | '/settings/integrations/'
@@ -1177,6 +1188,7 @@ export interface FileRouteTypes {
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
     | '/mcp/setup'
+    | '/oauth/authorize'
     | '/oauth/device'
     | '/settings/api-keys'
     | '/settings/integrations'
@@ -1277,6 +1289,7 @@ export interface FileRouteTypes {
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
     | '/_authed/mcp/setup/'
+    | '/_authed/oauth/authorize/'
     | '/_authed/oauth/device/'
     | '/_authed/settings/api-keys/'
     | '/_authed/settings/integrations/'
@@ -1584,6 +1597,13 @@ declare module '@tanstack/react-router' {
       path: '/oauth/device'
       fullPath: '/oauth/device/'
       preLoaderRoute: typeof AuthedOauthDeviceIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/oauth/authorize/': {
+      id: '/_authed/oauth/authorize/'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize/'
+      preLoaderRoute: typeof AuthedOauthAuthorizeIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/mcp/setup/': {
@@ -2501,6 +2521,7 @@ interface AuthedRouteChildren {
   AuthedEnvIndexRoute: typeof AuthedEnvIndexRoute
   AuthedIntegrationsVercelIndexRoute: typeof AuthedIntegrationsVercelIndexRoute
   AuthedMcpSetupIndexRoute: typeof AuthedMcpSetupIndexRoute
+  AuthedOauthAuthorizeIndexRoute: typeof AuthedOauthAuthorizeIndexRoute
   AuthedOauthDeviceIndexRoute: typeof AuthedOauthDeviceIndexRoute
   AuthedIntegrationsVercelCallbackIndexRoute: typeof AuthedIntegrationsVercelCallbackIndexRoute
   AuthedIntegrationsVercelCallbackSuccessIndexRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
@@ -2515,6 +2536,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedEnvIndexRoute: AuthedEnvIndexRoute,
   AuthedIntegrationsVercelIndexRoute: AuthedIntegrationsVercelIndexRoute,
   AuthedMcpSetupIndexRoute: AuthedMcpSetupIndexRoute,
+  AuthedOauthAuthorizeIndexRoute: AuthedOauthAuthorizeIndexRoute,
   AuthedOauthDeviceIndexRoute: AuthedOauthDeviceIndexRoute,
   AuthedIntegrationsVercelCallbackIndexRoute:
     AuthedIntegrationsVercelCallbackIndexRoute,
