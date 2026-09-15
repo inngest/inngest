@@ -92,7 +92,7 @@ function DeviceAuthorizationForm() {
   const [error, setError] = useState<string | null>(null);
 
   const environmentGroups = useMemo(
-    () => credentialEnvironmentOptions(environments ?? []).groups,
+    () => credentialEnvironmentOptions(environments ?? []),
     [environments],
   );
   const environmentOptions = environmentGroups.flatMap((group) => group.opts);
@@ -212,34 +212,25 @@ function DeviceAuthorizationForm() {
       setError('Select at least one permission.');
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    const controller = new AbortController();
-    activeSubmission.current = controller;
-    try {
-      await apiRequest(
-        getToken,
-        '/oauth/device/authorization',
-        {
-          request: details.request,
-          permission_grants: selectedPermissions,
-          resource_boundary_mode: boundary,
-          workspace_id: boundary === 'single_env' ? workspace?.id : null,
-          session_name: sessionName,
-          session_duration_days: durationDays,
-        },
-        controller.signal,
-      );
-      if (!controller.signal.aborted) setDone('approved');
-    } catch (err) {
-      if (!controller.signal.aborted) setError(errorMessage(err));
-    } finally {
-      if (!controller.signal.aborted) setSubmitting(false);
-    }
+    await submitAuthorization('approved', {
+      request: details.request,
+      permission_grants: selectedPermissions,
+      resource_boundary_mode: boundary,
+      workspace_id: boundary === 'single_env' ? workspace?.id : null,
+      session_name: sessionName,
+      session_duration_days: durationDays,
+    });
   }
 
   async function deny() {
     if (!details) return;
+    await submitAuthorization('denied', { request: details.request });
+  }
+
+  async function submitAuthorization(
+    decision: 'approved' | 'denied',
+    body: unknown,
+  ) {
     setSubmitting(true);
     setError(null);
     const controller = new AbortController();
@@ -247,13 +238,11 @@ function DeviceAuthorizationForm() {
     try {
       await apiRequest(
         getToken,
-        '/oauth/device/authorization/deny',
-        {
-          request: details.request,
-        },
+        `/oauth/device/authorization${decision === 'denied' ? '/deny' : ''}`,
+        body,
         controller.signal,
       );
-      if (!controller.signal.aborted) setDone('denied');
+      if (!controller.signal.aborted) setDone(decision);
     } catch (err) {
       if (!controller.signal.aborted) setError(errorMessage(err));
     } finally {

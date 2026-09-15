@@ -20,17 +20,15 @@ export function selectedPermissionGrants(
   groups: PermissionGroup[],
   levels: Record<string, PermissionLevel>,
 ): string[] {
-  const grants = new Set<string>();
-  for (const group of groups) {
-    const level = levels[group.resource] ?? 'none';
-    if (level === 'read' || level === 'write') {
-      group.read.forEach((grant) => grants.add(grant));
-    }
-    if (level === 'write') {
-      group.write.forEach((grant) => grants.add(grant));
-    }
-  }
-  return Array.from(grants).sort();
+  return [
+    ...new Set(
+      groups.flatMap((group) => {
+        const level = levels[group.resource];
+        if (level === 'write') return [...group.read, ...group.write];
+        return level === 'read' ? group.read : [];
+      }),
+    ),
+  ].sort();
 }
 
 export function requestedPermissionLevels({
@@ -41,13 +39,13 @@ export function requestedPermissionLevels({
   scopes: string[];
 }): Record<string, PermissionLevel> {
   const requested = new Set(scopes);
-  const levels: Record<string, PermissionLevel> = {};
-  for (const group of groups) {
-    if (group.write.some((scope) => requested.has(scope))) {
-      levels[group.resource] = 'write';
-    } else if (group.read.some((scope) => requested.has(scope))) {
-      levels[group.resource] = 'read';
-    }
-  }
-  return levels;
+  return Object.fromEntries(
+    groups.flatMap<[string, PermissionLevel]>((group) => {
+      if (group.write.some((scope) => requested.has(scope)))
+        return [[group.resource, 'write']];
+      if (group.read.some((scope) => requested.has(scope)))
+        return [[group.resource, 'read']];
+      return [];
+    }),
+  );
 }

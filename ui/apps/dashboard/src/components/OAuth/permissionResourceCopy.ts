@@ -3,91 +3,40 @@ type PermissionResourceCopy = {
   description: string | null;
 };
 
-const RESOURCE_COPY: Record<string, PermissionResourceCopy> = {
-  accounts: {
-    label: 'Accounts',
-    description: null,
-  },
-  api_keys: {
-    label: 'API keys',
-    description: null,
-  },
-  apps: {
-    label: 'Apps',
-    description: null,
-  },
-  environments: {
-    label: 'Environments',
-    description: null,
-  },
-  event_keys: {
-    label: 'Event keys',
-    description: null,
-  },
-  events: {
-    label: 'Events',
-    description: null,
-  },
-  experiments: {
-    label: 'Experiments',
-    description: null,
-  },
-  functions: {
-    label: 'Functions',
-    description: null,
-  },
-  insights: {
-    label: 'Insights',
-    description: null,
-  },
-  partners: {
-    label: 'Partners',
-    description: null,
-  },
-  runs: {
-    label: 'Runs',
-    description: null,
-  },
-  sandboxes: {
-    label: 'Sandboxes',
-    description: null,
-  },
-  sessions: {
-    label: 'Sessions',
-    description: null,
-  },
-  signing_keys: {
-    label: 'Signing keys',
-    description: null,
-  },
-  webhooks: {
-    label: 'Webhooks',
-    description:
-      'Read access includes URLs that can send events. Copied URLs still work after logout or session revocation. Revoke the webhook to disable them.',
-  },
+const RESOURCE_LABELS: Record<string, string> = {
+  accounts: 'Accounts',
+  api_keys: 'API keys',
+  apps: 'Apps',
+  environments: 'Environments',
+  event_keys: 'Event keys',
+  events: 'Events',
+  experiments: 'Experiments',
+  functions: 'Functions',
+  insights: 'Insights',
+  partners: 'Partners',
+  runs: 'Runs',
+  sandboxes: 'Sandboxes',
+  sessions: 'Sessions',
+  signing_keys: 'Signing keys',
+  webhooks: 'Webhooks',
 };
 
 function humanizeResource(resource: string) {
-  const words: string[] = [];
-  for (const part of resource.split('_')) {
-    if (part.length === 0) {
-      continue;
-    }
-    words.push(part.charAt(0).toUpperCase() + part.slice(1));
-  }
-  return words.join(' ');
+  return resource
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 export function permissionResourceCopy(
   resource: string,
 ): PermissionResourceCopy {
-  const copy = RESOURCE_COPY[resource];
-  if (copy) {
-    return copy;
-  }
-
   return {
-    label: humanizeResource(resource),
-    description: null,
+    label: RESOURCE_LABELS[resource] ?? humanizeResource(resource),
+    description:
+      resource === 'webhooks'
+        ? 'Read access includes URLs that can send events. Copied URLs still work after logout or session revocation. Revoke the webhook to disable them.'
+        : null,
   };
 }

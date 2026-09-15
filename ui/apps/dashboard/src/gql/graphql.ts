@@ -64,13 +64,6 @@ export type ApiKeyCreateResult = {
   plaintextKey: Scalars['String']['output'];
 };
 
-export type ApiKeyPermissionGroup = {
-  __typename?: 'APIKeyPermissionGroup';
-  read: Array<Scalars['String']['output']>;
-  resource: Scalars['String']['output'];
-  write: Array<Scalars['String']['output']>;
-};
-
 export type ApiKeyScope = {
   __typename?: 'APIKeyScope';
   allow: Array<Scalars['String']['output']>;
@@ -1857,7 +1850,6 @@ export type Price = {
 export type Query = {
   __typename?: 'Query';
   account: Account;
-  apiKeyPermissionCatalog: Array<ApiKeyPermissionGroup>;
   billableStepTimeSeries: Array<TimeSeries>;
   defaultEnv: Workspace;
   deploy: Deploy;
