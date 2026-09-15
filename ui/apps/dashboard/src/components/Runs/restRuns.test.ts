@@ -126,7 +126,7 @@ it('translates selected app IDs for the REST request', async () => {
       functionSlug: null,
       startTime: '2026-08-31T10:00:00Z',
       endTime: '2026-08-31T11:00:00Z',
-      status: ['RUNNING'],
+      status: ['RUNNING', 'UNKNOWN'],
       timeField: 'STARTED_AT',
       celQuery: undefined,
       isDeferred: false,
@@ -142,6 +142,36 @@ it('translates selected app IDs for the REST request', async () => {
     '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
     { signal: expect.any(AbortSignal) },
   );
+});
+
+it('does not issue an unfiltered REST request for UNKNOWN-only status', async () => {
+  const apiFetch = vi.fn();
+
+  await expect(
+    fetchRestRuns(
+      apiFetch,
+      {
+        appIDs: null,
+        restAppIDs: null,
+        environmentID: 'environment-id',
+        functionSlug: null,
+        startTime: '2026-08-31T10:00:00Z',
+        endTime: null,
+        status: ['UNKNOWN'],
+        timeField: 'QUEUED_AT',
+        celQuery: undefined,
+        isDeferred: null,
+        environmentSlug: 'production',
+        functionAppID: null,
+      },
+      undefined,
+      new AbortController().signal,
+    ),
+  ).resolves.toEqual({
+    data: [],
+    page: { hasMore: false, limit: 40 },
+  });
+  expect(apiFetch).not.toHaveBeenCalled();
 });
 
 it('decodes the selected cursor frontier', () => {

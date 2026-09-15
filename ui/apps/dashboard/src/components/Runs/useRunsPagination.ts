@@ -12,6 +12,7 @@ import { GetRunsDocument } from './queries';
 import { scanProgressivePages } from './progressiveRuns';
 import {
   fetchRunsPage,
+  getRestRunStatuses,
   restFunctionRunToTableRun,
   restRunsRefetchInterval,
   RUNS_CEL_MAX_BYTES,
@@ -246,6 +247,13 @@ export function fetchRestRuns(
       new RunsAPIError('Query cannot exceed 2048 bytes', 'query_too_long', 422),
     );
   }
+  const statuses = getRestRunStatuses(vars.status);
+  if (vars.status?.length && statuses.length === 0) {
+    return Promise.resolve({
+      data: [],
+      page: { hasMore: false, limit: REST_PAGE_SIZE },
+    });
+  }
   const pathname =
     vars.functionSlug && vars.functionAppID
       ? `/v2/apps/${encodeURIComponent(
@@ -264,7 +272,7 @@ export function fetchRestRuns(
   if (vars.isDeferred !== null) {
     params.set('isDeferred', String(vars.isDeferred));
   }
-  for (const status of vars.status ?? []) params.append('status', status);
+  for (const status of statuses) params.append('status', status);
   if (!vars.functionSlug) {
     for (const appID of vars.restAppIDs ?? []) params.append('appId', appID);
   }

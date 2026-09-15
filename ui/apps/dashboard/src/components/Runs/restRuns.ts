@@ -23,6 +23,10 @@ export function getRestAppIDs(
   );
 }
 
+export function getRestRunStatuses(statuses: string[] | null): string[] {
+  return statuses?.filter((status) => status !== 'UNKNOWN') ?? [];
+}
+
 // TODO: Replace these handwritten REST wire types with types generated from
 // the protobuf HTTP contract.
 export type RestFunctionRun = {
