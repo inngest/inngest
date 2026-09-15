@@ -33,6 +33,15 @@ func TestResponseEnumMarshalerShortensAPIEnumPrefixes(t *testing.T) {
 	run := body["data"].(map[string]any)
 	require.Equal(t, "COMPLETED", run["status"])
 	require.Equal(t, "FUNCTION_RUN_STATUS_FAILED", run["output"].(map[string]any)["literal"])
+
+	data, err = marshaler.Marshal(&apiv2.GetFunctionRunResponse{
+		Data: &apiv2.FunctionRun{
+			Id:     "run-id",
+			Status: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_UNKNOWN,
+		},
+	})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"data":{"id":"run-id","status":"UNKNOWN"}}`, string(data))
 }
 
 func TestResponseEnumMarshalerShortensTraceEnumPrefixes(t *testing.T) {

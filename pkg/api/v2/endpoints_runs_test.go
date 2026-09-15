@@ -193,7 +193,7 @@ func TestToFunctionRunStatus(t *testing.T) {
 		{name: "paused", status: enums.RunStatusRunning, functionPaused: true, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED},
 		{name: "skipped", status: enums.RunStatusSkipped, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_SKIPPED},
 		{name: "scheduled", status: enums.RunStatusScheduled, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED},
-		{name: "unknown", status: enums.RunStatusUnknown, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED},
+		{name: "unknown", status: enums.RunStatusUnknown, want: apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_UNKNOWN},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.want, toFunctionRunStatus(tc.status, tc.functionPaused))
