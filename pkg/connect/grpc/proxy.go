@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -228,12 +229,19 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		opts.Data.UserTraceCtx = marshaled
 	}
 
-	// Await SDK response forwarded by gateway
-
+	// Await SDK response forwarded by gateway.
 	reply := &connectpb.SDKResponse{}
-
+	responseReceived := make(chan struct{})
 	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
 	defer cancelWaitForResponseCtx()
+	var publishResponseOnce sync.Once
+	publishResponse := func(resp *connectpb.SDKResponse) {
+		publishResponseOnce.Do(func() {
+			reply = resp
+			close(responseReceived)
+			cancelWaitForResponseCtx()
+		})
+	}
 	go func() {
 		for {
 			select {
@@ -265,9 +273,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 				l.Debug("received response via polling")
 
-				reply = resp
-
-				cancelWaitForResponseCtx()
+				publishResponse(resp)
 				return
 			}
 
@@ -286,7 +292,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			close(replySubscribed)
 
 			select {
-			case reply = <-replyReceived:
+			case reply := <-replyReceived:
+				publishResponse(reply)
 			case <-ctx.Done():
 				// Unsubscribe never closes the channel.
 				return
@@ -295,7 +302,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.AddEvent("ReplyReceivedGRPC")
 			metrics.IncrConnectGatewayGRPCReplyCounter(ctx, 1, metrics.CounterOpt{})
 
-			cancelWaitForResponseCtx()
 		}()
 
 		select {
@@ -355,7 +361,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 				// Grace period to wait for the worker to send the response
 				select {
-				case <-waitForResponseCtx.Done():
+				case <-responseReceived:
 					l.Debug("response arrived during lease expiry grace period")
 					return
 				case <-time.After(consts.ConnectWorkerRequestGracePeriod):
@@ -373,7 +379,10 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	}()
 
 	// Forward message to the gateway if the request wasn't already running
-	var routedInstanceID string
+	var (
+		routedInstanceID  string
+		responseBeforeAck bool
+	)
 	if leaseID != nil {
 		// Determine the most suitable connection
 		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
@@ -436,9 +445,38 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				"conn_id", route.ConnectionID.String(),
 			)
 
-			// Forward now awaits the SDK to ack a job, so an error means that it's likely
-			// safe to retry through a different route (in case workers/gateways are unavailable)
-			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+			// Forward waits for the worker ACK. A response may arrive first if ACK
+			// handling is delayed, so let that response cancel the outstanding call.
+			forwardCtx, cancelForward := context.WithCancel(ctx)
+			forwardErrCh := make(chan error, 1)
+			gatewayID, connectionID := route.GatewayID, route.ConnectionID
+			go func() {
+				forwardErrCh <- i.gatewayGRPCManager.Forward(forwardCtx, gatewayID, connectionID, opts.Data)
+			}()
+
+			select {
+			case err = <-forwardErrCh:
+				cancelForward()
+				// Prefer a response which raced with a failed worker ACK.
+				select {
+				case <-responseReceived:
+					responseBeforeAck = true
+					err = nil
+				default:
+				}
+			case <-responseReceived:
+				cancelForward()
+				responseBeforeAck = true
+				err = nil
+			}
+			if ctx.Err() != nil && !responseBeforeAck {
+				cleanupWorkerRequestAfterCancellation(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+					l, "could not delete worker lease on context cancellation")
+				return nil, fmt.Errorf("parent context was closed unexpectedly")
+			}
+			if responseBeforeAck {
+				break
+			}
 			if err == nil {
 				break
 			}
@@ -479,27 +517,29 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
-		span.AddEvent("WorkerAck")
-		metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"kind":    "gateway",
-				"success": true,
-			},
-		})
+		if !responseBeforeAck {
+			span.AddEvent("WorkerAck")
+			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind":    "gateway",
+					"success": true,
+				},
+			})
 
-		l.Optional(opts.AccountID, "connect").Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+			l.Optional(opts.AccountID, "connect").Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 
-		metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"transport": transport},
-		})
+			metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"transport": transport},
+			})
+		}
 	}
 
 	select {
 	case <-ctx.Done():
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestAfterCancellation(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease on context cancellation")
 
 		return nil, fmt.Errorf("parent context was closed unexpectedly")
@@ -515,7 +555,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-	case <-waitForResponseCtx.Done():
+	case <-responseReceived:
 		// Stop checking for lease
 		cancelLeaseCtx()
 
@@ -575,6 +615,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			Message: "The worker stopped responding to the request.",
 		}
 	}
+}
+
+func cleanupWorkerRequestAfterCancellation(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID, requestID string, l logger.Logger, message string) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	cleanupWorkerRequestOrLogError(cleanupCtx, stateManager, envID, instanceID, requestID, l, message)
 }
 
 // cleanupWorkerRequestOrLogError cleans up the worker request and logs an error if it fails
