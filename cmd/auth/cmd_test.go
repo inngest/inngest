@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,6 +19,67 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
+
+func TestLoginIgnoresCredentialsForAnotherHost(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("INNGEST_CONFIG_DIR", dir)
+	metadata, err := json.Marshal(cliauth.Metadata{
+		Issuer: "https://other.example.com", Resource: "https://other.example.com/v2",
+		Storage: "unreadable", SessionID: "old-session",
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "auth.json"), metadata, 0o600))
+	var started atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/oauth/device/code", r.URL.Path)
+		started.Store(true)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"access_denied"}`))
+	}))
+	defer server.Close()
+	t.Setenv("INNGEST_API_HOST", server.URL)
+	command := &cli.Command{Name: "inngest", Commands: []*cli.Command{LoginCommand()}}
+	err = command.Run(context.Background(), []string{"inngest", "login", "--no-browser"})
+	require.ErrorContains(t, err, "start device login")
+	require.True(t, started.Load())
+}
+
+func TestLogoutClearsMetadataWhenCredentialIsMissing(t *testing.T) {
+	for _, jsonOutput := range []bool{false, true} {
+		t.Run(fmt.Sprint(jsonOutput), func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("INNGEST_CONFIG_DIR", dir)
+			manager, err := cliauth.NewManager()
+			require.NoError(t, err)
+			require.NoError(t, manager.Store().Save(cliauth.Metadata{
+				Issuer: "https://api.inngest.com", Resource: "https://api.inngest.com/v2", SessionID: "session",
+			}, cliauth.Credential{AccessToken: "access", RefreshToken: "refresh"}, true))
+			files, err := filepath.Glob(filepath.Join(dir, "oauth-credentials-*.json"))
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+			require.NoError(t, os.Remove(files[0]))
+			var output bytes.Buffer
+			command := &cli.Command{
+				Name: "inngest", Writer: &output,
+				Flags:    []cli.Flag{&cli.BoolFlag{Name: "json"}},
+				Commands: []*cli.Command{LogoutCommand()},
+			}
+			args := []string{"inngest", "logout"}
+			if jsonOutput {
+				args = []string{"inngest", "--json", "logout"}
+			}
+			require.NoError(t, command.Run(context.Background(), args))
+			_, err = manager.Store().Metadata()
+			require.ErrorIs(t, err, cliauth.ErrNotLoggedIn)
+			if jsonOutput {
+				require.JSONEq(t, `{"type":"logout","revoked":false,"local_credentials_removed":true}`, output.String())
+			} else {
+				require.Contains(t, output.String(), "Logged out locally. The remote session could not be revoked")
+			}
+		})
+	}
+}
 
 func TestJSONStatusIsOneLineAndFailsWhenLoggedOut(t *testing.T) {
 	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())

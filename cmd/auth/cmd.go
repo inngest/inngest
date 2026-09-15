@@ -69,15 +69,16 @@ func login(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	resource := cliauth.Resource(issuer)
-	_, _, loadErr := manager.Store().Load()
 	if !cmd.Bool("force") {
+		_, loadErr := manager.Store().Metadata()
+		if loadErr != nil && !errors.Is(loadErr, cliauth.ErrNotLoggedIn) {
+			return loadErr
+		}
 		if loadErr == nil {
 			accessToken, metadata, tokenErr := manager.AccessToken(ctx, resource)
 			if tokenErr == nil && manager.Validate(ctx, metadata, accessToken) == nil {
 				return writeStatus(cmd, metadata, true, "already_authenticated")
 			}
-		} else if !errors.Is(loadErr, cliauth.ErrNotLoggedIn) {
-			return loadErr
 		}
 	}
 
@@ -152,7 +153,7 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	defer unlock()
-	metadata, credential, err := manager.Store().Load()
+	metadata, err := manager.Store().Metadata()
 	if errors.Is(err, cliauth.ErrNotLoggedIn) {
 		if cmd.Bool("json") {
 			return writeJSONLine(cmd, map[string]any{"type": "logout", "revoked": false})
@@ -163,7 +164,13 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	revokeErr := manager.Revoke(ctx, metadata, credential)
+	_, credential, revokeErr := manager.Store().Load()
+	if revokeErr != nil && !errors.Is(revokeErr, cliauth.ErrNotLoggedIn) {
+		return revokeErr
+	}
+	if revokeErr == nil {
+		revokeErr = manager.Revoke(ctx, metadata, credential)
+	}
 	// local logout must work when the server is unavailable
 	if err := manager.Store().Delete(metadata); err != nil {
 		return errors.Join(revokeErr, err)
@@ -188,7 +195,11 @@ func status(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	metadata, _, err := manager.Store().Load()
+	metadata, err := manager.Store().Metadata()
+	var accessToken string
+	if err == nil {
+		accessToken, metadata, err = manager.AccessToken(ctx, metadata.Resource)
+	}
 	if errors.Is(err, cliauth.ErrNotLoggedIn) {
 		if cmd.Bool("json") {
 			if err := writeJSONLine(cmd, map[string]any{"type": "auth_status", "authenticated": false}); err != nil {
@@ -198,10 +209,6 @@ func status(ctx context.Context, cmd *cli.Command) error {
 		}
 		return cliauth.ErrNotLoggedIn
 	}
-	if err != nil {
-		return err
-	}
-	accessToken, metadata, err := manager.AccessToken(ctx, metadata.Resource)
 	if err != nil {
 		return err
 	}
