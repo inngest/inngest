@@ -23,6 +23,7 @@ import { parseRunsData } from './utils';
 type UseRunsPaginationParams = {
   commonQueryVars: {
     appIDs: string[] | null;
+    restAppIDs: string[] | null | undefined;
     environmentID: string;
     functionSlug: string | null;
     startTime: string;
@@ -231,7 +232,7 @@ const PROGRESSIVE_MAX_PASSES = 10;
 const PROGRESSIVE_MAX_MS = 10_000;
 const PROGRESSIVE_MIN_PASS_INTERVAL_MS = 250;
 
-function fetchRestRuns(
+export function fetchRestRuns(
   apiFetch: InngestAPIFetch,
   vars: UseRunsPaginationParams['commonQueryVars'],
   cursor: string | undefined,
@@ -265,7 +266,7 @@ function fetchRestRuns(
   }
   for (const status of vars.status ?? []) params.append('status', status);
   if (!vars.functionSlug) {
-    for (const appID of vars.appIDs ?? []) params.append('appId', appID);
+    for (const appID of vars.restAppIDs ?? []) params.append('appId', appID);
   }
   return fetchRunsPage(apiFetch, pathname, params, signal);
 }

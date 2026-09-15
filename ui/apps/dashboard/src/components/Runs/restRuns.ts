@@ -7,9 +7,20 @@ export const RUNS_CEL_MAX_BYTES = 2048;
 export const REST_RUNS_REFETCH_INTERVAL_MS = 1000;
 
 export function restRunsRefetchInterval(hasCEL: boolean, pageCount: number) {
-  return !hasCEL && pageCount === 1
-    ? REST_RUNS_REFETCH_INTERVAL_MS
-    : false;
+  return !hasCEL && pageCount === 1 ? REST_RUNS_REFETCH_INTERVAL_MS : false;
+}
+
+export function getRestAppIDs(
+  selectedAppIDs: string[] | undefined,
+  apps: Array<{ id: string; externalID: string }> | undefined,
+): string[] | null | undefined {
+  if (!selectedAppIDs?.length) return null;
+  if (!apps) return undefined;
+
+  return selectedAppIDs.map(
+    (selectedID) =>
+      apps.find((app) => app.id === selectedID)?.externalID ?? selectedID,
+  );
 }
 
 // TODO: Replace these handwritten REST wire types with types generated from
