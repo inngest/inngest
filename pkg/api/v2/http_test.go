@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -319,18 +320,19 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
 			Limit:       3,
 			TimeField:   RunTimeFieldStartedAt,
-			Status:      []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed},
+			Status:      []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
 			AppIDs:      []string{"my-app"},
 			FunctionIDs: []string{"test-fn"},
 			IsDeferred:  &isDeferred,
 			Order:       OrderDirectionAsc,
+			CEL:         `event.data.userId == "123"`,
 		}).Return(&GetRunsResult{}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
@@ -342,17 +344,18 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
 			Limit:       defaultRunsLimit,
 			TimeField:   RunTimeFieldQueuedAt,
-			Status:      []enums.RunStatus{},
+			Status:      []v2pb.FunctionRunStatus{},
 			AppIDs:      []string{"my-app"},
 			FunctionIDs: []string{"test-fn"},
 			Order:       OrderDirectionDesc,
+			CEL:         `output.status == "sent"`,
 		}).Return(&GetRunsResult{}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs?query=output.status%20%3D%3D%20%22sent%22", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
