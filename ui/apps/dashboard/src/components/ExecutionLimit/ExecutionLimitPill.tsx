@@ -49,8 +49,9 @@ export function ExecutionLimitPill() {
         </Link>
       }
     >
-      Hobby account executions limit reached. Upgrade your plan to continue
-      using Inngest.
+      {data.isVercel
+        ? 'Hobby account executions limit reached. Change configurations on the Vercel Integrations Settings page to upgrade and resume using Inngest.'
+        : 'Hobby account executions limit reached. Upgrade your plan to continue using Inngest.'}
     </AlertPill>
   );
 }
