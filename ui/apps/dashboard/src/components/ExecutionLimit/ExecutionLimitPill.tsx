@@ -16,7 +16,7 @@ export function ExecutionLimitPill() {
             data.marketplaceBillingURL,
             'app-hobby-execution-limit-pill',
           )}
-          className="text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense gap-0.5 text-xs leading-none"
+          className="text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense ml-4 gap-0.5 text-xs leading-none"
           iconAfter={<RiArrowRightLine className="h-3.5 w-3.5" />}
         >
           Upgrade
