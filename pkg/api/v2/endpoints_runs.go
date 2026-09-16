@@ -124,6 +124,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		IsDeferred:    req.IsDeferred,
 		Order:         req.Order,
 		Query:         req.Query,
+		Include:       req.Include,
 	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
@@ -315,6 +316,15 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 	if err != nil {
 		return GetRunsOpts{}, err
 	}
+	var include []RunListInclude
+	for _, value := range req.GetInclude() {
+		switch RunListInclude(value) {
+		case RunListIncludeDeferredFrom:
+			include = append(include, RunListIncludeDeferredFrom)
+		default:
+			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
+		}
+	}
 
 	return GetRunsOpts{
 		Cursor:        cursor,
@@ -329,6 +339,7 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		IsDeferred:    req.IsDeferred,
 		Order:         order,
 		CEL:           req.GetQuery(),
+		Include:       include,
 	}, nil
 }
 
@@ -579,6 +590,14 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 			IsBatch:  run.BatchID != nil,
 		},
 		IsDeferred: run.IsDeferred,
+	}
+	if run.DeferredFrom != nil {
+		result.DeferredFrom = &apiv2.RunDeferredFrom{
+			FunctionSlug: run.DeferredFrom.FunctionSlug,
+		}
+		if run.DeferredFrom.FunctionName != "" {
+			result.DeferredFrom.FunctionName = new(run.DeferredFrom.FunctionName)
+		}
 	}
 	if run.FunctionSlug != "" {
 		result.Function.Slug = new(run.FunctionSlug)

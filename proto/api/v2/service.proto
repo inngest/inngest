@@ -2668,6 +2668,11 @@ message FunctionRun {
   // interpreted with different field semantics.
   reserved 12;
   reserved "has_ai";
+  RunDeferredFrom deferred_from = 13 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The function that deferred this run. Present when requested with include=deferred_from."
+    }
+  ];
 }
 
 message GetFunctionRunRequest {
@@ -3935,6 +3940,11 @@ message ListRunsRequest {
       description: "CEL expression used to filter runs by event, output, or error data"
     }
   ];
+  repeated string include = 13 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional run expansions. Supported values: deferred_from."
+    }
+  ];
 }
 
 message ListFunctionRunsRequest {
@@ -3989,6 +3999,11 @@ message ListFunctionRunsRequest {
       description: "CEL expression used to filter runs by event, output, or error data"
     }
   ];
+  repeated string include = 13 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional run expansions. Supported values: deferred_from."
+    }
+  ];
 }
 
 message ListRunsResponse {
@@ -4019,4 +4034,9 @@ message CancelRunData {
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
     }
   ];
+}
+
+message RunDeferredFrom {
+  string function_slug = 1;
+  optional string function_name = 2;
 }
