@@ -13,4 +13,6 @@ extend google.protobuf.MethodOptions {
 message AuthzOptions {
   // Whether this endpoint requires authorization middleware
   bool require_authz = 1;
+  // permission required when using an API key or OAuth token
+  string permission = 2;
 }
