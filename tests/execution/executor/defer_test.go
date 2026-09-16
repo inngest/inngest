@@ -1133,7 +1133,7 @@ func TestDeferSessionTombstones(t *testing.T) {
 					"input":   map[string]any{},
 					"meta": map[string]any{
 						// nil marshals to JSON null: the per-key tombstone.
-						"sessions":           map[string]any{"cut": nil, "keep": "manual-id"},
+						"sessions":            map[string]any{"cut": nil, "keep": "manual-id"},
 						"propagated_sessions": map[string]any{"cut": "inherited-cut", "survive": "prop-id"},
 					},
 				},
@@ -1194,7 +1194,7 @@ func TestDeferSessionTombstones(t *testing.T) {
 					"input":   map[string]any{},
 					"meta": map[string]any{
 						// nil marshals to JSON null: the whole-field clear-all.
-						"sessions":           nil,
+						"sessions":            nil,
 						"propagated_sessions": map[string]any{"org": "o_9", "tenant": "acme"},
 					},
 				},
@@ -1319,16 +1319,6 @@ func toDeferRecords(got map[ulid.ULID][]cqrs.RunDefer) map[ulid.ULID][]deferReco
 	return out
 }
 
-func toParentRunIDs(got map[ulid.ULID][]cqrs.RunDeferredFrom) map[ulid.ULID][]ulid.ULID {
-	out := map[ulid.ULID][]ulid.ULID{}
-	for k, parents := range got {
-		for _, p := range parents {
-			out[k] = append(out[k], p.RunID)
-		}
-	}
-	return out
-}
-
 // Assert that parents and children are properly linked via real exec.Schedule
 // and exec.Execute calls.
 func TestDeferLinkage(t *testing.T) {
@@ -1354,16 +1344,6 @@ func TestDeferLinkage(t *testing.T) {
 				Status:        enums.DeferStatusAfterRun,
 			}},
 		}, toDeferRecords(defers))
-
-		// Child linked to the parent
-		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
-			[]ulid.ULID{childRunID},
-		)
-		r.NoError(err)
-		r.Equal(map[ulid.ULID][]ulid.ULID{
-			childRunID: {parentRunID},
-		}, toParentRunIDs(parents))
-		r.Equal(infra.fn.Slug, parents[childRunID][0].FnSlug)
 	})
 
 	// 1 parent run calls defer() twice, triggering 2 child runs.
@@ -1400,16 +1380,6 @@ func TestDeferLinkage(t *testing.T) {
 				},
 			},
 		}, toDeferRecords(defers))
-
-		// Children linked to the parent. Each has its own link to the parent
-		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
-			[]ulid.ULID{child1ID, child2ID},
-		)
-		r.NoError(err)
-		r.Equal(map[ulid.ULID][]ulid.ULID{
-			child1ID: {parentRunID},
-			child2ID: {parentRunID},
-		}, toParentRunIDs(parents))
 	})
 
 	// 2 parent runs call defer() and both events batch into 1 child run.
@@ -1444,15 +1414,6 @@ func TestDeferLinkage(t *testing.T) {
 				Status:        enums.DeferStatusAfterRun,
 			}},
 		}, toDeferRecords(defers))
-
-		// Child linked to the parents
-		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
-			[]ulid.ULID{childID},
-		)
-		r.NoError(err)
-		r.Equal(map[ulid.ULID][]ulid.ULID{
-			childID: {parent1ID, parent2ID},
-		}, toParentRunIDs(parents))
 	})
 
 	// 1 parent run calls defer() twice and both events batch into 1 child run.
@@ -1488,15 +1449,5 @@ func TestDeferLinkage(t *testing.T) {
 				},
 			},
 		}, toDeferRecords(defers))
-
-		// Child linked to the parent twice (once per defer event). We may want
-		// to dedupe this, but right now there are dupes in the slice
-		parents, err := infra.dbcqrs.GetRunDeferredFrom(infra.ctx,
-			[]ulid.ULID{childID},
-		)
-		r.NoError(err)
-		r.Equal(map[ulid.ULID][]ulid.ULID{
-			childID: {parentRunID, parentRunID},
-		}, toParentRunIDs(parents))
 	})
 }

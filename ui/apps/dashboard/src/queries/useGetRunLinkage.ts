@@ -3,7 +3,6 @@ import type {
   GetRunLinkagePayload,
   GetRunLinkageResult,
   RunDeferSummary,
-  RunDeferredFromSummary,
 } from '@inngest/components/SharedContext/useGetRunLinkage';
 import { gql, type TypedDocumentNode, useClient } from 'urql';
 
@@ -18,8 +17,6 @@ type GetRunLinkageQuery = {
   workspace: {
     run: {
       defers: RunDeferSummary[];
-      siblingDefers: RunDeferSummary[];
-      deferredFrom: RunDeferredFromSummary[];
     } | null;
   };
 };
@@ -33,20 +30,6 @@ const query: TypedDocumentNode<
       run(runID: $runID) {
         defers {
           ...RunDeferSummaryFields
-        }
-        siblingDefers {
-          ...RunDeferSummaryFields
-        }
-        deferredFrom {
-          runID
-          function {
-            name
-            slug
-          }
-          run {
-            id
-            status
-          }
         }
       }
     }
@@ -99,8 +82,6 @@ export function useGetRunLinkage() {
         loading: false,
         data: {
           defers: run.defers,
-          siblingDefers: run.siblingDefers,
-          deferredFrom: run.deferredFrom,
         },
       };
     },

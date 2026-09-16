@@ -42,13 +42,6 @@ export const GetRunsDocument = graphql(`
               name
               slug
             }
-            deferredFrom {
-              runID
-              function {
-                name
-                slug
-              }
-            }
             id
             isDeferred
             isBatch

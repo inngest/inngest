@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
 import { Pill } from '@inngest/components/Pill';
 import { IDCell, PillCell, TextCell, TimeCell } from '@inngest/components/Table';
-import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { formatMilliseconds } from '@inngest/components/utils/date';
-import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { EndedAtCell, RunStatusCell } from '../Table/Cell';
@@ -101,26 +98,10 @@ const columns = [
   }),
   columnHelper.accessor('function', {
     cell: (info) => {
-      const data = info.row.original;
       const fnName = info.getValue().name;
-      const { isDeferred } = data;
-
-      const parentFunction = data.deferredFrom?.[0]?.function;
-      const parentLabel =
-        parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
 
       return (
         <div className="flex max-w-md items-center gap-1">
-          {isDeferred && (
-            <>
-              <OptionalTooltip tooltip={parentLabel}>
-                <span className="inline-flex">
-                  <FunctionsIcon className="text-muted h-4 w-4 shrink-0" />
-                </span>
-              </OptionalTooltip>
-              <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
-            </>
-          )}
           <TextCell className="min-w-0">{fnName}</TextCell>
         </div>
       );

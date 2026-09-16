@@ -511,8 +511,6 @@ type FunctionRunV2 {
   trace: RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
-  siblingDefers: [RunDefer!]!
-  deferredFrom: [RunDeferredFrom!]!
   isDeferred: Boolean!
 }
 
@@ -549,12 +547,6 @@ enum RunDeferStatus {
   SCHEDULED
   ABORTED
   REJECTED
-}
-
-type RunDeferredFrom {
-  runID: ULID!
-  function: Function!
-  run: FunctionRunV2
 }
 
 enum RunTraceSpanStatus {

@@ -374,8 +374,6 @@ export const RunDetailsV4 = ({
               isDurableEndpoint={runData?.isDurableEndpoint}
               readOnly={readOnly}
               defers={linkageData?.defers}
-              siblingDefers={linkageData?.siblingDefers ?? []}
-              deferredFrom={linkageData?.deferredFrom}
             />
           )}
         </div>

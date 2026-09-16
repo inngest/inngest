@@ -16,10 +16,6 @@ func (dr *deferReader) GetRunDefers(ctx context.Context, keys dataloader.Keys) [
 	return loadByRunID(ctx, keys, dr.reader.GetRunDefers)
 }
 
-func (dr *deferReader) GetRunDeferredFrom(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
-	return loadByRunID(ctx, keys, dr.reader.GetRunDeferredFrom)
-}
-
 func loadByRunID[V any](
 	ctx context.Context,
 	keys dataloader.Keys,

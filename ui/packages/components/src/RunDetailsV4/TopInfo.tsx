@@ -16,7 +16,7 @@ import {
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
 import { ScoresAttrs, collectScoreMetadata } from '../RunDetails/ScoresAttrs';
-import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
+import type { RunDeferSummary } from '../SharedContext/useGetRunLinkage';
 import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
@@ -41,8 +41,6 @@ type TopInfoProps = {
   isDurableEndpoint?: boolean;
   readOnly?: boolean;
   defers?: RunDeferSummary[];
-  siblingDefers?: RunDeferSummary[];
-  deferredFrom?: RunDeferredFromSummary[];
 };
 
 export type Trigger = {
@@ -103,8 +101,6 @@ export const TopInfo = ({
   isDurableEndpoint,
   readOnly,
   defers,
-  siblingDefers,
-  deferredFrom,
 }: TopInfoProps) => {
   const [expanded, setExpanded] = useState(true);
   const { isRunning, send } = useDevServer();
@@ -150,10 +146,7 @@ export const TopInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
-  const hasLinkedRuns =
-    (deferredFrom?.length ?? 0) > 0 ||
-    (siblingDefers?.length ?? 0) > 0 ||
-    (defers?.length ?? 0) > 0;
+  const hasLinkedRuns = (defers?.length ?? 0) > 0;
 
   // Fall back through the linkage/trigger names and finally to the run/function
   // name so the header title is never blank (e.g. a deferred run with
@@ -391,13 +384,7 @@ export const TopInfo = ({
                   {
                     label: 'Linked runs',
                     id: 'linked',
-                    node: (
-                      <LinkedRuns
-                        defers={defers}
-                        siblingDefers={siblingDefers}
-                        deferredFrom={deferredFrom}
-                      />
-                    ),
+                    node: <LinkedRuns defers={defers} />,
                   },
                 ]
               : []),

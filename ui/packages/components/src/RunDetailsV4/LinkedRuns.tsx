@@ -1,23 +1,17 @@
 import type { ReactNode } from 'react';
 
-import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
+import type { RunDeferSummary } from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { IDCell, LinkCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 type Props = {
   defers?: RunDeferSummary[];
-  siblingDefers?: RunDeferSummary[];
-  deferredFrom?: RunDeferredFromSummary[];
 };
 
-export const LinkedRuns = ({ defers, siblingDefers, deferredFrom }: Props) => {
-  const parents = deferredFrom ?? [];
-
+export const LinkedRuns = ({ defers }: Props) => {
   return (
     <div className="h-full overflow-y-auto">
-      {parents.length > 0 && <ParentRunsSection parents={parents} />}
-      <DefersSection title="Parallel defers" defers={siblingDefers ?? []} />
       <DefersSection title="Deferred runs" defers={defers ?? []} />
     </div>
   );
@@ -65,43 +59,6 @@ const SectionTable = ({
 );
 
 const MutedDash = () => <span className="text-muted">-</span>;
-
-const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) => {
-  const { pathCreator } = usePathCreator();
-  return (
-    <SectionTable
-      title={parents.length > 1 ? 'Parent runs' : 'Parent run'}
-      columns={[{ header: 'Status', width: 'w-36' }, { header: 'Run ID' }, { header: 'Function' }]}
-    >
-      {parents.map((p) => (
-        <tr key={p.runID}>
-          <td className={tdClass}>
-            {p.run ? <StatusCell status={p.run.status} /> : <MutedDash />}
-          </td>
-          <td className={tdClass}>
-            <LinkCell href={pathCreator.runPopout({ runID: p.runID })}>
-              <span className="font-mono">{p.runID}</span>
-            </LinkCell>
-          </td>
-          <td className={tdClass}>
-            {p.function ? (
-              <PillCell
-                type="FUNCTION"
-                href={pathCreator.function({ functionSlug: p.function.slug })}
-              >
-                {p.function.name || p.function.slug}
-              </PillCell>
-            ) : (
-              <OptionalTooltip tooltip="Parent function unavailable">
-                <MutedDash />
-              </OptionalTooltip>
-            )}
-          </td>
-        </tr>
-      ))}
-    </SectionTable>
-  );
-};
 
 const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSummary[] }) => {
   const { pathCreator } = usePathCreator();

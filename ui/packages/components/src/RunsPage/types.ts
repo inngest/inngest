@@ -22,11 +22,4 @@ export type Run = {
   endedAt: string | null;
   startedAt: string | null;
   isDeferred: boolean;
-  deferredFrom?: Array<{
-    runID: string;
-    function: {
-      name: string;
-      slug: string;
-    } | null;
-  }>;
 };

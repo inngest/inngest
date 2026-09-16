@@ -333,13 +333,6 @@ export const GET_RUNS = gql`
           startedAt
           status
           isDeferred
-          deferredFrom {
-            runID
-            function {
-              name
-              slug
-            }
-          }
         }
       }
       pageInfo {
@@ -480,20 +473,6 @@ export const GET_RUN_LINKAGE = gql`
     run(runID: $runID) {
       defers {
         ...RunDeferSummaryFields
-      }
-      siblingDefers {
-        ...RunDeferSummaryFields
-      }
-      deferredFrom {
-        runID
-        function {
-          name
-          slug
-        }
-        run {
-          id
-          status
-        }
       }
     }
   }

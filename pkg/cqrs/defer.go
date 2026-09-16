@@ -25,15 +25,3 @@ type RunDefer struct {
 	// Scheduled child run ID, nil when the child hasn't been scheduled.
 	RunID *ulid.ULID
 }
-
-// RunDeferredFrom describes a parent run that scheduled a function run via
-// `defer`. A child can have multiple parents when batching collapses several
-// deferred.schedule events into one Schedule call.
-//
-// The struct exposes only the parent's identifiers. Consumers that need the
-// parent run or function fetch them lazily (via GraphQL resolvers, etc.) so
-// the read path doesn't pay for joins the caller may not use.
-type RunDeferredFrom struct {
-	RunID  ulid.ULID
-	FnSlug string
-}

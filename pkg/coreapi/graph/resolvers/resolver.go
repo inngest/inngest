@@ -72,10 +72,6 @@ func (r *Resolver) RunDefer() generated.RunDeferResolver {
 	return &runDeferResolver{r}
 }
 
-func (r *Resolver) RunDeferredFrom() generated.RunDeferredFromResolver {
-	return &runDeferredFromResolver{r}
-}
-
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }

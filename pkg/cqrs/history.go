@@ -46,11 +46,15 @@ type HistoryReader interface {
 	// ordered from oldest to newest.
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
 
+	// ############################################################################
+	// # DANGER: DO NOT LAND THIS WIP CLEANUP AS-IS                                #
+	// #                                                                          #
+	// # GetRunDeferredFrom powered GraphQL siblingDefers. A REST run-linkage     #
+	// # endpoint and UI migration MUST replace siblingDefers before removing     #
+	// # that reader or its GraphQL fields.                                       #
+	// ############################################################################
+
 	// GetRunDefers returns the child deferred runs. Empty if this run didn't
 	// defer any runs.
 	GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDefer, error)
-
-	// GetRunDeferredFrom returns the parent runs that triggered this deferred
-	// run. Empty if this run isn't a defer.
-	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDeferredFrom, error)
 }
