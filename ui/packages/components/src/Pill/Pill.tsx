@@ -99,7 +99,7 @@ export function Pill({
         </span>
       )}
       {icon && iconSide === 'right' && <span className="shrink-0">{icon}</span>}
-      {action && <span className="ml-4 shrink-0">{action}</span>}
+      {action && <span className="shrink-0">{action}</span>}
     </>
   );
 
