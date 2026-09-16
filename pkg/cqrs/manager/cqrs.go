@@ -1406,6 +1406,15 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return domainToCQRSList(fns, domainFunction), nil
 }
 
+func (w wrapper) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*cqrs.Function, error) {
+	fns, err := w.q.GetFunctionsBySlugs(ctx, slugs)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRSList(fns, domainFunction), nil
+}
+
 func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
 	fns, err := w.q.GetAppFunctions(ctx, appID)
 	if err != nil {

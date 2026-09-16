@@ -233,6 +233,14 @@ func (pq *pgQuerier) GetFunctions(ctx context.Context) ([]*db.Function, error) {
 	return convertSlice(rows, functionFromPG), nil
 }
 
+func (pq *pgQuerier) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*db.Function, error) {
+	rows, err := pq.q.GetFunctionsBySlugs(ctx, slugs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromPG), nil
+}
+
 func (pq *pgQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
 	r, err := pq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,
