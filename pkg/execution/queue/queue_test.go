@@ -33,6 +33,26 @@ func TestPartitionBacklogSizeConcurrencyOption(t *testing.T) {
 	})
 }
 
+func TestPartitionPeekMaxOption(t *testing.T) {
+	tests := []struct {
+		name string
+		max  int64
+		want int64
+	}{
+		{name: "default", want: PartitionPeekMax},
+		{name: "custom", max: 500, want: 500},
+		{name: "above maximum", max: AbsolutePartitionPeekMax + 1, want: AbsolutePartitionPeekMax},
+		{name: "non-positive", max: 0, want: PartitionPeekMax},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewQueueOptions(WithPartitionPeekMax(tt.max))
+			require.Equal(t, tt.want, opts.PartitionPeekMax)
+		})
+	}
+}
+
 func TestSemaphoreRequeueExtensionOption(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		opts := NewQueueOptions()

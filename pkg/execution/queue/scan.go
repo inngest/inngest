@@ -143,11 +143,7 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 			return nil
 		}
 
-		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
-		// Note: This is not optimal as some accounts may have fewer partitions than others and
-		// we're leaving capacity on the table. We'll need to find a better way to determine the
-		// optimal peek size in this case.
-		accountPartitionPeekMax := int64(math.Round(float64(PartitionPeekMax / int64(len(peekedAccounts)))))
+		accountPartitionPeekMax := max(q.PartitionPeekMax/int64(len(peekedAccounts)), 1)
 
 		var actualScannedPartitions int64
 
@@ -192,7 +188,7 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 	)
 
 	var actualScannedPartitions int64
-	err := q.ScanGlobalPartitions(ctx, PartitionPeekMax, peekUntil, metricShardName, &actualScannedPartitions, dispatch)
+	err := q.ScanGlobalPartitions(ctx, q.PartitionPeekMax, peekUntil, metricShardName, &actualScannedPartitions, dispatch)
 	if err != nil {
 		return fmt.Errorf("error scanning partition: %w", err)
 	}

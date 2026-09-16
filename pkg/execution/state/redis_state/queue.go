@@ -1334,11 +1334,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
-	if limit > osqueue.PartitionPeekMax {
-		return nil, osqueue.ErrPartitionPeekMaxExceedsLimits
+	if limit > q.PartitionPeekMax {
+		limit = q.PartitionPeekMax
 	}
 	if limit <= 0 {
-		limit = osqueue.PartitionPeekMax
+		limit = q.PartitionPeekMax
 	}
 
 	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
@@ -1615,7 +1615,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := int(math.Min(float64(len(items)), float64(osqueue.PartitionSelectionMax)))
+		n := min(len(items), int(osqueue.PartitionSelectionMax))
 		return items[0:n], nil
 	}
 

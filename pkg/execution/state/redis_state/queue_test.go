@@ -166,6 +166,46 @@ func TestQueueItemScore(t *testing.T) {
 	}
 }
 
+func TestPartitionPeekMax(t *testing.T) {
+	ctx := context.Background()
+	until := time.Now().Add(time.Hour)
+	const count = osqueue.PartitionPeekMax + 1
+
+	newShard := func(t *testing.T, opts ...osqueue.QueueOpt) RedisQueueShard {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+		require.NoError(t, err)
+		t.Cleanup(rc.Close)
+		_, shard := newQueue(t, rc, opts...)
+		for range count {
+			functionID := uuid.New()
+			_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+				FunctionID: functionID,
+				Data: osqueue.Item{Identifier: state.Identifier{
+					WorkflowID: functionID,
+					AccountID:  uuid.New(),
+				}},
+			}, time.Now(), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+		return shard
+	}
+
+	t.Run("default cap clamps larger reads", func(t *testing.T) {
+		shard := newShard(t)
+		items, err := shard.PartitionPeek(ctx, false, until, count)
+		require.NoError(t, err)
+		require.Len(t, items, int(osqueue.PartitionPeekMax))
+	})
+
+	t.Run("configured cap reads larger batches", func(t *testing.T) {
+		shard := newShard(t, osqueue.WithPartitionPeekMax(count))
+		items, err := shard.PartitionPeek(ctx, false, until, count)
+		require.NoError(t, err)
+		require.Len(t, items, int(count))
+	})
+}
+
 func TestQueueItemIsLeased(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
