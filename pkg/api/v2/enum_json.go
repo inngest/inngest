@@ -27,6 +27,7 @@ var responseEnumPrefixes = []string{
 	"SANDBOX_STATUS_",
 	"SANDBOX_PROCESS_STATE_",
 	"SANDBOX_LOG_STREAM_",
+	"SANDBOX_SNAPSHOT_STATUS_",
 }
 
 type responseEnumMarshaler struct {

@@ -33,6 +33,16 @@ enum SandboxLogStream {
   SANDBOX_LOG_STREAM_STDERR = 2;
 }
 
+enum SandboxSnapshotStatus {
+  SANDBOX_SNAPSHOT_STATUS_UNSPECIFIED = 0;
+  SANDBOX_SNAPSHOT_STATUS_CREATING = 1;
+  SANDBOX_SNAPSHOT_STATUS_READY = 2;
+  SANDBOX_SNAPSHOT_STATUS_DELETING = 3;
+  SANDBOX_SNAPSHOT_STATUS_DELETED = 4;
+  SANDBOX_SNAPSHOT_STATUS_FAILED = 5;
+  SANDBOX_SNAPSHOT_STATUS_LOST = 6;
+}
+
 message SandboxResourceSpec {
   uint32 vcpu = 1;
   uint32 memory_mb = 2;
@@ -102,6 +112,74 @@ message GetSandboxRequest {
 message DestroySandboxRequest {
   string sandbox_id = 1;
 }
+
+message PauseSandboxRequest {
+  string sandbox_id = 1;
+}
+
+message PauseSandboxResponse {
+  Sandbox data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message ResumeSandboxRequest {
+  string sandbox_id = 1;
+}
+
+message ResumeSandboxResponse {
+  Sandbox data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message SandboxSnapshot {
+  string id = 1;
+  string source_image_id = 2;
+  SandboxSnapshotStatus status = 3;
+  optional string compatibility_id = 4;
+  SandboxResourceSpec resources = 5;
+  uint32 memory_pack_count = 6;
+  uint32 disk_pack_count = 7;
+  uint64 stored_bytes = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp expires_at = 11;
+  optional string error = 12;
+}
+
+message CreateSandboxSnapshotRequest {
+  string sandbox_id = 1;
+}
+
+message CreateSandboxSnapshotResponse {
+  SandboxSnapshot data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message ListSandboxSnapshotsRequest {
+  optional string cursor = 1;
+  optional int32 limit = 2;
+}
+
+message ListSandboxSnapshotsResponse {
+  repeated SandboxSnapshot data = 1;
+  SandboxResponseMetadata metadata = 2;
+  SandboxPage page = 3;
+}
+
+message GetSandboxSnapshotRequest {
+  string snapshot_id = 1;
+}
+
+message GetSandboxSnapshotResponse {
+  SandboxSnapshot data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message DeleteSandboxSnapshotRequest {
+  string snapshot_id = 1;
+}
+
+message DeleteSandboxSnapshotResponse {}
 
 message ExecSandboxRequest {
   string sandbox_id = 1;

@@ -15,3 +15,9 @@ func TestWriteSandboxFileDataUsesNumericBytesWritten(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{"path":"/tmp/message.txt","bytesWritten":5}`, string(encoded))
 }
+
+func TestSandboxSnapshotUsesStringStoredBytes(t *testing.T) {
+	encoded, err := protojson.Marshal(&SandboxSnapshot{StoredBytes: 5})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"storedBytes":"5"}`, string(encoded))
+}

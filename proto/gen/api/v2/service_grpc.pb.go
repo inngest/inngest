@@ -44,6 +44,12 @@ const (
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
 	V2_DestroySandbox_FullMethodName             = "/api.v2.V2/DestroySandbox"
+	V2_PauseSandbox_FullMethodName               = "/api.v2.V2/PauseSandbox"
+	V2_ResumeSandbox_FullMethodName              = "/api.v2.V2/ResumeSandbox"
+	V2_CreateSandboxSnapshot_FullMethodName      = "/api.v2.V2/CreateSandboxSnapshot"
+	V2_ListSandboxSnapshots_FullMethodName       = "/api.v2.V2/ListSandboxSnapshots"
+	V2_GetSandboxSnapshot_FullMethodName         = "/api.v2.V2/GetSandboxSnapshot"
+	V2_DeleteSandboxSnapshot_FullMethodName      = "/api.v2.V2/DeleteSandboxSnapshot"
 	V2_ExecSandbox_FullMethodName                = "/api.v2.V2/ExecSandbox"
 	V2_StreamSandboxLogs_FullMethodName          = "/api.v2.V2/StreamSandboxLogs"
 	V2_WriteSandboxFile_FullMethodName           = "/api.v2.V2/WriteSandboxFile"
@@ -104,6 +110,12 @@ type V2Client interface {
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
 	DestroySandbox(ctx context.Context, in *DestroySandboxRequest, opts ...grpc.CallOption) (*DestroySandboxResponse, error)
+	PauseSandbox(ctx context.Context, in *PauseSandboxRequest, opts ...grpc.CallOption) (*PauseSandboxResponse, error)
+	ResumeSandbox(ctx context.Context, in *ResumeSandboxRequest, opts ...grpc.CallOption) (*ResumeSandboxResponse, error)
+	CreateSandboxSnapshot(ctx context.Context, in *CreateSandboxSnapshotRequest, opts ...grpc.CallOption) (*CreateSandboxSnapshotResponse, error)
+	ListSandboxSnapshots(ctx context.Context, in *ListSandboxSnapshotsRequest, opts ...grpc.CallOption) (*ListSandboxSnapshotsResponse, error)
+	GetSandboxSnapshot(ctx context.Context, in *GetSandboxSnapshotRequest, opts ...grpc.CallOption) (*GetSandboxSnapshotResponse, error)
+	DeleteSandboxSnapshot(ctx context.Context, in *DeleteSandboxSnapshotRequest, opts ...grpc.CallOption) (*DeleteSandboxSnapshotResponse, error)
 	ExecSandbox(ctx context.Context, in *ExecSandboxRequest, opts ...grpc.CallOption) (*ExecSandboxResponse, error)
 	StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxLogsResponse], error)
 	WriteSandboxFile(ctx context.Context, in *WriteSandboxFileRequest, opts ...grpc.CallOption) (*WriteSandboxFileResponse, error)
@@ -375,6 +387,66 @@ func (c *v2Client) DestroySandbox(ctx context.Context, in *DestroySandboxRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DestroySandboxResponse)
 	err := c.cc.Invoke(ctx, V2_DestroySandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) PauseSandbox(ctx context.Context, in *PauseSandboxRequest, opts ...grpc.CallOption) (*PauseSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseSandboxResponse)
+	err := c.cc.Invoke(ctx, V2_PauseSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ResumeSandbox(ctx context.Context, in *ResumeSandboxRequest, opts ...grpc.CallOption) (*ResumeSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeSandboxResponse)
+	err := c.cc.Invoke(ctx, V2_ResumeSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateSandboxSnapshot(ctx context.Context, in *CreateSandboxSnapshotRequest, opts ...grpc.CallOption) (*CreateSandboxSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSandboxSnapshotResponse)
+	err := c.cc.Invoke(ctx, V2_CreateSandboxSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListSandboxSnapshots(ctx context.Context, in *ListSandboxSnapshotsRequest, opts ...grpc.CallOption) (*ListSandboxSnapshotsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSandboxSnapshotsResponse)
+	err := c.cc.Invoke(ctx, V2_ListSandboxSnapshots_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetSandboxSnapshot(ctx context.Context, in *GetSandboxSnapshotRequest, opts ...grpc.CallOption) (*GetSandboxSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSandboxSnapshotResponse)
+	err := c.cc.Invoke(ctx, V2_GetSandboxSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) DeleteSandboxSnapshot(ctx context.Context, in *DeleteSandboxSnapshotRequest, opts ...grpc.CallOption) (*DeleteSandboxSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSandboxSnapshotResponse)
+	err := c.cc.Invoke(ctx, V2_DeleteSandboxSnapshot_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -709,6 +781,12 @@ type V2Server interface {
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
 	DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error)
+	PauseSandbox(context.Context, *PauseSandboxRequest) (*PauseSandboxResponse, error)
+	ResumeSandbox(context.Context, *ResumeSandboxRequest) (*ResumeSandboxResponse, error)
+	CreateSandboxSnapshot(context.Context, *CreateSandboxSnapshotRequest) (*CreateSandboxSnapshotResponse, error)
+	ListSandboxSnapshots(context.Context, *ListSandboxSnapshotsRequest) (*ListSandboxSnapshotsResponse, error)
+	GetSandboxSnapshot(context.Context, *GetSandboxSnapshotRequest) (*GetSandboxSnapshotResponse, error)
+	DeleteSandboxSnapshot(context.Context, *DeleteSandboxSnapshotRequest) (*DeleteSandboxSnapshotResponse, error)
 	ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error)
 	StreamSandboxLogs(*StreamSandboxLogsRequest, grpc.ServerStreamingServer[StreamSandboxLogsResponse]) error
 	WriteSandboxFile(context.Context, *WriteSandboxFileRequest) (*WriteSandboxFileResponse, error)
@@ -817,6 +895,24 @@ func (UnimplementedV2Server) GetSandbox(context.Context, *GetSandboxRequest) (*G
 }
 func (UnimplementedV2Server) DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DestroySandbox not implemented")
+}
+func (UnimplementedV2Server) PauseSandbox(context.Context, *PauseSandboxRequest) (*PauseSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PauseSandbox not implemented")
+}
+func (UnimplementedV2Server) ResumeSandbox(context.Context, *ResumeSandboxRequest) (*ResumeSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeSandbox not implemented")
+}
+func (UnimplementedV2Server) CreateSandboxSnapshot(context.Context, *CreateSandboxSnapshotRequest) (*CreateSandboxSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateSandboxSnapshot not implemented")
+}
+func (UnimplementedV2Server) ListSandboxSnapshots(context.Context, *ListSandboxSnapshotsRequest) (*ListSandboxSnapshotsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxSnapshots not implemented")
+}
+func (UnimplementedV2Server) GetSandboxSnapshot(context.Context, *GetSandboxSnapshotRequest) (*GetSandboxSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSandboxSnapshot not implemented")
+}
+func (UnimplementedV2Server) DeleteSandboxSnapshot(context.Context, *DeleteSandboxSnapshotRequest) (*DeleteSandboxSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteSandboxSnapshot not implemented")
 }
 func (UnimplementedV2Server) ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecSandbox not implemented")
@@ -1348,6 +1444,114 @@ func _V2_DestroySandbox_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).DestroySandbox(ctx, req.(*DestroySandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_PauseSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).PauseSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_PauseSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).PauseSandbox(ctx, req.(*PauseSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ResumeSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ResumeSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ResumeSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ResumeSandbox(ctx, req.(*ResumeSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateSandboxSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSandboxSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateSandboxSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateSandboxSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateSandboxSnapshot(ctx, req.(*CreateSandboxSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListSandboxSnapshots_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSandboxSnapshotsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListSandboxSnapshots(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListSandboxSnapshots_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListSandboxSnapshots(ctx, req.(*ListSandboxSnapshotsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetSandboxSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSandboxSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetSandboxSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetSandboxSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetSandboxSnapshot(ctx, req.(*GetSandboxSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_DeleteSandboxSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSandboxSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).DeleteSandboxSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_DeleteSandboxSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).DeleteSandboxSnapshot(ctx, req.(*DeleteSandboxSnapshotRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1919,6 +2123,30 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DestroySandbox",
 			Handler:    _V2_DestroySandbox_Handler,
+		},
+		{
+			MethodName: "PauseSandbox",
+			Handler:    _V2_PauseSandbox_Handler,
+		},
+		{
+			MethodName: "ResumeSandbox",
+			Handler:    _V2_ResumeSandbox_Handler,
+		},
+		{
+			MethodName: "CreateSandboxSnapshot",
+			Handler:    _V2_CreateSandboxSnapshot_Handler,
+		},
+		{
+			MethodName: "ListSandboxSnapshots",
+			Handler:    _V2_ListSandboxSnapshots_Handler,
+		},
+		{
+			MethodName: "GetSandboxSnapshot",
+			Handler:    _V2_GetSandboxSnapshot_Handler,
+		},
+		{
+			MethodName: "DeleteSandboxSnapshot",
+			Handler:    _V2_DeleteSandboxSnapshot_Handler,
 		},
 		{
 			MethodName: "ExecSandbox",
