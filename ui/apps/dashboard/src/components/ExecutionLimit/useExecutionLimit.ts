@@ -1,7 +1,10 @@
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
+import { Marketplace } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+
+import { isExecutionCapped, legacyExecutionCap } from './executionLimit';
 
 const executionLimitQuery = graphql(`
   query ExecutionLimitCheck {
@@ -19,10 +22,27 @@ const executionLimitQuery = graphql(`
   }
 `);
 
+const executionCapQuery = graphql(`
+  query ExecutionCapCheck {
+    account {
+      id
+      marketplace
+      marketplaceBillingURL
+      executionCap {
+        usage
+        limit
+        enforced
+        overageAllowed
+      }
+    }
+  }
+`);
+
 type ExecutionLimitData = {
   isCapped: boolean;
   usedExecutions: number;
   executionLimit: number;
+  isVercel: boolean;
   marketplaceBillingURL: string | null;
   enhanced: boolean;
 };
@@ -33,23 +53,34 @@ export function useExecutionLimit(): ExecutionLimitData | null {
     'hobby-execution-limit-ui',
   );
 
-  const res = useSkippableGraphQLQuery({
+  const legacyRes = useSkippableGraphQLQuery({
     query: executionLimitQuery,
     variables: {},
-    skip: !isReady,
+    skip: !isReady || enhanced,
   });
-  if (!res.data) return null;
+  const capRes = useSkippableGraphQLQuery({
+    query: executionCapQuery,
+    variables: {},
+    skip: !isReady || !enhanced,
+  });
 
-  const { usage, limit, overageAllowed } =
-    res.data.account.entitlements.executions;
-  if (limit === null) return null;
+  const account = enhanced ? capRes.data?.account : legacyRes.data?.account;
+  if (!account) return null;
+
+  const cap =
+    'executionCap' in account
+      ? account.executionCap
+      : legacyExecutionCap(account.entitlements.executions);
+  if (!cap) return null;
 
   return {
-    isCapped: !overageAllowed && usage >= limit,
-    usedExecutions: usage,
-    executionLimit: limit,
+    isCapped: isExecutionCapped(cap),
+    usedExecutions: cap.usage,
+    executionLimit: cap.limit,
+    isVercel:
+      'marketplace' in account && account.marketplace === Marketplace.Vercel,
     marketplaceBillingURL: deepLinkingEnabled
-      ? res.data.account.marketplaceBillingURL ?? null
+      ? account.marketplaceBillingURL ?? null
       : null,
     enhanced,
   };
