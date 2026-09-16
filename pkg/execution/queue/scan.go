@@ -130,7 +130,7 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
 			peeked, err := Duration(ctx, shard.Name(), "account_peek", q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return shard.AccountPeek(ctx, q.isSequential(), peekUntil, min(AccountPeekMax, q.PartitionPeekMax))
+				return shard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
@@ -143,8 +143,7 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 			return nil
 		}
 
-		peekedAccounts = peekedAccounts[:min(len(peekedAccounts), int(q.PartitionPeekMax))]
-		accountPartitionPeekMax := q.PartitionPeekMax / int64(len(peekedAccounts))
+		accountPartitionPeekMax := max(q.PartitionPeekMax/int64(len(peekedAccounts)), 1)
 
 		var actualScannedPartitions int64
 

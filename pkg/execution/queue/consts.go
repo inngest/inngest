@@ -5,9 +5,8 @@ import (
 )
 
 const (
-	PartitionSelectionMax = int64(100)
-	PartitionPeekMax      = PartitionSelectionMax * 3
-	// AbsolutePartitionPeekMax caps configured partition peeks.
+	PartitionSelectionMax    = int64(100)
+	PartitionPeekMax         = PartitionSelectionMax * 3
 	AbsolutePartitionPeekMax = int64(5000)
 	AccountPeekMax           = int64(30)
 
