@@ -6,6 +6,7 @@ export const clientFeatureFlags = [
   'connect-worker-concurrency-metrics',
   'dedicated-slack-channel',
   'enable-step-metadata',
+  'hobby-execution-limit-ui',
   'incident-banner',
   'insights-charts',
   'legacy-scores-page-enabled',
