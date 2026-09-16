@@ -3,22 +3,21 @@ import * as Sentry from '@sentry/tanstackstart-react';
 
 import type {
   BillingPlan,
-  EntitlementConcurrency,
-  EntitlementExecutions,
+  EntitlementConcurrencyValue,
   EntitlementInt,
-  EntitlementRunCount,
+  EntitlementWithOverage,
   GetPlansQuery,
 } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 export type Plan = Omit<
   BillingPlan,
-  'entitlements' | 'features' | 'availableAddons' | 'addons'
+  'entitlements' | 'ents' | 'features' | 'availableAddons' | 'addons'
 > & {
   entitlements: {
-    concurrency: Pick<EntitlementConcurrency, 'limit'>;
-    executions?: Pick<EntitlementExecutions, 'limit'>;
-    runCount: Pick<EntitlementRunCount, 'limit'>;
+    concurrency: Pick<EntitlementConcurrencyValue, 'limit'>;
+    executions?: Pick<EntitlementWithOverage, 'limit'>;
+    runCount: Pick<EntitlementWithOverage, 'limit'>;
     history: Pick<EntitlementInt, 'limit'>;
   };
 };

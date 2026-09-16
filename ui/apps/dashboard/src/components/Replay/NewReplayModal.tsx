@@ -26,7 +26,7 @@ import { useNavigate } from '@tanstack/react-router';
 const GetAccountEntitlementsDocument = graphql(`
   query GetAccountEntitlements {
     account {
-      entitlements {
+      entitlements: ents {
         history {
           limit
         }
