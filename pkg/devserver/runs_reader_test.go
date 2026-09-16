@@ -33,7 +33,7 @@ func TestRunListItemFromCQRSUsesTraceRunOutput(t *testing.T) {
 		FunctionName: "Test function",
 		TriggerIDs:   []string{eventID.String()},
 		Output:       []byte(`{"data":{"ok":true}}`),
-	}, true)
+	}, true, false)
 
 	require.NotNil(t, result.Output)
 	var output map[string]bool
@@ -74,7 +74,7 @@ func TestRunListItemFromCQRSUnwrapsRunCompleteOpcodeOutput(t *testing.T) {
 		Status:     enums.RunStatusCompleted,
 		TriggerIDs: []string{eventID.String()},
 		Output:     []byte(`{"data":[{"data":{"body":"Hello, World!"},"id":"step-1","op":"RunComplete"}]}`),
-	}, true)
+	}, true, false)
 
 	require.NotNil(t, result.Output)
 	var output map[string]string
@@ -92,5 +92,5 @@ func mappedRunListItem(t *testing.T, storedSlug, configuredSlug string) *apiv2.R
 		AppName:      "app",
 		FunctionID:   functionID,
 		FunctionSlug: apiv2.PublicFunctionID("app", storedSlug, configuredSlug),
-	}, false)
+	}, false, false)
 }

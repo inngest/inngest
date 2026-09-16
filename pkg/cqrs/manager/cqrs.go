@@ -4187,6 +4187,9 @@ func convertSpanRunRow(
 	if cron, ok := stringAttribute(attrs, meta.Attrs.CronSchedule.Key()); ok {
 		traceRun.CronSchedule = &cron
 	}
+	if slug, ok := stringAttribute(attrs, meta.Attrs.DeferParentFnSlug.Key()); ok {
+		traceRun.DeferParentFunctionSlug = slug
+	}
 
 	if endTime != nil {
 		traceRun.EndedAt = *endTime

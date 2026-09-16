@@ -104,7 +104,12 @@ type GetRunsOpts struct {
 	IsDeferred    *bool
 	Order         OrderDirection
 	CEL           string
+	Include       []RunListInclude
 }
+
+type RunListInclude string
+
+const RunListIncludeDeferredFrom RunListInclude = "deferred_from"
 
 type RunTimeField int
 
@@ -140,6 +145,16 @@ type RunListItem struct {
 	AppID          string
 	EventName      string
 	IsDeferred     *bool
+	DeferredFrom   *RunDeferredFrom
+}
+
+// RunDeferredFrom intentionally omits parent run IDs. No run-list consumer
+// uses them, and the underlying linkage can contain multiple IDs, so including
+// them would make the expansion size depend on linkage count. Add them here
+// when a run-list consumer needs them.
+type RunDeferredFrom struct {
+	FunctionSlug string
+	FunctionName string
 }
 
 type GetRunsResult struct {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +42,7 @@ type runProviderDataReader interface {
 	runSpanReader
 	GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error)
 	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error)
+	GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*cqrs.Function, error)
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error)
 	GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error)
 }
@@ -135,9 +137,43 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		return nil, err
 	}
 
+	includeDeferredFrom := slices.Contains(opts.Include, apiv2.RunListIncludeDeferredFrom)
+	deferredFunctionNames := map[string]string{}
+	if includeDeferredFrom {
+		// Resolve all parent names in one query. Missing functions keep their slug
+		// so clients still have useful context after a parent is deleted.
+		deferredFunctionSlugs := make([]string, 0)
+		seen := map[string]struct{}{}
+		for _, row := range rows {
+			slug := row.DeferParentFunctionSlug
+			if slug == "" {
+				continue
+			}
+			if _, ok := seen[slug]; ok {
+				continue
+			}
+			seen[slug] = struct{}{}
+			deferredFunctionSlugs = append(deferredFunctionSlugs, slug)
+		}
+
+		if len(deferredFunctionSlugs) > 0 {
+			functions, err := p.data.GetFunctionsBySlugs(ctx, deferredFunctionSlugs)
+			if err != nil {
+				return nil, err
+			}
+			for _, function := range functions {
+				deferredFunctionNames[function.Slug] = function.Name
+			}
+		}
+	}
+
 	runs := make([]*apiv2.RunListItem, 0, len(rows))
 	for _, row := range rows {
-		runs = append(runs, runListItemFromCQRS(row, opts.IncludeOutput))
+		run := runListItemFromCQRS(row, opts.IncludeOutput, includeDeferredFrom)
+		if run.DeferredFrom != nil {
+			run.DeferredFrom.FunctionName = deferredFunctionNames[run.DeferredFrom.FunctionSlug]
+		}
+		runs = append(runs, run)
 	}
 
 	hasMore := len(runs) > opts.Limit
@@ -333,7 +369,7 @@ func runEventID(root *cqrs.OtelSpan) (ulid.ULID, error) {
 	return eventID, nil
 }
 
-func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput bool) *apiv2.RunListItem {
+func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput, includeDeferredFrom bool) *apiv2.RunListItem {
 	runID, _ := ulid.Parse(row.RunID)
 	run := &apiv2.RunListItem{
 		RunID:        runID,
@@ -368,6 +404,11 @@ func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput bool) *apiv2.RunListI
 	}
 	if includeOutput && len(row.Output) > 0 {
 		run.Output = publicRunOutput(row.Output)
+	}
+	if includeDeferredFrom && row.DeferParentFunctionSlug != "" {
+		run.DeferredFrom = &apiv2.RunDeferredFrom{
+			FunctionSlug: row.DeferParentFunctionSlug,
+		}
 	}
 
 	return run
