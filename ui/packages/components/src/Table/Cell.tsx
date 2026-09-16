@@ -10,7 +10,6 @@ import { getStatusTextClass } from '@inngest/components/Status/statusClasses';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiSparkling2Fill } from '@remixicon/react';
 import { type LinkComponentProps } from '@tanstack/react-router';
 
 import { useDynamicRunData } from '../RunDetailsShared/utils';
@@ -23,20 +22,6 @@ export function IDCell({ children }: React.PropsWithChildren) {
 
 export function TextCell({ children, className }: React.PropsWithChildren<{ className?: string }>) {
   return <p className={cn(cellStyles, 'truncate font-medium', className)}>{children}</p>;
-}
-
-export function AICell({ children }: React.PropsWithChildren) {
-  return (
-    <div
-      className={cn(
-        cellStyles,
-        'text-primary-xIntense border-primary-xIntense flex w-fit max-w-56 items-center gap-2 rounded border px-1.5'
-      )}
-    >
-      <RiSparkling2Fill className="h-3.5 w-3.5 shrink-0" />
-      <span className="overflow-hidden text-ellipsis whitespace-nowrap">{children}</span>
-    </div>
-  );
 }
 
 export function LinkCell({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {

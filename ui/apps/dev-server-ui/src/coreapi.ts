@@ -332,7 +332,6 @@ export const GET_RUNS = gql`
           endedAt
           startedAt
           status
-          hasAI
           isDeferred
           deferredFrom {
             runID
@@ -472,7 +471,6 @@ export const GET_RUN = gql`
           }
         }
       }
-      hasAI
     }
   }
 `;
