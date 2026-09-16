@@ -1068,6 +1068,10 @@ func TestService_ListRuns(t *testing.T) {
 		AppID:        "my-app",
 		EventName:    "app/tested",
 		IsDeferred:   &isDeferred,
+		DeferredFrom: &RunDeferredFrom{
+			FunctionSlug: "parent-function",
+			FunctionName: "Parent function",
+		},
 	}
 
 	t.Run("returns mapped runs with filters", func(t *testing.T) {
@@ -1085,6 +1089,7 @@ func TestService_ListRuns(t *testing.T) {
 			IsDeferred:    &isDeferred,
 			Order:         OrderDirectionAsc,
 			CEL:           `event.data.userId == "123"`,
+			Include:       []RunListInclude{RunListIncludeDeferredFrom},
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, Cursor: pageCursor, HasMore: true}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
@@ -1104,6 +1109,7 @@ func TestService_ListRuns(t *testing.T) {
 			IsDeferred:    &isDeferred,
 			Order:         "asc",
 			Query:         new(`event.data.userId == "123"`),
+			Include:       []string{"deferred_from"},
 		})
 
 		require.NoError(t, err)
@@ -1114,6 +1120,8 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, "my-app", resp.Data[0].App.Id)
 		require.Equal(t, "app/tested", resp.Data[0].Trigger.GetEventName())
 		require.False(t, resp.Data[0].GetIsDeferred())
+		require.Equal(t, "parent-function", resp.Data[0].DeferredFrom.FunctionSlug)
+		require.Equal(t, "Parent function", resp.Data[0].DeferredFrom.GetFunctionName())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
 		require.NotNil(t, resp.Metadata.TimeRange)
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
