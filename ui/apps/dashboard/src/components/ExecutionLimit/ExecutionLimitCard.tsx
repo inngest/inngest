@@ -128,6 +128,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
             appearance="ghost"
             size="small"
             className="-mr-1 -mt-1 shrink-0"
+            tooltip="Dismiss for 24 hours"
             onClick={dismiss}
           />
         </div>
