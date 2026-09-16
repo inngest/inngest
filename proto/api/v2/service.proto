@@ -1238,6 +1238,120 @@ service V2 {
     };
   }
 
+  rpc PauseSandbox(PauseSandboxRequest) returns (PauseSandboxResponse) {
+    option (google.api.http) = { post: "/sandboxes/{sandbox_id}/pause" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:pause"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ResumeSandbox(ResumeSandboxRequest) returns (ResumeSandboxResponse) {
+    option (google.api.http) = { post: "/sandboxes/{sandbox_id}/resume" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:resume"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc CreateSandboxSnapshot(CreateSandboxSnapshotRequest) returns (CreateSandboxSnapshotResponse) {
+    option (google.api.http) = { post: "/sandboxes/{sandbox_id}/snapshots" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:create_snapshot"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a sandbox snapshot"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSandboxSnapshots(ListSandboxSnapshotsRequest) returns (ListSandboxSnapshotsResponse) {
+    option (google.api.http) = { get: "/snapshots" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:list_snapshots"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List sandbox snapshots"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetSandboxSnapshot(GetSandboxSnapshotRequest) returns (GetSandboxSnapshotResponse) {
+    option (google.api.http) = { get: "/snapshots/{snapshot_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:get_snapshot"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a sandbox snapshot"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc DeleteSandboxSnapshot(DeleteSandboxSnapshotRequest) returns (DeleteSandboxSnapshotResponse) {
+    option (google.api.http) = { delete: "/snapshots/{snapshot_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:delete_snapshot"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a sandbox snapshot"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc ExecSandbox(ExecSandboxRequest) returns (ExecSandboxResponse) {
     option (google.api.http) = {
       post: "/sandboxes/{sandbox_id}/exec"
