@@ -83,6 +83,16 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 	}
 }
 
+// WithPartitionPeekMax sets the maximum number of partitions read in one scan.
+// Non-positive values preserve the default.
+func WithPartitionPeekMax(max int64) QueueOpt {
+	return func(q *QueueOptions) {
+		if max > 0 {
+			q.PartitionPeekMax = max
+		}
+	}
+}
+
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AccountPriorityFinder = apf
@@ -481,6 +491,8 @@ type QueueOptions struct {
 	// peek min & max sets the range for partitions to peek for items
 	PeekMin int64
 	PeekMax int64
+	// PartitionPeekMax is the maximum number of partitions read in one scan.
+	PartitionPeekMax int64
 	// PeekSizeExponent is the exp. on the random skewed distribution
 	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
@@ -890,6 +902,7 @@ func NewQueueOptions(
 		},
 		PeekMin:                         DefaultQueuePeekMin,
 		PeekMax:                         DefaultQueuePeekMax,
+		PartitionPeekMax:                PartitionPeekMax,
 		PeekSizeExponent:                7,
 		shadowPeekMin:                   ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:                   ShadowPartitionPeekMaxBacklogs,

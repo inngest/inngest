@@ -166,6 +166,29 @@ func TestQueueItemScore(t *testing.T) {
 	}
 }
 
+func TestPartitionPeekMax(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	until := time.Now().Add(time.Hour)
+
+	t.Run("default cap rejects larger reads", func(t *testing.T) {
+		_, shard := newQueue(t, rc)
+		_, err := shard.PartitionPeek(ctx, true, until, osqueue.PartitionPeekMax+1)
+		require.EqualError(t, err, fmt.Sprintf("peek exceeded the maximum limit of %d", osqueue.PartitionPeekMax))
+	})
+
+	t.Run("configured cap permits larger reads", func(t *testing.T) {
+		const max = osqueue.PartitionPeekMax + 1
+		_, shard := newQueue(t, rc, osqueue.WithPartitionPeekMax(max))
+		_, err := shard.PartitionPeek(ctx, true, until, max)
+		require.NoError(t, err)
+	})
+}
+
 func TestQueueItemIsLeased(t *testing.T) {
 	now := time.Now()
 	tests := []struct {

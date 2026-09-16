@@ -1334,11 +1334,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
-	if limit > osqueue.PartitionPeekMax {
-		return nil, osqueue.ErrPartitionPeekMaxExceedsLimits
+	if limit > q.PartitionPeekMax {
+		return nil, fmt.Errorf("peek exceeded the maximum limit of %d", q.PartitionPeekMax)
 	}
 	if limit <= 0 {
-		limit = osqueue.PartitionPeekMax
+		limit = q.PartitionPeekMax
 	}
 
 	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
