@@ -49,14 +49,14 @@ const enhancedContent: Partial<Record<UsageBand, CardContent>> = {
     kind: 'warning',
     title: 'New runs will be paused',
     body: (usage) =>
-      `You've used ${usage} executions in the last 30 days and are close to the Hobby limit. New runs and scheduled functions will stop and won't be queued. Upgrade to Pro to resume now.`,
+      `You've used ${usage} executions this month and are close to the Hobby limit. New runs and scheduled functions will stop and won't be queued. Upgrade to Pro to resume now.`,
     dismissable: true,
   },
   capped: {
     kind: 'error',
     title: 'New runs are paused',
     body: (usage) =>
-      `You've used ${usage} executions in the last 30 days and reached the Hobby limit. New runs and scheduled functions won't start and aren't queued. Upgrade to Pro to resume now.`,
+      `You've used ${usage} executions this month and reached the Hobby limit. New runs and scheduled functions won't start and aren't queued. Upgrade to Pro to resume now.`,
     dismissable: false,
   },
 };
@@ -129,6 +129,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
             size="small"
             className="-mr-1 -mt-1 shrink-0"
             tooltip="Dismiss for 24 hours"
+            aria-label="Dismiss for 24 hours"
             onClick={dismiss}
           />
         </div>

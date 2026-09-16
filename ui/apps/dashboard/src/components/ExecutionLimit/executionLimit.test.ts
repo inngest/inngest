@@ -6,6 +6,7 @@ import {
   isDismissalActive,
   isExecutionCapped,
   legacyExecutionCap,
+  shouldShowExecutionLimit,
   usageBand,
 } from './executionLimit';
 
@@ -15,6 +16,21 @@ const atLimit = {
   enforced: true,
   overageAllowed: false,
 };
+
+describe('shouldShowExecutionLimit', () => {
+  it('shows notices only when overage is disallowed, regardless of enforcement', () => {
+    for (const enforced of [false, true]) {
+      expect(shouldShowExecutionLimit({ ...atLimit, enforced })).toBe(true);
+      expect(
+        shouldShowExecutionLimit({
+          ...atLimit,
+          enforced,
+          overageAllowed: true,
+        }),
+      ).toBe(false);
+    }
+  });
+});
 
 describe('isExecutionCapped', () => {
   it('caps once usage reaches the limit', () => {
