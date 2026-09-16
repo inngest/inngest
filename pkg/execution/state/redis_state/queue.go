@@ -1335,7 +1335,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	kg := q.RedisClient.kg
 
 	if limit > q.PartitionPeekMax {
-		return nil, fmt.Errorf("peek exceeded the maximum limit of %d", q.PartitionPeekMax)
+		limit = q.PartitionPeekMax
 	}
 	if limit <= 0 {
 		limit = q.PartitionPeekMax
@@ -1615,7 +1615,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := int(math.Min(float64(len(items)), float64(osqueue.PartitionSelectionMax)))
+		n := min(len(items), int(q.PartitionPeekMax))
 		return items[0:n], nil
 	}
 

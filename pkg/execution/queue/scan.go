@@ -130,7 +130,7 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 			peekedAccounts = q.runMode.ExclusiveAccounts
 		} else {
 			peeked, err := Duration(ctx, shard.Name(), "account_peek", q.Clock().Now(), func(ctx context.Context) ([]uuid.UUID, error) {
-				return shard.AccountPeek(ctx, q.isSequential(), peekUntil, AccountPeekMax)
+				return shard.AccountPeek(ctx, q.isSequential(), peekUntil, min(AccountPeekMax, q.PartitionPeekMax))
 			})
 			if err != nil {
 				return fmt.Errorf("could not peek accounts: %w", err)
@@ -143,11 +143,8 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 			return nil
 		}
 
-		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
-		// Note: This is not optimal as some accounts may have fewer partitions than others and
-		// we're leaving capacity on the table. We'll need to find a better way to determine the
-		// optimal peek size in this case.
-		accountPartitionPeekMax := int64(math.Round(float64(q.PartitionPeekMax / int64(len(peekedAccounts)))))
+		peekedAccounts = peekedAccounts[:min(len(peekedAccounts), int(q.PartitionPeekMax))]
+		accountPartitionPeekMax := q.PartitionPeekMax / int64(len(peekedAccounts))
 
 		var actualScannedPartitions int64
 

@@ -167,25 +167,42 @@ func TestQueueItemScore(t *testing.T) {
 }
 
 func TestPartitionPeekMax(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
-	require.NoError(t, err)
-	defer rc.Close()
-
 	ctx := context.Background()
 	until := time.Now().Add(time.Hour)
+	const count = osqueue.PartitionPeekMax + 1
 
-	t.Run("default cap rejects larger reads", func(t *testing.T) {
-		_, shard := newQueue(t, rc)
-		_, err := shard.PartitionPeek(ctx, true, until, osqueue.PartitionPeekMax+1)
-		require.EqualError(t, err, fmt.Sprintf("peek exceeded the maximum limit of %d", osqueue.PartitionPeekMax))
+	newShard := func(t *testing.T, opts ...osqueue.QueueOpt) RedisQueueShard {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+		require.NoError(t, err)
+		t.Cleanup(rc.Close)
+		_, shard := newQueue(t, rc, opts...)
+		for range count {
+			functionID := uuid.New()
+			_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+				FunctionID: functionID,
+				Data: osqueue.Item{Identifier: state.Identifier{
+					WorkflowID: functionID,
+					AccountID:  uuid.New(),
+				}},
+			}, time.Now(), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+		return shard
+	}
+
+	t.Run("default cap clamps larger reads", func(t *testing.T) {
+		shard := newShard(t)
+		items, err := shard.PartitionPeek(ctx, true, until, count)
+		require.NoError(t, err)
+		require.Len(t, items, int(osqueue.PartitionPeekMax))
 	})
 
-	t.Run("configured cap permits larger reads", func(t *testing.T) {
-		const max = osqueue.PartitionPeekMax + 1
-		_, shard := newQueue(t, rc, osqueue.WithPartitionPeekMax(max))
-		_, err := shard.PartitionPeek(ctx, true, until, max)
+	t.Run("configured cap reads larger batches", func(t *testing.T) {
+		shard := newShard(t, osqueue.WithPartitionPeekMax(count))
+		items, err := shard.PartitionPeek(ctx, true, until, count)
 		require.NoError(t, err)
+		require.Len(t, items, int(count))
 	})
 }
 
