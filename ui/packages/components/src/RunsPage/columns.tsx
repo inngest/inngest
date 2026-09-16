@@ -28,6 +28,11 @@ export function isColumnID(value: unknown): value is ColumnID {
   return columnsIDs.includes(value as ColumnID);
 }
 
+export function getDeferredParentLabel(run: Run): string {
+  const parentFunction = run.deferredFrom?.[0]?.function;
+  return parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
+}
+
 // Ensure that the column ID is valid at compile time
 function ensureColumnID(id: ColumnID): ColumnID {
   return id;
@@ -105,9 +110,7 @@ const columns = [
       const fnName = info.getValue().name;
       const { isDeferred } = data;
 
-      const parentFunction = data.deferredFrom?.[0]?.function;
-      const parentLabel =
-        parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
+      const parentLabel = getDeferredParentLabel(data);
 
       return (
         <div className="flex max-w-md items-center gap-1">

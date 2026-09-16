@@ -44,11 +44,10 @@ export type RestFunctionRun = {
     cronSchedule?: string;
   };
   isDeferred?: boolean;
-  deferredFrom?: Array<{
-    runId: string;
+  deferredFrom?: {
     functionSlug: string;
     functionName?: string;
-  }>;
+  };
 };
 
 export type RestRunsPage = {
@@ -141,13 +140,17 @@ export function restFunctionRunToTableRun(run: RestFunctionRun): Run {
     startedAt: run.startedAt ?? null,
     endedAt: run.endedAt ?? null,
     isDeferred: run.isDeferred ?? false,
-    deferredFrom: run.deferredFrom?.map((parent) => ({
-      runID: parent.runId,
-      function: {
-        name: parent.functionName ?? parent.functionSlug,
-        slug: parent.functionSlug,
-      },
-    })),
+    deferredFrom: run.deferredFrom
+      ? [
+          {
+            function: {
+              name:
+                run.deferredFrom.functionName ?? run.deferredFrom.functionSlug,
+              slug: run.deferredFrom.functionSlug,
+            },
+          },
+        ]
+      : undefined,
   };
 }
 
