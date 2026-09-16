@@ -41,7 +41,8 @@ func TestPartitionPeekMaxOption(t *testing.T) {
 	}{
 		{name: "default", want: PartitionPeekMax},
 		{name: "custom", max: 500, want: 500},
-		{name: "non-positive uses default", max: 0, want: PartitionPeekMax},
+		{name: "above maximum", max: AbsolutePartitionPeekMax + 1, want: AbsolutePartitionPeekMax},
+		{name: "non-positive", max: 0, want: PartitionPeekMax},
 	}
 
 	for _, tt := range tests {

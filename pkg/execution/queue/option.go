@@ -83,11 +83,13 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 	}
 }
 
-// WithPartitionPeekMax sets the maximum number of partitions read in one scan.
-// Non-positive values preserve the default.
+// WithPartitionPeekMax sets the maximum partitions read in one scan.
 func WithPartitionPeekMax(max int64) QueueOpt {
 	return func(q *QueueOptions) {
 		if max > 0 {
+			if max > AbsolutePartitionPeekMax {
+				max = AbsolutePartitionPeekMax
+			}
 			q.PartitionPeekMax = max
 		}
 	}
@@ -491,7 +493,7 @@ type QueueOptions struct {
 	// peek min & max sets the range for partitions to peek for items
 	PeekMin int64
 	PeekMax int64
-	// PartitionPeekMax is the maximum number of partitions read in one scan.
+	// PartitionPeekMax is the maximum partitions read in one scan.
 	PartitionPeekMax int64
 	// PeekSizeExponent is the exp. on the random skewed distribution
 	PeekSizeExponent float64
