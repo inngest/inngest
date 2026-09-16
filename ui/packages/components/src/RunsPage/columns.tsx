@@ -7,7 +7,7 @@ import { formatMilliseconds } from '@inngest/components/utils/date';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
-import { AICell, EndedAtCell, RunStatusCell } from '../Table/Cell';
+import { EndedAtCell, RunStatusCell } from '../Table/Cell';
 import type { Run, ViewScope } from './types';
 
 const columnHelper = createColumnHelper<Run>();
@@ -109,12 +109,6 @@ const columns = [
       const parentLabel =
         parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
 
-      const nameCell = data.hasAI ? (
-        <AICell>{fnName}</AICell>
-      ) : (
-        <TextCell className="min-w-0">{fnName}</TextCell>
-      );
-
       return (
         <div className="flex max-w-md items-center gap-1">
           {isDeferred && (
@@ -127,7 +121,7 @@ const columns = [
               <RiArrowRightSLine className="text-muted h-4 w-4 shrink-0" />
             </>
           )}
-          {nameCell}
+          <TextCell className="min-w-0">{fnName}</TextCell>
         </div>
       );
     },
