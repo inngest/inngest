@@ -1116,6 +1116,22 @@ func TestCQRSGetFunctions(t *testing.T) {
 			assert.True(t, foundFnIDs[expectedID], "Expected function ID %s to be found", expectedID)
 		}
 	})
+
+	t.Run("get functions by slugs", func(t *testing.T) {
+		err := cm.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnIDs[1]})
+		require.NoError(t, err)
+
+		functions, err := cm.GetFunctionsBySlugs(ctx, []string{"test-function-1", "test-function-2", "test-function-3", "missing-function"})
+		require.NoError(t, err)
+		require.Len(t, functions, 2)
+
+		functionsBySlug := make(map[string]*cqrs.Function, len(functions))
+		for _, fn := range functions {
+			functionsBySlug[fn.Slug] = fn
+		}
+		assert.Equal(t, fnIDs[0], functionsBySlug["test-function-1"].ID)
+		assert.Equal(t, fnIDs[2], functionsBySlug["test-function-3"].ID)
+	})
 }
 
 func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
