@@ -7,7 +7,7 @@ import (
 const (
 	PartitionSelectionMax    = int64(100)
 	PartitionPeekMax         = PartitionSelectionMax * 3
-	AbsolutePartitionPeekMax = int64(5000)
+	AbsolutePartitionPeekMax = int64(1500)
 	AccountPeekMax           = int64(30)
 
 	// PartitionLeaseDuration dictates how long a worker holds the lease for
