@@ -66,7 +66,11 @@ function Authed() {
     from: '/_authed/oauth/device/',
     shouldThrow: false,
   });
-  if (oauthApproval) {
+  const mcpApproval = useMatch({
+    from: '/_authed/oauth/authorize/',
+    shouldThrow: false,
+  });
+  if (oauthApproval || mcpApproval) {
     return <Outlet />;
   }
 
