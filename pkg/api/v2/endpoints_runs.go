@@ -579,7 +579,6 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 			IsBatch:  run.BatchID != nil,
 		},
 		IsDeferred: run.IsDeferred,
-		HasAi:      run.HasAI,
 	}
 	if run.FunctionSlug != "" {
 		result.Function.Slug = new(run.FunctionSlug)

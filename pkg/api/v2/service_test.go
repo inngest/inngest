@@ -1046,7 +1046,6 @@ func TestService_ListRuns(t *testing.T) {
 	from := startedAt.Add(-time.Hour)
 	until := startedAt.Add(time.Hour)
 	isDeferred := false
-	hasAI := true
 	limit := int32(1)
 	pageCursor, err := (&cqrs.TracePageCursor{
 		ID: runID.String(),
@@ -1069,7 +1068,6 @@ func TestService_ListRuns(t *testing.T) {
 		AppID:        "my-app",
 		EventName:    "app/tested",
 		IsDeferred:   &isDeferred,
-		HasAI:        &hasAI,
 	}
 
 	t.Run("returns mapped runs with filters", func(t *testing.T) {
@@ -1116,7 +1114,6 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, "my-app", resp.Data[0].App.Id)
 		require.Equal(t, "app/tested", resp.Data[0].Trigger.GetEventName())
 		require.False(t, resp.Data[0].GetIsDeferred())
-		require.True(t, resp.Data[0].GetHasAi())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
 		require.NotNil(t, resp.Metadata.TimeRange)
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
