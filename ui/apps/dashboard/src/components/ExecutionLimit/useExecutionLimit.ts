@@ -1,7 +1,7 @@
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const executionLimitQuery = graphql(`
   query ExecutionLimitCheck {
@@ -24,12 +24,20 @@ type ExecutionLimitData = {
   usedExecutions: number;
   executionLimit: number;
   marketplaceBillingURL: string | null;
+  enhanced: boolean;
 };
 
 export function useExecutionLimit(): ExecutionLimitData | null {
   const { value: deepLinkingEnabled } = useBooleanFlag('vercel-deep-linking');
+  const { value: enhanced, isReady } = useBooleanFlag(
+    'hobby-execution-limit-ui',
+  );
 
-  const res = useGraphQLQuery({ query: executionLimitQuery, variables: {} });
+  const res = useSkippableGraphQLQuery({
+    query: executionLimitQuery,
+    variables: {},
+    skip: !isReady,
+  });
   if (!res.data) return null;
 
   const { usage, limit, overageAllowed } =
@@ -43,6 +51,7 @@ export function useExecutionLimit(): ExecutionLimitData | null {
     marketplaceBillingURL: deepLinkingEnabled
       ? res.data.account.marketplaceBillingURL ?? null
       : null,
+    enhanced,
   };
 }
 
