@@ -78,6 +78,7 @@ const (
 	LeaseItemStatusNotFound
 	LeaseItemStatusLeaseContention
 	LeaseItemStatusLeaseError
+	LeaseItemStatusDropped
 )
 
 type LeaseItemResult struct {
