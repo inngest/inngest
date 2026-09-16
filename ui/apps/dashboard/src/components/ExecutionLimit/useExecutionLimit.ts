@@ -4,7 +4,12 @@ import { Marketplace } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-import { isExecutionCapped, legacyExecutionCap } from './executionLimit';
+import {
+  isExecutionCapped,
+  legacyExecutionCap,
+  usageBand,
+  type UsageBand,
+} from './executionLimit';
 
 const executionLimitQuery = graphql(`
   query ExecutionLimitCheck {
@@ -45,6 +50,8 @@ const executionCapQuery = graphql(`
 `);
 
 type ExecutionLimitData = {
+  accountID: string;
+  band: UsageBand;
   isCapped: boolean;
   usedExecutions: number;
   executionLimit: number;
@@ -84,9 +91,12 @@ export function useExecutionLimit(): ExecutionLimitData | null {
   const isEnterprise =
     'plan' in account &&
     (account.plan?.name ?? '').toLowerCase().includes('enterprise');
+  const isCapped = !isEnterprise && isExecutionCapped(cap);
 
   return {
-    isCapped: !isEnterprise && isExecutionCapped(cap),
+    accountID: account.id,
+    band: usageBand({ usage: cap.usage, limit: cap.limit, isCapped }),
+    isCapped,
     usedExecutions: cap.usage,
     executionLimit: cap.limit,
     isVercel:
