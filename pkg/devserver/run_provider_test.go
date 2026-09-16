@@ -344,6 +344,30 @@ func TestRunProviderGetRunsResolvesPublicFilters(t *testing.T) {
 	assert.Equal(t, "next-cursor", result.Runs[0].Cursor)
 }
 
+func TestRunProviderGetRunsIncludesDeferredParentContext(t *testing.T) {
+	runID := ulid.Make()
+	parentRunID := ulid.Make()
+	data := &stubRunProviderDataReader{
+		listedRuns: []*cqrs.TraceRun{{
+			RunID:      runID.String(),
+			StartedAt:  time.Now().UTC(),
+			Status:     enums.RunStatusCompleted,
+			IsDeferred: true,
+		}},
+		deferredFrom: map[ulid.ULID][]cqrs.RunDeferredFrom{
+			runID: {{RunID: parentRunID, FnSlug: "parent-function"}},
+		},
+	}
+
+	result, err := (&runProvider{data: data}).GetRuns(t.Context(), apiv2.GetRunsOpts{Limit: 20})
+	require.NoError(t, err)
+	require.Len(t, result.Runs, 1)
+	require.Equal(t, []apiv2.RunDeferredFrom{{
+		RunID:        parentRunID,
+		FunctionSlug: "parent-function",
+	}}, result.Runs[0].DeferredFrom)
+}
+
 func TestRunProviderGetRunsSkipsUnknownPublicFilter(t *testing.T) {
 	data := &stubRunProviderDataReader{}
 	provider := &runProvider{data: data}
@@ -438,15 +462,16 @@ func TestCQRSRunTimeField(t *testing.T) {
 }
 
 type stubRunProviderDataReader struct {
-	run        *cqrs.FunctionRun
-	runErr     error
-	fn         *cqrs.Function
-	fnErr      error
-	evt        *cqrs.Event
-	evtErr     error
-	listedRuns []*cqrs.TraceRun
-	listErr    error
-	listOpts   *cqrs.GetTraceRunOpt
+	run          *cqrs.FunctionRun
+	runErr       error
+	fn           *cqrs.Function
+	fnErr        error
+	evt          *cqrs.Event
+	evtErr       error
+	listedRuns   []*cqrs.TraceRun
+	listErr      error
+	listOpts     *cqrs.GetTraceRunOpt
+	deferredFrom map[ulid.ULID][]cqrs.RunDeferredFrom
 }
 
 func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
@@ -456,6 +481,10 @@ func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTr
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	return nil, nil
+}
+
+func (s *stubRunProviderDataReader) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]cqrs.RunDeferredFrom, error) {
+	return s.deferredFrom, nil
 }
 
 func (s *stubRunProviderDataReader) GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error) {

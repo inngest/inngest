@@ -42,6 +42,7 @@ type runProviderDataReader interface {
 	GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error)
 	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error)
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error)
+	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]cqrs.RunDeferredFrom, error)
 	GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error)
 }
 
@@ -143,6 +144,28 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 	hasMore := len(runs) > opts.Limit
 	if hasMore {
 		runs = runs[:opts.Limit]
+	}
+
+	deferredRunIDs := make([]ulid.ULID, 0, len(runs))
+	for _, run := range runs {
+		if run.IsDeferred != nil && *run.IsDeferred {
+			deferredRunIDs = append(deferredRunIDs, run.RunID)
+		}
+	}
+	deferredFrom := map[ulid.ULID][]cqrs.RunDeferredFrom{}
+	if len(deferredRunIDs) > 0 {
+		deferredFrom, err = p.data.GetRunDeferredFrom(ctx, deferredRunIDs)
+		if err != nil {
+			return nil, fmt.Errorf("get deferred run parents: %w", err)
+		}
+	}
+	for _, run := range runs {
+		for _, parent := range deferredFrom[run.RunID] {
+			run.DeferredFrom = append(run.DeferredFrom, apiv2.RunDeferredFrom{
+				RunID:        parent.RunID,
+				FunctionSlug: parent.FnSlug,
+			})
+		}
 	}
 
 	return &apiv2.GetRunsResult{

@@ -141,6 +141,13 @@ type RunListItem struct {
 	EventName      string
 	IsDeferred     *bool
 	HasAI          *bool
+	DeferredFrom   []RunDeferredFrom
+}
+
+type RunDeferredFrom struct {
+	RunID        ulid.ULID
+	FunctionSlug string
+	FunctionName string
 }
 
 type GetRunsResult struct {

@@ -581,6 +581,16 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 		IsDeferred: run.IsDeferred,
 		HasAi:      run.HasAI,
 	}
+	for _, parent := range run.DeferredFrom {
+		item := &apiv2.RunDeferredFrom{
+			RunId:        parent.RunID.String(),
+			FunctionSlug: parent.FunctionSlug,
+		}
+		if parent.FunctionName != "" {
+			item.FunctionName = new(parent.FunctionName)
+		}
+		result.DeferredFrom = append(result.DeferredFrom, item)
+	}
 	if run.FunctionSlug != "" {
 		result.Function.Slug = new(run.FunctionSlug)
 	}

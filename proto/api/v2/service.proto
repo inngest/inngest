@@ -2361,6 +2361,7 @@ message FunctionRun {
   optional google.protobuf.Struct output = 10;
   optional bool is_deferred = 11;
   optional bool has_ai = 12;
+  repeated RunDeferredFrom deferred_from = 13;
 }
 
 message GetFunctionRunRequest {
@@ -3712,4 +3713,10 @@ message CancelRunData {
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
     }
   ];
+}
+
+message RunDeferredFrom {
+  string run_id = 1;
+  string function_slug = 2;
+  optional string function_name = 3;
 }
