@@ -97,7 +97,6 @@ const query = graphql(`
             }
           }
         }
-        hasAI
       }
     }
   }

@@ -3,9 +3,8 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
 import { RiArrowRightLine, RiErrorWarningFill } from '@remixicon/react';
 
-import { pathCreator } from '@/utils/urls';
 import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
-import { useExecutionLimit } from './useExecutionLimit';
+import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
 
@@ -16,10 +15,10 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   if (collapsed) {
     return (
       <MenuItem
-        href={pathCreator.billing({
-          tab: 'plans',
-          ref: 'app-hobby-execution-limit-card-collapsed',
-        })}
+        {...upgradeLinkProps(
+          data.marketplaceBillingURL,
+          'app-hobby-execution-limit-card-collapsed',
+        )}
         className="border-tertiary-xSubtle bg-error border"
         collapsed={collapsed}
         text="Upgrade plan"
@@ -37,10 +36,10 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       kind="error"
       footer={
         <Link
-          to={pathCreator.billing({
-            tab: 'plans',
-            ref: 'app-hobby-execution-limit-card',
-          })}
+          {...upgradeLinkProps(
+            data.marketplaceBillingURL,
+            'app-hobby-execution-limit-card',
+          )}
           className="text-error decoration-error hover:text-tertiary-2xIntense hover:decoration-tertiary-2xIntense gap-0.5 text-xs leading-5"
           iconAfter={<RiArrowRightLine className="h-3.5 w-3.5" />}
         >

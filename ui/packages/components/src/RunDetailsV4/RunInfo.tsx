@@ -13,7 +13,6 @@ import {
 import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import { AICell } from '../Table/Cell';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
@@ -51,7 +50,6 @@ type Run = {
     stepID?: string | null;
     debugSessionID?: string | null;
   };
-  hasAI: boolean;
 };
 
 export const RunInfo = ({
@@ -142,7 +140,7 @@ export const RunInfo = ({
             {(run: Run) => {
               return (
                 <LinkElement href={pathCreator.function({ functionSlug: run.fn.slug })}>
-                  {run.hasAI ? <AICell>{run.fn.name}</AICell> : run.fn.name}
+                  {run.fn.name}
                 </LinkElement>
               );
             }}

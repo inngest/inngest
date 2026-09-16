@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -357,6 +358,62 @@ func TestRunProviderGetRunsSkipsUnknownPublicFilter(t *testing.T) {
 	assert.Equal(t, []string{"unknown-app"}, data.listOpts.Filter.AppName)
 }
 
+func TestRunProviderGetRunsPassesCEL(t *testing.T) {
+	data := &stubRunProviderDataReader{}
+	provider := &runProvider{data: data}
+
+	_, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit: 20,
+		CEL:   `event.data.userId == "123"`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, `event.data.userId == "123"`, data.listOpts.Filter.CEL)
+}
+
+func TestRunProviderGetRunsPausedFilter(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		statuses []v2pb.FunctionRunStatus
+	}{
+		{
+			name:     "paused only",
+			statuses: []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED},
+		},
+		{
+			name: "paused with a supported status",
+			statuses: []v2pb.FunctionRunStatus{
+				v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_PAUSED,
+				v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := &stubRunProviderDataReader{}
+			provider := &runProvider{data: data}
+
+			result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+				Limit:  20,
+				Status: tc.statuses,
+			})
+
+			require.Nil(t, result)
+			require.ErrorIs(t, err, apiv2.ErrPausedRunStatusNotSupported)
+			require.Nil(t, data.listOpts)
+		})
+	}
+}
+
+func TestRunProviderGetRunsMapsInvalidCEL(t *testing.T) {
+	data := &stubRunProviderDataReader{listErr: cqrs.ErrInvalidRunExpression}
+	provider := &runProvider{data: data}
+
+	result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{Limit: 20, CEL: "not valid"})
+
+	require.Nil(t, result)
+	require.ErrorIs(t, err, apiv2.ErrExpressionInvalid)
+}
+
 func TestCQRSRunTimeField(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -388,12 +445,13 @@ type stubRunProviderDataReader struct {
 	evt        *cqrs.Event
 	evtErr     error
 	listedRuns []*cqrs.TraceRun
+	listErr    error
 	listOpts   *cqrs.GetTraceRunOpt
 }
 
 func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	s.listOpts = &opts
-	return s.listedRuns, nil
+	return s.listedRuns, s.listErr
 }
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {

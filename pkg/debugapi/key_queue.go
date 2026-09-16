@@ -68,9 +68,13 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
+	backlogOps, ok := shard.(queue.BacklogOperations)
+	if !ok {
+		return nil, fmt.Errorf("queue shard %q does not support backlog reads", shard.Name())
+	}
 
 	until := time.Now().Add(365 * 24 * time.Hour)
-	iter, err := d.backlogReader.BacklogsByPartition(ctx, shard, req.GetPartitionId(), time.Time{}, until)
+	iter, err := backlogOps.BacklogsByPartition(ctx, req.GetPartitionId(), time.Time{}, until)
 	if err != nil {
 		return nil, fmt.Errorf("error listing backlogs: %w", err)
 	}

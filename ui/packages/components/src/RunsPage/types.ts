@@ -21,7 +21,6 @@ export type Run = {
   queuedAt: string;
   endedAt: string | null;
   startedAt: string | null;
-  hasAI?: boolean;
   isDeferred: boolean;
   deferredFrom?: Array<{
     runID: string;
