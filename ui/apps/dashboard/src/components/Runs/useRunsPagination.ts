@@ -270,6 +270,7 @@ export function fetchRestRuns(
     timeField: vars.timeField,
     order: 'DESC',
     limit: String(REST_PAGE_SIZE),
+    include: 'deferred_from',
   });
   if (vars.endTime) params.set('until', vars.endTime);
   if (cursor) params.set('cursor', cursor);

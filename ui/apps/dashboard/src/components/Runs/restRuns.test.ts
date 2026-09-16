@@ -36,13 +36,10 @@ describe('restFunctionRunToTableRun', () => {
           cronSchedule: '*/5 * * * *',
         },
         isDeferred: true,
-        deferredFrom: [
-          {
-            runId: 'parent-run',
-            functionSlug: 'parent-function',
-            functionName: 'Parent function',
-          },
-        ],
+        deferredFrom: {
+          functionSlug: 'parent-function',
+          functionName: 'Parent function',
+        },
       }),
     ).toMatchObject({
       id: 'run-1',
@@ -54,7 +51,6 @@ describe('restFunctionRunToTableRun', () => {
       isDeferred: true,
       deferredFrom: [
         {
-          runID: 'parent-run',
           function: { name: 'Parent function', slug: 'parent-function' },
         },
       ],
@@ -134,6 +130,21 @@ describe('restFunctionRunToTableRun', () => {
 
     expect(row.durationMS).toBe(195_000);
   });
+
+  it('uses the parent slug when its name is omitted', () => {
+    const row = restFunctionRunToTableRun({
+      id: 'run-1',
+      function: { id: 'fn-id', name: 'Function' },
+      app: { id: 'app' },
+      status: 'COMPLETED',
+      queuedAt: '2026-08-31T10:00:00Z',
+      deferredFrom: { functionSlug: 'parent-function' },
+    });
+
+    expect(row.deferredFrom?.[0]).toEqual({
+      function: { name: 'parent-function', slug: 'parent-function' },
+    });
+  });
 });
 
 it('translates selected app IDs for the REST request', async () => {
@@ -172,7 +183,7 @@ it('translates selected app IDs for the REST request', async () => {
 
   expect(apiFetch).toHaveBeenCalledOnce();
   expect(apiFetch).toHaveBeenCalledWith(
-    '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
+    '/v2/runs?from=2026-08-31T10%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&until=2026-08-31T11%3A00%3A00Z&cursor=next-page&isDeferred=false&status=RUNNING&appId=public-app-id',
     { signal: expect.any(AbortSignal) },
   );
 });
