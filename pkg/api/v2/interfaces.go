@@ -140,7 +140,6 @@ type RunListItem struct {
 	AppID          string
 	EventName      string
 	IsDeferred     *bool
-	HasAI          *bool
 }
 
 type GetRunsResult struct {

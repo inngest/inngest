@@ -2360,7 +2360,10 @@ message FunctionRun {
   RunTrigger trigger = 9;
   optional google.protobuf.Struct output = 10;
   optional bool is_deferred = 11;
-  optional bool has_ai = 12;
+  // Prevent reuse from causing old protobuf, JSON, or TextFormat payloads to be
+  // interpreted with different field semantics.
+  reserved 12;
+  reserved "has_ai";
 }
 
 message GetFunctionRunRequest {

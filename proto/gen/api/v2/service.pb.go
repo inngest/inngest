@@ -2092,7 +2092,6 @@ type FunctionRun struct {
 	Trigger       *RunTrigger            `protobuf:"bytes,9,opt,name=trigger,proto3" json:"trigger,omitempty"`
 	Output        *structpb.Struct       `protobuf:"bytes,10,opt,name=output,proto3,oneof" json:"output,omitempty"`
 	IsDeferred    *bool                  `protobuf:"varint,11,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
-	HasAi         *bool                  `protobuf:"varint,12,opt,name=has_ai,json=hasAi,proto3,oneof" json:"has_ai,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2200,13 +2199,6 @@ func (x *FunctionRun) GetOutput() *structpb.Struct {
 func (x *FunctionRun) GetIsDeferred() bool {
 	if x != nil && x.IsDeferred != nil {
 		return *x.IsDeferred
-	}
-	return false
-}
-
-func (x *FunctionRun) GetHasAi() bool {
-	if x != nil && x.HasAi != nil {
-		return *x.HasAi
 	}
 	return false
 }
@@ -9042,7 +9034,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\rcron_schedule\x18\x05 \x01(\tH\x02R\fcronSchedule\x88\x01\x01B\r\n" +
 	"\v_event_nameB\v\n" +
 	"\t_batch_idB\x10\n" +
-	"\x0e_cron_schedule\"\xf6\x04\n" +
+	"\x0e_cron_schedule\"\xdd\x04\n" +
 	"\vFunctionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
 	"\bfunction\x18\x02 \x01(\v2\x13.api.v2.FunctionRefR\bfunction\x12 \n" +
@@ -9058,14 +9050,12 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06output\x18\n" +
 	" \x01(\v2\x17.google.protobuf.StructH\x03R\x06output\x88\x01\x01\x12$\n" +
 	"\vis_deferred\x18\v \x01(\bH\x04R\n" +
-	"isDeferred\x88\x01\x01\x12\x1a\n" +
-	"\x06has_ai\x18\f \x01(\bH\x05R\x05hasAi\x88\x01\x01B\r\n" +
+	"isDeferred\x88\x01\x01B\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\x0e\n" +
 	"\f_duration_msB\t\n" +
 	"\a_outputB\x0e\n" +
-	"\f_is_deferredB\t\n" +
-	"\a_has_ai\"m\n" +
+	"\f_is_deferredJ\x04\b\f\x10\rR\x06has_ai\"m\n" +
 	"\x15GetFunctionRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
 	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
