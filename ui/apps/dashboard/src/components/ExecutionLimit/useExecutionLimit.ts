@@ -7,6 +7,7 @@ import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import {
   isExecutionCapped,
   legacyExecutionCap,
+  shouldShowExecutionLimit,
   usageBand,
   type UsageBand,
 } from './executionLimit';
@@ -59,19 +60,20 @@ type ExecutionLimitData = {
 };
 
 export function useExecutionLimit(): ExecutionLimitData | null {
-  const { value: enhanced, isReady } = useBooleanFlag(
+  const { value: enhancedEnabled, isReady } = useBooleanFlag(
     'hobby-execution-limit-ui',
   );
+  const enhanced = isReady && enhancedEnabled;
 
   const legacyRes = useSkippableGraphQLQuery({
     query: executionLimitQuery,
     variables: {},
-    skip: !isReady || enhanced,
+    skip: enhanced,
   });
   const capRes = useSkippableGraphQLQuery({
     query: executionCapQuery,
     variables: {},
-    skip: !isReady || !enhanced,
+    skip: !enhanced,
   });
 
   const account = enhanced ? capRes.data?.account : legacyRes.data?.account;
@@ -82,6 +84,7 @@ export function useExecutionLimit(): ExecutionLimitData | null {
       ? account.executionCap
       : legacyExecutionCap(account.entitlements.executions);
   if (!cap) return null;
+  if (!shouldShowExecutionLimit(cap)) return null;
 
   const isEnterprise =
     'plan' in account &&

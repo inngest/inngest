@@ -7,6 +7,11 @@ export type ExecutionCap = {
   overageAllowed: boolean;
 };
 
+// Display policy is separate from whether execution is actually blocked.
+export function shouldShowExecutionLimit(cap: ExecutionCap): boolean {
+  return !cap.overageAllowed;
+}
+
 export function isExecutionCapped({
   usage,
   limit,
