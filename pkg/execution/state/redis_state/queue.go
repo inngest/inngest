@@ -1615,7 +1615,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := min(len(items), int(q.PartitionPeekMax))
+		n := min(len(items), int(osqueue.PartitionSelectionMax))
 		return items[0:n], nil
 	}
 

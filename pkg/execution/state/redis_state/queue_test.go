@@ -193,14 +193,14 @@ func TestPartitionPeekMax(t *testing.T) {
 
 	t.Run("default cap clamps larger reads", func(t *testing.T) {
 		shard := newShard(t)
-		items, err := shard.PartitionPeek(ctx, true, until, count)
+		items, err := shard.PartitionPeek(ctx, false, until, count)
 		require.NoError(t, err)
 		require.Len(t, items, int(osqueue.PartitionPeekMax))
 	})
 
 	t.Run("configured cap reads larger batches", func(t *testing.T) {
 		shard := newShard(t, osqueue.WithPartitionPeekMax(count))
-		items, err := shard.PartitionPeek(ctx, true, until, count)
+		items, err := shard.PartitionPeek(ctx, false, until, count)
 		require.NoError(t, err)
 		require.Len(t, items, int(count))
 	})

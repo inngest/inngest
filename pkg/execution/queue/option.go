@@ -87,10 +87,7 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 func WithPartitionPeekMax(max int64) QueueOpt {
 	return func(q *QueueOptions) {
 		if max > 0 {
-			if max > AbsolutePartitionPeekMax {
-				max = AbsolutePartitionPeekMax
-			}
-			q.PartitionPeekMax = max
+			q.PartitionPeekMax = min(max, AbsolutePartitionPeekMax)
 		}
 	}
 }
