@@ -31,3 +31,11 @@ export const SmallError: Story = {
     value: 100,
   },
 };
+
+export const SmallWarning: Story = {
+  args: {
+    kind: 'warning',
+    size: 'small',
+    value: 92,
+  },
+};
