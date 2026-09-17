@@ -321,10 +321,7 @@ type MetadataEntry struct {
 	// to, independently of Parent (which identifies the span this metadata
 	// is attached to -- a request-scoped metadata span's Parent is the
 	// request's execution span, not the step span, but it still belongs to
-	// a step). All three are empty/nil for run-scoped metadata. StepID is
-	// the same hashed step ID used to compute a step's own deterministic
-	// span identity (see tracing.FinalizedStepSpanRefFromMetadataAndStepID),
-	// not the SDK-facing userland step ID.
+	// a step). All three are empty/nil for run-scoped metadata.
 	StepID      string
 	StepIndex   *int
 	StepAttempt *int
