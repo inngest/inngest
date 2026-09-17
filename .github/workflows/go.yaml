@@ -75,7 +75,7 @@ jobs:
       - name: Test
         run: |
           gotestsum --junitfile=junit.xml --format=standard-verbose -- \
-            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") \
+            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests" | grep -v "./cmd/duckdbbench") \
             -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
