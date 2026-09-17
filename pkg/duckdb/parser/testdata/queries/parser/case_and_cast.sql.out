@@ -1,0 +1,34 @@
+-- SELECT CASE WHEN a > 0 THEN 'pos' WHEN a < 0 THEN 'neg' ELSE 'zero' END FROM t
+SelectStatement
+  SelectItem()
+    CaseExpr
+      CaseWhen
+        BinaryExpr(>)
+          Ident(a)
+          Literal(1,0)
+        Literal(0,pos)
+      CaseWhen
+        BinaryExpr(<)
+          Ident(a)
+          Literal(1,0)
+        Literal(0,neg)
+      Literal(0,zero)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT CAST(a AS INTEGER) FROM t
+SelectStatement
+  SelectItem()
+    CastExpr(INTEGER,try=false)
+      Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT a::VARCHAR FROM t;
+SelectStatement
+  SelectItem()
+    CastExpr(VARCHAR,try=false)
+      Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
