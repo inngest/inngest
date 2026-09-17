@@ -17,6 +17,10 @@ func Command() *cli.Command {
 
 		Flags: []cli.Flag{
 			// Base flags
+			&cli.BoolFlag{
+				Name:  "cloud-sandboxes",
+				Usage: "Enable authenticated Cloud sandboxes while keeping workflows local (loopback only)",
+			},
 			&cli.StringSliceFlag{
 				Name:    "sdk-url",
 				Aliases: []string{"u"},
