@@ -800,3 +800,129 @@ enum AppMethod {
 input AppsFilterV1 {
   method: AppMethod
 }
+
+enum InsightsColumnType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATETIME
+  JSON
+  UNKNOWN
+}
+
+enum InsightsColumnHint {
+  APP_ID
+  FUNCTION_ID
+  RUN_ID
+  EVENT_ID
+  # A session reference: a STRUCT(key, id) object (runs.sessions' element
+  # type), not a bare ID string like the other hints -- a UI needs both
+  # fields to build a working session link.
+  SESSION
+}
+
+# InsightsPathSegment is one step of a path into a JSON column's value:
+# either a literal object key (key set, wildcard false) or "every element
+# of the array here" (wildcard true, key null). See
+# pkg/duckdb/insights.PathSegment's own doc comment for why a path is a
+# list of these instead of a single dotted string: a literal key can
+# itself contain a "." (an OTel span attribute name, say), which would
+# otherwise be indistinguishable from real nested JSON access.
+type InsightsPathSegment {
+  key: String
+  wildcard: Boolean!
+}
+
+# InsightsPathHint pairs one path into an InsightsQueryColumn's own value
+# (empty for the column's own whole value) with the hint the value found
+# there carries -- e.g. runs.inputs' [{wildcard:true}, {key:"id"}] path
+# carries EVENT_ID, describing each inputs[i].id, not inputs itself.
+type InsightsPathHint {
+  path: [InsightsPathSegment!]!
+  hint: InsightsColumnHint!
+}
+
+type InsightsQueryColumn {
+  name: String!
+  type: InsightsColumnType!
+  # pathHints exposes every hint found at any JSON sub-path of this
+  # column's own value -- empty when the column isn't traceable back to
+  # exactly one known table column, or has no known sub-paths. The
+  # column's own whole-value hint (what used to be a separate plain
+  # `hint` field) is the entry whose path is empty, if any -- there's no
+  # separate field for it any more, exactly one source of hint
+  # information. A consumer (e.g. a UI cell-detail renderer) resolving a
+  # specific JSON value found inside this column's own data matches it
+  # against each entry's path the same way pkg/duckdb/insights' own
+  # resolveSubPathHint does.
+  pathHints: [InsightsPathHint!]!
+}
+
+type InsightsQueryInfo {
+  primaryTable: String
+  tables: [String!]!
+  limited: Boolean!
+}
+
+enum InsightsDiagnosticSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+type InsightsDiagnosticPosition {
+  line: Int!
+  column: Int!
+}
+
+type InsightsDiagnostic {
+  start: InsightsDiagnosticPosition!
+  end: InsightsDiagnosticPosition!
+  severity: InsightsDiagnosticSeverity!
+  code: String!
+  message: String!
+}
+
+type InsightsQueryResult {
+  columns: [InsightsQueryColumn!]!
+  rows: [[Unknown]!]!
+  info: InsightsQueryInfo!
+  diagnostics: [InsightsDiagnostic!]!
+}
+
+# Sessions groups runs by the (key, id) pairs a triggering event tagged
+# them with -- see pkg/duckdb/dashboards (the DuckDB-backed query layer
+# every Sessions surface, GQL included, reads from) and
+# pkg/api/v2/endpoints_sessions.go (the REST/MCP counterpart of these
+# fields). Schema shape matches PR #4530 ("sessions oss") so the
+# already-shared dev-server-ui components (SessionKeys/SessionResults)
+# work against either backend unmodified.
+type SessionKey {
+  sessionKey: String!
+  createdAt: Time!
+}
+
+type SessionFunction {
+  slug: String!
+  name: String!
+}
+
+type SessionGroup {
+  sessionKey: String!
+  sessionId: String!
+  runCount: Int!
+  failedRunCount: Int!
+  failureRate: Float!
+  lastActiveAt: Time!
+  functions: [SessionFunction!]!
+}
+
+type SessionRun {
+  id: String!
+  functionSlug: String!
+  eventName: String
+  status: String!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+}
