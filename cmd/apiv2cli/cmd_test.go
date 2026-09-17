@@ -23,6 +23,34 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+func TestAPIRedirectCredentialSafety(t *testing.T) {
+	for _, test := range []struct {
+		name, target string
+		auth         bool
+		hops         int
+		wantError    bool
+	}{
+		{"https", "https://api.inngest.com/v2/apps", true, 1, false},
+		{"http downgrade", "http://api.inngest.com/v2/apps", true, 1, true},
+		{"loopback", "http://127.0.0.1:8090/v2/apps", true, 1, false},
+		{"no credentials", "http://example.com/v2/apps", false, 1, false},
+		{"redirect limit", "https://api.inngest.com/v2/apps", true, 10, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, test.target, nil)
+			if test.auth {
+				req.Header.Set("Authorization", "Bearer test-token")
+			}
+			err := checkAPIRedirect(req, make([]*http.Request, test.hops))
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestDiscoverEndpointsFromProto(t *testing.T) {
 	endpoints := discoverEndpoints()
 	require.NotEmpty(t, endpoints)

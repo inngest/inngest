@@ -376,7 +376,7 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 	if ep.streaming && !cmd.IsSet("timeout") {
 		timeout = 0
 	}
-	client := &http.Client{Timeout: timeout}
+	client := &http.Client{Timeout: timeout, CheckRedirect: checkAPIRedirect}
 	resp, err := client.Do(req)
 	if err != nil {
 		if req.URL.Scheme+"://"+req.URL.Host == defaultDevServerOrigin {
@@ -496,6 +496,13 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	}
 
 	return req, nil
+}
+
+func checkAPIRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	return guardPlaintextAuth(req)
 }
 
 // never send credentials over remote http
