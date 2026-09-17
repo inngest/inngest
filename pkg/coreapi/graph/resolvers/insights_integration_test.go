@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -80,7 +81,7 @@ func insertStepSpan(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID,
 		   (account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name, start_time, end_time, trace_id, span_id, parent_span_id, attributes)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'executor.step', ?, ?, ?, ?, ?, ?);`,
 		accountID.String(), envID.String(), runID, startTime, appID.String(), "test-app", functionID.String(), "test-fn",
-		startTime, startTime.Add(time.Second), uuid.New().String(), spanID, parentSpanID, attrs,
+		startTime, startTime.Add(time.Second), uuid.New().String(), spanID, parentSpanID, json.RawMessage(attrs),
 	)
 	require.NoError(t, err)
 }
