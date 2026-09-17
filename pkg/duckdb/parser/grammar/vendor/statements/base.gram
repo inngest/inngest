@@ -1,0 +1,19 @@
+CatalogQualification <- CatalogName '.'
+SchemaQualification <- SchemaName '.'
+ReservedSchemaQualification <- ReservedSchemaName '.'
+TableQualification <- TableName '.'
+ReservedTableQualification <- ReservedTableName '.'
+IdentifierOrStringLiteral <- Identifier / StringLiteral
+DottedIdentifier <- Identifier DotColLabel*
+DotColLabel <- '.' ColLabel
+ColId <- UnreservedKeyword / ColumnNameKeyword / Identifier
+ColIdOrString <- ColId / StringLiteralIdentifier
+TypeFuncName <- UnreservedKeyword / TypeFuncKeyword / Identifier
+TypeFuncKeyword <- TypeNameKeyword / FuncNameKeyword
+ColLabel <- ReservedKeyword / UnreservedKeyword / ColumnNameKeyword / FuncNameKeyword / TypeNameKeyword / Identifier
+ColLabelOrString <- ColLabelIdentifier / StringLiteralIdentifier
+ColLabelIdentifier <- ColLabel
+StringLiteralIdentifier <- StringLiteral
+NestedColumnName <- IdentifierDot* ColumnName
+IdentifierDot <- Identifier '.'
+StarSymbol <- '*'
