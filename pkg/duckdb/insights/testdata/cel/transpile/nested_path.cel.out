@@ -1,0 +1,14 @@
+INPUT
+output.nested.value == "x"
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+((output::JSON->>'$.data.nested.value') = ?)
+
+OUTPUT ARGS
+[x]
