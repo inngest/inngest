@@ -14,12 +14,42 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
+	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
+
+func TestAPIRedirectCredentialSafety(t *testing.T) {
+	for _, test := range []struct {
+		name, target string
+		auth         bool
+		hops         int
+		wantError    bool
+	}{
+		{"https", "https://api.inngest.com/v2/apps", true, 1, false},
+		{"http downgrade", "http://api.inngest.com/v2/apps", true, 1, true},
+		{"loopback", "http://127.0.0.1:8090/v2/apps", true, 1, false},
+		{"no credentials", "http://example.com/v2/apps", false, 1, false},
+		{"redirect limit", "https://api.inngest.com/v2/apps", true, 10, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, test.target, nil)
+			if test.auth {
+				req.Header.Set("Authorization", "Bearer test-token")
+			}
+			err := checkAPIRedirect(req, make([]*http.Request, test.hops))
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
 
 func TestDiscoverEndpointsFromProto(t *testing.T) {
 	endpoints := discoverEndpoints()
@@ -862,6 +892,92 @@ func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "Bearer sk-inn-api-test", gotAuth)
+}
+
+func TestCommandUsesStoredOAuthForMatchingResource(t *testing.T) {
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "signkey-legacy")
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+
+	var gotAuth string
+	var gotEnv string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotEnv = r.Header.Get("X-Inngest-Env")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer server.Close()
+
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:               server.URL,
+		Resource:             server.URL + "/v2",
+		ClientID:             cliauth.ClientID,
+		SessionID:            "session-id",
+		SessionExpiresAt:     time.Now().Add(time.Hour),
+		AccountID:            "account-id",
+		ResourceBoundaryMode: "all_envs",
+	}, cliauth.Credential{
+		AccessToken:  "inngest_at_stored",
+		RefreshToken: "inngest_rt_stored",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}, true))
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"health",
+		"--api-host", server.URL,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "Bearer inngest_at_stored", gotAuth)
+	require.Empty(t, gotEnv)
+}
+
+func TestCommandIgnoresStoredOAuthForDifferentResource(t *testing.T) {
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "")
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer server.Close()
+
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:           "https://api.inngest.com",
+		Resource:         "https://api.inngest.com/v2",
+		ClientID:         cliauth.ClientID,
+		SessionID:        "session-id",
+		SessionExpiresAt: time.Now().Add(time.Hour),
+		AccountID:        "account-id",
+	}, cliauth.Credential{
+		AccessToken:  "inngest_at_stored",
+		RefreshToken: "inngest_rt_stored",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}, true))
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"health",
+		"--api-host", server.URL,
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, gotAuth)
 }
 
 func TestNormalizeAPIURL(t *testing.T) {
