@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.45.0] - 2026-09-17
+
+### 🚀 Features
+
+- *(sandbox)* Accept snapshot ID when creating sandboxes (#4767)
+- *(traces)* Remove preview=false legacy trace path (#4799)
+- *(dashboard)* Add hobby execution limit notices (#4819)
+- *(api)* Reject unmapped v2 request fields via grpc-gateway fork (#4816)
+- *(api)* Support CEL queries in REST run lists (#4858)
+- *(api)* Define sandbox lifecycle contract (#4870)
+- *(queue)* Configure partition peek limit (#4875)
+- *(api)* Add include option for deferred parents (#4874)
+- *(auth)* Add cli oauth login (#4780)
+- *(auth)* Add mcp oauth support (#4781)
+
+### 🐛 Bug Fixes
+
+- *(debounce)* Handle removed config during execution (#4788)
+- *(cqrs)* Close query rows (#2680)
+- *(queue)* Reduce semaphore requeue churn (#4807)
+- *(api)* Serialize sandbox bytes written as a number (#4789)
+- *(semaphores)* Improve semaphore iteration, breaking early, etc (#4818)
+- *(deps)* Remove stale Tencent SDK replacement (#4829)
+- *(cel)* Improve certain classes of cel filter errors (#4832)
+- Preserve newer debounce events during queue item recovery (#4800)
+- *(queue)* Route requeues to current shard (#4844)
+- *(ui)* Update Next.js past critical advisories (#4847)
+- *(queue)* Close migration requeue routing window (#4849)
+- *(api)* Normalize unknown REST v2 body field errors (#4813)
+- *(api)* Return error when event run status lookup fails (#4855)
+- *(components)* NewCodeBlock drag-to-select breaks when a mid-drag resize hits the editor (#4856)
+- *(api)* REST v1 GET requests should keep their error codes (#4857)
+- *(debounce)* Finish source cleanup before execution (#4863)
+- *(ui)* Hide unknown run status filter (#4867)
+- *(api)* Return unknown run statuses accurately (#4868)
+- *(dashboard)* Remove dead run-level AI treatment (#4871)
+- *(rest)* Remove mistakenly added run-level has_ai field (#4872)
+
+### 🚜 Refactor
+
+- *(event-cel)* Remove unused package (#4792)
+- *(debug)* Remove unused/incomplete run debug feature (#4801)
+- *(metadata)* Remove span metadata feature flag (#4820)
+- *(cqrs)* Remove unused span stack reader (#4825)
+- *(cqrs)* Remove legacy trace spans reader (#4826)
+- Use go 1.26 new expressions (#4845)
+- *(queue)* Drop iterator APIs from the queue reader interfaces (#4859)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(metrics)* Remove unused pkg/usage (#4793)
+- *(api)* Add proto permission metadata (#4833)
+
 ## [v1.44.0] - 2026-08-26
 
 ### 🚀 Features
@@ -29,6 +82,7 @@ All notable changes to this project will be documented in this file.
 
 - Update CODEOWNERS (#4771)
 - Remove former owners from CODEOWNERS (#4785)
+- *(release)* V1.44.0 (#4764)
 
 ## [v1.43.0] - 2026-08-20
 
