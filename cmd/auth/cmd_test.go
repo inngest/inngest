@@ -81,6 +81,35 @@ func TestLogoutClearsMetadataWhenCredentialIsMissing(t *testing.T) {
 	}
 }
 
+func TestLogoutClearsMetadataWhenCredentialIsInvalid(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("INNGEST_CONFIG_DIR", dir)
+	manager, err := cliauth.NewManager()
+	require.NoError(t, err)
+	require.NoError(t, manager.Store().Save(cliauth.Metadata{
+		Issuer: "https://api.inngest.com", Resource: "https://api.inngest.com/v2", SessionID: "session",
+	}, cliauth.Credential{AccessToken: "access", RefreshToken: "refresh"}, true))
+	files, err := filepath.Glob(filepath.Join(dir, "oauth-credentials-*.json"))
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	// The insecure JSON file is the simplest way to create a malformed credential
+	// in a test; an invalid OS keyring payload exercises the same load-error path.
+	require.NoError(t, os.WriteFile(files[0], []byte("invalid JSON"), 0o600))
+	var output bytes.Buffer
+	command := &cli.Command{
+		Name:     "inngest",
+		Writer:   &output,
+		Commands: []*cli.Command{LogoutCommand()},
+	}
+
+	runErr := command.Run(context.Background(), []string{"inngest", "logout"})
+
+	_, metadataErr := manager.Store().Metadata()
+	require.ErrorIs(t, metadataErr, cliauth.ErrNotLoggedIn)
+	require.NoError(t, runErr)
+	require.Contains(t, output.String(), "Logged out locally. The remote session could not be revoked")
+}
+
 func TestJSONStatusIsOneLineAndFailsWhenLoggedOut(t *testing.T) {
 	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
 	output := bytes.Buffer{}

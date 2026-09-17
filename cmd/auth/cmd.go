@@ -164,25 +164,24 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	_, credential, revokeErr := manager.Store().Load()
-	if revokeErr != nil && !errors.Is(revokeErr, cliauth.ErrNotLoggedIn) {
-		return revokeErr
-	}
-	if revokeErr == nil {
+	_, credential, credentialErr := manager.Store().Load()
+	var revokeErr error
+	if credentialErr == nil {
 		revokeErr = manager.Revoke(ctx, metadata, credential)
 	}
-	// local logout must work when the server is unavailable
+	// local logout must work when credentials are unreadable or the server is unavailable
 	if err := manager.Store().Delete(metadata); err != nil {
-		return errors.Join(revokeErr, err)
+		return errors.Join(credentialErr, revokeErr, err)
 	}
+	revoked := credentialErr == nil && revokeErr == nil
 	if cmd.Bool("json") {
 		return writeJSONLine(cmd, map[string]any{
 			"type":                      "logout",
-			"revoked":                   revokeErr == nil,
+			"revoked":                   revoked,
 			"local_credentials_removed": true,
 		})
 	}
-	if revokeErr != nil {
+	if !revoked {
 		_, err = fmt.Fprintln(writer(cmd), "Logged out locally. The remote session could not be revoked and may remain active until it expires.")
 		return err
 	}
