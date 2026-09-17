@@ -177,7 +177,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 
 			var handlerCalls int32
 			opts := []QueueOpt{
-				WithCapacityManager(permanentConstraintErrorCapacityManager{err: tt.constraintErr}),
+				WithCapacityManager(permanentConstraintErrorCapacityManager{cause: tt.constraintErr}),
 				WithPartitionConstraintConfigGetter(func(context.Context, PartitionIdentifier) PartitionConstraintConfig {
 					return PartitionConstraintConfig{
 						Concurrency: PartitionConcurrency{AccountConcurrency: 1},
@@ -228,7 +228,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 }
 
 type permanentConstraintErrorCapacityManager struct {
-	err error
+	cause error
 }
 
 func (m permanentConstraintErrorCapacityManager) Check(context.Context, *constraintapi.CapacityCheckRequest) (*constraintapi.CapacityCheckResponse, errs.UserError, errs.InternalError) {
@@ -236,7 +236,7 @@ func (m permanentConstraintErrorCapacityManager) Check(context.Context, *constra
 }
 
 func (m permanentConstraintErrorCapacityManager) Acquire(context.Context, *constraintapi.CapacityAcquireRequest) (*constraintapi.CapacityAcquireResponse, errs.InternalError) {
-	return nil, wrappedConstraintAPIInternalError{err: m.err}
+	return nil, wrappedConstraintAPIInternalError{err: m.cause}
 }
 
 func (m permanentConstraintErrorCapacityManager) ExtendLease(context.Context, *constraintapi.CapacityExtendLeaseRequest) (*constraintapi.CapacityExtendLeaseResponse, errs.InternalError) {
