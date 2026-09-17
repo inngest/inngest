@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -31,10 +33,13 @@ func SaveFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	tp tracing.TracerProvider,
+	syncListeners []execution.SyncLifecycleListener,
 	log logger.Logger,
 	md *statev2.Metadata,
 	op state.GeneratorOpcode,
 ) error {
+	now := time.Now()
+
 	var (
 		// Why the defer was rejected.
 		rejectReason string
@@ -83,14 +88,16 @@ func SaveFromOp(
 		}
 	}
 
+	d := statev2.Defer{
+		FnSlug:         opts.FnSlug,
+		HashedID:       op.ID,
+		ScheduleStatus: enums.DeferStatusAfterRun,
+		Input:          opts.Input,
+		Meta:           opts.Meta,
+	}
+
 	if rejectReason == "" {
-		saveErr := rs.SaveDefer(ctx, md.ID, statev2.Defer{
-			FnSlug:         opts.FnSlug,
-			HashedID:       op.ID,
-			ScheduleStatus: enums.DeferStatusAfterRun,
-			Input:          opts.Input,
-			Meta:           opts.Meta,
-		})
+		saveErr := rs.SaveDefer(ctx, md.ID, d)
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):
 			// Count cap rejects without persisting anything. SDK retransmits absorbed.
@@ -115,23 +122,26 @@ func SaveFromOp(
 
 	if rejectReason == "" {
 		// Create span for the defer that'll schedule after the parent run ends.
-		createDeferSpan(ctx, tp, log, md, statev2.Defer{
-			FnSlug:         opts.FnSlug,
-			HashedID:       op.ID,
-			ScheduleStatus: enums.DeferStatusAfterRun,
-		}, userlandID)
+		createDeferSpan(ctx, tp, log, md, d, userlandID)
+		for _, sl := range syncListeners {
+			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
+		}
 	} else if rejectionPersisted {
 		fnSlug := ""
 		if opts != nil {
 			fnSlug = opts.FnSlug
 		}
 
-		// Create span for the rejected defer.
-		createDeferSpan(ctx, tp, log, md, statev2.Defer{
+		d := statev2.Defer{
 			FnSlug:         fnSlug,
 			HashedID:       op.ID,
 			ScheduleStatus: enums.DeferStatusRejected,
-		}, userlandID)
+		}
+		// Create span for the rejected defer.
+		createDeferSpan(ctx, tp, log, md, d, userlandID)
+		for _, sl := range syncListeners {
+			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
+		}
 	}
 
 	return nil
@@ -143,10 +153,23 @@ func SaveFromOp(
 // On success: updates the existing executor.defer span to status=Aborted via
 // UpdateSpan. The span identity is reconstructed from (parentRunID, hashedID),
 // not stored anywhere.
+//
+// fn_slug (DeferAbortOpts.FnSlug) and userland_id (op.Userland.ID) are both
+// already available here -- the SDK sends both on the abort op, the same
+// op-level Userland field SaveFromOp reads above, plus a fn_slug opts field
+// that simply wasn't being read here -- but only dualwrite's OnDeferAbort
+// takes them: the real path's own UpdateSpan-based read side
+// (pkg/cqrs/manager) already reconstructs fn_slug/userland_id correctly from
+// the original Add row regardless (see mapSpanFromRow's fragment merge), so
+// stamping them again here wouldn't change what that path can see. duckdb's
+// flat run_trace_spans model has no equivalent partial-update, so passing
+// them lets dualwrite's own row be fully self-describing instead of relying
+// on duckdbquery's read-side field merge for these two fields.
 func AbortFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	tp tracing.TracerProvider,
+	syncListeners []execution.SyncLifecycleListener,
 	log logger.Logger,
 	md *statev2.Metadata,
 	op state.GeneratorOpcode,
@@ -157,12 +180,21 @@ func AbortFromOp(
 		return fmt.Errorf("error parsing DeferAbort opts: %w", err)
 	}
 
+	var userlandID string
+	if op.Userland != nil {
+		userlandID = op.Userland.ID
+	}
+
 	if err := rs.SetDeferStatus(ctx, md.ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
 		log.Error("error aborting defer", "error", err)
 		return fmt.Errorf("error aborting defer: %w", err)
 	}
 
+	now := time.Now()
 	updateDeferSpanStatus(ctx, tp, log, md, opts.TargetHashedID, enums.DeferStatusAborted)
+	for _, sl := range syncListeners {
+		sl.OnDeferAbort(ctx, *md, opts.TargetHashedID, opts.FnSlug, userlandID, now)
+	}
 	return nil
 }
 
@@ -180,8 +212,20 @@ func createDeferSpan(
 	if tp == nil {
 		return
 	}
+
+	eventID, err := event.DeferEventID(md.ID.RunID, d.HashedID)
+	if err != nil {
+		log.Error(
+			"error generating defer event ID",
+			"error", err,
+			"hashed_id", util.SanitizeLogField(d.HashedID),
+			"run_id", md.ID.RunID,
+		)
+		return
+	}
+
 	now := time.Now()
-	_, err := tp.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
+	_, err = tp.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
 		Debug:     &tracing.SpanDebugData{Location: "defers.emitDeferSpan"},
 		Metadata:  md,
 		Parent:    tracing.RunSpanRefFromMetadata(md),
@@ -193,6 +237,7 @@ func createDeferSpan(
 			meta.Attr(meta.Attrs.DeferUserlandID, &userlandID),
 			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
 			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
+			meta.Attr(meta.Attrs.DeferEventID, &eventID),
 		),
 	})
 	if err != nil {
