@@ -1,0 +1,14 @@
+INPUT
+output.result == null || error.message != null
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+((output::JSON->'$.data.result') = 'null'::JSON OR (output::JSON->'$.error.message') != 'null'::JSON)
+
+OUTPUT ARGS
+[]
