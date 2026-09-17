@@ -1,0 +1,23 @@
+SELECT 1;
+
+SELECT a, b FROM t;
+
+SELECT a AS x, b AS y FROM orders;
+
+SELECT t.a, t.b FROM orders t;
+
+SELECT * FROM orders;
+
+SELECT a, b FROM orders WHERE a = 1;
+
+SELECT DISTINCT a FROM t;
+
+SELECT DISTINCT ON (a) a, b FROM t ORDER BY a;
+
+SELECT a, count(*) FROM t GROUP BY a HAVING count(*) > 1;
+
+SELECT a FROM t GROUP BY CUBE (a, b);
+
+SELECT a FROM t ORDER BY a DESC, b;
+
+SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5;

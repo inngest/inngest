@@ -1,0 +1,11 @@
+SELECT * FROM;
+
+SELECT (1 +;
+
+SELECT 'unterminated;
+
+SELEC * FROM t;
+
+SELECT * FROM t WHERE a = ;
+
+SELECT * FROM t GROUP BY;
