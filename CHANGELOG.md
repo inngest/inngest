@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.45.1] - 2026-09-17
+
+### 🐛 Bug Fixes
+
+- *(cli)* Better message when cli is unauthed (#4883)
+- *(queue)* Drop permanently unroutable items (#4878)
+
 ## [v1.45.0] - 2026-09-17
 
 ### 🚀 Features
@@ -54,6 +61,7 @@ All notable changes to this project will be documented in this file.
 
 - *(metrics)* Remove unused pkg/usage (#4793)
 - *(api)* Add proto permission metadata (#4833)
+- *(release)* V1.45.0 (#4790)
 
 ## [v1.44.0] - 2026-08-26
 
