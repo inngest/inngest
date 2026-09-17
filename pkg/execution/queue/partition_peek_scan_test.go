@@ -51,9 +51,10 @@ func TestPartitionPeekScanDynamicLimit(t *testing.T) {
 				limit = value
 				shard.limits = nil
 				require.NoError(t, q.scan(context.Background(), nil))
-				want := []int64{value}
+				effectiveLimit := max(value, PartitionSelectionMax)
+				want := []int64{effectiveLimit}
 				if accountScan {
-					want = []int64{max(value/2, 1), max(value/2, 1)}
+					want = []int64{max(effectiveLimit/2, 1), max(effectiveLimit/2, 1)}
 				}
 				require.Equal(t, want, shard.limits)
 			}

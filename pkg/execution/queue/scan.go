@@ -105,12 +105,6 @@ func (q *queueProcessor) scan(ctx context.Context, dispatch DispatchFunc) error 
 
 	peekUntil := q.Clock().Now().Add(PartitionLookahead)
 	partitionPeekMax := q.PartitionPeekLimit(ctx, shard.Name())
-	metrics.GaugeQueuePartitionPeekLimit(ctx, partitionPeekMax, metrics.GaugeOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": shard.Name(),
-		},
-	})
 
 	processAccount := false
 	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(100) <= q.runMode.AccountWeight) {

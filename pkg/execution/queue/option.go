@@ -85,7 +85,7 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 
 // WithPartitionPeekMaxGetter overrides the partition scan limit at runtime for
 // each queue shard. The getter may be called concurrently and must be safe for
-// concurrent use. Non-positive values fall back to the default of 300.
+// concurrent use. Non-positive values fall back to PartitionPeekMax.
 func WithPartitionPeekMaxGetter(getter func(context.Context, string) int64) QueueOpt {
 	return func(q *QueueOptions) {
 		q.partitionPeekMaxGetter = getter
@@ -93,16 +93,16 @@ func WithPartitionPeekMaxGetter(getter func(context.Context, string) int64) Queu
 }
 
 // PartitionPeekLimit returns the current partition peek limit for a shard.
-// The default is PartitionPeekMax(300), but this can be overridden by WithPartitionPeekMaxGetter.
-// The limit is capped at AbsolutePartitionPeekMax(1500).
-func (q *QueueOptions) PartitionPeekLimit(ctx context.Context, shardName string) int64 {
+// The default is PartitionPeekMax, but this can be overridden by WithPartitionPeekMaxGetter.
+// Positive values are clamped between PartitionSelectionMax and AbsolutePartitionPeekMax.
+func (o *QueueOptions) PartitionPeekLimit(ctx context.Context, shardName string) int64 {
 	limit := int64(PartitionPeekMax)
-	if q.partitionPeekMaxGetter != nil {
-		if value := q.partitionPeekMaxGetter(ctx, shardName); value > 0 {
+	if o.partitionPeekMaxGetter != nil {
+		if value := o.partitionPeekMaxGetter(ctx, shardName); value > 0 {
 			limit = value
 		}
 	}
-	return min(limit, AbsolutePartitionPeekMax)
+	return min(max(limit, PartitionSelectionMax), AbsolutePartitionPeekMax)
 }
 
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
