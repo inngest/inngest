@@ -1,0 +1,1 @@
+SELECT YEAR(queued_at), REGEXP_REPLACE(run_id, 'a', 'b'), STARTS_WITH(run_id, 'x'), JSON_KEYS(inngest), IF(status = 'Completed', run_id, app_id), IFNULL(app_id, function_id) FROM runs

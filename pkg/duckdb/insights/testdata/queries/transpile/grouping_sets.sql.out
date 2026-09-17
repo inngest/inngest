@@ -1,0 +1,26 @@
+{
+  "sql": "SELECT app_id, function_id, COUNT(*) FROM inngest.insights_runs(?, ?) AS runs GROUP BY GROUPING SETS (app_id, function_id) LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    1,
+    2,
+    0
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:96",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}
