@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync/atomic"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,7 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 		handler          PermanentConstraintErrorHandler
 		dequeueErr       error
 		wantErr          string
+		wantOutcome      string
 		wantHandlerCalls int32
 		wantDequeueCalls int32
 	}{
@@ -34,10 +37,12 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 			},
 			wantHandlerCalls: 1,
 			wantDequeueCalls: 1,
+			wantOutcome:      "dropped",
 		},
 		{
-			name:    "requires a handler",
-			wantErr: "handler is not configured",
+			name:        "requires a handler",
+			wantErr:     "handler is not configured",
+			wantOutcome: "ignored",
 		},
 		{
 			name: "keeps item when cleanup fails",
@@ -46,6 +51,7 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 			},
 			wantErr:          handlerErr.Error(),
 			wantHandlerCalls: 1,
+			wantOutcome:      "ignored",
 		},
 		{
 			name: "returns dequeue failure for retry",
@@ -56,6 +62,7 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 			wantErr:          dequeueErr.Error(),
 			wantHandlerCalls: 1,
 			wantDequeueCalls: 1,
+			wantOutcome:      "ignored",
 		},
 		{
 			name: "missing item is already dropped",
@@ -65,11 +72,15 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 			dequeueErr:       ErrQueueItemNotFound,
 			wantHandlerCalls: 1,
 			wantDequeueCalls: 1,
+			wantOutcome:      "dropped",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("LOG_HANDLER", "json")
+			var logs bytes.Buffer
+			ctx := logger.WithStdlib(context.Background(), logger.From(context.Background(), logger.WithLoggerWriter(&logs)))
 			shard := &mockShardForIterator{name: "test", dequeueErr: tt.dequeueErr}
 			registry, err := NewSingleShardRegistry(shard)
 			require.NoError(t, err)
@@ -84,7 +95,7 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 				}
 			}
 
-			q, err := New(context.Background(), "test", registry, WithPermanentConstraintErrorHandler(handler))
+			q, err := New(ctx, "test", registry, WithPermanentConstraintErrorHandler(handler))
 			require.NoError(t, err)
 
 			item := QueueItem{
@@ -99,7 +110,7 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 					},
 				},
 			}
-			err = q.dropPermanentlyUnroutableItem(context.Background(), item, cause)
+			err = q.dropPermanentlyUnroutableItem(ctx, item, cause)
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 			} else {
@@ -107,6 +118,11 @@ func TestDropPermanentlyUnroutableItem(t *testing.T) {
 			}
 			require.Equal(t, tt.wantHandlerCalls, atomic.LoadInt32(&handlerCalls))
 			require.Equal(t, tt.wantDequeueCalls, atomic.LoadInt32(&shard.dequeueCalls))
+			if tt.wantOutcome == "" {
+				require.NotContains(t, logs.String(), `"outcome":`)
+			} else {
+				require.Contains(t, logs.String(), `"outcome":"`+tt.wantOutcome+`"`)
+			}
 		})
 	}
 }
@@ -126,6 +142,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 		wantErr          error
 		wantHandlerCalls int32
 		wantDequeueCalls int32
+		wantOutcome      string
 	}{
 		{
 			name:             "permanent error is cleaned up and dropped",
@@ -134,12 +151,14 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 			wantStatus:       LeaseItemStatusDropped,
 			wantHandlerCalls: 1,
 			wantDequeueCalls: 1,
+			wantOutcome:      "dropped",
 		},
 		{
 			name:          "permanent error retries without handler",
 			constraintErr: permanentErr,
 			wantStatus:    LeaseItemStatusNone,
 			wantErr:       ErrProcessStopIterator,
+			wantOutcome:   "ignored",
 		},
 		{
 			name:             "cleanup failure retains item for retry",
@@ -149,6 +168,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 			wantStatus:       LeaseItemStatusNone,
 			wantErr:          ErrProcessStopIterator,
 			wantHandlerCalls: 1,
+			wantOutcome:      "ignored",
 		},
 		{
 			name:             "dequeue failure retains item for retry",
@@ -159,6 +179,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 			wantErr:          ErrProcessStopIterator,
 			wantHandlerCalls: 1,
 			wantDequeueCalls: 1,
+			wantOutcome:      "ignored",
 		},
 		{
 			name:             "transient error retains item for retry",
@@ -171,6 +192,9 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("LOG_HANDLER", "json")
+			var logs bytes.Buffer
+			ctx := logger.WithStdlib(context.Background(), logger.From(context.Background(), logger.WithLoggerWriter(&logs)))
 			shard := &mockShardForIterator{name: "test", dequeueErr: tt.dequeueErr}
 			registry, err := NewSingleShardRegistry(shard)
 			require.NoError(t, err)
@@ -191,7 +215,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 				}))
 			}
 
-			q, err := New(context.Background(), "test", registry, opts...)
+			q, err := New(ctx, "test", registry, opts...)
 			require.NoError(t, err)
 
 			accountID := uuid.New()
@@ -211,7 +235,7 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 				},
 			}
 
-			result, err := q.LeaseItem(context.Background(), LeaseItemRequest{Item: item}, func(context.Context, ProcessItem) (DispatchedItem, error) {
+			result, err := q.LeaseItem(ctx, LeaseItemRequest{Item: item}, func(context.Context, ProcessItem) (DispatchedItem, error) {
 				t.Fatal("dispatch must not be called when the constraint check fails")
 				return nil, nil
 			})
@@ -223,6 +247,11 @@ func TestLeaseItemPermanentConstraintError(t *testing.T) {
 			require.Equal(t, tt.wantStatus, result.Status)
 			require.Equal(t, tt.wantHandlerCalls, atomic.LoadInt32(&handlerCalls))
 			require.Equal(t, tt.wantDequeueCalls, atomic.LoadInt32(&shard.dequeueCalls))
+			if tt.wantOutcome == "" {
+				require.NotContains(t, logs.String(), `"outcome":`)
+			} else {
+				require.Contains(t, logs.String(), `"outcome":"`+tt.wantOutcome+`"`)
+			}
 		})
 	}
 }

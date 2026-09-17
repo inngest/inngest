@@ -498,7 +498,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 
 	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now, enableKeyQueues)
 	if err != nil {
-		if errors.Is(err, constraintapi.ErrConstraintShardNotFound) && q.Options().PermanentConstraintErrorHandler != nil {
+		if errors.Is(err, constraintapi.ErrConstraintShardNotFound) {
 			for _, item := range items {
 				if dropErr := q.dropPermanentlyUnroutableItem(ctx, *item, err); dropErr != nil {
 					l.ReportError(errors.Join(err, dropErr), "could not drop permanently unroutable backlog item")

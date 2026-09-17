@@ -137,7 +137,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		q.Clock().Now(),
 	)
 	if err != nil {
-		if errors.Is(err, constraintapi.ErrConstraintShardNotFound) && q.Options().PermanentConstraintErrorHandler != nil {
+		if errors.Is(err, constraintapi.ErrConstraintShardNotFound) {
 			if dropErr := q.dropPermanentlyUnroutableItem(ctx, *item, err); dropErr == nil {
 				span.SetAttributes(attribute.String("skip_reason", "constraint_shard_not_found"))
 				return LeaseItemResult{Status: LeaseItemStatusDropped}, nil
