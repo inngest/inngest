@@ -15,4 +15,5 @@ type ConstraintAPIInternalErrorCode int
 const (
 	ConstraintAPIErrorUnknown ConstraintAPIInternalErrorCode = iota
 	ConstraintAPIErrorInvalidRequest
+	ConstraintAPIErrorConstraintShardNotFound
 )
