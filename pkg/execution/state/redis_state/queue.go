@@ -1334,6 +1334,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
+	// The scanner already resolves the dynamic limit and divides it across accounts.
+	// Honor that budget without re-evaluating the getter or applying its floor;
+	// direct callers still get a default for non-positive limits and an absolute cap.
 	if limit <= 0 {
 		limit = osqueue.PartitionPeekMax
 	}

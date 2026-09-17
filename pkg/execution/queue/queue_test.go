@@ -126,7 +126,9 @@ func TestPartitionPeekLimit(t *testing.T) {
 		want  int64
 	}{
 		{name: "custom", value: 750, want: 750},
-		{name: "minimum", value: 1, want: 1},
+		{name: "below minimum", value: 1, want: PartitionSelectionMax},
+		{name: "just below minimum", value: PartitionSelectionMax - 1, want: PartitionSelectionMax},
+		{name: "minimum", value: PartitionSelectionMax, want: PartitionSelectionMax},
 		{name: "cap", value: 2000, want: AbsolutePartitionPeekMax},
 		{name: "zero", value: 0, want: PartitionPeekMax},
 		{name: "negative", value: -1, want: PartitionPeekMax},
