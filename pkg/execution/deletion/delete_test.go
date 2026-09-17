@@ -3,6 +3,7 @@ package deletion
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -678,4 +679,173 @@ func TestDeleteManager(t *testing.T) {
 			require.NoError(t, err, "Should succeed even with invalid payload type")
 		})
 	})
+}
+
+// stubShard satisfies queue.QueueShard for the final RemoveQueueItem step.
+type stubShard struct {
+	queue.QueueShard
+}
+
+func (stubShard) RemoveQueueItem(context.Context, queue.Scope, string, string) error { return nil }
+
+// recordingBatchManager records the arguments and context pins that reach
+// DeleteKeys so we can assert the batch location survives payload decoding.
+type recordingBatchManager struct {
+	batch.BatchManager
+
+	called     bool
+	functionID uuid.UUID
+	batchID    ulid.ULID
+	cluster    string
+	generation string
+}
+
+func (m *recordingBatchManager) DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error {
+	m.called = true
+	m.functionID = functionID
+	m.batchID = batchID
+	m.cluster = batch.BatchCluster(ctx)
+	m.generation = redis_state.BatchGeneration(ctx)
+	return nil
+}
+
+// TestDeleteQueueItemDecodesPersistedPayloads covers the shape a queue item
+// actually has once it has been read back from the queue: queue.Item.Payload is
+// a json.RawMessage for every kind that decodePayloadForKind does not decode,
+// which includes KindScheduleBatch. A plain type assertion silently skipped
+// cleanup for all of those items.
+func TestDeleteQueueItemDecodesPersistedPayloads(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	payload := batch.ScheduleBatchPayload{
+		BatchID:         batchID,
+		BatchPointer:    "pointer",
+		BatchCluster:    "valkey-batching-a",
+		BatchGeneration: "01K0T21HZW9DHDZ5P5TQKBN1E6",
+		FunctionID:      functionID,
+	}
+
+	// Round-trip through the real queue.Item codec rather than hand-building a
+	// json.RawMessage, so this breaks if decodePayloadForKind ever starts
+	// decoding KindScheduleBatch and the runtime payload shape changes.
+	t.Run("queue round-tripped payload still deletes batch keys", func(t *testing.T) {
+		encoded, err := json.Marshal(queue.Item{
+			Kind:       queue.KindScheduleBatch,
+			Identifier: state.Identifier{WorkflowID: functionID},
+			Payload:    payload,
+		})
+		require.NoError(t, err)
+
+		var decoded queue.Item
+		require.NoError(t, json.Unmarshal(encoded, &decoded))
+		_, isRaw := decoded.Payload.(json.RawMessage)
+		require.True(t, isRaw, "queue decoding must leave KindScheduleBatch as json.RawMessage")
+
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data:       decoded,
+		})
+		require.NoError(t, err)
+
+		require.True(t, bm.called, "DeleteKeys must run for a persisted payload")
+		require.Equal(t, functionID, bm.functionID)
+		require.Equal(t, batchID, bm.batchID)
+		require.Equal(t, "valkey-batching-a", bm.cluster, "cluster pin must reach DeleteKeys")
+		require.Equal(t, "01K0T21HZW9DHDZ5P5TQKBN1E6", bm.generation, "generation pin must reach DeleteKeys")
+	})
+
+	t.Run("struct payload keeps working", func(t *testing.T) {
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data: queue.Item{
+				Kind:       queue.KindScheduleBatch,
+				Identifier: state.Identifier{WorkflowID: functionID},
+				Payload:    payload,
+			},
+		})
+		require.NoError(t, err)
+		require.True(t, bm.called)
+		require.Equal(t, "valkey-batching-a", bm.cluster)
+	})
+
+	t.Run("legacy payload without pins selects the default namespace", func(t *testing.T) {
+		legacy := payload
+		legacy.BatchCluster = ""
+		legacy.BatchGeneration = ""
+		raw, err := json.Marshal(legacy)
+		require.NoError(t, err)
+
+		bm := &recordingBatchManager{}
+		dm, err := NewDeleteManager(WithBatchManager(bm))
+		require.NoError(t, err)
+
+		err = dm.DeleteQueueItem(ctx, stubShard{}, &queue.QueueItem{
+			FunctionID: functionID,
+			Data: queue.Item{
+				Kind:       queue.KindScheduleBatch,
+				Identifier: state.Identifier{WorkflowID: functionID},
+				Payload:    json.RawMessage(raw),
+			},
+		})
+		require.NoError(t, err)
+		require.True(t, bm.called)
+		require.Empty(t, bm.cluster)
+		require.Empty(t, bm.generation)
+	})
+}
+
+// notFoundDebouncer reports an absent debounce the way the real debouncer does:
+// an ErrDebounceNotFound error rather than a nil item.
+type notFoundDebouncer struct {
+	debounce.Debouncer
+	deleted bool
+}
+
+func (d *notFoundDebouncer) GetDebounceItem(context.Context, queue.Scope, ulid.ULID) (*debounce.DebounceItem, error) {
+	return nil, debounce.ErrDebounceNotFound
+}
+
+func (d *notFoundDebouncer) DeleteDebounceItem(context.Context, queue.Scope, ulid.ULID, debounce.DebounceItem) error {
+	d.deleted = true
+	return nil
+}
+
+// TestDeleteQueueItemAbsentDebounce guards against the queue item becoming
+// undeletable. GetDebounceItem reports absence as ErrDebounceNotFound, which is
+// expected for a stale timeout job, so cleanup must treat it as already done
+// and still remove the queue item instead of retrying forever.
+func TestDeleteQueueItemAbsentDebounce(t *testing.T) {
+	functionID := uuid.New()
+	raw, err := json.Marshal(debounce.DebouncePayload{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+		DebounceID:  ulid.MustNew(ulid.Now(), rand.Reader),
+	})
+	require.NoError(t, err)
+
+	deb := &notFoundDebouncer{}
+	dm, err := NewDeleteManager(WithDebouncer(deb))
+	require.NoError(t, err)
+
+	err = dm.DeleteQueueItem(context.Background(), stubShard{}, &queue.QueueItem{
+		FunctionID: functionID,
+		Data: queue.Item{
+			Kind:       queue.KindDebounce,
+			Identifier: state.Identifier{WorkflowID: functionID},
+			Payload:    json.RawMessage(raw),
+		},
+	})
+	require.NoError(t, err, "an absent debounce must not make the queue item undeletable")
+	require.False(t, deb.deleted, "nothing to delete when the debounce is already gone")
 }
