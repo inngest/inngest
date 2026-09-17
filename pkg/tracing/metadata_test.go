@@ -239,10 +239,10 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
 
-	stepID := "step-hash-1"
+	stepID := "step-userland-1"
 	stepAttempt := 2
 	withStepIdentity := func(cfg *MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &stepID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &stepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, &stepAttempt)
 	}
 
