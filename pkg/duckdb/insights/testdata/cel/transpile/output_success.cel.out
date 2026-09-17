@@ -1,0 +1,14 @@
+INPUT
+output.success == true
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+((output::JSON->>'$.data.success') = ?)
+
+OUTPUT ARGS
+[true]
