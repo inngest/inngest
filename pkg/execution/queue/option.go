@@ -45,6 +45,11 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// PermanentConstraintErrorHandler cleans up application state associated with
+// a queue item that cannot be routed to its configured constraint shard. The
+// queue only dequeues the item after this handler succeeds.
+type PermanentConstraintErrorHandler func(ctx context.Context, item QueueItem, cause error) error
+
 // QueueItemEarliestPeekTimeConfig controls earliest-peek-time side-key stamping.
 // Items already visited by the iterator are stamped individually when Enabled is
 // true. BulkStampLimit is only the additional tail budget used if the iterator
@@ -569,6 +574,7 @@ type QueueOptions struct {
 	latencyPartition *LatencyPartitionOptions
 
 	CapacityManager                     constraintapi.CapacityManager
+	PermanentConstraintErrorHandler     PermanentConstraintErrorHandler
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
@@ -724,6 +730,15 @@ func WithQueueAttemptResetter(resetter AttemptResetter) QueueOpt {
 func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityManager = capacityManager
+	}
+}
+
+// WithPermanentConstraintErrorHandler allows permanently unroutable queue
+// items to be cleaned up and dequeued instead of blocking every future scan.
+// Without this option, the queue retains its existing retry behavior.
+func WithPermanentConstraintErrorHandler(handler PermanentConstraintErrorHandler) QueueOpt {
+	return func(q *QueueOptions) {
+		q.PermanentConstraintErrorHandler = handler
 	}
 }
 

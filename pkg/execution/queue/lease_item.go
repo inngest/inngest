@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -136,6 +137,14 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		q.Clock().Now(),
 	)
 	if err != nil {
+		if errors.Is(err, constraintapi.ErrConstraintShardNotFound) {
+			if dropErr := q.dropPermanentlyUnroutableItem(ctx, *item, err); dropErr == nil {
+				span.SetAttributes(attribute.String("skip_reason", "constraint_shard_not_found"))
+				return LeaseItemResult{Status: LeaseItemStatusDropped}, nil
+			} else {
+				err = errors.Join(err, dropErr)
+			}
+		}
 		span.RecordError(err)
 		l.ReportError(err, "could not check constraints to lease item")
 		// Stop iterator but don't quit the queue.
