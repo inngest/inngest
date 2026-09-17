@@ -1,0 +1,18 @@
+-- SELECT * FROM
+ERROR: 1:14: unexpected trailing input
+
+-- SELECT (1 +
+ERROR: 1:12: unexpected trailing input
+
+-- SELECT 'unterminated
+ERROR: 1:8: unexpected trailing input
+
+-- SELEC * FROM t
+ERROR: 1:1: failed to parse SelectStatement
+
+-- SELECT * FROM t WHERE a =
+ERROR: 1:26: unexpected trailing input
+
+-- SELECT * FROM t GROUP BY;
+ERROR: 1:25: unexpected trailing input
+
