@@ -1,0 +1,3 @@
+{
+  "error": "insights: a computed column in a CTE or subquery must have an alias (at 1:19)"
+}

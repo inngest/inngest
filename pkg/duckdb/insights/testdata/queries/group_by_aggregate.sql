@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM runs GROUP BY app_id

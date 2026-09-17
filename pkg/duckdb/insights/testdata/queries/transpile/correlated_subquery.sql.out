@@ -1,0 +1,27 @@
+{
+  "sql": "SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE run_id IN (SELECT id FROM inngest.insights_events(?, ?) AS events WHERE status = runs.status) LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs",
+    "events"
+  ],
+  "limited": true,
+  "columnHints": [
+    3
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:91",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}
