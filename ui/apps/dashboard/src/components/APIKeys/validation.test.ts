@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   API_KEY_NAME_MAX,
   validateAPIKeyName,
+  validateRestrictedAPIKey,
 } from '@/components/APIKeys/validation';
 
 describe('validateAPIKeyName', () => {
@@ -35,5 +36,40 @@ describe('validateAPIKeyName', () => {
     // Padded with whitespace but content fits within the limit.
     const padded = '   ' + 'a'.repeat(API_KEY_NAME_MAX) + '   ';
     expect(validateAPIKeyName(padded)).toBeNull();
+  });
+});
+
+describe('restricted keys', () => {
+  const input = {
+    name: 'nightly-sync',
+    allEnvironments: false,
+    workspaceID: undefined,
+    permissions: ['apps:read:*'],
+  };
+
+  it('requires an explicit environment by default', () => {
+    expect(validateRestrictedAPIKey(input)).toBe('Select an environment.');
+    expect(
+      validateRestrictedAPIKey({ ...input, workspaceID: 'production-id' }),
+    ).toBeNull();
+  });
+
+  it('allows an explicit all-environment choice', () => {
+    expect(
+      validateRestrictedAPIKey({ ...input, allEnvironments: true }),
+    ).toBeNull();
+  });
+
+  it('requires permissions and a name', () => {
+    expect(
+      validateRestrictedAPIKey({
+        ...input,
+        allEnvironments: true,
+        permissions: [],
+      }),
+    ).toBe('Select at least one permission.');
+    expect(
+      validateRestrictedAPIKey({ ...input, name: ' ', allEnvironments: true }),
+    ).toBe('Name is required.');
   });
 });

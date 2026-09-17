@@ -21,6 +21,7 @@ import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
 import { canManageAPIKeys } from '@/components/APIKeys/permissions';
+import { RestrictedAPIKeys } from '@/components/APIKeys/RestrictedAPIKeys';
 
 export const Route = createFileRoute('/_authed/settings/api-keys/')({
   component: APIKeysPage,
@@ -32,7 +33,7 @@ const authedRoute = getRouteApi('/_authed');
 function APIKeysPage() {
   const res = useAPIKeys();
   const { profile } = authedRoute.useLoaderData();
-  const { membership, isLoaded: orgLoaded } = useOrganization();
+  const { organization, membership, isLoaded: orgLoaded } = useOrganization();
   const canManage = canManageAPIKeys({
     marketplace: profile.marketplace,
     organizationRole: membership?.role,
@@ -68,7 +69,7 @@ function APIKeysPage() {
       kind="primary"
       icon={<RiAddLine />}
       iconSide="left"
-      label="Create API key"
+      label="Create legacy key"
       onClick={() => setCreateOpen(true)}
       disabled={!canManage}
     />
@@ -76,13 +77,20 @@ function APIKeysPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 py-8">
-      <div className="flex items-start justify-between gap-4">
+      <h1 className="text-basis text-2xl">API keys</h1>
+      {canManage ? (
+        <RestrictedAPIKeys key={organization?.id ?? 'marketplace'} />
+      ) : (
+        <p className="text-subtle text-sm">
+          Only organization admins can view and manage restricted v2 keys.
+        </p>
+      )}
+      <div className="border-subtle flex items-start justify-between gap-4 border-t pt-8">
         <div className="flex flex-col gap-1">
-          <h1 className="text-basis text-2xl">API keys</h1>
+          <h2 className="text-basis text-lg">Legacy keys</h2>
           <p className="text-subtle max-w-2xl text-sm">
-            API keys are shared credentials that allow your applications to
-            authenticate with Inngest. They provide a secure way to connect, run
-            functions, and manage workflows.{' '}
+            These keys do not have fine-grained permissions. Use restricted keys
+            for new v2 integrations.{' '}
             <Link
               href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
               className="inline-flex"
