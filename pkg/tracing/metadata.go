@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -126,7 +127,7 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 				l.OnMetadataEntry(ctx, entry)
 			}
 		} else {
-			logger.StdlibLogger(ctx).Error("tracing: metadata span sync dispatch missing run ID", "location", location, "kind", kind.String())
+			logger.StdlibLogger(ctx).Error("tracing: metadata span sync dispatch missing run ID", "location", util.SanitizeLogField(location), "kind", util.SanitizeLogField(kind.String()))
 		}
 	}
 
