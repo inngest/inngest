@@ -7,6 +7,7 @@ import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Search } from '@inngest/components/Forms/Search';
+import { defaultLinkStyles } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import TabCards from '@inngest/components/TabCards/TabCards';
@@ -176,18 +177,21 @@ const useMCPTools = (operationsEndpoint: string) => {
 
 export const MCPSetup = ({
   apiKeysHref,
-  bearerTokenEnvVar,
+  bearerTokenEnvVar: apiKeyEnvVar,
   endpoint,
   isDevServer = false,
   operationsEndpoint,
 }: MCPSetupProps) => {
+  const [useAPIKey, setUseAPIKey] = useState(false);
+  const bearerTokenEnvVar = isDevServer || useAPIKey ? apiKeyEnvVar : undefined;
+  const usesOAuth = !isDevServer && !bearerTokenEnvVar;
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
   const { error, loading, retry, tools } = useMCPTools(operationsEndpoint);
   const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
   const hasAuthStep = Boolean(bearerTokenEnvVar);
   const connectStep = hasAuthStep ? 2 : 1;
-  const tryStep = connectStep + 1;
+  const tryStep = connectStep + (usesOAuth ? 2 : 1);
 
   return (
     <div className="bg-canvasBase min-h-full">
@@ -201,6 +205,24 @@ export const MCPSetup = ({
 
         <section className="mb-12">
           <h2 className="text-basis mb-6 text-lg font-medium">Get started</h2>
+
+          {!isDevServer && apiKeyEnvVar && (
+            <div className="mb-6">
+              <p className="text-muted mb-2 text-sm">
+                Cloud MCP supports OAuth. Connect your client, then sign in to approve access.
+              </p>
+              <p className="text-muted text-sm">
+                {useAPIKey ? 'Prefer to sign in? ' : 'You can also connect with an API key. '}
+                <button
+                  type="button"
+                  className={defaultLinkStyles}
+                  onClick={() => setUseAPIKey((current) => !current)}
+                >
+                  {useAPIKey ? 'View OAuth instructions' : 'View API-key instructions'}
+                </button>
+              </p>
+            </div>
+          )}
 
           {bearerTokenEnvVar && (
             <Step number={1} title="Create an API key">
@@ -237,11 +259,21 @@ export const MCPSetup = ({
             </p>
             <CodeLine className={`mb-4 ${mutedCopyButton}`} code={endpoint} />
             <ClientPicker
+              key={bearerTokenEnvVar ?? 'oauth'}
               bearerTokenEnvVar={bearerTokenEnvVar}
               clients={clients}
               isDevServer={isDevServer}
             />
           </Step>
+
+          {usesOAuth && (
+            <Step number={connectStep + 1} title="Sign in and approve access">
+              <p className="text-muted text-sm">
+                Sign in to Inngest in your browser. Choose an account, environment, and permissions,
+                then approve access. No API key is needed.
+              </p>
+            </Step>
+          )}
 
           <Step isLast number={tryStep} title="Try it">
             <p className="text-muted mb-3 text-sm">
@@ -252,6 +284,11 @@ export const MCPSetup = ({
                 <CodeLine className={mutedCopyButton} code={example} key={example} />
               ))}
             </div>
+            {!isDevServer && (
+              <p className="text-muted mt-3 text-sm">
+                If you grant access to all environments, specify the environment in your requests.
+              </p>
+            )}
           </Step>
         </section>
 
@@ -395,10 +432,14 @@ const ClientNotes = ({
             cloud, so it cannot reach this localhost endpoint directly. That flow requires a
             publicly reachable MCP URL under <strong>Customize → Connectors</strong>.
           </p>
+        ) : bearerTokenEnvVar ? (
+          <p className="mt-2">
+            These API-key instructions are for Claude Code. Use OAuth to connect without an API key.
+          </p>
         ) : (
           <p className="mt-2">
-            Claude Desktop&apos;s main chat uses remote connectors with OAuth. Cloud MCP currently
-            uses API key authentication, so use the Code tab for this connection.
+            In Claude Code, run <InlineCode>/mcp</InlineCode>, select{' '}
+            <InlineCode>inngest-cloud</InlineCode>, and authenticate.
           </p>
         )}
       </div>
@@ -407,6 +448,12 @@ const ClientNotes = ({
   if (client === 'codex') {
     return (
       <div className="text-muted mt-3 text-sm">
+        {!isDevServer && !bearerTokenEnvVar && (
+          <div className="mb-3">
+            <p className="mb-2">Then start browser sign-in:</p>
+            <CodeLine className={mutedCopyButton} code="codex mcp login inngest-cloud" />
+          </div>
+        )}
         {bearerTokenEnvVar && (
           <p className="mb-2">
             Codex reads <InlineCode>{bearerTokenEnvVar}</InlineCode> on every launch, so keep the
@@ -430,6 +477,9 @@ const ClientNotes = ({
           <InlineCode>~/.cursor/mcp.json</InlineCode> to enable it in every project, then reload
           Cursor.
         </p>
+        {!isDevServer && !bearerTokenEnvVar && (
+          <p className="mt-2">If OAuth sign-in fails, use the API-key instructions above.</p>
+        )}
         {bearerTokenEnvVar && (
           <p className="mt-2">
             Cursor reads <InlineCode>{`\${env:${bearerTokenEnvVar}}`}</InlineCode> on launch, so
@@ -722,20 +772,27 @@ const Troubleshooting = ({
           </ul>
         </AccordionList.Content>
       </AccordionList.Item>
-      {!isDevServer && bearerTokenEnvVar && (
+      {!isDevServer && (
         <AccordionList.Item value="unauthorized">
           <AccordionList.Trigger>
             <span className="text-basis font-medium">Requests fail with HTTP 401</span>
           </AccordionList.Trigger>
           <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-            <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
-              <li>
-                Confirm <InlineCode>{bearerTokenEnvVar}</InlineCode> is exported in the shell your
-                client runs from, then restart the client.
-              </li>
-              <li>Check that the API key has not been deleted or expired.</li>
-              <li>Terminal-based clients do not see keys exported in another terminal window.</li>
-            </ul>
+            {bearerTokenEnvVar ? (
+              <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+                <li>
+                  Confirm <InlineCode>{bearerTokenEnvVar}</InlineCode> is exported in the shell your
+                  client runs from, then restart the client.
+                </li>
+                <li>Check that the API key has not been deleted or expired.</li>
+                <li>Terminal-based clients do not see keys exported in another terminal window.</li>
+              </ul>
+            ) : (
+              <p className="text-basis text-sm">
+                Sign in again through your MCP client if your session has expired or been revoked.
+                Remove any old API-key headers from the client configuration before using OAuth.
+              </p>
+            )}
           </AccordionList.Content>
         </AccordionList.Item>
       )}
