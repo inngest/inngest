@@ -1,0 +1,1 @@
+SELECT * FROM runs, UNNEST(run_id, app_id)

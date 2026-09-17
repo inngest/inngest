@@ -1,0 +1,1 @@
+SELECT UNNEST(event_ids) FROM runs
