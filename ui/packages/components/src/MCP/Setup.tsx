@@ -7,6 +7,7 @@ import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Search } from '@inngest/components/Forms/Search';
+import { defaultLinkStyles } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import TabCards from '@inngest/components/TabCards/TabCards';
@@ -186,9 +187,7 @@ export const MCPSetup = ({
   const usesOAuth = !isDevServer && !bearerTokenEnvVar;
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
   const { error, loading, retry, tools } = useMCPTools(operationsEndpoint);
-  const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar).filter(
-    (client) => !usesOAuth || client.id !== 'cursor'
-  );
+  const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
   const hasAuthStep = Boolean(bearerTokenEnvVar);
   const connectStep = hasAuthStep ? 2 : 1;
@@ -210,14 +209,18 @@ export const MCPSetup = ({
           {!isDevServer && apiKeyEnvVar && (
             <div className="mb-6">
               <p className="text-muted mb-2 text-sm">
-                Sign in with OAuth in Claude Code or Codex. For Cursor or other clients, use an API
-                key.
+                Cloud MCP supports OAuth. Connect your client, then sign in to approve access.
               </p>
-              <Button
-                kind="secondary"
-                label={useAPIKey ? 'Use OAuth' : 'Use an API key'}
-                onClick={() => setUseAPIKey((current) => !current)}
-              />
+              <p className="text-muted text-sm">
+                {useAPIKey ? 'Prefer to sign in? ' : 'You can also connect with an API key. '}
+                <button
+                  type="button"
+                  className={defaultLinkStyles}
+                  onClick={() => setUseAPIKey((current) => !current)}
+                >
+                  {useAPIKey ? 'View OAuth instructions' : 'View API-key instructions'}
+                </button>
+              </p>
             </div>
           )}
 
@@ -474,6 +477,9 @@ const ClientNotes = ({
           <InlineCode>~/.cursor/mcp.json</InlineCode> to enable it in every project, then reload
           Cursor.
         </p>
+        {!isDevServer && !bearerTokenEnvVar && (
+          <p className="mt-2">If OAuth sign-in fails, use the API-key instructions above.</p>
+        )}
         {bearerTokenEnvVar && (
           <p className="mt-2">
             Cursor reads <InlineCode>{`\${env:${bearerTokenEnvVar}}`}</InlineCode> on launch, so

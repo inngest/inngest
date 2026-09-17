@@ -42,7 +42,7 @@ describe('MCP setup', () => {
       screen.getByText('claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp')
     ).toBeTruthy();
     expect(screen.queryByText('Create an API key')).toBeNull();
-    expect(screen.queryByRole('tab', { name: 'Cursor' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Cursor' })).toBeTruthy();
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Codex CLI' }), {
       button: 0,
@@ -52,11 +52,17 @@ describe('MCP setup', () => {
       screen.getByText('codex mcp add inngest-cloud --url https://api.inngest.com/mcp')
     ).toBeTruthy();
     expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cursor' }), { button: 0, ctrlKey: false });
+    expect(
+      screen.getByText('If OAuth sign-in fails, use the API-key instructions above.')
+    ).toBeTruthy();
+    expect(screen.queryByText(/"Authorization": "Bearer/)).toBeNull();
   });
 
   it('keeps API-key setup available and can switch back to OAuth', () => {
     render(<MCPSetup {...cloudProps} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Use an API key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View API-key instructions' }));
     expect(screen.getByText('Create an API key')).toBeTruthy();
     expect(screen.getByText(/claude mcp add.*--header/)).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Cursor' })).toBeTruthy();
@@ -65,7 +71,7 @@ describe('MCP setup', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cursor' }), { button: 0, ctrlKey: false });
     expect(screen.getByText(/"Authorization": "Bearer/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use OAuth' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View OAuth instructions' }));
     expect(screen.getByText('Sign in and approve access')).toBeTruthy();
     expect(screen.queryByText('Create an API key')).toBeNull();
     expect(screen.getByRole('tab', { name: 'Claude Code' }).getAttribute('aria-selected')).toBe(
@@ -86,6 +92,6 @@ describe('MCP setup', () => {
     ).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Cursor' })).toBeTruthy();
     expect(screen.queryByText('Sign in and approve access')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Use an API key' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View API-key instructions' })).toBeNull();
   });
 });
