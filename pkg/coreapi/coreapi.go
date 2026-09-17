@@ -2,6 +2,7 @@ package coreapi
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -33,6 +34,11 @@ import (
 
 type Options struct {
 	Data cqrs.Manager
+
+	// DuckDB is the dual-write DuckDB connection, threaded through to
+	// resolvers.Resolver so insights can execute against it
+	// directly — nil unless --duckdb dual-write started successfully.
+	DuckDB *sql.DB
 
 	AuthMiddleware func(http.Handler) http.Handler
 	Config         config.Config
@@ -97,6 +103,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	if o.isGraphQLEnabled() {
 		a.resolver = &resolvers.Resolver{
 			Data:            o.Data,
+			DuckDB:          o.DuckDB,
 			HistoryReader:   o.HistoryReader,
 			Runner:          o.Runner,
 			QueueReader:     o.QueueReader,
