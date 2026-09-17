@@ -261,6 +261,19 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
+// WithSyncLifecycleListeners registers listeners invoked synchronously
+// (inline, not via a spawned goroutine) alongside the async
+// execution.LifecycleListener dispatch. AddSyncLifecycleListener is not part
+// of the execution.Executor interface (unlike AddLifecycleListener), so this
+// asserts to the concrete *executor type, matching the pattern used by
+// options like WithHTTPClient above.
+func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).syncLifecycles = append(e.(*executor).syncLifecycles, l...)
+		return nil
+	}
+}
+
 func WithEventLifecycleListeners(l ...execution.EventLifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		for _, item := range l {
@@ -545,8 +558,9 @@ type executor struct {
 	driverv1 map[string]driver.DriverV1
 	driverv2 map[string]driver.DriverV2
 
-	lifecycles    []execution.LifecycleListener
-	evtLifecycles []execution.EventLifecycleListener
+	lifecycles     []execution.LifecycleListener
+	evtLifecycles  []execution.EventLifecycleListener
+	syncLifecycles []execution.SyncLifecycleListener
 
 	// rtpub represents teh realtime publisher used to broadcast notifications
 	// on run execution.
@@ -600,6 +614,10 @@ func (e *executor) AddEventLifecycleListener(l execution.EventLifecycleListener)
 	e.evtLifecycles = append(e.evtLifecycles, l)
 }
 
+func (e *executor) AddSyncLifecycleListener(l execution.SyncLifecycleListener) {
+	e.syncLifecycles = append(e.syncLifecycles, l)
+}
+
 func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Context, execution.EventLifecycleListener)) {
 	ctx = context.WithoutCancel(ctx)
 	for _, l := range e.evtLifecycles {
@@ -638,6 +656,45 @@ func (e *executor) RunFunctionFinishedLifecycle(
 ) {
 	for _, l := range e.lifecycles {
 		go l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, evts, resp)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnFunctionFinished(ctx, md, item, evts, resp, e.now())
+	}
+}
+
+// RunStepRunFinishedLifecycle fans OnStepRunFinished out to every
+// registered SyncLifecycleListener. OnStepRunFinished has no async
+// LifecycleListener counterpart (see sync_lifecycle.go's doc comment on it),
+// so unlike RunFunctionFinishedLifecycle above, there's no e.lifecycles loop
+// here.
+func (e *executor) RunStepRunFinishedLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	gen state.GeneratorOpcode,
+	now time.Time,
+) {
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepRunFinished(ctx, md, item, edge, gen, now)
+	}
+}
+
+// RunStepRunFailedLifecycle fans OnStepRunFailed out to every registered
+// SyncLifecycleListener. Like OnStepRunFinished, this has no async
+// LifecycleListener counterpart.
+func (e *executor) RunStepRunFailedLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	gen state.GeneratorOpcode,
+	status enums.StepStatus,
+	attempt int,
+	now time.Time,
+) {
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepRunFailed(ctx, md, item, edge, gen, status, attempt, now)
 	}
 }
 
@@ -1733,6 +1790,9 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnFunctionScheduled(ctx, metadata, item, evts)
+		}
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -1850,6 +1910,9 @@ func (e *executor) schedule(
 	sendSpans()
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnFunctionScheduled(ctx, metadata, item, evts)
 	}
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -2213,6 +2276,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			for _, e := range e.lifecycles {
 				go e.OnFunctionStarted(context.WithoutCancel(ctx), md, item, events)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnFunctionStarted(ctx, md, item, events)
+			}
 		}
 	}
 
@@ -2246,6 +2312,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		meta.AddAttr(execAttrs, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 
+	instance.reqStart = e.now()
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameExecution,
@@ -2255,7 +2322,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Metadata:   &md,
 			QueueItem:  &item,
 			Attributes: execAttrs,
-			StartTime:  e.now(),
+			StartTime:  instance.reqStart,
 		},
 	)
 	if err != nil {
@@ -2322,6 +2389,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				// step statuses when a step finishes.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepFinished(ctx, md, item, edge, resp, err, instance.reqStart, e.now())
+			}
 			return nil, err
 		}
 
@@ -2337,6 +2407,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				httpTimingMd,
 				enums.MetadataScopeRequest,
 				instance.execSpan,
+				nil,
 			)
 			if err != nil {
 				l.Warn("error creating HTTP timing metadata span", "error", err)
@@ -2352,6 +2423,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				timingMd,
 				enums.MetadataScopeRequest,
 				instance.execSpan,
+				nil,
 			)
 			if err != nil {
 				l.Warn("error creating timing metadata span", "error", err)
@@ -2406,6 +2478,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepFinished(ctx, i.md, i.item, i.edge, i.resp, nil, i.reqStart, e.now())
+	}
 
 	if i.resp.Err == nil && i.resp.IsOpResponse() {
 		// Handle generator op responses then return.
@@ -2453,6 +2528,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 				}
+				for _, sl := range e.syncLifecycles {
+					sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
+				}
 
 				return nil
 			}
@@ -2479,6 +2557,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				// Run the lifecycle method for this retry, which is baked into the queue.
 				i.IncrementAttempt()
 				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
+			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepScheduled(ctx, i.md, i.item, &i.resp.Step.Name, e.now())
 			}
 			return nil
 		}
@@ -2515,6 +2596,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
+		}
 
 		return nil
 	}
@@ -2546,6 +2630,9 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// Can be reached multiple times for parallel discovery steps
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
 		}
 	}
 
@@ -2704,6 +2791,9 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, endpoint.String())
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepStarted(ctx, i.md, i.item, i.edge, endpoint.String())
 	}
 
 	switch d := e.fnDriver(ctx, i.f).(type) {
@@ -3316,6 +3406,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			for _, e := range e.lifecycles {
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, e.now())
+			}
 			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 				l.OnRunCancelled(ctx, id, r)
 			})
@@ -3344,6 +3437,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			for _, e := range e.lifecycles {
 				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
+			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, e.now())
 			}
 			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 				l.OnRunCancelled(ctx, id, r)
@@ -3380,6 +3476,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnFunctionCancelled(ctx, md, r, evts, e.now())
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnRunCancelled(ctx, id, r)
@@ -3435,9 +3534,10 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
+	now := e.now()
 	pauseSpan := tracing.SpanRefFromPause(&pause)
 	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    e.now(),
+		EndTime:    now,
 		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
 		Status:     enums.StepStatusTimedOut,
 		TargetSpan: pauseSpan,
@@ -3522,13 +3622,22 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
+		}
 	case enums.OpcodeWaitForSignal:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
+		}
 	case enums.OpcodeWaitForEvent:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 		}
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -3613,9 +3722,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
 		}
+		now := e.now()
 		pauseSpan := tracing.SpanRefFromPause(&pause)
 		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			EndTime:    e.now(),
+			EndTime:    now,
 			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
 			TargetSpan: pauseSpan,
@@ -3712,13 +3822,22 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
+			}
 		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
+			}
 		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 			}
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -4135,6 +4254,10 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		var stepName *string = nil
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
 	}
+	for _, sl := range e.syncLifecycles {
+		var stepName *string = nil
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName, e.now())
+	}
 
 	return nil
 }
@@ -4170,7 +4293,7 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	if err := defers.SaveFromOp(ctx, e.smv2, e.tracerProvider, e.log, runCtx.Metadata(), gen); err != nil {
+	if err := defers.SaveFromOp(ctx, e.smv2, e.tracerProvider, e.syncLifecycles, e.log, runCtx.Metadata(), gen); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
@@ -4183,7 +4306,7 @@ func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx executi
 	// cancelled tombstone when the defer is absent) because emitting an
 	// DeferAdd and DeferAbort for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := defers.AbortFromOp(ctx, e.smv2, e.tracerProvider, e.log, runCtx.Metadata(), gen); err != nil {
+	if err := defers.AbortFromOp(ctx, e.smv2, e.tracerProvider, e.syncLifecycles, e.log, runCtx.Metadata(), gen); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")
@@ -4250,6 +4373,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	))
 
 	e.emitStepSpan(ctx, runCtx, &gen, extraMetadata, nil)
+	e.RunStepRunFinishedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, e.now())
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -4336,12 +4460,17 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	// State stored for each step MUST always be wrapped with either "error" or "data".
 	if IsStepRetryable(&gen, runCtx) {
 		e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+		e.RunStepRunFailedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, enums.StepStatusErrored, runCtx.AttemptCount(), e.now())
 
 		// Return an error to trigger standard queue retries.
 		runCtx.IncrementAttempt()
 		for _, l := range e.lifecycles {
 			lifecycleItem := runCtx.LifecycleItem()
 			go l.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name)
+		}
+		for _, sl := range e.syncLifecycles {
+			lifecycleItem := runCtx.LifecycleItem()
+			sl.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name, e.now())
 		}
 
 		return ErrHandledStepError
@@ -4361,6 +4490,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+	e.RunStepRunFailedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, enums.StepStatusFailed, runCtx.AttemptCount(), e.now())
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -4446,6 +4576,9 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil, e.now())
+	}
 
 	return nil
 }
@@ -4480,6 +4613,9 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 				evts,
 				*resp,
 			)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, e.now())
 		}
 	}
 
@@ -4525,6 +4661,9 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 				evts,
 				*resp,
 			)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, e.now())
 		}
 	}
 
@@ -4641,6 +4780,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name, e.now())
+	}
 	return err
 }
 
@@ -4756,6 +4898,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, until)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnSleep(ctx, *runCtx.Metadata(), lifecycleItem, gen, until, e.now())
+	}
 
 	return err
 }
@@ -4808,6 +4953,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			for _, e := range e.lifecycles {
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
+			}
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -4821,6 +4969,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
 		}
 	} else {
 		headers := make(map[string]string)
@@ -4850,6 +5001,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil, e.now())
 		}
 	}
 
@@ -4964,6 +5118,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				// step statuses when a step finishes.
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
+			}
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -4985,6 +5142,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
 		}
 	} else {
 		rawBody := resp.Body
@@ -5016,6 +5176,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil, e.now())
 		}
 	}
 
@@ -5216,6 +5379,15 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
 			context.WithoutCancel(ctx),
+			*runCtx.Metadata(),
+			lifecycleItem,
+			gen,
+			pause,
+		)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnWaitForSignal(
+			ctx,
 			*runCtx.Metadata(),
 			lifecycleItem,
 			gen,
@@ -5431,6 +5603,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnInvokeFunction(ctx, *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
+	}
 
 	return err
 }
@@ -5639,6 +5814,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, pause)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnWaitForEvent(ctx, *runCtx.Metadata(), lifecycleItem, gen, pause)
 	}
 
 	return err
@@ -6125,13 +6303,16 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	var parent *meta.SpanReference
 
 	runMD := runCtx.Metadata()
+	var attrs *meta.SerializableAttrs
 
 	switch scope {
 	case enums.MetadataScopeRun:
 		parent = tracing.RunSpanRefFromMetadata(runMD)
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
+		attrs = tracing.GeneratorAttrs(op)
 		if op.Op == enums.OpcodeStepError && IsStepRetryable(op, runCtx) {
-			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, runCtx.AttemptCount())
+			attempt := runCtx.AttemptCount()
+			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, attempt)
 		} else {
 			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
 		}
@@ -6141,10 +6322,29 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
 
-	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent)
+	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent, attrs)
 }
 
-func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, parent *meta.SpanReference) (*meta.SpanReference, error) {
+// createMetadataSpanOnParent creates the metadata span itself. stepID and
+// stepAttempt (both optional -- empty/nil for run-scoped metadata) identify
+// the step this metadata belongs to for dual-write's inngest.run_metadata
+// table (see execution.MetadataEntry), independently of parent, which
+// identifies the span this metadata is attached to (a step's finalized span,
+// its retry span, or a request's execution span) -- the two usually
+// coincide but aren't the same concept: a request-scoped metadata span's
+// parent is the execution span, not the step span, yet it still belongs to
+// a specific step.
+func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, parent *meta.SpanReference, attrs *meta.SerializableAttrs) (*meta.SpanReference, error) {
+	opts := []tracing.MetadataSpanAttrOpts{
+		tracing.WithMetadataSyncListeners(e.syncLifecycles...),
+		func(cfg *tracing.MetadataSpanConfig) {
+			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepID)
+			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepAttempt)
+			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandID)
+			meta.CopyFrom(cfg.Attrs, attrs, meta.Attrs.StepUserlandIndex)
+		},
+	}
+
 	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
@@ -6154,6 +6354,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 		runCtx.Metadata(),
 		md,
 		scope,
+		opts...,
 	)
 	if err != nil {
 		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
@@ -6178,7 +6379,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 	return ref, nil
 }
 
-func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
+func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, attrs *meta.SerializableAttrs, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
@@ -6220,13 +6421,15 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 	lifecycleItem := runCtx.LifecycleItem()
 	attrs := tracing.GeneratorAttrs(gen)
 	tracing.AddMetadataTenantAttrs(attrs, md.ID)
+	attempt := runCtx.AttemptCount()
+	meta.AddAttr(attrs, meta.Attrs.StepAttempt, &attempt)
 
 	seed := tracing.FinalizedStepDynamicSeed(gen.ID)
 	switch gen.Op {
 	case enums.OpcodeStepError:
 		if IsStepRetryable(gen, runCtx) {
 			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusErrored))
-			seed = tracing.RetryStepDynamicSeed(gen.ID, runCtx.AttemptCount())
+			seed = tracing.RetryStepDynamicSeed(gen.ID, attempt)
 		} else {
 			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusFailed))
 		}
@@ -6270,7 +6473,7 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 		logger.StdlibLogger(ctx).Warn("error creating step span", "error", err)
 	}
 
-	e.handleGeneratorMetadata(ctx, runCtx, gen, extraMetadata...)
+	e.handleGeneratorMetadata(ctx, runCtx, gen, attrs, extraMetadata...)
 
 	// Extract experiment metadata from opcode opts. The SDK spreads
 	// group.experiment() variant context (experimentName, variant,
