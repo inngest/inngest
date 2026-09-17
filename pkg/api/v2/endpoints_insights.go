@@ -26,6 +26,10 @@ import (
 // precedent that this is a query problem a client can point back at, not
 // an API failure.
 func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_QueryInsights_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no query was executed.")
+	}
 	if s.duckDB == nil {
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights requires dual-write (--duckdb) to be enabled")
 	}
@@ -69,6 +73,10 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 // TABLES short-circuit from -- so this works even without --duckdb dual-
 // write enabled.
 func (s *Service) ListInsightsTables(ctx context.Context, req *apiv2.ListInsightsTablesRequest) (*apiv2.ListInsightsTablesResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_ListInsightsTables_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no tables were fetched.")
+	}
 	schemas := insights.AllTableSchemas()
 	tables := make([]*apiv2.InsightsTable, len(schemas))
 	for i, schema := range schemas {
