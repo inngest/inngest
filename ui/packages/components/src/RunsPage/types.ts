@@ -23,7 +23,6 @@ export type Run = {
   startedAt: string | null;
   isDeferred: boolean;
   deferredFrom?: Array<{
-    runID: string;
     function: {
       name: string;
       slug: string;
