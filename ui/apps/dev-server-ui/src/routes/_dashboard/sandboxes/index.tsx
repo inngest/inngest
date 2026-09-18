@@ -138,7 +138,7 @@ function SandboxesPage() {
       <div className="border-warning bg-warning/10 text-basis rounded-md border p-4 text-sm">
         <strong>Cloud compute, local workflows.</strong> Functions, events, and
         runs remain local. Sandboxes are real Cloud resources and persist when
-        this server stops or disconnects. Tunneling is not included.
+        this server stops or disconnects.
       </div>
 
       {!token ? (
