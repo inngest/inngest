@@ -1,0 +1,29 @@
+-- SELECT a FROM t WHERE EXISTS (SELECT 1 FROM other WHERE other.id = t.id)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  SubqueryExpr(exists=true,not=false)
+    SelectStatement
+      SelectItem()
+        Literal(1,1)
+      FromClause
+        BaseTableRef(other,alias=)
+      BinaryExpr(=)
+        Ident(other.id)
+        Ident(t.id)
+
+-- SELECT (SELECT max(a) FROM t) AS m FROM other;
+SelectStatement
+  SelectItem(m)
+    SubqueryExpr(exists=false,not=false)
+      SelectStatement
+        SelectItem()
+          FunctionExpr(max,distinct=false)
+            Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+  FromClause
+    BaseTableRef(other,alias=)
+

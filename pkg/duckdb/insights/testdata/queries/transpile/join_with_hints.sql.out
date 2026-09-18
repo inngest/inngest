@@ -1,0 +1,28 @@
+{
+  "sql": "SELECT runs.run_id, extended_trace_spans.attributes -\u003e\u003e '_inngest.function.slug' FROM inngest.insights_runs(?, ?) AS runs INNER JOIN inngest.insights_extended_trace_spans(?, ?) AS extended_trace_spans ON runs.run_id = extended_trace_spans.run_id LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs",
+    "extended_trace_spans"
+  ],
+  "limited": true,
+  "columnHints": [
+    3,
+    2
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:162",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}
