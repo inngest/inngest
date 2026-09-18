@@ -78,7 +78,9 @@ export function CreateRestrictedAPIKeyModal({
   });
 
   async function submit() {
-    if (fetching || loadingEnvironments || environmentError) return;
+    if (fetching || loadingEnvironments || environmentError) {
+      return;
+    }
     setError(null);
     setShowValidation(true);
     if (Object.values(validation).some(Boolean)) {
@@ -104,7 +106,9 @@ export function CreateRestrictedAPIKeyModal({
       },
     });
     // discard a secret returned after closing or switching organizations
-    if (!active.current) return;
+    if (!active.current) {
+      return;
+    }
     if (result.error || !result.data) {
       setError(
         result.error
@@ -120,7 +124,9 @@ export function CreateRestrictedAPIKeyModal({
     <Modal
       isOpen
       onClose={() => {
-        if (!fetching) onClose();
+        if (!fetching) {
+          onClose();
+        }
       }}
       className="w-full max-w-2xl"
     >

@@ -53,7 +53,9 @@ export function RestrictedAPIKeys() {
   const refresh = () => reload({ requestPolicy: 'network-only' });
 
   async function confirm() {
-    if (!confirmation || saving) return;
+    if (!confirmation || saving) {
+      return;
+    }
     setError(null);
     const result =
       confirmation.kind === 'revoke'
@@ -129,14 +131,17 @@ export function RestrictedAPIKeys() {
     }),
   ];
 
-  if (loadError)
+  if (loadError) {
     return (
       <Alert severity="error">
         Could not load API keys.{' '}
         <Button label="Retry" kind="secondary" onClick={refresh} />
       </Alert>
     );
-  if (!data) return <LoadingIcon />;
+  }
+  if (!data) {
+    return <LoadingIcon />;
+  }
 
   const policyButton = (
     <Button
@@ -250,7 +255,9 @@ export function RestrictedAPIKeys() {
           autoClose={false}
           onSubmit={confirm}
           onClose={() => {
-            if (!saving) setConfirmation(null);
+            if (!saving) {
+              setConfirmation(null);
+            }
           }}
         >
           {error && (

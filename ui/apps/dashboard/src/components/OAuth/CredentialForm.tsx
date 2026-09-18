@@ -95,7 +95,9 @@ export function CredentialForm({
               value={allEnvironments ? 'all' : 'single'}
               disabled={disabled}
               onValueChange={(value) => {
-                if (value) onAllEnvironmentsChange(value === 'all');
+                if (value) {
+                  onAllEnvironmentsChange(value === 'all');
+                }
               }}
             >
               {[
