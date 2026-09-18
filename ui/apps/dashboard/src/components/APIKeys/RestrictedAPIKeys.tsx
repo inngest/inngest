@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Link } from '@inngest/components/Link';
 import { AlertModal } from '@inngest/components/Modal';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
@@ -128,7 +129,7 @@ export function RestrictedAPIKeys() {
   if (loadError)
     return (
       <Alert severity="error">
-        Could not load restricted keys.{' '}
+        Could not load API keys.{' '}
         <Button label="Retry" kind="secondary" onClick={refresh} />
       </Alert>
     );
@@ -137,29 +138,18 @@ export function RestrictedAPIKeys() {
   return (
     <section className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-basis text-lg">Restricted v2 keys</h2>
-          <p className="text-subtle text-sm">
-            Choose permissions, environments, and expiration for each shared
-            key.
-          </p>
-        </div>
-        <Button
-          label="Create restricted key"
-          onClick={() => setCreating(true)}
-        />
+        <p className="text-subtle text-sm">
+          For the v2 API and CLI.{' '}
+          <Link href="https://api-docs.inngest.com/" className="inline-flex">
+            View docs
+          </Link>
+        </p>
+        <Button label="Create API key" onClick={() => setCreating(true)} />
       </div>
-      <p className="text-subtle text-sm">
-        Send the key in <code>Authorization: Bearer &lt;key&gt;</code>, or use{' '}
-        <code>INNGEST_API_KEY</code> with <code>inngest api</code>.
-        All-environment keys need <code>X-Inngest-Env</code> (CLI:{' '}
-        <code>--env</code>) for environment-specific requests. For MCP, use
-        OAuth; restricted keys are not supported there yet.
-      </p>
       {data.apiCredentials.keys.length ? (
         <Table data={data.apiCredentials.keys} columns={columns} />
       ) : (
-        <p className="text-subtle text-sm">No restricted keys yet.</p>
+        <p className="text-subtle text-sm">No API keys yet.</p>
       )}
       {(offset > 0 || data.apiCredentials.hasMore) && (
         <div className="flex justify-end gap-2">
@@ -181,22 +171,20 @@ export function RestrictedAPIKeys() {
         <div>
           <h3 className="text-basis text-sm">
             {data.v2RestrictedAuth
-              ? 'Legacy v2 access is disabled'
-              : 'Legacy v2 access is allowed'}
+              ? 'Legacy access to v2 is disabled'
+              : 'Legacy access to v2 is enabled'}
           </h3>
           <p className="text-subtle text-sm">
-            Require OAuth or restricted keys for v2. This does not change v1
-            access or SDK signing.
+            {data.v2RestrictedAuth
+              ? 'Legacy API keys and signing keys cannot access v2.'
+              : 'Legacy API keys and signing keys bypass these permissions.'}{' '}
+            V1 and SDK signing are unchanged.
           </p>
         </div>
         <Button
           kind="secondary"
           appearance="outlined"
-          label={
-            data.v2RestrictedAuth
-              ? 'Allow legacy access'
-              : 'Disable legacy access'
-          }
+          label={data.v2RestrictedAuth ? 'Enable' : 'Disable'}
           disabled={saving || fetching}
           onClick={() => {
             setError(null);
@@ -207,13 +195,6 @@ export function RestrictedAPIKeys() {
           }}
         />
       </div>
-      {!data.v2RestrictedAuth && (
-        <Alert severity="warning">
-          Restricted keys do not limit existing API keys or signing keys.
-          Disable legacy v2 access once your integrations use OAuth or
-          restricted keys.
-        </Alert>
-      )}
       {creating && (
         <CreateRestrictedAPIKeyModal
           groups={data.apiCredentialPermissionCatalog}
@@ -232,13 +213,13 @@ export function RestrictedAPIKeys() {
               ? `Revoke "${confirmation.key.name}"?`
               : confirmation.enabled
               ? 'Disable legacy v2 access?'
-              : 'Allow legacy v2 access?'
+              : 'Enable legacy v2 access?'
           }
           description={
             confirmation.kind === 'revoke'
               ? 'Applications using this key will lose access immediately. This cannot be undone.'
               : confirmation.enabled
-              ? 'V2 requests using legacy API keys or signing keys will fail. Move your integrations to OAuth or restricted keys first. V1 and SDK signing are unchanged.'
+              ? 'Legacy API keys and signing keys will stop working on v2. Switch to OAuth or API keys with permissions first. V1 and SDK signing are unchanged.'
               : 'Legacy API keys and signing keys will work on v2 again without fine-grained permissions.'
           }
           confirmButtonLabel={

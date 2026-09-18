@@ -112,7 +112,7 @@ export function CreateRestrictedAPIKeyModal({
       className="w-full max-w-2xl overflow-visible"
     >
       <Modal.Header>
-        {secret ? 'Copy your API key' : 'Create restricted v2 key'}
+        {secret ? 'Copy your API key' : 'Create API key'}
       </Modal.Header>
       <Modal.Body>
         {secret ? (
@@ -120,9 +120,8 @@ export function CreateRestrictedAPIKeyModal({
         ) : (
           <div className="flex flex-col gap-6">
             <p className="text-subtle text-sm">
-              Shared keys belong to this organization and keep working if you
-              leave. They work only with the v2 API. Create a new key to change
-              its access.
+              Keys belong to your organization and keep working if you leave.
+              Create a new key to change its access.
             </p>
             <CredentialForm
               name={name}

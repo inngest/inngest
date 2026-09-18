@@ -11,7 +11,6 @@ import { RiAddLine } from '@remixicon/react';
 import { createFileRoute, getRouteApi } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
-import { APIKeysEmptyState } from '@/components/APIKeys/EmptyState';
 import {
   APIKeysTable,
   type APIKeyRow,
@@ -82,15 +81,14 @@ function APIKeysPage() {
         <RestrictedAPIKeys key={organization?.id ?? 'marketplace'} />
       ) : (
         <p className="text-subtle text-sm">
-          Only organization admins can view and manage restricted v2 keys.
+          Only organization admins can view and manage API keys.
         </p>
       )}
       <div className="border-subtle flex items-start justify-between gap-4 border-t pt-8">
         <div className="flex flex-col gap-1">
-          <h2 className="text-basis text-lg">Legacy keys</h2>
+          <h2 className="text-basis text-lg">Legacy API keys</h2>
           <p className="text-subtle max-w-2xl text-sm">
-            These keys do not have fine-grained permissions. Use restricted keys
-            for new v2 integrations.{' '}
+            These keys have no fine-grained permissions.{' '}
             <Link
               href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
               className="inline-flex"
@@ -112,11 +110,7 @@ function APIKeysPage() {
       </div>
 
       {keys.length === 0 ? (
-        <APIKeysEmptyState
-          onCreate={() => setCreateOpen(true)}
-          canCreate={canManage}
-          disabledTooltip={ADMIN_TOOLTIP}
-        />
+        <p className="text-subtle text-sm">No legacy API keys.</p>
       ) : (
         <APIKeysTable
           keys={keys}
