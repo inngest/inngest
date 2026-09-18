@@ -570,7 +570,12 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.Fu
 }
 
 func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
-	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
+	queuedAt := run.QueuedAt
+	if queuedAt.IsZero() {
+		// queuedAt should match the timestamp encoded in the run ID. Cloud's
+		// run_list_rollup currently has a bug where it uses the earliest span instead.
+		queuedAt = ulid.Time(run.RunID.Time())
+	}
 
 	result := &apiv2.FunctionRun{
 		Id: run.RunID.String(),
@@ -582,7 +587,7 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 			Id: run.AppID,
 		},
 		Status:   toFunctionRunStatus(run.Status, run.FunctionPaused),
-		QueuedAt: queuedAt,
+		QueuedAt: timestamppb.New(queuedAt),
 		Trigger: &apiv2.RunTrigger{
 			EventIds: []string{run.EventID.String()},
 			IsBatch:  run.BatchID != nil,

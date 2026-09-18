@@ -379,6 +379,7 @@ func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput, includeDeferredFrom 
 	run := &apiv2.RunListItem{
 		RunID:        runID,
 		Cursor:       row.Cursor,
+		QueuedAt:     row.QueuedAt,
 		RunStartedAt: row.StartedAt,
 		FunctionID:   row.FunctionID.String(),
 		FunctionSlug: row.FunctionSlug,

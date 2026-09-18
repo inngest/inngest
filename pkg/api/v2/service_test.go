@@ -1042,6 +1042,7 @@ func TestService_ListRuns(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
 	startedAt := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	queuedAt := startedAt.Add(-1500 * time.Millisecond)
 	endedAt := startedAt.Add(5 * time.Second)
 	from := startedAt.Add(-time.Hour)
 	until := startedAt.Add(time.Hour)
@@ -1058,6 +1059,7 @@ func TestService_ListRuns(t *testing.T) {
 	run := &RunListItem{
 		RunID:        runID,
 		Cursor:       "opaque-cursor",
+		QueuedAt:     queuedAt,
 		RunStartedAt: startedAt,
 		EventID:      eventID,
 		Status:       enums.RunStatusCompleted,
@@ -1123,6 +1125,7 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, "parent-function", resp.Data[0].DeferredFrom.FunctionSlug)
 		require.Equal(t, "Parent function", resp.Data[0].DeferredFrom.GetFunctionName())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.Equal(t, queuedAt, resp.Data[0].QueuedAt.AsTime())
 		require.Equal(t, startedAt, resp.Data[0].StartedAt.AsTime())
 		require.Equal(t, endedAt, resp.Data[0].EndedAt.AsTime())
 		require.Equal(t, uint64(5000), resp.Data[0].GetDurationMs())
@@ -1152,6 +1155,7 @@ func TestService_ListRuns(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Len(t, resp.Data, 1)
+		require.Equal(t, ulid.Time(runID.Time()).UTC(), resp.Data[0].QueuedAt.AsTime())
 		require.Nil(t, resp.Data[0].StartedAt)
 		require.Nil(t, resp.Data[0].DurationMs)
 	})
