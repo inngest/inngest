@@ -7,7 +7,6 @@ import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries/environments';
-import { EnvironmentType } from '@/utils/environments';
 import { CredentialForm } from '@/components/OAuth/CredentialForm';
 import { credentialEnvironmentOptions } from '@/components/OAuth/credentialEnvironments';
 import {
@@ -29,10 +28,13 @@ const Create = graphql(`
   }
 `);
 
-const expirations: Option[] = [7, 30, 90, 365].map((days) => ({
-  id: String(days),
-  name: `${days} days`,
-}));
+const expirations: Option[] = [
+  ...[7, 30, 90, 365].map((days) => ({
+    id: String(days),
+    name: `${days} days`,
+  })),
+  { id: 'never', name: 'Never expires' },
+];
 const defaultExpiration: Option = { id: '30', name: '30 days' };
 
 export function CreateRestrictedAPIKeyModal({
@@ -49,6 +51,8 @@ export function CreateRestrictedAPIKeyModal({
   const [levels, setLevels] = useState<Record<string, PermissionLevel>>({});
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   const [
     {
       data: environments,
@@ -66,9 +70,6 @@ export function CreateRestrictedAPIKeyModal({
   }, []);
 
   const permissions = selectedPermissionGrants(groups, levels);
-  const branchEnvironment = environments?.find(
-    (env) => env.type === EnvironmentType.BranchParent && !env.isArchived,
-  );
   const validation = validateRestrictedAPIKey({
     name,
     allEnvironments,
@@ -77,17 +78,29 @@ export function CreateRestrictedAPIKeyModal({
   });
 
   async function submit() {
-    if (validation || fetching) return;
+    if (fetching || loadingEnvironments || environmentError) return;
     setError(null);
+    setShowValidation(true);
+    if (Object.values(validation).some(Boolean)) {
+      requestAnimationFrame(() => {
+        form.current
+          ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+          ?.focus();
+      });
+      return;
+    }
     const result = await create({
       input: {
         name: name.trim(),
         permissions,
         allEnvironments,
         workspaceID: allEnvironments ? null : environment?.id,
-        expiresAt: new Date(
-          Date.now() + Number(expiration.id) * 86_400_000,
-        ).toISOString(),
+        expiresAt:
+          expiration.id === 'never'
+            ? null
+            : new Date(
+                Date.now() + Number(expiration.id) * 86_400_000,
+              ).toISOString(),
       },
     });
     // discard a secret returned after closing or switching organizations
@@ -109,7 +122,7 @@ export function CreateRestrictedAPIKeyModal({
       onClose={() => {
         if (!fetching) onClose();
       }}
-      className="w-full max-w-2xl overflow-visible"
+      className="w-full max-w-2xl"
     >
       <Modal.Header>
         {secret ? 'Copy your API key' : 'Create API key'}
@@ -118,14 +131,22 @@ export function CreateRestrictedAPIKeyModal({
         {secret ? (
           <RevealKeyCard plaintextKey={secret} />
         ) : (
-          <div className="flex flex-col gap-6">
+          <form
+            ref={form}
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+            className="flex flex-col gap-6"
+          >
             <p className="text-subtle text-sm">
               Keys belong to your organization and keep working if you leave.
-              Create a new key to change its access.
             </p>
             <CredentialForm
               name={name}
-              nameLabel="Key name"
+              nameLabel="Key name (required)"
+              nameRequired
               namePlaceholder="eg. nightly-sync"
               onNameChange={setName}
               expiration={{
@@ -136,18 +157,9 @@ export function CreateRestrictedAPIKeyModal({
               allEnvironments={allEnvironments}
               onAllEnvironmentsChange={setAllEnvironments}
               environment={environment}
-              branchEnvironment={
-                branchEnvironment
-                  ? {
-                      id: branchEnvironment.id,
-                      name: 'All branch environments',
-                    }
-                  : undefined
-              }
               onEnvironmentChange={setEnvironment}
               environmentGroups={credentialEnvironmentOptions(
                 environments ?? [],
-                true,
               )}
               selectedResourceCount={
                 groups.filter(
@@ -171,6 +183,7 @@ export function CreateRestrictedAPIKeyModal({
                 </div>
               }
               disabled={fetching || loadingEnvironments}
+              fieldErrors={showValidation ? validation : undefined}
               error={
                 (error || environmentError) && (
                   <Alert severity="error">
@@ -189,10 +202,9 @@ export function CreateRestrictedAPIKeyModal({
                   />
                   <Button
                     label="Create key"
-                    onClick={submit}
+                    type="submit"
                     loading={fetching}
                     disabled={
-                      Boolean(validation) ||
                       fetching ||
                       loadingEnvironments ||
                       Boolean(environmentError)
@@ -201,7 +213,7 @@ export function CreateRestrictedAPIKeyModal({
                 </>
               }
             />
-          </div>
+          </form>
         )}
       </Modal.Body>
       {secret && (

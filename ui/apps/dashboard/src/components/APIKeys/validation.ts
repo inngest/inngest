@@ -5,14 +5,16 @@ export function validateRestrictedAPIKey(input: {
   allEnvironments: boolean;
   workspaceID?: string;
   permissions: string[];
-}): string | null {
-  return (
-    validateAPIKeyName(input.name) ??
-    (!input.allEnvironments && !input.workspaceID
-      ? 'Select an environment.'
-      : null) ??
-    (input.permissions.length === 0 ? 'Select at least one permission.' : null)
-  );
+}) {
+  return {
+    name: validateAPIKeyName(input.name),
+    environment:
+      !input.allEnvironments && !input.workspaceID
+        ? 'Select an environment.'
+        : null,
+    permissions:
+      input.permissions.length === 0 ? 'Select at least one permission.' : null,
+  };
 }
 
 // Returns a user-facing error string, or null when the name is valid.

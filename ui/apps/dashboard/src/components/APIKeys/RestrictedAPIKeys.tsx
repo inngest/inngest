@@ -10,7 +10,6 @@ import { useMutation, useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import type { GetRestrictedApiKeysQuery } from '@/gql/graphql';
-import { EnvironmentType } from '@/utils/environments';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { CreateRestrictedAPIKeyModal } from './CreateRestrictedAPIKeyModal';
 import { apiKeyErrorMessage } from './errorMessage';
@@ -73,14 +72,14 @@ export function RestrictedAPIKeys() {
       header: 'Key',
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
-          <span className="text-basis">{row.original.name}</span>
-          <code className="text-subtle text-xs">{row.original.maskedKey}</code>
-          <details className="text-subtle text-xs">
+          <span className="text-basis text-sm">{row.original.name}</span>
+          <code className="text-light text-xs">{row.original.maskedKey}</code>
+          <details className="text-subtle text-xs [contain:inline-size]">
             <summary className="cursor-pointer">Permissions</summary>
-            <ul className="mt-1">
+            <ul className="mt-2 space-y-1 pb-1 pl-4">
               {row.original.permissions.map((permission) => (
                 <li key={permission}>
-                  <code>{permission}</code>
+                  <code className="break-all">{permission}</code>
                 </li>
               ))}
             </ul>
@@ -88,40 +87,44 @@ export function RestrictedAPIKeys() {
         </div>
       ),
     }),
-    column.accessor(
-      (key) =>
-        key.env?.type === EnvironmentType.BranchParent
-          ? 'All branch environments'
-          : key.env?.name ?? 'All environments',
-      {
-        id: 'environment',
-        header: 'Environment',
-      },
-    ),
+    column.accessor((key) => key.env?.name ?? 'All environments', {
+      id: 'environment',
+      header: 'Environment',
+      cell: (info) => (
+        <span className="text-subtle text-sm">{info.getValue()}</span>
+      ),
+    }),
     column.accessor('expiresAt', {
       header: 'Expires',
       cell: ({ row }) =>
         row.original.revokedAt ? (
-          <span className="text-subtle">Revoked</span>
+          <span className="text-subtle text-sm">Revoked</span>
+        ) : row.original.expiresAt ? (
+          <Time
+            className="text-subtle text-sm"
+            value={row.original.expiresAt}
+          />
         ) : (
-          <Time value={row.original.expiresAt} />
+          <span className="text-subtle text-sm">Never</span>
         ),
     }),
     column.display({
       id: 'actions',
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
-        <Button
-          label="Revoke"
-          kind="danger"
-          appearance="outlined"
-          size="small"
-          disabled={Boolean(row.original.revokedAt) || saving}
-          onClick={() => {
-            setError(null);
-            setConfirmation({ kind: 'revoke', key: row.original });
-          }}
-        />
+        <div className="flex justify-end">
+          <Button
+            label="Revoke"
+            kind="danger"
+            appearance="outlined"
+            size="small"
+            disabled={Boolean(row.original.revokedAt) || saving}
+            onClick={() => {
+              setError(null);
+              setConfirmation({ kind: 'revoke', key: row.original });
+            }}
+          />
+        </div>
       ),
     }),
   ];
@@ -135,19 +138,42 @@ export function RestrictedAPIKeys() {
     );
   if (!data) return <LoadingIcon />;
 
+  const policyButton = (
+    <Button
+      kind="secondary"
+      appearance="outlined"
+      label={data.v2RestrictedAuth ? 'Enable' : 'Disable'}
+      disabled={saving || fetching}
+      onClick={() => {
+        setError(null);
+        setConfirmation({
+          kind: 'policy',
+          enabled: !data.v2RestrictedAuth,
+        });
+      }}
+    />
+  );
+
   return (
     <section className="flex flex-col gap-5">
       <div className="flex items-start justify-between gap-4">
-        <p className="text-subtle text-sm">
-          For the v2 API and CLI.{' '}
-          <Link href="https://api-docs.inngest.com/" className="inline-flex">
-            View docs
-          </Link>
-        </p>
+        <div className="text-subtle space-y-1 text-sm">
+          <p>
+            For the v2 API, CLI, and MCP.{' '}
+            <Link href="https://api-docs.inngest.com/" className="inline-flex">
+              View docs
+            </Link>
+          </p>
+          <p>We recommend using OAuth for the CLI and MCP instead.</p>
+        </div>
         <Button label="Create API key" onClick={() => setCreating(true)} />
       </div>
       {data.apiCredentials.keys.length ? (
-        <Table data={data.apiCredentials.keys} columns={columns} />
+        <Table
+          data={data.apiCredentials.keys}
+          columns={columns}
+          cellClassName="py-3 align-top"
+        />
       ) : (
         <p className="text-subtle text-sm">No API keys yet.</p>
       )}
@@ -167,34 +193,28 @@ export function RestrictedAPIKeys() {
           />
         </div>
       )}
-      <div className="border-subtle flex items-center justify-between gap-4 rounded border p-4">
-        <div>
-          <h3 className="text-basis text-sm">
-            {data.v2RestrictedAuth
-              ? 'Legacy access to v2 is disabled'
-              : 'Legacy access to v2 is enabled'}
-          </h3>
-          <p className="text-subtle text-sm">
-            {data.v2RestrictedAuth
-              ? 'Legacy API keys and signing keys cannot access v2.'
-              : 'Legacy API keys and signing keys bypass these permissions.'}{' '}
-            V1 and SDK signing are unchanged.
-          </p>
+      {data.v2RestrictedAuth ? (
+        <div className="border-subtle flex items-center justify-between gap-4 rounded border p-4">
+          <div>
+            <h3 className="text-basis text-sm">
+              Legacy access to v2 is disabled
+            </h3>
+            <p className="text-subtle text-sm">
+              Legacy API keys and signing keys cannot access v2.
+            </p>
+          </div>
+          {policyButton}
         </div>
-        <Button
-          kind="secondary"
-          appearance="outlined"
-          label={data.v2RestrictedAuth ? 'Enable' : 'Disable'}
-          disabled={saving || fetching}
-          onClick={() => {
-            setError(null);
-            setConfirmation({
-              kind: 'policy',
-              enabled: !data.v2RestrictedAuth,
-            });
-          }}
-        />
-      </div>
+      ) : (
+        <Alert
+          severity="warning"
+          className="text-sm sm:flex sm:items-center sm:justify-between sm:gap-4 sm:[&>div:last-child]:m-0 sm:[&>div:last-child]:shrink-0"
+          button={policyButton}
+        >
+          <h3 className="font-medium">Legacy access to v2 is enabled</h3>
+          <p>Legacy API keys and signing keys bypass these permissions.</p>
+        </Alert>
+      )}
       {creating && (
         <CreateRestrictedAPIKeyModal
           groups={data.apiCredentialPermissionCatalog}
@@ -219,7 +239,7 @@ export function RestrictedAPIKeys() {
             confirmation.kind === 'revoke'
               ? 'Applications using this key will lose access immediately. This cannot be undone.'
               : confirmation.enabled
-              ? 'Legacy API keys and signing keys will stop working on v2. Switch to OAuth or API keys with permissions first. V1 and SDK signing are unchanged.'
+              ? 'Legacy API keys and signing keys will stop working on v2. Switch to OAuth or API keys with permissions first.'
               : 'Legacy API keys and signing keys will work on v2 again without fine-grained permissions.'
           }
           confirmButtonLabel={

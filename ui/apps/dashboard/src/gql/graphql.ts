@@ -52,7 +52,8 @@ export type ApiCredential = {
   __typename?: 'APICredential';
   createdAt: Scalars['Time']['output'];
   env: Maybe<Workspace>;
-  expiresAt: Scalars['Time']['output'];
+  /** Null means the key does not expire. */
+  expiresAt: Maybe<Scalars['Time']['output']>;
   id: Scalars['UUID']['output'];
   maskedKey: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -598,7 +599,8 @@ export type ConnectV1WorkerMetricsFilter = {
 
 export type CreateApiCredentialInput = {
   allEnvironments: Scalars['Boolean']['input'];
-  expiresAt: Scalars['Time']['input'];
+  /** Null means the key does not expire. */
+  expiresAt?: InputMaybe<Scalars['Time']['input']>;
   name: Scalars['String']['input'];
   permissions: Array<Scalars['String']['input']>;
   workspaceID?: InputMaybe<Scalars['UUID']['input']>;
@@ -3223,7 +3225,7 @@ export type GetRestrictedApiKeysQueryVariables = Exact<{
 }>;
 
 
-export type GetRestrictedApiKeysQuery = { __typename?: 'Query', v2RestrictedAuth: boolean, apiCredentials: { __typename?: 'APICredentialPage', hasMore: boolean, keys: Array<{ __typename?: 'APICredential', id: string, name: string, maskedKey: string, permissions: Array<string>, createdAt: string, expiresAt: string, revokedAt: string | null, env: { __typename?: 'Workspace', id: string, name: string, type: EnvironmentType } | null }> }, apiCredentialPermissionCatalog: Array<{ __typename?: 'APICredentialPermissionGroup', resource: string, read: Array<string>, write: Array<string> }> };
+export type GetRestrictedApiKeysQuery = { __typename?: 'Query', v2RestrictedAuth: boolean, apiCredentials: { __typename?: 'APICredentialPage', hasMore: boolean, keys: Array<{ __typename?: 'APICredential', id: string, name: string, maskedKey: string, permissions: Array<string>, createdAt: string, expiresAt: string | null, revokedAt: string | null, env: { __typename?: 'Workspace', id: string, name: string, type: EnvironmentType } | null }> }, apiCredentialPermissionCatalog: Array<{ __typename?: 'APICredentialPermissionGroup', resource: string, read: Array<string>, write: Array<string> }> };
 
 export type RevokeRestrictedApiKeyMutationVariables = Exact<{
   id: Scalars['UUID']['input'];
