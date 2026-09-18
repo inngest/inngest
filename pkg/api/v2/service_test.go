@@ -1123,12 +1123,37 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, "parent-function", resp.Data[0].DeferredFrom.FunctionSlug)
 		require.Equal(t, "Parent function", resp.Data[0].DeferredFrom.GetFunctionName())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.Equal(t, startedAt, resp.Data[0].StartedAt.AsTime())
+		require.Equal(t, endedAt, resp.Data[0].EndedAt.AsTime())
+		require.Equal(t, uint64(5000), resp.Data[0].GetDurationMs())
 		require.NotNil(t, resp.Metadata.TimeRange)
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
 		require.Equal(t, until, resp.Metadata.TimeRange.Until.AsTime())
 		require.True(t, resp.Page.HasMore)
 		require.Equal(t, pageCursor, resp.Page.GetCursor())
 		require.Equal(t, int32(1), resp.Page.Limit)
+	})
+
+	t.Run("omits timing fields for a queued run", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(&GetRunsResult{
+			Runs: []*RunListItem{{
+				RunID:   runID,
+				EventID: eventID,
+				Status:  enums.RunStatusScheduled,
+				EndedAt: &endedAt,
+			}},
+		}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Nil(t, resp.Data[0].StartedAt)
+		require.Nil(t, resp.Data[0].DurationMs)
 	})
 
 	t.Run("validates time range", func(t *testing.T) {

@@ -571,7 +571,6 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.Fu
 
 func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
-	startedAt := timestamppb.New(run.RunStartedAt)
 
 	result := &apiv2.FunctionRun{
 		Id: run.RunID.String(),
@@ -582,14 +581,16 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 		App: &apiv2.AppRef{
 			Id: run.AppID,
 		},
-		Status:    toFunctionRunStatus(run.Status, run.FunctionPaused),
-		QueuedAt:  queuedAt,
-		StartedAt: startedAt,
+		Status:   toFunctionRunStatus(run.Status, run.FunctionPaused),
+		QueuedAt: queuedAt,
 		Trigger: &apiv2.RunTrigger{
 			EventIds: []string{run.EventID.String()},
 			IsBatch:  run.BatchID != nil,
 		},
 		IsDeferred: run.IsDeferred,
+	}
+	if !run.RunStartedAt.IsZero() {
+		result.StartedAt = timestamppb.New(run.RunStartedAt)
 	}
 	if run.DeferredFrom != nil {
 		result.DeferredFrom = &apiv2.RunDeferredFrom{
@@ -616,8 +617,10 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 
 	if run.EndedAt != nil {
 		result.EndedAt = timestamppb.New(*run.EndedAt)
-		duration := uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
-		result.DurationMs = &duration
+		if !run.RunStartedAt.IsZero() {
+			duration := uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
+			result.DurationMs = &duration
+		}
 	}
 
 	if len(run.Output) > 0 {
