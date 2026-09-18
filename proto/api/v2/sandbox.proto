@@ -92,6 +92,13 @@ message CreateSandboxRequest {
   uint32 memory_mb = 3;
   map<string, string> environment = 4;
   optional string snapshot_id = 5;
+  // Exact workspace secret names, each injected under that same environment
+  // variable name. Names must be unique, valid environment keys, and must not
+  // overlap with environment. Names resolve to UUID bindings when creating the
+  // workload; create recovery retains those bindings even if a secret is archived
+  // and its name reused. Values are fetched at launch and may remain in the guest
+  // and its snapshots. Cannot be supplied with snapshot_id.
+  repeated string secrets = 6;
 }
 
 message ListSandboxesRequest {
