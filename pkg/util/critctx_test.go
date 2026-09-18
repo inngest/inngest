@@ -117,6 +117,21 @@ func TestCrit(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("It should return an error if the crit panics", func(t *testing.T) {
+		buf := bytes.NewBuffer(nil)
+		log := logger.StdlibLogger(bg, logger.WithLoggerWriter(buf))
+		ctx := logger.WithStdlib(bg, log)
+
+		res, err := CritT(ctx, "panicky", func(ctx context.Context) (int, error) {
+			panic("everything is on fire")
+		}, WithTimeout(time.Second))
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "panic in crit: everything is on fire")
+		require.Equal(t, 0, res)
+		require.Contains(t, buf.String(), "panic in crit")
+	})
+
 	t.Run("It should return context deadline error if execution exceeds expected duration", func(t *testing.T) {
 		ctx := context.Background()
 		var called bool
