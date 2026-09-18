@@ -244,6 +244,11 @@ export const MCPSetup = ({
                 className={mutedCopyButton}
                 code={`export ${bearerTokenEnvVar}=<your-api-key>`}
               />
+              {!isDevServer && (
+                <p className="text-muted mt-3 text-sm">
+                  The key&apos;s permissions and environment limits apply to every tool call.
+                </p>
+              )}
               {apiKeysHref && (
                 <div className="mt-3">
                   <Button href={apiKeysHref} kind="primary" label="Create API key" />

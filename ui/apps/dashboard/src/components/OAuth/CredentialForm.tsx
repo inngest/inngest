@@ -14,6 +14,7 @@ type Props = {
   name: string;
   nameLabel: string;
   namePlaceholder?: string;
+  nameRequired?: boolean;
   onNameChange: (name: string) => void;
   expiration?: {
     value: Option;
@@ -28,6 +29,11 @@ type Props = {
   permissions: ReactNode;
   selectedResourceCount: number;
   error?: ReactNode;
+  fieldErrors?: {
+    name?: string | null;
+    environment?: string | null;
+    permissions?: string | null;
+  };
   actions: ReactNode;
   disabled: boolean;
 };
@@ -36,6 +42,7 @@ export function CredentialForm({
   name,
   nameLabel,
   namePlaceholder,
+  nameRequired = false,
   onNameChange,
   expiration,
   allEnvironments,
@@ -46,6 +53,7 @@ export function CredentialForm({
   permissions,
   selectedResourceCount,
   error,
+  fieldErrors,
   actions,
   disabled,
 }: Props) {
@@ -63,9 +71,21 @@ export function CredentialForm({
     <div className="flex w-full flex-col gap-8">
       <fieldset disabled={disabled} className="flex flex-col gap-6">
         <legend className="sr-only">Credential details</legend>
-        <div className="flex flex-col gap-2">
+        <div
+          className="flex flex-col gap-2"
+          role="group"
+          aria-label="Environment"
+          aria-invalid={Boolean(fieldErrors?.environment)}
+          aria-describedby={
+            fieldErrors?.environment
+              ? 'credential-environment-error'
+              : undefined
+          }
+          tabIndex={-1}
+        >
           <span className="text-basis text-sm font-medium">
-            Choose environment
+            Choose environment{' '}
+            <span className="text-subtle font-normal">(required)</span>
           </span>
           <div className="flex flex-wrap gap-2">
             <ToggleGroup
@@ -75,7 +95,9 @@ export function CredentialForm({
               value={allEnvironments ? 'all' : 'single'}
               disabled={disabled}
               onValueChange={(value) => {
-                if (value) onAllEnvironmentsChange(value === 'all');
+                if (value) {
+                  onAllEnvironmentsChange(value === 'all');
+                }
               }}
             >
               {[
@@ -85,7 +107,7 @@ export function CredentialForm({
                 <ToggleGroup.Item
                   key={value}
                   value={value}
-                  className="bg-canvasSubtle hover:bg-canvasMuted hover:text-basis data-[state=on]:bg-canvasBase data-[state=on]:text-basis focus-visible:ring-primary-moderate w-16 focus-visible:ring-2 focus-visible:ring-inset"
+                  className="bg-canvasSubtle hover:bg-canvasMuted hover:text-basis data-[state=on]:bg-canvasBase data-[state=on]:text-basis focus-visible:ring-primary-moderate px-3 focus-visible:ring-2 focus-visible:ring-inset"
                 >
                   {label}
                 </ToggleGroup.Item>
@@ -95,6 +117,9 @@ export function CredentialForm({
               <div className="min-w-48 flex-1">
                 <SelectWithSearch
                   label="Environment"
+                  className={
+                    fieldErrors?.environment ? 'border-error' : undefined
+                  }
                   isLabelVisible={false}
                   value={environment}
                   onChange={(option: Option) => {
@@ -145,6 +170,11 @@ export function CredentialForm({
               </div>
             )}
           </div>
+          {fieldErrors?.environment && (
+            <p id="credential-environment-error" className="text-error text-sm">
+              {fieldErrors.environment}
+            </p>
+          )}
           {allEnvironments && (
             <Alert severity="info">
               Environment-specific requests must specify the environment name.
@@ -177,7 +207,11 @@ export function CredentialForm({
         )}
         <Input
           id="credential-name"
+          name="credential-name"
           label={nameLabel}
+          required={nameRequired}
+          error={fieldErrors?.name ?? undefined}
+          aria-invalid={Boolean(fieldErrors?.name)}
           placeholder={namePlaceholder}
           value={name}
           onChange={(event) => onNameChange(event.target.value)}
@@ -185,15 +219,32 @@ export function CredentialForm({
         />
       </fieldset>
 
-      <div className="flex flex-col gap-3">
+      <div
+        className="flex flex-col gap-3"
+        role="group"
+        aria-label="Permissions"
+        aria-invalid={Boolean(fieldErrors?.permissions)}
+        aria-describedby={
+          fieldErrors?.permissions ? 'credential-permissions-error' : undefined
+        }
+        tabIndex={-1}
+      >
         <div className="flex items-center justify-between gap-3">
-          <span className="text-basis text-sm font-medium">Permissions</span>
+          <span className="text-basis text-sm font-medium">
+            Permissions{' '}
+            <span className="text-subtle font-normal">(required)</span>
+          </span>
           <span className="text-subtle text-xs">
             {selectedResourceCount}{' '}
             {selectedResourceCount === 1 ? 'resource' : 'resources'} selected
           </span>
         </div>
         {permissions}
+        {fieldErrors?.permissions && (
+          <p id="credential-permissions-error" className="text-error text-sm">
+            {fieldErrors.permissions}
+          </p>
+        )}
       </div>
       {error}
       <div className="flex gap-2">{actions}</div>

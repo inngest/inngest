@@ -16,8 +16,12 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
 type Documents = {
     "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": typeof types.AiOverviewFunctionLookupDocument,
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.CreateApiKeyDocument,
+    "\n  mutation CreateRestrictedAPIKey($input: CreateAPICredentialInput!) {\n    createAPICredential(input: $input) {\n      plaintextKey\n      key { id }\n    }\n  }\n": typeof types.CreateRestrictedApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": typeof types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": typeof types.UpdateApiKeyDocument,
+    "\n  query GetRestrictedAPIKeys($offset: Int!) {\n    apiCredentials(limit: 20, offset: $offset) {\n      hasMore\n      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name type } }\n    }\n    apiCredentialPermissionCatalog { resource read write }\n    v2RestrictedAuth\n  }\n": typeof types.GetRestrictedApiKeysDocument,
+    "\n  mutation RevokeRestrictedAPIKey($id: UUID!) { revokeAPICredential(id: $id) }\n": typeof types.RevokeRestrictedApiKeyDocument,
+    "\n  mutation SetV2RestrictedAuth($enabled: Boolean!) { setV2RestrictedAuth(enabled: $enabled) }\n": typeof types.SetV2RestrictedAuthDocument,
     "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": typeof types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.UnachiveAppDocument,
@@ -185,8 +189,12 @@ type Documents = {
 const documents: Documents = {
     "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.AiOverviewFunctionLookupDocument,
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.CreateApiKeyDocument,
+    "\n  mutation CreateRestrictedAPIKey($input: CreateAPICredentialInput!) {\n    createAPICredential(input: $input) {\n      plaintextKey\n      key { id }\n    }\n  }\n": types.CreateRestrictedApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": types.UpdateApiKeyDocument,
+    "\n  query GetRestrictedAPIKeys($offset: Int!) {\n    apiCredentials(limit: 20, offset: $offset) {\n      hasMore\n      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name type } }\n    }\n    apiCredentialPermissionCatalog { resource read write }\n    v2RestrictedAuth\n  }\n": types.GetRestrictedApiKeysDocument,
+    "\n  mutation RevokeRestrictedAPIKey($id: UUID!) { revokeAPICredential(id: $id) }\n": types.RevokeRestrictedApiKeyDocument,
+    "\n  mutation SetV2RestrictedAuth($enabled: Boolean!) { setV2RestrictedAuth(enabled: $enabled) }\n": types.SetV2RestrictedAuthDocument,
     "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
@@ -377,11 +385,27 @@ export function graphql(source: "\n  mutation CreateAPIKey($input: CreateAPIKeyI
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "\n  mutation CreateRestrictedAPIKey($input: CreateAPICredentialInput!) {\n    createAPICredential(input: $input) {\n      plaintextKey\n      key { id }\n    }\n  }\n"): (typeof documents)["\n  mutation CreateRestrictedAPIKey($input: CreateAPICredentialInput!) {\n    createAPICredential(input: $input) {\n      plaintextKey\n      key { id }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n"): (typeof documents)["\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetRestrictedAPIKeys($offset: Int!) {\n    apiCredentials(limit: 20, offset: $offset) {\n      hasMore\n      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name type } }\n    }\n    apiCredentialPermissionCatalog { resource read write }\n    v2RestrictedAuth\n  }\n"): (typeof documents)["\n  query GetRestrictedAPIKeys($offset: Int!) {\n    apiCredentials(limit: 20, offset: $offset) {\n      hasMore\n      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name type } }\n    }\n    apiCredentialPermissionCatalog { resource read write }\n    v2RestrictedAuth\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation RevokeRestrictedAPIKey($id: UUID!) { revokeAPICredential(id: $id) }\n"): (typeof documents)["\n  mutation RevokeRestrictedAPIKey($id: UUID!) { revokeAPICredential(id: $id) }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SetV2RestrictedAuth($enabled: Boolean!) { setV2RestrictedAuth(enabled: $enabled) }\n"): (typeof documents)["\n  mutation SetV2RestrictedAuth($enabled: Boolean!) { setV2RestrictedAuth(enabled: $enabled) }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
