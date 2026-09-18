@@ -8,6 +8,10 @@ const executionLimitQuery = graphql(`
     account {
       id
       marketplaceBillingURL
+      plan {
+        id
+        name
+      }
       entitlements {
         executions {
           usage
@@ -36,8 +40,12 @@ export function useExecutionLimit(): ExecutionLimitData | null {
     res.data.account.entitlements.executions;
   if (limit === null) return null;
 
+  const isEnterprise = (res.data.account.plan?.name ?? '')
+    .toLowerCase()
+    .includes('enterprise');
+
   return {
-    isCapped: !overageAllowed && usage >= limit,
+    isCapped: !isEnterprise && !overageAllowed && usage >= limit,
     usedExecutions: usage,
     executionLimit: limit,
     marketplaceBillingURL: deepLinkingEnabled
