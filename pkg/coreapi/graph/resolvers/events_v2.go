@@ -24,9 +24,15 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		pageSize = first
 	}
 
+	var cel string
+	if filter.Query != nil {
+		cel = *filter.Query
+	}
+
 	opts := &cqrs.WorkspaceEventsOpts{
 		Limit: pageSize,
 		Names: filter.EventNames,
+		CEL:   cel,
 	}
 
 	cursor := &EventsV2ConnectionCursor{}
