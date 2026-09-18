@@ -7,7 +7,7 @@ import BottomBar from './BottomBar';
 import SideBarV2 from './SideBarV2';
 import TopBar from './TopBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
-import { ExecutionLimitBanner, ExecutionLimitPill } from '../ExecutionLimit';
+import { ExecutionLimitPill } from '../ExecutionLimit/ExecutionLimitPill';
 import IncidentBanner from '../Incident/IncidentBanner';
 import { PaymentStatusBanner } from '../PaymentStatusBanner/PaymentStatusBanner';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
@@ -74,8 +74,7 @@ export default function Layout({
 
           {/* disabled by Dan 11/22/2025 for performance reasons */}
           <Suspense>{/* <BillingBanner /> */}</Suspense>
-
-          <ExecutionLimitBanner />
+          <Suspense>{/* <ExecutionOverageBanner /> */}</Suspense>
 
           {children}
         </div>

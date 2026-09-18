@@ -5,6 +5,7 @@ import { createFileRoute, ClientOnly } from '@tanstack/react-router';
 import { Runs } from '@/components/Runs/Runs';
 import { useRef } from 'react';
 import { type RefreshRunsRef } from '@/components/Runs/Runs';
+import { ExecutionLimitBanner } from '@/components/ExecutionLimit';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/runs/')({
   component: RunsComponent,
@@ -30,6 +31,7 @@ function RunsComponent() {
           </div>
         }
       />
+      <ExecutionLimitBanner />
       <ClientOnly>
         <Runs scope="env" ref={ref} />
       </ClientOnly>

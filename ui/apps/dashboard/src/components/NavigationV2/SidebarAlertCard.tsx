@@ -4,6 +4,7 @@ const kindStyles = {
   default: 'border-subtle bg-canvasBase text-basis',
   error: 'border-tertiary-xSubtle bg-error text-error',
   warning: 'border-accent-xSubtle bg-warning text-warning',
+  caution: 'border-accent-xSubtle bg-warning text-warning',
 } as const;
 
 export type SidebarAlertCardProps = {

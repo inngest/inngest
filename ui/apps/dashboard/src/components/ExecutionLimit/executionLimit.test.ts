@@ -6,8 +6,10 @@ import {
   isDismissalActive,
   isExecutionCapped,
   legacyExecutionCap,
+  pillContent,
   shouldShowExecutionLimit,
   usageBand,
+  usageKind,
 } from './executionLimit';
 
 const atLimit = {
@@ -100,19 +102,23 @@ describe('usageBand', () => {
   });
 });
 
+describe('usageKind', () => {
+  it('maps each usage band to its pill/card tone', () => {
+    expect(usageKind('under50')).toBe('default');
+    expect(usageKind('50')).toBe('caution');
+    expect(usageKind('75')).toBe('warning');
+    expect(usageKind('90')).toBe('error');
+    expect(usageKind('capped')).toBe('error');
+  });
+});
+
 describe('dismissalStorageKey', () => {
   const accountA = '5d258962-2c37-4a5d-b875-ebe72792c47f';
   const accountB = 'e8ea18c4-dbb4-4e98-a6a4-8ff8b3801765';
 
   it('gives different accounts different keys', () => {
-    expect(dismissalStorageKey('banner', accountA)).not.toBe(
-      dismissalStorageKey('banner', accountB),
-    );
-  });
-
-  it('gives the banner and the card different keys', () => {
-    expect(dismissalStorageKey('banner', accountA)).not.toBe(
-      dismissalStorageKey('card', accountA),
+    expect(dismissalStorageKey('card', accountA)).not.toBe(
+      dismissalStorageKey('card', accountB),
     );
   });
 
@@ -148,5 +154,35 @@ describe('isDismissalActive', () => {
 
   it('treats a malformed stamp as expired', () => {
     expect(isDismissalActive(NaN, now)).toBe(false);
+  });
+});
+
+describe('pillContent', () => {
+  it('stays hidden below half of the limit', () => {
+    expect(pillContent('under50', false)).toBeNull();
+  });
+
+  it('cautions once usage crosses half of the limit', () => {
+    expect(pillContent('50', false)).toMatchObject({ kind: 'caution' });
+    expect(pillContent('50', false)?.text).toContain('almost reached');
+  });
+
+  it('warns at three-quarters of the limit', () => {
+    expect(pillContent('75', false)).toMatchObject({ kind: 'warning' });
+    expect(pillContent('75', false)?.text).toContain('almost reached');
+  });
+
+  it('errors at 90% of the limit, with the same almost-reached copy as capped', () => {
+    expect(pillContent('90', false)).toMatchObject({ kind: 'error' });
+    expect(pillContent('90', false)?.text).toContain('almost reached');
+  });
+
+  it('escalates to an error once capped, dropping the almost-reached copy', () => {
+    expect(pillContent('capped', false)).toMatchObject({ kind: 'error' });
+    expect(pillContent('capped', false)?.text).not.toContain('almost');
+  });
+
+  it('points Vercel accounts at the integration settings', () => {
+    expect(pillContent('75', true)?.text).toContain('Vercel');
   });
 });

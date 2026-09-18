@@ -1,33 +1,22 @@
-import { Banner, type Severity } from '@inngest/components/Banner';
+import { Banner } from '@inngest/components/Banner';
 
-import type { UsageBand } from './executionLimit';
-import { useDismissal } from './useDismissal';
 import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
 
-const bannerSeverity: Partial<Record<UsageBand, Severity>> = {
-  '50': 'info',
-  '75': 'warning',
-};
+const numberFormatter = new Intl.NumberFormat('en-US');
 
 export function ExecutionLimitBanner() {
   const data = useExecutionLimit();
-  const { isReady, isDismissed, dismiss } = useDismissal(
-    'banner',
-    data?.accountID,
-  );
 
-  if (!data?.enhanced || !isReady || isDismissed) return null;
+  if (!data?.enhanced || data.band !== 'capped') return null;
 
-  const severity = bannerSeverity[data.band];
-  if (!severity) return null;
+  const formattedUsage = numberFormatter.format(data.usedExecutions);
 
   return (
     <Banner
-      severity={severity}
-      onDismiss={dismiss}
+      severity="error"
       cta={
         <Banner.Link
-          severity={severity}
+          severity="error"
           className="mr-2 shrink-0"
           {...upgradeLinkProps(
             data.marketplaceBillingURL,
@@ -38,8 +27,8 @@ export function ExecutionLimitBanner() {
         </Banner.Link>
       }
     >
-      You have used over 50% of your plan&apos;s executions. Upgrade your plan
-      to avoid disruptions
+      New runs are paused. You&apos;ve used {formattedUsage} executions this
+      month and reached the Hobby limit. Upgrade to Pro to resume now.
     </Banner>
   );
 }

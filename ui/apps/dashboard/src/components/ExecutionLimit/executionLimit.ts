@@ -51,10 +51,43 @@ export function usageBand({
   return 'under50';
 }
 
-export type DismissalSurface = 'banner' | 'card';
+export type UsageKind = 'default' | 'caution' | 'warning' | 'error';
+
+export function usageKind(band: UsageBand): UsageKind {
+  if (band === 'capped') return 'error';
+  if (band === 'under50') return 'default';
+  if (band === '50') return 'caution';
+  if (band === '75') return 'warning';
+  return 'error';
+}
+
+export function pillContent(
+  band: UsageBand,
+  isVercel: boolean,
+): { kind: 'caution' | 'warning' | 'error'; text: string } | null {
+  const kind = usageKind(band);
+  if (kind === 'default') return null;
+
+  if (band === 'capped') {
+    return {
+      kind,
+      text: isVercel
+        ? 'Hobby account executions limit reached. Change configurations on the Vercel Integrations Settings page to upgrade and resume using Inngest.'
+        : 'Hobby account executions limit reached. Upgrade your plan to continue using Inngest.',
+    };
+  }
+
+  return {
+    kind,
+    text: isVercel
+      ? 'Hobby account executions limit almost reached. Change configurations on the Vercel Integrations Settings page to upgrade and avoid disruption.'
+      : 'Hobby account executions limit almost reached. Upgrade your plan to continue using Inngest.',
+  };
+}
+
+export type DismissalSurface = 'card';
 
 const DISMISSAL_STORAGE_KEY_PREFIX: Record<DismissalSurface, string> = {
-  banner: 'dismissedExecutionLimitBanner',
   card: 'dismissedExecutionLimitCard',
 };
 
