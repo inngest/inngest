@@ -39,3 +39,11 @@ export const SmallWarning: Story = {
     value: 92,
   },
 };
+
+export const SmallCaution: Story = {
+  args: {
+    kind: 'caution',
+    size: 'small',
+    value: 60,
+  },
+};

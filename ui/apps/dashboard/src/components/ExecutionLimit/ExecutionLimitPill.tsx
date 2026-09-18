@@ -3,11 +3,12 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { RiArrowRightLine, RiErrorWarningFill } from '@remixicon/react';
 
 import { AlertPill } from '../Layout/AlertPill';
+import { pillContent } from './executionLimit';
 import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
 
 export function ExecutionLimitPill() {
   const data = useExecutionLimit();
-  if (!data?.isCapped) return null;
+  if (!data) return null;
 
   const linkProps = upgradeLinkProps(
     data.marketplaceBillingURL,
@@ -15,6 +16,8 @@ export function ExecutionLimitPill() {
   );
 
   if (!data.enhanced) {
+    if (!data.isCapped) return null;
+
     return (
       <Pill
         action={
@@ -37,21 +40,23 @@ export function ExecutionLimitPill() {
     );
   }
 
+  const content = pillContent(data.band, data.isVercel);
+  if (!content) return null;
+
   return (
     <AlertPill
+      kind={content.kind}
       action={
         <Link
           {...linkProps}
-          className="text-alwaysWhite text-xs font-black leading-4 hover:decoration-current"
+          className="text-current text-xs font-black leading-4 hover:decoration-current"
           iconAfter={<RiArrowRightLine className="h-3.5 w-3.5" />}
         >
           Upgrade
         </Link>
       }
     >
-      {data.isVercel
-        ? 'Hobby account executions limit reached. Change configurations on the Vercel Integrations Settings page to upgrade and resume using Inngest.'
-        : 'Hobby account executions limit reached. Upgrade your plan to continue using Inngest.'}
+      {content.text}
     </AlertPill>
   );
 }

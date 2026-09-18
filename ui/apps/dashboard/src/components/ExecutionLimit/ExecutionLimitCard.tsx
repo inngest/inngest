@@ -27,6 +27,11 @@ const kindStyles = {
     icon: 'text-warning',
     link: 'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
   },
+  caution: {
+    collapsed: 'border-accent-xSubtle bg-warning',
+    icon: 'text-warning',
+    link: 'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+  },
 } as const;
 
 type CardContent = {
@@ -44,14 +49,17 @@ const legacyContent: CardContent = {
   dismissable: false,
 };
 
+const pausedContent = {
+  title: 'New runs will be paused',
+  body: (usage: string) =>
+    `You've used ${usage} executions this month and are close to the Hobby limit. New runs and scheduled functions will stop and won't be queued. Upgrade to Pro to resume now.`,
+  dismissable: true,
+};
+
 const enhancedContent: Partial<Record<UsageBand, CardContent>> = {
-  '90': {
-    kind: 'warning',
-    title: 'New runs will be paused',
-    body: (usage) =>
-      `You've used ${usage} executions this month and are close to the Hobby limit. New runs and scheduled functions will stop and won't be queued. Upgrade to Pro to resume now.`,
-    dismissable: true,
-  },
+  '50': { kind: 'caution', ...pausedContent },
+  '75': { kind: 'warning', ...pausedContent },
+  '90': { kind: 'error', ...pausedContent },
   capped: {
     kind: 'error',
     title: 'New runs are paused',
