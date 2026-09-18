@@ -33,5 +33,24 @@ describe('credential environments', () => {
       { label: 'Production', opts: [{ id: 'prod', name: 'prod' }] },
       { label: 'Test', opts: [{ id: 'test', name: 'test' }] },
     ]);
+    expect(
+      credentialEnvironmentOptions(
+        [
+          environment('prod', EnvironmentType.Production),
+          environment('test', EnvironmentType.Test),
+          environment('archived', EnvironmentType.BranchChild, true),
+          environment('preview', EnvironmentType.BranchChild),
+          environment('parent', EnvironmentType.BranchParent),
+        ],
+        true,
+      ),
+    ).toEqual([
+      { label: 'Production', opts: [{ id: 'prod', name: 'prod' }] },
+      { label: 'Test', opts: [{ id: 'test', name: 'test' }] },
+      {
+        label: 'Branch environments',
+        opts: [{ id: 'preview', name: 'preview' }],
+      },
+    ]);
   });
 });

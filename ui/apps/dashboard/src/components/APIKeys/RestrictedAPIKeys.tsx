@@ -9,6 +9,7 @@ import { useMutation, useQuery } from 'urql';
 
 import { graphql } from '@/gql';
 import type { GetRestrictedApiKeysQuery } from '@/gql/graphql';
+import { EnvironmentType } from '@/utils/environments';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { CreateRestrictedAPIKeyModal } from './CreateRestrictedAPIKeyModal';
 import { apiKeyErrorMessage } from './errorMessage';
@@ -17,7 +18,7 @@ const Query = graphql(`
   query GetRestrictedAPIKeys($offset: Int!) {
     apiCredentials(limit: 20, offset: $offset) {
       hasMore
-      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name } }
+      keys { id name maskedKey permissions createdAt expiresAt revokedAt env { id name type } }
     }
     apiCredentialPermissionCatalog { resource read write }
     v2RestrictedAuth
@@ -86,10 +87,16 @@ export function RestrictedAPIKeys() {
         </div>
       ),
     }),
-    column.accessor((key) => key.env?.name ?? 'All environments', {
-      id: 'environment',
-      header: 'Environment',
-    }),
+    column.accessor(
+      (key) =>
+        key.env?.type === EnvironmentType.BranchParent
+          ? 'All branch environments'
+          : key.env?.name ?? 'All environments',
+      {
+        id: 'environment',
+        header: 'Environment',
+      },
+    ),
     column.accessor('expiresAt', {
       header: 'Expires',
       cell: ({ row }) =>
@@ -146,7 +153,8 @@ export function RestrictedAPIKeys() {
         Send the key in <code>Authorization: Bearer &lt;key&gt;</code>, or use{' '}
         <code>INNGEST_API_KEY</code> with <code>inngest api</code>.
         All-environment keys need <code>X-Inngest-Env</code> (CLI:{' '}
-        <code>--env</code>) for environment-specific requests.
+        <code>--env</code>) for environment-specific requests. For MCP, use
+        OAuth; restricted keys are not supported there yet.
       </p>
       {data.apiCredentials.keys.length ? (
         <Table data={data.apiCredentials.keys} columns={columns} />
@@ -199,6 +207,13 @@ export function RestrictedAPIKeys() {
           }}
         />
       </div>
+      {!data.v2RestrictedAuth && (
+        <Alert severity="warning">
+          Restricted keys do not limit existing API keys or signing keys.
+          Disable legacy v2 access once your integrations use OAuth or
+          restricted keys.
+        </Alert>
+      )}
       {creating && (
         <CreateRestrictedAPIKeyModal
           groups={data.apiCredentialPermissionCatalog}

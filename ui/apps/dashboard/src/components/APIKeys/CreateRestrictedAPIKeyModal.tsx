@@ -7,6 +7,7 @@ import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries/environments';
+import { EnvironmentType } from '@/utils/environments';
 import { CredentialForm } from '@/components/OAuth/CredentialForm';
 import { credentialEnvironmentOptions } from '@/components/OAuth/credentialEnvironments';
 import {
@@ -65,6 +66,9 @@ export function CreateRestrictedAPIKeyModal({
   }, []);
 
   const permissions = selectedPermissionGrants(groups, levels);
+  const branchEnvironment = environments?.find(
+    (env) => env.type === EnvironmentType.BranchParent && !env.isArchived,
+  );
   const validation = validateRestrictedAPIKey({
     name,
     allEnvironments,
@@ -133,9 +137,18 @@ export function CreateRestrictedAPIKeyModal({
               allEnvironments={allEnvironments}
               onAllEnvironmentsChange={setAllEnvironments}
               environment={environment}
+              branchEnvironment={
+                branchEnvironment
+                  ? {
+                      id: branchEnvironment.id,
+                      name: 'All branch environments',
+                    }
+                  : undefined
+              }
               onEnvironmentChange={setEnvironment}
               environmentGroups={credentialEnvironmentOptions(
                 environments ?? [],
+                true,
               )}
               selectedResourceCount={
                 groups.filter(

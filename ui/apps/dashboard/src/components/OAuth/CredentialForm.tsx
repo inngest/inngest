@@ -23,8 +23,9 @@ type Props = {
   allEnvironments: boolean;
   onAllEnvironmentsChange: (all: boolean) => void;
   environment: Option | null;
+  branchEnvironment?: Option;
   environmentGroups: EnvironmentOptionGroup[];
-  onEnvironmentChange: (environment: Option) => void;
+  onEnvironmentChange: (environment: Option | null) => void;
   permissions: ReactNode;
   selectedResourceCount: number;
   error?: ReactNode;
@@ -41,6 +42,7 @@ export function CredentialForm({
   allEnvironments,
   onAllEnvironmentsChange,
   environment,
+  branchEnvironment,
   environmentGroups,
   onEnvironmentChange,
   permissions,
@@ -50,6 +52,9 @@ export function CredentialForm({
   disabled,
 }: Props) {
   const [query, setQuery] = useState('');
+  const allBranches = Boolean(
+    branchEnvironment && environment?.id === branchEnvironment.id,
+  );
   const groups = environmentGroups
     .map((group) => ({
       ...group,
@@ -72,26 +77,37 @@ export function CredentialForm({
               type="single"
               size="small"
               aria-label="Environment access"
-              value={allEnvironments ? 'all' : 'single'}
+              value={
+                allEnvironments ? 'all' : allBranches ? 'branches' : 'single'
+              }
               disabled={disabled}
               onValueChange={(value) => {
-                if (value) onAllEnvironmentsChange(value === 'all');
+                if (!value) return;
+                onAllEnvironmentsChange(value === 'all');
+                if (value === 'branches' && branchEnvironment) {
+                  onEnvironmentChange(branchEnvironment);
+                } else if (value === 'single' && allBranches) {
+                  onEnvironmentChange(null);
+                }
               }}
             >
               {[
                 { value: 'single', label: 'Single' },
+                ...(branchEnvironment
+                  ? [{ value: 'branches', label: 'All branches' }]
+                  : []),
                 { value: 'all', label: 'All' },
               ].map(({ value, label }) => (
                 <ToggleGroup.Item
                   key={value}
                   value={value}
-                  className="bg-canvasSubtle hover:bg-canvasMuted hover:text-basis data-[state=on]:bg-canvasBase data-[state=on]:text-basis focus-visible:ring-primary-moderate w-16 focus-visible:ring-2 focus-visible:ring-inset"
+                  className="bg-canvasSubtle hover:bg-canvasMuted hover:text-basis data-[state=on]:bg-canvasBase data-[state=on]:text-basis focus-visible:ring-primary-moderate min-w-16 px-3 focus-visible:ring-2 focus-visible:ring-inset"
                 >
                   {label}
                 </ToggleGroup.Item>
               ))}
             </ToggleGroup>
-            {!allEnvironments && (
+            {!allEnvironments && !allBranches && (
               <div className="min-w-48 flex-1">
                 <SelectWithSearch
                   label="Environment"
@@ -149,6 +165,13 @@ export function CredentialForm({
             <Alert severity="info">
               Environment-specific requests must specify the environment name.
               This access includes production.
+            </Alert>
+          )}
+          {!allEnvironments && allBranches && (
+            <Alert severity="info">
+              Access includes current and future branch environments, not
+              production. Specify a branch name for environment-specific
+              requests.
             </Alert>
           )}
         </div>
