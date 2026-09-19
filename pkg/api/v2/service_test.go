@@ -1137,6 +1137,33 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, int32(1), resp.Page.Limit)
 	})
 
+	t.Run("rejects total count with query", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Runs: &mockRunProvider{}}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query:   new(`event.name == "test"`),
+			Include: []string{"total_count"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "include total_count cannot be used with query")
+	})
+
+	t.Run("returns requested total count", func(t *testing.T) {
+		totalCount := int64(27)
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.MatchedBy(func(opts GetRunsOpts) bool {
+			return len(opts.Include) == 1 && opts.Include[0] == RunListIncludeTotalCount
+		})).Return(&GetRunsResult{TotalCount: &totalCount}, nil).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Include: []string{"total_count"},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, totalCount, resp.GetTotalCount())
+		require.NotNil(t, resp.TotalCount)
+		reader.AssertExpectations(t)
+	})
+
 	t.Run("omits timing fields for a queued run", func(t *testing.T) {
 		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, mock.Anything).Return(&GetRunsResult{

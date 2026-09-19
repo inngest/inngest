@@ -434,6 +434,48 @@ func TestRunProviderGetRunsPassesCEL(t *testing.T) {
 	require.Equal(t, `event.data.userId == "123"`, data.listOpts.Filter.CEL)
 }
 
+func TestRunProviderGetRunsTotalCount(t *testing.T) {
+	from := time.Now().UTC().Add(-time.Hour)
+	until := from.Add(30 * time.Minute)
+	deferred := true
+	data := &stubRunProviderDataReader{count: 42}
+
+	result, err := (&runProvider{data: data}).GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit:       20,
+		From:        &from,
+		Until:       &until,
+		TimeField:   apiv2.RunTimeFieldEndedAt,
+		Status:      []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED},
+		AppIDs:      []string{"app"},
+		FunctionIDs: []string{"function"},
+		IsDeferred:  &deferred,
+		Order:       apiv2.OrderDirectionAsc,
+		Include:     []apiv2.RunListInclude{apiv2.RunListIncludeTotalCount},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, int64(42), *result.TotalCount)
+	require.NotNil(t, data.countOpts)
+	require.Equal(t, data.listOpts.Filter, data.countOpts.Filter)
+	require.Empty(t, data.countOpts.Order)
+	require.Empty(t, data.countOpts.Cursor)
+	require.Zero(t, data.countOpts.Items)
+}
+
+func TestRunProviderGetRunsSkipsTotalCountForCEL(t *testing.T) {
+	data := &stubRunProviderDataReader{count: 42}
+
+	result, err := (&runProvider{data: data}).GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit:   20,
+		CEL:     `event.name == "test"`,
+		Include: []apiv2.RunListInclude{apiv2.RunListIncludeTotalCount},
+	})
+
+	require.NoError(t, err)
+	require.Nil(t, result.TotalCount)
+	require.Nil(t, data.countOpts)
+}
+
 func TestRunProviderGetRunsPausedFilter(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -513,11 +555,19 @@ type stubRunProviderDataReader struct {
 	listedRuns          []*cqrs.TraceRun
 	listErr             error
 	listOpts            *cqrs.GetTraceRunOpt
+	count               int
+	countErr            error
+	countOpts           *cqrs.GetTraceRunOpt
 }
 
 func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	s.listOpts = &opts
 	return s.listedRuns, s.listErr
+}
+
+func (s *stubRunProviderDataReader) GetTraceRunsCount(ctx context.Context, opts cqrs.GetTraceRunOpt) (int, error) {
+	s.countOpts = &opts
+	return s.count, s.countErr
 }
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
