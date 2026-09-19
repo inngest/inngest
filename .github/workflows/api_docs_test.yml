@@ -1,0 +1,25 @@
+name: API Docs Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/api_v2_examples.json"
+  pull_request:
+    paths:
+      - "docs/api_v2_examples.json"
+
+permissions:
+  contents: read
+
+jobs:
+  examples:
+    name: Validate API examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+      - run: go test ./tools/convert-openapi -run Examples
