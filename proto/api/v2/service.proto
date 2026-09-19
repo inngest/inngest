@@ -3942,7 +3942,7 @@ message ListRunsRequest {
   ];
   repeated string include = 13 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional run expansions. Supported values: deferred_from."
+      description: "Optional run expansions. Supported values: deferred_from, total_count. total_count cannot be used with query."
     }
   ];
 }
@@ -4001,7 +4001,7 @@ message ListFunctionRunsRequest {
   ];
   repeated string include = 13 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional run expansions. Supported values: deferred_from."
+      description: "Optional run expansions. Supported values: deferred_from, total_count. total_count cannot be used with query."
     }
   ];
 }
@@ -4010,12 +4010,16 @@ message ListRunsResponse {
   repeated FunctionRun data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+  // Exact total matching run count when requested. Omitted otherwise and for progressive CEL searches.
+  optional int64 total_count = 4;
 }
 
 message ListFunctionRunsResponse {
   repeated FunctionRun data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+  // Exact total matching run count when requested. Omitted otherwise and for progressive CEL searches.
+  optional int64 total_count = 4;
 }
 
 message CancelRunRequest {

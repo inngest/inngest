@@ -135,9 +135,10 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		return nil, err
 	}
 	return &apiv2.ListFunctionRunsResponse{
-		Data:     resp.Data,
-		Metadata: resp.Metadata,
-		Page:     resp.Page,
+		Data:       resp.Data,
+		Metadata:   resp.Metadata,
+		Page:       resp.Page,
+		TotalCount: resp.TotalCount,
 	}, nil
 }
 
@@ -168,9 +169,10 @@ func (s *Service) listRuns(ctx context.Context, opts GetRunsOpts) (*apiv2.ListRu
 	}
 
 	return &apiv2.ListRunsResponse{
-		Data:     data,
-		Metadata: runsResponseMetadata(opts.From, opts.Until),
-		Page:     page,
+		Data:       data,
+		Metadata:   runsResponseMetadata(opts.From, opts.Until),
+		Page:       page,
+		TotalCount: result.TotalCount,
 	}, nil
 }
 
@@ -321,8 +323,17 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		switch RunListInclude(value) {
 		case RunListIncludeDeferredFrom:
 			include = append(include, RunListIncludeDeferredFrom)
+		case RunListIncludeTotalCount:
+			include = append(include, RunListIncludeTotalCount)
 		default:
 			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
+		}
+	}
+	if req.GetQuery() != "" {
+		for _, value := range include {
+			if value == RunListIncludeTotalCount {
+				return GetRunsOpts{}, fmt.Errorf("include total_count cannot be used with query")
+			}
 		}
 	}
 

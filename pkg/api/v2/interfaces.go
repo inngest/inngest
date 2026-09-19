@@ -109,7 +109,10 @@ type GetRunsOpts struct {
 
 type RunListInclude string
 
-const RunListIncludeDeferredFrom RunListInclude = "deferred_from"
+const (
+	RunListIncludeDeferredFrom RunListInclude = "deferred_from"
+	RunListIncludeTotalCount   RunListInclude = "total_count"
+)
 
 type RunTimeField int
 
@@ -162,6 +165,9 @@ type GetRunsResult struct {
 	Runs    []*RunListItem
 	Cursor  string
 	HasMore bool
+	// TotalCount is exact when requested without CEL. CEL searches discover
+	// matches progressively and leave this unset.
+	TotalCount *int64
 }
 
 type RunProvider interface {

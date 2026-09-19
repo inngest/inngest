@@ -8668,10 +8668,12 @@ func (x *ListFunctionRunsRequest) GetInclude() []string {
 }
 
 type ListRunsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
-	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Data     []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page     *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	// Exact total matching run count when requested. Omitted otherwise and for progressive CEL searches.
+	TotalCount    *int64 `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3,oneof" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8727,11 +8729,20 @@ func (x *ListRunsResponse) GetPage() *Page {
 	return nil
 }
 
+func (x *ListRunsResponse) GetTotalCount() int64 {
+	if x != nil && x.TotalCount != nil {
+		return *x.TotalCount
+	}
+	return 0
+}
+
 type ListFunctionRunsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
-	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Data     []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page     *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	// Exact total matching run count when requested. Omitted otherwise and for progressive CEL searches.
+	TotalCount    *int64 `protobuf:"varint,4,opt,name=total_count,json=totalCount,proto3,oneof" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8785,6 +8796,13 @@ func (x *ListFunctionRunsResponse) GetPage() *Page {
 		return x.Page
 	}
 	return nil
+}
+
+func (x *ListFunctionRunsResponse) GetTotalCount() int64 {
+	if x != nil && x.TotalCount != nil {
+		return *x.TotalCount
+	}
+	return 0
 }
 
 type CancelRunRequest struct {
@@ -9696,8 +9714,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xcf\n" +
-	"\n" +
+	"\t_ended_at\"\x84\v\n" +
 	"\x0fListRunsRequest\x12*\n" +
 	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
@@ -9714,15 +9731,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
 	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
-	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12X\n" +
-	"\ainclude\x18\r \x03(\tB>\x92A;29Optional run expansions. Supported values: deferred_from.R\aincludeB\x11\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12\x8c\x01\n" +
+	"\ainclude\x18\r \x03(\tBr\x92Ao2mOptional run expansions. Supported values: deferred_from, total_count. total_count cannot be used with query.R\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
 	"\f_is_deferredB\b\n" +
-	"\x06_query\"\xa0\n" +
+	"\x06_query\"\xd5\n" +
 	"\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
@@ -9740,23 +9757,29 @@ const file_api_v2_service_proto_rawDesc = "" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
 	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
-	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12X\n" +
-	"\ainclude\x18\r \x03(\tB>\x92A;29Optional run expansions. Supported values: deferred_from.R\aincludeB\x11\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12\x8c\x01\n" +
+	"\ainclude\x18\r \x03(\tBr\x92Ao2mOptional run expansions. Supported values: deferred_from, total_count. total_count cannot be used with query.R\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
 	"\f_is_deferredB\b\n" +
-	"\x06_query\"\x93\x01\n" +
+	"\x06_query\"\xc9\x01\n" +
 	"\x10ListRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x9b\x01\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\x12$\n" +
+	"\vtotal_count\x18\x04 \x01(\x03H\x00R\n" +
+	"totalCount\x88\x01\x01B\x0e\n" +
+	"\f_total_count\"\xd1\x01\n" +
 	"\x18ListFunctionRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\")\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\x12$\n" +
+	"\vtotal_count\x18\x04 \x01(\x03H\x00R\n" +
+	"totalCount\x88\x01\x01B\x0e\n" +
+	"\f_total_count\")\n" +
 	"\x10CancelRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\"t\n" +
 	"\x11CancelRunResponse\x12)\n" +
@@ -11105,6 +11128,8 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[125].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[126].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[127].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[128].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[129].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[133].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

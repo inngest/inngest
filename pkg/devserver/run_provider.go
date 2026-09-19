@@ -45,6 +45,7 @@ type runProviderDataReader interface {
 	GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*cqrs.Function, error)
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error)
 	GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error)
+	GetTraceRunsCount(ctx context.Context, opts cqrs.GetTraceRunOpt) (int, error)
 }
 
 type runSpanReader interface {
@@ -108,7 +109,7 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		eventIDs = append(eventIDs, opts.EventID)
 	}
 
-	rows, err := p.data.GetRuns(ctx, cqrs.GetTraceRunOpt{
+	listOpts := cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AccountID:    consts.DevServerAccountID,
 			WorkspaceID:  consts.DevServerEnvID,
@@ -129,7 +130,8 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		Cursor:        opts.Cursor,
 		Items:         uint(opts.Limit + 1),
 		IncludeOutput: opts.IncludeOutput,
-	})
+	}
+	rows, err := p.data.GetRuns(ctx, listOpts)
 	if err != nil {
 		if errors.Is(err, cqrs.ErrInvalidRunExpression) {
 			return nil, fmt.Errorf("%w: %v", apiv2.ErrExpressionInvalid, err)
@@ -186,10 +188,19 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		runs = runs[:opts.Limit]
 	}
 
-	return &apiv2.GetRunsResult{
+	result := &apiv2.GetRunsResult{
 		Runs:    runs,
 		HasMore: hasMore,
-	}, nil
+	}
+	if slices.Contains(opts.Include, apiv2.RunListIncludeTotalCount) && opts.CEL == "" {
+		count, err := p.data.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{Filter: listOpts.Filter})
+		if err != nil {
+			return nil, err
+		}
+		result.TotalCount = new(int64(count))
+	}
+
+	return result, nil
 }
 
 func runStatusesForCQRS(statuses []v2pb.FunctionRunStatus) ([]enums.RunStatus, error) {
