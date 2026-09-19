@@ -66,7 +66,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 ) {
   const env = useEnvironment();
 
-  const [{ data: functionData, fetching: isFunctionLoading }] = useFunction({
+  const [{ data: functionData }] = useFunction({
     functionSlug: functionSlug ?? '',
     pause: scope !== 'fn',
   });
@@ -82,11 +82,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const { value: tracePreviewEnabled } = booleanFlag(
     'traces-preview',
     true,
-    true,
-  );
-  const { isReady: isRestRunsFlagReady, value: restRunsEnabled } = booleanFlag(
-    'rest-runs-table',
-    false,
     true,
   );
   const [appIDs] = useStringArraySearchParam('filterApp');
@@ -151,18 +146,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ],
   );
 
-  const isRestRunsSelectionReady = isRestRunsFlagReady;
-  const isRestRunsRequested = restRunsEnabled;
-  const isRestRunsMetadataLoading =
-    isRestRunsRequested &&
-    ((scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
-      (scope === 'fn' &&
-        commonQueryVars.functionAppID === null &&
-        isFunctionLoading));
-  const pauseRuns = !isRestRunsSelectionReady || isRestRunsMetadataLoading;
-  const shouldUseREST =
-    !pauseRuns &&
-    isRestRunsRequested &&
+  const runsEnabled =
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
@@ -178,13 +162,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     progressiveSearch,
   } = useRunsPagination({
     commonQueryVars,
-    tracePreviewEnabled,
-    shouldUseREST,
-    pause: pauseRuns,
+    enabled: runsEnabled,
   });
 
   const [countRes, countRefetch] = useQuery({
-    pause: pauseRuns || (shouldUseREST && Boolean(search)),
+    pause: Boolean(search),
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
@@ -209,9 +191,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
-    if (!(shouldUseREST && search)) countRefetch();
+    if (!search) countRefetch();
     setRefreshNonce((n) => n + 1);
-  }, [countRefetch, reset, search, shouldUseREST]);
+  }, [countRefetch, reset, search]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {

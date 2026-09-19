@@ -14,18 +14,10 @@ import { useRunsPagination } from './useRunsPagination';
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
-  gqlRefetch: vi.fn(),
 }));
 
 vi.mock('@/queries/useInngestAPIFetch', () => ({
   useInngestAPIFetch: () => mocks.apiFetch,
-}));
-
-vi.mock('urql', () => ({
-  useQuery: () => [
-    { data: undefined, error: undefined, fetching: false },
-    mocks.gqlRefetch,
-  ],
 }));
 
 (
@@ -50,18 +42,16 @@ const commonQueryVars = {
 type RunsPaginationResult = ReturnType<typeof useRunsPagination>;
 
 function RunsPaginationHarness({
+  enabled = true,
   onRender,
-  pause = false,
 }: {
+  enabled?: boolean;
   onRender: (result: RunsPaginationResult) => void;
-  pause?: boolean;
 }) {
   onRender(
     useRunsPagination({
       commonQueryVars,
-      tracePreviewEnabled: false,
-      shouldUseREST: true,
-      pause,
+      enabled,
     }),
   );
   return null;
@@ -96,6 +86,30 @@ describe('REST runs pagination refresh', () => {
     container = undefined;
     queryClient = undefined;
     vi.clearAllMocks();
+  });
+
+  it('waits for route identifiers without falling back to another provider', async () => {
+    let result: RunsPaginationResult | undefined;
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness
+            enabled={false}
+            onRender={(value) => (result = value)}
+          />
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(result?.isLoadingInitial).toBe(true);
   });
 
   it('only refetches manually and refreshes from the first page', async () => {
@@ -160,27 +174,6 @@ describe('REST runs pagination refresh', () => {
       expect(result?.runs.map(({ id }) => id)).toEqual(['run-1']),
     );
     expect(mocks.apiFetch.mock.calls[2]?.[0]).not.toContain('cursor=');
-  });
-
-  it('does not start either transport while selection is paused', async () => {
-    let result: RunsPaginationResult | undefined;
-    queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(
-        <QueryClientProvider client={queryClient!}>
-          <RunsPaginationHarness pause onRender={(value) => (result = value)} />
-        </QueryClientProvider>,
-      );
-    });
-
-    expect(mocks.apiFetch).not.toHaveBeenCalled();
-    expect(result?.isLoadingInitial).toBe(true);
   });
 
   it('does not start another page request after pagination fails', async () => {

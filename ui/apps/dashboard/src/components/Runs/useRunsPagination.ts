@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { useQuery } from 'urql';
 
 import {
   useInngestAPIFetch,
   type InngestAPIFetch,
 } from '@/queries/useInngestAPIFetch';
 
-import { GetRunsDocument } from './queries';
 import { scanProgressivePages } from './progressiveRuns';
 import {
   fetchRunsPage,
@@ -17,7 +15,6 @@ import {
   RunsAPIError,
   type RestRunsPage,
 } from './restRuns';
-import { parseRunsData } from './utils';
 
 type UseRunsPaginationParams = {
   commonQueryVars: {
@@ -34,9 +31,7 @@ type UseRunsPaginationParams = {
     environmentSlug: string;
     functionAppID: string | null;
   };
-  tracePreviewEnabled: boolean;
-  shouldUseREST: boolean;
-  pause: boolean;
+  enabled: boolean;
 };
 
 export type ProgressiveSearchState = {
@@ -49,34 +44,19 @@ export type ProgressiveSearchState = {
 
 export function useRunsPagination({
   commonQueryVars,
-  tracePreviewEnabled,
-  shouldUseREST,
-  pause,
+  enabled,
 }: UseRunsPaginationParams) {
   const apiFetch = useInngestAPIFetch(commonQueryVars.environmentSlug);
   const queryClient = useQueryClient();
+  const useProgressive = Boolean(commonQueryVars.celQuery);
   const progressive = useProgressiveRuns({
-    enabled: !pause && shouldUseREST && Boolean(commonQueryVars.celQuery),
+    enabled: enabled && useProgressive,
     apiFetch,
     vars: commonQueryVars,
   });
-  const useProgressive = shouldUseREST && Boolean(commonQueryVars.celQuery);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [allRuns, setAllRuns] = useState<Run[]>([]);
-
-  const [queryRes, refetch] = useQuery({
-    pause: pause || shouldUseREST,
-    query: GetRunsDocument,
-    requestPolicy: 'network-only',
-    variables: {
-      ...commonQueryVars,
-      functionRunCursor: cursor,
-      preview: tracePreviewEnabled,
-    },
-  });
 
   const restQuery = useInfiniteQuery({
-    enabled: !pause && shouldUseREST && !useProgressive,
+    enabled: enabled && !useProgressive,
     queryKey: ['runs-rest-v2', commonQueryVars],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) =>
@@ -103,97 +83,30 @@ export function useRunsPagination({
     return [...byID.values()];
   }, [restQuery.data?.pages]);
 
-  const newRuns = useMemo(() => {
-    return parseRunsData(queryRes.data?.environment.runs.edges);
-  }, [queryRes.data?.environment.runs.edges]);
-
-  const pageInfo = queryRes.data?.environment.runs.pageInfo;
-  const hasNextPage = pageInfo?.hasNextPage ?? false;
-
-  // Create a stable stringified version of commonQueryVars for dependency tracking
-  const queryVarsKey = useMemo(
-    () => JSON.stringify(commonQueryVars),
-    [commonQueryVars],
-  );
-
-  // When new data comes in, either replace (first page) or append (subsequent pages)
-  useEffect(() => {
-    if (newRuns.length > 0) {
-      if (cursor === null) {
-        // First page - replace all runs
-        setAllRuns(newRuns);
-      } else {
-        // Subsequent pages - append only if we don't already have this data
-        setAllRuns((prev) => {
-          // Check if we already appended this page (avoid duplicates)
-          const firstNewRun = newRuns[0];
-          if (
-            prev.length > 0 &&
-            firstNewRun &&
-            prev.some((r) => r.id === firstNewRun.id)
-          ) {
-            return prev;
-          }
-          return [...prev, ...newRuns];
-        });
-      }
-    }
-  }, [newRuns, cursor]);
-
-  // Reset when filter variables change
-  useEffect(() => {
-    setCursor(null);
-    setAllRuns([]);
-  }, [queryVarsKey]);
-
   const loadMore = useCallback(() => {
-    if (shouldUseREST) {
-      if (!restQuery.error && !restQuery.isFetching && restQuery.hasNextPage) {
-        void restQuery.fetchNextPage();
-      }
-      return;
-    }
-    if (!queryRes.fetching && hasNextPage && pageInfo?.endCursor) {
-      setCursor(pageInfo.endCursor);
+    if (!restQuery.error && !restQuery.isFetching && restQuery.hasNextPage) {
+      void restQuery.fetchNextPage();
     }
   }, [
-    shouldUseREST,
     restQuery.error,
     restQuery.isFetching,
     restQuery.hasNextPage,
     restQuery.fetchNextPage,
-    queryRes.fetching,
-    hasNextPage,
-    pageInfo?.endCursor,
   ]);
 
   const reset = useCallback(() => {
-    if (pause) return;
+    if (!enabled) return;
     if (useProgressive) {
       progressive.reset();
       return;
     }
-    if (shouldUseREST) {
-      void queryClient.resetQueries({
-        queryKey: ['runs-rest-v2', commonQueryVars],
-        exact: true,
-      });
-      return;
-    }
-    setCursor(null);
-    setAllRuns([]);
-    refetch();
-  }, [
-    commonQueryVars,
-    pause,
-    progressive,
-    queryClient,
-    refetch,
-    shouldUseREST,
-    useProgressive,
-  ]);
+    void queryClient.resetQueries({
+      queryKey: ['runs-rest-v2', commonQueryVars],
+      exact: true,
+    });
+  }, [commonQueryVars, enabled, progressive, queryClient, useProgressive]);
 
-  if (pause) {
+  if (!enabled) {
     return {
       runs: [],
       isLoading: true,
@@ -224,29 +137,15 @@ export function useRunsPagination({
     };
   }
 
-  if (shouldUseREST) {
-    return {
-      runs: restRuns,
-      isLoading: restQuery.isFetching,
-      isLoadingInitial: restQuery.isLoading,
-      isLoadingMore: restQuery.isFetchingNextPage,
-      hasNextPage: restQuery.hasNextPage ?? false,
-      loadMore,
-      reset,
-      error: restQuery.error,
-      progressiveSearch: undefined,
-    };
-  }
-
   return {
-    runs: allRuns,
-    isLoading: queryRes.fetching,
-    isLoadingInitial: queryRes.fetching && cursor === null,
-    isLoadingMore: queryRes.fetching && cursor !== null,
-    hasNextPage,
+    runs: restRuns,
+    isLoading: restQuery.isFetching,
+    isLoadingInitial: restQuery.isLoading,
+    isLoadingMore: restQuery.isFetchingNextPage,
+    hasNextPage: restQuery.hasNextPage ?? false,
     loadMore,
     reset,
-    error: queryRes.error,
+    error: restQuery.error,
     progressiveSearch: undefined,
   };
 }
