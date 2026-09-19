@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Run } from '@inngest/components/RunsPage/types';
+import type {
+  FunctionRunStatus,
+  FunctionRunTimeField,
+} from '@inngest/components/types/functionRun';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   useInngestAPIFetch,
   type InngestAPIFetch,
 } from '@/queries/useInngestAPIFetch';
-
 import { scanProgressivePages } from './progressiveRuns';
 import {
   fetchRunsPage,
@@ -19,13 +22,11 @@ import {
 type UseRunsPaginationParams = {
   commonQueryVars: {
     appIDs: string[] | null;
-    restAppIDs: string[] | null | undefined;
-    environmentID: string;
     functionSlug: string | null;
     startTime: string;
     endTime: string | null;
-    status: any[] | null;
-    timeField: any;
+    status: FunctionRunStatus[] | null;
+    timeField: FunctionRunTimeField;
     celQuery: string | undefined;
     isDeferred: boolean | null;
     environmentSlug: string;
@@ -109,7 +110,6 @@ export function useRunsPagination({
   if (!enabled) {
     return {
       runs: [],
-      isLoading: true,
       isLoadingInitial: true,
       isLoadingMore: false,
       hasNextPage: false,
@@ -123,7 +123,6 @@ export function useRunsPagination({
   if (useProgressive) {
     return {
       runs: progressive.runs,
-      isLoading: progressive.state.phase === 'searching',
       isLoadingInitial:
         progressive.state.phase === 'searching' &&
         progressive.runs.length === 0,
@@ -139,7 +138,6 @@ export function useRunsPagination({
 
   return {
     runs: restRuns,
-    isLoading: restQuery.isFetching,
     isLoadingInitial: restQuery.isLoading,
     isLoadingMore: restQuery.isFetchingNextPage,
     hasNextPage: restQuery.hasNextPage ?? false,
@@ -169,8 +167,8 @@ export function fetchRestRuns(
       new RunsAPIError('Query cannot exceed 2048 bytes', 'query_too_long', 422),
     );
   }
-  // GraphQL identifies workflows by their app-qualified slug, while this REST
-  // route expects the configured function ID.
+  // Dashboard routes use an app-qualified function slug, while this REST route
+  // expects the configured function ID.
   const functionID =
     vars.functionSlug &&
     vars.functionAppID &&
@@ -198,7 +196,7 @@ export function fetchRestRuns(
   }
   for (const status of vars.status ?? []) params.append('status', status);
   if (!vars.functionSlug) {
-    for (const appID of vars.restAppIDs ?? []) params.append('appId', appID);
+    for (const appID of vars.appIDs ?? []) params.append('appId', appID);
   }
   return fetchRunsPage(apiFetch, pathname, params, signal);
 }

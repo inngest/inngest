@@ -14,7 +14,7 @@ import {
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParams';
-import { CombinedError, useQuery } from 'urql';
+import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
@@ -22,7 +22,7 @@ import { RunsOrderByField } from '@/gql/graphql';
 import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
-import { AppFilterDocument, CountRunsDocument } from './queries';
+import { AppFilterDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
@@ -44,21 +44,6 @@ type EnvProps = {
 };
 
 type Props = FnProps | EnvProps;
-
-const parseCelSearchError = (error: CombinedError | Error | undefined) => {
-  // REST returns Error subclasses while URQL returns CombinedError. Check each
-  // shape before reading transport-specific fields.
-  if (
-    error instanceof RunsAPIError &&
-    (error.code === 'expression_invalid' || error.code === 'query_too_long')
-  ) {
-    return error;
-  }
-  if (!(error instanceof CombinedError)) return;
-  return error.graphQLErrors.find(
-    (item) => item.extensions.code === 'expression_invalid',
-  );
-};
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   { functionSlug, scope }: Props,
@@ -106,20 +91,16 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     return toRunStatuses(rawFilteredStatus ?? []);
   }, [rawFilteredStatus]);
 
-  // TODO: Once REST is fully rolled out, store external app IDs in filterApp
-  // and remove this translation, even though that will break old bookmarks.
+  // App filters and existing bookmarks store GraphQL app IDs, while the REST
+  // endpoint accepts external app IDs.
   const restAppIDs = useMemo(
     () => getRestAppIDs(appIDs, appsRes.data?.env?.apps),
     [appIDs, appsRes.data?.env?.apps],
   );
 
-  const environment = useEnvironment();
-
   const commonQueryVars = useMemo(
     () => ({
-      appIDs: appIDs ?? null,
-      restAppIDs,
-      environmentID: environment.id,
+      appIDs: restAppIDs ?? null,
       functionSlug: functionSlug ?? null,
       startTime: calculatedStartTime.toISOString(),
       endTime: endTime ?? null,
@@ -127,13 +108,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       timeField,
       celQuery: search,
       isDeferred: excludeDeferred ? false : null,
-      environmentSlug: environment.slug,
+      environmentSlug: env.slug,
       functionAppID: functionData?.workspace.workflow?.app.externalID ?? null,
     }),
     [
-      appIDs,
       restAppIDs,
-      environment.id,
       functionSlug,
       calculatedStartTime,
       endTime,
@@ -141,7 +120,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       timeField,
       search,
       excludeDeferred,
-      environment.slug,
+      env.slug,
       functionData?.workspace.workflow?.app.externalID,
     ],
   );
@@ -150,7 +129,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
-  // Use the new hook to manage pagination
   const {
     runs,
     isLoadingInitial,
@@ -164,22 +142,12 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     commonQueryVars,
     enabled: runsEnabled,
   });
-
-  const [countRes, countRefetch] = useQuery({
-    pause: Boolean(search),
-    query: CountRunsDocument,
-    requestPolicy: 'network-only',
-    variables: commonQueryVars,
-  });
-
-  const searchError = parseCelSearchError(paginationError || countRes.error);
-
-  let totalCount = undefined;
-  if (!countRes.fetching) {
-    // Only set the total count if the count query has finished loading since we
-    // don't want to render stale data
-    totalCount = countRes.data?.environment.runs.totalCount;
-  }
+  const searchError =
+    paginationError instanceof RunsAPIError &&
+    (paginationError.code === 'expression_invalid' ||
+      paginationError.code === 'query_too_long')
+      ? paginationError
+      : undefined;
 
   const onScrollToTop = useCallback(() => {
     // Not needed with new hook, but keeping for compatibility
@@ -191,9 +159,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
-    if (!search) countRefetch();
     setRefreshNonce((n) => n + 1);
-  }, [countRefetch, reset, search]);
+  }, [reset]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -224,7 +191,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       getTrigger={getTrigger}
       functionIsPaused={functionData?.workspace.workflow?.isPaused ?? false}
       scope={scope}
-      totalCount={totalCount}
+      totalCount={undefined}
       searchError={searchError}
       error={paginationError}
       progressiveSearch={

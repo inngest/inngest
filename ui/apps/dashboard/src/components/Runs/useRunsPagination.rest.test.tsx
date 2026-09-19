@@ -26,13 +26,11 @@ vi.mock('@/queries/useInngestAPIFetch', () => ({
 
 const commonQueryVars = {
   appIDs: null,
-  restAppIDs: null,
-  environmentID: 'environment-id',
   functionSlug: null,
   startTime: '2026-09-15T00:00:00Z',
   endTime: null,
   status: null,
-  timeField: 'QUEUED_AT',
+  timeField: 'QUEUED_AT' as const,
   celQuery: undefined,
   isDeferred: null,
   environmentSlug: 'production',

@@ -160,13 +160,13 @@ it('translates selected app IDs for the REST request', async () => {
     ['internal-app-id'],
     [{ id: 'internal-app-id', externalID: 'public-app-id' }],
   );
+  expect(restAppIDs).toEqual(['public-app-id']);
+  if (!restAppIDs) throw new Error('expected translated app IDs');
 
   await fetchRestRuns(
     apiFetch,
     {
-      appIDs: ['internal-app-id'],
-      restAppIDs,
-      environmentID: 'environment-id',
+      appIDs: restAppIDs,
       functionSlug: null,
       startTime: '2026-08-31T10:00:00Z',
       endTime: '2026-08-31T11:00:00Z',

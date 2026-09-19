@@ -14,13 +14,11 @@ import { fetchRestRuns, useProgressiveRuns } from './useRunsPagination';
 
 const baseVars = {
   appIDs: null,
-  restAppIDs: null,
-  environmentID: 'environment-id',
   functionSlug: null,
   startTime: '2026-09-15T00:00:00Z',
   endTime: null,
   status: null,
-  timeField: 'STARTED_AT',
+  timeField: 'STARTED_AT' as const,
   isDeferred: null,
   environmentSlug: 'production',
   functionAppID: null,
@@ -58,9 +56,15 @@ describe('fetchRestRuns', () => {
       );
 
       expect(apiFetch).toHaveBeenCalledOnce();
-      expect(apiFetch.mock.calls[0]?.[0]).toMatch(
-        new RegExp(`/v2/apps/app/functions/${expectedFunctionID}/runs\\?`),
+      const requestURL = new URL(
+        apiFetch.mock.calls[0]?.[0] ?? '',
+        'https://api.example.com',
       );
+      expect(requestURL.pathname).toBe(
+        `/v2/apps/app/functions/${expectedFunctionID}/runs`,
+      );
+      expect(requestURL.searchParams.get('include')).toBe('deferred_from');
+      expect(requestURL.searchParams.has('appId')).toBe(false);
     },
   );
 });
