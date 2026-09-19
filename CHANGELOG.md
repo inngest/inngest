@@ -2,12 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.46.0] - 2026-09-19
+
+### 🚀 Features
+
+- *(api)* Add sandbox secret name arrays (#4864)
+
+### 🐛 Bug Fixes
+
+- *(api)* Preserve run list timestamps (#4887)
+
+### 🚜 Refactor
+
+- *(dashboard)* Omit unused deferred parent run IDs (#4888)
+
 ## [v1.45.1] - 2026-09-17
 
 ### 🐛 Bug Fixes
 
 - *(cli)* Better message when cli is unauthed (#4883)
 - *(queue)* Drop permanently unroutable items (#4878)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.45.1 (#4884)
 
 ## [v1.45.0] - 2026-09-17
 
