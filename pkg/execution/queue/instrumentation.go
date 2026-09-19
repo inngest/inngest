@@ -12,6 +12,7 @@ func newInstrumentationRole(q *queueProcessor, opts ...QueueRoleOpt) QueueRole {
 		ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 		return shard.Instrument(ctx)
 	}, func(ctx context.Context, shard QueueShard) {
+		metrics.GaugeQueuePartitionPeekLimit(ctx, q.PartitionPeekLimit(ctx, shard.Name()), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		metrics.GaugePartitionProcessorCapacity(ctx, q.partitionCapacity(), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		metrics.GaugePartitionProcessorInFlight(ctx, q.partitionSem.Count(), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})

@@ -88,13 +88,26 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 	}
 }
 
-// WithPartitionPeekMax sets the maximum partitions read in one scan.
-func WithPartitionPeekMax(max int64) QueueOpt {
+// WithPartitionPeekMaxGetter overrides the partition scan limit at runtime for
+// each queue shard. The getter may be called concurrently and must be safe for
+// concurrent use. Non-positive values fall back to PartitionPeekMax.
+func WithPartitionPeekMaxGetter(getter func(context.Context, string) int64) QueueOpt {
 	return func(q *QueueOptions) {
-		if max > 0 {
-			q.PartitionPeekMax = min(max, AbsolutePartitionPeekMax)
+		q.partitionPeekMaxGetter = getter
+	}
+}
+
+// PartitionPeekLimit returns the current partition peek limit for a shard.
+// The default is PartitionPeekMax, but this can be overridden by WithPartitionPeekMaxGetter.
+// Positive values are clamped between PartitionSelectionMax and AbsolutePartitionPeekMax.
+func (o *QueueOptions) PartitionPeekLimit(ctx context.Context, shardName string) int64 {
+	limit := int64(PartitionPeekMax)
+	if o.partitionPeekMaxGetter != nil {
+		if value := o.partitionPeekMaxGetter(ctx, shardName); value > 0 {
+			limit = value
 		}
 	}
+	return min(max(limit, PartitionSelectionMax), AbsolutePartitionPeekMax)
 }
 
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
@@ -493,10 +506,9 @@ type QueueOptions struct {
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
-	PeekMin int64
-	PeekMax int64
-	// PartitionPeekMax is the maximum partitions read in one scan.
-	PartitionPeekMax int64
+	PeekMin                int64
+	PeekMax                int64
+	partitionPeekMaxGetter func(context.Context, string) int64
 	// PeekSizeExponent is the exp. on the random skewed distribution
 	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
@@ -916,7 +928,6 @@ func NewQueueOptions(
 		},
 		PeekMin:                         DefaultQueuePeekMin,
 		PeekMax:                         DefaultQueuePeekMax,
-		PartitionPeekMax:                PartitionPeekMax,
 		PeekSizeExponent:                7,
 		shadowPeekMin:                   ShadowPartitionPeekMinBacklogs,
 		shadowPeekMax:                   ShadowPartitionPeekMaxBacklogs,

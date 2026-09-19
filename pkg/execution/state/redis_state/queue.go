@@ -1334,12 +1334,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
-	if limit > q.PartitionPeekMax {
-		limit = q.PartitionPeekMax
-	}
+	// The scanner already resolves the dynamic limit and divides it across accounts.
+	// Honor that budget without re-evaluating the getter or applying its floor;
+	// direct callers still get a default for non-positive limits and an absolute cap.
 	if limit <= 0 {
-		limit = q.PartitionPeekMax
+		limit = osqueue.PartitionPeekMax
 	}
+	limit = min(limit, osqueue.AbsolutePartitionPeekMax)
 
 	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
 	// to fetch the scores for all allowed partitions, then filter where score <= until.

@@ -20,6 +20,15 @@ func GaugeWorkerQueueCapacity(ctx context.Context, val int64, opts GaugeOpt) {
 	})
 }
 
+func GaugeQueuePartitionPeekLimit(ctx context.Context, val int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, val, GaugeOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_partition_peek_limit",
+		Description: "Effective partition peek budget per scan before division across accounts",
+		Tags:        opts.Tags,
+	})
+}
+
 func GaugeGlobalPartitionSize(ctx context.Context, val int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, val, GaugeOpt{
 		PkgName:     opts.PkgName,
