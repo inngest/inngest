@@ -98,7 +98,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const [excludeDeferred = false] = useBooleanSearchParam('excludeDeferred');
-  const [forceRestRuns] = useBooleanSearchParam('forceRestRuns');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -152,9 +151,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ],
   );
 
-  const isRestRunsSelectionReady =
-    forceRestRuns !== undefined || isRestRunsFlagReady;
-  const isRestRunsRequested = forceRestRuns ?? restRunsEnabled;
+  const isRestRunsSelectionReady = isRestRunsFlagReady;
+  const isRestRunsRequested = restRunsEnabled;
   const isRestRunsMetadataLoading =
     isRestRunsRequested &&
     ((scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
