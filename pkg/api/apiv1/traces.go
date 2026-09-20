@@ -407,7 +407,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		return fmt.Errorf("failed to create span: %w", err)
 	}
 
-	a.emitUserlandSpan(ctx, runID, fn, auth, parent, s, attrs)
+	a.emitUserlandSpan(ctx, l, runID, fn, auth, parent, s, attrs)
 
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
 		cfg.Attrs = cfg.Attrs.Merge(tenantAttrs)
@@ -451,7 +451,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 // span through its private TracerProvider rather than reusing this one
 // (this endpoint's span is created through the real, SQLite-backed
 // TracerProvider).
-func (a router) emitUserlandSpan(ctx context.Context, runID ulid.ULID, fn *cqrs.Function, auth apiv1auth.V1Auth, parent *meta.SpanReference, s *tracev1.Span, attrs []attribute.KeyValue) {
+func (a router) emitUserlandSpan(ctx context.Context, l logger.Logger, runID ulid.ULID, fn *cqrs.Function, auth apiv1auth.V1Auth, parent *meta.SpanReference, s *tracev1.Span, attrs []attribute.KeyValue) {
 	if len(a.opts.SyncLifecycleListeners) == 0 {
 		return
 	}
@@ -471,9 +471,9 @@ func (a router) emitUserlandSpan(ctx context.Context, runID ulid.ULID, fn *cqrs.
 		Attributes:   attrs,
 	}
 
-	for _, l := range a.opts.SyncLifecycleListeners {
-		l.OnExtendedTraceSpan(ctx, span)
-	}
+	execution.SafelyInvokeSyncListeners(ctx, l, a.opts.SyncLifecycleListeners, "OnExtendedTraceSpan", func(listener execution.SyncLifecycleListener) {
+		listener.OnExtendedTraceSpan(ctx, span)
+	})
 }
 
 func getInngestTraceRef(s *tracev1.Span) (*meta.SpanReference, error) {
