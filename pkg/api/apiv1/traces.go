@@ -458,9 +458,14 @@ func (a router) emitUserlandSpan(ctx context.Context, l logger.Logger, runID uli
 	}
 
 	span := execution.ExtendedTraceSpan{
-		AccountID:    auth.AccountID(),
-		EnvID:        auth.WorkspaceID(),
-		AppID:        fn.AppID,
+		AccountID: auth.AccountID(),
+		EnvID:     auth.WorkspaceID(),
+		AppID:     fn.AppID,
+		// AppName: intentionally left empty. Resolving it means an extra
+		// synchronous lookup (cqrs.AppReader.GetAppByID) on the OTLP
+		// span-ingestion hot path per userland span -- unsafe to add here
+		// until that lookup is cached/batched or made async. TODO: populate
+		// this once that's in place.
 		FunctionID:   fn.ID,
 		FunctionSlug: fn.Slug,
 		RunID:        runID,
