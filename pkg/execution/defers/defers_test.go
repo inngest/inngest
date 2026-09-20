@@ -21,11 +21,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeTracerProvider records every CreateSpanOptions passed to CreateSpan so
-// tests can assert on span timestamps/attributes without a real backend.
+// fakeTracerProvider records every CreateSpanOptions/UpdateSpanOptions
+// passed in so tests can assert on span timestamps/attributes/ordering
+// without a real backend. order, when set, lets callers interleave these
+// calls with other fakes' calls (e.g. state mutations, listener dispatch)
+// to assert relative ordering across objects.
 type fakeTracerProvider struct {
 	tracing.TracerProvider
 	createSpanCalls []*tracing.CreateSpanOptions
+	updateSpanCalls []*tracing.UpdateSpanOptions
+	order           *[]string
 }
 
 func (f *fakeTracerProvider) CreateSpan(_ context.Context, _ string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
@@ -33,14 +38,41 @@ func (f *fakeTracerProvider) CreateSpan(_ context.Context, _ string, opts *traci
 	return &meta.SpanReference{}, nil
 }
 
+func (f *fakeTracerProvider) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
+	f.updateSpanCalls = append(f.updateSpanCalls, opts)
+	if f.order != nil {
+		*f.order = append(*f.order, "span")
+	}
+	return nil
+}
+
 // recordingSyncListener records every OnDeferAdd/OnDeferAbort call.
 type recordingSyncListener struct {
 	execution.NoopSyncLifecycleListener
+	name      string
 	deferAdds []time.Time
+
+	abortCalls []abortCall
+	order      *[]string
+}
+
+type abortCall struct {
+	md             statev2.Metadata
+	targetHashedID string
+	fnSlug         string
+	userlandID     string
+	now            time.Time
 }
 
 func (r *recordingSyncListener) OnDeferAdd(_ context.Context, _ statev2.Metadata, _ statev2.Defer, _ string, now time.Time) {
 	r.deferAdds = append(r.deferAdds, now)
+}
+
+func (r *recordingSyncListener) OnDeferAbort(_ context.Context, md statev2.Metadata, targetHashedID, fnSlug, userlandID string, now time.Time) {
+	r.abortCalls = append(r.abortCalls, abortCall{md: md, targetHashedID: targetHashedID, fnSlug: fnSlug, userlandID: userlandID, now: now})
+	if r.order != nil {
+		*r.order = append(*r.order, "listener:"+r.name)
+	}
 }
 
 type fakeRunService struct {
@@ -51,6 +83,9 @@ type fakeRunService struct {
 	savedDeferCalls      int
 	setDeferStatusHashed string
 	setDeferStatusValue  enums.DeferStatus
+	setDeferStatusErr    error
+	setDeferStatusCalls  int
+	order                *[]string
 }
 
 func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.Defer) error {
@@ -60,9 +95,13 @@ func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.De
 }
 
 func (f *fakeRunService) SetDeferStatus(_ context.Context, _ statev2.ID, hashedID string, status enums.DeferStatus) error {
+	f.setDeferStatusCalls++
 	f.setDeferStatusHashed = hashedID
 	f.setDeferStatusValue = status
-	return nil
+	if f.order != nil && f.setDeferStatusErr == nil {
+		*f.order = append(*f.order, "state")
+	}
+	return f.setDeferStatusErr
 }
 
 func runMetadata() *statev2.Metadata {
@@ -240,5 +279,74 @@ func TestAbortFromOp(t *testing.T) {
 
 		r.Error(err)
 		r.Empty(fake.setDeferStatusHashed)
+	})
+
+	t.Run("surfaces parse error from malformed opts without touching state", func(t *testing.T) {
+		r := require.New(t)
+		fake := &fakeRunService{}
+		malformedOp := state.GeneratorOpcode{
+			Op:   enums.OpcodeDeferAbort,
+			ID:   "step-id",
+			Opts: json.RawMessage(`not-json`),
+		}
+
+		err := AbortFromOp(context.Background(), fake, nil, nil, logger.VoidLogger(), runMetadata(), malformedOp)
+
+		r.Error(err)
+		r.Zero(fake.setDeferStatusCalls)
+	})
+
+	t.Run("SetDeferStatus failure surfaces error without span update or listener callback", func(t *testing.T) {
+		r := require.New(t)
+		order := []string{}
+		fake := &fakeRunService{setDeferStatusErr: errors.New("redis dead"), order: &order}
+		tp := &fakeTracerProvider{order: &order}
+		listener := &recordingSyncListener{name: "l1", order: &order}
+
+		err := AbortFromOp(context.Background(), fake, tp, []execution.SyncLifecycleListener{listener}, logger.VoidLogger(), runMetadata(),
+			abortOp(t, state.DeferAbortOpts{TargetHashedID: "hash-1", FnSlug: "child-fn"}))
+
+		r.Error(err)
+		r.Equal(1, fake.setDeferStatusCalls)
+		r.Empty(tp.updateSpanCalls)
+		r.Empty(listener.abortCalls)
+		r.Empty(order)
+	})
+
+	t.Run("successful abort updates state before span and notifies listeners in order with shared identity", func(t *testing.T) {
+		r := require.New(t)
+		order := []string{}
+		fake := &fakeRunService{order: &order}
+		tp := &fakeTracerProvider{order: &order}
+		listener1 := &recordingSyncListener{name: "l1", order: &order}
+		listener2 := &recordingSyncListener{name: "l2", order: &order}
+		md := runMetadata()
+
+		op := abortOp(t, state.DeferAbortOpts{TargetHashedID: "hash-1", FnSlug: "child-fn"})
+		op.Userland = &struct {
+			ID    string `json:"id"`
+			Index int    `json:"index,omitempty"`
+		}{ID: "user-facing-id"}
+
+		err := AbortFromOp(context.Background(), fake, tp, []execution.SyncLifecycleListener{listener1, listener2}, logger.VoidLogger(), md, op)
+		r.NoError(err)
+
+		// State mutation happens before the span update, which happens
+		// before either listener is notified, in registration order.
+		r.Equal([]string{"state", "span", "listener:l1", "listener:l2"}, order)
+
+		r.Equal("hash-1", fake.setDeferStatusHashed)
+		r.Equal(enums.DeferStatusAborted, fake.setDeferStatusValue)
+
+		r.Len(listener1.abortCalls, 1)
+		r.Len(listener2.abortCalls, 1)
+		for _, call := range []abortCall{listener1.abortCalls[0], listener2.abortCalls[0]} {
+			r.Equal(*md, call.md)
+			r.Equal("hash-1", call.targetHashedID)
+			r.Equal("child-fn", call.fnSlug)
+			r.Equal("user-facing-id", call.userlandID)
+		}
+		// Both listeners are notified with the same timestamp.
+		r.Equal(listener1.abortCalls[0].now, listener2.abortCalls[0].now)
 	})
 }
