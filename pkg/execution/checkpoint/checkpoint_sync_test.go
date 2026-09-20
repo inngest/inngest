@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -1023,6 +1024,159 @@ func TestCheckpointSyncSteps_DuplicateSaveSuppressesStepFinishedMetric(t *testin
 	mocks.metrics.AssertNotCalled(t, "OnStepFinished")
 }
 
+// TestCheckpointSyncSteps_NotifiesRunStepRunFinishedLifecycle proves the sync
+// step path actually dispatches executor.RunStepRunFinishedLifecycle with a
+// real (non-zero) LifecycleItem, and that a duplicate save suppresses it --
+// mirroring the OnStepFinished metric's suppression above. mockExecutor's
+// RunStepRunFinishedLifecycle only records a call when a test registers an
+// expectation for it (see its doc comment), so prior tests exercising this
+// opcode without registering one would pass even if checkpoint.go's
+// production dispatch were deleted; this test closes that gap by asserting
+// on it explicitly.
+func TestCheckpointSyncSteps_NotifiesRunStepRunFinishedLifecycle(t *testing.T) {
+	t.Run("dispatches with a real, non-zero LifecycleItem on success", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+			Name: "Step 1",
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, op)
+
+		expectedData := map[string]any{"data": json.RawMessage(op.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).Return(false, nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+		mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted)
+
+		mocks.executor.On("RunStepRunFinishedLifecycle", ctx, testData.metadata, mock.MatchedBy(func(item queue.Item) bool {
+			// Unlike the async path (which passes a placeholder
+			// queue.Item{}), the sync path builds this from
+			// checkpointRunContext.LifecycleItem(), so it must carry real
+			// tenant/run identity and a non-empty GroupID.
+			return item.Identifier.RunID == testData.metadata.ID.RunID &&
+				item.Identifier.WorkflowID == testData.metadata.ID.FunctionID &&
+				item.Identifier.AppID == testData.metadata.ID.Tenant.AppID &&
+				item.GroupID != ""
+		}), inngest.SourceEdge, mock.MatchedBy(func(o state.GeneratorOpcode) bool {
+			return o.ID == "step-1"
+		}), mock.AnythingOfType("time.Time")).Return()
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.NoError(err)
+
+		mocks.executor.AssertExpectations(t)
+	})
+
+	t.Run("does not dispatch on a duplicate save", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+			Name: "Step 1",
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, op)
+
+		expectedData := map[string]any{"data": json.RawMessage(op.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).
+			Return(false, state.ErrDuplicateResponse)
+
+		// Registering the expectation (rather than omitting it) means the
+		// mock would fail this test with "unexpected call" if production
+		// code called it anyway -- proving the negative, not just failing
+		// to prove the positive.
+		mocks.executor.On("RunStepRunFinishedLifecycle", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.NoError(err)
+
+		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+	})
+
+	t.Run("does not dispatch when SaveStep fails", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+			Name: "Step 1",
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, op)
+
+		expectedData := map[string]any{"data": json.RawMessage(op.Data)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedOutputBytes).
+			Return(false, errors.New("redis dead"))
+		mocks.executor.On("RunStepRunFinishedLifecycle", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.Error(err)
+
+		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+	})
+}
+
+// TestCheckpointSyncSteps_NotifiesSyncListenersOfAcceptedDefer proves
+// Opts.SyncLifecycleListeners is forwarded all the way into
+// defers.SaveFromOp for the sync checkpoint path -- the same forwarding
+// TestSyncStepMetadata's "notifies sync lifecycle listeners of
+// opcode-attached metadata" subtest proves for CreateMetadataSpanFromValues,
+// but for the OnDeferAdd hook instead.
+func TestCheckpointSyncSteps_NotifiesSyncListenersOfAcceptedDefer(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID: "step-defer",
+		Op: enums.OpcodeDeferAdd,
+		Opts: map[string]any{
+			"fn_slug": "onDefer-score",
+			"input":   map[string]any{"user_id": "u_123"},
+		},
+	}
+
+	mocks, testData := setupSyncCheckpointTest(t, op)
+
+	listener := &recordingDeferListener{}
+	testData.checkpointer = New(Opts{
+		State:                  mocks.state,
+		TracerProvider:         mocks.tracer,
+		Queue:                  mocks.queue,
+		MetricsProvider:        mocks.metrics,
+		Executor:               mocks.executor,
+		FnReader:               mocks.fnReader,
+		SyncLifecycleListeners: []execution.SyncLifecycleListener{listener},
+	})
+
+	mocks.state.On("SaveDefer", ctx, testData.metadata.ID, mock.MatchedBy(func(d state.Defer) bool {
+		return d.FnSlug == "onDefer-score" && d.HashedID == "step-defer"
+	})).Return(nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+
+	err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+	require.NoError(err)
+
+	require.Len(listener.entries, 1, "Expected the defer listener to be notified once")
+	require.Equal("onDefer-score", listener.entries[0].FnSlug)
+	require.Equal("step-defer", listener.entries[0].HashedID)
+}
+
 //
 //
 // Testing utils.
@@ -1110,6 +1264,17 @@ type recordingMetadataListener struct {
 
 func (r *recordingMetadataListener) OnMetadataEntry(ctx context.Context, entry execution.MetadataEntry) {
 	r.entries = append(r.entries, entry)
+}
+
+// recordingDeferListener implements execution.SyncLifecycleListener,
+// recording every OnDeferAdd call for assertions.
+type recordingDeferListener struct {
+	execution.NoopSyncLifecycleListener
+	entries []state.Defer
+}
+
+func (r *recordingDeferListener) OnDeferAdd(ctx context.Context, md state.Metadata, d state.Defer, userlandID string, now time.Time) {
+	r.entries = append(r.entries, d)
 }
 
 type testSyncMocks struct {
