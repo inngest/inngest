@@ -657,9 +657,10 @@ func (e *executor) RunFunctionFinishedLifecycle(
 	for _, l := range e.lifecycles {
 		go l.OnFunctionFinished(context.WithoutCancel(ctx), md, item, evts, resp)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnFunctionFinished(ctx, md, item, evts, resp, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionFinished(ctx, md, item, evts, resp, syncNow)
+	})
 }
 
 // RunStepRunFinishedLifecycle fans OnStepRunFinished out to every
@@ -675,9 +676,9 @@ func (e *executor) RunStepRunFinishedLifecycle(
 	gen state.GeneratorOpcode,
 	now time.Time,
 ) {
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepRunFinished", func(sl execution.SyncLifecycleListener) {
 		sl.OnStepRunFinished(ctx, md, item, edge, gen, now)
-	}
+	})
 }
 
 // RunStepRunFailedLifecycle fans OnStepRunFailed out to every registered
@@ -693,9 +694,9 @@ func (e *executor) RunStepRunFailedLifecycle(
 	attempt int,
 	now time.Time,
 ) {
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepRunFailed", func(sl execution.SyncLifecycleListener) {
 		sl.OnStepRunFailed(ctx, md, item, edge, gen, status, attempt, now)
-	}
+	})
 }
 
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
@@ -1790,9 +1791,9 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		for _, sl := range e.syncLifecycles {
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
 			sl.OnFunctionScheduled(ctx, metadata, item, evts)
-		}
+		})
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -1911,9 +1912,9 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
 		sl.OnFunctionScheduled(ctx, metadata, item, evts)
-	}
+	})
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -2276,9 +2277,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			for _, e := range e.lifecycles {
 				go e.OnFunctionStarted(context.WithoutCancel(ctx), md, item, events)
 			}
-			for _, sl := range e.syncLifecycles {
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionStarted", func(sl execution.SyncLifecycleListener) {
 				sl.OnFunctionStarted(ctx, md, item, events)
-			}
+			})
 		}
 	}
 
@@ -2389,9 +2390,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				// step statuses when a step finishes.
 				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnStepFinished(ctx, md, item, edge, resp, err, instance.reqStart, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepFinished", func(sl execution.SyncLifecycleListener) {
+				sl.OnStepFinished(ctx, md, item, edge, resp, err, instance.reqStart, syncNow)
+			})
 			return nil, err
 		}
 
@@ -2478,9 +2480,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnStepFinished(ctx, i.md, i.item, i.edge, i.resp, nil, i.reqStart, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepFinished", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepFinished(ctx, i.md, i.item, i.edge, i.resp, nil, i.reqStart, syncNow)
+	})
 
 	if i.resp.Err == nil && i.resp.IsOpResponse() {
 		// Handle generator op responses then return.
@@ -2528,9 +2531,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 				}
-				for _, sl := range e.syncLifecycles {
-					sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
-				}
+				syncNow := e.now()
+				execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+					sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, syncNow)
+				})
 
 				return nil
 			}
@@ -2553,14 +2557,18 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusErrored)
 			// Retries are a native aspect of the queue;  returning errors always
 			// retries steps if possible.
+			//
+			// Increment once, regardless of how many legacy/sync listeners are
+			// registered -- this must not vary with listener count.
+			i.IncrementAttempt()
 			for _, e := range e.lifecycles {
 				// Run the lifecycle method for this retry, which is baked into the queue.
-				i.IncrementAttempt()
 				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnStepScheduled(ctx, i.md, i.item, &i.resp.Step.Name, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepScheduled", func(sl execution.SyncLifecycleListener) {
+				sl.OnStepScheduled(ctx, i.md, i.item, &i.resp.Step.Name, syncNow)
+			})
 			return nil
 		}
 
@@ -2596,9 +2604,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
-		}
+		syncNow := e.now()
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, syncNow)
+		})
 
 		return nil
 	}
@@ -2631,9 +2640,10 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(context.WithoutCancel(ctx), i.md, i.item, i.events, *i.resp)
 		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, e.now())
-		}
+		syncNow := e.now()
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+			sl.OnFunctionFinished(ctx, i.md, i.item, i.events, *i.resp, syncNow)
+		})
 	}
 
 	return nil
@@ -2792,9 +2802,9 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, endpoint.String())
 	}
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepStarted", func(sl execution.SyncLifecycleListener) {
 		sl.OnStepStarted(ctx, i.md, i.item, i.edge, endpoint.String())
-	}
+	})
 
 	switch d := e.fnDriver(ctx, i.f).(type) {
 	case driver.DriverV2:
@@ -3406,9 +3416,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			for _, e := range e.lifecycles {
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionCancelled", func(sl execution.SyncLifecycleListener) {
+				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, syncNow)
+			})
 			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 				l.OnRunCancelled(ctx, id, r)
 			})
@@ -3438,9 +3449,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionCancelled", func(sl execution.SyncLifecycleListener) {
+				sl.OnFunctionCancelled(ctx, md, r, []json.RawMessage{}, syncNow)
+			})
 			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 				l.OnRunCancelled(ctx, id, r)
 			})
@@ -3477,9 +3489,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnFunctionCancelled(ctx, md, r, evts, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionCancelled", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionCancelled(ctx, md, r, evts, syncNow)
+	})
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnRunCancelled(ctx, id, r)
 	})
@@ -3622,23 +3635,23 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
-		for _, sl := range e.syncLifecycles {
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnInvokeFunctionResumed", func(sl execution.SyncLifecycleListener) {
 			sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
-		}
+		})
 	case enums.OpcodeWaitForSignal:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
-		for _, sl := range e.syncLifecycles {
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForSignalResumed", func(sl execution.SyncLifecycleListener) {
 			sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
-		}
+		})
 	case enums.OpcodeWaitForEvent:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
-		for _, sl := range e.syncLifecycles {
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForEventResumed", func(sl execution.SyncLifecycleListener) {
 			sl.OnWaitForEventResumed(ctx, md, pause, r, now)
-		}
+		})
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnRunResumed(ctx, id, r, code)
@@ -3822,23 +3835,23 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-			for _, sl := range e.syncLifecycles {
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnInvokeFunctionResumed", func(sl execution.SyncLifecycleListener) {
 				sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
-			}
+			})
 		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-			for _, sl := range e.syncLifecycles {
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForSignalResumed", func(sl execution.SyncLifecycleListener) {
 				sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
-			}
+			})
 		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-			for _, sl := range e.syncLifecycles {
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForEventResumed", func(sl execution.SyncLifecycleListener) {
 				sl.OnWaitForEventResumed(ctx, md, pause, r, now)
-			}
+			})
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnRunResumed(ctx, sv2id, r, code)
@@ -4254,10 +4267,11 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		var stepName *string = nil
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName)
 	}
-	for _, sl := range e.syncLifecycles {
-		var stepName *string = nil
-		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName, e.now())
-	}
+	syncNow := e.now()
+	var stepName *string = nil
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepScheduled", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, stepName, syncNow)
+	})
 
 	return nil
 }
@@ -4468,10 +4482,11 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 			lifecycleItem := runCtx.LifecycleItem()
 			go l.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name)
 		}
-		for _, sl := range e.syncLifecycles {
-			lifecycleItem := runCtx.LifecycleItem()
-			sl.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name, e.now())
-		}
+		syncNow := e.now()
+		lifecycleItem := runCtx.LifecycleItem()
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepScheduled", func(sl execution.SyncLifecycleListener) {
+			sl.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name, syncNow)
+		})
 
 		return ErrHandledStepError
 	}
@@ -4576,9 +4591,10 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepScheduled", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, nil, syncNow)
+	})
 
 	return nil
 }
@@ -4614,9 +4630,10 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 				*resp,
 			)
 		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, e.now())
-		}
+		syncNow := e.now()
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, syncNow)
+		})
 	}
 
 	return err
@@ -4662,9 +4679,10 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 				*resp,
 			)
 		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, e.now())
-		}
+		syncNow := e.now()
+		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionFinished", func(sl execution.SyncLifecycleListener) {
+			sl.OnFunctionFinished(ctx, *md, runCtx.LifecycleItem(), evts, *resp, syncNow)
+		})
 	}
 
 	return err
@@ -4780,9 +4798,10 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepScheduled", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepScheduled(ctx, *runCtx.Metadata(), nextItem, &gen.Name, syncNow)
+	})
 	return err
 }
 
@@ -4898,9 +4917,10 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, until)
 	}
-	for _, sl := range e.syncLifecycles {
-		sl.OnSleep(ctx, *runCtx.Metadata(), lifecycleItem, gen, until, e.now())
-	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnSleep", func(sl execution.SyncLifecycleListener) {
+		sl.OnSleep(ctx, *runCtx.Metadata(), lifecycleItem, gen, until, syncNow)
+	})
 
 	return err
 }
@@ -5603,9 +5623,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
 	}
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnInvokeFunction", func(sl execution.SyncLifecycleListener) {
 		sl.OnInvokeFunction(ctx, *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
-	}
+	})
 
 	return err
 }
@@ -5815,9 +5835,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, pause)
 	}
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForEvent", func(sl execution.SyncLifecycleListener) {
 		sl.OnWaitForEvent(ctx, *runCtx.Metadata(), lifecycleItem, gen, pause)
-	}
+	})
 
 	return err
 }
