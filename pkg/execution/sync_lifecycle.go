@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
@@ -26,7 +28,40 @@ import (
 // path. Implementations MUST NOT block: no I/O, no locking, no flush logic in
 // any hook body — a slow implementation here adds latency directly to the
 // execution/ingestion critical path.
+//
+// Callers MUST fan out to every registered listener through
+// SafelyInvokeSyncListeners rather than looping and calling a hook directly:
+// a panicking implementation must never crash the execution, checkpointing,
+// defer-handling, or OTLP-ingestion path that happened to be dispatching to
+// it, and must never stop later listeners in the same fan-out from running.
 var _ SyncLifecycleListener = (*NoopSyncLifecycleListener)(nil)
+
+// SafelyInvokeSyncListeners calls fn once for each listener in ls -- a
+// single SyncLifecycleListener hook invocation -- recovering from any panic
+// instead of letting it propagate into the caller's critical path or stop
+// the fan-out partway through. hook names the hook being invoked, for the
+// log line. See the SyncLifecycleListener doc comment: every call site
+// fanning out to SyncLifecycleListeners MUST go through this.
+func SafelyInvokeSyncListeners(ctx context.Context, log logger.Logger, ls []SyncLifecycleListener, hook string, fn func(SyncLifecycleListener)) {
+	for _, l := range ls {
+		invokeSyncListener(ctx, log, hook, l, fn)
+	}
+}
+
+func invokeSyncListener(ctx context.Context, log logger.Logger, hook string, l SyncLifecycleListener, fn func(SyncLifecycleListener)) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.ErrorContext(
+				ctx,
+				"panic in sync lifecycle listener",
+				"hook", hook,
+				"error", r,
+				"stack", string(debug.Stack()),
+			)
+		}
+	}()
+	fn(l)
+}
 
 type SyncLifecycleListener interface {
 	// OnFunctionScheduled is called synchronously when a new function is
