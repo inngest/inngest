@@ -4387,7 +4387,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	))
 
 	e.emitStepSpan(ctx, runCtx, &gen, extraMetadata, nil)
-	e.RunStepRunFinishedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, e.now())
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -4407,6 +4406,12 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	if err != nil {
 		return err
 	}
+
+	// Notify sync listeners only once the step's output is durably
+	// persisted -- a SaveStep failure above returns before this point, so a
+	// listener (e.g. dual-write) never records a step as finished when it
+	// never actually committed.
+	e.RunStepRunFinishedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, e.now())
 
 	// Once step output has been saved, we can release the held capacity.
 	// This allows us to continue work in the queue on other items even before
@@ -4505,7 +4510,6 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
-	e.RunStepRunFailedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, enums.StepStatusFailed, runCtx.AttemptCount(), e.now())
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -4519,6 +4523,12 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	if err != nil {
 		return err
 	}
+
+	// Notify sync listeners only once the step's failure is durably
+	// persisted -- a SaveStep failure above returns before this point, so a
+	// listener (e.g. dual-write) never records a step as failed when it
+	// never actually committed.
+	e.RunStepRunFailedLifecycle(ctx, *runCtx.Metadata(), runCtx.LifecycleItem(), edge.Edge, gen, enums.StepStatusFailed, runCtx.AttemptCount(), e.now())
 
 	// Once step output has been saved, we can release the held capacity.
 	// This allows us to continue work in the queue on other items even before
