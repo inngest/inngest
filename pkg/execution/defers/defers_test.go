@@ -6,16 +6,42 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+// fakeTracerProvider records every CreateSpanOptions passed to CreateSpan so
+// tests can assert on span timestamps/attributes without a real backend.
+type fakeTracerProvider struct {
+	tracing.TracerProvider
+	createSpanCalls []*tracing.CreateSpanOptions
+}
+
+func (f *fakeTracerProvider) CreateSpan(_ context.Context, _ string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+	f.createSpanCalls = append(f.createSpanCalls, opts)
+	return &meta.SpanReference{}, nil
+}
+
+// recordingSyncListener records every OnDeferAdd/OnDeferAbort call.
+type recordingSyncListener struct {
+	execution.NoopSyncLifecycleListener
+	deferAdds []time.Time
+}
+
+func (r *recordingSyncListener) OnDeferAdd(_ context.Context, _ statev2.Metadata, _ statev2.Defer, _ string, now time.Time) {
+	r.deferAdds = append(r.deferAdds, now)
+}
 
 type fakeRunService struct {
 	statev2.RunService
@@ -149,6 +175,49 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSaveFromOp_MalformedOptsDoesNotPanic proves that a defer op whose Opts
+// blob fails to unmarshal (DeferAddOpts returning (nil, err), distinct from
+// unmarshal-succeeds-but-Validate-fails cases which return a non-nil opts)
+// is soft-rejected without dereferencing the nil opts.
+func TestSaveFromOp_MalformedOptsDoesNotPanic(t *testing.T) {
+	r := require.New(t)
+	fake := &fakeRunService{}
+	op := state.GeneratorOpcode{
+		Op:   enums.OpcodeDeferAdd,
+		ID:   "hash-malformed",
+		Opts: json.RawMessage(`not-json`),
+	}
+
+	r.NotPanics(func() {
+		err := SaveFromOp(context.Background(), fake, nil, nil, logger.VoidLogger(), runMetadata(), op)
+		r.NoError(err)
+	})
+	r.Zero(fake.savedDeferCalls)
+}
+
+// TestSaveFromOp_SpanAndListenerShareTimestamp proves the executor.defer
+// span's StartTime/EndTime and the OnDeferAdd timestamp all come from the
+// same instant, rather than each independently calling time.Now().
+func TestSaveFromOp_SpanAndListenerShareTimestamp(t *testing.T) {
+	r := require.New(t)
+	fake := &fakeRunService{}
+	tp := &fakeTracerProvider{}
+	listener := &recordingSyncListener{}
+
+	op := deferAddOp(t, "hash-timestamp", state.DeferAddOpts{
+		FnSlug: "child-fn",
+		Input:  json.RawMessage(`{"x":1}`),
+	})
+
+	err := SaveFromOp(context.Background(), fake, tp, []execution.SyncLifecycleListener{listener}, logger.VoidLogger(), runMetadata(), op)
+	r.NoError(err)
+
+	r.Len(tp.createSpanCalls, 1)
+	r.Len(listener.deferAdds, 1)
+	r.Equal(tp.createSpanCalls[0].StartTime, listener.deferAdds[0])
+	r.Equal(tp.createSpanCalls[0].EndTime, listener.deferAdds[0])
 }
 
 func TestAbortFromOp(t *testing.T) {

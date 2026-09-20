@@ -88,15 +88,19 @@ func SaveFromOp(
 		}
 	}
 
-	d := statev2.Defer{
-		FnSlug:         opts.FnSlug,
-		HashedID:       op.ID,
-		ScheduleStatus: enums.DeferStatusAfterRun,
-		Input:          opts.Input,
-		Meta:           opts.Meta,
-	}
-
+	// opts is only guaranteed non-nil when err == nil, i.e. rejectReason is
+	// still "" here -- malformed serialized options (err != nil, opts nil)
+	// must not dereference opts.
+	var d statev2.Defer
 	if rejectReason == "" {
+		d = statev2.Defer{
+			FnSlug:         opts.FnSlug,
+			HashedID:       op.ID,
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          opts.Input,
+			Meta:           opts.Meta,
+		}
+
 		saveErr := rs.SaveDefer(ctx, md.ID, d)
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):
@@ -122,10 +126,10 @@ func SaveFromOp(
 
 	if rejectReason == "" {
 		// Create span for the defer that'll schedule after the parent run ends.
-		createDeferSpan(ctx, tp, log, md, d, userlandID)
-		for _, sl := range syncListeners {
+		createDeferSpan(ctx, tp, log, md, d, userlandID, now)
+		execution.SafelyInvokeSyncListeners(ctx, log, syncListeners, "OnDeferAdd", func(sl execution.SyncLifecycleListener) {
 			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
-		}
+		})
 	} else if rejectionPersisted {
 		fnSlug := ""
 		if opts != nil {
@@ -138,10 +142,10 @@ func SaveFromOp(
 			ScheduleStatus: enums.DeferStatusRejected,
 		}
 		// Create span for the rejected defer.
-		createDeferSpan(ctx, tp, log, md, d, userlandID)
-		for _, sl := range syncListeners {
+		createDeferSpan(ctx, tp, log, md, d, userlandID, now)
+		execution.SafelyInvokeSyncListeners(ctx, log, syncListeners, "OnDeferAdd", func(sl execution.SyncLifecycleListener) {
 			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
-		}
+		})
 	}
 
 	return nil
@@ -192,15 +196,17 @@ func AbortFromOp(
 
 	now := time.Now()
 	updateDeferSpanStatus(ctx, tp, log, md, opts.TargetHashedID, enums.DeferStatusAborted)
-	for _, sl := range syncListeners {
+	execution.SafelyInvokeSyncListeners(ctx, log, syncListeners, "OnDeferAbort", func(sl execution.SyncLifecycleListener) {
 		sl.OnDeferAbort(ctx, *md, opts.TargetHashedID, opts.FnSlug, userlandID, now)
-	}
+	})
 	return nil
 }
 
 // createDeferSpan writes the executor.defer span. userlandID is passed
 // separately because it is not part of the persisted defer record: it's
-// only used here to display the user-typed defer ID in the trace UI.
+// only used here to display the user-typed defer ID in the trace UI. now is
+// passed in rather than captured here so the span's timestamps match the
+// same instant reported to syncListeners' OnDeferAdd for this event.
 func createDeferSpan(
 	ctx context.Context,
 	tp tracing.TracerProvider,
@@ -208,6 +214,7 @@ func createDeferSpan(
 	md *statev2.Metadata,
 	d statev2.Defer,
 	userlandID string,
+	now time.Time,
 ) {
 	if tp == nil {
 		return
@@ -224,7 +231,6 @@ func createDeferSpan(
 		return
 	}
 
-	now := time.Now()
 	_, err = tp.CreateSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
 		Debug:     &tracing.SpanDebugData{Location: "defers.emitDeferSpan"},
 		Metadata:  md,
