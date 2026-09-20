@@ -183,8 +183,23 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 	// a MetadataSpanAttrOpts (e.g. the executor's createMetadataSpanOnParent,
 	// apiv1/metadata.go's addTenantIDs), independently of tenant/run
 	// identity's source above.
+	//
+	// StepHashedID reads meta.Attrs.StepID, the internal hashed step ID
+	// generatorAttrs always sets from op.ID -- kept separately from StepID
+	// below so a consumer can always join on it even when the SDK-facing ID
+	// isn't available.
+	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepID); ok && v != nil {
+		entry.StepHashedID = *v
+	}
+	// StepID prefers meta.Attrs.StepUserlandID (the SDK-facing ID) since
+	// that's what's displayed to users, falling back to the hashed ID when
+	// userland isn't present -- not every opcode/SDK version populates
+	// op.Userland (see generatorAttrs), which would otherwise leave StepID
+	// empty for step-scoped metadata in production.
 	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepUserlandID); ok && v != nil {
 		entry.StepID = *v
+	} else {
+		entry.StepID = entry.StepHashedID
 	}
 	if v, ok := meta.GetAttr(attrs, meta.Attrs.StepUserlandIndex); ok && v != nil {
 		entry.StepIndex = v
