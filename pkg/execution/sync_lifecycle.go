@@ -356,10 +356,18 @@ type MetadataEntry struct {
 	// to, independently of Parent (which identifies the span this metadata
 	// is attached to -- a request-scoped metadata span's Parent is the
 	// request's execution span, not the step span, but it still belongs to
-	// a step). All three are empty/nil for run-scoped metadata.
-	StepID      string
-	StepIndex   *int
-	StepAttempt *int
+	// a step). All four are empty/nil for run-scoped metadata.
+	//
+	// StepID is the SDK-facing userland step ID (meta.Attrs.StepUserlandID),
+	// falling back to the internal hashed ID (StepHashedID) when userland
+	// isn't present -- not every opcode/SDK version populates it.
+	StepID string
+	// StepHashedID is always the internal hashed step ID (meta.Attrs.StepID),
+	// the same identity used to join onto step spans, independently of
+	// which value StepID above ends up holding.
+	StepHashedID string
+	StepIndex    *int
+	StepAttempt  *int
 }
 
 // ExtendedTraceSpan carries everything OnExtendedTraceSpan needs to record a

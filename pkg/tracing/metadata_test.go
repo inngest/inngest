@@ -231,7 +231,10 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStateMetadata(t *
 // proves step identity (added via an attrs option, mirroring
 // pkg/execution/executor's createMetadataSpanOnParent) is picked up
 // alongside stateMetadata-sourced tenant/run identity -- the two are
-// populated independently in buildSyncMetadataEntry.
+// populated independently in buildSyncMetadataEntry. It also proves
+// MetadataEntry.StepID prefers the SDK-facing userland ID
+// (meta.Attrs.StepUserlandID) when present, while StepHashedID always
+// carries the internal hashed ID (meta.Attrs.StepID) independently.
 func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *testing.T) {
 	tp := NewNoopTracerProvider()
 	rec := &recordingMetadataListener{}
@@ -239,10 +242,12 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
 
-	stepID := "step-userland-1"
+	hashedStepID := "hashed-step-1"
+	userlandStepID := "my-step"
 	stepAttempt := 2
 	withStepIdentity := func(cfg *MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &stepID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &userlandStepID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, &stepAttempt)
 	}
 
@@ -260,10 +265,64 @@ func TestCreateMetadataSpanFromValues_NotifiesSyncListenersWithStepIdentity(t *t
 
 	got := rec.entries[0]
 	require.Equal(t, runID, got.RunID)
-	require.Equal(t, stepID, got.StepID)
+	require.Equal(t, userlandStepID, got.StepID)
+	require.Equal(t, hashedStepID, got.StepHashedID)
 	require.NotNil(t, got.StepAttempt)
 	require.Equal(t, stepAttempt, *got.StepAttempt)
 	require.Nil(t, got.StepIndex)
+}
+
+// TestCreateMetadataSpanFromValues_StepIDFallsBackToHashedID proves
+// entry.StepID falls back to the internal hashed step ID when the userland
+// step ID isn't present on attrs -- mirroring opcodes/SDK versions where
+// op.Userland is nil, so generatorAttrs never sets meta.Attrs.StepUserlandID.
+func TestCreateMetadataSpanFromValues_StepIDFallsBackToHashedID(t *testing.T) {
+	tp := NewNoopTracerProvider()
+	rec := &recordingMetadataListener{}
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
+
+	hashedStepID := "hashed-step-1"
+	withHashedOnly := func(cfg *MetadataSpanConfig) {
+		meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
+	}
+
+	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		"test.kind", enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+		withHashedOnly,
+		WithMetadataSyncListeners(rec),
+	)
+	require.NoError(t, err)
+	require.Len(t, rec.entries, 1)
+	require.Equal(t, hashedStepID, rec.entries[0].StepID)
+	require.Equal(t, hashedStepID, rec.entries[0].StepHashedID)
+}
+
+// TestCreateMetadataSpanFromValues_StepIdentityEmptyWithoutEitherAttr proves
+// both StepID and StepHashedID stay empty when neither the userland nor the
+// hashed step ID is present on attrs (run-scoped metadata).
+func TestCreateMetadataSpanFromValues_StepIdentityEmptyWithoutEitherAttr(t *testing.T) {
+	tp := NewNoopTracerProvider()
+	rec := &recordingMetadataListener{}
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: runID}}
+
+	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		"test.kind", enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+		WithMetadataSyncListeners(rec),
+	)
+	require.NoError(t, err)
+	require.Len(t, rec.entries, 1)
+	require.Empty(t, rec.entries[0].StepID)
+	require.Empty(t, rec.entries[0].StepHashedID)
 }
 
 // TestCreateMetadataSpanFromValues_NotifiesSyncListenersFromAttrsWhenStateMetadataNil
