@@ -4959,6 +4959,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	var output []byte
+	// gatewayErr carries the terminal (non-retry) failure, if any, through to
+	// the single post-SaveStep listener dispatch below -- nil means success.
+	var gatewayErr *state.UserError
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
 	gen.Timing.B = e.now().Sub(start).Nanoseconds()
@@ -4983,9 +4986,10 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			for _, e := range e.lifecycles {
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepGatewayRequestFinished", func(sl execution.SyncLifecycleListener) {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, syncNow)
+			})
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -4995,14 +4999,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		output, _ = json.Marshal(map[string]json.RawMessage{
 			execution.StateErrorKey: userLandErrByt,
 		})
-
-		lifecycleItem := runCtx.LifecycleItem()
-		for _, e := range e.lifecycles {
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
-		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
-		}
+		gatewayErr = &userLandErr
 	} else {
 		headers := make(map[string]string)
 		for k, v := range resp.Header {
@@ -5022,19 +5019,8 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 
 		runCtx.UpdateOpcodeOutput(&gen, output)
-		lifecycleItem := runCtx.LifecycleItem()
 
 		e.emitStepSpan(ctx, runCtx, &gen, nil, tracing.GatewayResponseAttrs(resp, nil, gen, nil))
-
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
-		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil, e.now())
-		}
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
@@ -5050,6 +5036,23 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 	if err != nil {
 		return err
 	}
+
+	// Notify sync/legacy listeners of the terminal (non-retry) outcome --
+	// success or a persisted final error -- only once SaveStep has
+	// succeeded above, so a listener never records an outcome that never
+	// actually committed. The retry branch above dispatches immediately
+	// instead, since it returns before ever reaching SaveStep in this call.
+	lifecycleItem = runCtx.LifecycleItem()
+	for _, l := range e.lifecycles {
+		// OnStepFinished handles step success and step errors/failures.  It is
+		// currently the responsibility of the lifecycle manager to handle the differing
+		// step statuses when a step finishes.
+		go l.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, gatewayErr)
+	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepGatewayRequestFinished", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, gatewayErr, syncNow)
+	})
 
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
@@ -5087,6 +5090,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
 	gen.Timing.B = e.now().Sub(start).Nanoseconds()
 	failure := err != nil || (resp != nil && resp.StatusCode > 299)
+
+	// gatewayErr carries the terminal (non-retry) failure, if any, through to
+	// the single post-SaveStep listener dispatch below -- nil means success.
+	var gatewayErr *state.UserError
 
 	// Update the driver response appropriately for the trace lifecycles.
 	if resp == nil {
@@ -5148,9 +5155,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				// step statuses when a step finishes.
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
-			for _, sl := range e.syncLifecycles {
-				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
-			}
+			syncNow := e.now()
+			execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepGatewayRequestFinished", func(sl execution.SyncLifecycleListener) {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, syncNow)
+			})
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -5165,17 +5173,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		resp.Body, _ = json.Marshal(map[string]json.RawMessage{
 			execution.StateErrorKey: userLandErrByt,
 		})
-
-		lifecycleItem := runCtx.LifecycleItem()
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
-		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr, e.now())
-		}
+		gatewayErr = &userLandErr
 	} else {
 		rawBody := resp.Body
 
@@ -5200,16 +5198,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			&gen,
 			md,
 			tracing.GatewayResponseAttrs(resp, nil, gen, rawBody))
-
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
-		}
-		for _, sl := range e.syncLifecycles {
-			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil, e.now())
-		}
 	}
 
 	// Persist the cumulative metadata size delta alongside the step output.
@@ -5225,6 +5213,23 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	if err != nil {
 		return err
 	}
+
+	// Notify sync/legacy listeners of the terminal (non-retry) outcome --
+	// success or a persisted final error -- only once SaveStep has
+	// succeeded above, so a listener never records an outcome that never
+	// actually committed. The retry branch above dispatches immediately
+	// instead, since it returns before ever reaching SaveStep in this call.
+	lifecycleItem = runCtx.LifecycleItem()
+	for _, l := range e.lifecycles {
+		// OnStepFinished handles step success and step errors/failures.  It is
+		// currently the responsibility of the lifecycle manager to handle the differing
+		// step statuses when a step finishes.
+		go l.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, gatewayErr)
+	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnStepGatewayRequestFinished", func(sl execution.SyncLifecycleListener) {
+		sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, gatewayErr, syncNow)
+	})
 
 	// XXX: If auto-call is supported and a tool is provided, auto-call invokes
 	// before scheduling the next step.  This can only happen if the tool is an
