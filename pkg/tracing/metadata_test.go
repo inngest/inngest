@@ -379,3 +379,205 @@ func TestCreateMetadataSpanFromValues_SkipsSyncListenersWithNoRunID(t *testing.T
 	require.NotNil(t, ref)
 	require.Empty(t, rec.entries)
 }
+
+// orderedTracerProvider wraps NewNoopTracerProvider, recording "create" in a
+// shared order log so tests can assert the span is created before any
+// listener is dispatched.
+type orderedTracerProvider struct {
+	TracerProvider
+	order *[]string
+}
+
+func (o *orderedTracerProvider) CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
+	*o.order = append(*o.order, "create")
+	return o.TracerProvider.CreateSpan(ctx, name, opts)
+}
+
+// failingTracerProvider fails every CreateSpan call, for proving listeners
+// are never notified when span creation itself fails.
+type failingTracerProvider struct {
+	TracerProvider
+	err error
+}
+
+func (f *failingTracerProvider) CreateSpan(context.Context, string, *CreateSpanOptions) (*meta.SpanReference, error) {
+	return nil, f.err
+}
+
+// orderedListener records OnMetadataEntry calls plus their arrival order in
+// a shared log, for asserting inline (not concurrent/reordered) dispatch.
+type orderedListener struct {
+	execution.NoopSyncLifecycleListener
+	name    string
+	order   *[]string
+	entries []execution.MetadataEntry
+}
+
+func (o *orderedListener) OnMetadataEntry(_ context.Context, entry execution.MetadataEntry) {
+	o.entries = append(o.entries, entry)
+	*o.order = append(*o.order, "listener:"+o.name)
+}
+
+// TestCreateMetadataSpanFromValues_ScopeTable exercises every
+// enums.MetadataScope value (other than Unknown) through
+// CreateMetadataSpanFromValues with two registered listeners and
+// deliberately different internal/userland step IDs, asserting: the exact
+// Parent reference, scope, values, userland step ID (preferred) alongside
+// the independently-carried hashed ID, optional index/attempt, a shared
+// CreatedAt across both listeners, inline dispatch order (both listeners
+// fire, in registration order), and that span creation happens before
+// either listener is notified.
+func TestCreateMetadataSpanFromValues_ScopeTable(t *testing.T) {
+	scopes := []enums.MetadataScope{
+		enums.MetadataScopeRun,
+		enums.MetadataScopeStep,
+		enums.MetadataScopeStepAttempt,
+		enums.MetadataScopeExtendedTrace,
+		enums.MetadataScopeRequest,
+	}
+
+	for _, scope := range scopes {
+		t.Run(scope.String(), func(t *testing.T) {
+			order := []string{}
+			tp := &orderedTracerProvider{TracerProvider: NewNoopTracerProvider(), order: &order}
+			l1 := &orderedListener{name: "l1", order: &order}
+			l2 := &orderedListener{name: "l2", order: &order}
+
+			accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			stateMd := &statev2.Metadata{ID: statev2.ID{
+				RunID:      runID,
+				FunctionID: functionID,
+				Tenant:     statev2.Tenant{AccountID: accountID, EnvID: envID, AppID: appID},
+			}}
+
+			hashedStepID := "hashed-" + scope.String()
+			userlandStepID := "userland-" + scope.String()
+			stepIndex := 3
+			stepAttempt := 1
+			withStepIdentity := func(cfg *MetadataSpanConfig) {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, &userlandStepID)
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandIndex, &stepIndex)
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, &stepAttempt)
+			}
+
+			parent := &meta.SpanReference{TraceParent: "00-" + scope.String() + "-parent-00"}
+			values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
+			ref, err := CreateMetadataSpanFromValues(
+				context.Background(), tp, parent,
+				"test.location", "test", stateMd,
+				"test.kind", enums.MetadataOpcodeMerge, values, scope,
+				withStepIdentity,
+				WithMetadataSyncListeners(l1, l2),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, ref)
+
+			require.Len(t, l1.entries, 1)
+			require.Len(t, l2.entries, 1)
+			require.Equal(t, []string{"create", "listener:l1", "listener:l2"}, order)
+
+			for _, entry := range []execution.MetadataEntry{l1.entries[0], l2.entries[0]} {
+				require.Same(t, parent, entry.Parent)
+				require.Equal(t, scope, entry.Scope)
+				require.Equal(t, values, entry.Values)
+				require.Equal(t, runID, entry.RunID)
+				require.Equal(t, accountID, entry.AccountID)
+				require.Equal(t, userlandStepID, entry.StepID)
+				require.Equal(t, hashedStepID, entry.StepHashedID)
+				require.NotNil(t, entry.StepIndex)
+				require.Equal(t, stepIndex, *entry.StepIndex)
+				require.NotNil(t, entry.StepAttempt)
+				require.Equal(t, stepAttempt, *entry.StepAttempt)
+			}
+			require.Equal(t, l1.entries[0].CreatedAt, l2.entries[0].CreatedAt)
+		})
+	}
+}
+
+// TestCreateMetadataSpanFromValues_SpanTooLargeSkipsListeners proves the
+// per-span size gate rejects before ever creating a span or notifying a
+// listener.
+func TestCreateMetadataSpanFromValues_SpanTooLargeSkipsListeners(t *testing.T) {
+	tp := NewNoopTracerProvider()
+	rec := &recordingMetadataListener{}
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)}}
+
+	values := makeValues(consts.MaxMetadataSpanSize + 1)
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		"test.kind", enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+		WithMetadataSyncListeners(rec),
+	)
+	require.ErrorIs(t, err, metadata.ErrMetadataSpanTooLarge)
+	require.Nil(t, ref)
+	require.Empty(t, rec.entries)
+}
+
+// TestCreateMetadataSpanFromValues_CumulativeLimitSkipsListeners proves the
+// per-run cumulative size gate rejects without creating a span or notifying
+// a listener.
+func TestCreateMetadataSpanFromValues_CumulativeLimitSkipsListeners(t *testing.T) {
+	tp := NewNoopTracerProvider()
+	rec := &recordingMetadataListener{}
+	spanSize := 50000
+	stateMd := &statev2.Metadata{
+		ID: statev2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)},
+		Metrics: statev2.RunMetrics{
+			MetadataSize:       consts.MaxRunMetadataSize - spanSize + 1,
+			MetadataSizeLoaded: consts.MaxRunMetadataSize - spanSize + 1,
+		},
+	}
+
+	values := makeValues(spanSize)
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		"test.kind", enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+		WithMetadataSyncListeners(rec),
+	)
+	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
+	require.Nil(t, ref)
+	require.Empty(t, rec.entries)
+}
+
+// TestCreateMetadataSpan_SerializeFailureSkipsListeners proves a
+// metadata.Structured that fails to serialize never reaches span creation
+// or listener dispatch.
+func TestCreateMetadataSpan_SerializeFailureSkipsListeners(t *testing.T) {
+	tp := NewNoopTracerProvider()
+	rec := &recordingMetadataListener{}
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)}}
+
+	md := &mockStructured{kind: "test.kind", serializeErr: errors.New("bad json")}
+	ref, err := CreateMetadataSpan(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd, md, enums.MetadataScopeStep,
+		WithMetadataSyncListeners(rec),
+	)
+	require.Error(t, err)
+	require.Nil(t, ref)
+	require.Empty(t, rec.entries)
+}
+
+// TestCreateMetadataSpanFromValues_TracerFailureSkipsListeners proves a
+// tracer-provider failure creating the span skips listener dispatch
+// entirely -- a row must never be reported for a span that doesn't exist.
+func TestCreateMetadataSpanFromValues_TracerFailureSkipsListeners(t *testing.T) {
+	tp := &failingTracerProvider{err: errors.New("tracer backend unavailable")}
+	rec := &recordingMetadataListener{}
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)}}
+
+	values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		"test.kind", enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+		WithMetadataSyncListeners(rec),
+	)
+	require.Error(t, err)
+	require.Nil(t, ref)
+	require.Empty(t, rec.entries)
+}
