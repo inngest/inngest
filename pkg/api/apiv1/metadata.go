@@ -249,6 +249,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			md,
 			scope,
 			addTenantIDs,
+			tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
 		)
 		if err != nil {
 			return err
@@ -402,6 +403,7 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 			md,
 			scope,
 			addTenantIDs,
+			tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
 		)
 		if err != nil {
 			return err

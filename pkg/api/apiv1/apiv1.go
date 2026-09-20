@@ -99,9 +99,11 @@ type Opts struct {
 
 	// SyncLifecycleListeners are notified synchronously (see
 	// execution.SyncLifecycleListener) when a userland (extended-trace) span
-	// is committed via OTLP ingestion -- see traces.go's commitSpan. Nil/empty
-	// is a no-op; only a caller wiring DuckDB dual-write
-	// (pkg/execution/dualwrite) sets this today.
+	// is committed via OTLP ingestion (traces.go's commitSpan, both
+	// OnExtendedTraceSpan and OnMetadataEntry for extracted span metadata)
+	// and when metadata is submitted via AddRunMetadata (metadata.go,
+	// OnMetadataEntry). Nil/empty is a no-op; only a caller wiring DuckDB
+	// dual-write (pkg/execution/dualwrite) sets this today.
 	SyncLifecycleListeners []execution.SyncLifecycleListener
 }
 
