@@ -123,9 +123,9 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 
 	if len(cfg.SyncListeners) > 0 {
 		if entry, ok := buildSyncMetadataEntry(cfg.Attrs, parent, stateMetadata, kind, scope, values); ok {
-			for _, l := range cfg.SyncListeners {
+			execution.SafelyInvokeSyncListeners(ctx, logger.StdlibLogger(ctx), cfg.SyncListeners, "OnMetadataEntry", func(l execution.SyncLifecycleListener) {
 				l.OnMetadataEntry(ctx, entry)
-			}
+			})
 		} else {
 			logger.StdlibLogger(ctx).Error("tracing: metadata span sync dispatch missing run ID", "location", util.SanitizeLogField(location), "kind", util.SanitizeLogField(kind.String()))
 		}
