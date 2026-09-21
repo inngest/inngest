@@ -7,8 +7,14 @@ import {
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { useColumns as useFunctionColumns } from '@inngest/components/Functions/columns';
 import { AlertModal } from '@inngest/components/Modal/AlertModal';
+import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiArrowDownSLine,
@@ -30,6 +36,11 @@ import CheckoutModal, {
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import type { SelfServePlan } from '@/components/Billing/Plans/utils';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import {
+  usageKind,
+  type UsageKind,
+} from '@/components/ExecutionLimit/executionLimit';
+import { useExecutionLimit } from '@/components/ExecutionLimit/useExecutionLimit';
 import { UpdateAccountAddonQuantityDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
@@ -81,6 +92,7 @@ export function InfraDashboard({
   const placeholders = data.placeholders;
   const billingDays = billingCycleDaysRemaining();
   const selectedPlan = data.currentInfraPlan;
+  const executionLimit = useExecutionLimit();
 
   return (
     <div className="bg-canvasBase min-h-full w-full px-4 pb-16 pt-4 lg:px-6">
@@ -131,15 +143,28 @@ export function InfraDashboard({
       </header>
 
       <section className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+        {executionLimit?.enhanced ? (
+          <KpiCard
+            cap={{
+              value: executionLimit.usedExecutions,
+              limit: executionLimit.executionLimit,
+              kind: usageKind(executionLimit.band),
+            }}
+            fetching={false}
+            label="Executions ran (runs + steps)"
+            value={formatCompactNumber(executionLimit.usedExecutions)}
+          />
+        ) : (
+          <KpiCard
+            fetching={loading.executionsRan}
+            label="Executions ran (runs + steps)"
+            value={formatCompactNumber(data.executionsRan)}
+          />
+        )}
         <KpiCard
           fetching={loading.eventsReceived}
           label="Events received"
           value={formatCompactNumber(data.eventsReceived)}
-        />
-        <KpiCard
-          fetching={loading.executionsRan}
-          label="Executions ran (runs + steps)"
-          value={formatCompactNumber(data.executionsRan)}
         />
         <KpiCard
           fetching={loading.backlog}
@@ -189,19 +214,21 @@ export function InfraDashboard({
   );
 }
 
+const capTicks = [50, 75, 90];
+
 function KpiCard({
+  cap,
   className,
   delta,
   fetching,
   label,
-  progress,
   value,
 }: {
+  cap?: { value: number; limit: number; kind: UsageKind };
   className?: string;
   delta?: string;
   fetching: boolean;
   label: string;
-  progress?: number;
   value: string;
 }) {
   return (
@@ -225,17 +252,42 @@ function KpiCard({
               {delta}
             </div>
           )}
+          {cap && (
+            <div className="text-muted mb-1 ml-auto text-xs">
+              /{formatCompactNumber(cap.limit)}
+            </div>
+          )}
         </div>
       )}
-      {typeof progress === 'number' && (
-        <div className="mt-3 flex items-center gap-3">
-          <div className="bg-canvasMuted h-1 w-full overflow-hidden rounded-full">
-            <div
-              className="bg-primary-moderate h-full rounded-full"
-              style={{ width: `${progress}%` }}
-            />
+      {cap && !fetching && (
+        <div className="mt-3">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <ProgressBar
+                  className="bg-canvasMuted"
+                  kind={cap.kind}
+                  limit={cap.limit}
+                  size="small"
+                  value={cap.value}
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              {formatPercent((cap.value / cap.limit) * 100)} of limit used
+            </TooltipContent>
+          </Tooltip>
+          <div className="relative mt-1 h-4">
+            {capTicks.map((tick) => (
+              <span
+                key={tick}
+                className="text-muted absolute -translate-x-1/2 text-xs"
+                style={{ left: `${tick}%` }}
+              >
+                {tick}%
+              </span>
+            ))}
           </div>
-          <span className="text-basis text-xs">{formatPercent(progress)}</span>
         </div>
       )}
     </div>

@@ -1,6 +1,19 @@
+import {
+  useBooleanFlag,
+  useIsIdentificationSettled,
+} from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
+import { Marketplace } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
+
+import {
+  isExecutionCapped,
+  legacyExecutionCap,
+  shouldShowExecutionLimit,
+  usageBand,
+  type UsageBand,
+} from './executionLimit';
 
 const executionLimitQuery = graphql(`
   query ExecutionLimitCheck {
@@ -22,30 +35,79 @@ const executionLimitQuery = graphql(`
   }
 `);
 
+const executionCapQuery = graphql(`
+  query ExecutionCapCheck {
+    account {
+      id
+      marketplace
+      marketplaceBillingURL
+      executionCap {
+        usage
+        limit
+        enforced
+        overageAllowed
+      }
+    }
+  }
+`);
+
 type ExecutionLimitData = {
+  accountID: string;
+  band: UsageBand;
   isCapped: boolean;
   usedExecutions: number;
   executionLimit: number;
+  isVercel: boolean;
   marketplaceBillingURL: string | null;
+  enhanced: boolean;
 };
 
 export function useExecutionLimit(): ExecutionLimitData | null {
-  const res = useGraphQLQuery({ query: executionLimitQuery, variables: {} });
-  if (!res.data) return null;
+  const { value: enhancedEnabled, isReady } = useBooleanFlag(
+    'hobby-execution-limit-ui',
+  );
+  const enhanced = isReady && enhancedEnabled;
 
-  const { usage, limit, overageAllowed } =
-    res.data.account.entitlements.executions;
-  if (limit === null) return null;
+  // Gates both queries so a flagged account never renders the legacy card
+  // first, without stranding accounts that never identify.
+  const isSettled = useIsIdentificationSettled();
 
-  const isEnterprise = (res.data.account.plan?.name ?? '')
-    .toLowerCase()
-    .includes('enterprise');
+  const legacyRes = useSkippableGraphQLQuery({
+    query: executionLimitQuery,
+    variables: {},
+    skip: !isSettled || enhanced,
+  });
+  const capRes = useSkippableGraphQLQuery({
+    query: executionCapQuery,
+    variables: {},
+    skip: !isSettled || !enhanced,
+  });
+
+  const account = enhanced ? capRes.data?.account : legacyRes.data?.account;
+  if (!account) return null;
+
+  const cap =
+    'executionCap' in account
+      ? account.executionCap
+      : legacyExecutionCap(account.entitlements.executions);
+  if (!cap) return null;
+  if (!shouldShowExecutionLimit(cap)) return null;
+
+  const isEnterprise =
+    'plan' in account &&
+    (account.plan?.name ?? '').toLowerCase().includes('enterprise');
+  const isCapped = !isEnterprise && isExecutionCapped(cap);
 
   return {
-    isCapped: !isEnterprise && !overageAllowed && usage >= limit,
-    usedExecutions: usage,
-    executionLimit: limit,
-    marketplaceBillingURL: res.data.account.marketplaceBillingURL ?? null,
+    accountID: account.id,
+    band: usageBand({ usage: cap.usage, limit: cap.limit, isCapped }),
+    isCapped,
+    usedExecutions: cap.usage,
+    executionLimit: cap.limit,
+    isVercel:
+      'marketplace' in account && account.marketplace === Marketplace.Vercel,
+    marketplaceBillingURL: account.marketplaceBillingURL ?? null,
+    enhanced,
   };
 }
 

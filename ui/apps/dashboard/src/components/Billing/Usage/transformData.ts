@@ -2,6 +2,7 @@ import { type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 
+import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
 import { type TimeSeries } from '@/gql/graphql';
 import {
   textColor,
@@ -10,26 +11,23 @@ import {
   backgroundColor,
 } from '@/utils/tailwind';
 
-type ChartPoint = {
-  time: Date;
-  additionalCount: number;
-  includedCount: number;
-};
+type MarkAreaBound = { xAxis: string };
 
 /**
  * Transforms raw time series data into chart-compatible format.
  */
 function transformChartData(
   data: TimeSeries['data'],
-  includedStepCountLimit: number = Infinity,
+  includedCountLimit: number = Infinity,
 ): {
   categories: string[];
-  includedValues: number[];
-  additionalValues: number[];
-  additionalCount: number;
-  totalCount: number;
+  dailyValues: number[];
+  cumulativeValues: number[];
+  limitCrossoverIndex: number;
 } {
-  const series: ChartPoint[] = [];
+  const categories: string[] = [];
+  const dailyValues: number[] = [];
+  const cumulativeValues: number[] = [];
   let cumulativeCount = 0;
 
   for (const point of data) {
@@ -37,38 +35,19 @@ function transformChartData(
 
     const pointCount = point.value ?? 0;
     cumulativeCount += pointCount;
-    let additionalCount: number;
-    let includedCount: number;
 
-    if (cumulativeCount <= includedStepCountLimit) {
-      additionalCount = 0;
-      includedCount = pointCount;
-    } else {
-      additionalCount = Math.min(
-        pointCount,
-        cumulativeCount - includedStepCountLimit,
-      );
-      includedCount = Math.max(0, pointCount - additionalCount);
-    }
-
-    series.push({
-      time: new Date(point.time),
-      includedCount,
-      additionalCount,
-    });
+    categories.push(new Date(point.time).toISOString());
+    dailyValues.push(pointCount);
+    cumulativeValues.push(cumulativeCount);
   }
-
-  const categories = series.map((item) => item.time.toISOString());
-  const includedValues = series.map((item) => item.includedCount);
-  const additionalValues = series.map((item) => item.additionalCount);
-  const additionalCount = Math.max(0, cumulativeCount - includedStepCountLimit);
 
   return {
     categories,
-    includedValues,
-    additionalValues,
-    additionalCount,
-    totalCount: cumulativeCount,
+    dailyValues,
+    cumulativeValues,
+    limitCrossoverIndex: cumulativeValues.findIndex(
+      (value) => value >= includedCountLimit,
+    ),
   };
 }
 
@@ -77,20 +56,54 @@ function transformChartData(
  */
 export function createChartOptions(
   data: TimeSeries['data'],
-  includedStepCountLimit: number = Infinity,
+  includedCountLimit: number = Infinity,
   type: string,
 ): Partial<ChartProps['option']> {
   const dark = isDark();
 
-  // Transform raw data
-  const { categories, includedValues, additionalValues } = transformChartData(
-    data,
-    includedStepCountLimit,
-  );
+  const { categories, dailyValues, cumulativeValues, limitCrossoverIndex } =
+    transformChartData(data, includedCountLimit);
+
+  const hasLimit = Number.isFinite(includedCountLimit);
+
+  const limitMarkLine = hasLimit
+    ? {
+        animation: false,
+        silent: true,
+        symbol: 'none' as const,
+        data: [{ yAxis: includedCountLimit }],
+        label: { show: false },
+        lineStyle: {
+          type: 'solid' as const,
+          width: 1,
+          color: resolveColor(colors.tertiary['moderate'], dark, '#F54A3F'),
+        },
+      }
+    : undefined;
+
+  // Shades the portion of the period spent at or over the plan limit.
+  const overLimitMarkArea =
+    hasLimit && limitCrossoverIndex !== -1
+      ? {
+          animation: false,
+          silent: true,
+          itemStyle: {
+            color: resolveColor(backgroundColor.error, dark, '#FEF4F3'),
+            opacity: 0.4,
+          },
+          data: [
+            // Omitting yAxis bounds spans the full plot height.
+            [{ xAxis: categories[limitCrossoverIndex] }, { xAxis: 'max' }] as [
+              MarkAreaBound,
+              MarkAreaBound,
+            ],
+          ],
+        }
+      : undefined;
 
   const datasetNames = {
-    additionalCount: `Additional ${type}s`,
-    includedCount: `Plan-included ${type}s`,
+    dailyCount: `Daily ${type}s`,
+    cumulativeCount: `Cumulative ${type}s`,
   };
 
   return {
@@ -112,7 +125,7 @@ export function createChartOptions(
         fontSize: '12px',
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
       },
-      data: [datasetNames.includedCount, datasetNames.additionalCount],
+      data: [datasetNames.dailyCount, datasetNames.cumulativeCount],
     },
     xAxis: {
       data: categories,
@@ -173,27 +186,28 @@ export function createChartOptions(
     },
     series: [
       {
-        name: datasetNames.includedCount,
-        data: includedValues,
+        name: datasetNames.dailyCount,
+        data: dailyValues,
         type: 'bar',
-        stack: 'usage',
-
         itemStyle: {
-          color: resolveColor(colors.primary['moderate'], dark, '#2C9B63'),
+          color: resolveColor(CHART_COLORS[2], dark, '#9CD2FF'),
         },
         barWidth: '98%',
-        barGap: '-98%',
       },
       {
-        name: datasetNames.additionalCount,
-        data: additionalValues,
-        type: 'bar',
-        stack: 'usage',
-        itemStyle: {
-          color: resolveColor(colors.primary['2xSubtle'], dark, '#C4EFD4'),
+        name: datasetNames.cumulativeCount,
+        data: cumulativeValues,
+        type: 'line',
+        showSymbol: false,
+        lineStyle: {
+          width: 1.5,
+          color: resolveColor(CHART_COLORS[3], dark, '#FCC43F'),
         },
-        barWidth: '98%',
-        barGap: '-98%',
+        itemStyle: {
+          color: resolveColor(CHART_COLORS[3], dark, '#FCC43F'),
+        },
+        markLine: limitMarkLine,
+        markArea: overLimitMarkArea,
       },
     ],
   };

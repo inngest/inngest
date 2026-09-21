@@ -36,3 +36,11 @@ export function useBooleanFlag(
 function useIsIdentified(): boolean {
   return useContext(IdentificationContext).isIdentified;
 }
+
+/**
+ * Returns true once identification has either completed or is known not to be
+ * coming. Unlike `isReady`, this is eventually true for every account.
+ */
+export function useIsIdentificationSettled(): boolean {
+  return useContext(IdentificationContext).isSettled;
+}

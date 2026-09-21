@@ -23,4 +23,28 @@ describe('ProgressBar', () => {
     const indicator = container.querySelector('[style="width: 100%;"]');
     expect(indicator?.className).toContain('bg-tertiary-intense');
   });
+
+  it('renders the small warning treatment near the limit', () => {
+    const { container } = render(
+      <ProgressBar kind="warning" limit={100} size="small" value={92} />
+    );
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar.className).toContain('bg-accent-xSubtle');
+
+    const indicator = container.querySelector('[style="width: 92%;"]');
+    expect(indicator?.className).toContain('bg-accent-moderate');
+  });
+
+  it('renders the small caution treatment past half of the limit', () => {
+    const { container } = render(
+      <ProgressBar kind="caution" limit={100} size="small" value={60} />
+    );
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar.className).toContain('bg-accent-3xSubtle');
+
+    const indicator = container.querySelector('[style="width: 60%;"]');
+    expect(indicator?.className).toContain('bg-accent-xSubtle');
+  });
 });

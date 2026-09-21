@@ -3,14 +3,17 @@ import { createContext, useEffect, useState } from 'react';
 import { useLDClient, withLDProvider } from 'launchdarkly-react-client-sdk';
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
-export const IdentificationContext = createContext({ isIdentified: false });
+export const IdentificationContext = createContext({
+  isIdentified: false,
+  isSettled: false,
+});
 
 function LaunchDarkly({ children }: { children: React.ReactNode }) {
   const [isIdentified, setIsIdentified] = useState(false);
   const client = useLDClient();
 
-  const { user } = useUser();
-  const { organization } = useOrganization();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
 
   const accountID = organization?.publicMetadata.accountID;
   const externalID = user?.externalId;
@@ -41,8 +44,13 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
       });
   }, [accountID, client, externalID, organization?.name, userName]);
 
+  // JWT-authed accounts lack the Clerk IDs identify needs, so they settle
+  // without ever identifying.
+  const isSettled =
+    isIdentified || (userLoaded && orgLoaded && (!accountID || !externalID));
+
   return (
-    <IdentificationContext.Provider value={{ isIdentified }}>
+    <IdentificationContext.Provider value={{ isIdentified, isSettled }}>
       {children}
     </IdentificationContext.Provider>
   );
