@@ -87,9 +87,8 @@ describe('useExecutionLimit', () => {
   });
 
   it.each([
+    // A flag that fails to load or identify comes back ready with its default.
     { name: 'off', value: false, isReady: true },
-    { name: 'missing or unidentified', value: false, isReady: false },
-    { name: 'true but unready', value: true, isReady: false },
   ])('uses legacy limits when the flag is $name', ({ value, isReady }) => {
     flag = { value, isReady };
 
@@ -105,6 +104,18 @@ describe('useExecutionLimit', () => {
       mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
     ).toEqual([false, true]);
   });
+
+  it.each([false, true])(
+    'fetches nothing until the flag is ready (value %s)',
+    (value) => {
+      flag = { value, isReady: false };
+
+      expect(useExecutionLimit()).toBeNull();
+      expect(
+        mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
+      ).toEqual([true, true]);
+    },
+  );
 
   it('uses the enhanced cap only when the flag is ready and enabled', () => {
     flag = { value: true, isReady: true };
