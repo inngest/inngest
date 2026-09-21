@@ -5420,7 +5420,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			pause,
 		)
 	}
-	for _, sl := range e.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnWaitForSignal", func(sl execution.SyncLifecycleListener) {
 		sl.OnWaitForSignal(
 			ctx,
 			*runCtx.Metadata(),
@@ -5428,7 +5428,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			gen,
 			pause,
 		)
-	}
+	})
 
 	return err
 }

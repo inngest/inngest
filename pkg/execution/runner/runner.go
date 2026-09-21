@@ -128,9 +128,9 @@ func NewService(c config.Config, opts ...Opt) Runner {
 // listeners synchronously (inline) whenever an event is durably created,
 // regardless of whether it later matches a function.
 func (s *svc) notifySyncLifecyclesEventReceived(ctx context.Context, evt event.TrackedEvent) {
-	for _, l := range s.syncLifecycles {
+	execution.SafelyInvokeSyncListeners(ctx, s.log, s.syncLifecycles, "OnEventReceived", func(l execution.SyncLifecycleListener) {
 		l.OnEventReceived(ctx, evt)
-	}
+	})
 }
 
 type svc struct {
