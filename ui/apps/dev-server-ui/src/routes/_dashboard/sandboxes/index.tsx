@@ -1,9 +1,14 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { createFileRoute } from '@tanstack/react-router';
 
 const tokenKey = 'inngest.cloud-sandboxes.local-capability';
+const pageSize = 10;
+
+function lastPage(count: number) {
+  return Math.max(0, Math.ceil(count / pageSize) - 1);
+}
 
 type Login = { verificationUri: string; userCode: string };
 type CloudStatus = {
@@ -49,7 +54,11 @@ function SandboxesPage() {
   const [status, setStatus] = useState<CloudStatus>();
   const [sandboxes, setSandboxes] = useState<Sandbox[]>([]);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState('');
+  const [page, setPage] = useState(0);
+  const refreshVersion = useRef(0);
+  const currentPage = Math.min(page, lastPage(status?.sandboxIds.length ?? 0));
 
   useEffect(() => {
     const hashToken = new URLSearchParams(window.location.hash.slice(1)).get(
@@ -64,20 +73,27 @@ function SandboxesPage() {
 
   const refresh = useCallback(async () => {
     if (!token) return;
+    const version = refreshVersion.current;
     try {
       const next = await request<CloudStatus>('/dev/cloud/status', token);
+      if (version !== refreshVersion.current) return;
       setStatus(next);
       setError(next.loginError || '');
       if (next.connected) {
+        const start =
+          Math.min(page, lastPage(next.sandboxIds.length)) * pageSize;
+        const ids = next.sandboxIds.slice(start, start + pageSize);
         const results = await Promise.allSettled(
-          next.sandboxIds.map((id) =>
+          ids.map((id) =>
             request<Sandbox>(`/v2/sandboxes/${encodeURIComponent(id)}`, token),
           ),
         );
-        setSandboxes(
-          results.flatMap((result) =>
-            result.status === 'fulfilled' ? [result.value] : [],
-          ),
+        if (version !== refreshVersion.current) return;
+        setSandboxes((previous) =>
+          results.flatMap((result, index) => {
+            if (result.status === 'fulfilled') return [result.value];
+            return previous.filter((sandbox) => sandbox.id === ids[index]);
+          }),
         );
         const failed = results.find((result) => result.status === 'rejected');
         if (failed?.status === 'rejected')
@@ -90,28 +106,35 @@ function SandboxesPage() {
         setSandboxes([]);
       }
     } catch (err) {
+      if (version !== refreshVersion.current) return;
       setStatus(undefined);
       setError(
         err instanceof Error ? err.message : 'Unable to reach the server',
       );
     }
-  }, [token]);
+  }, [token, page]);
 
-  useEffect(() => void refresh(), [refresh]);
+  useEffect(() => {
+    void refresh();
+    return () => {
+      // Ignore responses for a page or local token that is no longer selected.
+      refreshVersion.current++;
+    };
+  }, [refresh]);
   useEffect(() => {
     if (!status?.login && !status?.connected) return;
-    const timer = window.setInterval(refresh, 3000);
+    const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
   }, [refresh, status?.login, status?.connected]);
 
   const action = async (name: string, path: string, method = 'POST') => {
     setBusy(name);
-    setError('');
+    setActionError('');
     try {
       await request<unknown>(path, token, method);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      setActionError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setBusy('');
     }
@@ -185,6 +208,7 @@ function SandboxesPage() {
                     sessionStorage.removeItem(tokenKey);
                     setToken('');
                     setError('');
+                    setActionError('');
                   }}
                 />
               </div>
@@ -285,6 +309,29 @@ function SandboxesPage() {
             </Card>
           ) : (
             <div className="flex flex-col gap-3">
+              {status.sandboxIds.length > pageSize && (
+                <div className="flex items-center justify-end gap-3">
+                  <Button
+                    appearance="outlined"
+                    label="Previous"
+                    disabled={currentPage === 0 || Boolean(busy)}
+                    onClick={() => setPage(currentPage - 1)}
+                  />
+                  <span className="text-muted text-sm">
+                    Page {currentPage + 1} of{' '}
+                    {lastPage(status.sandboxIds.length) + 1}
+                  </span>
+                  <Button
+                    appearance="outlined"
+                    label="Next"
+                    disabled={
+                      currentPage === lastPage(status.sandboxIds.length) ||
+                      Boolean(busy)
+                    }
+                    onClick={() => setPage(currentPage + 1)}
+                  />
+                </div>
+              )}
               {sandboxes.map((sandbox) => {
                 const paused = sandbox.status.toLowerCase() === 'paused';
                 const running = sandbox.status.toLowerCase() === 'running';
@@ -344,9 +391,9 @@ function SandboxesPage() {
           )}
         </>
       )}
-      {error && status && (
+      {(actionError || error) && status && (
         <p role="alert" className="text-error text-sm">
-          {error}
+          {actionError || error}
         </p>
       )}
       {status?.warning && (
