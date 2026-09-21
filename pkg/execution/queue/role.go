@@ -187,19 +187,33 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 			leaseSlot = -1
 		}
 
+		// Renew the slot this processor already owns before probing unrelated
+		// slots. A transient database error must not make us forget a durable
+		// lease that can still be valid until its recorded expiry.
+		if leaseSlot >= 0 {
+			leaseID, err := shard.RoleLease(
+				ctx,
+				queueRoleLeaseName(name, leaseSlot),
+				leaseDuration,
+				q.roleLease(name),
+			)
+			switch err {
+			case nil:
+				q.setRoleLease(ctx, name, leaseID, shard)
+				return true
+			case ErrRoleAlreadyLeased:
+				q.setRoleLease(ctx, name, nil, shard)
+				leaseSlot = -1
+			default:
+				logger.StdlibLogger(ctx).Error("error renewing queue role lease", "role", name, "error", err)
+				return true
+			}
+		}
+
 		for slot := 0; slot < leaseCount; slot++ {
 			leaseName := queueRoleLeaseName(name, slot)
-			var existing *ulid.ULID
-			if slot == leaseSlot {
-				existing = q.roleLease(name)
-			}
-
-			leaseID, err := shard.RoleLease(ctx, leaseName, leaseDuration, existing)
+			leaseID, err := shard.RoleLease(ctx, leaseName, leaseDuration)
 			if err == ErrRoleAlreadyLeased {
-				if slot == leaseSlot {
-					q.setRoleLease(ctx, name, nil, shard)
-					leaseSlot = -1
-				}
 				continue
 			}
 			if err != nil {
