@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -271,6 +272,61 @@ func TestJournalFailureDoesNotFailSuccessfulCreate(t *testing.T) {
 	require.Equal(t, 201, w.Code)
 	require.Contains(t, request(b, "GET", "/dev/cloud/status").Body.String(), "Could not save")
 	require.Equal(t, []string{sandboxID}, b.sandboxes[b.identity(metadata)])
+}
+
+func TestJournalUpdatesAcrossServers(t *testing.T) {
+	first, metadata := testBridge(t, func(w http.ResponseWriter, r *http.Request) {})
+	second, err := New(t.Context(), 8289)
+	require.NoError(t, err)
+	other := *metadata
+	workspace := "other-environment"
+	other.WorkspaceID = &workspace
+	for _, test := range []struct {
+		name     string
+		bridge   *Bridge
+		metadata *cliauth.Metadata
+		id       string
+		remove   bool
+		want     []string
+	}{
+		{"first create", first, metadata, "first", false, []string{"first"}},
+		{"stale server create", second, metadata, "second", false, []string{"first", "second"}},
+		{"other environment", first, &other, "other", false, []string{"other"}},
+		{"delete from stale server", first, metadata, "second", true, []string{"first"}},
+		{"do not resurrect deleted ID", second, metadata, "third", false, []string{"first", "third"}},
+		{"duplicate create", first, metadata, "third", false, []string{"first", "third"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			test.bridge.remember(test.metadata, test.id, test.remove)
+			require.Empty(t, test.bridge.warning)
+			restarted, err := New(t.Context(), 8288)
+			require.NoError(t, err)
+			require.ElementsMatch(t, test.want, restarted.sandboxes[first.identity(test.metadata)])
+		})
+	}
+	journal, err := first.loadJournal()
+	require.NoError(t, err)
+	require.Equal(t, []string{"other"}, journal[first.identity(&other)])
+}
+
+func TestConcurrentJournalUpdates(t *testing.T) {
+	first, metadata := testBridge(t, func(w http.ResponseWriter, r *http.Request) {})
+	second, err := New(t.Context(), 8289)
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	for _, bridge := range []*Bridge{first, second} {
+		wg.Go(func() {
+			for i := range 10 {
+				bridge.remember(metadata, fmt.Sprintf("%s-%d", bridge.port, i), false)
+			}
+		})
+	}
+	wg.Wait()
+	require.Empty(t, first.warning)
+	require.Empty(t, second.warning)
+	restarted, err := New(t.Context(), 8288)
+	require.NoError(t, err)
+	require.Len(t, restarted.sandboxes[first.identity(metadata)], 20)
 }
 
 func TestRefreshUsesExistingAuthManager(t *testing.T) {

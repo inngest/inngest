@@ -21,8 +21,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gofrs/flock"
 	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"golang.org/x/oauth2"
@@ -96,13 +98,9 @@ func New(ctx context.Context, port int) (*Bridge, error) {
 		resource: resource, port: fmt.Sprint(port),
 		statePath: filepath.Join(dir, "dev-sandboxes", fmt.Sprintf("%x.json", sha256.Sum256([]byte(project)))),
 		transport: http.DefaultTransport.(*http.Transport).Clone(),
-		sandboxes: map[string][]string{},
 	}
-	if data, err := os.ReadFile(b.statePath); err == nil {
-		if err := json.Unmarshal(data, &b.sandboxes); err != nil || b.sandboxes == nil {
-			return nil, fmt.Errorf("invalid sandbox resource journal: %s", b.statePath)
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
+	b.sandboxes, err = b.loadJournal()
+	if err != nil {
 		return nil, err
 	}
 	b.routes()
@@ -349,22 +347,58 @@ func (b *Bridge) remember(metadata *cliauth.Metadata, id string, remove bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	key := b.identity(metadata)
-	if remove {
-		b.sandboxes[key] = slices.DeleteFunc(b.sandboxes[key], func(value string) bool { return value == id })
-	} else if !slices.Contains(b.sandboxes[key], id) {
-		b.sandboxes[key] = append(b.sandboxes[key], id)
+	update := func(journal map[string][]string) {
+		if remove {
+			journal[key] = slices.DeleteFunc(journal[key], func(value string) bool { return value == id })
+		} else if !slices.Contains(journal[key], id) {
+			journal[key] = append(journal[key], id)
+		}
 	}
-	if err := b.saveJournal(); err != nil {
+	update(b.sandboxes)
+	if err := b.saveJournal(update); err != nil {
 		// Do not turn a successful mutation into a retryable failure.
 		b.warning = "Could not save sandbox IDs for recovery. Keep their IDs before stopping this dev server."
 	}
 }
 
-func (b *Bridge) saveJournal() error {
+func (b *Bridge) loadJournal() (map[string][]string, error) {
+	journal := map[string][]string{}
+	data, err := os.ReadFile(b.statePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return journal, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &journal); err != nil || journal == nil {
+		return nil, fmt.Errorf("invalid sandbox resource journal: %s", b.statePath)
+	}
+	return journal, nil
+}
+
+func (b *Bridge) saveJournal(update func(map[string][]string)) error {
 	if err := os.MkdirAll(filepath.Dir(b.statePath), 0o700); err != nil {
 		return err
 	}
-	data, err := json.Marshal(b.sandboxes)
+	// Servers in the same project share this journal. Apply only this mutation
+	// to the latest file so a stale server cannot lose IDs or resurrect deletions.
+	ctx, cancel := context.WithTimeout(b.ctx, 5*time.Second)
+	defer cancel()
+	lock := flock.New(b.statePath + ".lock")
+	locked, err := lock.TryLockContext(ctx, 50*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	if !locked {
+		return errors.New("could not lock sandbox resource journal")
+	}
+	defer func() { _ = lock.Unlock() }()
+	journal, err := b.loadJournal()
+	if err != nil {
+		return err
+	}
+	update(journal)
+	data, err := json.Marshal(journal)
 	if err != nil {
 		return err
 	}
