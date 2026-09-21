@@ -3,6 +3,8 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,5 +67,44 @@ func TestRunFunctionFinishedLifecycleSyncListenerDoesNotAffectAsyncListeners(t *
 	case <-async.done:
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for async listener")
+	}
+}
+
+// TestSyncLifecycleRegistrationIsStaticOptionOnly locks the registration
+// contract documented on execution.SyncLifecycleListener: sync listeners are
+// supplied once at construction, via WithSyncLifecycleListeners, and there is
+// deliberately no post-construction mutator. A dynamic AddSyncLifecycleListener
+// (the counterpart AddLifecycleListener provides for async listeners) would let
+// a consumer register with some dispatchers but not others, leaving a listener
+// observing only part of a run's lifecycle -- so its absence is part of the
+// contract, not an oversight.
+func TestSyncLifecycleRegistrationIsStaticOptionOnly(t *testing.T) {
+	// The option is a real registration path: a listener supplied through it
+	// lands in the same slice the dispatchers fan out over.
+	sync := &recordingSyncLifecycle{}
+	e := &executor{log: logger.VoidLogger()}
+	require.NoError(t, WithSyncLifecycleListeners(sync)(e))
+
+	e.RunFunctionFinishedLifecycle(context.Background(), sv2.Metadata{}, queue.Item{}, nil, statev1.DriverResponse{})
+	require.Equal(t, 1, sync.finishedCalls)
+
+	// ...and it is the *only* registration path. Neither the concrete
+	// *executor nor the execution.Executor interface may expose a mutator for
+	// sync listeners.
+	for _, typ := range []reflect.Type{
+		reflect.TypeOf(&executor{}),
+		reflect.TypeOf((*execution.Executor)(nil)).Elem(),
+	} {
+		for i := 0; i < typ.NumMethod(); i++ {
+			name := typ.Method(i).Name
+			if !strings.Contains(name, "Sync") {
+				continue
+			}
+			require.False(t,
+				strings.HasPrefix(name, "Add") || strings.HasPrefix(name, "Set") || strings.HasPrefix(name, "Register"),
+				"%s.%s: sync lifecycle listeners are registered statically via WithSyncLifecycleListeners; adding a runtime mutator breaks that contract",
+				typ, name,
+			)
+		}
 	}
 }
