@@ -34,6 +34,27 @@ import (
 // a panicking implementation must never crash the execution, checkpointing,
 // defer-handling, or OTLP-ingestion path that happened to be dispatching to
 // it, and must never stop later listeners in the same fan-out from running.
+//
+// Registration is static: listeners are supplied once, at construction, and
+// there is deliberately no post-construction mutator anywhere (no
+// AddSyncLifecycleListener counterpart to Executor.AddLifecycleListener).
+// A listener observes only part of a run's lifecycle unless it reaches every
+// dispatcher, so a composition root builds one shared slice and passes that
+// same slice to all four construction sites:
+//
+//   - executor.WithSyncLifecycleListeners (run/step lifecycle, defers,
+//     executor-created metadata)
+//   - runner.WithSyncLifecycleListeners (event ingestion)
+//   - apiv1.Opts.SyncLifecycleListeners (AddRunMetadata, OTLP userland spans
+//     and their extracted metadata)
+//   - checkpoint.Opts.SyncLifecycleListeners (checkpointed steps, defers and
+//     metadata; the API forwards its own slice here)
+//
+// Lifecycle ownership follows the same rule: whichever composition root
+// builds the slice owns starting and shutting its listeners down, exactly
+// once. This interface intentionally carries no Close/shutdown hook, so a
+// listener needing one exposes it on its concrete type for that owner to
+// call.
 var _ SyncLifecycleListener = (*NoopSyncLifecycleListener)(nil)
 
 // SafelyInvokeSyncListeners calls fn once for each listener in ls -- a

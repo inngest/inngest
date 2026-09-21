@@ -263,10 +263,12 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 
 // WithSyncLifecycleListeners registers listeners invoked synchronously
 // (inline, not via a spawned goroutine) alongside the async
-// execution.LifecycleListener dispatch. AddSyncLifecycleListener is not part
-// of the execution.Executor interface (unlike AddLifecycleListener), so this
-// asserts to the concrete *executor type, matching the pattern used by
-// options like WithHTTPClient above.
+// execution.LifecycleListener dispatch. This is the *only* way to register
+// them on an executor: there is deliberately no AddSyncLifecycleListener
+// counterpart to AddLifecycleListener (see execution.SyncLifecycleListener's
+// doc comment on static, construction-time registration). It asserts to the
+// concrete *executor type, matching the pattern used by options like
+// WithHTTPClient above.
 func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).syncLifecycles = append(e.(*executor).syncLifecycles, l...)
@@ -612,10 +614,6 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 
 func (e *executor) AddEventLifecycleListener(l execution.EventLifecycleListener) {
 	e.evtLifecycles = append(e.evtLifecycles, l)
-}
-
-func (e *executor) AddSyncLifecycleListener(l execution.SyncLifecycleListener) {
-	e.syncLifecycles = append(e.syncLifecycles, l)
 }
 
 func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Context, execution.EventLifecycleListener)) {
