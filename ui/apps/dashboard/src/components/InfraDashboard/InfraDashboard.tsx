@@ -152,7 +152,7 @@ export function InfraDashboard({
             }}
             fetching={false}
             label="Executions ran (runs + steps)"
-            value={executionLimit.usedExecutions.toLocaleString('en-US')}
+            value={formatCompactNumber(executionLimit.usedExecutions)}
           />
         ) : (
           <KpiCard
@@ -254,7 +254,7 @@ function KpiCard({
           )}
           {cap && (
             <div className="text-muted mb-1 ml-auto text-xs">
-              /{cap.limit.toLocaleString('en-US')}
+              /{formatCompactNumber(cap.limit)}
             </div>
           )}
         </div>

@@ -6,11 +6,13 @@ import { useExecutionLimit } from './useExecutionLimit';
 
 const mocks = vi.hoisted(() => ({
   useBooleanFlag: vi.fn(),
+  useIsIdentificationSettled: vi.fn(),
   useSkippableGraphQLQuery: vi.fn(),
 }));
 
 vi.mock('@/components/FeatureFlags/hooks', () => ({
   useBooleanFlag: mocks.useBooleanFlag,
+  useIsIdentificationSettled: mocks.useIsIdentificationSettled,
 }));
 
 vi.mock('@/gql', () => ({
@@ -48,6 +50,7 @@ describe('useExecutionLimit', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.useIsIdentificationSettled.mockReturnValue(true);
     flag = { value: false, isReady: true };
     legacyAccount = {
       id: 'legacy-account',
@@ -103,6 +106,16 @@ describe('useExecutionLimit', () => {
     expect(
       mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
     ).toEqual([false, true]);
+  });
+
+  it('fetches nothing until identification settles', () => {
+    mocks.useIsIdentificationSettled.mockReturnValue(false);
+    flag = { value: false, isReady: false };
+
+    expect(useExecutionLimit()).toBeNull();
+    expect(
+      mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
+    ).toEqual([true, true]);
   });
 
   it('uses the enhanced cap only when the flag is ready and enabled', () => {

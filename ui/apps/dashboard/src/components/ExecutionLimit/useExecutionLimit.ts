@@ -1,4 +1,7 @@
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import {
+  useBooleanFlag,
+  useIsIdentificationSettled,
+} from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import { Marketplace } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -65,15 +68,19 @@ export function useExecutionLimit(): ExecutionLimitData | null {
   );
   const enhanced = isReady && enhancedEnabled;
 
+  // Gates both queries so a flagged account never renders the legacy card
+  // first, without stranding accounts that never identify.
+  const isSettled = useIsIdentificationSettled();
+
   const legacyRes = useSkippableGraphQLQuery({
     query: executionLimitQuery,
     variables: {},
-    skip: enhanced,
+    skip: !isSettled || enhanced,
   });
   const capRes = useSkippableGraphQLQuery({
     query: executionCapQuery,
     variables: {},
-    skip: !enhanced,
+    skip: !isSettled || !enhanced,
   });
 
   const account = enhanced ? capRes.data?.account : legacyRes.data?.account;
