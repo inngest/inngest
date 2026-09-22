@@ -19,10 +19,12 @@ func DefaultTemplates() Templates {
 	return Templates{
 		Tenants: []Tenant{
 			{
-				AccountID:  uuid.New(),
-				EnvID:      uuid.New(),
-				AppID:      uuid.New(),
-				FunctionID: uuid.New(),
+				AccountID:    uuid.New(),
+				EnvID:        uuid.New(),
+				AppID:        uuid.New(),
+				AppName:      "seeded-app",
+				FunctionID:   uuid.New(),
+				FunctionSlug: "seeded-app-seeded-function",
 			},
 		},
 		Statuses: []string{"Queued", "Running", "Completed", "Completed", "Failed", "Cancelled"},
@@ -138,7 +140,7 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 	WITH sampled_run_ids AS (
 		SELECT DISTINCT run_id FROM %s.runs LIMIT ?
 	)
-	SELECT account_id, env_id, app_id, function_id, status, inputs, output
+	SELECT account_id, env_id, app_id, app_name, function_id, function_slug, status, inputs, output
 	FROM %s.runs
 	WHERE run_id IN (SELECT run_id FROM sampled_run_ids)
 	QUALIFY row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
@@ -153,10 +155,11 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 	for rows.Next() {
 		var (
 			rawAccountID, rawEnvID, rawAppID, rawFunctionID any
+			appName, functionSlug                           string
 			status                                          any
 			rawInputs, rawOutput                            any
 		)
-		if err := rows.Scan(&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &status, &rawInputs, &rawOutput); err != nil {
+		if err := rows.Scan(&rawAccountID, &rawEnvID, &rawAppID, &appName, &rawFunctionID, &functionSlug, &status, &rawInputs, &rawOutput); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("duckdbseed: scanning sampled run: %w", err)
 		}
 
@@ -164,6 +167,7 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
+		tenant.AppName, tenant.FunctionSlug = appName, functionSlug
 		if !seenTenants[tenant] {
 			seenTenants[tenant] = true
 			tenants = append(tenants, tenant)
