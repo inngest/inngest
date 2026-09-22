@@ -252,15 +252,16 @@ func encodeQuackCancelRequest(connectionID string, queryID quackHugeint) []byte 
 }
 
 // decodeQuackPrepareResponseBody reads a PrepareResponse body and returns
-// rows keyed by result column name, built from every inline DataChunk the
-// server returned, alongside names (field2) and types (field1), both in the
-// query's own left-to-right order — the only place that order survives once
-// namedRows folds a chunk's columns into a map. Both are populated even for
-// a zero-row result, unlike rows.go's jsonlines session (see
+// positional rows built from every inline DataChunk the server returned,
+// alongside names (field2) and types (field1), both in the query's own
+// left-to-right order. Rows share one *columns built from names, so a
+// repeated column name keeps every value. Names and types are populated
+// even for a zero-row result, unlike rows.go's jsonlines session (see
 // quackSession.query). needsMoreFetch signals more rows than fit in this
 // response; resultUUID (field5) is the token a FetchRequest passes back to
 // pull the rest.
-func decodeQuackPrepareResponseBody(r *quackReader) (names []string, types []quackLogicalType, rows []map[string]any, needsMoreFetch bool, resultUUID quackHugeint, err error) {
+func decodeQuackPrepareResponseBody(r *quackReader) (names []string, types []quackLogicalType, rows []row, needsMoreFetch bool, resultUUID quackHugeint, err error) {
+	var shared *columns
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
 		return nil, nil, nil, false, quackHugeint{}, terr
 	} else if ok {
@@ -332,7 +333,10 @@ func decodeQuackPrepareResponseBody(r *quackReader) (names []string, types []qua
 			if terr := r.endObject(); terr != nil {
 				return nil, nil, nil, false, quackHugeint{}, terr
 			}
-			chunkRows, terr := chunk.namedRows(names)
+			if shared == nil {
+				shared = newColumns(names)
+			}
+			chunkRows, terr := chunk.rows(shared)
 			if terr != nil {
 				return nil, nil, nil, false, quackHugeint{}, terr
 			}
@@ -402,7 +406,7 @@ func encodeQuackFetchRequest(connectionID string, uuid quackHugeint, batchIndex 
 // batchIndex+1 back (encodeQuackFetchRequest's doc comment has the full
 // story on why the request side needs this at all, including why 0 is
 // never a usable value for it).
-func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[string]any, chunkCount int, batchIndex uint64, err error) {
+func decodeQuackFetchResponseBody(r *quackReader, cols *columns) (rows []row, chunkCount int, batchIndex uint64, err error) {
 	var chunkCountU64 uint64
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
 		return nil, 0, 0, terr
@@ -439,7 +443,7 @@ func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[st
 		if terr != nil {
 			return nil, 0, 0, terr
 		}
-		chunkRows, terr := chunk.namedRows(names)
+		chunkRows, terr := chunk.rows(cols)
 		if terr != nil {
 			return nil, 0, 0, terr
 		}
@@ -1381,12 +1385,12 @@ type quackDataChunk struct {
 	columns  []quackColumn
 }
 
-// namedRows zips this chunk's columns against names (from the enclosing
-// PrepareResponse's result_names) into one map[string]any per row, matching
-// the shape process.exec has always returned (see sqlExecer).
-func (c quackDataChunk) namedRows(names []string) ([]map[string]any, error) {
-	if len(names) != len(c.columns) {
-		return nil, fmt.Errorf("duckdb: quack result has %d names but %d columns", len(names), len(c.columns))
+// rows zips this chunk's columns against cols (from the enclosing
+// PrepareResponse's result_names) into one positional row per result row
+// (see result.go).
+func (c quackDataChunk) rows(cols *columns) ([]row, error) {
+	if len(cols.names) != len(c.columns) {
+		return nil, fmt.Errorf("duckdb: quack result has %d names but %d columns", len(cols.names), len(c.columns))
 	}
 	colValues := make([][]any, len(c.columns))
 	for i, col := range c.columns {
@@ -1396,15 +1400,15 @@ func (c quackDataChunk) namedRows(names []string) ([]map[string]any, error) {
 		}
 		colValues[i] = vs
 	}
-	rows := make([]map[string]any, c.rowCount)
+	out := make([]row, c.rowCount)
 	for r := 0; r < c.rowCount; r++ {
-		row := make(map[string]any, len(names))
-		for i, name := range names {
-			row[name] = colValues[i][r]
+		vals := make([]any, len(c.columns))
+		for i := range c.columns {
+			vals[i] = colValues[i][r]
 		}
-		rows[r] = row
+		out[r] = row{cols: cols, vals: vals}
 	}
-	return rows, nil
+	return out, nil
 }
 
 // decodeQuackDataChunk reads a DataChunk object: field100 rows, field101
