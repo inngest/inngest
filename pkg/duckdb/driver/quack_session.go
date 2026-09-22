@@ -304,5 +304,11 @@ func (s *quackSession) send(ctx context.Context, payload []byte) (quackMessageHe
 	if err != nil {
 		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: decoding response header: %w", err)
 	}
+	// The server currently leaves connection_id empty on every response
+	// after the handshake, so only a present-but-different ID is rejected:
+	// that would mean this response belongs to some other session.
+	if s.connectionID != "" && hdr.ConnectionID != "" && hdr.ConnectionID != s.connectionID {
+		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: response for connection %s received on connection %s", hdr.ConnectionID, s.connectionID)
+	}
 	return hdr, r, nil
 }
