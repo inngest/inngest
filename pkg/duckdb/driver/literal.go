@@ -131,13 +131,21 @@ func encodeLiteral(v driver.Value) (string, error) {
 
 // interpolate replaces every "?" positional placeholder in query with its
 // corresponding encoded literal, in ordinal order. It returns an error if the
-// number of placeholders doesn't match len(args).
+// number of placeholders doesn't match len(args). A "?" inside a string
+// literal, quoted identifier, comment, or dollar-quoted string is not a
+// placeholder — see placeholderOffsets.
 func interpolate(query string, args []driver.NamedValue) (string, error) {
+	offsets, lexErr := placeholderOffsets(query)
 	if len(args) == 0 {
-		if strings.Count(query, "?") != 0 {
-			return "", fmt.Errorf("duckdb: query has placeholders but no args were bound: %q", query)
+		// With nothing to bind, a query this lexer can't make sense of is
+		// passed through untouched so DuckDB reports the real syntax error.
+		if lexErr == nil && len(offsets) != 0 {
+			return "", fmt.Errorf("duckdb: query has %d placeholders but no args were bound", len(offsets))
 		}
 		return query, nil
+	}
+	if lexErr != nil {
+		return "", lexErr
 	}
 
 	ordered := make([]driver.Value, len(args))
@@ -147,26 +155,139 @@ func interpolate(query string, args []driver.NamedValue) (string, error) {
 		}
 		ordered[a.Ordinal-1] = a.Value
 	}
+	if len(offsets) != len(ordered) {
+		return "", fmt.Errorf("duckdb: query has %d placeholders but %d args were bound", len(offsets), len(ordered))
+	}
 
 	var sb strings.Builder
-	argIdx := 0
-	for i := 0; i < len(query); i++ {
-		if query[i] == '?' {
-			if argIdx >= len(ordered) {
-				return "", fmt.Errorf("duckdb: query has more placeholders than the %d bound args", len(args))
-			}
-			literal, err := encodeLiteral(ordered[argIdx])
-			if err != nil {
-				return "", err
-			}
-			sb.WriteString(literal)
-			argIdx++
-			continue
+	prev := 0
+	for i, off := range offsets {
+		literal, err := encodeLiteral(ordered[i])
+		if err != nil {
+			return "", err
 		}
-		sb.WriteByte(query[i])
+		sb.WriteString(query[prev:off])
+		sb.WriteString(literal)
+		prev = off + 1
 	}
-	if argIdx != len(ordered) {
-		return "", fmt.Errorf("duckdb: query has %d placeholders but %d args were bound", argIdx, len(ordered))
-	}
+	sb.WriteString(query[prev:])
 	return sb.String(), nil
+}
+
+// placeholderOffsets returns the byte offset of every "?" in query that
+// DuckDB's parser would see as a positional parameter, skipping the lexical
+// contexts where "?" is just text:
+//
+//   - 'string' literals, with ” as an escaped quote, and E'...' escape
+//     strings, where a backslash escapes the next byte
+//   - "quoted identifiers", with "" as an escaped quote
+//   - -- line comments and /* block comments */, which nest
+//   - $$dollar-quoted$$ and $tag$dollar-quoted$tag$ strings
+//
+// An unterminated construct is an error: interpolating into SQL whose
+// quoting we can't follow is exactly how a bound value ends up somewhere it
+// shouldn't.
+func placeholderOffsets(query string) ([]int, error) {
+	var offsets []int
+	n := len(query)
+	for i := 0; i < n; i++ {
+		c := query[i]
+		switch {
+		case c == '?':
+			offsets = append(offsets, i)
+
+		case c == '\'':
+			escapes := i > 0 && (query[i-1] == 'E' || query[i-1] == 'e') && (i < 2 || !isIdentByte(query[i-2]))
+			end, ok := skipQuoted(query, i, '\'', escapes)
+			if !ok {
+				return nil, fmt.Errorf("duckdb: unterminated string literal at offset %d", i)
+			}
+			i = end
+
+		case c == '"':
+			end, ok := skipQuoted(query, i, '"', false)
+			if !ok {
+				return nil, fmt.Errorf("duckdb: unterminated quoted identifier at offset %d", i)
+			}
+			i = end
+
+		case c == '-' && i+1 < n && query[i+1] == '-':
+			end := strings.IndexByte(query[i:], '\n')
+			if end < 0 {
+				return offsets, nil
+			}
+			i += end
+
+		case c == '/' && i+1 < n && query[i+1] == '*':
+			depth := 1
+			j := i + 2
+			for ; j < n && depth > 0; j++ {
+				switch {
+				case query[j] == '/' && j+1 < n && query[j+1] == '*':
+					depth++
+					j++
+				case query[j] == '*' && j+1 < n && query[j+1] == '/':
+					depth--
+					j++
+				}
+			}
+			if depth > 0 {
+				return nil, fmt.Errorf("duckdb: unterminated block comment at offset %d", i)
+			}
+			i = j - 1
+
+		case c == '$' && (i == 0 || !isIdentByte(query[i-1])):
+			tag, ok := dollarTag(query[i:])
+			if !ok {
+				continue
+			}
+			end := strings.Index(query[i+len(tag):], tag)
+			if end < 0 {
+				return nil, fmt.Errorf("duckdb: unterminated dollar-quoted string at offset %d", i)
+			}
+			i += len(tag) + end + len(tag) - 1
+		}
+	}
+	return offsets, nil
+}
+
+// skipQuoted returns the offset of the quote closing the quoted run that
+// opens at query[start], treating a doubled quote as an escaped one and,
+// when backslashEscapes is set, a backslash as escaping the next byte.
+func skipQuoted(query string, start int, quote byte, backslashEscapes bool) (int, bool) {
+	for j := start + 1; j < len(query); j++ {
+		switch query[j] {
+		case '\\':
+			if backslashEscapes {
+				j++
+			}
+		case quote:
+			if j+1 < len(query) && query[j+1] == quote {
+				j++
+				continue
+			}
+			return j, true
+		}
+	}
+	return 0, false
+}
+
+// dollarTag reports whether s opens a dollar-quoted string, returning its
+// delimiter ("$$" or "$tag$"). A "$" followed by a digit is a $1-style
+// parameter, not a tag, since a tag can't start with one.
+func dollarTag(s string) (string, bool) {
+	for j := 1; j < len(s); j++ {
+		c := s[j]
+		if c == '$' {
+			return s[:j+1], true
+		}
+		if !isIdentByte(c) || (j == 1 && c >= '0' && c <= '9') {
+			return "", false
+		}
+	}
+	return "", false
+}
+
+func isIdentByte(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c >= 0x80
 }
