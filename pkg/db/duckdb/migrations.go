@@ -25,7 +25,7 @@ var MigrationsFS embed.FS
 // var is completely unset, so an explicitly-set value always wins.
 //
 // The override can't be a literal empty string: over the quack transport
-// (see quack_session.go — production's setupDualWrite always enables it,
+// (see pkg/duckdb/driver/internal/quack/session.go — production's setupDualWrite always enables it,
 // alongside the plain jsonlines transport tests here use directly), DuckDB's
 // prepare/fetch protocol rejects a statement that resolves to nothing with
 // "Query did not return any columns", even though the same empty statement

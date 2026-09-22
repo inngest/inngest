@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,19 +17,19 @@ import (
 // ...`), minus the table dependency.
 func TestQuackQueryDateColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT '2026-01-01'::DATE AS d, 1 AS n;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT '2026-01-01'::DATE AS d, 1 AS n;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"d", "n"}, cols)
 	require.Equal(t, []string{"DATE", "INTEGER"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), rows[0].get("d"))
+	require.Equal(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), rows[0].Get("d"))
 }
 
 // TestQuackQueryTimestampTZColumn covers LogicalTypeId 32 (TIMESTAMP WITH
@@ -39,7 +40,7 @@ func TestQuackQueryDateColumn(t *testing.T) {
 // TimeZone.
 func TestQuackQueryTimestampTZColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
@@ -50,17 +51,17 @@ func TestQuackQueryTimestampTZColumn(t *testing.T) {
 	// than instant-preserving) decode would be caught: if quack decoded the
 	// text-rendered, zone-shifted value instead of the raw UTC instant, this
 	// offset would corrupt the result.
-	_, _, err = quackProc.exec(t.Context(), "SET TimeZone = 'America/New_York';")
+	_, _, err = quackProc.Exec(t.Context(), "SET TimeZone = 'America/New_York';")
 	require.NoError(t, err)
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT '2026-01-01 12:00:00+05:30'::TIMESTAMPTZ AS ts;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT '2026-01-01 12:00:00+05:30'::TIMESTAMPTZ AS ts;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"ts"}, cols)
 	require.Equal(t, []string{"TIMESTAMP WITH TIME ZONE"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0].get("ts").(time.Time)
-	require.True(t, ok, "expected a time.Time, got %T", rows[0].get("ts"))
+	got, ok := rows[0].Get("ts").(time.Time)
+	require.True(t, ok, "expected a time.Time, got %T", rows[0].Get("ts"))
 	want := time.Date(2026, 1, 1, 12, 0, 0, 0, time.FixedZone("", 5*3600+30*60))
 	require.True(t, got.Equal(want), "got %v, want %v (same instant)", got, want)
 }
@@ -70,19 +71,19 @@ func TestQuackQueryTimestampTZColumn(t *testing.T) {
 // produces for jsonlines' TIME layout.
 func TestQuackQueryTimeColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT '12:34:56.5'::TIME AS t;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT '12:34:56.5'::TIME AS t;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"t"}, cols)
 	require.Equal(t, []string{"TIME"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, time.Date(0, 1, 1, 12, 34, 56, 500000000, time.UTC), rows[0].get("t"))
+	require.Equal(t, time.Date(0, 1, 1, 12, 34, 56, 500000000, time.UTC), rows[0].Get("t"))
 }
 
 // TestQuackQueryTimeTZColumn covers LogicalTypeId 34 (TIME WITH TIME ZONE),
@@ -91,21 +92,21 @@ func TestQuackQueryTimeColumn(t *testing.T) {
 // straightforward fixed-width layout every other case here decodes.
 func TestQuackQueryTimeTZColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT '12:34:56.5+05:30'::TIMETZ AS t;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT '12:34:56.5+05:30'::TIMETZ AS t;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"t"}, cols)
 	require.Equal(t, []string{"TIME WITH TIME ZONE"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0].get("t").(time.Time)
-	require.True(t, ok, "expected a time.Time, got %T", rows[0].get("t"))
+	got, ok := rows[0].Get("t").(time.Time)
+	require.True(t, ok, "expected a time.Time, got %T", rows[0].Get("t"))
 	require.Equal(t, 12, got.Hour())
 	require.Equal(t, 34, got.Minute())
 	require.Equal(t, 56, got.Second())

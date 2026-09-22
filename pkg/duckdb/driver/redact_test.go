@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,12 +29,12 @@ func TestRedactErrScrubsSecretsButKeepsClassification(t *testing.T) {
 	r := &secretRedactor{}
 	r.add("sekrit", "postgres://u:pw@h/db", "")
 
-	raw := fmt.Errorf("%w: Parser Error: LINE 1: ... token = 'sekrit' ... ATTACH 'postgres://u:pw@h/db'", errStatementFailed)
+	raw := fmt.Errorf("%w: Parser Error: LINE 1: ... token = 'sekrit' ... ATTACH 'postgres://u:pw@h/db'", result.ErrStatementFailed)
 	got := r.redactErr(raw)
 	require.NotContains(t, got.Error(), "sekrit")
 	require.NotContains(t, got.Error(), "pw@h")
 	require.Contains(t, got.Error(), redactedPlaceholder)
-	require.ErrorIs(t, got, errStatementFailed)
+	require.ErrorIs(t, got, result.ErrStatementFailed)
 	require.Nil(t, errors.Unwrap(got), "unwrapping must not hand back the unredacted message")
 
 	clean := errors.New("nothing secret here")
@@ -47,7 +49,7 @@ func TestRedactErrScrubsSecretsButKeepsClassification(t *testing.T) {
 // never reaches the returned error.
 func TestQuackBootstrapErrorDoesNotLeakToken(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	// A non-loopback host makes quack_serve itself fail after the token is
 	// already part of the statement.

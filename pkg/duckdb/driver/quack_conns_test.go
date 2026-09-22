@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +35,7 @@ func TestOpenWithQuackConnsRequiresQuackAddr(t *testing.T) {
 // still fully serialized and this test fails.
 func TestOpenWithQuackConnsRunsQueriesConcurrently(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 	dir := t.TempDir()
 
 	addr := EphemeralQuackAddr

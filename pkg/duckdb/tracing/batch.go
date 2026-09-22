@@ -87,7 +87,7 @@ func (b *batcher) stop() { close(b.stopc) }
 // path can then never acquire that same mutex to kill the subprocess — the
 // bounded bounds Close already has (see Closer, driver.Connector)
 // only cover work *after* the lock is acquired, not the lock acquisition
-// itself. quackSession's HTTP client has no timeout of its own by design
+// itself. quack.Session's HTTP client has no timeout of its own by design
 // (see newQuackHTTPClient's doc comment) specifically so a caller can opt
 // into a longer-running call like DuckLake compaction; a batch flush is not
 // that caller, so it gets its own short leash instead. A statement that

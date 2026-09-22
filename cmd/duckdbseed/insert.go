@@ -210,7 +210,7 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 // VARCHAR->LIST casting from that text, which sidesteps a real server-side
 // gap — duckdb-quack's AppendRequest handler crashes (empty-bodied HTTP
 // 500) on any native LIST-typed column, verified down to the minimal case;
-// see pkg/db/duckdb/quack_append.go's wireID doc comment for the full
+// see pkg/duckdb/driver/internal/quack/append.go's ColumnKind.wireID doc comment for the full
 // writeup. now stands in for inserted_at's DEFAULT current_timestamp, which
 // this appender (having no column-name info on the wire) cannot leave
 // unsupplied — see runColumns' doc comment.
