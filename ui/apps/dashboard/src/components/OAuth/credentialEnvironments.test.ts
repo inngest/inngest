@@ -21,17 +21,31 @@ describe('credential environments', () => {
       isAutoArchiveEnabled: false,
       lastDeployedAt: null,
     });
+    const environments = [
+      environment('prod', EnvironmentType.Production),
+      environment('test', EnvironmentType.Test),
+      environment('archived', EnvironmentType.Test, true),
+      environment('branch', EnvironmentType.BranchChild),
+      environment('parent', EnvironmentType.BranchParent),
+      environment('archived-branch', EnvironmentType.BranchChild, true),
+      environment('archived-parent', EnvironmentType.BranchParent, true),
+    ];
+    expect(credentialEnvironmentOptions(environments)).toEqual([
+      { label: 'Production', opts: [{ id: 'prod', name: 'prod' }] },
+      { label: 'Test', opts: [{ id: 'test', name: 'test' }] },
+    ]);
     expect(
-      credentialEnvironmentOptions([
-        environment('prod', EnvironmentType.Production),
-        environment('test', EnvironmentType.Test),
-        environment('archived', EnvironmentType.Test, true),
-        environment('branch', EnvironmentType.BranchChild),
-        environment('parent', EnvironmentType.BranchParent),
-      ]),
+      credentialEnvironmentOptions(environments, { includeBranches: true }),
     ).toEqual([
       { label: 'Production', opts: [{ id: 'prod', name: 'prod' }] },
       { label: 'Test', opts: [{ id: 'test', name: 'test' }] },
+      {
+        label: 'Branches',
+        opts: [
+          { id: 'parent', name: 'parent (includes children)' },
+          { id: 'branch', name: 'branch' },
+        ],
+      },
     ]);
   });
 });

@@ -2,12 +2,16 @@ import type { Option } from '@inngest/components/Select/Select';
 
 import { EnvironmentType, type Environment } from '@/utils/environments';
 
-export function credentialEnvironmentOptions(environments: Environment[]) {
+export function credentialEnvironmentOptions(
+  environments: Environment[],
+  { includeBranches = false }: { includeBranches?: boolean } = {},
+) {
   const eligible = environments.filter(
     (environment) =>
       !environment.isArchived &&
-      environment.type !== EnvironmentType.BranchChild &&
-      environment.type !== EnvironmentType.BranchParent,
+      (includeBranches ||
+        (environment.type !== EnvironmentType.BranchChild &&
+          environment.type !== EnvironmentType.BranchParent)),
   );
   const option = ({ id, name }: Environment): Option => ({ id, name });
   return [
@@ -20,8 +24,26 @@ export function credentialEnvironmentOptions(environments: Environment[]) {
     {
       label: 'Test',
       opts: eligible
-        .filter((env) => env.type !== EnvironmentType.Production)
+        .filter((env) => env.type === EnvironmentType.Test)
         .map(option),
     },
+    ...(includeBranches
+      ? [
+          {
+            label: 'Branches',
+            opts: [
+              ...eligible
+                .filter((env) => env.type === EnvironmentType.BranchParent)
+                .map((env) => ({
+                  id: env.id,
+                  name: `${env.name} (includes children)`,
+                })),
+              ...eligible
+                .filter((env) => env.type === EnvironmentType.BranchChild)
+                .map(option),
+            ],
+          },
+        ]
+      : []),
   ];
 }

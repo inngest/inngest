@@ -9,7 +9,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { useMutation, useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import type { GetRestrictedApiKeysQuery } from '@/gql/graphql';
+import { EnvironmentType, type GetRestrictedApiKeysQuery } from '@/gql/graphql';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { CreateRestrictedAPIKeyModal } from './CreateRestrictedAPIKeyModal';
 import { apiKeyErrorMessage } from './errorMessage';
@@ -89,13 +89,19 @@ export function RestrictedAPIKeys() {
         </div>
       ),
     }),
-    column.accessor((key) => key.env?.name ?? 'All environments', {
-      id: 'environment',
-      header: 'Environment',
-      cell: (info) => (
-        <span className="text-subtle text-sm">{info.getValue()}</span>
-      ),
-    }),
+    column.accessor(
+      (key) =>
+        key.env?.type === EnvironmentType.BranchParent
+          ? `${key.env.name} (includes children)`
+          : key.env?.name ?? 'All environments',
+      {
+        id: 'environment',
+        header: 'Environment',
+        cell: (info) => (
+          <span className="text-subtle text-sm">{info.getValue()}</span>
+        ),
+      },
+    ),
     column.accessor('expiresAt', {
       header: 'Expires',
       cell: ({ row }) =>

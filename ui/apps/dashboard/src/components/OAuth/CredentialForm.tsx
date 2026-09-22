@@ -24,6 +24,7 @@ type Props = {
   allEnvironments: boolean;
   onAllEnvironmentsChange: (all: boolean) => void;
   environment: Option | null;
+  environmentDescription?: string;
   environmentGroups: EnvironmentOptionGroup[];
   onEnvironmentChange: (environment: Option) => void;
   permissions: ReactNode;
@@ -48,6 +49,7 @@ export function CredentialForm({
   allEnvironments,
   onAllEnvironmentsChange,
   environment,
+  environmentDescription,
   environmentGroups,
   onEnvironmentChange,
   permissions,
@@ -174,6 +176,9 @@ export function CredentialForm({
             <p id="credential-environment-error" className="text-error text-sm">
               {fieldErrors.environment}
             </p>
+          )}
+          {!allEnvironments && environmentDescription && (
+            <p className="text-muted text-sm">{environmentDescription}</p>
           )}
           {allEnvironments && (
             <Alert severity="info">
