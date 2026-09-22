@@ -77,6 +77,10 @@ type session struct {
 	// desynced is set by exec when it abandons an in-flight statement.
 	// Guarded by mu.
 	desynced bool
+
+	// redactor scrubs bootstrap secrets out of diagnostics before they are
+	// logged or returned — see secretRedactor. Nil redacts nothing.
+	redactor *secretRedactor
 }
 
 func newSession(stdin io.Writer, out io.Reader) *session {
@@ -156,7 +160,7 @@ func (s *session) exec(ctx context.Context, sql string) (cols []string, rows []m
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := reportDiagnostics(ctx, diags); err != nil {
+	if err := reportDiagnostics(ctx, s.redactor, diags); err != nil {
 		return nil, nil, err
 	}
 	return cols, rows, nil
@@ -206,7 +210,7 @@ func (s *session) query(ctx context.Context, sql string) (cols []string, types [
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err := reportDiagnostics(ctx, append(describeDiags, dataDiags...)); err != nil {
+	if err := reportDiagnostics(ctx, s.redactor, append(describeDiags, dataDiags...)); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -375,8 +379,8 @@ func decodeOrderedRow(line []byte) (cols []string, row map[string]any, err error
 // statement was in flight — preserving the "stderr routed to the main
 // process's logger" behaviour the previous dedicated stderr goroutine
 // provided — and returns errStatementFailed if any of them is DuckDB error
-// output.
-func reportDiagnostics(ctx context.Context, diags []string) error {
+// output. Every line is passed through redactor first.
+func reportDiagnostics(ctx context.Context, redactor *secretRedactor, diags []string) error {
 	if len(diags) == 0 {
 		return nil
 	}
@@ -384,6 +388,7 @@ func reportDiagnostics(ctx context.Context, diags []string) error {
 	l := logger.StdlibLogger(ctx)
 	var errLines []string
 	for _, line := range diags {
+		line = redactor.redact(line)
 		l.Warn("duckdb subprocess stderr", "line", line)
 		if isErrorDiagnostic(line) {
 			errLines = append(errLines, line)
