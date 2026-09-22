@@ -1,13 +1,25 @@
 import { createContext, useEffect, useState } from 'react';
 
-import { useLDClient, withLDProvider } from 'launchdarkly-react-client-sdk';
+import {
+  useLDClient,
+  useLDClientError,
+  withLDProvider,
+} from 'launchdarkly-react-client-sdk';
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
-export const IdentificationContext = createContext({ isIdentified: false });
+export const IdentificationContext = createContext({
+  isIdentified: false,
+  hasError: false,
+});
 
 function LaunchDarkly({ children }: { children: React.ReactNode }) {
-  const [isIdentified, setIsIdentified] = useState(false);
+  const [identification, setIdentification] = useState<{
+    accountID: unknown;
+    externalID: string | null | undefined;
+    status: 'ready' | 'error';
+  }>();
   const client = useLDClient();
+  const clientError = useLDClientError();
 
   const { user } = useUser();
   const { organization } = useOrganization();
@@ -21,28 +33,53 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    client
-      .identify({
-        kind: 'multi',
-        account: {
-          key: accountID,
-          name: organization.name,
-        },
-        user: {
-          anonymous: false,
-          key: externalID,
-          name: userName ?? 'Unknown',
-        },
-      })
+    let active = true;
+    setIdentification(undefined);
+
+    Promise.resolve()
+      .then(() =>
+        client.identify({
+          kind: 'multi',
+          account: {
+            key: accountID,
+            name: organization.name,
+          },
+          user: {
+            anonymous: false,
+            key: externalID,
+            name: userName ?? 'Unknown',
+          },
+        }),
+      )
       .then(() => {
-        // We need to set this because calling client.identify won't trigger a
-        // re-render for the useLDClient hook.
-        setIsIdentified(true);
+        if (active)
+          setIdentification({ accountID, externalID, status: 'ready' });
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        console.error(
+          "Couldn't identify feature flag context; using flag defaults",
+          error,
+        );
+        setIdentification({ accountID, externalID, status: 'error' });
       });
+
+    return () => {
+      active = false;
+    };
   }, [accountID, client, externalID, organization?.name, userName]);
 
+  const status =
+    identification?.accountID === accountID &&
+    identification?.externalID === externalID
+      ? identification?.status
+      : undefined;
+  const hasError = Boolean(clientError) || status === 'error';
+
   return (
-    <IdentificationContext.Provider value={{ isIdentified }}>
+    <IdentificationContext.Provider
+      value={{ isIdentified: status === 'ready', hasError }}
+    >
       {children}
     </IdentificationContext.Provider>
   );
