@@ -28,7 +28,7 @@ func TestQuackQueryDateColumn(t *testing.T) {
 	require.Equal(t, []string{"d", "n"}, cols)
 	require.Equal(t, []string{"DATE", "INTEGER"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), rows[0]["d"])
+	require.Equal(t, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), rows[0].get("d"))
 }
 
 // TestQuackQueryTimestampTZColumn covers LogicalTypeId 32 (TIMESTAMP WITH
@@ -59,8 +59,8 @@ func TestQuackQueryTimestampTZColumn(t *testing.T) {
 	require.Equal(t, []string{"TIMESTAMP WITH TIME ZONE"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0]["ts"].(time.Time)
-	require.True(t, ok, "expected a time.Time, got %T", rows[0]["ts"])
+	got, ok := rows[0].get("ts").(time.Time)
+	require.True(t, ok, "expected a time.Time, got %T", rows[0].get("ts"))
 	want := time.Date(2026, 1, 1, 12, 0, 0, 0, time.FixedZone("", 5*3600+30*60))
 	require.True(t, got.Equal(want), "got %v, want %v (same instant)", got, want)
 }
@@ -82,7 +82,7 @@ func TestQuackQueryTimeColumn(t *testing.T) {
 	require.Equal(t, []string{"t"}, cols)
 	require.Equal(t, []string{"TIME"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, time.Date(0, 1, 1, 12, 34, 56, 500000000, time.UTC), rows[0]["t"])
+	require.Equal(t, time.Date(0, 1, 1, 12, 34, 56, 500000000, time.UTC), rows[0].get("t"))
 }
 
 // TestQuackQueryTimeTZColumn covers LogicalTypeId 34 (TIME WITH TIME ZONE),
@@ -104,8 +104,8 @@ func TestQuackQueryTimeTZColumn(t *testing.T) {
 	require.Equal(t, []string{"TIME WITH TIME ZONE"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0]["t"].(time.Time)
-	require.True(t, ok, "expected a time.Time, got %T", rows[0]["t"])
+	got, ok := rows[0].get("t").(time.Time)
+	require.True(t, ok, "expected a time.Time, got %T", rows[0].get("t"))
 	require.Equal(t, 12, got.Hour())
 	require.Equal(t, 34, got.Minute())
 	require.Equal(t, 56, got.Second())

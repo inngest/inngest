@@ -43,7 +43,7 @@ func TestQuackSessionHandshakeAndExec(t *testing.T) {
 	_, rows, err := sess.exec(context.Background(), "SELECT COUNT(*) AS n FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(2), rows[0]["n"])
+	require.Equal(t, int64(2), rows[0].get("n"))
 }
 
 // TestQuackSessionExecPreservesColumnOrder pins quack's column order to the
@@ -109,8 +109,8 @@ func TestQuackSessionFetchesAllRowsWhenResultExceedsOneInlineResponse(t *testing
 	require.NoError(t, err)
 	require.Equal(t, []string{"n"}, cols)
 	require.Len(t, rows, wantRows)
-	require.Equal(t, int64(0), rows[0]["n"])
-	require.Equal(t, int64(wantRows-1), rows[wantRows-1]["n"])
+	require.Equal(t, int64(0), rows[0].get("n"))
+	require.Equal(t, int64(wantRows-1), rows[wantRows-1].get("n"))
 }
 
 // TestQuackSessionFetchAfterResultClosedMapsToErrStatementFailed exercises
@@ -157,13 +157,13 @@ func TestQuackSessionExecDecodesStructAndListOfStruct(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"s"}, cols)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": int64(1), "b": "x"}, rows[0]["s"])
+	require.Equal(t, map[string]any{"a": int64(1), "b": "x"}, rows[0].get("s"))
 
 	cols, rows, err = sess.exec(context.Background(), "SELECT {'a': 1, 'b': NULL} AS s")
 	require.NoError(t, err)
 	require.Equal(t, []string{"s"}, cols)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": int64(1), "b": nil}, rows[0]["s"])
+	require.Equal(t, map[string]any{"a": int64(1), "b": nil}, rows[0].get("s"))
 
 	cols, rows, err = sess.exec(context.Background(), "SELECT [{'a': 1}, {'a': 2}] AS s")
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestQuackSessionExecDecodesStructAndListOfStruct(t *testing.T) {
 	require.Equal(t, []any{
 		map[string]any{"a": int64(1)},
 		map[string]any{"a": int64(2)},
-	}, rows[0]["s"])
+	}, rows[0].get("s"))
 }
 
 func TestQuackSessionExecAgainstUnreachableServerErrors(t *testing.T) {

@@ -105,7 +105,7 @@ func newQuackSession(ctx context.Context, listenURL, token string) (*quackSessio
 
 // exec implements sqlExecer as query without the type-name conversion, for
 // ExecContext callers (DDL/INSERT/health checks) that don't need column types.
-func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error) {
+func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error) {
 	cols, _, rows, err = s.query(ctx, sqlText)
 	return cols, rows, err
 }
@@ -135,7 +135,7 @@ func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string,
 // handler (verified against the real extension: this is what actually
 // stops the abandoned statement from continuing to burn CPU server-side,
 // which simply not waiting for the response never did on its own).
-func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error) {
+func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error) {
 	queryID := randomQuackHugeint()
 	stopCancelWatch := s.watchForCancel(ctx, queryID)
 	defer stopCancelWatch()
@@ -188,6 +188,7 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 	// Options.QuackConns) runs its own independent fetch loop, so this
 	// needs no synchronization.
 	nextBatchIndex := uint64(1)
+	fetchCols := newColumns(cols)
 	for needsMoreFetch {
 		fetchPhase := fmt.Sprintf("fetch (result_uuid=%s batch_index=%d)", resultUUID, nextBatchIndex)
 		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
@@ -201,7 +202,7 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("unexpected response message type %d", hdr.Type))
 		}
 
-		fetchedRows, chunkCount, batchIndex, ferr := decodeQuackFetchResponseBody(r, cols)
+		fetchedRows, chunkCount, batchIndex, ferr := decodeQuackFetchResponseBody(r, fetchCols)
 		if ferr != nil {
 			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("decoding fetch response: %w", ferr))
 		}

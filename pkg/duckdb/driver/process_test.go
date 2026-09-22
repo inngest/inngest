@@ -39,8 +39,8 @@ func TestStartProcessExecAndQuery(t *testing.T) {
 	_, rows, err := p.sess.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["id"])
-	require.Equal(t, "a", rows[0]["name"])
+	require.Equal(t, float64(1), rows[0].get("id"))
+	require.Equal(t, "a", rows[0].get("name"))
 }
 
 func TestProcessRestartAfterCrash(t *testing.T) {
@@ -521,7 +521,7 @@ func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT 7 AS seven;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(7), rows[0]["seven"])
+	require.Equal(t, float64(7), rows[0].get("seven"))
 }
 
 // TestExecFailedRestartWrapsErrDisabledImmediately pins Fix 5's contract: the
