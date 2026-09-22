@@ -39,29 +39,34 @@ type Timings struct {
 	Insert   time.Duration
 }
 
-// Column kind lists mirror pkg/db/duckdb/migrations/000001_baseline.sql's
-// (and, for runs, 000002_runs_is_deferred.sql's appended column) column
-// order for each table exactly. duckdbdriver.QuackAppender's wire protocol carries
-// no column names — a row's values are matched positionally against the
-// table's own full column list — so, unlike the earlier duckdb-go-based
-// version of this tool, there is no way to scope the appender to a subset
-// of columns: inngest.runs' inserted_at (DEFAULT current_timestamp) must be
-// supplied explicitly too (see runRowValues), even though nothing else in
-// this codebase ever needs to read it back.
+// Column kind lists mirror each table's column order exactly, as created by
+// pkg/db/duckdb/migrations (000001_baseline.sql, plus columns later
+// migrations append). duckdbdriver.QuackAppender's wire
+// protocol carries no column names — a row's values are matched
+// positionally against the table's own full column list — so there is no
+// way to scope the appender to a subset of columns: defaulted columns such
+// as inngest.runs' is_deferred and inserted_at must be supplied explicitly
+// too (see runRowValues). A schema change to any of these tables must be
+// mirrored here; insert_test.go exercises every table against the real
+// migrations.
 var (
 	runColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, queued_at
 		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // scheduled_at, started_at, ended_at
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, function_id, status
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // inputs, output
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
+		duckdbdriver.QuackColumnVarchar,                                                          // status
+		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
 		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
 		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
+		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
+		duckdbdriver.QuackColumnVarchar,     // defer_parent_fn_slug
+		duckdbdriver.QuackColumnVarchar,     // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
 		duckdbdriver.QuackColumnTimestampMS, // inserted_at
-		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs, so always NULL
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, function_id, name
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
+		duckdbdriver.QuackColumnVarchar,                                          // name
 		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, links, output, input
@@ -80,7 +85,7 @@ var (
 	// duckdb-quack server) for event_ids' VARCHAR->LIST casting above.
 	metadataColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // app_id, function_id, span_id, scope
+		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampMS, // values, created_at
@@ -212,10 +217,12 @@ func runRowValues(r RunRow, now time.Time) []any {
 	return []any{
 		r.AccountID, r.EnvID, r.RunID, r.QueuedAt,
 		nullableTime(r.ScheduledAt), nullableTime(r.StartedAt), nullableTime(r.EndedAt),
-		r.AppID, r.FunctionID, r.Status,
-		r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
+		r.AppID, r.AppName, r.FunctionID, r.FunctionSlug, r.Status,
+		nonEmptyJSON(r.Attributes), r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
+		"false", // is_deferred — this tool never generates deferred runs
+		nil,     // defer_parent_fn_slug
+		nil,     // defer_parent_run_ids
 		now,
-		nil, // is_deferred — this tool never generates deferred runs
 	}
 }
 
@@ -226,7 +233,7 @@ func spanRowValues(s SpanRow) []any {
 	}
 	return []any{
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
-		s.AppID, s.FunctionID, s.Name, s.StartTime, s.EndTime,
+		s.AppID, s.AppName, s.FunctionID, s.FunctionSlug, s.Name, s.StartTime, s.EndTime,
 		s.TraceID, s.SpanID, parent, s.Attributes, nil, nullableJSON(s.Output), nullableJSON(s.Input),
 	}
 }
@@ -248,7 +255,7 @@ func metadataRowValues(m MetadataRow) []any {
 	}
 	return []any{
 		m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt,
-		m.AppID, m.FunctionID, m.SpanID, m.Scope,
+		m.SpanID, m.Scope,
 		stepID, stepIndex, stepAttempt,
 		m.Kind, strconv.FormatBool(m.IsUser),
 		m.Values, m.CreatedAt,
@@ -280,6 +287,14 @@ func nullableTime(t *time.Time) any {
 // a JSON-typed column (output/input) fails at commit time ("Malformed
 // JSON... input length is 0") rather than faithfully reproducing "this
 // span/run had no output/input".
+// nonEmptyJSON supplies "{}" for a NOT NULL VARIANT column with no value.
+func nonEmptyJSON(s string) string {
+	if s == "" {
+		return `{}`
+	}
+	return s
+}
+
 func nullableJSON(s string) any {
 	if s == "" {
 		return nil
