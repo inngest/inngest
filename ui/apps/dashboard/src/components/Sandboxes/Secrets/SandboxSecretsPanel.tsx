@@ -6,7 +6,7 @@ import { AlertModal } from '@inngest/components/Modal';
 import { Time } from '@inngest/components/Time';
 import {
   RiAddLine,
-  RiArchiveLine,
+  RiDeleteBin6Line,
   RiKey2Line,
   RiPencilLine,
 } from '@remixicon/react';
@@ -73,20 +73,17 @@ export function SandboxSecretsPanel({
       if (response.error || !response.data?.archiveEnvSecret) {
         setArchiveError(
           response.error
-            ? secretErrorMessage(
-                response.error,
-                'Could not archive the secret.',
-              )
-            : 'Could not archive the secret.',
+            ? secretErrorMessage(response.error, 'Could not delete the secret.')
+            : 'Could not delete the secret.',
         );
         return;
       }
-      toast.success('Secret archived');
+      toast.success('Secret deleted');
       setArchiveTarget(undefined);
       refetch({ requestPolicy: 'network-only' });
     } catch {
       setArchiveError(
-        'Could not confirm the archive. Refresh the list before trying again.',
+        'Could not confirm the deletion. Refresh the list before trying again.',
       );
     } finally {
       setArchiving(false);
@@ -229,9 +226,9 @@ export function SandboxSecretsPanel({
                   kind="secondary"
                   appearance="ghost"
                   size="small"
-                  icon={<RiArchiveLine />}
-                  aria-label={`Archive ${secret.name}`}
-                  tooltip="Archive"
+                  icon={<RiDeleteBin6Line />}
+                  aria-label={`Delete ${secret.name}`}
+                  tooltip="Delete"
                   onClick={() => {
                     setArchiveError(undefined);
                     setArchiveTarget(secret);
@@ -253,10 +250,10 @@ export function SandboxSecretsPanel({
           if (!archiving) setArchiveTarget(undefined);
         }}
         title={
-          archiveTarget ? `Archive ${archiveTarget.name}?` : 'Archive Secret?'
+          archiveTarget ? `Delete ${archiveTarget.name}?` : 'Delete Secret?'
         }
-        description="New launches cannot use this secret. Running sandboxes and existing snapshots keep values they already received."
-        confirmButtonLabel="Archive Secret"
+        description="New sandboxes cannot use this secret. Existing sandboxes and snapshots retain values they already received."
+        confirmButtonLabel="Delete Secret"
         cancelButtonLabel="Cancel"
         confirmButtonKind="danger"
         onSubmit={submitArchive}

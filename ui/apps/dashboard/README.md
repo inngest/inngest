@@ -94,7 +94,7 @@ you can sign in using these credentials:
 
 The `/env/$envSlug/sandboxes` page uses the shared right helper panel for secret
 management, behind the existing `sandbox_api` flag. Organization admins can list,
-create, replace and archive secrets for the selected environment. This requires
+create, replace and delete secrets for the selected environment. This requires
 the Cloud API's `envSecrets`, `createEnvSecret`, `updateEnvSecretValue` and
 `archiveEnvSecret` GraphQL fields and configured secret storage. The browser
 uses the existing authenticated GraphQL client; it never accesses KMS directly.
@@ -110,7 +110,7 @@ and 64-KiB value limits enforced per entry.
 Names match exactly and become sandbox environment variable names:
 `secrets: ["OPENAI_API_KEY"]`. Saved values cannot be retrieved by this UI.
 Replacement affects future retrievals; running sandboxes and existing snapshots
-retain values already received. Archiving prevents future retrievals of that
+retain values already received. Deleting prevents future retrievals of that
 secret identity.
 
 Imports save sequentially and stop on the first failure. Successful rows are
