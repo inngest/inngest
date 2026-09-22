@@ -28,7 +28,7 @@ func seedSpanRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID
 // functionID are accepted for call-site parity with seedSpanRow but unused:
 // that table has no app_id/function_id columns at all (see the "TODO:
 // decide whether we can add app/function ids here" comment in
-// pkg/db/duckdb/migrations/000003_run_metadata.sql).
+// pkg/db/duckdb/migrations/000001_baseline.sql).
 func seedMetadataRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, _, _ uuid.UUID, runID ulid.ULID, spanID, scope, kind string, isUser bool, values string, createdAt time.Time) {
 	t.Helper()
 	_, err := m.db.ExecContext(ctx,

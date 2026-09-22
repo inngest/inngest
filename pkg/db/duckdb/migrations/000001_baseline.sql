@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   inputs VARIANT NOT NULL,
   output VARIANT,
   -- event_ids holds the run's triggering event(s) internal ULID(s) — see
-  -- pkg/execution/dualwrite/listener.go's addRunEventAttrs, which sources it
+  -- pkg/duckdb/tracing/listener.go's addRunEventAttrs, which sources it
   -- from sv2.Metadata.Config.EventIDs (the same persisted field
   -- pkg/run/trace_lifecycle.go's OTel "sys.event.ids" span attribute is
   -- derived from for the SQLite/Postgres path). NULL for cron-only runs,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   -- sessions is the run-level form of pkg/tracing/meta.EventSessions (the
   -- JSON "event.sessions" attribute on the real run span) — one (key, id)
   -- pair per session a triggering event tagged this run with, sourced from
-  -- pkg/execution/dualwrite/listener.go's addRunEventAttrs, sorted/deduped/
+  -- pkg/duckdb/tracing/listener.go's addRunEventAttrs, sorted/deduped/
   -- capped at consts.MaxRunSessions the same way
   -- pkg/execution/executor/executor.go's normalizeRunSessions builds the
   -- real span's attribute. NULL when no triggering event carried any
@@ -89,7 +89,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET PARTITIONED BY (year
 
 
 -- Column set mirrors pkg/db/sqlite's `spans` table (see
--- pkg/execution/dualwrite/span_exporter.go's doc comment), minus the
+-- pkg/duckdb/tracing/tracing.go's SpanExporter doc comment), minus the
 -- dynamic-span rollup columns (dynamic_span_id, status, event_ids,
 -- is_deferred) — this table only ever holds flat, non-dynamic spans, so
 -- those values live in `attributes` like any other span attribute instead
@@ -123,10 +123,10 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (y
 -- commented out for now: DuckLake's own table type does not support triggers
 -- ("Not implemented Error: Triggers are not supported for this table type"
 -- against a real DuckLake-attached table — see
--- pkg/execution/dualwrite/helpers_test.go's newTestDuckDB doc comment). Its
+-- pkg/duckdb/tracing/helpers_test.go's newTestDuckDB doc comment). Its
 -- logic is instead run as an explicit secondary query on every span batch
--- insertion in the duckdb dualwrite path — see
--- pkg/execution/dualwrite/batch.go's materializeRuns.
+-- insertion in the duckdb dual-write path — see
+-- pkg/duckdb/tracing/batch.go's materializeRuns.
 --
 -- CREATE TRIGGER inngest_runs_mv AFTER INSERT ON inngest.run_trace_spans
 -- REFERENCING NEW TABLE AS new_rows
