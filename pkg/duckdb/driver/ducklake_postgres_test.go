@@ -80,7 +80,7 @@ func TestDuckLakePostgresCatalogAttaches(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["c"])
+	require.Equal(t, float64(1), rows[0].get("c"))
 }
 
 // TestDuckLakePostgresCatalogInliningStaysOffWithJSONColumn is the live
@@ -120,7 +120,7 @@ func TestDuckLakePostgresCatalogInliningStaysOffWithJSONColumn(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = '%s';", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Greater(t, rows[0]["file_count"], float64(0), "inlining must be forced off for a postgres catalog, so even one small insert should flush to Parquet")
+	require.Greater(t, rows[0].get("file_count"), float64(0), "inlining must be forced off for a postgres catalog, so even one small insert should flush to Parquet")
 }
 
 // TestOpenWithDuckLakePostgresCatalog exercises the Postgres catalog mode

@@ -34,7 +34,7 @@ type pooledQuackConn struct {
 	gen  uint64
 }
 
-func (c *pooledQuackConn) exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error) {
+func (c *pooledQuackConn) exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error) {
 	err = c.run(ctx, func(s *quackSession) error {
 		var e error
 		cols, rows, e = s.exec(ctx, sqlText)
@@ -43,7 +43,7 @@ func (c *pooledQuackConn) exec(ctx context.Context, sqlText string) (cols []stri
 	return cols, rows, err
 }
 
-func (c *pooledQuackConn) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error) {
+func (c *pooledQuackConn) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error) {
 	err = c.run(ctx, func(s *quackSession) error {
 		var e error
 		cols, types, rows, e = s.query(ctx, sqlText)

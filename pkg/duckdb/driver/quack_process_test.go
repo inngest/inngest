@@ -47,8 +47,8 @@ func TestStartProcessWithQuackTransport(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(1), rows[0]["id"])
-	require.Equal(t, "a", rows[0]["name"])
+	require.Equal(t, int64(1), rows[0].get("id"))
+	require.Equal(t, "a", rows[0].get("name"))
 }
 
 func TestQuackTransportSurvivesRestart(t *testing.T) {
@@ -81,7 +81,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(1), rows[0]["c"])
+	require.Equal(t, int64(1), rows[0].get("c"))
 
 	p.mu.Lock()
 	disabled := p.disabled
