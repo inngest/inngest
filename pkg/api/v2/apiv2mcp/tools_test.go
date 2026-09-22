@@ -63,6 +63,11 @@ func TestInputSchema(t *testing.T) {
 	schema := InputSchema(endpoint)
 	properties := schema["properties"].(map[string]any)
 	require.Contains(t, properties, "env")
+	require.Equal(
+		t,
+		"Environment slug. Required for environment-specific tools when the credential can access all environments.",
+		properties["env"].(map[string]any)["description"],
+	)
 	require.Contains(t, properties, "appId")
 	require.Contains(t, properties, "functionId")
 	require.Contains(t, properties, "data")

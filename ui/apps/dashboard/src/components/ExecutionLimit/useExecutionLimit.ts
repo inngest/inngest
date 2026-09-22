@@ -1,4 +1,3 @@
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -8,11 +7,17 @@ const executionLimitQuery = graphql(`
     account {
       id
       marketplaceBillingURL
-      entitlements {
+      plan {
+        id
+        name
+      }
+      entitlements: ents {
         executions {
-          usage
           limit
           overageAllowed
+        }
+        usage {
+          executions
         }
       }
     }
@@ -27,22 +32,22 @@ type ExecutionLimitData = {
 };
 
 export function useExecutionLimit(): ExecutionLimitData | null {
-  const { value: deepLinkingEnabled } = useBooleanFlag('vercel-deep-linking');
-
   const res = useGraphQLQuery({ query: executionLimitQuery, variables: {} });
   if (!res.data) return null;
 
-  const { usage, limit, overageAllowed } =
-    res.data.account.entitlements.executions;
+  const { limit, overageAllowed } = res.data.account.entitlements.executions;
+  const usage = res.data.account.entitlements.usage.executions;
   if (limit === null) return null;
 
+  const isEnterprise = (res.data.account.plan?.name ?? '')
+    .toLowerCase()
+    .includes('enterprise');
+
   return {
-    isCapped: !overageAllowed && usage >= limit,
+    isCapped: !isEnterprise && !overageAllowed && usage >= limit,
     usedExecutions: usage,
     executionLimit: limit,
-    marketplaceBillingURL: deepLinkingEnabled
-      ? res.data.account.marketplaceBillingURL ?? null
-      : null,
+    marketplaceBillingURL: res.data.account.marketplaceBillingURL ?? null,
   };
 }
 

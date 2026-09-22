@@ -43,7 +43,6 @@ export const GetRunsDocument = graphql(`
               slug
             }
             deferredFrom {
-              runID
               function {
                 name
                 slug

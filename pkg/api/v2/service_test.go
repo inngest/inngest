@@ -1042,6 +1042,7 @@ func TestService_ListRuns(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
 	startedAt := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	queuedAt := startedAt.Add(-1500 * time.Millisecond)
 	endedAt := startedAt.Add(5 * time.Second)
 	from := startedAt.Add(-time.Hour)
 	until := startedAt.Add(time.Hour)
@@ -1058,6 +1059,7 @@ func TestService_ListRuns(t *testing.T) {
 	run := &RunListItem{
 		RunID:        runID,
 		Cursor:       "opaque-cursor",
+		QueuedAt:     queuedAt,
 		RunStartedAt: startedAt,
 		EventID:      eventID,
 		Status:       enums.RunStatusCompleted,
@@ -1068,6 +1070,10 @@ func TestService_ListRuns(t *testing.T) {
 		AppID:        "my-app",
 		EventName:    "app/tested",
 		IsDeferred:   &isDeferred,
+		DeferredFrom: &RunDeferredFrom{
+			FunctionSlug: "parent-function",
+			FunctionName: "Parent function",
+		},
 	}
 
 	t.Run("returns mapped runs with filters", func(t *testing.T) {
@@ -1085,6 +1091,7 @@ func TestService_ListRuns(t *testing.T) {
 			IsDeferred:    &isDeferred,
 			Order:         OrderDirectionAsc,
 			CEL:           `event.data.userId == "123"`,
+			Include:       []RunListInclude{RunListIncludeDeferredFrom},
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, Cursor: pageCursor, HasMore: true}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
@@ -1104,6 +1111,7 @@ func TestService_ListRuns(t *testing.T) {
 			IsDeferred:    &isDeferred,
 			Order:         "asc",
 			Query:         new(`event.data.userId == "123"`),
+			Include:       []string{"deferred_from"},
 		})
 
 		require.NoError(t, err)
@@ -1114,13 +1122,42 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, "my-app", resp.Data[0].App.Id)
 		require.Equal(t, "app/tested", resp.Data[0].Trigger.GetEventName())
 		require.False(t, resp.Data[0].GetIsDeferred())
+		require.Equal(t, "parent-function", resp.Data[0].DeferredFrom.FunctionSlug)
+		require.Equal(t, "Parent function", resp.Data[0].DeferredFrom.GetFunctionName())
 		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.Equal(t, queuedAt, resp.Data[0].QueuedAt.AsTime())
+		require.Equal(t, startedAt, resp.Data[0].StartedAt.AsTime())
+		require.Equal(t, endedAt, resp.Data[0].EndedAt.AsTime())
+		require.Equal(t, uint64(5000), resp.Data[0].GetDurationMs())
 		require.NotNil(t, resp.Metadata.TimeRange)
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
 		require.Equal(t, until, resp.Metadata.TimeRange.Until.AsTime())
 		require.True(t, resp.Page.HasMore)
 		require.Equal(t, pageCursor, resp.Page.GetCursor())
 		require.Equal(t, int32(1), resp.Page.Limit)
+	})
+
+	t.Run("omits timing fields for a queued run", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(&GetRunsResult{
+			Runs: []*RunListItem{{
+				RunID:   runID,
+				EventID: eventID,
+				Status:  enums.RunStatusScheduled,
+				EndedAt: &endedAt,
+			}},
+		}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, ulid.Time(runID.Time()).UTC(), resp.Data[0].QueuedAt.AsTime())
+		require.Nil(t, resp.Data[0].StartedAt)
+		require.Nil(t, resp.Data[0].DurationMs)
 	})
 
 	t.Run("validates time range", func(t *testing.T) {

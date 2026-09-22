@@ -48,6 +48,7 @@ type Querier interface {
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
 	GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error)
+	GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*Function, error)
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error)
 	GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error)

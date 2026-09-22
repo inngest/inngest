@@ -45,6 +45,11 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// PermanentConstraintErrorHandler cleans up application state associated with
+// a queue item that cannot be routed to its configured constraint shard. The
+// queue only dequeues the item after this handler succeeds.
+type PermanentConstraintErrorHandler func(ctx context.Context, item QueueItem, cause error) error
+
 // QueueItemEarliestPeekTimeConfig controls earliest-peek-time side-key stamping.
 // Items already visited by the iterator are stamped individually when Enabled is
 // true. BulkStampLimit is only the additional tail budget used if the iterator
@@ -81,6 +86,28 @@ func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) Queu
 	return func(q *QueueOptions) {
 		q.PartitionPausedGetter = partitionPausedGetter
 	}
+}
+
+// WithPartitionPeekMaxGetter overrides the partition scan limit at runtime for
+// each queue shard. The getter may be called concurrently and must be safe for
+// concurrent use. Non-positive values fall back to PartitionPeekMax.
+func WithPartitionPeekMaxGetter(getter func(context.Context, string) int64) QueueOpt {
+	return func(q *QueueOptions) {
+		q.partitionPeekMaxGetter = getter
+	}
+}
+
+// PartitionPeekLimit returns the current partition peek limit for a shard.
+// The default is PartitionPeekMax, but this can be overridden by WithPartitionPeekMaxGetter.
+// Positive values are clamped between PartitionSelectionMax and AbsolutePartitionPeekMax.
+func (o *QueueOptions) PartitionPeekLimit(ctx context.Context, shardName string) int64 {
+	limit := int64(PartitionPeekMax)
+	if o.partitionPeekMaxGetter != nil {
+		if value := o.partitionPeekMaxGetter(ctx, shardName); value > 0 {
+			limit = value
+		}
+	}
+	return min(max(limit, PartitionSelectionMax), AbsolutePartitionPeekMax)
 }
 
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
@@ -479,8 +506,9 @@ type QueueOptions struct {
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
-	PeekMin int64
-	PeekMax int64
+	PeekMin                int64
+	PeekMax                int64
+	partitionPeekMaxGetter func(context.Context, string) int64
 	// PeekSizeExponent is the exp. on the random skewed distribution
 	PeekSizeExponent float64
 	// usePeekEWMA specifies whether we should use EWMA for peeking.
@@ -558,6 +586,7 @@ type QueueOptions struct {
 	latencyPartition *LatencyPartitionOptions
 
 	CapacityManager                     constraintapi.CapacityManager
+	PermanentConstraintErrorHandler     PermanentConstraintErrorHandler
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
@@ -713,6 +742,15 @@ func WithQueueAttemptResetter(resetter AttemptResetter) QueueOpt {
 func WithCapacityManager(capacityManager constraintapi.CapacityManager) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityManager = capacityManager
+	}
+}
+
+// WithPermanentConstraintErrorHandler allows permanently unroutable queue
+// items to be cleaned up and dequeued instead of blocking every future scan.
+// Without this option, the queue retains its existing retry behavior.
+func WithPermanentConstraintErrorHandler(handler PermanentConstraintErrorHandler) QueueOpt {
+	return func(q *QueueOptions) {
+		q.PermanentConstraintErrorHandler = handler
 	}
 }
 

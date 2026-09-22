@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -116,4 +117,44 @@ func TestAsRetryAt(t *testing.T) {
 	require.NotNil(t, AsRetryAtError(base))
 	require.NotNil(t, AsRetryAtError(wrapped))
 	require.Nil(t, AsRetryAtError(fmt.Errorf("no")))
+}
+
+func TestPartitionPeekLimit(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		value int64
+		want  int64
+	}{
+		{name: "custom", value: 750, want: 750},
+		{name: "below minimum", value: 1, want: PartitionSelectionMax},
+		{name: "just below minimum", value: PartitionSelectionMax - 1, want: PartitionSelectionMax},
+		{name: "minimum", value: PartitionSelectionMax, want: PartitionSelectionMax},
+		{name: "cap", value: 2000, want: AbsolutePartitionPeekMax},
+		{name: "zero", value: 0, want: PartitionPeekMax},
+		{name: "negative", value: -1, want: PartitionPeekMax},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewQueueOptions(WithPartitionPeekMaxGetter(func(ctx context.Context, shard string) int64 {
+				require.Equal(t, "ss3", shard)
+				return tt.value
+			}))
+			require.Equal(t, tt.want, opts.PartitionPeekLimit(context.Background(), "ss3"))
+		})
+	}
+	t.Run("nil getter uses default", func(t *testing.T) {
+		opts := NewQueueOptions(WithPartitionPeekMaxGetter(nil))
+		require.Equal(t, int64(PartitionPeekMax), opts.PartitionPeekLimit(context.Background(), "ss3"))
+	})
+	t.Run("default", func(t *testing.T) {
+		require.Equal(t, int64(PartitionPeekMax), NewQueueOptions().PartitionPeekLimit(context.Background(), "ss3"))
+	})
+	t.Run("runtime updates and shard targeting", func(t *testing.T) {
+		limits := map[string]int64{"ss3": 750, "ss6": 500}
+		opts := NewQueueOptions(WithPartitionPeekMaxGetter(func(_ context.Context, shard string) int64 { return limits[shard] }))
+		require.Equal(t, int64(750), opts.PartitionPeekLimit(context.Background(), "ss3"))
+		require.Equal(t, int64(500), opts.PartitionPeekLimit(context.Background(), "ss6"))
+		limits["ss3"] = 1000
+		require.Equal(t, int64(1000), opts.PartitionPeekLimit(context.Background(), "ss3"))
+		require.Equal(t, int64(PartitionPeekMax), opts.PartitionPeekLimit(context.Background(), "other"))
+	})
 }

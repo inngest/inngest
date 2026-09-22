@@ -16,7 +16,7 @@ import { Route as BillingUsageRoute } from '@/routes/_authed/billing/usage/index
 const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
     account {
-      entitlements {
+      entitlements: ents {
         executions {
           limit
         }

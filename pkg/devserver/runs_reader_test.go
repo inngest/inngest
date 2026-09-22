@@ -17,12 +17,14 @@ func TestRunListItemFromCQRSUsesTraceRunOutput(t *testing.T) {
 	runID := ulid.Make()
 	eventID := ulid.Make()
 	startedAt := time.Now().UTC()
+	queuedAt := startedAt.Add(-time.Second)
 	finishedAt := startedAt.Add(time.Second)
 	appID := uuid.New()
 	functionID := uuid.New()
 
 	result := runListItemFromCQRS(&cqrs.TraceRun{
 		RunID:        runID.String(),
+		QueuedAt:     queuedAt,
 		StartedAt:    startedAt,
 		EndedAt:      finishedAt,
 		Status:       enums.RunStatusCompleted,
@@ -33,8 +35,9 @@ func TestRunListItemFromCQRSUsesTraceRunOutput(t *testing.T) {
 		FunctionName: "Test function",
 		TriggerIDs:   []string{eventID.String()},
 		Output:       []byte(`{"data":{"ok":true}}`),
-	}, true)
+	}, true, false)
 
+	require.Equal(t, queuedAt, result.QueuedAt)
 	require.NotNil(t, result.Output)
 	var output map[string]bool
 	require.NoError(t, json.Unmarshal(result.Output, &output))
@@ -74,7 +77,7 @@ func TestRunListItemFromCQRSUnwrapsRunCompleteOpcodeOutput(t *testing.T) {
 		Status:     enums.RunStatusCompleted,
 		TriggerIDs: []string{eventID.String()},
 		Output:     []byte(`{"data":[{"data":{"body":"Hello, World!"},"id":"step-1","op":"RunComplete"}]}`),
-	}, true)
+	}, true, false)
 
 	require.NotNil(t, result.Output)
 	var output map[string]string
@@ -92,5 +95,5 @@ func mappedRunListItem(t *testing.T, storedSlug, configuredSlug string) *apiv2.R
 		AppName:      "app",
 		FunctionID:   functionID,
 		FunctionSlug: apiv2.PublicFunctionID("app", storedSlug, configuredSlug),
-	}, false)
+	}, false, false)
 }

@@ -1,6 +1,7 @@
 import LogoWall from '@/components/SignIn/LogoWall';
 import SplitView from '@/components/SignIn/SplitView';
 import TrustPanel from '@/components/SignIn/TrustPanel';
+import { getSignupAttribution } from '@/utils/signupAttribution';
 import { absoluteUrl, canonicalLink } from '@/utils/urls';
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
@@ -138,6 +139,7 @@ function RouteComponent() {
               <SignUp
                 unsafeMetadata={{
                   ...(anonymousId && { anonymousID: anonymousId }),
+                  ...getSignupAttribution(),
                 }}
                 appearance={{
                   elements: {

@@ -62,6 +62,17 @@ function Authed() {
     shouldThrow: false,
     select: (match) => match.loaderData?.env,
   });
+  const oauthApproval = useMatch({
+    from: '/_authed/oauth/device/',
+    shouldThrow: false,
+  });
+  const mcpApproval = useMatch({
+    from: '/_authed/oauth/authorize/',
+    shouldThrow: false,
+  });
+  if (oauthApproval || mcpApproval) {
+    return <Outlet />;
+  }
 
   return (
     <Layout collapsed={navCollapsed} activeEnv={activeEnv} profile={profile}>
