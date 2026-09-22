@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/require"
 )
@@ -137,7 +138,7 @@ func TestTimestampRoundTripPreservesMicroseconds(t *testing.T) {
 // decodes to a real map.
 func TestJSONRawMessageRoundTripsIntoVariantColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})

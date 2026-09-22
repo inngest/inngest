@@ -49,7 +49,7 @@ func (r *secretRedactor) redact(s string) string {
 
 // redactErr returns err unchanged if its message contains no registered
 // secret. Otherwise it returns an error with the scrubbed message that still
-// matches the original chain under errors.Is (so errStatementFailed
+// matches the original chain under errors.Is (so result.ErrStatementFailed
 // classification keeps working) but deliberately does not expose it via
 // Unwrap, which would hand the unredacted message straight back.
 func (r *secretRedactor) redactErr(err error) error {

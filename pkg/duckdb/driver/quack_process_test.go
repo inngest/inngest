@@ -2,67 +2,55 @@ package driver
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/stretchr/testify/require"
 )
 
-// freeLocalAddr resolves an ephemeral local port, closing the listener
-// immediately so quack_serve can bind it. Small TOCTOU race, acceptable for
-// tests (same tradeoff quack_session_test.go makes).
-func freeLocalAddr(t *testing.T) string {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := l.Addr().(*net.TCPAddr).Port
-	require.NoError(t, l.Close())
-	return fmt.Sprintf("127.0.0.1:%d", port)
-}
-
 func TestStartProcessWithQuackTransport(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, isQuack := p.sess.(*quackSession)
+	_, isQuack := p.sess.(*quack.Session)
 	require.True(t, isQuack, "process should have swapped its active session to the quack transport once bootstrapped")
 
 	require.NoError(t, p.healthCheck(t.Context()))
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
 	require.NoError(t, err)
-	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), "SELECT id, name FROM t;")
+	_, rows, err := p.Exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(1), rows[0].get("id"))
-	require.Equal(t, "a", rows[0].get("name"))
+	require.Equal(t, int64(1), rows[0].Get("id"))
+	require.Equal(t, "a", rows[0].Get("name"))
 }
 
 func TestQuackTransportSurvivesRestart(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER);")
 	require.NoError(t, err)
-	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1);")
 	require.NoError(t, err)
 
 	pidBefore := p.cmd.Process.Pid
@@ -74,19 +62,19 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	// gone. What this proves is that the restart's fresh spawn+bootstrap
 	// stands up a *new* quack listener and the process keeps working over
 	// it, rather than hanging or falling back to some other transport.
-	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE t (id INTEGER);")
 	require.NoError(t, err, "restart must re-bootstrap the quack transport, not just the jsonlines control channel")
-	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO t VALUES (1);")
 	require.NoError(t, err)
-	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM t;")
+	_, rows, err := p.Exec(t.Context(), "SELECT count(*) AS c FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(1), rows[0].get("c"))
+	require.Equal(t, int64(1), rows[0].Get("c"))
 
 	p.mu.Lock()
 	disabled := p.disabled
 	pidAfter := p.cmd.Process.Pid
-	_, stillQuack := p.sess.(*quackSession)
+	_, stillQuack := p.sess.(*quack.Session)
 	p.mu.Unlock()
 	require.False(t, disabled)
 	require.NotEqual(t, pidBefore, pidAfter)
@@ -110,7 +98,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 // must now surface its ctx error without ever touching the subprocess.
 //
 // It also asserts the query is genuinely interrupted server-side, not just
-// abandoned: quackSession.query's watchForCancel sends a real CancelRequest
+// abandoned: quack.Session.Query's watchForCancel sends a real CancelRequest
 // (encodeQuackCancelRequest), which quack_server.cpp turns into a DuckDB
 // Connection::Interrupt() -- confirmed here by watching the subprocess's own
 // CPU time via ps plateau almost immediately after cancel, rather than
@@ -118,14 +106,14 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 // on its own.
 func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.exec(t.Context(), "SET threads=1;")
+	_, _, err = p.Exec(t.Context(), "SET threads=1;")
 	require.NoError(t, err)
 
 	pidBefore := p.cmd.Process.Pid
@@ -138,7 +126,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() {
-		_, _, _, err := p.query(ctx, slowSQL)
+		_, _, _, err := p.Query(ctx, slowSQL)
 		done <- err
 	}()
 
@@ -164,7 +152,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	// The connection (and process.exec's mutex-guarded path a write like
 	// dual-write's would use) must still be immediately usable -- not
 	// blocked behind the abandoned query.
-	_, rows, err := p.exec(t.Context(), "SELECT 1 AS ok;")
+	_, rows, err := p.Exec(t.Context(), "SELECT 1 AS ok;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 
