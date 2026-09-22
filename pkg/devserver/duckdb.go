@@ -11,8 +11,8 @@ import (
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
-	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/duckdb/tracing"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )

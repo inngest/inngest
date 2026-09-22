@@ -111,7 +111,7 @@ func generateRandomArrivalEvents(batchSeed, indexOffset, totalRuns int, timeRang
 			timedRunEvent{at: endedAt, ev: runEvent{
 				accountID: accountID, runID: runID, status: statusBySeq[2],
 				queuedAt: queuedAt, startedAt: sql.NullTime{Time: startedAt, Valid: true},
-				endedAt: sql.NullTime{Time: endedAt, Valid: true},
+				endedAt:    sql.NullTime{Time: endedAt, Valid: true},
 				attributes: attributesBySeq[2], updatedAt: endedAt,
 			}},
 		)

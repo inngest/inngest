@@ -221,7 +221,6 @@ func TestEnsureBinaryDownloadsVerifiesAndInstalls(t *testing.T) {
 	}
 }
 
-
 func TestEnsureBinaryChecksumMismatchFailsClosed(t *testing.T) {
 	assetName, err := assetNameFor(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
