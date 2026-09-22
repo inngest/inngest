@@ -362,7 +362,7 @@ func TestQuackDecodePrepareResponseBuildsNamedRows(t *testing.T) {
 	require.Len(t, types, 1)
 	require.Equal(t, "INTEGER", types[0].typeName())
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(7), rows[0]["ok"])
+	require.Equal(t, int64(7), rows[0].get("ok"))
 }
 
 // writeDecimalLogicalType writes a DECIMAL LogicalType object — the shape
