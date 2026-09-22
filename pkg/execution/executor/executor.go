@@ -494,8 +494,6 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	}
 }
 
-// TODO: should this also include a ResetsAt time.Time?
-// TODO: would just ExecutionCapDecision be better naming?
 type ExecutionCapLimitDecision struct {
 	Exceeded bool
 	Enforce  bool
