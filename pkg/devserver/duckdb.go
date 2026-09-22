@@ -22,13 +22,7 @@ import (
 // query.Wrap when --duckdb-reads is on). Above 1, database/sql can
 // run that many statements genuinely concurrently instead of serializing
 // every one of them (write or read) behind a single mutex — see
-// driver.Connector's doc comments (openQuackConn, Options.QuackConns) for
-// the one thing this trades away: only the very first connection ever
-// opened keeps process.exec's automatic restart-on-crash handling, so a
-// write that happens to land on one of the others during a genuine
-// subprocess crash (rare, and distinct from a caller's ctx merely ending —
-// see runWithRestartLocked) fails outright rather than transparently
-// retrying after a respawn. Sized for "a handful of simultaneously open
+// driver.Options.QuackConns. Sized for "a handful of simultaneously open
 // Insights tabs plus dual-write's own batch flushes," not production load.
 const dualWriteQuackConns = 16
 
