@@ -40,6 +40,11 @@ type quackHugeint struct {
 	lo uint64
 }
 
+// String renders h as 32 hex digits, for correlating log lines.
+func (h quackHugeint) String() string {
+	return fmt.Sprintf("%016x%016x", uint64(h.hi), h.lo)
+}
+
 // randomQuackHugeint returns a random 128-bit value for use as an opaque
 // client-generated correlation token (see encodeQuackPrepareRequest).
 func randomQuackHugeint() quackHugeint {

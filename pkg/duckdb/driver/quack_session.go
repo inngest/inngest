@@ -98,6 +98,8 @@ func newQuackSession(ctx context.Context, listenURL, token string) (*quackSessio
 	}
 
 	s.connectionID = hdr.ConnectionID
+	logger.StdlibLogger(ctx).Debug("duckdb: quack connection opened",
+		"transport", "quack", "phase", "connect", "connection_id", s.connectionID, "endpoint", s.endpoint)
 	return s, nil
 }
 
@@ -138,22 +140,35 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 	stopCancelWatch := s.watchForCancel(ctx, queryID)
 	defer stopCancelWatch()
 
+	// Protocol-level log lines and transport errors carry correlation IDs
+	// (connection, query, result, batch) and the phase, never SQL or row
+	// data. Statement errors are left as DuckDB reported them, since those
+	// are shown to users (Insights) as-is.
+	l := logger.StdlibLogger(ctx).With("transport", "quack", "connection_id", s.connectionID, "query_id", queryID.String())
+	phaseErr := func(phase string, err error) error {
+		return fmt.Errorf("duckdb: quack %s (connection_id=%s query_id=%s): %w", phase, s.connectionID, queryID, err)
+	}
+	start := time.Now()
+
 	hdr, r, err := s.send(ctx, encodeQuackPrepareRequest(s.connectionID, sqlText, queryID))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, phaseErr("prepare", err)
 	}
 
 	if hdr.Type == quackMsgErrorResponse {
 		return nil, nil, nil, decodeQuackStatementError(r)
 	}
 	if hdr.Type != quackMsgPrepareResponse {
-		return nil, nil, nil, fmt.Errorf("duckdb: quack: unexpected response message type %d", hdr.Type)
+		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("unexpected response message type %d", hdr.Type))
 	}
 
 	cols, quackTypes, rows, needsMoreFetch, resultUUID, err := decodeQuackPrepareResponseBody(r)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("duckdb: quack: decoding prepare response: %w", err)
+		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("decoding prepare response: %w", err))
 	}
+	l.Debug("duckdb: quack prepare complete",
+		"phase", "prepare", "rows", len(rows), "needs_more_fetch", needsMoreFetch,
+		"result_uuid", resultUUID.String(), "duration", time.Since(start))
 
 	// nextBatchIndex starts at 1, not 0: confirmed by reading the real quack
 	// extension binary's disassembly (no source is vendored in this repo) —
@@ -174,21 +189,25 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 	// needs no synchronization.
 	nextBatchIndex := uint64(1)
 	for needsMoreFetch {
+		fetchPhase := fmt.Sprintf("fetch (result_uuid=%s batch_index=%d)", resultUUID, nextBatchIndex)
 		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, phaseErr(fetchPhase, err)
 		}
 		if hdr.Type == quackMsgErrorResponse {
 			return nil, nil, nil, decodeQuackStatementError(r)
 		}
 		if hdr.Type != quackMsgFetchResponse {
-			return nil, nil, nil, fmt.Errorf("duckdb: quack: unexpected response message type %d", hdr.Type)
+			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("unexpected response message type %d", hdr.Type))
 		}
 
 		fetchedRows, chunkCount, batchIndex, ferr := decodeQuackFetchResponseBody(r, cols)
 		if ferr != nil {
-			return nil, nil, nil, fmt.Errorf("duckdb: quack: decoding fetch response: %w", ferr)
+			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("decoding fetch response: %w", ferr))
 		}
+		l.Debug("duckdb: quack fetch complete",
+			"phase", "fetch", "result_uuid", resultUUID.String(), "batch_index", batchIndex,
+			"rows", len(fetchedRows), "chunks", chunkCount)
 		rows = append(rows, fetchedRows...)
 		needsMoreFetch = chunkCount > 0
 		nextBatchIndex = batchIndex + 1
@@ -229,7 +248,8 @@ func (s *quackSession) watchForCancel(ctx context.Context, queryID quackHugeint)
 			cancelCtx, cancel := context.WithTimeout(context.Background(), quackCancelRequestTimeout)
 			defer cancel()
 			hdr, r, err := s.send(cancelCtx, encodeQuackCancelRequest(s.connectionID, queryID))
-			l := logger.StdlibLogger(context.WithoutCancel(ctx))
+			l := logger.StdlibLogger(context.WithoutCancel(ctx)).With(
+				"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
 			switch {
 			case err != nil:
 				l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)

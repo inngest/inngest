@@ -399,7 +399,12 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	p.quackGen++
 	p.quackEP.Store(&quackEndpoint{listenURL: listenURL, token: token, gen: p.quackGen})
 
-	l.Info("duckdb: quack transport active", "listen_url", listenURL, "generation", p.quackGen)
+	l.Info("duckdb: quack transport active",
+		"transport", "quack",
+		"listen_url", listenURL,
+		"connection_id", quackSess.connectionID,
+		"generation", p.quackGen,
+	)
 	return nil
 }
 
@@ -975,7 +980,11 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 // returns nil once a restart succeeds, or an ErrDisabled-wrapped error after
 // permanently disabling the process if the one restart attempt fails.
 func (p *process) restartAfterFailureLocked(ctx context.Context, err error) error {
-	l := logger.StdlibLogger(ctx).With("generation", p.quackGen)
+	transport := "jsonlines"
+	if _, ok := p.sess.(*quackSession); ok {
+		transport = "quack"
+	}
+	l := logger.StdlibLogger(ctx).With("transport", transport, "generation", p.quackGen)
 	if errors.Is(err, errSessionDesynced) {
 		l.Warn("duckdb: session desynced by a cancelled context; respawning subprocess to resync", "error", err)
 	} else {
