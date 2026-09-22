@@ -69,6 +69,7 @@ func generateRun(rng *rand.Rand, tmpl Templates, cfg GenerateConfig) GeneratedRu
 		Inputs:       pickString(rng, tmpl.Inputs, `{}`),
 		Output:       pickString(rng, tmpl.Outputs, `{}`),
 		EventIDs:     eventIDs,
+		TraceID:      trace.TraceID,
 	}
 
 	spans := generateSpanTree(trace, run)
