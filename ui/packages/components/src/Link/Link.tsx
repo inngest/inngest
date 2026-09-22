@@ -2,6 +2,8 @@ import type { HTMLAttributeAnchorTarget } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import { Link as TanstackLink, type LinkComponentProps } from '@tanstack/react-router';
 
+import { usePublicHref } from './usePublicHref';
+
 export const defaultLinkStyles =
   'text-link hover:decoration-link decoration-transparent decoration-1 underline underline-offset-2 cursor-pointer transition-color duration-300';
 
@@ -29,9 +31,10 @@ export function Link({
   children,
   ...props
 }: React.PropsWithChildren<LinkProps>) {
+  const resolvedHref = usePublicHref(href);
   return href ? (
     <a
-      href={href}
+      href={resolvedHref}
       className={cn(
         defaultLinkStyles,
         'group flex items-center gap-1',

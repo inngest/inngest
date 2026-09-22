@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag.js';
 
-import { createDevServerURL } from './useFeatureFlags';
+import { createDevServerURL } from '@/utils/devServer';
 
-export const useBooleanFlag = (flag: string, defaultValue: boolean = false): BooleanFlag => {
+export const useBooleanFlag = (
+  flag: string,
+  defaultValue: boolean = false,
+): BooleanFlag => {
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 

@@ -64,7 +64,14 @@ const previewPlugin = () => ({
   },
 });
 
+// prerender reloads this file without its mode.  the flag preserves the /dev paths.
+const hosted = process.env.INNGEST_UI_HOSTED === '1';
+
 export default defineConfig({
+  base: hosted ? '/dev/' : '/',
+  define: {
+    'import.meta.env.VITE_HOSTED': JSON.stringify(hosted ? 'true' : 'false'),
+  },
   resolve: {
     alias: {
       '@inngest/components': path.resolve(
@@ -84,9 +91,19 @@ export default defineConfig({
       projects: ['./tsconfig.json'],
     }),
     tanstackStart({
-      spa: { enabled: true },
+      spa: { enabled: true, maskPath: hosted ? '/runs' : '/' },
+      ...(hosted
+        ? {
+            prerender: {
+              enabled: true,
+              autoStaticPathsDiscovery: false,
+              crawlLinks: false,
+            },
+            pages: [{ path: '/', prerender: { enabled: true } }],
+          }
+        : {}),
     }),
     viteReact(),
-    previewPlugin(),
+    ...(!hosted && !process.env.TSS_PRERENDERING ? [previewPlugin()] : []),
   ],
 });

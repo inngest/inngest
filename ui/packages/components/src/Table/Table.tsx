@@ -2,6 +2,7 @@ import { Fragment, useMemo } from 'react';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSortAsc, RiSortDesc } from '@remixicon/react';
+import { useRouter } from '@tanstack/react-router';
 import {
   flexRender,
   getCoreRowModel,
@@ -11,6 +12,8 @@ import {
   type Row,
   type SortingState,
 } from '@tanstack/react-table';
+
+import { publicHref } from '../Link/usePublicHref';
 
 interface WithId {
   id: string;
@@ -79,6 +82,7 @@ export function Table<T>({
   headerStyle = 'default',
   density = 'default',
 }: TableProps<T>) {
+  const router = useRouter({ warn: false });
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
     if (isLoading) {
@@ -122,7 +126,7 @@ export function Table<T>({
   const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
   const tableHeadStyles = cn(
     'sticky top-0 z-[2]',
-    headerStyle === 'subtle' ? 'bg-canvasBase border-subtle border-b' : 'bg-tableHeader',
+    headerStyle === 'subtle' ? 'bg-canvasBase border-subtle border-b' : 'bg-tableHeader'
   );
   const tableColumnStyles = 'px-4';
   const headerRowHeight = density === 'compact' ? 'h-7' : 'h-9';
@@ -228,7 +232,7 @@ export function Table<T>({
                       : cn('border-light box-border border-b', bodyRowHeight),
                     onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : '',
                     onRowMouseEnter ? 'hover:bg-canvasSubtle' : '',
-                    isRowHighlighted?.(row) ? 'bg-canvasSubtle' : '',
+                    isRowHighlighted?.(row) ? 'bg-canvasSubtle' : ''
                   )}
                   onMouseEnter={onRowMouseEnter ? () => onRowMouseEnter(row) : undefined}
                   onMouseLeave={onRowMouseLeave}
@@ -240,7 +244,7 @@ export function Table<T>({
                     const url = getRowHref?.(row);
                     if (url && (e.metaKey || e.ctrlKey || e.button === 1)) {
                       // Simulate native link behavior
-                      window.open(url, '_blank');
+                      window.open(publicHref(url, router?.basepath), '_blank');
                       return;
                     }
                     onRowClick?.(row);

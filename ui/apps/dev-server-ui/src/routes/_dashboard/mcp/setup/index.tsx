@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { MCPSetup } from '@inngest/components/MCP/Setup';
-import { createDevServerURL } from '@/hooks/useFeatureFlags';
+import { createDevServerURL } from '@/utils/devServer';
 
 export const Route = createFileRoute('/_dashboard/mcp/setup/')({
   component: MCPComponent,
