@@ -19,7 +19,7 @@ func TestQuackQueryIntegerFamilyColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -46,7 +46,7 @@ func TestQuackQueryUBigIntColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -68,7 +68,7 @@ func TestQuackQueryHugeintColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -97,7 +97,7 @@ func TestQuackQueryDecimalColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -126,7 +126,7 @@ func TestQuackQueryBlobColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -147,7 +147,7 @@ func TestQuackQueryBitColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -171,7 +171,7 @@ func TestQuackQueryIntervalColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -199,7 +199,7 @@ func TestQuackQueryEnumColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -228,7 +228,7 @@ func TestQuackQueryMapColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -259,7 +259,7 @@ func TestQuackQueryArrayColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -282,7 +282,7 @@ func TestQuackQueryArrayColumnEdgeCases(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -312,7 +312,7 @@ func TestQuackQueryUnionColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -342,7 +342,7 @@ func TestQuackQueryVariantColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -379,7 +379,7 @@ func TestQuackQueryVariantColumnScalarLeafTypes(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
