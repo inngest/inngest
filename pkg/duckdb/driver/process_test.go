@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -30,17 +31,17 @@ func TestStartProcessExecAndQuery(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.sess.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
+	_, _, err = p.sess.Exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
 	require.NoError(t, err)
 
-	_, _, err = p.sess.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
+	_, _, err = p.sess.Exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
 	require.NoError(t, err)
 
-	_, rows, err := p.sess.exec(t.Context(), "SELECT id, name FROM t;")
+	_, rows, err := p.sess.Exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].get("id"))
-	require.Equal(t, "a", rows[0].get("name"))
+	require.Equal(t, float64(1), rows[0].Get("id"))
+	require.Equal(t, "a", rows[0].Get("name"))
 }
 
 func TestProcessRestartAfterCrash(t *testing.T) {
@@ -354,7 +355,7 @@ func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
 	// Trigger the restart through a short-lived context, mirroring a single
 	// dual-write batch-flush/hook-call context.
 	shortCtx, cancel := context.WithCancel(t.Context())
-	_, _, err = p.exec(shortCtx, "SELECT 1;")
+	_, _, err = p.Exec(shortCtx, "SELECT 1;")
 	require.NoError(t, err, "exec should transparently restart and succeed")
 
 	// End the triggering context shortly after the call returns, as a real
@@ -387,7 +388,7 @@ func TestExecSurfacesConstraintViolation(t *testing.T) {
 
 	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (NULL);")
 	require.Error(t, err, "a NOT NULL violation must not be reported as success")
-	require.ErrorIs(t, err, errStatementFailed)
+	require.ErrorIs(t, err, result.ErrStatementFailed)
 	require.Contains(t, err.Error(), "Constraint Error")
 
 	// The row must genuinely not be there, and the session must still be
@@ -418,15 +419,15 @@ func TestExecSurfacesTypeAndSchemaErrors(t *testing.T) {
 
 	// Conversion Error.
 	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES ('not-an-int');")
-	require.ErrorIs(t, err, errStatementFailed)
+	require.ErrorIs(t, err, result.ErrStatementFailed)
 
 	// Binder Error: schema drift, i.e. a column the migration never created.
 	_, err = db.ExecContext(t.Context(), "INSERT INTO t (nonexistent_column) VALUES (1);")
-	require.ErrorIs(t, err, errStatementFailed)
+	require.ErrorIs(t, err, result.ErrStatementFailed)
 
 	// Catalog Error: a missing table.
 	_, err = db.ExecContext(t.Context(), "INSERT INTO nonexistent_table VALUES (1);")
-	require.ErrorIs(t, err, errStatementFailed)
+	require.ErrorIs(t, err, result.ErrStatementFailed)
 
 	// Still healthy after three rejected statements.
 	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (1);")
@@ -505,23 +506,23 @@ func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	_, _, err = p.sess.exec(ctx, "SELECT 42 AS answer;")
-	require.ErrorIs(t, err, errSessionDesynced)
+	_, _, err = p.sess.Exec(ctx, "SELECT 42 AS answer;")
+	require.ErrorIs(t, err, result.ErrSessionDesynced)
 	require.ErrorIs(t, err, context.Canceled)
 
 	// A desynced session refuses further work outright, so the abandoned
 	// statement's queued output can never be misread as another statement's
 	// result.
-	_, _, err = p.sess.exec(t.Context(), "SELECT 1 AS ok;")
-	require.ErrorIs(t, err, errSessionDesynced)
+	_, _, err = p.sess.Exec(t.Context(), "SELECT 1 AS ok;")
+	require.ErrorIs(t, err, result.ErrSessionDesynced)
 
 	// process.exec recognises the desync as recoverable-by-respawn and does
 	// so, using a context detached from the (dead) caller ctx for the health
 	// check.
-	_, rows, err := p.exec(t.Context(), "SELECT 7 AS seven;")
+	_, rows, err := p.Exec(t.Context(), "SELECT 7 AS seven;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(7), rows[0].get("seven"))
+	require.Equal(t, float64(7), rows[0].Get("seven"))
 }
 
 // TestExecFailedRestartWrapsErrDisabledImmediately pins Fix 5's contract: the
