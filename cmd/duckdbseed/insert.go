@@ -62,6 +62,7 @@ var (
 		duckdbdriver.QuackColumnVarchar,     // defer_parent_fn_slug
 		duckdbdriver.QuackColumnVarchar,     // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
 		duckdbdriver.QuackColumnTimestampMS, // inserted_at
+		duckdbdriver.QuackColumnVarchar,     // trace_id (000003_runs_trace_id.sql, appended)
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
@@ -223,6 +224,7 @@ func runRowValues(r RunRow, now time.Time) []any {
 		nil,     // defer_parent_fn_slug
 		nil,     // defer_parent_run_ids
 		now,
+		r.TraceID,
 	}
 }
 
