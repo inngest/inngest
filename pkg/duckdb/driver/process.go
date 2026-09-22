@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -92,12 +93,17 @@ type process struct {
 	// written to again) purely so the CLI doesn't exit, since closing stdin
 	// would kill the quack listener along with the rest of the process.
 	sess sqlExecer
-	// quackListenURL/quackToken are set by startQuackLocked once the quack
-	// listener is up, and read by openQuackConn to hand out additional,
-	// independent quackSession connections beyond the primary one in sess —
-	// see Options.QuackConns.
-	quackListenURL string
-	quackToken     string
+	// quackEP is the live quack listener's endpoint, published by
+	// startQuackLocked and cleared by closeLocked. It is atomic rather than
+	// guarded by mu so pooled connections (pooledQuackConn) can check it on
+	// every statement without queueing behind whatever the primary
+	// connection is running under mu. A nil value means no listener is up
+	// (not yet bootstrapped, mid-restart, disabled, or closed).
+	quackEP atomic.Pointer[quackEndpoint]
+	// quackGen counts successful quack bootstraps (initial start plus every
+	// restart); it is copied into each quackEndpoint so a pooled connection
+	// can tell its session belongs to a dead subprocess. Guarded by mu.
+	quackGen uint64
 	// redactor scrubs quack tokens and catalog URIs out of bootstrap errors
 	// and subprocess diagnostics — see secretRedactor.
 	redactor *secretRedactor
@@ -390,10 +396,10 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
 	}
 	p.sess = quackSess
-	p.quackListenURL = listenURL
-	p.quackToken = token
+	p.quackGen++
+	p.quackEP.Store(&quackEndpoint{listenURL: listenURL, token: token, gen: p.quackGen})
 
-	l.Info("duckdb: quack transport active", "listen_url", listenURL)
+	l.Info("duckdb: quack transport active", "listen_url", listenURL, "generation", p.quackGen)
 	return nil
 }
 
@@ -419,32 +425,67 @@ func mapKeys(m map[string]any) []string {
 	return keys
 }
 
-// openQuackConn hands out a new, independent quackSession against the same
-// already-running quack listener p.sess (the primary connection) uses —
-// unlike every call through p.exec, this bypasses p.mu entirely, so it can
-// genuinely execute concurrently with the primary connection and with other
-// openQuackConn-returned sessions. Used only when Options.QuackConns > 1
-// (see Connector.Connect); the primary connection keeps its usual
-// restart-on-crash handling via p.exec, but a session returned here does
-// not — a crash invalidates it outright, which database/sql surfaces as a
-// query error on that connection rather than a transparent retry, and
-// database/sql may hand any caller (including dual-write's own writes,
-// once QuackConns > 1) one of these instead of the restart-managed primary
-// connection — there's no way to pin a specific caller to connection #1.
-// Accepted deliberately: a genuine subprocess crash (as opposed to a
-// caller's ctx merely ending, which runWithRestartLocked no longer treats
-// as crash-worthy at all — see its own doc comment) is rare, and losing
-// one write to it without a retry is a smaller cost than serializing every
-// write behind however long an unrelated ad hoc Insights query takes.
+// openQuackConn hands out a new pooled connection (pooledQuackConn) against
+// the running quack listener, beyond the primary one in sess. Unlike every
+// call through p.exec, its statements bypass p.mu, so it genuinely executes
+// concurrently with the primary connection and with other pooled
+// connections. Used only when Options.QuackConns > 1 (see
+// Connector.Connect).
+//
+// A pooled connection does not snapshot the listener: it re-reads quackEP
+// before each statement and transparently re-handshakes when the
+// subprocess has been restarted underneath it, and a transport failure on
+// it drives the same one-restart-then-disable policy the primary connection
+// uses (see recoverQuackLocked). That matters because database/sql may hand
+// any caller — dual-write's own writes included — one of these rather than
+// the primary connection.
 func (p *process) openQuackConn(ctx context.Context) (sqlExecer, error) {
-	p.mu.Lock()
-	url, token := p.quackListenURL, p.quackToken
-	p.mu.Unlock()
-
-	if url == "" {
-		return nil, fmt.Errorf("duckdb: quack listener not bootstrapped; QuackAddr must be set to use QuackConns")
+	c := &pooledQuackConn{p: p}
+	// Handshake eagerly so a bad listener fails Connect, not the first
+	// statement.
+	if _, err := c.currentSession(ctx); err != nil {
+		return nil, err
 	}
-	return newQuackSession(ctx, url, token)
+	return c, nil
+}
+
+// currentQuackEndpoint returns the live quack listener's endpoint. When none
+// is published it waits on mu, which an in-flight restart holds, and
+// re-checks — so a pooled connection racing a restart gets the new listener
+// rather than a spurious error.
+func (p *process) currentQuackEndpoint() (*quackEndpoint, error) {
+	if ep := p.quackEP.Load(); ep != nil {
+		return ep, nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.disabled {
+		return nil, ErrDisabled
+	}
+	if ep := p.quackEP.Load(); ep != nil {
+		return ep, nil
+	}
+	return nil, errQuackUnavailable
+}
+
+// recoverQuack is a pooled connection's counterpart to runWithRestartLocked's
+// restart path: cause is a transport failure observed on a session from
+// generation gen. If the subprocess has already been restarted since (by
+// the primary connection or another pooled one), there is nothing to do —
+// the caller just re-handshakes. Otherwise this connection performs the
+// restart itself, so concurrent failures from one crash restart it once.
+func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.disabled {
+		return ErrDisabled
+	}
+	if p.quackGen != gen {
+		logger.StdlibLogger(ctx).Debug("duckdb: pooled quack session is stale; subprocess already restarted",
+			"transport", "quack", "stale_generation", gen, "generation", p.quackGen)
+		return nil
+	}
+	return p.restartAfterFailureLocked(ctx, cause)
 }
 
 // currentQuackSession returns the primary connection's current transport if
@@ -882,8 +923,6 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 		return err
 	}
 
-	l := logger.StdlibLogger(ctx)
-
 	// A session left mid-statement-desynced (jsonlines only — see
 	// errSessionDesynced's doc comment) can never be trusted again no
 	// matter what ctx says: the subprocess's own stdout stream still has
@@ -912,14 +951,31 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 		// retry once the context is done, so today's restart-then-give-up
 		// pays the full cost of a restart for zero benefit in exactly this
 		// case.
-		l.Warn("duckdb: statement failed because its context ended; surfacing the error without restarting the subprocess", "error", err)
+		logger.StdlibLogger(ctx).Warn("duckdb: statement failed because its context ended; surfacing the error without restarting the subprocess", "error", err)
 		return err
 	}
 
-	// Everything else means the pipe broke, the subprocess died, or (for
-	// jsonlines specifically) the caller's ctx was cancelled mid-statement,
-	// leaving that session protocol-desynced. Both are only recoverable by
-	// respawning.
+	if restartErr := p.restartAfterFailureLocked(ctx, err); restartErr != nil {
+		return restartErr
+	}
+
+	if ctx.Err() != nil {
+		// The restart resynced the session, but retrying under a context
+		// that is already done cannot succeed.
+		return err
+	}
+
+	return fn()
+}
+
+// restartAfterFailureLocked assumes mu is already held. err is the failure
+// that triggered it: the pipe broke, the subprocess died, or (for jsonlines
+// specifically) the caller's ctx was cancelled mid-statement, leaving that
+// session protocol-desynced. All are only recoverable by respawning. It
+// returns nil once a restart succeeds, or an ErrDisabled-wrapped error after
+// permanently disabling the process if the one restart attempt fails.
+func (p *process) restartAfterFailureLocked(ctx context.Context, err error) error {
+	l := logger.StdlibLogger(ctx).With("generation", p.quackGen)
 	if errors.Is(err, errSessionDesynced) {
 		l.Warn("duckdb: session desynced by a cancelled context; respawning subprocess to resync", "error", err)
 	} else {
@@ -937,15 +993,8 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 		l.Error("duckdb: subprocess restart failed; permanently disabling dual-write for this process", "exec_error", err, "restart_error", restartErr)
 		return fmt.Errorf("%w (exec error: %v; restart error: %v)", ErrDisabled, err, restartErr)
 	}
-	l.Info("duckdb: subprocess restarted successfully after a crash")
-
-	if ctx.Err() != nil {
-		// The restart resynced the session, but retrying under a context
-		// that is already done cannot succeed.
-		return err
-	}
-
-	return fn()
+	l.Info("duckdb: subprocess restarted successfully after a crash", "new_generation", p.quackGen)
+	return nil
 }
 
 // closeLocked assumes mu is already held.
@@ -954,6 +1003,9 @@ func (p *process) closeLocked(ctx context.Context) error {
 		return nil
 	}
 	p.started = false
+	// Unpublish the listener first so pooled connections stop handing out
+	// sessions against a subprocess that is about to go away.
+	p.quackEP.Store(nil)
 
 	// Retire the jsonlines session's reader goroutine first so it can never
 	// block handing a line to an exec that will never run again. A
@@ -1165,16 +1217,12 @@ type Options struct {
 
 	// QuackConns, when greater than 1, allows Open's *sql.DB to hand out up
 	// to that many concurrent connections instead of the default single
-	// serialized session — each one beyond the first an independent
-	// quackSession opened via process.openQuackConn, genuinely concurrent
-	// against the quack HTTP listener rather than serialized through
-	// process.exec's mutex. Requires QuackAddr to be set; Open returns an
-	// error otherwise. Leave at the zero value (0 or 1) for the original
-	// single-connection behavior. See openQuackConn's doc comment for what
-	// a caller (dual-write included, as of this field's use in
-	// pkg/devserver/dualwrite.go) trades away by raising this: every
-	// connection beyond the first loses process.exec's restart-on-crash
-	// handling, and database/sql may hand any given caller either kind.
+	// serialized session — each one beyond the first a pooledQuackConn
+	// opened via process.openQuackConn, genuinely concurrent against the
+	// quack HTTP listener rather than serialized through process.exec's
+	// mutex, while keeping the same restart-on-crash handling. Requires
+	// QuackAddr to be set; Open returns an error otherwise. Leave at the
+	// zero value (0 or 1) for the original single-connection behavior.
 	QuackConns int
 
 	// AllowUnsignedExtensions starts the subprocess with -unsigned, allowing
@@ -1249,10 +1297,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	// A second and later connection when QuackConns opts into concurrency:
-	// a fresh, independent quackSession instead of the shared c.proc, so
-	// this connection can genuinely run alongside others rather than
-	// queueing behind process.exec's mutex. See openQuackConn's doc comment
-	// for what this trades away (no crash-restart handling).
+	// a pooled quack connection instead of the shared c.proc, so this
+	// connection can genuinely run alongside others rather than queueing
+	// behind process.exec's mutex. See openQuackConn's doc comment.
 	if c.opts.QuackConns > 1 {
 		sess, err := c.proc.openQuackConn(ctx)
 		if err != nil {
