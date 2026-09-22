@@ -13,7 +13,7 @@
 // TracerProvider are expected to set every attribute the processor would
 // have (tenant/debug attrs, per-span-name extras) directly on each
 // tracing.CreateSpanOptions.Attributes themselves — see
-// pkg/execution/dualwrite/tracing.go's addTenantAndDebugAttrs/
+// pkg/duckdb/tracing/tracing.go's addTenantAndDebugAttrs/
 // addRunSpanAttrs, its only caller.
 package v3
 
@@ -46,7 +46,7 @@ var propagator = propagation.NewCompositeTextMapPropagator(
 
 // TracerProvider is a narrower counterpart to tracing.TracerProvider: no
 // CreateDroppableSpan, since nothing in this package's only caller
-// (pkg/execution/dualwrite) ever creates a span it might not send — every
+// (pkg/duckdb/tracing) ever creates a span it might not send — every
 // span it creates is unconditionally recorded.
 type TracerProvider interface {
 	CreateSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error)

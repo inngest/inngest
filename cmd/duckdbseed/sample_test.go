@@ -116,7 +116,7 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 // completely unchanged, so the exact same relationship (child's
 // parent_span_id text matching root's span_id text) still holds after
 // replay without this package ever needing to resolve it itself. This
-// seeds a run shaped exactly like real dualwrite output: the root's own
+// seeds a run shaped exactly like real dual-write output: the root's own
 // parent_span_id is the literal OTel zero-SpanID sentinel, and every
 // other span's parent_span_id is the deterministic value that equals the
 // root's own span_id (mirroring pkg/tracing/util.go's

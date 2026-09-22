@@ -211,8 +211,7 @@ func freeLocalQuackAddr() (string, error) {
 
 // stopDualWrite stops the background batcher goroutines started by
 // setupDualWrite's listener and closes the underlying duckdb subprocess, if
-// l is non-nil and implements the shutdown hook. This addresses the
-// goroutine-leak gap flagged by Task 8's review: NewListener's batchers
+// l is non-nil and implements the shutdown hook. NewListener's batchers
 // otherwise run for the life of the process with no way to stop them. Errors
 // are logged, not returned — dual-write shutdown must never block or fail
 // `inngest dev`'s own shutdown.

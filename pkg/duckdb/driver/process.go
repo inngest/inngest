@@ -26,7 +26,7 @@ import (
 // statements — a disabled process never attempts to respawn again, so every
 // subsequent call fails identically.
 //
-// It is exported so pkg/execution/dualwrite can observe the terminal state
+// It is exported so pkg/duckdb/tracing can observe the terminal state
 // instead of retrying forever: the very first error that disables the process
 // wraps this too, so a caller never has to fail twice to notice.
 var ErrDisabled = errors.New("duckdb: subprocess permanently disabled after a failed restart attempt")
@@ -47,7 +47,7 @@ const restartHealthTimeout = 10 * time.Second
 // independent of whatever per-call ctx triggered a given exec/spawn/restart.
 // exec.CommandContext kills its process for the context's entire lifetime,
 // not just at start — so spawning with a short-lived, per-request ctx (the
-// shape Task 8's dualwrite package uses: one context per batch flush or hook
+// shape pkg/duckdb/tracing uses: one context per batch flush or hook
 // call) would kill a freshly-restarted, perfectly healthy subprocess the
 // instant that unrelated context ended. procCtx is created once, alongside
 // the process, and cancelled only by Connector.Close.
@@ -971,8 +971,8 @@ func (p *process) close(ctx context.Context) error {
 // POC; making it configurable is future work.
 const DuckLakeAlias = "inngest"
 
-// DuckLakeOptions opts a process into DuckLake. It is exploratory groundwork:
-// nothing in the existing Migrate / dual-write path sets it yet.
+// DuckLakeOptions opts a process into DuckLake. pkg/devserver's
+// setupDualWrite sets it for a persisted (--persist) dual-write catalog.
 //
 // CatalogPath/DataPath (or PostgresCatalogURI/DataPath, or
 // SQLiteCatalogPath/DataPath) are required when this struct is used.

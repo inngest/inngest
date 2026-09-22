@@ -39,8 +39,8 @@ func TestMigrateCreatesStagingTables(t *testing.T) {
 		require.NoError(t, rows.Close())
 	}
 
-	// insights_* logical tables are parameterized table macros (Task 9 of
-	// docs/plans/012-duckdb-insights-query-layer-plan.md), invoked as table
+	// insights_* logical tables are parameterized table macros (see
+	// migrations/000002_insights_views.sql), invoked as table
 	// functions with (account_id, env_id) arguments rather than queried as
 	// bare tables.
 	for _, macro := range []string{

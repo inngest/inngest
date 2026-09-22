@@ -16,7 +16,7 @@ import (
 var MigrationsFS embed.FS
 
 // ducklakeOnlyEnvVar is the single env var every "-- +goose ENVSUB ON" block
-// in migrations/000001_baseline.sql and migrations/000003_run_metadata.sql
+// in migrations/000001_baseline.sql
 // substitutes: each occurrence's own in-file default is a DuckLake-only "SET
 // SORTED/PARTITIONED BY" statement, used as-is (unset var) when persist is
 // true. When persist is false, Migrate sets this var to a harmless "SELECT
