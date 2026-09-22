@@ -36,7 +36,7 @@ export function credentialEnvironmentOptions(
                 .filter((env) => env.type === EnvironmentType.BranchParent)
                 .map((env) => ({
                   id: env.id,
-                  name: `${env.name} (includes children)`,
+                  name: 'Branch environments*',
                 })),
               ...eligible
                 .filter((env) => env.type === EnvironmentType.BranchChild)

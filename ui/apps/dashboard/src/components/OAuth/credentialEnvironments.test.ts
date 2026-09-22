@@ -42,7 +42,7 @@ describe('credential environments', () => {
       {
         label: 'Branches',
         opts: [
-          { id: 'parent', name: 'parent (includes children)' },
+          { id: 'parent', name: 'Branch environments*' },
           { id: 'branch', name: 'branch' },
         ],
       },

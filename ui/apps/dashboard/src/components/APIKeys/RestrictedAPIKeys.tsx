@@ -92,7 +92,7 @@ export function RestrictedAPIKeys() {
     column.accessor(
       (key) =>
         key.env?.type === EnvironmentType.BranchParent
-          ? `${key.env.name} (includes children)`
+          ? 'Branch environments'
           : key.env?.name ?? 'All environments',
       {
         id: 'environment',

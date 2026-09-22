@@ -167,7 +167,7 @@ export function CreateRestrictedAPIKeyModal({
               environmentDescription={
                 environments?.find((env) => env.id === environment?.id)
                   ?.type === EnvironmentType.BranchParent
-                  ? 'Includes all current and future child environments. Select a child when making environment-specific requests.'
+                  ? '*Includes all current and future branch environments.'
                   : undefined
               }
               onEnvironmentChange={setEnvironment}

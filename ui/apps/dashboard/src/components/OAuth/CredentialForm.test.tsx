@@ -21,7 +21,7 @@ const props = {
 
 describe('credential form validation', () => {
   it('shows the parent boundary note only for single-environment access', () => {
-    const description = 'Includes all current and future child environments.';
+    const description = '*Includes all current and future branch environments.';
     const render = (allEnvironments: boolean) =>
       renderToStaticMarkup(
         <CredentialForm
