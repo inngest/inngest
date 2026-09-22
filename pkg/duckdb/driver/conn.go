@@ -68,7 +68,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if err != nil {
 		return nil, err
 	}
-	return driver.RowsAffected(0), nil
+	return unknownResult{}, nil
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
@@ -110,6 +110,19 @@ func queryFingerprint(query string) string {
 	sum := sha256.Sum256([]byte(query))
 	return hex.EncodeToString(sum[:6])
 }
+
+// errRowsAffectedUnsupported is returned by unknownResult: neither transport
+// reports DuckDB's changed-row count, and fabricating 0 would claim a
+// successful statement touched nothing.
+var errRowsAffectedUnsupported = errors.New("duckdb: RowsAffected is not supported by this driver")
+
+type unknownResult struct{}
+
+func (unknownResult) LastInsertId() (int64, error) {
+	return 0, errors.New("duckdb: LastInsertId is not supported by this driver")
+}
+
+func (unknownResult) RowsAffected() (int64, error) { return 0, errRowsAffectedUnsupported }
 
 func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	switch v := nv.Value.(type) {
