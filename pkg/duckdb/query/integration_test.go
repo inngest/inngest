@@ -93,6 +93,16 @@ func TestDualWriteThenDuckDBQueryRoundTrip(t *testing.T) {
 	require.Len(t, runs, 1)
 	require.Equal(t, md.ID.RunID.String(), runs[0].RunID)
 
+	// trace_id is copied from the run span onto inngest.runs, so it must
+	// match the trace the run's spans were written under.
+	var spanTraceID string
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT trace_id FROM inngest.run_trace_spans WHERE run_id = ? AND name = 'executor.run';",
+		md.ID.RunID.String()).Scan(&spanTraceID))
+	require.NotEmpty(t, spanTraceID)
+	require.Equal(t, spanTraceID, runs[0].TraceID)
+	require.Equal(t, spanTraceID, run.TraceID)
+
 	count, err := m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
 			AccountID: md.ID.Tenant.AccountID, WorkspaceID: md.ID.Tenant.EnvID,

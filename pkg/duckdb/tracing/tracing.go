@@ -391,7 +391,8 @@ SELECT
   attributes."_inngest.defer.parent_fn_slug" IS NOT NULL AS is_deferred,
   attributes."_inngest.defer.parent_fn_slug"::VARCHAR AS defer_parent_fn_slug,
   TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]) AS defer_parent_run_ids,
-  current_timestamp
+  current_timestamp,
+  trace_id
 FROM inngest.run_trace_spans
 WHERE span_id IN (%s)
 AND name IN ('executor.run', 'executor.run.queued', 'executor.run.started');`,

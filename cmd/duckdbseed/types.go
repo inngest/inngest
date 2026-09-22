@@ -174,6 +174,8 @@ type RunRow struct {
 	Inputs     string
 	Output     string
 	EventIDs   []string
+	// TraceID mirrors inngest.runs.trace_id: the replayed trace's own.
+	TraceID string
 	// Sessions mirrors inngest.runs.sessions — this tool never generates
 	// session-tagged runs, so it's always left nil.
 	Sessions []SessionPair
