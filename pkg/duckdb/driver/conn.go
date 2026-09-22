@@ -2,9 +2,12 @@ package driver
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql/driver"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -59,8 +62,10 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if err != nil {
 		return nil, err
 	}
-	logger.StdlibLogger(ctx).Debug("duckdb: exec", "sql", sql)
-	if _, _, err := c.sess.exec(ctx, sql); err != nil {
+	start := time.Now()
+	_, _, err = c.sess.exec(ctx, sql)
+	logStatement(ctx, "exec", query, len(args), start, -1, err)
+	if err != nil {
 		return nil, err
 	}
 	return driver.RowsAffected(0), nil
@@ -71,12 +76,39 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
-	logger.StdlibLogger(ctx).Debug("duckdb: query", "sql", sql)
+	start := time.Now()
 	cols, types, rows, err := c.sess.query(ctx, sql)
+	logStatement(ctx, "query", query, len(args), start, len(rows), err)
 	if err != nil {
 		return nil, err
 	}
 	return newMapRows(cols, types, rows), nil
+}
+
+// logStatement debug-logs one statement without its SQL text. The
+// interpolated statement carries bound values — dual-write's batch INSERTs
+// include event payloads and step output — so it is identified by a
+// fingerprint of the un-interpolated query instead, which is stable across
+// executions of the same statement shape. rows < 0 means "not applicable".
+func logStatement(ctx context.Context, op, query string, args int, start time.Time, rows int, err error) {
+	attrs := []any{
+		"op", op,
+		"fingerprint", queryFingerprint(query),
+		"args", args,
+		"duration", time.Since(start),
+	}
+	if rows >= 0 {
+		attrs = append(attrs, "rows", rows)
+	}
+	if err != nil {
+		attrs = append(attrs, "error", err)
+	}
+	logger.StdlibLogger(ctx).Debug("duckdb: statement", attrs...)
+}
+
+func queryFingerprint(query string) string {
+	sum := sha256.Sum256([]byte(query))
+	return hex.EncodeToString(sum[:6])
 }
 
 func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
