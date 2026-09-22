@@ -602,6 +602,9 @@ func TestGetTraceRunsPaginatesWithCursor(t *testing.T) {
 		if len(runs) == 0 {
 			break
 		}
+		// Matches the SQL manager: never more than Items per page, since
+		// the GQL resolver derives hasNextPage from len == Items.
+		require.LessOrEqual(t, len(runs), 2, "page %d returned more than Items runs", page)
 		for _, r := range runs {
 			got = append(got, r.RunID)
 		}
