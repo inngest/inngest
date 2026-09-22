@@ -318,6 +318,51 @@ func TestNewListenerEndToEndRunFlow(t *testing.T) {
 	require.NotNil(t, finished["ended_at"])
 }
 
+// TestListenerOnFunctionCancelledWritesTerminalRunRow proves a cancelled run
+// reaches a terminal Cancelled row in inngest.runs: the executor calls only
+// OnFunctionCancelled on cancellation, never OnFunctionFinished. started_at
+// comes from the run state's own StartedAt, so it's kept for a run cancelled
+// mid-run and left NULL for one cancelled before it started.
+func TestListenerOnFunctionCancelledWritesTerminalRunRow(t *testing.T) {
+	cases := []struct {
+		name        string
+		startedAt   time.Time
+		wantStarted bool
+	}{
+		{"cancelled mid-run", time.Now().Add(-time.Second), true},
+		{"cancelled before starting", time.Time{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, cleanup := newTestDuckDB(t)
+			defer cleanup()
+
+			l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+			md := testMetadata(t)
+			md.Config.StartedAt = tc.startedAt
+			ctx := context.Background()
+
+			l.OnFunctionScheduled(ctx, md, queue.Item{}, nil)
+			l.OnFunctionCancelled(ctx, md, execution.CancelRequest{}, nil, time.Now())
+
+			require.Eventually(t, func() bool {
+				var count int
+				_ = db.QueryRowContext(ctx, "SELECT count(*) FROM inngest.runs;").Scan(&count)
+				return count == 2
+			}, 5*time.Second, 20*time.Millisecond)
+
+			rows := selectRows(t, db, "SELECT status, started_at, ended_at FROM inngest.runs;")
+			cancelled := rowByStatus(t, rows, enums.StepStatusCancelled.String())
+			require.NotNil(t, cancelled["ended_at"])
+			if tc.wantStarted {
+				require.NotNil(t, cancelled["started_at"])
+			} else {
+				require.Nil(t, cancelled["started_at"])
+			}
+		})
+	}
+}
+
 // TestListenerEmitsGroupIDOnSpansWithQueueItem proves createSpan sets
 // meta.Attrs.GroupID (job.group.id) from queue.Item.GroupID on every span
 // built with a QueueItem — see tracing.go's addQueueItemAttrs doc comment
