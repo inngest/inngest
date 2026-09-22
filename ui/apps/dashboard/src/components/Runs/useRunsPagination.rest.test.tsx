@@ -51,14 +51,17 @@ type RunsPaginationResult = ReturnType<typeof useRunsPagination>;
 
 function RunsPaginationHarness({
   onRender,
+  pause = false,
 }: {
   onRender: (result: RunsPaginationResult) => void;
+  pause?: boolean;
 }) {
   onRender(
     useRunsPagination({
       commonQueryVars,
       tracePreviewEnabled: false,
       shouldUseREST: true,
+      pause,
     }),
   );
   return null;
@@ -157,6 +160,27 @@ describe('REST runs pagination refresh', () => {
       expect(result?.runs.map(({ id }) => id)).toEqual(['run-1']),
     );
     expect(mocks.apiFetch.mock.calls[2]?.[0]).not.toContain('cursor=');
+  });
+
+  it('does not start either transport while selection is paused', async () => {
+    let result: RunsPaginationResult | undefined;
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness pause onRender={(value) => (result = value)} />
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(mocks.apiFetch).not.toHaveBeenCalled();
+    expect(result?.isLoadingInitial).toBe(true);
   });
 
   it('does not start another page request after pagination fails', async () => {

@@ -66,7 +66,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 ) {
   const env = useEnvironment();
 
-  const [{ data: functionData }] = useFunction({
+  const [{ data: functionData, fetching: isFunctionLoading }] = useFunction({
     functionSlug: functionSlug ?? '',
     pause: scope !== 'fn',
   });
@@ -84,7 +84,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     true,
     true,
   );
-  const { value: restRunsEnabled } = booleanFlag(
+  const { isReady: isRestRunsFlagReady, value: restRunsEnabled } = booleanFlag(
     'rest-runs-table',
     false,
     true,
@@ -152,8 +152,19 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ],
   );
 
+  const isRestRunsSelectionReady =
+    forceRestRuns !== undefined || isRestRunsFlagReady;
+  const isRestRunsRequested = forceRestRuns ?? restRunsEnabled;
+  const isRestRunsMetadataLoading =
+    isRestRunsRequested &&
+    ((scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
+      (scope === 'fn' &&
+        commonQueryVars.functionAppID === null &&
+        isFunctionLoading));
+  const pauseRuns = !isRestRunsSelectionReady || isRestRunsMetadataLoading;
   const shouldUseREST =
-    (forceRestRuns ?? restRunsEnabled) &&
+    !pauseRuns &&
+    isRestRunsRequested &&
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
@@ -171,10 +182,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     commonQueryVars,
     tracePreviewEnabled,
     shouldUseREST,
+    pause: pauseRuns,
   });
 
   const [countRes, countRefetch] = useQuery({
-    pause: shouldUseREST && Boolean(search),
+    pause: pauseRuns || (shouldUseREST && Boolean(search)),
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,

@@ -36,6 +36,7 @@ type UseRunsPaginationParams = {
   };
   tracePreviewEnabled: boolean;
   shouldUseREST: boolean;
+  pause: boolean;
 };
 
 export type ProgressiveSearchState = {
@@ -50,11 +51,12 @@ export function useRunsPagination({
   commonQueryVars,
   tracePreviewEnabled,
   shouldUseREST,
+  pause,
 }: UseRunsPaginationParams) {
   const apiFetch = useInngestAPIFetch(commonQueryVars.environmentSlug);
   const queryClient = useQueryClient();
   const progressive = useProgressiveRuns({
-    enabled: shouldUseREST && Boolean(commonQueryVars.celQuery),
+    enabled: !pause && shouldUseREST && Boolean(commonQueryVars.celQuery),
     apiFetch,
     vars: commonQueryVars,
   });
@@ -63,7 +65,7 @@ export function useRunsPagination({
   const [allRuns, setAllRuns] = useState<Run[]>([]);
 
   const [queryRes, refetch] = useQuery({
-    pause: shouldUseREST,
+    pause: pause || shouldUseREST,
     query: GetRunsDocument,
     requestPolicy: 'network-only',
     variables: {
@@ -74,7 +76,7 @@ export function useRunsPagination({
   });
 
   const restQuery = useInfiniteQuery({
-    enabled: shouldUseREST && !useProgressive,
+    enabled: !pause && shouldUseREST && !useProgressive,
     queryKey: ['runs-rest-v2', commonQueryVars],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) =>
@@ -166,6 +168,7 @@ export function useRunsPagination({
   ]);
 
   const reset = useCallback(() => {
+    if (pause) return;
     if (useProgressive) {
       progressive.reset();
       return;
@@ -182,12 +185,27 @@ export function useRunsPagination({
     refetch();
   }, [
     commonQueryVars,
+    pause,
     progressive,
     queryClient,
     refetch,
     shouldUseREST,
     useProgressive,
   ]);
+
+  if (pause) {
+    return {
+      runs: [],
+      isLoading: true,
+      isLoadingInitial: true,
+      isLoadingMore: false,
+      hasNextPage: false,
+      loadMore: () => {},
+      reset,
+      error: undefined,
+      progressiveSearch: undefined,
+    };
+  }
 
   if (useProgressive) {
     return {
