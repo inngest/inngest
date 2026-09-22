@@ -187,11 +187,19 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 
 	// The primary connection's sess is *process (crash-restart handling
 	// wraps the real transport); an extra connection from Options.QuackConns
-	// > 1 is already a bare *quackSession. Handle both.
+	// > 1 is a *pooledQuackConn. Either way the appender drives the current
+	// *quackSession directly, so a crash mid-append surfaces as a plain
+	// error rather than a transparent retry.
 	var sess *quackSession
 	switch s := c.sess.(type) {
 	case *quackSession:
 		sess = s
+	case *pooledQuackConn:
+		var err error
+		sess, err = s.currentSession(ctx)
+		if err != nil {
+			return nil, err
+		}
 	case *process:
 		var err error
 		sess, err = s.currentQuackSession()
