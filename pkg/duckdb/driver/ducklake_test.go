@@ -42,7 +42,7 @@ func TestDuckLakeBootstrapAttachesOnStart(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.dl_t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["c"])
+	require.Equal(t, float64(1), rows[0].get("c"))
 }
 
 // TestDuckLakeInlinesSmallInsertsUpToRowLimit pins the
@@ -75,7 +75,7 @@ func TestDuckLakeInlinesSmallInsertsUpToRowLimit(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'inline_t';")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(0), rows[0]["file_count"], "1000 rows at the row limit must stay inlined, not flushed to Parquet")
+	require.Equal(t, float64(0), rows[0].get("file_count"), "1000 rows at the row limit must stay inlined, not flushed to Parquet")
 }
 
 // TestDuckLakeInliningRowLimitIsConfigurable proves
@@ -105,7 +105,7 @@ func TestDuckLakeInliningRowLimitIsConfigurable(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'low_limit_t';")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Greater(t, rows[0]["file_count"], float64(0), "200 rows must exceed a row limit of 2 and flush to Parquet")
+	require.Greater(t, rows[0].get("file_count"), float64(0), "200 rows must exceed a row limit of 2 and flush to Parquet")
 }
 
 // TestDuckLakeReattachesAfterCrash is the whole reason the bootstrap lives
@@ -149,7 +149,7 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err, "the restart must re-attach the DuckLake catalog")
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["c"],
+	require.Equal(t, float64(1), rows[0].get("c"),
 		"the pre-crash row must still be readable from the re-attached lake")
 
 	p.mu.Lock()
@@ -165,7 +165,7 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 	require.NoError(t, err)
 	_, rows, err = p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err)
-	require.Equal(t, float64(2), rows[0]["c"])
+	require.Equal(t, float64(2), rows[0].get("c"))
 }
 
 // TestOpenWithDuckLake exercises the Options wiring through the public API.
