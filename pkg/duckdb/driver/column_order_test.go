@@ -85,3 +85,42 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	require.Equal(t, wantTypes, quackTypes)
 	require.Empty(t, quackRows, "query matches zero rows")
 }
+
+// TestRepeatedColumnNamesKeepEveryValue runs a query that repeats a column
+// name through database/sql over both transports and requires every value
+// back, in order — the shape of an Insights join like
+// SELECT r.account_id, e.account_id ....
+func TestRepeatedColumnNamesKeepEveryValue(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	requireQuackExtension(t, binPath)
+
+	const query = "SELECT 1 AS x, 'two' AS x, 3 AS y;"
+
+	quackAddr := EphemeralQuackAddr
+	for name, opts := range map[string]Options{
+		"jsonlines": {BinaryPath: binPath, DBFile: ":memory:"},
+		"quack":     {BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db, err := Open(t.Context(), opts)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = db.Close() })
+
+			rows, err := db.QueryContext(t.Context(), query)
+			require.NoError(t, err)
+			defer rows.Close()
+
+			cols, err := rows.Columns()
+			require.NoError(t, err)
+			require.Equal(t, []string{"x", "x", "y"}, cols)
+
+			require.True(t, rows.Next())
+			var a, c int64
+			var b string
+			require.NoError(t, rows.Scan(&a, &b, &c))
+			require.Equal(t, int64(1), a)
+			require.Equal(t, "two", b)
+			require.Equal(t, int64(3), c)
+		})
+	}
+}

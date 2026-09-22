@@ -35,8 +35,8 @@ import (
 // already-decoded PrepareResponse metadata, no extra statement at all, for
 // quack).
 type sqlExecer interface {
-	exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error)
-	query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error)
+	exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error)
+	query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error)
 }
 
 // conn implements database/sql/driver.Conn, ExecerContext, and QueryerContext
