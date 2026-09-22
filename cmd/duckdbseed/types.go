@@ -1,8 +1,7 @@
 // Command duckdbseed seeds a DuckDB dual-write database
 // (inngest.runs/run_trace_spans/events/run_metadata, per
-// pkg/db/duckdb/migrations/000001_baseline.sql and
-// 000003_run_metadata.sql) with synthetic test data shaped after a real dev
-// database, for exercising pkg/cqrs/duckdbquery and the trace UI without
+// pkg/db/duckdb/migrations/000001_baseline.sql) with synthetic test data shaped after a real dev
+// database, for exercising pkg/duckdb/query and the trace UI without
 // running real workloads through `inngest dev`.
 package main
 
@@ -219,9 +218,9 @@ type EventRow struct {
 }
 
 // MetadataRow mirrors inngest.run_metadata's columns
-// (pkg/db/duckdb/migrations/000003_run_metadata.sql). StepID/StepIndex/
+// (pkg/db/duckdb/migrations/000001_baseline.sql). StepID/StepIndex/
 // StepAttempt are nil for a run-scoped row (Scope == "run"), matching
-// pkg/execution/dualwrite/listener.go's OnMetadataEntry, which leaves them
+// pkg/duckdb/tracing/listener.go's OnMetadataEntry, which leaves them
 // unset the same way for run-scoped metadata.
 type MetadataRow struct {
 	AccountID   uuid.UUID

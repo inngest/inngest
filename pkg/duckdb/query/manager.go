@@ -1,6 +1,6 @@
 // Package duckdbquery implements a DuckDB-backed cqrs.Manager decorator for
 // the GQL runs/events/run-trace read paths, reading the tables
-// pkg/execution/dualwrite writes into (inngest.runs, inngest.run_trace_spans,
+// pkg/duckdb/tracing writes into (inngest.runs, inngest.run_trace_spans,
 // inngest.events).
 //
 // Manager embeds the real cqrs.Manager and overrides only the methods this

@@ -106,9 +106,9 @@ func addRunSpanAttrs(attrs *meta.SerializableAttrs, md *sv2.Metadata) {
 }
 
 // SpanExporter is a standalone, DuckDB-specific sdktrace.SpanExporter
-// backing dualwrite's private TracerProvider (see newListenerTracerProvider)
+// backing the listener's private TracerProvider (see newListenerTracerProvider)
 // with the same channel+batcher machinery as listener's runs/events. Every
-// span dualwrite's hooks create — via l.tp.CreateSpan, never by hand —
+// span the listener's hooks create — via l.tp.CreateSpan, never by hand —
 // arrives here as a real OTel ReadOnlySpan, converted into an
 // inngest.run_trace_spans row the same way pkg/tracing/tracer_sqlc.go's
 // dbExporter converts one for pkg/db/sqlite's `spans` table (see
@@ -139,7 +139,7 @@ func newSpanExporter(db *sql.DB, spansCap int, opts batcherOpts) *SpanExporter {
 	return se
 }
 
-// ExportSpans implements sdktrace.SpanExporter. dualwrite's private
+// ExportSpans implements sdktrace.SpanExporter. The listener's private
 // TracerProvider uses a SimpleSpanProcessor (see NewOtelTracerProvider), so
 // this runs synchronously on the calling hook's own goroutine — but it does
 // no I/O of its own: converting a span to a row and non-blocking
