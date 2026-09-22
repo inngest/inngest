@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation } from '@tanstack/react-router';
+import { useLocation } from '@tanstack/react-router';
+import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { TooltipProvider } from '@inngest/components/Tooltip';
 
@@ -88,23 +89,21 @@ export function HostedConnection({ children }: { children: ReactNode }) {
                 browser.
               </p>
               <div className="bg-disabled my-4 flex flex-wrap items-center justify-between gap-2 rounded p-4">
-                <p
-                  role="status"
-                  aria-live="polite"
-                  className="text-subtle text-sm"
-                >
-                  {messages[status]}
-                </p>
-                <span className="text-muted break-all text-sm">{origin}</span>
+                <div>
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className="text-subtle text-sm"
+                  >
+                    {messages[status]}
+                  </p>
+                  <p className="text-muted mt-1 break-all text-sm">{origin}</p>
+                </div>
+                {status === 'connected' && (
+                  <Button kind="primary" label="View runs" to="/runs" />
+                )}
               </div>
-              {status === 'connected' ? (
-                <Link
-                  to="/runs"
-                  className="bg-primary-moderate mt-4 inline-flex rounded px-4 py-2 font-medium"
-                >
-                  Open dashboard
-                </Link>
-              ) : (
+              {status !== 'connected' && (
                 <section
                   aria-labelledby="start-server-heading"
                   className="mt-8"

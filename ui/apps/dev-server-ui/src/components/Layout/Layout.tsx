@@ -17,7 +17,10 @@ export default function Layout({
   );
   // Captured before the persistence effect below writes a value, so V2 can
   // auto-collapse on small viewports when the user has no explicit pref.
-  const hasStoredPref = useRef(false);
+  const hasStoredPref = useRef(
+    typeof window !== 'undefined' &&
+      localStorage.getItem('navCollapsed') !== null,
+  );
 
   useEffect(() => {
     hasStoredPref.current = localStorage.getItem('navCollapsed') !== null;
