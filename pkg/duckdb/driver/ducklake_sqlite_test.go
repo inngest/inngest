@@ -38,7 +38,7 @@ func TestDuckLakeSQLiteCatalogAttaches(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["c"])
+	require.Equal(t, float64(1), rows[0].get("c"))
 }
 
 // TestDuckLakeSQLiteCatalogHandlesJSONColumn guards against a SQLite-catalog
@@ -68,7 +68,7 @@ func TestDuckLakeSQLiteCatalogHandlesJSONColumn(t *testing.T) {
 	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT data FROM inngest.%s WHERE id = 1;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": float64(1)}, rows[0]["data"])
+	require.Equal(t, map[string]any{"a": float64(1)}, rows[0].get("data"))
 }
 
 // TestOpenWithDuckLakeSQLiteCatalog exercises the SQLite catalog mode
