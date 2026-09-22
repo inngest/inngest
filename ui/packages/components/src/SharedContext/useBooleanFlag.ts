@@ -1,8 +1,8 @@
 import { useShared } from './SharedContext';
 
 export type BooleanFlag = {
-  // Whether the flag is ready to be used. This will be false if the user has
-  // not been identified in the LaunchDarkly client.
+  // Ready means the value can be used, including the default after an error.
+  // False means flag identification is still pending.
   isReady: boolean;
 
   value: boolean;

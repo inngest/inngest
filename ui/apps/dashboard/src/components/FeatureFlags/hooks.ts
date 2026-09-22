@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useFlags } from 'launchdarkly-react-client-sdk';
 
@@ -9,30 +9,26 @@ export function useBooleanFlag(
   defaultValue: boolean = false,
 ): BooleanFlag {
   const value: unknown = useFlags()[flag];
-  const isIdentified = useIsIdentified();
+  const { isIdentified, hasError } = useContext(IdentificationContext);
+  const failure = hasError
+    ? 'feature flag initialization or identification failed'
+    : !isIdentified
+    ? undefined
+    : value === undefined
+    ? 'flag unavailable'
+    : typeof value !== 'boolean'
+    ? 'expected a boolean value'
+    : undefined;
 
-  if (!isIdentified) {
-    return { isReady: false, value: defaultValue };
-  }
+  useEffect(() => {
+    if (failure) {
+      console.error(
+        `Couldn't load flag "${flag}": ${failure}; using default ${defaultValue}`,
+      );
+    }
+  }, [flag, failure, defaultValue]);
 
-  if (typeof value === 'undefined') {
-    console.error(`flag ${flag} is not available`);
-    return { isReady: false, value: defaultValue };
-  }
-
-  if (typeof value !== 'boolean') {
-    console.error(`flag ${flag} is not a boolean`);
-    return { isReady: false, value: defaultValue };
-  }
-
-  return { isReady: true, value };
-}
-
-/**
- * Returns true if the user is identified in the LaunchDarkly client. This is
- * useful when you want to ensure that the user is identified before querying
- * for flags.
- */
-function useIsIdentified(): boolean {
-  return useContext(IdentificationContext).isIdentified;
+  if (failure) return { isReady: true, value: defaultValue };
+  if (!isIdentified) return { isReady: false, value: defaultValue };
+  return { isReady: true, value: value as boolean };
 }
