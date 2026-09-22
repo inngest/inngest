@@ -260,7 +260,7 @@ func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
 	require.NoError(t, duckdb.Migrate(ctx, db, true))
 
 	l := tracing.NewListener(db)
-	closer, ok := l.(syncLifecycleCloser)
+	closer, ok := l.(tracing.Closer)
 	require.True(t, ok, "NewListener's return value must implement the Close shutdown hook")
 	defer func() { _ = closer.Close(context.Background()) }()
 
@@ -297,7 +297,7 @@ func TestDualWriteEndToEndRowsLandInDuckDBInMemory(t *testing.T) {
 	require.NoError(t, duckdb.Migrate(ctx, db, false))
 
 	l := tracing.NewListener(db)
-	closer, ok := l.(syncLifecycleCloser)
+	closer, ok := l.(tracing.Closer)
 	require.True(t, ok, "NewListener's return value must implement the Close shutdown hook")
 	defer func() { _ = closer.Close(context.Background()) }()
 
