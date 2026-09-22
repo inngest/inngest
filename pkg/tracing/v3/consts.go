@@ -2,7 +2,7 @@ package v3
 
 import "github.com/inngest/inngest/pkg/tracing/meta"
 
-// Span names for this package's TracerProvider — see pkg/execution/dualwrite,
+// Span names for this package's TracerProvider — see pkg/duckdb/tracing,
 // its only caller. Some are genuinely new (no equivalent in the real
 // production tracing pipeline, pkg/tracing/meta); others deliberately alias
 // the same constant meta defines, for spans whose identity (name, and often

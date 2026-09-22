@@ -25,7 +25,7 @@ import (
 
 // eventsPerRun is the number of lifecycle writes a single run produces —
 // queued, started, ended — matching runCommonFields' three real dual-write
-// hooks (pkg/execution/dualwrite/listener.go).
+// hooks (pkg/duckdb/tracing/listener.go).
 const eventsPerRun = 3
 
 var statusBySeq = [eventsPerRun]string{"queued", "running", "completed"}
@@ -209,7 +209,7 @@ var benchTables = []string{"bench_runs_flat", "bench_runs_merged", "bench_runs_m
 // DataInliningRowLimit is -1, not 0: the zero value means "unset, use
 // driver.DefaultDataInliningRowLimit (1000)" (see its doc comment) — that
 // convention is depended on by real production code
-// (pkg/devserver/dualwrite.go never sets this field at all), so it can't
+// (pkg/devserver/duckdb.go never sets this field at all), so it can't
 // also mean "disabled" here. -1 is the documented sentinel for actually
 // disabling inlining: every write flushes straight to a real Parquet file
 // rather than possibly staying inlined in the catalog, which otherwise

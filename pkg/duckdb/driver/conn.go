@@ -13,7 +13,7 @@ import (
 )
 
 // sqlExecer abstracts over what runs a SQL statement and collects its JSON
-// rows. *session (rows.go) implements it directly — Task 4's tests exercise
+// rows. *session (rows.go) implements it directly — conn_test.go exercises
 // conn against a fake io.ReadWriter transport via a bare *session. *process
 // (process.go) implements it too, additionally providing crash detection,
 // one-restart-then-permanently-disable recovery, and locking around the real

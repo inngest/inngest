@@ -12,7 +12,7 @@ import (
 
 // newTestDuckDB opens a real duckdb subprocess with DuckLake attached and
 // the dual-write schema migrated, mirroring
-// pkg/execution/dualwrite/helpers_test.go's newTestDuckDB.
+// pkg/duckdb/tracing/helpers_test.go's newTestDuckDB.
 func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	t.Helper()
 	binPath, err := exec.LookPath("duckdb")
