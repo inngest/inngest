@@ -11,9 +11,7 @@ const links = [
   { label: 'Changelog', href: 'https://www.inngest.com/changelog' },
 ];
 
-export default function BottomBar() {
-  const { data: info } = useInfoQuery();
-
+export default function BottomBar({ connected }: { connected: boolean }) {
   return (
     <footer className="bg-canvasSubtle text-muted flex h-[30px] shrink-0 items-center justify-between px-6 text-xs">
       <div className="flex items-center gap-3">
@@ -33,7 +31,12 @@ export default function BottomBar() {
       </div>
       {/* Version is best-effort — skip the label entirely when the server
           doesn't report one. */}
-      {info?.version && <div>Dev Server v{info.version}</div>}
+      {connected && <ServerVersion />}
     </footer>
   );
+}
+
+function ServerVersion() {
+  const { data: info } = useInfoQuery();
+  return info?.version ? <div>Dev Server v{info.version}</div> : null;
 }

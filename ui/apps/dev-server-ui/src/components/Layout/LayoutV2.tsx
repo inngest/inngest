@@ -8,6 +8,7 @@ type LayoutProps = {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   hasStoredPref: boolean;
+  connected: boolean;
   children: ReactNode;
 };
 
@@ -15,6 +16,7 @@ export default function LayoutV2({
   collapsed,
   setCollapsed,
   hasStoredPref,
+  connected,
   children,
 }: LayoutProps) {
   return (
@@ -26,6 +28,7 @@ export default function LayoutV2({
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           hasStoredPref={hasStoredPref}
+          connected={connected}
         />
 
         <div
@@ -36,7 +39,7 @@ export default function LayoutV2({
         </div>
       </div>
 
-      <BottomBar />
+      <BottomBar connected={connected} />
     </div>
   );
 }

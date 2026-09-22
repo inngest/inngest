@@ -1,6 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from '@tanstack/react-router';
-import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import { Header } from '@inngest/components/Header/Header';
+import { TooltipProvider } from '@inngest/components/Tooltip';
+
+import Layout from '@/components/Layout/Layout';
+import StoreProvider from '@/components/StoreProvider';
 import {
   getAPIOrigin,
   portStorageKey,
@@ -8,6 +12,8 @@ import {
   validPort,
   type ConnectionStatus,
 } from '@/utils/devServer';
+
+const command = 'npx --ignore-scripts=false inngest-cli@latest dev';
 
 const messages: Record<ConnectionStatus, string> = {
   checking:
@@ -65,140 +71,152 @@ export function HostedConnection({ children }: { children: ReactNode }) {
   if (status === 'connected' && !isHome) return <>{children}</>;
 
   return (
-    <main className="bg-canvasBase text-basis min-h-screen px-5 py-10 sm:py-16">
-      <div className="mx-auto max-w-2xl">
-        <a href="/" aria-label="Inngest home" className="inline-block">
-          <InngestLogo width={120} />
-        </a>
-        <h1 className="mt-10 text-3xl font-semibold sm:text-4xl">
-          Inngest Dev Server
-        </h1>
-        <p className="text-subtle mt-4 text-lg">
-          Build and debug durable workflows locally. Send test events, inspect
-          function runs, and explore execution traces from your browser.
-        </p>
-        <p className="text-subtle mt-3">
-          This UI connects directly to the Inngest Dev Server on this device.
-          Your apps and functions run on your machine.
-        </p>
-        <section
-          aria-labelledby="connection-heading"
-          className="border-subtle bg-canvasSubtle mt-8 rounded-lg border p-5 sm:p-6"
-        >
-          <h2 id="connection-heading" className="text-lg font-medium">
-            {status === 'connected'
-              ? 'Connected to localhost'
-              : 'Connect your local server'}
-          </h2>
-          <p role="status" aria-live="polite" className="text-subtle mt-2">
-            {messages[status]}
-          </p>
-          <p className="text-muted mt-2 break-all text-sm">{origin}</p>
-          {status === 'connected' ? (
-            <Link
-              to="/runs"
-              className="bg-primary-moderate mt-5 inline-flex rounded px-4 py-2 font-medium"
-            >
-              Open dashboard
-            </Link>
-          ) : (
-            <>
-              <p className="mt-5">Run this command in your terminal:</p>
-              <pre className="bg-canvasBase border-subtle mt-3 overflow-x-auto rounded border p-4 text-sm">
-                <code>npx --ignore-scripts=false inngest-cli@latest dev</code>
-              </pre>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="border-subtle rounded border px-4 py-2"
-                  onClick={async () => {
+    <StoreProvider>
+      <TooltipProvider delayDuration={0}>
+        <Layout connected={status === 'connected'}>
+          <div className="flex h-full flex-col overflow-y-scroll">
+            <Header breadcrumb={[{ text: 'Dev Server' }]} />
+            <main className="mx-auto w-full max-w-4xl px-6 pb-4 pt-16">
+              <h1 className="mb-1 text-xl">
+                {status === 'connected'
+                  ? 'Your Dev Server is ready'
+                  : 'Connect your Dev Server'}
+              </h1>
+              <p className="text-subtle text-sm">
+                Build and debug durable workflows locally. Send test events,
+                inspect function runs, and explore execution traces from your
+                browser.
+              </p>
+              <div className="bg-disabled my-4 flex flex-wrap items-center justify-between gap-2 rounded p-4">
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-subtle text-sm"
+                >
+                  {messages[status]}
+                </p>
+                <span className="text-muted break-all text-sm">{origin}</span>
+              </div>
+              {status === 'connected' ? (
+                <Link
+                  to="/runs"
+                  className="bg-primary-moderate mt-4 inline-flex rounded px-4 py-2 font-medium"
+                >
+                  Open dashboard
+                </Link>
+              ) : (
+                <section
+                  aria-labelledby="start-server-heading"
+                  className="mt-8"
+                >
+                  <h2 id="start-server-heading" className="mb-1 text-lg">
+                    Start the Dev Server
+                  </h2>
+                  <p className="text-subtle text-sm">
+                    Run this command in your terminal, then return to this page.
+                    Your apps and functions run on your machine.
+                  </p>
+                  <pre className="bg-canvasSubtle border-subtle mt-4 overflow-x-auto rounded border p-4 text-sm">
+                    <code>{command}</code>
+                  </pre>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      className="border-subtle rounded border px-4 py-2 text-sm"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(command);
+                          setCopyMessage('Command copied.');
+                        } catch {
+                          setCopyMessage(
+                            'Select the command above to copy it.',
+                          );
+                        }
+                      }}
+                    >
+                      Copy command
+                    </button>
+                    <button
+                      type="button"
+                      className="border-subtle rounded border px-4 py-2 text-sm"
+                      onClick={() => {
+                        setStatus('checking');
+                        setAttempt((value) => value + 1);
+                      }}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                  <p role="status" className="text-muted mt-2 text-sm">
+                    {copyMessage}
+                  </p>
+                </section>
+              )}
+              <details className="mt-8">
+                <summary className="cursor-pointer text-sm">
+                  Use a different port
+                </summary>
+                <form
+                  className="mt-3 flex flex-wrap items-end gap-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!validPort(port)) {
+                      setPortError('Enter a port from 1 to 65535.');
+                      return;
+                    }
                     try {
-                      await navigator.clipboard.writeText(
-                        'npx --ignore-scripts=false inngest-cli@latest dev',
+                      window.localStorage.setItem(
+                        portStorageKey,
+                        String(Number(port)),
                       );
-                      setCopyMessage('Command copied.');
+                      window.location.reload();
                     } catch {
-                      setCopyMessage('Select the command above to copy it.');
+                      setPortError(
+                        'Allow site storage to save a different port.',
+                      );
                     }
                   }}
                 >
-                  Copy command
-                </button>
-                <button
-                  type="button"
-                  className="border-subtle rounded border px-4 py-2"
-                  onClick={() => {
-                    setStatus('checking');
-                    setAttempt((value) => value + 1);
-                  }}
+                  <label className="text-sm">
+                    Localhost port
+                    <input
+                      type="number"
+                      min="1"
+                      max="65535"
+                      required
+                      value={port}
+                      onChange={(event) => setPort(event.target.value)}
+                      className="bg-canvasBase border-subtle mt-1 block w-32 rounded border p-2"
+                    />
+                  </label>
+                  <button
+                    className="border-subtle rounded border px-4 py-2 text-sm"
+                    type="submit"
+                  >
+                    Connect
+                  </button>
+                  {portError && <p role="alert">{portError}</p>}
+                </form>
+              </details>
+              <div className="mt-8 flex flex-wrap gap-5 text-sm">
+                <a
+                  className="text-link underline"
+                  href="/docs/local-development?ref=dev"
                 >
-                  Try again
-                </button>
+                  Setup guide
+                </a>
+                <a className="text-link underline" href={origin}>
+                  Open local UI
+                </a>
               </div>
-              <p role="status" className="text-muted mt-2 text-sm">
-                {copyMessage}
+              <p className="text-muted mt-6 text-sm">
+                Keep the Dev Server running while you work. On a phone or
+                tablet, localhost refers to that device, not your computer.
               </p>
-            </>
-          )}
-          <details className="mt-6">
-            <summary className="cursor-pointer">Use a different port</summary>
-            <form
-              className="mt-3 flex flex-wrap items-end gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!validPort(port)) {
-                  setPortError('Enter a port from 1 to 65535.');
-                  return;
-                }
-                try {
-                  window.localStorage.setItem(
-                    portStorageKey,
-                    String(Number(port)),
-                  );
-                  window.location.reload();
-                } catch {
-                  setPortError('Allow site storage to save a different port.');
-                }
-              }}
-            >
-              <label className="text-sm">
-                Localhost port
-                <input
-                  type="number"
-                  min="1"
-                  max="65535"
-                  required
-                  value={port}
-                  onChange={(event) => setPort(event.target.value)}
-                  className="bg-canvasBase border-subtle mt-1 block w-32 rounded border p-2"
-                />
-              </label>
-              <button
-                className="border-subtle rounded border px-4 py-2"
-                type="submit"
-              >
-                Connect
-              </button>
-              {portError && <p role="alert">{portError}</p>}
-            </form>
-          </details>
-        </section>
-        <div className="mt-6 flex flex-wrap gap-5 text-sm">
-          <a
-            className="text-link underline"
-            href="/docs/local-development?ref=dev"
-          >
-            Setup guide
-          </a>
-          <a className="text-link underline" href={origin}>
-            Open local UI
-          </a>
-        </div>
-        <p className="text-muted mt-6 text-sm">
-          Keep the Dev Server running while you work. On a phone or tablet,
-          localhost refers to that device, not your computer.
-        </p>
-      </div>
-    </main>
+            </main>
+          </div>
+        </Layout>
+      </TooltipProvider>
+    </StoreProvider>
   );
 }

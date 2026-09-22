@@ -11,12 +11,14 @@ type SideBarProps = {
   // Whether the user has an explicit stored preference; when absent we
   // auto-collapse on small viewports.
   hasStoredPref: boolean;
+  connected: boolean;
 };
 
 export default function SideBarV2({
   collapsed,
   setCollapsed,
   hasStoredPref,
+  connected,
 }: SideBarProps) {
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +79,7 @@ export default function SideBarV2({
       ref={navRef}
     >
       <div className="flex grow flex-col justify-between">
-        <Navigation collapsed={collapsed} />
+        <Navigation collapsed={collapsed} connected={connected} />
 
         <div className="pl-3 pr-2">
           {/* Discreet, icon-only collapse toggle pinned to the sidebar foot.
