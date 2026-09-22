@@ -401,7 +401,11 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 			return nil, fmt.Errorf("duckdbquery: encoding run cursor: %w", err)
 		}
 		out = append(out, trun)
-		if opt.Items > 0 && uint(len(out)) > opt.Items {
+		// The query fetches Items+1 rows, but like the SQL manager this
+		// returns at most Items: callers detect a next page themselves (the
+		// GQL resolver compares len to Items; the REST run provider asks for
+		// Limit+1).
+		if opt.Items > 0 && uint(len(out)) >= opt.Items {
 			break
 		}
 	}
