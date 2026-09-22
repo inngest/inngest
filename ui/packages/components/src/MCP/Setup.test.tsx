@@ -11,6 +11,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@tanstack/react-router', () => ({
   ClientOnly: ({ children }: { children: ReactNode }) => children,
   Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
+  useRouter: () => undefined,
 }));
 
 vi.mock('@inngest/components/CodeBlock/CommandBlock', () => {
