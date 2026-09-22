@@ -85,7 +85,7 @@ func (b *batcher) stop() { close(b.stopc) }
 // flush wedged on the duckdb subprocess (e.g. a genuine hang, not just a
 // slow one) holds process.exec's mutex forever, and Close's own shutdown
 // path can then never acquire that same mutex to kill the subprocess — the
-// bounded bounds Close already has (see dualwrite.Closer, driver.Connector)
+// bounded bounds Close already has (see Closer, driver.Connector)
 // only cover work *after* the lock is acquired, not the lock acquisition
 // itself. quackSession's HTTP client has no timeout of its own by design
 // (see newQuackHTTPClient's doc comment) specifically so a caller can opt

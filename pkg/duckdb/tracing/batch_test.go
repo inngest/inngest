@@ -151,8 +151,8 @@ func TestBatcherHandlesMixedColumnsAcrossRowsInABatch(t *testing.T) {
 }
 
 // TestBatcherDrainsChannelOnStopBeforeExiting is a regression test for a
-// real shutdown data-loss bug found while wiring Close() into pkg/devserver
-// (Task 9): stop() closes stopc, but run()'s select statement has no
+// real shutdown data-loss bug found while wiring Close() into pkg/devserver:
+// stop() closes stopc, but run()'s select statement has no
 // priority ordering between `case row := <-b.in` and `case <-b.stopc` — when
 // both are simultaneously ready (rows already buffered in the channel at
 // the moment stop() is called), Go's select picks between them uniformly at

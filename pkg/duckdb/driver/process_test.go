@@ -330,8 +330,8 @@ func TestProcessHealthCheckAndRestartAreRaceFree(t *testing.T) {
 // per-call ctx that happened to trigger the spawn. exec.CommandContext kills
 // its process for the *entire* lifetime of the context passed to it, not
 // just while starting — so if a restart is triggered from inside a
-// short-lived, per-request context (exactly the shape Task 8's dualwrite
-// package uses: one context per batch flush or hook call), spawning under
+// short-lived, per-request context (exactly the shape pkg/duckdb/tracing
+// uses: one context per batch flush or hook call), spawning under
 // that ctx would kill the freshly-restarted, perfectly healthy subprocess
 // the instant that unrelated context ends.
 //
@@ -352,7 +352,7 @@ func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
 	_, _ = p.cmd.Process.Wait()
 
 	// Trigger the restart through a short-lived context, mirroring a single
-	// dualwrite batch-flush/hook-call context.
+	// dual-write batch-flush/hook-call context.
 	shortCtx, cancel := context.WithCancel(t.Context())
 	_, _, err = p.exec(shortCtx, "SELECT 1;")
 	require.NoError(t, err, "exec should transparently restart and succeed")
@@ -526,7 +526,7 @@ func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
 
 // TestExecFailedRestartWrapsErrDisabledImmediately pins Fix 5's contract: the
 // *first* error a caller sees once the one-restart-then-disable policy fires
-// already wraps ErrDisabled, so pkg/execution/dualwrite can stop flushing
+// already wraps ErrDisabled, so pkg/duckdb/tracing can stop flushing
 // immediately instead of having to fail a second time to learn the state is
 // terminal.
 func TestExecFailedRestartWrapsErrDisabledImmediately(t *testing.T) {
