@@ -196,3 +196,87 @@ func TestSpecialFloatRoundTrip(t *testing.T) {
 	require.Equal(t, 1, neginfs)
 	require.Equal(t, 1, finite)
 }
+
+// TestInterpolateIgnoresQuestionMarksOutsidePlaceholderContexts covers every
+// lexical context in which "?" is text rather than a parameter. Each case
+// binds exactly one arg, so a scanner that mistook any quoted "?" for a
+// placeholder would fail on the count mismatch or splice the literal into
+// the wrong place.
+func TestInterpolateIgnoresQuestionMarksOutsidePlaceholderContexts(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"string literal", `SELECT '?', ?`, `SELECT '?', 'x'`},
+		{"doubled quote escape", `SELECT 'it''s ?', ?`, `SELECT 'it''s ?', 'x'`},
+		{"escape string backslash quote", `SELECT E'\' ?', ?`, `SELECT E'\' ?', 'x'`},
+		{"lowercase escape string", `SELECT e'\\', ?`, `SELECT e'\\', 'x'`},
+		{"backslash is literal in plain string", `SELECT 'a\', ?`, `SELECT 'a\', 'x'`},
+		{"identifier ending in e is not an escape string", `SELECT name'?' , ?`, `SELECT name'?' , 'x'`},
+		{"quoted identifier", `SELECT "col?" FROM t WHERE a = ?`, `SELECT "col?" FROM t WHERE a = 'x'`},
+		{"doubled quote in identifier", `SELECT "a""?" , ?`, `SELECT "a""?" , 'x'`},
+		{"line comment", "SELECT ? -- trailing ?\n", "SELECT 'x' -- trailing ?\n"},
+		{"line comment at eof", "SELECT ? -- ?", "SELECT 'x' -- ?"},
+		{"block comment", `SELECT /* ? */ ?`, `SELECT /* ? */ 'x'`},
+		{"nested block comment", `SELECT /* a /* ? */ ? */ ?`, `SELECT /* a /* ? */ ? */ 'x'`},
+		{"dollar quoted", `SELECT $$ ? $$, ?`, `SELECT $$ ? $$, 'x'`},
+		{"tagged dollar quoted", `SELECT $q$ ? $$ ? $q$, ?`, `SELECT $q$ ? $$ ? $q$, 'x'`},
+		{"positional dollar param is not a tag", `SELECT $1, ?`, `SELECT $1, 'x'`},
+		{"quote inside comment", "SELECT ? -- don't\n", "SELECT 'x' -- don't\n"},
+		{"comment marker inside string", `SELECT '--', '/*', ?`, `SELECT '--', '/*', 'x'`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := interpolate(tc.query, []driver.NamedValue{{Ordinal: 1, Value: "x"}})
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// TestInterpolateRejectsUnterminatedConstructs pins that a bound value is
+// never spliced into SQL whose quoting the scanner could not follow.
+func TestInterpolateRejectsUnterminatedConstructs(t *testing.T) {
+	for _, q := range []string{
+		`SELECT ?, 'open`,
+		`SELECT ?, "open`,
+		`SELECT ?, /* open`,
+		`SELECT ?, /* a /* b */`,
+		`SELECT ?, $$ open`,
+		`SELECT ?, E'\'`,
+	} {
+		t.Run(q, func(t *testing.T) {
+			_, err := interpolate(q, []driver.NamedValue{{Ordinal: 1, Value: "x"}})
+			require.Error(t, err)
+		})
+	}
+}
+
+// TestInterpolateWithoutArgs covers the no-args path: quoted "?" is fine, a
+// real placeholder with nothing bound is an error, and SQL the scanner can't
+// lex passes through so DuckDB reports its own syntax error.
+func TestInterpolateWithoutArgs(t *testing.T) {
+	got, err := interpolate(`SELECT '?' AS q -- ?`, nil)
+	require.NoError(t, err)
+	require.Equal(t, `SELECT '?' AS q -- ?`, got)
+
+	_, err = interpolate(`SELECT ?`, nil)
+	require.Error(t, err)
+
+	got, err = interpolate(`SELECT 'unterminated ?`, nil)
+	require.NoError(t, err)
+	require.Equal(t, `SELECT 'unterminated ?`, got)
+}
+
+// TestInterpolateBoundValueContainingQuestionMark guards against a
+// regression where placeholders are found by rescanning the output: a bound
+// string containing "?" must not consume the next arg.
+func TestInterpolateBoundValueContainingQuestionMark(t *testing.T) {
+	got, err := interpolate(`SELECT ?, ?`, []driver.NamedValue{
+		{Ordinal: 1, Value: "a?b"},
+		{Ordinal: 2, Value: "c"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, `SELECT 'a?b', 'c'`, got)
+}
