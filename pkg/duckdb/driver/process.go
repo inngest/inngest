@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -97,7 +98,10 @@ type process struct {
 	// see Options.QuackConns.
 	quackListenURL string
 	quackToken     string
-	stdin          io.WriteCloser
+	// redactor scrubs quack tokens and catalog URIs out of bootstrap errors
+	// and subprocess diagnostics — see secretRedactor.
+	redactor *secretRedactor
+	stdin    io.WriteCloser
 	// out is the read end of the subprocess's merged stdout+stderr pipe —
 	// see spawnLocked for why they are merged.
 	out      *os.File
@@ -156,9 +160,14 @@ func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, du
 		quackAddr:  quackAddr,
 		procCtx:    procCtx,
 		procCancel: procCancel,
+		redactor:   &secretRedactor{},
 	}
 	for _, opt := range opts {
 		opt(p)
+	}
+	p.redactor.add(p.quackServeToken)
+	if duckLake != nil {
+		p.redactor.add(duckLake.PostgresCatalogURI, duckLake.QuackCatalogToken)
 	}
 
 	p.mu.Lock()
@@ -239,7 +248,9 @@ func (p *process) spawnLocked() error {
 	p.cmd = cmd
 	p.stdin = stdin
 	p.out = outR
-	p.sess = newSession(stdin, outR)
+	sess := newSession(stdin, outR)
+	sess.redactor = p.redactor
+	p.sess = sess
 	p.started = true
 	return nil
 }
@@ -328,6 +339,7 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("duckdb: generating quack auth token: %w", err)
 		}
+		p.redactor.add(token)
 	}
 	tokenLiteral, err := encodeLiteral(token)
 	if err != nil {
@@ -353,10 +365,8 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		return err
 	}
 	bootstrapStmts = append(bootstrapStmts, quackStmts...)
-	for _, stmt := range bootstrapStmts {
-		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
-			return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", stmt, err)
-		}
+	if err := p.bootstrapExecLocked(ctx, "quack", bootstrapStmts); err != nil {
+		return err
 	}
 
 	// The CLI's own "listen_url" is authoritative: with an ephemeral
@@ -364,14 +374,15 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	serveStmt := fmt.Sprintf("CALL quack_serve(%s, token = %s);", quackAddrLiteral, tokenLiteral)
 	_, rows, err := p.sess.exec(ctx, serveStmt)
 	if err != nil {
-		return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", serveStmt, err)
+		return fmt.Errorf("duckdb: quack bootstrap failed on %s: %w", stmtSummary(serveStmt), p.redactor.redactErr(err))
 	}
 	if len(rows) != 1 {
 		return fmt.Errorf("duckdb: quack_serve returned %d rows, expected 1", len(rows))
 	}
 	listenURL, ok := rows[0]["listen_url"].(string)
 	if !ok || listenURL == "" {
-		return fmt.Errorf("duckdb: quack_serve response missing listen_url (row: %v)", rows[0])
+		// Column names only: the row also carries auth_token.
+		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", mapKeys(rows[0]))
 	}
 
 	quackSess, err := newQuackSession(ctx, listenURL, token)
@@ -384,6 +395,28 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 
 	l.Info("duckdb: quack transport active", "listen_url", listenURL)
 	return nil
+}
+
+// bootstrapExecLocked assumes mu is already held. It runs one bootstrap
+// phase's statements over the current session, reporting a failure by
+// statement summary (stmtSummary) and redacted engine error rather than the
+// full statement, since bootstrap SQL carries tokens and catalog URIs inline.
+func (p *process) bootstrapExecLocked(ctx context.Context, phase string, stmts []string) error {
+	for _, stmt := range stmts {
+		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
+			return fmt.Errorf("duckdb: %s bootstrap failed on %s: %w", phase, stmtSummary(stmt), p.redactor.redactErr(err))
+		}
+	}
+	return nil
+}
+
+func mapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // openQuackConn hands out a new, independent quackSession against the same
@@ -490,12 +523,7 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 		// tolerating it.
 		fmt.Sprintf("SET extension_directories=[%s];", extLiteral),
 	}
-	for _, stmt := range stmts {
-		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
-			return fmt.Errorf("duckdb: state dir bootstrap failed on %q: %w", stmt, err)
-		}
-	}
-	return nil
+	return p.bootstrapExecLocked(ctx, "state dir", stmts)
 }
 
 // bootstrapDuckLakeLocked assumes mu is already held. It is a no-op unless the
@@ -547,12 +575,7 @@ func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: creating DuckLake data path %q: %w", opts.DataPath, err)
 	}
 
-	for _, stmt := range stmts {
-		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
-			return fmt.Errorf("duckdb: DuckLake bootstrap failed on %q: %w", stmt, err)
-		}
-	}
-	return nil
+	return p.bootstrapExecLocked(ctx, "DuckLake", stmts)
 }
 
 // duckLakeBootstrapStmts builds the SQL statement sequence
