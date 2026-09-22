@@ -11,11 +11,13 @@ const executionLimitQuery = graphql(`
         id
         name
       }
-      entitlements {
+      entitlements: ents {
         executions {
-          usage
           limit
           overageAllowed
+        }
+        usage {
+          executions
         }
       }
     }
@@ -33,8 +35,8 @@ export function useExecutionLimit(): ExecutionLimitData | null {
   const res = useGraphQLQuery({ query: executionLimitQuery, variables: {} });
   if (!res.data) return null;
 
-  const { usage, limit, overageAllowed } =
-    res.data.account.entitlements.executions;
+  const { limit, overageAllowed } = res.data.account.entitlements.executions;
+  const usage = res.data.account.entitlements.usage.executions;
   if (limit === null) return null;
 
   const isEnterprise = (res.data.account.plan?.name ?? '')
