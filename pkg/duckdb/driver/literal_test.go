@@ -139,7 +139,7 @@ func TestJSONRawMessageRoundTripsIntoVariantColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })

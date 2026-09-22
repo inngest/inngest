@@ -90,7 +90,7 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -166,7 +166,7 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -233,7 +233,7 @@ func TestQuackAppenderWritesVarcharArrayLiteralIntoRealArrayColumn(t *testing.T)
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -294,7 +294,7 @@ func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	const workers = 4
 	const rowsPerWorker = 25
 	connector, db, err := OpenConnector(t.Context(), Options{
@@ -360,7 +360,7 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	// More workers than QuackConns forces genuine connection reuse (the pool
 	// cannot open more than QuackConns connections at once), and several
 	// short-lived appenders per worker gives many acquire/release cycles a
