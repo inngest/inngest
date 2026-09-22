@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,25 +18,25 @@ import (
 // duckdb binary.
 func TestQuackQueryIntegerFamilyColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT (-5)::TINYINT AS ti, 200::UTINYINT AS uti, 300::USMALLINT AS us, "+
 			"4000000000::UINTEGER AS ui, 12345.6::FLOAT AS f;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"ti", "uti", "us", "ui", "f"}, cols)
 	require.Equal(t, []string{"TINYINT", "UTINYINT", "USMALLINT", "UINTEGER", "FLOAT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(-5), rows[0].get("ti"))
-	require.Equal(t, int64(200), rows[0].get("uti"))
-	require.Equal(t, int64(300), rows[0].get("us"))
-	require.Equal(t, int64(4000000000), rows[0].get("ui"))
-	require.InDelta(t, 12345.599609375, rows[0].get("f"), 1e-9)
+	require.Equal(t, int64(-5), rows[0].Get("ti"))
+	require.Equal(t, int64(200), rows[0].Get("uti"))
+	require.Equal(t, int64(300), rows[0].Get("us"))
+	require.Equal(t, int64(4000000000), rows[0].Get("ui"))
+	require.InDelta(t, 12345.599609375, rows[0].Get("f"), 1e-9)
 }
 
 // TestQuackQueryUBigIntColumn covers UBigInt(31): its range overflows
@@ -44,19 +45,19 @@ func TestQuackQueryIntegerFamilyColumns(t *testing.T) {
 // real binary).
 func TestQuackQueryUBigIntColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT 18000000000000000000::UBIGINT AS ub;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT 18000000000000000000::UBIGINT AS ub;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"ub"}, cols)
 	require.Equal(t, []string{"UBIGINT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "18000000000000000000", rows[0].get("ub"))
+	require.Equal(t, "18000000000000000000", rows[0].Get("ub"))
 }
 
 // TestQuackQueryHugeintColumns covers Hugeint(50) and UHugeint(49): both
@@ -66,14 +67,14 @@ func TestQuackQueryUBigIntColumn(t *testing.T) {
 // confirmed independently against a real duckdb binary.
 func TestQuackQueryHugeintColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT 170141183460469231731687303715884105727::HUGEINT AS hg_max, "+
 			"(-170141183460469231731687303715884105728)::HUGEINT AS hg_min, "+
 			"340282366920938463463374607431768211455::UHUGEINT AS uhg_max;")
@@ -81,9 +82,9 @@ func TestQuackQueryHugeintColumns(t *testing.T) {
 	require.Equal(t, []string{"hg_max", "hg_min", "uhg_max"}, cols)
 	require.Equal(t, []string{"HUGEINT", "HUGEINT", "UHUGEINT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "170141183460469231731687303715884105727", rows[0].get("hg_max"))
-	require.Equal(t, "-170141183460469231731687303715884105728", rows[0].get("hg_min"))
-	require.Equal(t, "340282366920938463463374607431768211455", rows[0].get("uhg_max"))
+	require.Equal(t, "170141183460469231731687303715884105727", rows[0].Get("hg_max"))
+	require.Equal(t, "-170141183460469231731687303715884105728", rows[0].Get("hg_min"))
+	require.Equal(t, "340282366920938463463374607431768211455", rows[0].Get("uhg_max"))
 }
 
 // TestQuackQueryDecimalColumns covers Decimal(21) across all four physical
@@ -95,14 +96,14 @@ func TestQuackQueryHugeintColumns(t *testing.T) {
 // scale-0 conventions.
 func TestQuackQueryDecimalColumns(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT 12.3::DECIMAL(4,1) AS d16, 123.400::DECIMAL(9,3) AS d32, "+
 			"(-123.456)::DECIMAL(18,3) AS d64, "+
 			"12345678901234567890.123456789::DECIMAL(38,9) AS d128, "+
@@ -111,11 +112,11 @@ func TestQuackQueryDecimalColumns(t *testing.T) {
 	require.Equal(t, []string{"d16", "d32", "d64", "d128", "d_scale0"}, cols)
 	require.Equal(t, []string{"DECIMAL(4,1)", "DECIMAL(9,3)", "DECIMAL(18,3)", "DECIMAL(38,9)", "DECIMAL(5,0)"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "12.3", rows[0].get("d16"))
-	require.Equal(t, "123.400", rows[0].get("d32"))
-	require.Equal(t, "-123.456", rows[0].get("d64"))
-	require.Equal(t, "12345678901234567890.123456789", rows[0].get("d128"))
-	require.Equal(t, "5", rows[0].get("d_scale0"))
+	require.Equal(t, "12.3", rows[0].Get("d16"))
+	require.Equal(t, "123.400", rows[0].Get("d32"))
+	require.Equal(t, "-123.456", rows[0].Get("d64"))
+	require.Equal(t, "12345678901234567890.123456789", rows[0].Get("d128"))
+	require.Equal(t, "5", rows[0].Get("d_scale0"))
 }
 
 // TestQuackQueryBlobColumn covers Blob(26): BLOB shares VARCHAR's
@@ -124,19 +125,19 @@ func TestQuackQueryDecimalColumns(t *testing.T) {
 // escaped display string.
 func TestQuackQueryBlobColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), `SELECT '\xAA\xBB\xCC'::BLOB AS b;`)
+	cols, types, rows, err := quackProc.Query(t.Context(), `SELECT '\xAA\xBB\xCC'::BLOB AS b;`)
 	require.NoError(t, err)
 	require.Equal(t, []string{"b"}, cols)
 	require.Equal(t, []string{"BLOB"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, rows[0].get("b"))
+	require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, rows[0].Get("b"))
 }
 
 // TestQuackQueryBitColumn covers Bit(36): BIT is a bitstring_t, an alias
@@ -145,21 +146,21 @@ func TestQuackQueryBlobColumn(t *testing.T) {
 // produces (bit.cpp), confirmed against a real binary.
 func TestQuackQueryBitColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT BIT '101010' AS b, BIT '1' AS b2, BIT '11111111' AS b3;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT BIT '101010' AS b, BIT '1' AS b2, BIT '11111111' AS b3;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"b", "b2", "b3"}, cols)
 	require.Equal(t, []string{"BIT", "BIT", "BIT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "101010", rows[0].get("b"))
-	require.Equal(t, "1", rows[0].get("b2"))
-	require.Equal(t, "11111111", rows[0].get("b3"))
+	require.Equal(t, "101010", rows[0].Get("b"))
+	require.Equal(t, "1", rows[0].Get("b2"))
+	require.Equal(t, "11111111", rows[0].Get("b3"))
 }
 
 // TestQuackQueryIntervalColumn covers Interval(27): a 16-byte
@@ -169,14 +170,14 @@ func TestQuackQueryBitColumn(t *testing.T) {
 // every expected string here was confirmed against a real duckdb binary.
 func TestQuackQueryIntervalColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT INTERVAL '1 year 2 months 3 days 04:05:06.789' AS a, "+
 			"INTERVAL '25 hours' AS b, "+
 			"(-INTERVAL '1 year 2 days 3 hours') AS c, "+
@@ -185,10 +186,10 @@ func TestQuackQueryIntervalColumn(t *testing.T) {
 	require.Equal(t, []string{"a", "b", "c", "d"}, cols)
 	require.Equal(t, []string{"INTERVAL", "INTERVAL", "INTERVAL", "INTERVAL"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "1 year 2 months 3 days 04:05:06.789", rows[0].get("a"))
-	require.Equal(t, "25:00:00", rows[0].get("b"))
-	require.Equal(t, "-1 year -2 days -03:00:00", rows[0].get("c"))
-	require.Equal(t, "00:00:00", rows[0].get("d"))
+	require.Equal(t, "1 year 2 months 3 days 04:05:06.789", rows[0].Get("a"))
+	require.Equal(t, "25:00:00", rows[0].Get("b"))
+	require.Equal(t, "-1 year -2 days -03:00:00", rows[0].Get("c"))
+	require.Equal(t, "00:00:00", rows[0].Get("d"))
 }
 
 // TestQuackQueryEnumColumn covers Enum(104): a small (<=255 value)
@@ -197,25 +198,25 @@ func TestQuackQueryIntervalColumn(t *testing.T) {
 // quackLogicalType.enumValues by decodeQuackLogicalType.
 func TestQuackQueryEnumColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	_, _, err = quackProc.exec(t.Context(), "CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');")
+	_, _, err = quackProc.Exec(t.Context(), "CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');")
 	require.NoError(t, err)
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT 'happy'::mood AS m, 'sad'::mood AS m2;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT 'happy'::mood AS m, 'sad'::mood AS m2;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"m", "m2"}, cols)
 	// typeName() renders ENUM's full value-list expansion (matching
 	// DuckDB's own DESCRIBE), not the CREATE TYPE alias "mood".
 	require.Equal(t, []string{"ENUM('sad', 'ok', 'happy')", "ENUM('sad', 'ok', 'happy')"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "happy", rows[0].get("m"))
-	require.Equal(t, "sad", rows[0].get("m2"))
+	require.Equal(t, "happy", rows[0].Get("m"))
+	require.Equal(t, "sad", rows[0].Get("m2"))
 }
 
 // TestQuackQueryMapColumn covers Map(102): physically (and, per this
@@ -226,21 +227,21 @@ func TestQuackQueryEnumColumn(t *testing.T) {
 // reuse actually works against a real subprocess.
 func TestQuackQueryMapColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT MAP {'a': 1, 'b': 2} AS m;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT MAP {'a': 1, 'b': 2} AS m;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"m"}, cols)
 	require.Equal(t, []string{"MAP(VARCHAR, INTEGER)"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0].get("m").([]any)
-	require.True(t, ok, "expected a []any, got %T", rows[0].get("m"))
+	got, ok := rows[0].Get("m").([]any)
+	require.True(t, ok, "expected a []any, got %T", rows[0].Get("m"))
 	want := []any{
 		map[string]any{"key": "a", "value": int64(1)},
 		map[string]any{"key": "b", "value": int64(2)},
@@ -257,19 +258,19 @@ func TestQuackQueryMapColumn(t *testing.T) {
 // that one child vector.
 func TestQuackQueryArrayColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(), "SELECT [1,2,3]::INTEGER[3] AS a;")
+	cols, types, rows, err := quackProc.Query(t.Context(), "SELECT [1,2,3]::INTEGER[3] AS a;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"a"}, cols)
 	require.Equal(t, []string{"INTEGER[3]"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, []any{int64(1), int64(2), int64(3)}, rows[0].get("a"))
+	require.Equal(t, []any{int64(1), int64(2), int64(3)}, rows[0].Get("a"))
 }
 
 // TestQuackQueryArrayColumnEdgeCases covers the cases that broke the first
@@ -280,24 +281,24 @@ func TestQuackQueryArrayColumn(t *testing.T) {
 // "count" is the outer array's flattened element total rather than 1.
 func TestQuackQueryArrayColumnEdgeCases(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT NULL::INTEGER[3] AS null_arr, [[1,2],[3,4]]::INTEGER[2][2] AS nested;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"null_arr", "nested"}, cols)
 	require.Equal(t, []string{"INTEGER[3]", "INTEGER[2][2]"}, types)
 	require.Len(t, rows, 1)
-	require.Nil(t, rows[0].get("null_arr"))
+	require.Nil(t, rows[0].Get("null_arr"))
 	require.Equal(t, []any{
 		[]any{int64(1), int64(2)},
 		[]any{int64(3), int64(4)},
-	}, rows[0].get("nested"))
+	}, rows[0].Get("nested"))
 }
 
 // TestQuackQueryUnionColumn covers Union(107): physically PhysicalType::
@@ -310,23 +311,23 @@ func TestQuackQueryArrayColumnEdgeCases(t *testing.T) {
 // as {"a": 1}, not the full struct).
 func TestQuackQueryUnionColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT union_value(a := 1) AS u, union_value(b := 'hi') AS u2, "+
 			"NULL::UNION(a INTEGER, b VARCHAR) AS u3;")
 	require.NoError(t, err)
 	require.Equal(t, []string{"u", "u2", "u3"}, cols)
 	require.Equal(t, []string{"UNION(a INTEGER)", "UNION(b VARCHAR)", "UNION(a INTEGER, b VARCHAR)"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": int64(1)}, rows[0].get("u"))
-	require.Equal(t, map[string]any{"b": "hi"}, rows[0].get("u2"))
-	require.Nil(t, rows[0].get("u3"))
+	require.Equal(t, map[string]any{"a": int64(1)}, rows[0].Get("u"))
+	require.Equal(t, map[string]any{"b": "hi"}, rows[0].Get("u2"))
+	require.Nil(t, rows[0].Get("u3"))
 }
 
 // TestQuackQueryVariantColumn covers Variant(109): physically PhysicalType::
@@ -340,14 +341,14 @@ func TestQuackQueryUnionColumn(t *testing.T) {
 // VARCHAR-aliased-as-JSON columns already have.
 func TestQuackQueryVariantColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		`SELECT '{"a": 1, "b": [1, 2, 3], "c": null, "d": "hi", "e": 3.14, "f": true, `+
 			`"g": {"nested": [4, 5]}, "empty_obj": {}, "empty_arr": [], `+
 			`"arr_of_obj": [{"x": 1}, {"y": 2}]}'::JSON::VARIANT AS v, NULL::VARIANT AS v_null;`)
@@ -366,8 +367,8 @@ func TestQuackQueryVariantColumn(t *testing.T) {
 		"empty_obj":  map[string]any{},
 		"empty_arr":  []any{},
 		"arr_of_obj": []any{map[string]any{"x": int64(1)}, map[string]any{"y": int64(2)}},
-	}, rows[0].get("v"))
-	require.Nil(t, rows[0].get("v_null"))
+	}, rows[0].Get("v"))
+	require.Nil(t, rows[0].Get("v_null"))
 }
 
 // TestQuackQueryVariantColumnScalarLeafTypes covers the non-JSON-producible
@@ -377,14 +378,14 @@ func TestQuackQueryVariantColumn(t *testing.T) {
 // INTERVAL.
 func TestQuackQueryVariantColumnScalarLeafTypes(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	cols, types, rows, err := quackProc.query(t.Context(),
+	cols, types, rows, err := quackProc.Query(t.Context(),
 		"SELECT 18000000000000000000::UBIGINT::VARIANT AS ub, "+
 			"170141183460469231731687303715884105727::HUGEINT::VARIANT AS hg, "+
 			"12.345::DECIMAL(5,3)::VARIANT AS dec, "+
@@ -398,15 +399,15 @@ func TestQuackQueryVariantColumnScalarLeafTypes(t *testing.T) {
 		require.Equal(t, "VARIANT", ty)
 	}
 	require.Len(t, rows, 1)
-	require.Equal(t, "18000000000000000000", rows[0].get("ub"))
-	require.Equal(t, "170141183460469231731687303715884105727", rows[0].get("hg"))
-	require.Equal(t, "12.345", rows[0].get("dec"))
-	require.Equal(t, "not-a-real-uuid-000000000000", rows[0].get("not_uuid"))
-	d, ok := rows[0].get("d").(time.Time)
-	require.True(t, ok, "DATE-typed VARIANT leaf should decode to time.Time, got %T", rows[0].get("d"))
+	require.Equal(t, "18000000000000000000", rows[0].Get("ub"))
+	require.Equal(t, "170141183460469231731687303715884105727", rows[0].Get("hg"))
+	require.Equal(t, "12.345", rows[0].Get("dec"))
+	require.Equal(t, "not-a-real-uuid-000000000000", rows[0].Get("not_uuid"))
+	d, ok := rows[0].Get("d").(time.Time)
+	require.True(t, ok, "DATE-typed VARIANT leaf should decode to time.Time, got %T", rows[0].Get("d"))
 	require.Equal(t, "2024-03-15", d.Format("2006-01-02"))
-	ts, ok := rows[0].get("ts").(time.Time)
-	require.True(t, ok, "TIMESTAMP-typed VARIANT leaf should decode to time.Time, got %T", rows[0].get("ts"))
+	ts, ok := rows[0].Get("ts").(time.Time)
+	require.True(t, ok, "TIMESTAMP-typed VARIANT leaf should decode to time.Time, got %T", rows[0].Get("ts"))
 	require.Equal(t, "2024-03-15T10:30:00Z", ts.Format(time.RFC3339))
-	require.Equal(t, "1 year 2 months 3 days", rows[0].get("iv"))
+	require.Equal(t, "1 year 2 months 3 days", rows[0].Get("iv"))
 }

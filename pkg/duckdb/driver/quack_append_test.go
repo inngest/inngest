@@ -8,74 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/stretchr/testify/require"
 )
-
-// TestQuackEncodeUUIDMatchesPinnedWireBytes reuses the exact wire-byte pair
-// quack_protocol_test.go's TestQuackDecodeChunkUUIDDecodesToStandardString
-// already pins (confirmed against a real duckdb subprocess), proving
-// quackEncodeUUID is the true inverse of the decode side's transform rather
-// than just self-consistent.
-func TestQuackEncodeUUIDMatchesPinnedWireBytes(t *testing.T) {
-	want := []byte{137, 103, 245, 228, 211, 194, 177, 160, 137, 71, 246, 229, 212, 195, 178, 33}
-	id := uuid.MustParse("a1b2c3d4-e5f6-4789-a0b1-c2d3e4f56789")
-
-	got := quackEncodeUUID(id)
-	require.Equal(t, want, got[:])
-}
-
-// TestQuackEncodeDataChunkDecodesBackToOriginalValues round-trips a
-// multi-column, multi-row chunk (every QuackColumnKind, plus a NULL in each
-// column) purely through this client's own encode/decode pair — no
-// subprocess needed, since the wire format is symmetric and the decode side
-// is already verified against a real duckdb subprocess elsewhere
-// (quack_protocol_test.go).
-func TestQuackEncodeDataChunkDecodesBackToOriginalValues(t *testing.T) {
-	id1 := uuid.New()
-	id2 := uuid.New()
-	ts1 := time.UnixMilli(1_700_000_000_123).UTC()
-	ts2 := time.UnixMilli(1_800_000_000_456).UTC()
-
-	cols := []QuackColumnKind{QuackColumnUUID, QuackColumnVarchar, QuackColumnJSON, QuackColumnTimestampMS}
-	rows := [][]any{
-		{id1.String(), "span-a", `{"k":"v","n":1}`, ts1},
-		{nil, nil, nil, nil},
-		{id2.String(), "span-b", `{"arr":[1,2,3]}`, ts2},
-	}
-
-	chunk, err := encodeQuackDataChunk(cols, rows)
-	require.NoError(t, err)
-
-	r := newQuackReader(chunk)
-	c, err := decodeQuackDataChunk(r)
-	require.NoError(t, err)
-	require.Equal(t, 3, c.rowCount)
-	require.Len(t, c.columns, 4)
-
-	uuidVals, err := c.columns[0].values()
-	require.NoError(t, err)
-	require.Equal(t, []any{id1.String(), nil, id2.String()}, uuidVals)
-
-	varcharVals, err := c.columns[1].values()
-	require.NoError(t, err)
-	require.Equal(t, []any{"span-a", nil, "span-b"}, varcharVals)
-
-	require.Equal(t, "JSON", c.columns[2].alias)
-	jsonVals, err := c.columns[2].values()
-	require.NoError(t, err)
-	require.Equal(t, []any{
-		map[string]any{"k": "v", "n": float64(1)},
-		nil,
-		map[string]any{"arr": []any{float64(1), float64(2), float64(3)}},
-	}, jsonVals)
-
-	tsVals, err := c.columns[3].values()
-	require.NoError(t, err)
-	require.Len(t, tsVals, 3)
-	require.True(t, ts1.Equal(tsVals[0].(time.Time)))
-	require.Nil(t, tsVals[1])
-	require.True(t, ts2.Equal(tsVals[2].(time.Time)))
-}
 
 // TestQuackAppenderWritesRowsIntoRealTable is the load-bearing check: it
 // drives NewQuackAppender/AppendRow/Close against a real duckdb subprocess
@@ -83,11 +19,11 @@ func TestQuackEncodeDataChunkDecodesBackToOriginalValues(t *testing.T) {
 // PrepareRequest exec path (SELECT) to prove AppendRequest's wire shape —
 // including the field3 append_chunk presence-byte-then-object encoding this
 // client's own protocol source didn't make certain in isolation (see
-// quack_append.go's package doc comment) — is actually accepted by a real
+// internal/quack/append.go's doc comment) — is actually accepted by a real
 // duckdb-quack server, not just self-consistent with this client's decoder.
 func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -145,7 +81,7 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 
 // TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows pins a real,
 // production-scale failure this client's SEND_DATA_REQUEST path (see
-// quack_senddata.go) hit and fixed: unlike v1.5's standalone AppendRequest,
+// internal/quack/senddata.go) hit and fixed: unlike v1.5's standalone AppendRequest,
 // which accepted one arbitrarily large DataChunk with no apparent row-count
 // ceiling, a SEND_DATA_REQUEST's chunks flow through DuckDB's ordinary
 // execution engine (scan_data_from_quack_client feeds a real pipeline),
@@ -157,13 +93,13 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 // trying to set size to N for vector with capacity 2048" inside
 // CastVarcharToJSON, specifically on the JSON-aliased column this test also
 // exercises. rowsToQuackChunks splits a large buffer into
-// quackStandardVectorSize-capped chunks within the one batch instead — this
-// test flushes more than 2*quackStandardVectorSize rows in a single Flush
+// quack.StandardVectorSize-capped chunks within the one batch instead — this
+// test flushes more than 2*quack.StandardVectorSize rows in a single Flush
 // call to prove that split actually holds up against a real server, not
 // just self-consistently in this client's own encoder/decoder.
 func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -187,7 +123,7 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 		[]QuackColumnKind{QuackColumnVarchar, QuackColumnJSON})
 	require.NoError(t, err)
 
-	const wantRows = 2*quackStandardVectorSize + 500
+	const wantRows = 2*quack.StandardVectorSize + 500
 	for i := range wantRows {
 		require.NoError(t, appender.AppendRow(fmt.Sprintf("row-%d", i), fmt.Sprintf(`{"i":%d}`, i)))
 	}
@@ -230,7 +166,7 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 // entirely.
 func TestQuackAppenderWritesVarcharArrayLiteralIntoRealArrayColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -286,12 +222,12 @@ func TestQuackAppenderWritesVarcharArrayLiteralIntoRealArrayColumn(t *testing.T)
 // OpenConnector's *Connector, called repeatedly for its own raw connections
 // (bypassing *sql.DB's pool — see OpenConnector and
 // NewQuackAppenderFromConn's doc comments), each backed by an independent
-// quackSession that appends concurrently with the others into the same
+// quack.Session that appends concurrently with the others into the same
 // table without any row landing more than once, and without any two
 // workers ending up sharing a connection.
 func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -357,7 +293,7 @@ func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 // constructor to prove that can no longer happen.
 func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr

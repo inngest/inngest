@@ -67,20 +67,20 @@ func TestDuckLakePostgresCatalogAttaches(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _, _ = p.exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS inngest.%s;", table))
+		_, _, _ = p.Exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS inngest.%s;", table))
 		_ = p.close(context.Background())
 	})
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER);", table))
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("INSERT INTO inngest.%s VALUES (1);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("INSERT INTO inngest.%s VALUES (1);", table))
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
+	_, rows, err := p.Exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].get("c"))
+	require.Equal(t, float64(1), rows[0].Get("c"))
 }
 
 // TestDuckLakePostgresCatalogInliningStaysOffWithJSONColumn is the live
@@ -107,20 +107,20 @@ func TestDuckLakePostgresCatalogInliningStaysOffWithJSONColumn(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _, _ = p.exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS inngest.%s;", table))
+		_, _, _ = p.Exec(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS inngest.%s;", table))
 		_ = p.close(context.Background())
 	})
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER, data JSON);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER, data JSON);", table))
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf(`INSERT INTO inngest.%s VALUES (1, '{"a": 1}');`, table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf(`INSERT INTO inngest.%s VALUES (1, '{"a": 1}');`, table))
 	require.NoError(t, err, "a JSON-column insert must not fail against a postgres catalog (ducklake#1175)")
 
-	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = '%s';", table))
+	_, rows, err := p.Exec(t.Context(), fmt.Sprintf("SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = '%s';", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Greater(t, rows[0].get("file_count"), float64(0), "inlining must be forced off for a postgres catalog, so even one small insert should flush to Parquet")
+	require.Greater(t, rows[0].Get("file_count"), float64(0), "inlining must be forced off for a postgres catalog, so even one small insert should flush to Parquet")
 }
 
 // TestOpenWithDuckLakePostgresCatalog exercises the Postgres catalog mode

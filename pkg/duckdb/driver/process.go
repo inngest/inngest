@@ -17,6 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/jsonlines"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
@@ -85,9 +88,9 @@ type process struct {
 	mu  sync.Mutex
 	cmd *exec.Cmd
 	// sess is the currently active sqlExecer: the jsonlines session
-	// (rows.go) spawnLocked always creates first, or — once
+	// (internal/jsonlines) spawnLocked always creates first, or — once
 	// startQuackLocked's bootstrap succeeds, when quackAddr is set — the
-	// quackSession it swaps in. Every exec/healthCheck call after that swap
+	// quack.Session it swaps in. Every exec/healthCheck call after that swap
 	// goes over quack instead; the jsonlines pipe stays open (never
 	// written to again) purely so the CLI doesn't exit, since closing stdin
 	// would kill the quack listener along with the rest of the process.
@@ -253,8 +256,8 @@ func (p *process) spawnLocked() error {
 	p.cmd = cmd
 	p.stdin = stdin
 	p.out = outR
-	sess := newSession(stdin, outR)
-	sess.redactor = p.redactor
+	sess := jsonlines.NewSession(stdin, outR)
+	sess.Redact = p.redactor.redact
 	p.sess = sess
 	p.started = true
 	return nil
@@ -262,7 +265,7 @@ func (p *process) spawnLocked() error {
 
 // healthCheckLocked assumes mu is already held.
 func (p *process) healthCheckLocked(ctx context.Context) error {
-	_, rows, err := p.sess.exec(ctx, "SELECT 1 AS ok;")
+	_, rows, err := p.sess.Exec(ctx, "SELECT 1 AS ok;")
 	if err != nil {
 		return fmt.Errorf("duckdb: health check failed: %w", err)
 	}
@@ -318,7 +321,7 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 // startQuackLocked bootstraps a quack listener inside the freshly spawned
 // subprocess over the jsonlines control channel (p.sess, still the jsonlines
 // session at this point — see spawnLocked), then swaps p.sess to a
-// quackSession pointed at the listener so every subsequent exec/healthCheck
+// quack.Session pointed at the listener so every subsequent exec/healthCheck
 // call goes over quack instead. It is a no-op unless the caller opted into
 // quack (Options.QuackAddr).
 //
@@ -377,20 +380,20 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	// The CLI's own "listen_url" is authoritative: with an ephemeral
 	// QuackAddr (port 0) it carries the port the kernel actually assigned.
 	serveStmt := fmt.Sprintf("CALL quack_serve(%s, token = %s);", quackAddrLiteral, tokenLiteral)
-	_, rows, err := p.sess.exec(ctx, serveStmt)
+	_, rows, err := p.sess.Exec(ctx, serveStmt)
 	if err != nil {
 		return fmt.Errorf("duckdb: quack bootstrap failed on %s: %w", stmtSummary(serveStmt), p.redactor.redactErr(err))
 	}
 	if len(rows) != 1 {
 		return fmt.Errorf("duckdb: quack_serve returned %d rows, expected 1", len(rows))
 	}
-	listenURL, ok := rows[0].get("listen_url").(string)
+	listenURL, ok := rows[0].Get("listen_url").(string)
 	if !ok || listenURL == "" {
 		// Column names only: the row also carries auth_token.
-		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", rows[0].names())
+		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", rows[0].Names())
 	}
 
-	quackSess, err := newQuackSession(ctx, listenURL, token)
+	quackSess, err := quack.NewSession(ctx, listenURL, token)
 	if err != nil {
 		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
 	}
@@ -401,7 +404,7 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	l.Info("duckdb: quack transport active",
 		"transport", "quack",
 		"listen_url", listenURL,
-		"connection_id", quackSess.connectionID,
+		"connection_id", quackSess.ConnectionID(),
 		"generation", p.quackGen,
 	)
 	return nil
@@ -413,7 +416,7 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 // full statement, since bootstrap SQL carries tokens and catalog URIs inline.
 func (p *process) bootstrapExecLocked(ctx context.Context, phase string, stmts []string) error {
 	for _, stmt := range stmts {
-		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
+		if _, _, err := p.sess.Exec(ctx, stmt); err != nil {
 			return fmt.Errorf("duckdb: %s bootstrap failed on %s: %w", phase, stmtSummary(stmt), p.redactor.redactErr(err))
 		}
 	}
@@ -485,16 +488,16 @@ func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) err
 
 // currentQuackSession returns the primary connection's current transport if
 // it's quack, for callers (quack_append.go's NewQuackAppender) that need the
-// real *quackSession rather than the sqlExecer interface — AppendRequest has
+// real *quack.Session rather than the sqlExecer interface — AppendRequest has
 // no jsonlines equivalent, so there's nothing to abstract over. Like
 // openQuackConn, this bypasses p.exec's restart-on-crash handling: a crash
 // mid-append surfaces as a plain error, not a transparent retry. Returns an
 // error if the primary connection is still jsonlines (Options.QuackAddr
 // unset, or the quack bootstrap hasn't swapped p.sess yet).
-func (p *process) currentQuackSession() (*quackSession, error) {
+func (p *process) currentQuackSession() (*quack.Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	sess, ok := p.sess.(*quackSession)
+	sess, ok := p.sess.(*quack.Session)
 	if !ok {
 		return nil, fmt.Errorf("duckdb: quack appender requires a quack-transport connection (Options.QuackAddr)")
 	}
@@ -583,7 +586,7 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 // they neither add phantom rows to session.exec's result nor emit anything that
 // reportDiagnostics could misclassify as an error. Failures do print the usual
 // "<Kind> Error: " diagnostics, which session.exec turns into
-// errStatementFailed — surfaced here as a real error, never swallowed.
+// result.ErrStatementFailed — surfaced here as a real error, never swallowed.
 //
 // IF NOT EXISTS makes the ATTACH idempotent so a re-bootstrap of a session
 // that already has the catalog is harmless rather than a hard Binder Error.
@@ -838,10 +841,10 @@ func (p *process) restart(ctx context.Context) error {
 	return p.restartLocked(ctx)
 }
 
-// exec is the entry point conn.go's ExecContext calls to run a statement
+// Exec is the entry point conn.go's ExecContext calls to run a statement
 // against the supervised subprocess. See runWithRestartLocked for the
 // crash/restart classification shared with query below.
-func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error) {
+func (p *process) Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -851,7 +854,7 @@ func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows
 
 	runErr := p.runWithRestartLocked(ctx, func() error {
 		var e error
-		cols, rows, e = p.sess.exec(ctx, sqlText)
+		cols, rows, e = p.sess.Exec(ctx, sqlText)
 		return e
 	})
 	if runErr != nil {
@@ -860,11 +863,11 @@ func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows
 	return cols, rows, nil
 }
 
-// query is exec's counterpart for conn.go's QueryContext, additionally
+// Query is exec's counterpart for conn.go's QueryContext, additionally
 // carrying the result's column types through — see sqlExecer's doc comment
-// (conn.go) and rows.go's session.query / quack_session.go's
-// quackSession.query for what each transport does to produce them.
-func (p *process) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error) {
+// (conn.go) and internal/jsonlines' Session.Query / internal/quack's
+// Session.Query for what each transport does to produce them.
+func (p *process) Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -874,7 +877,7 @@ func (p *process) query(ctx context.Context, sqlText string) (cols []string, typ
 
 	runErr := p.runWithRestartLocked(ctx, func() error {
 		var e error
-		cols, types, rows, e = p.sess.query(ctx, sqlText)
+		cols, types, rows, e = p.sess.Query(ctx, sqlText)
 		return e
 	})
 	if runErr != nil {
@@ -887,12 +890,12 @@ func (p *process) query(ctx context.Context, sqlText string) (cols []string, typ
 // runs fn once and classifies whatever it returns into the three cases that
 // need different handling:
 //
-//   - errStatementFailed: DuckDB rejected the statement (constraint, type, or
+//   - result.ErrStatementFailed: DuckDB rejected the statement (constraint, type, or
 //     schema error). The subprocess is fine; return the error as-is. Session
 //     errors used to be assumed to be transport-only, which is why these were
 //     invisible before session.exec learned to correlate the subprocess's
 //     stderr with the statement in flight (see rows.go).
-//   - errSessionDesynced: the caller's ctx was cancelled mid-statement, so
+//   - result.ErrSessionDesynced: the caller's ctx was cancelled mid-statement, so
 //     the session can no longer trust its own framing. Respawn to resync,
 //     but do not retry under a context that is already done.
 //   - anything else: the pipe broke or the subprocess died. Attempt exactly
@@ -914,25 +917,25 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 	// A statement DuckDB itself rejected is not a transport failure: the
 	// subprocess is healthy and an identical retry would fail identically,
 	// so surface it to the caller untouched.
-	if errors.Is(err, errStatementFailed) {
+	if errors.Is(err, result.ErrStatementFailed) {
 		return err
 	}
 
 	// A session left mid-statement-desynced (jsonlines only — see
-	// errSessionDesynced's doc comment) can never be trusted again no
+	// result.ErrSessionDesynced's doc comment) can never be trusted again no
 	// matter what ctx says: the subprocess's own stdout stream still has
 	// the abandoned statement's output queued on it, which would
 	// misattribute to whatever statement runs next unless the whole
 	// subprocess respawns. Everything below this assumes err does NOT wrap
-	// errSessionDesynced.
-	if !errors.Is(err, errSessionDesynced) && ctx.Err() != nil {
+	// result.ErrSessionDesynced.
+	if !errors.Is(err, result.ErrSessionDesynced) && ctx.Err() != nil {
 		// The caller's own context ended (cancelled or timed out), and the
 		// transport in use doesn't leave anything behind that needs fixing
 		// for that: quack's HTTP transport is a self-contained request per
 		// statement, so an aborted request doesn't desync anything for a
 		// later request on this same connection, or for any other caller
 		// sharing it — verified empirically (a fresh query on the same
-		// connection succeeds in ~1ms after an abort). quackSession.query's
+		// connection succeeds in ~1ms after an abort). quack.Session.Query's
 		// own watchForCancel already sent the server a real CancelRequest
 		// for this statement the moment ctx ended (verified empirically to
 		// actually stop the abandoned query's CPU usage server-side, not
@@ -971,11 +974,11 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 // permanently disabling the process if the one restart attempt fails.
 func (p *process) restartAfterFailureLocked(ctx context.Context, err error) error {
 	transport := "jsonlines"
-	if _, ok := p.sess.(*quackSession); ok {
+	if _, ok := p.sess.(*quack.Session); ok {
 		transport = "quack"
 	}
 	l := logger.StdlibLogger(ctx).With("transport", transport, "generation", p.quackGen)
-	if errors.Is(err, errSessionDesynced) {
+	if errors.Is(err, result.ErrSessionDesynced) {
 		l.Warn("duckdb: session desynced by a cancelled context; respawning subprocess to resync", "error", err)
 	} else {
 		l.Warn("duckdb: subprocess crashed; attempting one restart", "error", err)
@@ -1008,11 +1011,11 @@ func (p *process) closeLocked(ctx context.Context) error {
 
 	// Retire the jsonlines session's reader goroutine first so it can never
 	// block handing a line to an exec that will never run again. A
-	// quackSession (see startQuackLocked) has no such goroutine — it's a
+	// quack.Session (see startQuackLocked) has no such goroutine — it's a
 	// plain HTTP client — so this is a no-op once the transport has been
 	// swapped.
-	if closer, ok := p.sess.(interface{ close() }); ok {
-		closer.close()
+	if closer, ok := p.sess.(interface{ Close() }); ok {
+		closer.Close()
 	}
 
 	_ = p.stdin.Close()
@@ -1337,7 +1340,7 @@ func (c *Connector) Close() error {
 //
 // If opts.QuackConns > 1, that constraint is relaxed instead:
 // SetMaxOpenConns(opts.QuackConns) allows database/sql's pool to open that
-// many connections, each beyond the first served by its own quackSession
+// many connections, each beyond the first served by its own quack.Session
 // (see Connector.Connect and process.openQuackConn) — opts.QuackAddr must
 // be set in that case, or Open returns an error before spawning anything.
 func Open(ctx context.Context, opts Options) (*sql.DB, error) {
@@ -1351,7 +1354,7 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 // connection per parallel worker, say, rather than one checked out and
 // returned per statement — can call Connector.Connect directly for each
 // one, bypassing the pool entirely (each call, beyond the first, opens an
-// independent quackSession — see Connector.Connect and
+// independent quack.Session — see Connector.Connect and
 // process.openQuackConn — so this is only useful once opts.QuackConns > 1).
 func OpenConnector(ctx context.Context, opts Options) (*Connector, *sql.DB, error) {
 	if opts.QuackConns > 1 && opts.QuackAddr == nil {
