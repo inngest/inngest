@@ -1,8 +1,7 @@
 // Command duckdbseed seeds a DuckDB dual-write database
 // (inngest.runs/run_trace_spans/events/run_metadata, per
-// pkg/db/duckdb/migrations/000001_baseline.sql and
-// 000003_run_metadata.sql) with synthetic test data shaped after a real dev
-// database, for exercising pkg/cqrs/duckdbquery and the trace UI without
+// pkg/db/duckdb/migrations/000001_baseline.sql) with synthetic test data shaped after a real dev
+// database, for exercising pkg/duckdb/query and the trace UI without
 // running real workloads through `inngest dev`.
 //
 // It writes via pkg/db/duckdb's quack Appender (driver.QuackAppender) over
@@ -238,7 +237,7 @@ func progressLogger(logf func(format string, args ...any)) func(batchIndex, tota
 // DuckLake attached under driver.DuckLakeAlias, quack always enabled (this
 // tool's Appender-based writes require it — see insert.go), and the schema
 // migrated (driver.Migrate — the real dual-write migrations, not a local
-// copy), mirroring pkg/devserver/dualwrite.go's setupDualWrite layout
+// copy), mirroring pkg/devserver/duckdb.go's setupDualWrite layout
 // (<dir>/main.duckdb, <dir>/catalog.duckdb, <dir>/data/) so this tool reads
 // and writes the same catalog `inngest dev --duckdb` does.
 //
