@@ -52,8 +52,8 @@ func TestRunSamplesFromSourceWithoutModifyingIt(t *testing.T) {
 	seedConnector, seedDB, err := openDuckDB(t.Context(), sourceDir, 1)
 	require.NoError(t, err)
 	_, err = seedDB.ExecContext(t.Context(),
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, app_id, function_id, status, inputs)
-		 VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'run-1', now(), '33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 'Completed', '{}');`,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
+		 VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'run-1', now(), '33333333-3333-3333-3333-333333333333', 'my-app', '44444444-4444-4444-4444-444444444444', 'my-app-my-function', 'Completed', '{}', '{}');`,
 	)
 	require.NoError(t, err)
 	require.NoError(t, seedDB.Close())

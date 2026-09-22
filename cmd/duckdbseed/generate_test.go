@@ -13,10 +13,12 @@ func testTemplates() Templates {
 	return Templates{
 		Tenants: []Tenant{
 			{
-				AccountID:  uuid.New(),
-				EnvID:      uuid.New(),
-				AppID:      uuid.New(),
-				FunctionID: uuid.New(),
+				AccountID:    uuid.New(),
+				EnvID:        uuid.New(),
+				AppID:        uuid.New(),
+				AppName:      "my-app",
+				FunctionID:   uuid.New(),
+				FunctionSlug: "my-app-my-function",
 			},
 		},
 		Statuses: []string{"Completed", "Failed"},
@@ -113,6 +115,14 @@ func TestGenerateRunsUsesATenantFromTemplates(t *testing.T) {
 	require.Equal(t, want.EnvID, run.EnvID)
 	require.Equal(t, want.AppID, run.AppID)
 	require.Equal(t, want.FunctionID, run.FunctionID)
+	require.Equal(t, want.AppName, run.AppName)
+	require.Equal(t, want.FunctionSlug, run.FunctionSlug)
+	// runs.attributes mirrors the root span's, as dual-write's materializeRuns does.
+	require.Equal(t, `{"sys.step.name":"my-function"}`, run.Attributes)
+	for _, s := range generated[0].Spans {
+		require.Equal(t, want.AppName, s.AppName)
+		require.Equal(t, want.FunctionSlug, s.FunctionSlug)
+	}
 }
 
 func TestGenerateRunsKeepsQueuedAtWithinWindow(t *testing.T) {
