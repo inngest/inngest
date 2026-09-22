@@ -17,17 +17,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-// syncLifecycleCloser is satisfied by dual-write listeners that own
-// background goroutines/resources needing explicit shutdown — in practice,
-// the value setupDualWrite returns always satisfies this (see
-// tracing.Closer). Declared locally (rather than referencing
-// tracing.Closer directly) so callers holding only an
-// execution.SyncLifecycleListener can type-assert without every caller
-// needing to import tracing.
-type syncLifecycleCloser interface {
-	Close(ctx context.Context) error
-}
-
 // dualWriteQuackConns is the *sql.DB connection cap setupDualWrite opens
 // with (driver.Options.QuackConns), shared by dual-write's own writes and
 // every caller reading through the same handle (Insights, and
@@ -219,7 +208,7 @@ func stopDualWrite(ctx context.Context, l execution.SyncLifecycleListener) {
 	if l == nil {
 		return
 	}
-	c, ok := l.(syncLifecycleCloser)
+	c, ok := l.(tracing.Closer)
 	if !ok {
 		return
 	}
