@@ -33,7 +33,7 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, want, jsonlinesCols)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -74,7 +74,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	require.Equal(t, wantTypes, jsonlinesTypes)
 	require.Empty(t, jsonlinesRows, "query matches zero rows")
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })

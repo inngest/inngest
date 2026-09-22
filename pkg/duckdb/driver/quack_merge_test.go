@@ -22,7 +22,7 @@ func TestQuackMergeAppenderMergesRowsIntoRealTable(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -83,7 +83,7 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -136,7 +136,7 @@ func TestQuackMergeAppenderOmitsUpdateWhenUpdateSetEmpty(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -196,7 +196,7 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
@@ -297,7 +297,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	requireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	const quackConns = 4
 	const workers = 20
 	const appendersPerWorker = 5
