@@ -3,12 +3,15 @@ package driver
 import (
 	"testing"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/jsonlines"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/stretchr/testify/require"
 )
 
 // TestQuackAndJSONLinesReportTheSameColumnOrder runs the identical query
 // through both sqlExecer transports (jsonlines' *session and quack's
-// *quackSession, both reached via *process so restart/health-check plumbing
+// *quack.Session, both reached via *process so restart/health-check plumbing
 // is exercised too) and requires them to report the same column order — and
 // for that order to match the query's own left-to-right column list, not
 // whatever order the two transports' underlying map types happen to iterate
@@ -18,7 +21,7 @@ import (
 // wire.
 func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	const query = "SELECT 1 AS zebra, 2 AS apple, 3 AS mango;"
 	want := []string{"zebra", "apple", "mango"}
@@ -26,10 +29,10 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	jsonlinesProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = jsonlinesProc.close(t.Context()) })
-	_, isJSONLines := jsonlinesProc.sess.(*session)
+	_, isJSONLines := jsonlinesProc.sess.(*jsonlines.Session)
 	require.True(t, isJSONLines, "expected jsonlines transport when QuackAddr is unset")
 
-	jsonlinesCols, _, err := jsonlinesProc.exec(t.Context(), query)
+	jsonlinesCols, _, err := jsonlinesProc.Exec(t.Context(), query)
 	require.NoError(t, err)
 	require.Equal(t, want, jsonlinesCols)
 
@@ -37,10 +40,10 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
-	_, isQuack := quackProc.sess.(*quackSession)
+	_, isQuack := quackProc.sess.(*quack.Session)
 	require.True(t, isQuack, "expected quack transport once bootstrapped")
 
-	quackCols, _, err := quackProc.exec(t.Context(), query)
+	quackCols, _, err := quackProc.Exec(t.Context(), query)
 	require.NoError(t, err)
 	require.Equal(t, want, quackCols)
 
@@ -55,7 +58,7 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 // transports identically.
 func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	// CURRENT_TIMESTAMP is TIMESTAMP WITH TIME ZONE in DuckDB, not the plain
 	// microsecond TIMESTAMP a literal `TIMESTAMP '...'` would produce —
@@ -68,7 +71,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = jsonlinesProc.close(t.Context()) })
 
-	jsonlinesCols, jsonlinesTypes, jsonlinesRows, err := jsonlinesProc.query(t.Context(), query)
+	jsonlinesCols, jsonlinesTypes, jsonlinesRows, err := jsonlinesProc.Query(t.Context(), query)
 	require.NoError(t, err)
 	require.Equal(t, wantCols, jsonlinesCols)
 	require.Equal(t, wantTypes, jsonlinesTypes)
@@ -79,7 +82,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 
-	quackCols, quackTypes, quackRows, err := quackProc.query(t.Context(), query)
+	quackCols, quackTypes, quackRows, err := quackProc.Query(t.Context(), query)
 	require.NoError(t, err)
 	require.Equal(t, wantCols, quackCols)
 	require.Equal(t, wantTypes, quackTypes)
@@ -92,7 +95,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 // SELECT r.account_id, e.account_id ....
 func TestRepeatedColumnNamesKeepEveryValue(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	const query = "SELECT 1 AS x, 'two' AS x, 3 AS y;"
 

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +21,7 @@ import (
 // UPDATE and WHEN NOT MATCHED INSERT actually ran against a real server.
 func TestQuackMergeAppenderMergesRowsIntoRealTable(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -80,7 +82,7 @@ func TestQuackMergeAppenderMergesRowsIntoRealTable(t *testing.T) {
 // real server too, not just the INSERT path already covered there.
 func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -107,7 +109,7 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	const wantRows = 2*quackStandardVectorSize + 500
+	const wantRows = 2*quack.StandardVectorSize + 500
 	for i := range wantRows {
 		require.NoError(t, appender.AppendRow(fmt.Sprintf("row-%d", i), fmt.Sprintf("v-%d", i)))
 	}
@@ -133,7 +135,7 @@ func TestQuackMergeAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 // UPDATE SET list outright.
 func TestQuackMergeAppenderOmitsUpdateWhenUpdateSetEmpty(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -193,7 +195,7 @@ func TestQuackMergeAppenderOmitsUpdateWhenUpdateSetEmpty(t *testing.T) {
 // land, not some undefined mix of the two).
 func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
@@ -256,45 +258,17 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 	}, got)
 }
 
-// TestQuackMergeAppenderDedupKeysRejectsUnknownColumn guards
-// buildQuackSendDataMergeSQL's validation: a DedupKeys entry that doesn't
-// name one of the columns passed to NewQuackMergeAppender must fail clearly
-// up front, rather than reaching the server as a "column not found" SQL
-// error against a QUALIFY clause the caller never wrote themselves.
-func TestQuackMergeAppenderDedupKeysRejectsUnknownColumn(t *testing.T) {
-	_, err := buildQuackSendDataMergeSQL("main", "t", QuackMergeConfig{
-		On:           "t.k = s.k",
-		DedupKeys:    []string{"nope"},
-		DedupOrderBy: "seq",
-	}, []QuackMergeColumn{{Name: "k", Kind: QuackColumnVarchar}}, "stream-1")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "nope")
-}
-
-// TestQuackMergeAppenderDedupKeysRequiresDedupOrderBy guards the other
-// buildQuackSendDataMergeSQL validation: DedupKeys with no DedupOrderBy has
-// no way to choose which same-key row survives, so it must fail clearly up
-// front rather than building a QUALIFY with an empty ORDER BY.
-func TestQuackMergeAppenderDedupKeysRequiresDedupOrderBy(t *testing.T) {
-	_, err := buildQuackSendDataMergeSQL("main", "t", QuackMergeConfig{
-		On:        "t.k = s.k",
-		DedupKeys: []string{"k"},
-	}, []QuackMergeColumn{{Name: "k", Kind: QuackColumnVarchar}}, "stream-1")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "DedupOrderBy")
-}
-
 // TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded is the MERGE
 // analogue of quack_append_test.go's identically-named test: proves
 // NewQuackMergeAppender's pooled *sql.Conn is held open for the appender's
 // whole lifetime (not released back to db's pool the moment the underlying
-// quackSession is extracted), so many concurrent, short-lived appenders
+// quack.Session is extracted), so many concurrent, short-lived appenders
 // sharing a small connection pool never have one appender's in-flight
 // stream superseded by another's PrepareRequest landing on the same
 // connection mid-flight.
 func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	dir := t.TempDir()
 	addr := EphemeralQuackAddr
