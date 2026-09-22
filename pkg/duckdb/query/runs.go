@@ -16,7 +16,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids, is_deferred"
+const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids, is_deferred, trace_id"
 
 // runStatusToStepStatusString maps a cqrs.TraceRun filter's RunStatus back
 // to the StepStatus string inngest.runs.status actually stores. Only
@@ -481,10 +481,12 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		rawQueuedAt, rawStartedAt, rawEndedAt           any
 		status                                          string
 		rawOutput, rawEventIDs, rawIsDeferred           any
+		traceID                                         sql.NullString
 	)
 	if err := rows.Scan(
 		&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &runID,
 		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs, &rawIsDeferred,
+		&traceID,
 	); err != nil {
 		return nil, err
 	}
@@ -554,6 +556,7 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		AppID:       appID,
 		FunctionID:  functionID,
 		RunID:       runID,
+		TraceID:     traceID.String, // NULL for rows written before migration 000003
 		QueuedAt:    queuedAt,
 		StartedAt:   startedAt,
 		EndedAt:     endedAt,
