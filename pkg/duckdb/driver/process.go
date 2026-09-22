@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -385,10 +384,10 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 	if len(rows) != 1 {
 		return fmt.Errorf("duckdb: quack_serve returned %d rows, expected 1", len(rows))
 	}
-	listenURL, ok := rows[0]["listen_url"].(string)
+	listenURL, ok := rows[0].get("listen_url").(string)
 	if !ok || listenURL == "" {
 		// Column names only: the row also carries auth_token.
-		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", mapKeys(rows[0]))
+		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", rows[0].names())
 	}
 
 	quackSess, err := newQuackSession(ctx, listenURL, token)
@@ -419,15 +418,6 @@ func (p *process) bootstrapExecLocked(ctx context.Context, phase string, stmts [
 		}
 	}
 	return nil
-}
-
-func mapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // openQuackConn hands out a new pooled connection (pooledQuackConn) against
@@ -851,7 +841,7 @@ func (p *process) restart(ctx context.Context) error {
 // exec is the entry point conn.go's ExecContext calls to run a statement
 // against the supervised subprocess. See runWithRestartLocked for the
 // crash/restart classification shared with query below.
-func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error) {
+func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -874,7 +864,7 @@ func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows
 // carrying the result's column types through — see sqlExecer's doc comment
 // (conn.go) and rows.go's session.query / quack_session.go's
 // quackSession.query for what each transport does to produce them.
-func (p *process) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []map[string]any, err error) {
+func (p *process) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
