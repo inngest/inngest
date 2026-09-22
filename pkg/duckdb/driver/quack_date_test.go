@@ -18,7 +18,7 @@ func TestQuackQueryDateColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -41,7 +41,7 @@ func TestQuackQueryTimestampTZColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -72,7 +72,7 @@ func TestQuackQueryTimeColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
@@ -93,7 +93,7 @@ func TestQuackQueryTimeTZColumn(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	quackAddr := freeLocalAddr(t)
+	quackAddr := EphemeralQuackAddr
 	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
