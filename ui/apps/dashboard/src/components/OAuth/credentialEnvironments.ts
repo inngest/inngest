@@ -9,11 +9,13 @@ export function credentialEnvironmentOptions(
   const eligible = environments.filter(
     (environment) =>
       !environment.isArchived &&
-      (includeBranches ||
-        (environment.type !== EnvironmentType.BranchChild &&
-          environment.type !== EnvironmentType.BranchParent)),
+      environment.type !== EnvironmentType.BranchParent &&
+      (includeBranches || environment.type !== EnvironmentType.BranchChild),
   );
   const option = ({ id, name }: Environment): Option => ({ id, name });
+  const branches = eligible
+    .filter((env) => env.type === EnvironmentType.BranchChild)
+    .map(option);
   return [
     {
       label: 'Production',
@@ -27,21 +29,11 @@ export function credentialEnvironmentOptions(
         .filter((env) => env.type === EnvironmentType.Test)
         .map(option),
     },
-    ...(includeBranches
+    ...(branches.length > 0
       ? [
           {
             label: 'Branches',
-            opts: [
-              ...eligible
-                .filter((env) => env.type === EnvironmentType.BranchParent)
-                .map((env) => ({
-                  id: env.id,
-                  name: 'Branch environments*',
-                })),
-              ...eligible
-                .filter((env) => env.type === EnvironmentType.BranchChild)
-                .map(option),
-            ],
+            opts: branches,
           },
         ]
       : []),

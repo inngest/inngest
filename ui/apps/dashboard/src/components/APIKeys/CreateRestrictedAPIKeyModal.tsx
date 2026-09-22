@@ -7,7 +7,6 @@ import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries/environments';
-import { EnvironmentType } from '@/utils/environments';
 import { CredentialForm } from '@/components/OAuth/CredentialForm';
 import { credentialEnvironmentOptions } from '@/components/OAuth/credentialEnvironments';
 import {
@@ -164,12 +163,6 @@ export function CreateRestrictedAPIKeyModal({
               allEnvironments={allEnvironments}
               onAllEnvironmentsChange={setAllEnvironments}
               environment={environment}
-              environmentDescription={
-                environments?.find((env) => env.id === environment?.id)
-                  ?.type === EnvironmentType.BranchParent
-                  ? '*Includes all current and future branch environments.'
-                  : undefined
-              }
               onEnvironmentChange={setEnvironment}
               environmentGroups={credentialEnvironmentOptions(
                 environments ?? [],

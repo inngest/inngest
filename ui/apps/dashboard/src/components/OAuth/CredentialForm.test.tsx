@@ -20,20 +20,10 @@ const props = {
 };
 
 describe('credential form validation', () => {
-  it('shows the parent boundary note only for single-environment access', () => {
-    const description = '*Includes all current and future branch environments.';
-    const render = (allEnvironments: boolean) =>
-      renderToStaticMarkup(
-        <CredentialForm
-          {...props}
-          allEnvironments={allEnvironments}
-          environmentDescription={description}
-        />,
-      );
-    expect(render(false)).toContain(description);
-    expect(render(true)).not.toContain(description);
-    expect(render(false)).toContain('Single');
-    expect(render(false)).toContain('All');
+  it('offers single or all environments', () => {
+    const html = renderToStaticMarkup(<CredentialForm {...props} />);
+    expect(html).toContain('Single');
+    expect(html).toContain('All');
   });
   it('marks the name as required without showing errors before submission', () => {
     const html = renderToStaticMarkup(<CredentialForm {...props} />);
