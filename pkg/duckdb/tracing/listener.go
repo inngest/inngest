@@ -376,8 +376,36 @@ func (l *listener) emitOnFunctionFinishedNonStepSpan(ctx context.Context, mdPtr 
 	})
 }
 
-func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ execution.CancelRequest, evts []json.RawMessage, now time.Time) {
-	// TODO: emit a span here maybe?
+// OnFunctionCancelled writes the run's terminal root "executor.run" span with
+// a Cancelled status — the same span (same Seed, so the same span ID)
+// OnFunctionFinished writes for a run that completes or fails. The executor
+// calls only this hook on cancellation, never OnFunctionFinished, so without
+// it inngest.runs would keep the run's last Queued/Running row forever.
+// started_at is the run state's own StartedAt: kept for a run cancelled
+// mid-run, NULL for one cancelled before it ever started.
+func (l *listener) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, _ execution.CancelRequest, evts []json.RawMessage, now time.Time) {
+	status := enums.StepStatusCancelled
+	queuedAt := ulid.Time(md.ID.RunID.Time())
+	mdPtr := safeMetadata(md)
+
+	runAttrs := meta.NewAttrSet()
+	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &status)
+	addEventsInputAttr(ctx, runAttrs, evts)
+	addRunEventAttrs(runAttrs, md, evts)
+	tracing.AddTimingAttrs(runAttrs, queuedAt, time.Time{}, md.Config.StartedAt, now)
+	if md.Config.StartedAt.IsZero() {
+		// Explicitly nil, as in OnFunctionScheduled: otherwise
+		// tracingv3.CreateSpan defaults started_at to StartTime (queuedAt).
+		meta.AddAttr(runAttrs, meta.Attrs.StartedAt, (*time.Time)(nil))
+	}
+	addRunSpanAttrs(runAttrs, mdPtr)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameRun, &tracing.CreateSpanOptions{
+		Seed:       md.ID.RunID[:],
+		Metadata:   mdPtr,
+		StartTime:  queuedAt,
+		EndTime:    now,
+		Attributes: runAttrs,
+	})
 }
 
 // OnStepScheduled creates a point-in-time marker span (tracingv3.SpanNameStepPlanned)
