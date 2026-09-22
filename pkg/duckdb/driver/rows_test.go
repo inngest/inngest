@@ -25,8 +25,8 @@ func TestSessionExecReadsUntilEOFMarker(t *testing.T) {
 	_, rows, err := s.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
-	require.Equal(t, float64(1), rows[0]["id"])
-	require.Equal(t, "a", rows[0]["name"])
+	require.Equal(t, float64(1), rows[0].get("id"))
+	require.Equal(t, "a", rows[0].get("name"))
 
 	require.Contains(t, written.String(), "SELECT id, name FROM t;")
 	require.Contains(t, written.String(), eofMarker)
@@ -85,7 +85,7 @@ func TestSessionQueryBatchesDescribeAndDataInOneRoundTrip(t *testing.T) {
 	require.Equal(t, []string{"id", "name"}, cols)
 	require.Equal(t, []string{"INTEGER", "VARCHAR"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0]["id"])
+	require.Equal(t, float64(1), rows[0].get("id"))
 
 	// Both the DESCRIBE statement and the real query, plus both interior
 	// canaries, went out together — not as two separate exec()-style round
@@ -142,8 +142,40 @@ func TestSessionQueryReportsErrorDiagnosticFromEitherSegment(t *testing.T) {
 }
 
 func TestMapRowsColumns(t *testing.T) {
-	r := newMapRows([]string{"id"}, nil, []map[string]any{{"id": float64(1)}})
+	r := newMapRows([]string{"id"}, nil, testRows([]string{"id"}, []any{float64(1)}))
 	require.Equal(t, []string{"id"}, r.Columns())
+}
+
+// testRows builds positional rows sharing one *columns.
+func testRows(names []string, vals ...[]any) []row {
+	cols := newColumns(names)
+	out := make([]row, len(vals))
+	for i, v := range vals {
+		out[i] = row{cols: cols, vals: v}
+	}
+	return out
+}
+
+// TestMapRowsKeepsEveryValueOfARepeatedColumnName pins that a query
+// repeating a column name (SELECT a.x, b.x) returns both values, where
+// map-keyed rows used to collapse them into the second.
+func TestMapRowsKeepsEveryValueOfARepeatedColumnName(t *testing.T) {
+	r := newMapRows([]string{"x", "x", "y"}, nil, testRows([]string{"x", "x", "y"}, []any{"a", "b", "c"}))
+	require.Equal(t, []string{"x", "x", "y"}, r.Columns())
+	dest := make([]driver.Value, 3)
+	require.NoError(t, r.Next(dest))
+	require.Equal(t, []driver.Value{"a", "b", "c"}, dest)
+}
+
+func TestDecodeOrderedRowKeepsRepeatedKeys(t *testing.T) {
+	cols, vals, err := decodeOrderedRow([]byte(`{"a":1,"a":2,"b":3}`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "a", "b"}, cols)
+	require.Equal(t, []any{float64(1), float64(2), float64(3)}, vals)
+
+	r := row{cols: newColumns(cols), vals: vals}
+	require.Equal(t, float64(1), r.get("a"), "get resolves to the first column of a name")
+	require.Nil(t, r.get("missing"))
 }
 
 func TestMapRowsReportsColumnTypeDatabaseTypeName(t *testing.T) {
@@ -153,11 +185,11 @@ func TestMapRowsReportsColumnTypeDatabaseTypeName(t *testing.T) {
 }
 
 func TestMapRowsNextIteratesAllRowsThenEOF(t *testing.T) {
-	r := newMapRows([]string{"id"}, nil, []map[string]any{
-		{"id": float64(1)},
-		{"id": float64(2)},
-		{"id": float64(3)},
-	})
+	r := newMapRows([]string{"id"}, nil, testRows([]string{"id"},
+		[]any{float64(1)},
+		[]any{float64(2)},
+		[]any{float64(3)},
+	))
 	require.Equal(t, []string{"id"}, r.Columns())
 
 	dest := make([]driver.Value, 1)

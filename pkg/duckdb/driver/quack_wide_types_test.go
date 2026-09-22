@@ -31,11 +31,11 @@ func TestQuackQueryIntegerFamilyColumns(t *testing.T) {
 	require.Equal(t, []string{"ti", "uti", "us", "ui", "f"}, cols)
 	require.Equal(t, []string{"TINYINT", "UTINYINT", "USMALLINT", "UINTEGER", "FLOAT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(-5), rows[0]["ti"])
-	require.Equal(t, int64(200), rows[0]["uti"])
-	require.Equal(t, int64(300), rows[0]["us"])
-	require.Equal(t, int64(4000000000), rows[0]["ui"])
-	require.InDelta(t, 12345.599609375, rows[0]["f"], 1e-9)
+	require.Equal(t, int64(-5), rows[0].get("ti"))
+	require.Equal(t, int64(200), rows[0].get("uti"))
+	require.Equal(t, int64(300), rows[0].get("us"))
+	require.Equal(t, int64(4000000000), rows[0].get("ui"))
+	require.InDelta(t, 12345.599609375, rows[0].get("f"), 1e-9)
 }
 
 // TestQuackQueryUBigIntColumn covers UBigInt(31): its range overflows
@@ -56,7 +56,7 @@ func TestQuackQueryUBigIntColumn(t *testing.T) {
 	require.Equal(t, []string{"ub"}, cols)
 	require.Equal(t, []string{"UBIGINT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "18000000000000000000", rows[0]["ub"])
+	require.Equal(t, "18000000000000000000", rows[0].get("ub"))
 }
 
 // TestQuackQueryHugeintColumns covers Hugeint(50) and UHugeint(49): both
@@ -81,9 +81,9 @@ func TestQuackQueryHugeintColumns(t *testing.T) {
 	require.Equal(t, []string{"hg_max", "hg_min", "uhg_max"}, cols)
 	require.Equal(t, []string{"HUGEINT", "HUGEINT", "UHUGEINT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "170141183460469231731687303715884105727", rows[0]["hg_max"])
-	require.Equal(t, "-170141183460469231731687303715884105728", rows[0]["hg_min"])
-	require.Equal(t, "340282366920938463463374607431768211455", rows[0]["uhg_max"])
+	require.Equal(t, "170141183460469231731687303715884105727", rows[0].get("hg_max"))
+	require.Equal(t, "-170141183460469231731687303715884105728", rows[0].get("hg_min"))
+	require.Equal(t, "340282366920938463463374607431768211455", rows[0].get("uhg_max"))
 }
 
 // TestQuackQueryDecimalColumns covers Decimal(21) across all four physical
@@ -111,11 +111,11 @@ func TestQuackQueryDecimalColumns(t *testing.T) {
 	require.Equal(t, []string{"d16", "d32", "d64", "d128", "d_scale0"}, cols)
 	require.Equal(t, []string{"DECIMAL(4,1)", "DECIMAL(9,3)", "DECIMAL(18,3)", "DECIMAL(38,9)", "DECIMAL(5,0)"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "12.3", rows[0]["d16"])
-	require.Equal(t, "123.400", rows[0]["d32"])
-	require.Equal(t, "-123.456", rows[0]["d64"])
-	require.Equal(t, "12345678901234567890.123456789", rows[0]["d128"])
-	require.Equal(t, "5", rows[0]["d_scale0"])
+	require.Equal(t, "12.3", rows[0].get("d16"))
+	require.Equal(t, "123.400", rows[0].get("d32"))
+	require.Equal(t, "-123.456", rows[0].get("d64"))
+	require.Equal(t, "12345678901234567890.123456789", rows[0].get("d128"))
+	require.Equal(t, "5", rows[0].get("d_scale0"))
 }
 
 // TestQuackQueryBlobColumn covers Blob(26): BLOB shares VARCHAR's
@@ -136,7 +136,7 @@ func TestQuackQueryBlobColumn(t *testing.T) {
 	require.Equal(t, []string{"b"}, cols)
 	require.Equal(t, []string{"BLOB"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, rows[0]["b"])
+	require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, rows[0].get("b"))
 }
 
 // TestQuackQueryBitColumn covers Bit(36): BIT is a bitstring_t, an alias
@@ -157,9 +157,9 @@ func TestQuackQueryBitColumn(t *testing.T) {
 	require.Equal(t, []string{"b", "b2", "b3"}, cols)
 	require.Equal(t, []string{"BIT", "BIT", "BIT"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "101010", rows[0]["b"])
-	require.Equal(t, "1", rows[0]["b2"])
-	require.Equal(t, "11111111", rows[0]["b3"])
+	require.Equal(t, "101010", rows[0].get("b"))
+	require.Equal(t, "1", rows[0].get("b2"))
+	require.Equal(t, "11111111", rows[0].get("b3"))
 }
 
 // TestQuackQueryIntervalColumn covers Interval(27): a 16-byte
@@ -185,10 +185,10 @@ func TestQuackQueryIntervalColumn(t *testing.T) {
 	require.Equal(t, []string{"a", "b", "c", "d"}, cols)
 	require.Equal(t, []string{"INTERVAL", "INTERVAL", "INTERVAL", "INTERVAL"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "1 year 2 months 3 days 04:05:06.789", rows[0]["a"])
-	require.Equal(t, "25:00:00", rows[0]["b"])
-	require.Equal(t, "-1 year -2 days -03:00:00", rows[0]["c"])
-	require.Equal(t, "00:00:00", rows[0]["d"])
+	require.Equal(t, "1 year 2 months 3 days 04:05:06.789", rows[0].get("a"))
+	require.Equal(t, "25:00:00", rows[0].get("b"))
+	require.Equal(t, "-1 year -2 days -03:00:00", rows[0].get("c"))
+	require.Equal(t, "00:00:00", rows[0].get("d"))
 }
 
 // TestQuackQueryEnumColumn covers Enum(104): a small (<=255 value)
@@ -214,8 +214,8 @@ func TestQuackQueryEnumColumn(t *testing.T) {
 	// DuckDB's own DESCRIBE), not the CREATE TYPE alias "mood".
 	require.Equal(t, []string{"ENUM('sad', 'ok', 'happy')", "ENUM('sad', 'ok', 'happy')"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, "happy", rows[0]["m"])
-	require.Equal(t, "sad", rows[0]["m2"])
+	require.Equal(t, "happy", rows[0].get("m"))
+	require.Equal(t, "sad", rows[0].get("m2"))
 }
 
 // TestQuackQueryMapColumn covers Map(102): physically (and, per this
@@ -239,8 +239,8 @@ func TestQuackQueryMapColumn(t *testing.T) {
 	require.Equal(t, []string{"MAP(VARCHAR, INTEGER)"}, types)
 	require.Len(t, rows, 1)
 
-	got, ok := rows[0]["m"].([]any)
-	require.True(t, ok, "expected a []any, got %T", rows[0]["m"])
+	got, ok := rows[0].get("m").([]any)
+	require.True(t, ok, "expected a []any, got %T", rows[0].get("m"))
 	want := []any{
 		map[string]any{"key": "a", "value": int64(1)},
 		map[string]any{"key": "b", "value": int64(2)},
@@ -269,7 +269,7 @@ func TestQuackQueryArrayColumn(t *testing.T) {
 	require.Equal(t, []string{"a"}, cols)
 	require.Equal(t, []string{"INTEGER[3]"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, []any{int64(1), int64(2), int64(3)}, rows[0]["a"])
+	require.Equal(t, []any{int64(1), int64(2), int64(3)}, rows[0].get("a"))
 }
 
 // TestQuackQueryArrayColumnEdgeCases covers the cases that broke the first
@@ -293,11 +293,11 @@ func TestQuackQueryArrayColumnEdgeCases(t *testing.T) {
 	require.Equal(t, []string{"null_arr", "nested"}, cols)
 	require.Equal(t, []string{"INTEGER[3]", "INTEGER[2][2]"}, types)
 	require.Len(t, rows, 1)
-	require.Nil(t, rows[0]["null_arr"])
+	require.Nil(t, rows[0].get("null_arr"))
 	require.Equal(t, []any{
 		[]any{int64(1), int64(2)},
 		[]any{int64(3), int64(4)},
-	}, rows[0]["nested"])
+	}, rows[0].get("nested"))
 }
 
 // TestQuackQueryUnionColumn covers Union(107): physically PhysicalType::
@@ -324,9 +324,9 @@ func TestQuackQueryUnionColumn(t *testing.T) {
 	require.Equal(t, []string{"u", "u2", "u3"}, cols)
 	require.Equal(t, []string{"UNION(a INTEGER)", "UNION(b VARCHAR)", "UNION(a INTEGER, b VARCHAR)"}, types)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": int64(1)}, rows[0]["u"])
-	require.Equal(t, map[string]any{"b": "hi"}, rows[0]["u2"])
-	require.Nil(t, rows[0]["u3"])
+	require.Equal(t, map[string]any{"a": int64(1)}, rows[0].get("u"))
+	require.Equal(t, map[string]any{"b": "hi"}, rows[0].get("u2"))
+	require.Nil(t, rows[0].get("u3"))
 }
 
 // TestQuackQueryVariantColumn covers Variant(109): physically PhysicalType::
@@ -366,8 +366,8 @@ func TestQuackQueryVariantColumn(t *testing.T) {
 		"empty_obj":  map[string]any{},
 		"empty_arr":  []any{},
 		"arr_of_obj": []any{map[string]any{"x": int64(1)}, map[string]any{"y": int64(2)}},
-	}, rows[0]["v"])
-	require.Nil(t, rows[0]["v_null"])
+	}, rows[0].get("v"))
+	require.Nil(t, rows[0].get("v_null"))
 }
 
 // TestQuackQueryVariantColumnScalarLeafTypes covers the non-JSON-producible
@@ -398,15 +398,15 @@ func TestQuackQueryVariantColumnScalarLeafTypes(t *testing.T) {
 		require.Equal(t, "VARIANT", ty)
 	}
 	require.Len(t, rows, 1)
-	require.Equal(t, "18000000000000000000", rows[0]["ub"])
-	require.Equal(t, "170141183460469231731687303715884105727", rows[0]["hg"])
-	require.Equal(t, "12.345", rows[0]["dec"])
-	require.Equal(t, "not-a-real-uuid-000000000000", rows[0]["not_uuid"])
-	d, ok := rows[0]["d"].(time.Time)
-	require.True(t, ok, "DATE-typed VARIANT leaf should decode to time.Time, got %T", rows[0]["d"])
+	require.Equal(t, "18000000000000000000", rows[0].get("ub"))
+	require.Equal(t, "170141183460469231731687303715884105727", rows[0].get("hg"))
+	require.Equal(t, "12.345", rows[0].get("dec"))
+	require.Equal(t, "not-a-real-uuid-000000000000", rows[0].get("not_uuid"))
+	d, ok := rows[0].get("d").(time.Time)
+	require.True(t, ok, "DATE-typed VARIANT leaf should decode to time.Time, got %T", rows[0].get("d"))
 	require.Equal(t, "2024-03-15", d.Format("2006-01-02"))
-	ts, ok := rows[0]["ts"].(time.Time)
-	require.True(t, ok, "TIMESTAMP-typed VARIANT leaf should decode to time.Time, got %T", rows[0]["ts"])
+	ts, ok := rows[0].get("ts").(time.Time)
+	require.True(t, ok, "TIMESTAMP-typed VARIANT leaf should decode to time.Time, got %T", rows[0].get("ts"))
 	require.Equal(t, "2024-03-15T10:30:00Z", ts.Format(time.RFC3339))
-	require.Equal(t, "1 year 2 months 3 days", rows[0]["iv"])
+	require.Equal(t, "1 year 2 months 3 days", rows[0].get("iv"))
 }

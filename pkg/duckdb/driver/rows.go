@@ -143,7 +143,7 @@ func (s *session) readLoop(out io.Reader) {
 // queued, which desyncs the protocol permanently, so the session marks itself
 // unusable; process.exec responds by respawning the subprocess with a fresh
 // session.
-func (s *session) exec(ctx context.Context, sql string) (cols []string, rows []map[string]any, err error) {
+func (s *session) exec(ctx context.Context, sql string) (cols []string, rows []row, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -185,7 +185,7 @@ func (s *session) exec(ctx context.Context, sql string) (cols []string, rows []m
 // and read. cols/types are always derived from DESCRIBE's own rows, never
 // from the real query's, since DESCRIBE's rows are the only ones guaranteed
 // present regardless of how many rows the real query actually matches.
-func (s *session) query(ctx context.Context, sql string) (cols []string, types []string, rows []map[string]any, err error) {
+func (s *session) query(ctx context.Context, sql string) (cols []string, types []string, rows []row, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -229,7 +229,8 @@ func (s *session) query(ctx context.Context, sql string) (cols []string, types [
 // session exactly as exec's read loop always has: the subprocess's
 // remaining output for the abandoned statement(s) is still queued, so the
 // session can no longer correlate output with statements.
-func (s *session) readSegment(ctx context.Context, marker string) (cols []string, rows []map[string]any, diags []string, err error) {
+func (s *session) readSegment(ctx context.Context, marker string) (cols []string, rows []row, diags []string, err error) {
+	var shared *columns
 	for {
 		select {
 		case line, ok := <-s.lines:
@@ -244,20 +245,23 @@ func (s *session) readSegment(ctx context.Context, marker string) (cols []string
 				continue
 			}
 
-			rowCols, row, derr := decodeOrderedRow(line)
+			lineCols, vals, derr := decodeOrderedRow(line)
 			if derr != nil {
 				diags = append(diags, string(line))
 				continue
 			}
 
-			if m, ok := row["__marker__"].(string); ok && m == marker {
+			if len(lineCols) == 1 && lineCols[0] == "__marker__" && vals[0] == marker {
 				return cols, rows, diags, nil
 			}
 
-			if cols == nil {
-				cols = rowCols
+			// Every row of one statement has the same columns, so the
+			// first row's are shared by the rest.
+			if shared == nil {
+				cols = lineCols
+				shared = newColumns(cols)
 			}
-			rows = append(rows, row)
+			rows = append(rows, row{cols: shared, vals: vals})
 		case <-ctx.Done():
 			s.desynced = true
 			return nil, nil, diags, fmt.Errorf("%w: %w", errSessionDesynced, ctx.Err())
@@ -286,17 +290,17 @@ func normalizeStatement(sql string) string {
 // order the described query itself projects columns in. column_name/
 // column_type are DESCRIBE's first two output columns (followed by null/
 // key/default/extra, none of which query() has a use for).
-func parseDescribeRows(rows []map[string]any) (names []string, types []string, err error) {
+func parseDescribeRows(rows []row) (names []string, types []string, err error) {
 	names = make([]string, len(rows))
 	types = make([]string, len(rows))
-	for i, row := range rows {
-		name, ok := row["column_name"].(string)
+	for i, r := range rows {
+		name, ok := r.get("column_name").(string)
 		if !ok {
-			return nil, nil, fmt.Errorf("duckdb: DESCRIBE row missing column_name: %v", row)
+			return nil, nil, fmt.Errorf("duckdb: DESCRIBE row missing column_name: %v", r.vals)
 		}
-		dbType, ok := row["column_type"].(string)
+		dbType, ok := r.get("column_type").(string)
 		if !ok {
-			return nil, nil, fmt.Errorf("duckdb: DESCRIBE row missing column_type: %v", row)
+			return nil, nil, fmt.Errorf("duckdb: DESCRIBE row missing column_type: %v", r.vals)
 		}
 		names[i] = name
 		types[i] = dbType
@@ -335,12 +339,13 @@ func stripANSISGR(line []byte) []byte {
 	return out
 }
 
-// decodeOrderedRow parses one -jsonlines output line into both a row map (for
-// value lookup) and cols: its top-level keys in on-the-wire order.
-// encoding/json's map-decoding path loses key order, so this walks the token
-// stream instead — the JSON text itself still has the query's column order,
-// since that's how the DuckDB CLI writes each row.
-func decodeOrderedRow(line []byte) (cols []string, row map[string]any, err error) {
+// decodeOrderedRow parses one -jsonlines output line into cols, its
+// top-level keys in on-the-wire order, and vals, the matching values.
+// encoding/json's map-decoding path loses key order (and collapses repeated
+// keys, which the CLI emits for a query that repeats a column name), so this
+// walks the token stream instead — the JSON text itself still has the
+// query's column order, since that's how the DuckDB CLI writes each row.
+func decodeOrderedRow(line []byte) (cols []string, vals []any, err error) {
 	dec := json.NewDecoder(bytes.NewReader(line))
 	tok, err := dec.Token()
 	if err != nil {
@@ -350,7 +355,6 @@ func decodeOrderedRow(line []byte) (cols []string, row map[string]any, err error
 		return nil, nil, fmt.Errorf("duckdb: expected a JSON object, got %v", tok)
 	}
 
-	row = make(map[string]any)
 	for dec.More() {
 		keyTok, kerr := dec.Token()
 		if kerr != nil {
@@ -367,12 +371,12 @@ func decodeOrderedRow(line []byte) (cols []string, row map[string]any, err error
 		}
 
 		cols = append(cols, key)
-		row[key] = val
+		vals = append(vals, val)
 	}
 	if _, err := dec.Token(); err != nil { // closing '}'
 		return nil, nil, err
 	}
-	return cols, row, nil
+	return cols, vals, nil
 }
 
 // reportDiagnostics logs every non-JSON line the subprocess emitted while the
@@ -411,7 +415,7 @@ func isErrorDiagnostic(line string) bool {
 	return strings.Contains(line, "Error: ")
 }
 
-// mapRows adapts a []map[string]any into database/sql/driver.Rows. types is
+// mapRows adapts a []row into database/sql/driver.Rows. types is
 // nil for a result conn.go's ExecContext path produced (no caller ever asks
 // ExecContext's driver.Result for column types); QueryContext always
 // supplies it (see conn.go), which is what backs *sql.Rows.ColumnTypes()'s
@@ -419,11 +423,11 @@ func isErrorDiagnostic(line string) bool {
 type mapRows struct {
 	cols  []string
 	types []string
-	rows  []map[string]any
+	rows  []row
 	pos   int
 }
 
-func newMapRows(cols []string, types []string, rows []map[string]any) *mapRows {
+func newMapRows(cols []string, types []string, rows []row) *mapRows {
 	return &mapRows{cols: cols, types: types, rows: rows}
 }
 
@@ -447,9 +451,12 @@ func (r *mapRows) Next(dest []driver.Value) error {
 	if r.pos >= len(r.rows) {
 		return io.EOF
 	}
-	row := r.rows[r.pos]
-	for i, col := range r.cols {
-		val := row[col]
+	cur := r.rows[r.pos]
+	for i := range r.cols {
+		var val any
+		if i < len(cur.vals) {
+			val = cur.vals[i]
+		}
 		if i < len(r.types) {
 			val = convertTimeValue(r.types[i], val)
 		}
