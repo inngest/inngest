@@ -29,7 +29,7 @@ func TestStartProcessWithQuackTransport(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
@@ -55,7 +55,7 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
@@ -120,7 +120,7 @@ func TestQuackCancelledQueryDoesNotRestartSubprocess(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	requireQuackExtension(t, binPath)
 
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
