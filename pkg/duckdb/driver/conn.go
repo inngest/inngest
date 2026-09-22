@@ -9,34 +9,34 @@ import (
 	"errors"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 )
 
-// sqlExecer abstracts over what runs a SQL statement and collects its JSON
-// rows. *session (rows.go) implements it directly — conn_test.go exercises
-// conn against a fake io.ReadWriter transport via a bare *session. *process
-// (process.go) implements it too, additionally providing crash detection,
-// one-restart-then-permanently-disable recovery, and locking around the real
-// subprocess. conn is deliberately transport-agnostic so both keep working
-// unchanged.
+// sqlExecer abstracts over what runs a SQL statement and collects its rows.
+// The transports (*jsonlines.Session, *quack.Session) implement it directly;
+// *process implements it on top of whichever one is active, adding crash
+// detection, one-restart-then-permanently-disable recovery, and locking
+// around the real subprocess, and *pooledQuackConn does the same for extra
+// pooled connections. conn is deliberately transport-agnostic; conn_test.go
+// exercises it against a stub.
 //
-// cols is the result's column names in the query's own left-to-right order —
-// carried separately from rows because a map can't preserve it. It may be
-// nil for a statement that returns no columns (DDL) or, for *session
-// specifically, no rows (see rows.go's session.exec).
+// cols is the result's column names in the query's own left-to-right order.
+// It may be nil for a statement that returns no columns (DDL) or, for the
+// jsonlines transport specifically, no rows (see jsonlines.Session.Exec).
 //
-// query is exec's counterpart for conn.QueryContext: it additionally
+// Query is Exec's counterpart for conn.QueryContext: it additionally
 // returns types, the result's DuckDB column type names in the same order as
-// cols — see rows.go's session.query and quack_session.go's quackSession.query
-// for how each transport gets there (a batched DESCRIBE for jsonlines;
+// cols — see jsonlines.Session.Query and quack.Session.Query for how each
+// transport gets there (a batched DESCRIBE for jsonlines;
 // already-decoded PrepareResponse metadata, no extra statement at all, for
 // quack).
 type sqlExecer interface {
-	exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error)
-	query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error)
+	Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error)
+	Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error)
 }
 
 // conn implements database/sql/driver.Conn, ExecerContext, and QueryerContext
@@ -63,7 +63,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, err
 	}
 	start := time.Now()
-	_, _, err = c.sess.exec(ctx, sql)
+	_, _, err = c.sess.Exec(ctx, sql)
 	logStatement(ctx, "exec", query, len(args), start, -1, err)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, err
 	}
 	start := time.Now()
-	cols, types, rows, err := c.sess.query(ctx, sql)
+	cols, types, rows, err := c.sess.Query(ctx, sql)
 	logStatement(ctx, "query", query, len(args), start, len(rows), err)
 	if err != nil {
 		return nil, err

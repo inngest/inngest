@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,7 +16,7 @@ import (
 func openPooledForTest(t *testing.T, conns int) (*Connector, *sql.DB) {
 	t.Helper()
 	binPath := RequireDuckDBBinary(t)
-	requireQuackExtension(t, binPath)
+	duckdbtest.RequireQuackExtension(t, binPath)
 
 	addr := EphemeralQuackAddr
 	c, db, err := OpenConnector(t.Context(), Options{
@@ -113,7 +114,7 @@ func TestPooledQuackConnRehandshakesAfterRestartElsewhere(t *testing.T) {
 
 	killSubprocess(t, c.proc)
 	// The primary (restart-managed) path notices the crash and restarts.
-	_, _, err = c.proc.exec(ctx, "SELECT 1;")
+	_, _, err = c.proc.Exec(ctx, "SELECT 1;")
 	require.NoError(t, err)
 
 	var one int
@@ -153,6 +154,6 @@ func TestPooledQuackConnAfterCloseFailsFast(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, c.Close())
 
-	_, _, err = sess.exec(ctx, "SELECT 1;")
+	_, _, err = sess.Exec(ctx, "SELECT 1;")
 	require.ErrorIs(t, err, errQuackUnavailable)
 }

@@ -27,6 +27,7 @@ command -v jq >/dev/null || {
 # duckdbseed appender against the real schema (catches column drift).
 declare -A SMOKE=(
 	[./pkg/duckdb/driver]='^(TestConnectorCloseTerminatesSubprocess|TestExecTriggersRestartAfterCrash|TestQuackTransportSurvivesRestart|TestPooledQuackConn.*|TestQuackAppenderWritesRowsIntoRealTable|TestQuackBootstrapErrorDoesNotLeakToken)$'
+	[./pkg/duckdb/driver/internal/quack]='^TestQuackSession(HandshakeAndExec|FetchesAllRowsWhenResultExceedsOneInlineResponse|StatementErrorMapsToErrStatementFailed)$'
 	[./pkg/db/duckdb]='^TestMigrate'
 	[./pkg/duckdb/tracing]='^(TestNewListenerEndToEnd.*|TestBatcherDrainsChannelOnStopBeforeExiting)$'
 	[./pkg/duckdb/query]='^TestDualWriteThenDuckDBQueryRoundTrip$'

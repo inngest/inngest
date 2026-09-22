@@ -19,7 +19,7 @@ import (
 // binary). That rules out DialectSQLite3 and any Querier reusing its DDL
 // shape, so every query below is instead hand-written and scanned
 // positionally in the query's own column order (see pkg/db/duckdb/rows.go
-// and quack_protocol.go, which guarantee Columns() matches that order).
+// and pkg/duckdb/driver/internal/quack/protocol.go, which guarantee Columns() matches that order).
 type duckdbStore struct {
 	tableName string
 }

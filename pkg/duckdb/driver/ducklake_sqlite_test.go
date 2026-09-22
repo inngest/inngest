@@ -29,16 +29,16 @@ func TestDuckLakeSQLiteCatalogAttaches(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(context.Background()) })
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER);", table))
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("INSERT INTO inngest.%s VALUES (1);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("INSERT INTO inngest.%s VALUES (1);", table))
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
+	_, rows, err := p.Exec(t.Context(), fmt.Sprintf("SELECT count(*) AS c FROM inngest.%s;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].get("c"))
+	require.Equal(t, float64(1), rows[0].Get("c"))
 }
 
 // TestDuckLakeSQLiteCatalogHandlesJSONColumn guards against a SQLite-catalog
@@ -59,16 +59,16 @@ func TestDuckLakeSQLiteCatalogHandlesJSONColumn(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(context.Background()) })
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER, data JSON);", table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf("CREATE TABLE inngest.%s (id INTEGER, data JSON);", table))
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), fmt.Sprintf(`INSERT INTO inngest.%s VALUES (1, '{"a": 1}');`, table))
+	_, _, err = p.Exec(t.Context(), fmt.Sprintf(`INSERT INTO inngest.%s VALUES (1, '{"a": 1}');`, table))
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), fmt.Sprintf("SELECT data FROM inngest.%s WHERE id = 1;", table))
+	_, rows, err := p.Exec(t.Context(), fmt.Sprintf("SELECT data FROM inngest.%s WHERE id = 1;", table))
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, map[string]any{"a": float64(1)}, rows[0].get("data"))
+	require.Equal(t, map[string]any{"a": float64(1)}, rows[0].Get("data"))
 }
 
 // TestOpenWithDuckLakeSQLiteCatalog exercises the SQLite catalog mode

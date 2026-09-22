@@ -1,4 +1,4 @@
-package driver
+package quack
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -29,10 +30,10 @@ type fakeQuackServer struct {
 	nextConn atomic.Int64
 
 	mu        sync.Mutex
-	cancelled []quackHugeint
-	prepared  []quackHugeint
+	cancelled []hugeint
+	prepared  []hugeint
 
-	onPrepare  func(w http.ResponseWriter, r *http.Request, sql string, queryID quackHugeint)
+	onPrepare  func(w http.ResponseWriter, r *http.Request, sql string, queryID hugeint)
 	onFetch    func(w http.ResponseWriter, r *http.Request, batchIndex uint64)
 	onSendData func(w http.ResponseWriter, r *http.Request)
 }
@@ -51,18 +52,18 @@ func (f *fakeQuackServer) handle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	rd := newQuackReader(body)
-	hdr, err := decodeQuackMessageHeader(rd)
+	rd := newReader(body)
+	hdr, err := decodeMessageHeader(rd)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	switch hdr.Type {
-	case quackMsgConnectionRequest:
+	case msgConnectionRequest:
 		_, _ = w.Write(fakeConnectionResponse(fmt.Sprintf("conn-%d", f.nextConn.Add(1))))
 
-	case quackMsgPrepareRequest:
+	case msgPrepareRequest:
 		var sql string
 		if ok, _ := rd.tryBeginProperty(1); ok {
 			sql, _ = rd.readString()
@@ -73,67 +74,67 @@ func (f *fakeQuackServer) handle(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		f.onPrepare(w, r, sql, qid)
 
-	case quackMsgFetchRequest:
+	case msgFetchRequest:
 		_ = readHugeintField(f.t, rd, 1)
 		require.NoError(f.t, rd.beginProperty(2))
 		batch, _ := rd.readUInt64()
 		f.onFetch(w, r, batch)
 
-	case quackMsgSendDataRequest:
+	case msgSendDataRequest:
 		f.onSendData(w, r)
 
-	case quackMsgCancelRequest:
+	case msgCancelRequest:
 		qid := readHugeintField(f.t, rd, 1)
 		f.mu.Lock()
 		f.cancelled = append(f.cancelled, qid)
 		f.mu.Unlock()
-		_, _ = w.Write(encodeQuackMessage(quackMsgSuccessResponse, "", func(*quackWriter) {}))
+		_, _ = w.Write(encodeMessage(msgSuccessResponse, "", func(*writer) {}))
 
 	default:
 		http.Error(w, "unexpected message type", http.StatusBadRequest)
 	}
 }
 
-func (f *fakeQuackServer) session(t *testing.T) *quackSession {
+func (f *fakeQuackServer) session(t *testing.T) *Session {
 	t.Helper()
-	s, err := newQuackSession(t.Context(), f.srv.URL, "token")
+	s, err := NewSession(t.Context(), f.srv.URL, "token")
 	require.NoError(t, err)
 	return s
 }
 
-func (f *fakeQuackServer) cancelledIDs() []quackHugeint {
+func (f *fakeQuackServer) cancelledIDs() []hugeint {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]quackHugeint(nil), f.cancelled...)
+	return append([]hugeint(nil), f.cancelled...)
 }
 
-func (f *fakeQuackServer) lastPrepared() quackHugeint {
+func (f *fakeQuackServer) lastPrepared() hugeint {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	require.NotEmpty(f.t, f.prepared)
 	return f.prepared[len(f.prepared)-1]
 }
 
-func readHugeintField(t *testing.T, r *quackReader, id uint16) quackHugeint {
+func readHugeintField(t *testing.T, r *reader, id uint16) hugeint {
 	require.NoError(t, r.beginProperty(id))
 	hi, err := r.readSignedLeb128()
 	require.NoError(t, err)
 	lo, err := r.readUnsignedLeb128()
 	require.NoError(t, err)
-	return quackHugeint{hi: hi, lo: lo}
+	return hugeint{hi: hi, lo: lo}
 }
 
 func fakeConnectionResponse(connID string) []byte {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgConnectionResponse)
+	w.writeByte(1, msgConnectionResponse)
 	w.writeString(2, connID)
-	w.writeUint64(3, quackOptionalIdxInvalid)
+	w.writeUint64(3, optionalIdxInvalid)
 	w.endObject()
 	w.beginObject()
 	w.writeStringDefault(1, "fake")
 	w.writeStringDefault(2, "fake")
-	w.writeUint64Default(3, supportedQuackVersion)
+	w.writeUint64Default(3, supportedVersion)
 	w.endObject()
 	return w.bytes()
 }
@@ -141,11 +142,11 @@ func fakeConnectionResponse(connID string) []byte {
 // fakePrepareResponse is a one-column INTEGER "v" result holding value,
 // optionally announcing that more batches must be fetched.
 func fakePrepareResponse(t *testing.T, connID string, value int32, needsMore bool) []byte {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgPrepareResponse)
+	w.writeByte(1, msgPrepareResponse)
 	w.writeStringDefault(2, connID)
-	w.writeUint64(3, quackOptionalIdxInvalid)
+	w.writeUint64(3, optionalIdxInvalid)
 	w.endObject()
 
 	w.beginObject()
@@ -176,10 +177,10 @@ func fakePrepareResponse(t *testing.T, connID string, value int32, needsMore boo
 // fakeFetchResponse delivers batchIndex with one chunk holding value, or,
 // when done, the zero-chunk response that ends the fetch loop.
 func fakeFetchResponse(t *testing.T, batchIndex uint64, value int32, done bool) []byte {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgFetchResponse)
-	w.writeUint64(3, quackOptionalIdxInvalid)
+	w.writeByte(1, msgFetchResponse)
+	w.writeUint64(3, optionalIdxInvalid)
 	w.endObject()
 	w.beginObject()
 	if !done {
@@ -213,7 +214,7 @@ func verifyNoQuackLeaks(t *testing.T, opts ...goleak.Option) {
 func requireTransportError(t *testing.T, err error, wantSubstrings ...string) {
 	t.Helper()
 	require.Error(t, err)
-	require.NotErrorIs(t, err, errStatementFailed, "a transport fault must not be classified as a statement error")
+	require.NotErrorIs(t, err, result.ErrStatementFailed, "a transport fault must not be classified as a statement error")
 	for _, s := range wantSubstrings {
 		require.Contains(t, err.Error(), s)
 	}
@@ -221,52 +222,52 @@ func requireTransportError(t *testing.T, err error, wantSubstrings ...string) {
 
 func TestQuackFaultTruncatedPrepareResponse(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		full := fakePrepareResponse(t, "", 1, false)
 		_, _ = w.Write(full[:len(full)/2])
 	}
 	s := f.session(t)
 
-	_, _, _, err := s.query(t.Context(), "SELECT 1")
+	_, _, _, err := s.Query(t.Context(), "SELECT 1")
 	requireTransportError(t, err, "prepare", "connection_id="+s.connectionID, "query_id="+f.lastPrepared().String())
 }
 
 func TestQuackFaultUnexpectedPrepareMessageType(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		_, _ = w.Write(fakeFetchResponse(t, 1, 1, false))
 	}
 	s := f.session(t)
 
-	_, _, _, err := s.query(t.Context(), "SELECT 1")
+	_, _, _, err := s.Query(t.Context(), "SELECT 1")
 	requireTransportError(t, err, "prepare", "unexpected response message type")
 }
 
 func TestQuackFaultHTTPErrorOnPrepare(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	s := f.session(t)
 
-	_, _, _, err := s.query(t.Context(), "SELECT 1")
+	_, _, _, err := s.Query(t.Context(), "SELECT 1")
 	requireTransportError(t, err, "prepare", "HTTP 500")
 }
 
 func TestQuackFaultResponseForAnotherConnection(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		_, _ = w.Write(fakePrepareResponse(t, "someone-else", 1, false))
 	}
 	s := f.session(t)
 
-	_, _, _, err := s.query(t.Context(), "SELECT 1")
+	_, _, _, err := s.Query(t.Context(), "SELECT 1")
 	requireTransportError(t, err, "received on connection "+s.connectionID)
 }
 
 func TestQuackFaultTruncatedFetchResponse(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		_, _ = w.Write(fakePrepareResponse(t, "", 1, true))
 	}
 	f.onFetch = func(w http.ResponseWriter, _ *http.Request, batch uint64) {
@@ -275,13 +276,13 @@ func TestQuackFaultTruncatedFetchResponse(t *testing.T) {
 	}
 	s := f.session(t)
 
-	_, _, _, err := s.query(t.Context(), "SELECT 1")
+	_, _, _, err := s.Query(t.Context(), "SELECT 1")
 	requireTransportError(t, err, "fetch", "batch_index=1")
 }
 
 func TestQuackFaultMultiBatchFetchHappyPath(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, _ string, _ hugeint) {
 		_, _ = w.Write(fakePrepareResponse(t, "", 1, true))
 	}
 	f.onFetch = func(w http.ResponseWriter, _ *http.Request, batch uint64) {
@@ -289,11 +290,11 @@ func TestQuackFaultMultiBatchFetchHappyPath(t *testing.T) {
 	}
 	s := f.session(t)
 
-	_, _, rows, err := s.query(t.Context(), "SELECT 1")
+	_, _, rows, err := s.Query(t.Context(), "SELECT 1")
 	require.NoError(t, err)
 	var got []any
 	for _, r := range rows {
-		got = append(got, r.get("v"))
+		got = append(got, r.Get("v"))
 	}
 	require.Equal(t, []any{int64(1), int64(2), int64(3)}, got)
 }
@@ -305,7 +306,7 @@ func TestQuackFaultMultiBatchFetchHappyPath(t *testing.T) {
 func TestQuackFaultCancelDuringPrepare(t *testing.T) {
 	ignore := goleak.IgnoreCurrent()
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(_ http.ResponseWriter, r *http.Request, _ string, _ quackHugeint) {
+	f.onPrepare = func(_ http.ResponseWriter, r *http.Request, _ string, _ hugeint) {
 		blockUntilClientGone(r)
 	}
 	s := f.session(t)
@@ -313,7 +314,7 @@ func TestQuackFaultCancelDuringPrepare(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	_, _, _, err := s.query(ctx, "SELECT slow")
+	_, _, _, err := s.Query(ctx, "SELECT slow")
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Less(t, time.Since(start), 5*time.Second)
 
@@ -333,7 +334,7 @@ func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
 	f := newFakeQuackServer(t)
 	var blockFetch atomic.Bool
 	blockFetch.Store(true)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, sql string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, sql string, _ hugeint) {
 		_, _ = w.Write(fakePrepareResponse(t, "", 1, sql == "SELECT paged"))
 	}
 	f.onFetch = func(w http.ResponseWriter, r *http.Request, batch uint64) {
@@ -350,7 +351,7 @@ func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		cancel()
 	}()
-	_, _, _, err := s.query(ctx, "SELECT paged")
+	_, _, _, err := s.Query(ctx, "SELECT paged")
 	require.ErrorIs(t, err, context.Canceled)
 	require.Contains(t, err.Error(), "fetch")
 
@@ -360,7 +361,7 @@ func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
 		return len(ids) == 1 && ids[0] == want
 	}, 5*time.Second, 10*time.Millisecond)
 
-	_, _, rows, err := s.query(t.Context(), "SELECT 1")
+	_, _, rows, err := s.Query(t.Context(), "SELECT 1")
 	require.NoError(t, err, "the session must be reusable after a cancelled statement")
 	require.Len(t, rows, 1)
 	require.Len(t, f.cancelledIDs(), 1, "a completed statement must not send a cancel")
@@ -371,14 +372,14 @@ func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
 // every caller gets its own statement's result.
 func TestQuackFaultConcurrentSessionsGetTheirOwnResults(t *testing.T) {
 	f := newFakeQuackServer(t)
-	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, sql string, _ quackHugeint) {
+	f.onPrepare = func(w http.ResponseWriter, _ *http.Request, sql string, _ hugeint) {
 		n, err := strconv.Atoi(strings.TrimPrefix(sql, "SELECT "))
 		require.NoError(t, err)
 		// Later statements finish first.
 		time.Sleep(time.Duration(40-n) * time.Millisecond)
 		_, _ = w.Write(fakePrepareResponse(t, "", int32(n), false))
 	}
-	sessions := []*quackSession{f.session(t), f.session(t), f.session(t)}
+	sessions := []*Session{f.session(t), f.session(t), f.session(t)}
 
 	var wg sync.WaitGroup
 	errs := make(chan error, 40)
@@ -386,8 +387,8 @@ func TestQuackFaultConcurrentSessionsGetTheirOwnResults(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, _, rows, err := sessions[i%len(sessions)].query(t.Context(), fmt.Sprintf("SELECT %d", i))
-			if err == nil && (len(rows) != 1 || rows[0].get("v") != int64(i)) {
+			_, _, rows, err := sessions[i%len(sessions)].Query(t.Context(), fmt.Sprintf("SELECT %d", i))
+			if err == nil && (len(rows) != 1 || rows[0].Get("v") != int64(i)) {
 				err = fmt.Errorf("statement %d got %v", i, rows)
 			}
 			errs <- err
@@ -404,10 +405,10 @@ func TestQuackFaultConcurrentSessionsGetTheirOwnResults(t *testing.T) {
 func TestQuackFaultSendDataTruncatedAndHTTPError(t *testing.T) {
 	f := newFakeQuackServer(t)
 	s := f.session(t)
-	payload := encodeQuackSendDataRequest(s.connectionID, "stream", 0, nil, nil, nil)
+	payload := encodeSendDataRequest(s.connectionID, "stream", 0, nil, nil, nil)
 
 	f.onSendData = func(w http.ResponseWriter, _ *http.Request) {
-		full := encodeQuackMessage(quackMsgSendDataResponse, "", func(*quackWriter) {})
+		full := encodeMessage(msgSendDataResponse, "", func(*writer) {})
 		_, _ = w.Write(full[:len(full)-1])
 	}
 	requireTransportError(t, s.sendDataRequest(t.Context(), payload))
