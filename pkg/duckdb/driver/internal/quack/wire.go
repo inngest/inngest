@@ -1,4 +1,4 @@
-package driver
+package quack
 
 import (
 	"bytes"
@@ -7,31 +7,31 @@ import (
 	"fmt"
 )
 
-// quackTerminatorFieldID marks the end of an object on the wire: a raw
+// terminatorFieldID marks the end of an object on the wire: a raw
 // uint16 0xFFFF written where a field id would otherwise appear.
-const quackTerminatorFieldID = 0xFFFF
+const terminatorFieldID = 0xFFFF
 
-// quackWriter and quackReader implement DuckDB's BinarySerializer wire
+// writer and reader implement DuckDB's BinarySerializer wire
 // codec: signed ints are sign-extending LEB128 (not ZigZag), unsigned ints
 // are standard LEB128, strings/blobs are an unsigned-LEB128 length prefix
 // plus raw bytes, and every object ends with a raw uint16 0xFFFF terminator.
-type quackWriter struct {
+type writer struct {
 	buf bytes.Buffer
 }
 
-func (w *quackWriter) bytes() []byte { return w.buf.Bytes() }
+func (w *writer) bytes() []byte { return w.buf.Bytes() }
 
-func (w *quackWriter) beginObject() {}
+func (w *writer) beginObject() {}
 
-func (w *quackWriter) endObject() { w.writeFieldID(quackTerminatorFieldID) }
+func (w *writer) endObject() { w.writeFieldID(terminatorFieldID) }
 
-func (w *quackWriter) writeFieldID(id uint16) {
+func (w *writer) writeFieldID(id uint16) {
 	var b [2]byte
 	binary.LittleEndian.PutUint16(b[:], id)
 	w.buf.Write(b[:])
 }
 
-func (w *quackWriter) writeUnsignedLeb128(v uint64) {
+func (w *writer) writeUnsignedLeb128(v uint64) {
 	for {
 		b := byte(v & 0x7F)
 		v >>= 7
@@ -45,7 +45,7 @@ func (w *quackWriter) writeUnsignedLeb128(v uint64) {
 	}
 }
 
-func (w *quackWriter) writeSignedLeb128(v int64) {
+func (w *writer) writeSignedLeb128(v int64) {
 	for {
 		b := byte(v & 0x7F)
 		v >>= 7
@@ -60,7 +60,7 @@ func (w *quackWriter) writeSignedLeb128(v int64) {
 	}
 }
 
-func (w *quackWriter) writeBool(id uint16, v bool) {
+func (w *writer) writeBool(id uint16, v bool) {
 	w.writeFieldID(id)
 	if v {
 		w.buf.WriteByte(1)
@@ -69,38 +69,38 @@ func (w *quackWriter) writeBool(id uint16, v bool) {
 	}
 }
 
-func (w *quackWriter) writeByte(id uint16, v byte) {
+func (w *writer) writeByte(id uint16, v byte) {
 	w.writeFieldID(id)
 	w.writeUnsignedLeb128(uint64(v))
 }
 
-func (w *quackWriter) writeUint64(id uint16, v uint64) {
+func (w *writer) writeUint64(id uint16, v uint64) {
 	w.writeFieldID(id)
 	w.writeUnsignedLeb128(v)
 }
 
 // writeHugeint writes hi as signed LEB128 and lo as unsigned LEB128; always
 // present on the wire, never default-omitted.
-func (w *quackWriter) writeHugeint(id uint16, v quackHugeint) {
+func (w *writer) writeHugeint(id uint16, v hugeint) {
 	w.writeFieldID(id)
 	w.writeSignedLeb128(v.hi)
 	w.writeUnsignedLeb128(v.lo)
 }
 
-func (w *quackWriter) writeUint64Default(id uint16, v uint64) {
+func (w *writer) writeUint64Default(id uint16, v uint64) {
 	if v == 0 {
 		return
 	}
 	w.writeUint64(id, v)
 }
 
-func (w *quackWriter) writeString(id uint16, v string) {
+func (w *writer) writeString(id uint16, v string) {
 	w.writeFieldID(id)
 	w.writeUnsignedLeb128(uint64(len(v)))
 	w.buf.WriteString(v)
 }
 
-func (w *quackWriter) writeStringDefault(id uint16, v string) {
+func (w *writer) writeStringDefault(id uint16, v string) {
 	if v == "" {
 		return
 	}
@@ -110,53 +110,53 @@ func (w *quackWriter) writeStringDefault(id uint16, v string) {
 // writeData writes an unsigned-LEB128 length prefix followed by data. Used
 // for the top-level ConnectionRequest body; this client never writes a
 // DataChunk payload, only reads them.
-func (w *quackWriter) writeData(data []byte) {
+func (w *writer) writeData(data []byte) {
 	w.writeUnsignedLeb128(uint64(len(data)))
 	w.buf.Write(data)
 }
 
 // beginList writes a list's element count; there is no endList since the
 // wire format has no list terminator.
-func (w *quackWriter) beginList(count uint64) {
+func (w *writer) beginList(count uint64) {
 	w.writeUnsignedLeb128(count)
 }
 
-// quackReader parses messages from the duckdb quack server. Field ids are
+// reader parses messages from the duckdb quack server. Field ids are
 // read one token ahead (peek/consume) so tryBeginProperty can detect a
 // default-omitted optional field (next id greater than expected) without
 // consuming it.
-type quackReader struct {
+type reader struct {
 	data          []byte
 	pos           int
 	hasBuffered   bool
 	bufferedField uint16
 }
 
-func newQuackReader(data []byte) *quackReader {
-	return &quackReader{data: data}
+func newReader(data []byte) *reader {
+	return &reader{data: data}
 }
 
-var errQuackTruncated = errors.New("duckdb: quack message truncated")
+var errTruncated = errors.New("duckdb: quack message truncated")
 
-func (r *quackReader) readRawByte() (byte, error) {
+func (r *reader) readRawByte() (byte, error) {
 	if r.pos >= len(r.data) {
-		return 0, errQuackTruncated
+		return 0, errTruncated
 	}
 	b := r.data[r.pos]
 	r.pos++
 	return b, nil
 }
 
-func (r *quackReader) readRawBytes(n int) ([]byte, error) {
+func (r *reader) readRawBytes(n int) ([]byte, error) {
 	if r.pos+n > len(r.data) {
-		return nil, errQuackTruncated
+		return nil, errTruncated
 	}
 	b := r.data[r.pos : r.pos+n]
 	r.pos += n
 	return b, nil
 }
 
-func (r *quackReader) readRawUint16() (uint16, error) {
+func (r *reader) readRawUint16() (uint16, error) {
 	b, err := r.readRawBytes(2)
 	if err != nil {
 		return 0, err
@@ -164,7 +164,7 @@ func (r *quackReader) readRawUint16() (uint16, error) {
 	return binary.LittleEndian.Uint16(b), nil
 }
 
-func (r *quackReader) readUnsignedLeb128() (uint64, error) {
+func (r *reader) readUnsignedLeb128() (uint64, error) {
 	var result uint64
 	var shift uint
 	for {
@@ -183,7 +183,7 @@ func (r *quackReader) readUnsignedLeb128() (uint64, error) {
 	}
 }
 
-func (r *quackReader) readSignedLeb128() (int64, error) {
+func (r *reader) readSignedLeb128() (int64, error) {
 	var result int64
 	var shift uint
 	var b byte
@@ -208,7 +208,7 @@ func (r *quackReader) readSignedLeb128() (int64, error) {
 	return result, nil
 }
 
-func (r *quackReader) peekField() (uint16, error) {
+func (r *reader) peekField() (uint16, error) {
 	if !r.hasBuffered {
 		f, err := r.readRawUint16()
 		if err != nil {
@@ -220,9 +220,9 @@ func (r *quackReader) peekField() (uint16, error) {
 	return r.bufferedField, nil
 }
 
-func (r *quackReader) consumeField() { r.hasBuffered = false }
+func (r *reader) consumeField() { r.hasBuffered = false }
 
-func (r *quackReader) nextField() (uint16, error) {
+func (r *reader) nextField() (uint16, error) {
 	if r.hasBuffered {
 		r.hasBuffered = false
 		return r.bufferedField, nil
@@ -230,20 +230,20 @@ func (r *quackReader) nextField() (uint16, error) {
 	return r.readRawUint16()
 }
 
-func (r *quackReader) beginObject() {}
+func (r *reader) beginObject() {}
 
-func (r *quackReader) endObject() error {
+func (r *reader) endObject() error {
 	next, err := r.nextField()
 	if err != nil {
 		return err
 	}
-	if next != quackTerminatorFieldID {
-		return fmt.Errorf("duckdb: expected end-of-object terminator (0x%04x) but found field id 0x%04x", quackTerminatorFieldID, next)
+	if next != terminatorFieldID {
+		return fmt.Errorf("duckdb: expected end-of-object terminator (0x%04x) but found field id 0x%04x", terminatorFieldID, next)
 	}
 	return nil
 }
 
-func (r *quackReader) beginProperty(id uint16) error {
+func (r *reader) beginProperty(id uint16) error {
 	actual, err := r.nextField()
 	if err != nil {
 		return err
@@ -257,7 +257,7 @@ func (r *quackReader) beginProperty(id uint16) error {
 // tryBeginProperty reports whether the next field matches id, consuming it
 // if so. Returns false without consuming if the field is past id (optional
 // field omitted) or is the terminator; errors if it's below id (corrupt stream).
-func (r *quackReader) tryBeginProperty(id uint16) (bool, error) {
+func (r *reader) tryBeginProperty(id uint16) (bool, error) {
 	next, err := r.peekField()
 	if err != nil {
 		return false, err
@@ -266,13 +266,13 @@ func (r *quackReader) tryBeginProperty(id uint16) (bool, error) {
 		r.consumeField()
 		return true, nil
 	}
-	if next == quackTerminatorFieldID || next > id {
+	if next == terminatorFieldID || next > id {
 		return false, nil
 	}
 	return false, fmt.Errorf("duckdb: out-of-order field id 0x%04x (expected >= 0x%04x)", next, id)
 }
 
-func (r *quackReader) readBool() (bool, error) {
+func (r *reader) readBool() (bool, error) {
 	b, err := r.readRawByte()
 	if err != nil {
 		return false, err
@@ -280,21 +280,21 @@ func (r *quackReader) readBool() (bool, error) {
 	return b != 0, nil
 }
 
-func (r *quackReader) readByte() (byte, error) {
+func (r *reader) readByte() (byte, error) {
 	v, err := r.readUnsignedLeb128()
 	return byte(v), err
 }
 
-func (r *quackReader) readUInt32() (uint32, error) {
+func (r *reader) readUInt32() (uint32, error) {
 	v, err := r.readUnsignedLeb128()
 	return uint32(v), err
 }
 
-func (r *quackReader) readUInt64() (uint64, error) {
+func (r *reader) readUInt64() (uint64, error) {
 	return r.readUnsignedLeb128()
 }
 
-func (r *quackReader) readString() (string, error) {
+func (r *reader) readString() (string, error) {
 	n, err := r.readUnsignedLeb128()
 	if err != nil {
 		return "", err
@@ -309,7 +309,7 @@ func (r *quackReader) readString() (string, error) {
 	return string(b), nil
 }
 
-func (r *quackReader) readData() ([]byte, error) {
+func (r *reader) readData() ([]byte, error) {
 	n, err := r.readUnsignedLeb128()
 	if err != nil {
 		return nil, err
@@ -320,10 +320,10 @@ func (r *quackReader) readData() ([]byte, error) {
 	return r.readRawBytes(int(n))
 }
 
-func (r *quackReader) beginList() (uint64, error) {
+func (r *reader) beginList() (uint64, error) {
 	return r.readUnsignedLeb128()
 }
 
-func (r *quackReader) beginNullable() (bool, error) {
+func (r *reader) beginNullable() (bool, error) {
 	return r.readBool()
 }

@@ -121,7 +121,7 @@ func (d dbInserter) insertBatch(ctx context.Context, rows []spanRow) error {
 // piece over the same underlying session/connection — trading a single large
 // statement for several smaller ones. This exists to test whether it avoids
 // quack's disproportionate PrepareRequest cost for one giant statement (every
-// quack exec goes through a real SQL PREPARE — see quack_session.go's exec —
+// quack exec goes through a real SQL PREPARE — see pkg/duckdb/driver/internal/quack's Session.Exec —
 // and binding a single INSERT's multi-thousand-row literal VALUES list scales
 // worse than linearly there, confirmed empirically: jsonlines holds ~42µs/row
 // from batch=1000 to 10000, quack goes from ~9µs/row-marginal to ~860µs/row).
@@ -228,7 +228,7 @@ func requireDuckDBBinary(tb testing.TB) string {
 
 // requireQuackExtension skips the benchmark if the quack extension can't be
 // installed (no network, or an old duckdb build) — mirrors
-// pkg/db/duckdb/quack_testutil_test.go's helper of the same name.
+// pkg/duckdb/driver/internal/duckdbtest's helper of the same purpose.
 func requireQuackExtension(tb testing.TB, binPath string) {
 	tb.Helper()
 	out, err := exec.Command(binPath, ":memory:", "-c", "INSTALL quack; LOAD quack; SELECT 1;").CombinedOutput()

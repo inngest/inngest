@@ -33,16 +33,16 @@ func TestDuckLakeBootstrapAttachesOnStart(t *testing.T) {
 	require.NoError(t, err, "bootstrap must create the DuckLake data directory")
 	require.True(t, info.IsDir())
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE inngest.dl_t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE inngest.dl_t (id INTEGER);")
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), "INSERT INTO inngest.dl_t VALUES (1);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO inngest.dl_t VALUES (1);")
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.dl_t;")
+	_, rows, err := p.Exec(t.Context(), "SELECT count(*) AS c FROM inngest.dl_t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].get("c"))
+	require.Equal(t, float64(1), rows[0].Get("c"))
 }
 
 // TestDuckLakeInlinesSmallInsertsUpToRowLimit pins the
@@ -64,18 +64,18 @@ func TestDuckLakeInlinesSmallInsertsUpToRowLimit(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE inngest.inline_t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE inngest.inline_t (id INTEGER);")
 	require.NoError(t, err)
 
 	for range 5 {
-		_, _, err = p.exec(t.Context(), "INSERT INTO inngest.inline_t SELECT range FROM range(200);")
+		_, _, err = p.Exec(t.Context(), "INSERT INTO inngest.inline_t SELECT range FROM range(200);")
 		require.NoError(t, err)
 	}
 
-	_, rows, err := p.exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'inline_t';")
+	_, rows, err := p.Exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'inline_t';")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(0), rows[0].get("file_count"), "1000 rows at the row limit must stay inlined, not flushed to Parquet")
+	require.Equal(t, float64(0), rows[0].Get("file_count"), "1000 rows at the row limit must stay inlined, not flushed to Parquet")
 }
 
 // TestDuckLakeInliningRowLimitIsConfigurable proves
@@ -96,16 +96,16 @@ func TestDuckLakeInliningRowLimitIsConfigurable(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE inngest.low_limit_t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE inngest.low_limit_t (id INTEGER);")
 	require.NoError(t, err)
 
-	_, _, err = p.exec(t.Context(), "INSERT INTO inngest.low_limit_t SELECT range FROM range(200);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO inngest.low_limit_t SELECT range FROM range(200);")
 	require.NoError(t, err)
 
-	_, rows, err := p.exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'low_limit_t';")
+	_, rows, err := p.Exec(t.Context(), "SELECT file_count FROM ducklake_table_info('inngest') WHERE table_name = 'low_limit_t';")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
-	require.Greater(t, rows[0].get("file_count"), float64(0), "200 rows must exceed a row limit of 2 and flush to Parquet")
+	require.Greater(t, rows[0].Get("file_count"), float64(0), "200 rows must exceed a row limit of 2 and flush to Parquet")
 }
 
 // TestDuckLakeReattachesAfterCrash is the whole reason the bootstrap lives
@@ -132,9 +132,9 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, _, err = p.exec(t.Context(), "CREATE TABLE inngest.crash_t (id INTEGER);")
+	_, _, err = p.Exec(t.Context(), "CREATE TABLE inngest.crash_t (id INTEGER);")
 	require.NoError(t, err)
-	_, _, err = p.exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (42);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (42);")
 	require.NoError(t, err)
 
 	pidBefore := p.cmd.Process.Pid
@@ -146,10 +146,10 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 
 	// Goes through the production path: dead session detected -> restart ->
 	// health check -> DuckLake bootstrap -> retry the statement.
-	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
+	_, rows, err := p.Exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err, "the restart must re-attach the DuckLake catalog")
 	require.Len(t, rows, 1)
-	require.Equal(t, float64(1), rows[0].get("c"),
+	require.Equal(t, float64(1), rows[0].Get("c"),
 		"the pre-crash row must still be readable from the re-attached lake")
 
 	p.mu.Lock()
@@ -161,11 +161,11 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 
 	// The re-attached session must keep working for writes too, not just the
 	// one retried read.
-	_, _, err = p.exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (43);")
+	_, _, err = p.Exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (43);")
 	require.NoError(t, err)
-	_, rows, err = p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
+	_, rows, err = p.Exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err)
-	require.Equal(t, float64(2), rows[0].get("c"))
+	require.Equal(t, float64(2), rows[0].Get("c"))
 }
 
 // TestOpenWithDuckLake exercises the Options wiring through the public API.
