@@ -7,7 +7,7 @@ package duckdbbench
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
+	sqldriver "database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -170,7 +170,7 @@ func (q quackAppendInserter) insertBatch(ctx context.Context, rows []spanRow) er
 // same duckdbgo.Connector openEmbeddedConnector used for schema setup, not a
 // connection borrowed from *sql.DB's pool — the Appender API needs to own its
 // connection for its lifetime.
-type appenderInserter struct{ conn driver.Conn }
+type appenderInserter struct{ conn sqldriver.Conn }
 
 func (a appenderInserter) insertBatch(ctx context.Context, rows []spanRow) error {
 	if len(rows) == 0 {
