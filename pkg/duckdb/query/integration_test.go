@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/duckdb/tracing"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/duckdb/tracing"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
