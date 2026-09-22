@@ -37,8 +37,9 @@ export function HostedConnection({ children }: { children: ReactNode }) {
     pathname === '/' || pathname === '/dev' || pathname === '/dev/';
 
   useEffect(() => {
-    setOrigin(getAPIOrigin());
-    setPort(new URL(getAPIOrigin()).port || '80');
+    const apiOrigin = getAPIOrigin();
+    setOrigin(apiOrigin);
+    setPort(new URL(apiOrigin).port || '80');
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController;
