@@ -146,7 +146,7 @@ export function useRunsPagination({
 
   const loadMore = useCallback(() => {
     if (shouldUseREST) {
-      if (!restQuery.isFetching && restQuery.hasNextPage) {
+      if (!restQuery.error && !restQuery.isFetching && restQuery.hasNextPage) {
         void restQuery.fetchNextPage();
       }
       return;
@@ -156,6 +156,7 @@ export function useRunsPagination({
     }
   }, [
     shouldUseREST,
+    restQuery.error,
     restQuery.isFetching,
     restQuery.hasNextPage,
     restQuery.fetchNextPage,

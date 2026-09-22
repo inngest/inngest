@@ -158,4 +158,51 @@ describe('REST runs pagination refresh', () => {
     );
     expect(mocks.apiFetch.mock.calls[2]?.[0]).not.toContain('cursor=');
   });
+
+  it('does not start another page request after pagination fails', async () => {
+    mocks.apiFetch.mockImplementation((pathname: string) => {
+      if (pathname.includes('cursor=second-page')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ errors: [{ message: 'Too many requests' }] }),
+            { status: 429, headers: { 'Retry-After': '0' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [run('run-1')],
+            page: { cursor: 'second-page', hasMore: true, limit: 40 },
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    let result: RunsPaginationResult | undefined;
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness onRender={(value) => (result = value)} />
+        </QueryClientProvider>,
+      );
+    });
+    await vi.waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(result?.hasNextPage).toBe(true));
+
+    await act(async () => result?.loadMore());
+    await vi.waitFor(() => expect(result?.error).toBeInstanceOf(Error));
+    await vi.waitFor(() => expect(mocks.apiFetch).toHaveBeenCalledTimes(5));
+
+    await act(async () => result?.loadMore());
+    expect(mocks.apiFetch).toHaveBeenCalledTimes(5);
+  });
 });
