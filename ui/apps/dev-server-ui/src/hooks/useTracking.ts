@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { createDevServerURL } from '@/utils/devServer';
 
 export function useTracking() {
   // Stable across renders so callers can safely list trackEvent in their
@@ -30,12 +31,4 @@ export function useTracking() {
   );
 
   return { trackEvent };
-}
-
-function createDevServerURL(path: string) {
-  const host = import.meta.env.VITE_PUBLIC_API_BASE_URL;
-  if (!host) {
-    return path;
-  }
-  return new URL(path, host).toString();
 }

@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
+import { usePublicHref } from '../Link/usePublicHref';
 import { cn } from '../utils/classNames';
 import {
   getButtonColors,
@@ -46,9 +47,10 @@ type LinkWrapperProps = {
 } & Omit<LinkComponentProps, 'href' | 'to'>;
 
 export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
-  ({ children, href, to, target, rel, prefetch = false, scroll = true, ...props }, ref) =>
-    href ? (
-      <a href={href} target={target} rel={rel} {...props}>
+  ({ children, href, to, target, rel, prefetch = false, scroll = true, ...props }, ref) => {
+    const resolvedHref = usePublicHref(href);
+    return href ? (
+      <a href={resolvedHref} target={target} rel={rel} ref={ref} {...props}>
         {children}
       </a>
     ) : to ? (
@@ -64,7 +66,8 @@ export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
       </Link>
     ) : (
       children
-    )
+    );
+  }
 );
 LinkWrapper.displayName = 'LinkWrapper';
 

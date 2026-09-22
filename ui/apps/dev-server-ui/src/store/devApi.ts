@@ -2,10 +2,9 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { z } from 'zod';
 
 import { api } from './generated';
+import { getAPIOrigin } from '@/utils/devServer';
 
-const baseURL = import.meta.env.VITE_PUBLIC_API_BASE_URL
-  ? new URL('/', import.meta.env.VITE_PUBLIC_API_BASE_URL)
-  : '/';
+const baseURL = getAPIOrigin() || '/';
 
 export interface EventPayload {
   id?: string;
@@ -28,7 +27,7 @@ export interface ServerInfo extends z.output<typeof serverInfoSchema> {
 
 export const devApi = createApi({
   reducerPath: 'devApi',
-  baseQuery: fetchBaseQuery({ baseUrl: baseURL.toString() }),
+  baseQuery: fetchBaseQuery({ baseUrl: baseURL }),
   endpoints: (builder) => ({
     info: builder.query<ServerInfo, void>({
       query() {

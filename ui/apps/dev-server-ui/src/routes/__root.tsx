@@ -14,6 +14,8 @@ import {
 import globalsCss from '@inngest/components/AppRoot/globals.css?url';
 import fontsCss from '@inngest/components/AppRoot/fonts.css?url';
 import StoreProvider from '@/components/StoreProvider';
+import { HostedConnection } from '@/components/HostedConnection';
+import { isHosted } from '@/utils/devServer';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -26,8 +28,33 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Inngest Server',
+        title: isHosted
+          ? 'Inngest Dev Server | Local workflow development'
+          : 'Inngest Server',
       },
+      ...(isHosted
+        ? [
+            {
+              name: 'description',
+              content:
+                'Build and debug durable workflows locally. Connect to your Inngest Dev Server to send events, inspect function runs, and explore execution traces.',
+            },
+            { name: 'robots', content: 'noindex, follow' },
+            { property: 'og:title', content: 'Inngest Dev Server' },
+            {
+              property: 'og:description',
+              content:
+                'Build and debug durable workflows on your machine from your browser.',
+            },
+            { property: 'og:type', content: 'website' },
+            {
+              property: 'og:image',
+              content:
+                'https://www.inngest.com/assets/homepage/open-graph-2026.png',
+            },
+            { name: 'twitter:card', content: 'summary_large_image' },
+          ]
+        : []),
     ],
     links: [
       {
@@ -40,12 +67,12 @@ export const Route = createRootRoute({
       },
       {
         rel: 'icon',
-        href: '/favicon-june-2025.svg',
+        href: `${import.meta.env.BASE_URL}favicon-june-2025.svg`,
         media: '(prefers-color-scheme: light)',
       },
       {
         rel: 'icon',
-        href: '/favicon-june-2025.svg',
+        href: `${import.meta.env.BASE_URL}favicon-june-2025.svg`,
         media: '(prefers-color-scheme: dark)',
       },
     ],
@@ -54,24 +81,27 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const Connection = isHosted ? HostedConnection : React.Fragment;
   return (
     <RootDocument>
-      <StoreProvider>
-        <ThemeProvider attribute="class" defaultTheme="system">
-          <Outlet />
-          <Toaster
-            toastOptions={{
-              className: 'drop-shadow-lg',
-              style: {
-                background: `rgb(var(--color-background-canvas-base))`,
-                borderRadius: 0,
-                borderWidth: '0px 0px 2px',
-                color: `rgb(var(--color-foreground-base))`,
-              },
-            }}
-          />
-        </ThemeProvider>
-      </StoreProvider>
+      <ThemeProvider attribute="class" defaultTheme="system">
+        <Connection>
+          <StoreProvider>
+            <Outlet />
+            <Toaster
+              toastOptions={{
+                className: 'drop-shadow-lg',
+                style: {
+                  background: `rgb(var(--color-background-canvas-base))`,
+                  borderRadius: 0,
+                  borderWidth: '0px 0px 2px',
+                  color: `rgb(var(--color-foreground-base))`,
+                },
+              }}
+            />
+          </StoreProvider>
+        </Connection>
+      </ThemeProvider>
     </RootDocument>
   );
 }
@@ -86,7 +116,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <div id="app" />
         <div id="modals" />
         {children}
-        <TanStackRouterDevtools position="bottom-right" />
+        {import.meta.env.DEV && (
+          <TanStackRouterDevtools position="bottom-right" />
+        )}
         <Scripts />
       </body>
     </html>

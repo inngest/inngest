@@ -2,6 +2,8 @@ import NextLink from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 
+import { usePublicHref } from '../Link/usePublicHref';
+
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
   mainContent: React.ReactNode;
@@ -19,6 +21,7 @@ export default function ConfigurationBlock({
   rightElement, // TODO: should rightElement be RiArrowRightSLine by default if we have href and are going to wrap in NextLink?
   href,
 }: ConfigurationBlockProps) {
+  const resolvedHref = usePublicHref(href);
   const showSubContentAndExpressionSeparator = !!subContent && !!expression;
 
   const borderClasses =
@@ -54,7 +57,7 @@ export default function ConfigurationBlock({
   );
 
   return href ? (
-    <NextLink href={href} className={cn('hover:bg-canvasMuted block', borderClasses)}>
+    <NextLink href={resolvedHref!} className={cn('hover:bg-canvasMuted block', borderClasses)}>
       {content}
     </NextLink>
   ) : (

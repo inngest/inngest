@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createDevServerURL } from '@/utils/devServer';
 
 interface FeatureFlags {
   FEATURE_CEL_SEARCH?: boolean;
@@ -30,16 +31,4 @@ export function useFeatureFlags() {
   }, []);
 
   return { featureFlags, loading, error };
-}
-
-/**
- * Creates a Dev Server URL from a path. If Dev Server host is unknown, it
- * returns the path.
- */
-export function createDevServerURL(path: string) {
-  const host = import.meta.env.VITE_PUBLIC_API_BASE_URL;
-  if (!host) {
-    return path;
-  }
-  return new URL(path, host).toString();
 }
