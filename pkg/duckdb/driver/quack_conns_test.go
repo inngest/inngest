@@ -37,7 +37,7 @@ func TestOpenWithQuackConnsRunsQueriesConcurrently(t *testing.T) {
 	requireQuackExtension(t, binPath)
 	dir := t.TempDir()
 
-	addr := freeLocalAddr(t)
+	addr := EphemeralQuackAddr
 
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,

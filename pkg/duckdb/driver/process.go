@@ -359,6 +359,8 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		}
 	}
 
+	// The CLI's own "listen_url" is authoritative: with an ephemeral
+	// QuackAddr (port 0) it carries the port the kernel actually assigned.
 	serveStmt := fmt.Sprintf("CALL quack_serve(%s, token = %s);", quackAddrLiteral, tokenLiteral)
 	_, rows, err := p.sess.exec(ctx, serveStmt)
 	if err != nil {
@@ -966,6 +968,12 @@ func (p *process) close(ctx context.Context) error {
 	return p.closeLocked(ctx)
 }
 
+// EphemeralQuackAddr asks quack_serve to bind a kernel-assigned loopback
+// port. The port actually bound is read back from quack_serve's listen_url,
+// so there is no window between choosing a port and binding it for another
+// process to claim it.
+const EphemeralQuackAddr = "127.0.0.1:0"
+
 // DuckLakeAlias is the catalog name the DuckLake bootstrap attaches under, so
 // callers address DuckLake-backed tables as inngest.<table>. It is fixed for this
 // POC; making it configurable is future work.
@@ -1113,7 +1121,10 @@ type Options struct {
 
 	// QuackAddr, when non-nil, starts a quack listener on the given address
 	// after every successful health check of a freshly spawned subprocess.
-	// Leave nil (the zero value) to disable quack entirely.
+	// Leave nil (the zero value) to disable quack entirely. Use
+	// EphemeralQuackAddr unless a caller outside this process needs a fixed
+	// port: quack_serve binds with address reuse, so a fixed port already
+	// held by another listener binds "successfully" instead of failing.
 	QuackAddr *string
 
 	// QuackServeToken, when non-empty, is used as quack_serve's fixed auth

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -255,10 +254,7 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 		return nil, nil, fmt.Errorf("creating %q: %w", dir, err)
 	}
 
-	addr, err := freeLocalQuackAddr()
-	if err != nil {
-		return nil, nil, fmt.Errorf("allocating a local port for the quack listener: %w", err)
-	}
+	addr := driver.EphemeralQuackAddr
 
 	connector, db, err := driver.OpenConnector(ctx, driver.Options{
 		BinaryPath: binPath,
@@ -280,24 +276,6 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 		return nil, nil, err
 	}
 	return connector, db, nil
-}
-
-// freeLocalQuackAddr resolves an ephemeral loopback port for
-// driver.Options.QuackAddr, mirroring pkg/devserver/dualwrite.go's helper
-// of the same purpose (unexported there too, so duplicated rather than
-// imported across packages for one small function). Closing the listener
-// immediately before duckdb binds it is a small TOCTOU race, acceptable for
-// this dev tool.
-func freeLocalQuackAddr() (string, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", err
-	}
-	addr := l.Addr().(*net.TCPAddr)
-	if err := l.Close(); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("127.0.0.1:%d", addr.Port), nil
 }
 
 func lookDuckDBBinary() (string, error) {
