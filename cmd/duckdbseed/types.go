@@ -14,10 +14,12 @@ import (
 // Tenant is one observed (or synthesized) account/env/app/function tuple
 // that generated runs are attributed to.
 type Tenant struct {
-	AccountID  uuid.UUID
-	EnvID      uuid.UUID
-	AppID      uuid.UUID
-	FunctionID uuid.UUID
+	AccountID    uuid.UUID
+	EnvID        uuid.UUID
+	AppID        uuid.UUID
+	AppName      string
+	FunctionID   uuid.UUID
+	FunctionSlug string
 }
 
 // Templates holds the value pools GenerateRuns samples from when building
@@ -153,19 +155,25 @@ type GenerateConfig struct {
 
 // RunRow mirrors inngest.runs' columns (pkg/db/duckdb/migrations/000001_baseline.sql).
 type RunRow struct {
-	AccountID   uuid.UUID
-	EnvID       uuid.UUID
-	RunID       string
-	QueuedAt    time.Time
-	ScheduledAt *time.Time
-	StartedAt   *time.Time
-	EndedAt     *time.Time
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
-	Status      string
-	Inputs      string
-	Output      string
-	EventIDs    []string
+	AccountID    uuid.UUID
+	EnvID        uuid.UUID
+	RunID        string
+	QueuedAt     time.Time
+	ScheduledAt  *time.Time
+	StartedAt    *time.Time
+	EndedAt      *time.Time
+	AppID        uuid.UUID
+	AppName      string
+	FunctionID   uuid.UUID
+	FunctionSlug string
+	Status       string
+	// Attributes mirrors inngest.runs.attributes, which dual-write copies
+	// from the run's root span (see pkg/duckdb/tracing's materializeRuns);
+	// generateRun likewise takes it from the replayed trace's root span.
+	Attributes string
+	Inputs     string
+	Output     string
+	EventIDs   []string
 	// Sessions mirrors inngest.runs.sessions — this tool never generates
 	// session-tagged runs, so it's always left nil.
 	Sessions []SessionPair
@@ -188,7 +196,9 @@ type SpanRow struct {
 	RunID        string
 	RunQueuedAt  time.Time
 	AppID        uuid.UUID
+	AppName      string
 	FunctionID   uuid.UUID
+	FunctionSlug string
 	Name         string
 	StartTime    time.Time
 	EndTime      time.Time
@@ -227,8 +237,6 @@ type MetadataRow struct {
 	EnvID       uuid.UUID
 	RunID       string
 	RunQueuedAt time.Time
-	AppID       uuid.UUID
-	FunctionID  uuid.UUID
 	SpanID      string
 	Scope       string
 	StepID      *string

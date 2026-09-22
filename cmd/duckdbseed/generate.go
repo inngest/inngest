@@ -54,24 +54,38 @@ func generateRun(rng *rand.Rand, tmpl Templates, cfg GenerateConfig) GeneratedRu
 	}
 
 	run := RunRow{
-		AccountID:  tenant.AccountID,
-		EnvID:      tenant.EnvID,
-		RunID:      newULID(rng, queuedAt),
-		QueuedAt:   queuedAt,
-		StartedAt:  startedAt,
-		EndedAt:    endedAt,
-		AppID:      tenant.AppID,
-		FunctionID: tenant.FunctionID,
-		Status:     pickString(rng, tmpl.Statuses, "Completed"),
-		Inputs:     pickString(rng, tmpl.Inputs, `{}`),
-		Output:     pickString(rng, tmpl.Outputs, `{}`),
-		EventIDs:   eventIDs,
+		AccountID:    tenant.AccountID,
+		EnvID:        tenant.EnvID,
+		RunID:        newULID(rng, queuedAt),
+		QueuedAt:     queuedAt,
+		StartedAt:    startedAt,
+		EndedAt:      endedAt,
+		AppID:        tenant.AppID,
+		AppName:      tenant.AppName,
+		FunctionID:   tenant.FunctionID,
+		FunctionSlug: tenant.FunctionSlug,
+		Status:       pickString(rng, tmpl.Statuses, "Completed"),
+		Attributes:   rootSpanAttributes(trace),
+		Inputs:       pickString(rng, tmpl.Inputs, `{}`),
+		Output:       pickString(rng, tmpl.Outputs, `{}`),
+		EventIDs:     eventIDs,
 	}
 
 	spans := generateSpanTree(trace, run)
 	metadata := generateMetadata(rng, tmpl, run, spans)
 
 	return GeneratedRun{Run: run, Spans: spans, Events: events, Metadata: metadata}
+}
+
+// rootSpanAttributes returns the attributes of trace's root span (the one
+// with no parent), or "{}" if it has none or they're empty.
+func rootSpanAttributes(trace TraceTemplate) string {
+	for _, s := range trace.Spans {
+		if s.ParentSpanID == nil && s.Attributes != "" {
+			return s.Attributes
+		}
+	}
+	return `{}`
 }
 
 // defaultTraceTemplate is replayed when tmpl has no sampled traces to draw
@@ -110,7 +124,9 @@ func generateSpanTree(trace TraceTemplate, run RunRow) []SpanRow {
 			RunID:        run.RunID,
 			RunQueuedAt:  run.QueuedAt,
 			AppID:        run.AppID,
+			AppName:      run.AppName,
 			FunctionID:   run.FunctionID,
+			FunctionSlug: run.FunctionSlug,
 			Name:         s.Name,
 			StartTime:    anchor.Add(s.StartOffset),
 			EndTime:      anchor.Add(s.EndOffset),
@@ -159,8 +175,6 @@ func generateMetadata(rng *rand.Rand, tmpl Templates, run RunRow, spans []SpanRo
 			EnvID:       run.EnvID,
 			RunID:       run.RunID,
 			RunQueuedAt: run.QueuedAt,
-			AppID:       run.AppID,
-			FunctionID:  run.FunctionID,
 			SpanID:      item.SpanID,
 			CreatedAt:   run.QueuedAt.Add(item.Offset),
 			Scope:       item.Scope,
