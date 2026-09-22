@@ -1,4 +1,4 @@
-package driver
+package quack
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestQuackEncodeConnectionRequestThenDecodeHeader(t *testing.T) {
-	req := quackConnectionRequest{
+	req := connectionRequest{
 		AuthString:               "tok",
 		ClientDuckDBVersion:      "inngest-quack 0.0.1",
 		ClientPlatform:           "go",
@@ -17,19 +17,19 @@ func TestQuackEncodeConnectionRequestThenDecodeHeader(t *testing.T) {
 	}
 	msg := req.encode()
 
-	r := newQuackReader(msg)
-	hdr, err := decodeQuackMessageHeader(r)
+	r := newReader(msg)
+	hdr, err := decodeMessageHeader(r)
 	require.NoError(t, err)
-	require.Equal(t, byte(quackMsgConnectionRequest), hdr.Type)
+	require.Equal(t, byte(msgConnectionRequest), hdr.Type)
 	require.Equal(t, "", hdr.ConnectionID) // no connection yet at handshake time
 }
 
 func TestQuackDecodeConnectionResponse(t *testing.T) {
 	// Build bytes shaped exactly like a real quack_serve ConnectionResponse:
 	// header{type=2, connection_id="abc"} body{server_version, platform, quack_version}.
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgConnectionResponse)
+	w.writeByte(1, msgConnectionResponse)
 	w.writeString(2, "abc")
 	w.writeUint64(3, ^uint64(0))
 	w.endObject()
@@ -39,45 +39,45 @@ func TestQuackDecodeConnectionResponse(t *testing.T) {
 	w.writeUint64Default(3, 1)
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	hdr, err := decodeQuackMessageHeader(r)
+	r := newReader(w.bytes())
+	hdr, err := decodeMessageHeader(r)
 	require.NoError(t, err)
-	require.Equal(t, byte(quackMsgConnectionResponse), hdr.Type)
+	require.Equal(t, byte(msgConnectionResponse), hdr.Type)
 	require.Equal(t, "abc", hdr.ConnectionID)
 
-	resp, err := decodeQuackConnectionResponseBody(r)
+	resp, err := decodeConnectionResponseBody(r)
 	require.NoError(t, err)
 	require.Equal(t, "v1.5.5", resp.ServerDuckDBVersion)
 	require.Equal(t, "osx_arm64", resp.ServerPlatform)
-	require.EqualValues(t, 1, resp.QuackVersion)
+	require.EqualValues(t, 1, resp.Version)
 }
 
 func TestQuackDecodeErrorResponse(t *testing.T) {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgErrorResponse)
+	w.writeByte(1, msgErrorResponse)
 	w.writeUint64(3, ^uint64(0)) // client_query_id is mandatory on the wire, not default-omit
 	w.endObject()
 	w.beginObject()
 	w.writeStringDefault(1, "Table with name t does not exist!")
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	hdr, err := decodeQuackMessageHeader(r)
+	r := newReader(w.bytes())
+	hdr, err := decodeMessageHeader(r)
 	require.NoError(t, err)
-	require.Equal(t, byte(quackMsgErrorResponse), hdr.Type)
+	require.Equal(t, byte(msgErrorResponse), hdr.Type)
 
-	msg, err := decodeQuackErrorResponseBody(r)
+	msg, err := decodeErrorResponseBody(r)
 	require.NoError(t, err)
 	require.Equal(t, "Table with name t does not exist!", msg)
 }
 
 func TestQuackEncodePrepareRequest(t *testing.T) {
-	msg := encodeQuackPrepareRequest("conn-1", "SELECT 1", randomQuackHugeint())
-	r := newQuackReader(msg)
-	hdr, err := decodeQuackMessageHeader(r)
+	msg := encodePrepareRequest("conn-1", "SELECT 1", randomHugeint())
+	r := newReader(msg)
+	hdr, err := decodeMessageHeader(r)
 	require.NoError(t, err)
-	require.Equal(t, byte(quackMsgPrepareRequest), hdr.Type)
+	require.Equal(t, byte(msgPrepareRequest), hdr.Type)
 	require.Equal(t, "conn-1", hdr.ConnectionID)
 }
 
@@ -86,7 +86,7 @@ func TestQuackEncodePrepareRequest(t *testing.T) {
 // same shape verified against a real `duckdb` quack server in exploration.
 func buildFlatIntegerChunk(t *testing.T, value int32) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	// DataChunk object: field100 rows, field101 types, field102 columns.
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
@@ -119,13 +119,13 @@ func buildFlatIntegerChunk(t *testing.T, value int32) []byte {
 // as buildFlatIntegerChunk, but days-since-epoch is DATE's physical value.
 func buildFlatDateChunk(t *testing.T, days int32) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
 	w.beginList(1)
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeDate)
+	w.writeByte(100, logicalTypeDate)
 	w.endObject()
 	w.writeFieldID(102)
 	w.beginList(1)
@@ -148,12 +148,12 @@ func TestQuackDecodeChunkFlatDate(t *testing.T) {
 	days := int32(want.Sub(time.Unix(0, 0).UTC()).Hours() / 24)
 
 	body := buildFlatDateChunk(t, days)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 	require.Equal(t, 1, c.rowCount)
 	require.Len(t, c.columns, 1)
-	require.Equal(t, quackLogicalTypeDate, c.columns[0].typeID)
+	require.Equal(t, logicalTypeDate, c.columns[0].typeID)
 
 	values, err := c.columns[0].values()
 	require.NoError(t, err)
@@ -162,12 +162,12 @@ func TestQuackDecodeChunkFlatDate(t *testing.T) {
 
 func TestQuackDecodeChunkFlatInteger(t *testing.T) {
 	body := buildFlatIntegerChunk(t, 42)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 	require.Equal(t, 1, c.rowCount)
 	require.Len(t, c.columns, 1)
-	require.Equal(t, quackLogicalTypeInteger, c.columns[0].typeID)
+	require.Equal(t, logicalTypeInteger, c.columns[0].typeID)
 
 	values, err := c.columns[0].values()
 	require.NoError(t, err)
@@ -182,14 +182,14 @@ func TestQuackDecodeChunkFlatInteger(t *testing.T) {
 // terminator, no further fields).
 func buildVarcharJSONChunk(t *testing.T, jsonText string) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
 	w.beginList(1)
 	// LogicalType object: field100 id=VARCHAR, field101 type_info={100: kind, 101: alias}.
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeVarchar)
+	w.writeByte(100, logicalTypeVarchar)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1) // nullable "present" marker for type_info
 	w.beginObject()
@@ -200,12 +200,12 @@ func buildVarcharJSONChunk(t *testing.T, jsonText string) []byte {
 	w.writeFieldID(102)
 	w.beginList(1)
 	// Vector object (Flat): field100 has_validity=false, fields 107/108/109
-	// data — see encodeQuackVarcharVectorData's doc comment for this shape
+	// data — see encodeVarcharVectorData's doc comment for this shape
 	// (new as of quack protocol version 3; confirmed against a real
 	// duckdb v2.1.0-alpha40409 subprocess).
 	w.beginObject()
 	w.writeBool(100, false)
-	require.NoError(t, encodeQuackVarcharVectorData(w, [][]any{{jsonText}}, 0))
+	require.NoError(t, encodeVarcharVectorData(w, [][]any{{jsonText}}, 0))
 	w.endObject()
 	w.endObject()
 	return w.bytes()
@@ -213,8 +213,8 @@ func buildVarcharJSONChunk(t *testing.T, jsonText string) []byte {
 
 func TestQuackDecodeChunkVarcharAliasedAsJSONDecodesNestedValue(t *testing.T) {
 	body := buildVarcharJSONChunk(t, `{"k":1,"arr":[1,2,3]}`)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 	require.Equal(t, "JSON", c.columns[0].alias)
 
@@ -230,13 +230,13 @@ func TestQuackDecodeChunkVarcharAliasedAsJSONDecodesNestedValue(t *testing.T) {
 // against a real duckdb subprocess: a packed bit mask, LSB-first, 1=valid).
 func buildFlatIntegerChunkWithValidity(t *testing.T, values [2]int32, rowNull int) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 2) // rows
 	w.writeFieldID(101)
 	w.beginList(1) // one column
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeInteger)
+	w.writeByte(100, logicalTypeInteger)
 	w.endObject()
 	w.writeFieldID(102)
 	w.beginList(1) // that one column's Vector
@@ -266,8 +266,8 @@ func buildFlatIntegerChunkWithValidity(t *testing.T, values [2]int32, rowNull in
 
 func TestQuackDecodeChunkValidityMaskProducesNilForNullRows(t *testing.T) {
 	body := buildFlatIntegerChunkWithValidity(t, [2]int32{7, 9}, 1)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 
 	values, err := c.columns[0].values()
@@ -283,13 +283,13 @@ func TestQuackDecodeChunkValidityMaskProducesNilForNullRows(t *testing.T) {
 func TestQuackDecodeChunkUUIDDecodesToStandardString(t *testing.T) {
 	wireBytes := []byte{137, 103, 245, 228, 211, 194, 177, 160, 137, 71, 246, 229, 212, 195, 178, 33}
 
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
 	w.beginList(1)
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeUUID)
+	w.writeByte(100, logicalTypeUUID)
 	w.endObject()
 	w.writeFieldID(102)
 	w.beginList(1)
@@ -300,8 +300,8 @@ func TestQuackDecodeChunkUUIDDecodesToStandardString(t *testing.T) {
 	w.endObject()
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(w.bytes())
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 
 	values, err := c.columns[0].values()
@@ -310,9 +310,9 @@ func TestQuackDecodeChunkUUIDDecodesToStandardString(t *testing.T) {
 }
 
 func TestQuackDecodePrepareResponseBuildsNamedRows(t *testing.T) {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
-	w.writeByte(1, quackMsgPrepareResponse)
+	w.writeByte(1, msgPrepareResponse)
 	w.writeString(2, "conn-1")
 	w.writeUint64(3, ^uint64(0))
 	w.endObject()
@@ -351,18 +351,18 @@ func TestQuackDecodePrepareResponseBuildsNamedRows(t *testing.T) {
 	w.writeUnsignedLeb128(0)
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	hdr, err := decodeQuackMessageHeader(r)
+	r := newReader(w.bytes())
+	hdr, err := decodeMessageHeader(r)
 	require.NoError(t, err)
-	require.Equal(t, byte(quackMsgPrepareResponse), hdr.Type)
+	require.Equal(t, byte(msgPrepareResponse), hdr.Type)
 
-	names, types, rows, _, _, err := decodeQuackPrepareResponseBody(r)
+	names, types, rows, _, _, err := decodePrepareResponseBody(r)
 	require.NoError(t, err)
 	require.Equal(t, []string{"ok"}, names)
 	require.Len(t, types, 1)
 	require.Equal(t, "INTEGER", types[0].typeName())
 	require.Len(t, rows, 1)
-	require.Equal(t, int64(7), rows[0].get("ok"))
+	require.Equal(t, int64(7), rows[0].Get("ok"))
 }
 
 // writeDecimalLogicalType writes a DECIMAL LogicalType object — the shape
@@ -371,9 +371,9 @@ func TestQuackDecodePrepareResponseBuildsNamedRows(t *testing.T) {
 // DecimalTypeInfo, otherwise unused), 200: width as a plain ULEB128 scalar
 // (not a nested LogicalType, unlike LIST/STRUCT's field200), 201: scale as a
 // plain ULEB128 scalar}.
-func writeDecimalLogicalType(w *quackWriter, width, scale byte) {
+func writeDecimalLogicalType(w *writer, width, scale byte) {
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeDecimal)
+	w.writeByte(100, logicalTypeDecimal)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1) // type_info nullable "present" marker
 	w.beginObject()
@@ -385,13 +385,13 @@ func writeDecimalLogicalType(w *quackWriter, width, scale byte) {
 }
 
 func TestDecodeQuackLogicalTypeDecimal(t *testing.T) {
-	w := &quackWriter{}
+	w := &writer{}
 	writeDecimalLogicalType(w, 10, 2)
 
-	r := newQuackReader(w.bytes())
-	lt, err := decodeQuackLogicalType(r)
+	r := newReader(w.bytes())
+	lt, err := decodeLogicalType(r)
 	require.NoError(t, err)
-	require.Equal(t, quackLogicalTypeDecimal, lt.id)
+	require.Equal(t, logicalTypeDecimal, lt.id)
 	require.Equal(t, byte(10), lt.decimalWidth)
 	require.Equal(t, byte(2), lt.decimalScale)
 	require.Equal(t, "DECIMAL(10,2)", lt.typeName())
@@ -405,9 +405,9 @@ func TestDecodeQuackLogicalTypeDecimal(t *testing.T) {
 // the wire), 201: a raw ULEB128 count followed by that many
 // length-prefixed strings — the enum's dictionary values, in declaration
 // order}.
-func writeEnumLogicalType(w *quackWriter, values []string) {
+func writeEnumLogicalType(w *writer, values []string) {
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeEnum)
+	w.writeByte(100, logicalTypeEnum)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1)
 	w.beginObject()
@@ -424,13 +424,13 @@ func writeEnumLogicalType(w *quackWriter, values []string) {
 }
 
 func TestDecodeQuackLogicalTypeEnum(t *testing.T) {
-	w := &quackWriter{}
+	w := &writer{}
 	writeEnumLogicalType(w, []string{"a", "b"})
 
-	r := newQuackReader(w.bytes())
-	lt, err := decodeQuackLogicalType(r)
+	r := newReader(w.bytes())
+	lt, err := decodeLogicalType(r)
 	require.NoError(t, err)
-	require.Equal(t, quackLogicalTypeEnum, lt.id)
+	require.Equal(t, logicalTypeEnum, lt.id)
 	require.Equal(t, []string{"a", "b"}, lt.enumValues)
 	require.Equal(t, "ENUM('a', 'b')", lt.typeName())
 }
@@ -443,56 +443,56 @@ func TestDecodeQuackLogicalTypeEnum(t *testing.T) {
 func TestQuackLogicalTypeName(t *testing.T) {
 	tests := []struct {
 		name string
-		lt   quackLogicalType
+		lt   logicalType
 		want string
 	}{
-		{"boolean", quackLogicalType{id: quackLogicalTypeBoolean}, "BOOLEAN"},
-		{"tinyint", quackLogicalType{id: quackLogicalTypeTinyInt}, "TINYINT"},
-		{"smallint", quackLogicalType{id: quackLogicalTypeSmallInt}, "SMALLINT"},
-		{"integer", quackLogicalType{id: quackLogicalTypeInteger}, "INTEGER"},
-		{"bigint", quackLogicalType{id: quackLogicalTypeBigInt}, "BIGINT"},
-		{"hugeint", quackLogicalType{id: quackLogicalTypeHugeint}, "HUGEINT"},
-		{"uhugeint", quackLogicalType{id: quackLogicalTypeUHugeint}, "UHUGEINT"},
-		{"utinyint", quackLogicalType{id: quackLogicalTypeUTinyInt}, "UTINYINT"},
-		{"usmallint", quackLogicalType{id: quackLogicalTypeUSmallInt}, "USMALLINT"},
-		{"uinteger", quackLogicalType{id: quackLogicalTypeUInteger}, "UINTEGER"},
-		{"ubigint", quackLogicalType{id: quackLogicalTypeUBigInt}, "UBIGINT"},
-		{"float", quackLogicalType{id: quackLogicalTypeFloat}, "FLOAT"},
-		{"double", quackLogicalType{id: quackLogicalTypeDouble}, "DOUBLE"},
-		{"date", quackLogicalType{id: quackLogicalTypeDate}, "DATE"},
-		{"time", quackLogicalType{id: quackLogicalTypeTime}, "TIME"},
-		{"time_tz", quackLogicalType{id: quackLogicalTypeTimeTZ}, "TIME WITH TIME ZONE"},
-		{"timestamp_sec", quackLogicalType{id: quackLogicalTypeTimestampSec}, "TIMESTAMP"},
-		{"timestamp_ms", quackLogicalType{id: quackLogicalTypeTimestampMs}, "TIMESTAMP"},
-		{"timestamp", quackLogicalType{id: quackLogicalTypeTimestamp}, "TIMESTAMP"},
-		{"timestamp_ns", quackLogicalType{id: quackLogicalTypeTimestampNs}, "TIMESTAMP"},
-		{"timestamp_tz", quackLogicalType{id: quackLogicalTypeTimestampTZ}, "TIMESTAMP WITH TIME ZONE"},
-		{"interval", quackLogicalType{id: quackLogicalTypeInterval}, "INTERVAL"},
-		{"varchar", quackLogicalType{id: quackLogicalTypeVarchar}, "VARCHAR"},
-		{"json", quackLogicalType{id: quackLogicalTypeVarchar, alias: quackAliasJSON}, "JSON"},
-		{"blob", quackLogicalType{id: quackLogicalTypeBlob}, "BLOB"},
-		{"bit", quackLogicalType{id: quackLogicalTypeBit}, "BIT"},
-		{"uuid", quackLogicalType{id: quackLogicalTypeUUID}, "UUID"},
+		{"boolean", logicalType{id: logicalTypeBoolean}, "BOOLEAN"},
+		{"tinyint", logicalType{id: logicalTypeTinyInt}, "TINYINT"},
+		{"smallint", logicalType{id: logicalTypeSmallInt}, "SMALLINT"},
+		{"integer", logicalType{id: logicalTypeInteger}, "INTEGER"},
+		{"bigint", logicalType{id: logicalTypeBigInt}, "BIGINT"},
+		{"hugeint", logicalType{id: logicalTypeHugeint}, "HUGEINT"},
+		{"uhugeint", logicalType{id: logicalTypeUHugeint}, "UHUGEINT"},
+		{"utinyint", logicalType{id: logicalTypeUTinyInt}, "UTINYINT"},
+		{"usmallint", logicalType{id: logicalTypeUSmallInt}, "USMALLINT"},
+		{"uinteger", logicalType{id: logicalTypeUInteger}, "UINTEGER"},
+		{"ubigint", logicalType{id: logicalTypeUBigInt}, "UBIGINT"},
+		{"float", logicalType{id: logicalTypeFloat}, "FLOAT"},
+		{"double", logicalType{id: logicalTypeDouble}, "DOUBLE"},
+		{"date", logicalType{id: logicalTypeDate}, "DATE"},
+		{"time", logicalType{id: logicalTypeTime}, "TIME"},
+		{"time_tz", logicalType{id: logicalTypeTimeTZ}, "TIME WITH TIME ZONE"},
+		{"timestamp_sec", logicalType{id: logicalTypeTimestampSec}, "TIMESTAMP"},
+		{"timestamp_ms", logicalType{id: logicalTypeTimestampMs}, "TIMESTAMP"},
+		{"timestamp", logicalType{id: logicalTypeTimestamp}, "TIMESTAMP"},
+		{"timestamp_ns", logicalType{id: logicalTypeTimestampNs}, "TIMESTAMP"},
+		{"timestamp_tz", logicalType{id: logicalTypeTimestampTZ}, "TIMESTAMP WITH TIME ZONE"},
+		{"interval", logicalType{id: logicalTypeInterval}, "INTERVAL"},
+		{"varchar", logicalType{id: logicalTypeVarchar}, "VARCHAR"},
+		{"json", logicalType{id: logicalTypeVarchar, alias: aliasJSON}, "JSON"},
+		{"blob", logicalType{id: logicalTypeBlob}, "BLOB"},
+		{"bit", logicalType{id: logicalTypeBit}, "BIT"},
+		{"uuid", logicalType{id: logicalTypeUUID}, "UUID"},
 		{
 			"list",
-			quackLogicalType{id: quackLogicalTypeList, child: &quackLogicalType{id: quackLogicalTypeInteger}},
+			logicalType{id: logicalTypeList, child: &logicalType{id: logicalTypeInteger}},
 			"INTEGER[]",
 		},
 		{
 			"struct",
-			quackLogicalType{id: quackLogicalTypeStruct, structFields: []quackStructField{
-				{name: "a", typ: quackLogicalType{id: quackLogicalTypeInteger}},
-				{name: "b", typ: quackLogicalType{id: quackLogicalTypeVarchar}},
+			logicalType{id: logicalTypeStruct, structFields: []structField{
+				{name: "a", typ: logicalType{id: logicalTypeInteger}},
+				{name: "b", typ: logicalType{id: logicalTypeVarchar}},
 			}},
 			"STRUCT(a INTEGER, b VARCHAR)",
 		},
 		{
 			"map",
-			quackLogicalType{id: quackLogicalTypeMap, child: &quackLogicalType{
-				id: quackLogicalTypeStruct,
-				structFields: []quackStructField{
-					{name: "key", typ: quackLogicalType{id: quackLogicalTypeInteger}},
-					{name: "value", typ: quackLogicalType{id: quackLogicalTypeVarchar}},
+			logicalType{id: logicalTypeMap, child: &logicalType{
+				id: logicalTypeStruct,
+				structFields: []structField{
+					{name: "key", typ: logicalType{id: logicalTypeInteger}},
+					{name: "value", typ: logicalType{id: logicalTypeVarchar}},
 				},
 			}},
 			"MAP(INTEGER, VARCHAR)",
@@ -510,7 +510,7 @@ func TestQuackTimestampMicrosDecodesToUTCTime(t *testing.T) {
 	want := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	micros := want.UnixMicro()
 
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1)
 	w.writeFieldID(101)
@@ -531,8 +531,8 @@ func TestQuackTimestampMicrosDecodesToUTCTime(t *testing.T) {
 	w.endObject()
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(w.bytes())
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 	values, err := c.columns[0].values()
 	require.NoError(t, err)
@@ -541,18 +541,18 @@ func TestQuackTimestampMicrosDecodesToUTCTime(t *testing.T) {
 }
 
 // TestQuackDecodeChunkListLogicalTypeMissingChildErrors proves a LIST
-// LogicalType with no field200 child (which decodeQuackLogicalType leaves as
-// a nil child) is rejected explicitly by decodeQuackListVector rather than
+// LogicalType with no field200 child (which decodeLogicalType leaves as
+// a nil child) is rejected explicitly by decodeListVector rather than
 // panicking on a nil dereference — this client has no way to decode a LIST
 // vector's child data without knowing its type.
 func TestQuackDecodeChunkListLogicalTypeMissingChildErrors(t *testing.T) {
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1)
 	w.writeFieldID(101)
 	w.beginList(1)
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeList) // no type_info at all, so no child
+	w.writeByte(100, logicalTypeList) // no type_info at all, so no child
 	w.endObject()
 	w.writeFieldID(102)
 	w.beginList(1)
@@ -564,14 +564,14 @@ func TestQuackDecodeChunkListLogicalTypeMissingChildErrors(t *testing.T) {
 	w.endObject()
 	w.endObject()
 
-	r := newQuackReader(w.bytes())
-	_, err := decodeQuackDataChunk(r)
+	r := newReader(w.bytes())
+	_, err := decodeDataChunk(r)
 	require.Error(t, err)
 }
 
 // buildListVarcharChunk builds a three-row LIST<VARCHAR> DataChunk covering
 // a multi-element list, an empty list, and a SQL NULL list — the same shapes
-// verified against a real duckdb subprocess (see decodeQuackListVector's doc
+// verified against a real duckdb subprocess (see decodeListVector's doc
 // comment): field100 hasValidity, field101 validity mask, field104 the
 // flattened child vector's total element count, field105 a list of
 // list_entry_t {100: offset, 101: length} objects (one per row, a NULL row's
@@ -579,21 +579,21 @@ func TestQuackDecodeChunkListLogicalTypeMissingChildErrors(t *testing.T) {
 // the child vector itself wrapped in its own object.
 func buildListVarcharChunk(t *testing.T) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 3) // rows
 	w.writeFieldID(101)
 	w.beginList(1) // 1 column type
 	// LogicalType: id=LIST, type_info={100: kind, 200: child LogicalType VARCHAR}.
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeList)
+	w.writeByte(100, logicalTypeList)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1) // type_info nullable "present" marker
 	w.beginObject()
 	w.writeByte(100, 0) // extraTypeInfoKind — unused by this client
 	w.writeFieldID(200)
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeVarchar)
+	w.writeByte(100, logicalTypeVarchar)
 	w.endObject() // child LogicalType terminator
 	w.endObject() // type_info terminator
 	w.endObject() // outer LogicalType terminator
@@ -621,8 +621,8 @@ func buildListVarcharChunk(t *testing.T) []byte {
 	w.writeFieldID(106)
 	w.beginObject()
 	w.writeBool(100, false) // child vector has no nulls
-	require.NoError(t, encodeQuackVarcharVectorData(w, [][]any{{"a"}, {"b"}}, 0))
-	w.endObject() // child vector terminator (consumed inside decodeQuackListVector)
+	require.NoError(t, encodeVarcharVectorData(w, [][]any{{"a"}, {"b"}}, 0))
+	w.endObject() // child vector terminator (consumed inside decodeListVector)
 	w.endObject() // outer LIST vector terminator
 	w.endObject() // DataChunk terminator
 	return w.bytes()
@@ -630,10 +630,10 @@ func buildListVarcharChunk(t *testing.T) []byte {
 
 func TestQuackDecodeChunkListVarcharDecodesRowsWithEmptyAndNull(t *testing.T) {
 	body := buildListVarcharChunk(t)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
-	require.Equal(t, quackLogicalTypeList, c.columns[0].typeID)
+	require.Equal(t, logicalTypeList, c.columns[0].typeID)
 
 	values, err := c.columns[0].values()
 	require.NoError(t, err)
@@ -647,15 +647,15 @@ func TestQuackDecodeChunkListVarcharDecodesRowsWithEmptyAndNull(t *testing.T) {
 // writeStructLogicalType writes a STRUCT LogicalType object with the given
 // named fields (each field's type written by typeWriters, in order) — the
 // shape confirmed against a real duckdb subprocess (see
-// decodeQuackLogicalType's doc comment): id=STRUCT (100), type_info={100:
+// decodeLogicalType's doc comment): id=STRUCT (100), type_info={100:
 // extraTypeInfoKind byte (value 5 observed for StructTypeInfo, otherwise
 // unused by this client, matching LIST's own unused-kind convention), 200: a
 // raw ULEB128 count followed by that many child entries, each an object with
 // field id 0 = name (string) and field id 1 = type (nested LogicalType,
 // terminated the normal way), then the entry's own terminator}.
-func writeStructLogicalType(w *quackWriter, names []string, typeWriters []func()) {
+func writeStructLogicalType(w *writer, names []string, typeWriters []func()) {
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeStruct)
+	w.writeByte(100, logicalTypeStruct)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1) // type_info nullable "present" marker
 	w.beginObject()
@@ -672,7 +672,7 @@ func writeStructLogicalType(w *quackWriter, names []string, typeWriters []func()
 	w.endObject() // outer LogicalType terminator
 }
 
-func writeScalarLogicalType(w *quackWriter, typeID byte) func() {
+func writeScalarLogicalType(w *writer, typeID byte) func() {
 	return func() {
 		w.beginObject()
 		w.writeByte(100, typeID)
@@ -683,22 +683,22 @@ func writeScalarLogicalType(w *quackWriter, typeID byte) func() {
 // buildStructChunk builds a one-row DataChunk whose sole column is a
 // STRUCT{a: INTEGER, b: VARCHAR} value, with no NULLs anywhere — the same
 // shape verified against a real duckdb subprocess (see
-// decodeQuackStructVector's doc comment): field100 hasValidity, field103 a
+// decodeStructVector's doc comment): field100 hasValidity, field103 a
 // raw ULEB128 count of child fields followed by that many child Vector
 // objects in LogicalType field order (not name-tagged — order alone ties
 // them back to the type's own field names), each child at the same row count
 // as the parent (unlike LIST, which flattens child rows via offsets/lengths).
 func buildStructChunk(t *testing.T, aVal int32, bVal string) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
 	w.beginList(1) // 1 column type
 
 	writeStructLogicalType(w, []string{"a", "b"}, []func(){
-		writeScalarLogicalType(w, quackLogicalTypeInteger),
-		writeScalarLogicalType(w, quackLogicalTypeVarchar),
+		writeScalarLogicalType(w, logicalTypeInteger),
+		writeScalarLogicalType(w, logicalTypeVarchar),
 	})
 
 	w.writeFieldID(102)
@@ -724,7 +724,7 @@ func buildStructChunk(t *testing.T, aVal int32, bVal string) []byte {
 	// child1 (b: VARCHAR)
 	w.beginObject()
 	w.writeBool(100, false)
-	require.NoError(t, encodeQuackVarcharVectorData(w, [][]any{{bVal}}, 0))
+	require.NoError(t, encodeVarcharVectorData(w, [][]any{{bVal}}, 0))
 	w.endObject()
 
 	w.endObject() // outer STRUCT vector terminator
@@ -734,10 +734,10 @@ func buildStructChunk(t *testing.T, aVal int32, bVal string) []byte {
 
 func TestQuackDecodeChunkStructDecodesRowToMap(t *testing.T) {
 	body := buildStructChunk(t, 1, "x")
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
-	require.Equal(t, quackLogicalTypeStruct, c.columns[0].typeID)
+	require.Equal(t, logicalTypeStruct, c.columns[0].typeID)
 
 	values, err := c.columns[0].values()
 	require.NoError(t, err)
@@ -752,14 +752,14 @@ func TestQuackDecodeChunkStructDecodesRowToMap(t *testing.T) {
 // other type's validity handling.
 func buildStructChunkTwoRowsSecondNull(t *testing.T) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 2) // rows
 	w.writeFieldID(101)
 	w.beginList(1)
 
 	writeStructLogicalType(w, []string{"a"}, []func(){
-		writeScalarLogicalType(w, quackLogicalTypeInteger),
+		writeScalarLogicalType(w, logicalTypeInteger),
 	})
 
 	w.writeFieldID(102)
@@ -788,8 +788,8 @@ func buildStructChunkTwoRowsSecondNull(t *testing.T) []byte {
 
 func TestQuackDecodeChunkStructNullRowDecodesNil(t *testing.T) {
 	body := buildStructChunkTwoRowsSecondNull(t)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 
 	values, err := c.columns[0].values()
@@ -803,15 +803,15 @@ func TestQuackDecodeChunkStructNullRowDecodesNil(t *testing.T) {
 // parent struct's (absent here, so hasValidity=false at the struct level).
 func buildStructChunkWithNullField(t *testing.T) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
 	w.beginList(1)
 
 	writeStructLogicalType(w, []string{"a", "b"}, []func(){
-		writeScalarLogicalType(w, quackLogicalTypeInteger),
-		writeScalarLogicalType(w, quackLogicalTypeVarchar),
+		writeScalarLogicalType(w, logicalTypeInteger),
+		writeScalarLogicalType(w, logicalTypeVarchar),
 	})
 
 	w.writeFieldID(102)
@@ -834,7 +834,7 @@ func buildStructChunkWithNullField(t *testing.T) []byte {
 	w.writeBool(100, true)
 	w.writeFieldID(101)
 	w.writeData([]byte{0b0}) // row0 NULL
-	require.NoError(t, encodeQuackVarcharVectorData(w, [][]any{{nil}}, 0))
+	require.NoError(t, encodeVarcharVectorData(w, [][]any{{nil}}, 0))
 	w.endObject()
 
 	w.endObject() // outer STRUCT vector terminator
@@ -844,8 +844,8 @@ func buildStructChunkWithNullField(t *testing.T) []byte {
 
 func TestQuackDecodeChunkStructWithNullFieldDecodesNilForThatField(t *testing.T) {
 	body := buildStructChunkWithNullField(t)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
 
 	values, err := c.columns[0].values()
@@ -855,12 +855,12 @@ func TestQuackDecodeChunkStructWithNullFieldDecodesNilForThatField(t *testing.T)
 
 // buildListOfStructChunk builds a one-row LIST(STRUCT{a: INTEGER}) DataChunk
 // whose sole row is a two-element list [{a: 1}, {a: 2}] — proving
-// decodeQuackListVector's existing recursion into decodeQuackVector picks up
+// decodeListVector's existing recursion into decodeVector picks up
 // the new STRUCT case for free, per the task's LIST(STRUCT(...)) non-goal
 // callout.
 func buildListOfStructChunk(t *testing.T) []byte {
 	t.Helper()
-	w := &quackWriter{}
+	w := &writer{}
 	w.beginObject()
 	w.writeUint64(100, 1) // rows
 	w.writeFieldID(101)
@@ -868,14 +868,14 @@ func buildListOfStructChunk(t *testing.T) []byte {
 
 	// LogicalType: id=LIST, type_info={100: kind, 200: child LogicalType STRUCT{a: INTEGER}}.
 	w.beginObject()
-	w.writeByte(100, quackLogicalTypeList)
+	w.writeByte(100, logicalTypeList)
 	w.writeFieldID(101)
 	w.buf.WriteByte(1) // type_info nullable "present" marker
 	w.beginObject()
 	w.writeByte(100, 0) // extraTypeInfoKind — unused by this client
 	w.writeFieldID(200)
 	writeStructLogicalType(w, []string{"a"}, []func(){
-		writeScalarLogicalType(w, quackLogicalTypeInteger),
+		writeScalarLogicalType(w, logicalTypeInteger),
 	})
 	w.endObject() // type_info terminator
 	w.endObject() // outer LIST LogicalType terminator
@@ -905,7 +905,7 @@ func buildListOfStructChunk(t *testing.T) []byte {
 	w.writeData([]byte{1, 0, 0, 0, 2, 0, 0, 0})
 	w.endObject()
 
-	w.endObject() // child STRUCT vector terminator (consumed inside decodeQuackListVector)
+	w.endObject() // child STRUCT vector terminator (consumed inside decodeListVector)
 	w.endObject() // outer LIST vector terminator
 	w.endObject() // DataChunk terminator
 	return w.bytes()
@@ -913,10 +913,10 @@ func buildListOfStructChunk(t *testing.T) []byte {
 
 func TestQuackDecodeChunkListOfStructDecodesRowsOfMaps(t *testing.T) {
 	body := buildListOfStructChunk(t)
-	r := newQuackReader(body)
-	c, err := decodeQuackDataChunk(r)
+	r := newReader(body)
+	c, err := decodeDataChunk(r)
 	require.NoError(t, err)
-	require.Equal(t, quackLogicalTypeList, c.columns[0].typeID)
+	require.Equal(t, logicalTypeList, c.columns[0].typeID)
 
 	values, err := c.columns[0].values()
 	require.NoError(t, err)

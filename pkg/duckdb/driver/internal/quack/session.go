@@ -1,4 +1,4 @@
-package driver
+package quack
 
 import (
 	"bytes"
@@ -9,29 +9,30 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// quackClientVersion and quackClientPlatform are sent in the ConnectionRequest
+// clientVersion and clientPlatform are sent in the ConnectionRequest
 // handshake for server-side diagnostics only; the server doesn't gate on them.
-const quackClientVersion = "inngest-duckdb-quack-client 0.0.1"
+const clientVersion = "inngest-duckdb-quack-client 0.0.1"
 
-func quackClientPlatform() string { return runtime.GOOS + "/" + runtime.GOARCH }
+func clientPlatform() string { return runtime.GOOS + "/" + runtime.GOARCH }
 
-// supportedQuackVersion is the only quack protocol version this client
+// supportedVersion is the only quack protocol version this client
 // speaks. A mismatch fails loudly rather than risk silently misparsing a
 // newer server's responses, since DuckDB's wire format may still change
 // before it stabilizes.
-const supportedQuackVersion = 3
+const supportedVersion = 3
 
-// quackHeartbeatTimeoutSeconds is sent as every ConnectionRequest's
+// heartbeatTimeoutSeconds is sent as every ConnectionRequest's
 // heartbeat_timeout (required as of protocol version 3; omitting it defaults
 // to 0, which the server rejects as out of range). This client has no
 // keepalive of its own and a session may sit idle indefinitely between exec
 // calls, so it requests the server's maximum.
-const quackHeartbeatTimeoutSeconds = 9223372036854775
+const heartbeatTimeoutSeconds = 9223372036854775
 
-// newQuackHTTPClient has no Timeout of its own: every request already goes
+// newHTTPClient has no Timeout of its own: every request already goes
 // out via http.NewRequestWithContext(ctx, ...) in send(), so the caller's own
 // context is the sole timeout authority. A fixed client-level Timeout would
 // double-constrain that — and did, in practice: a 30s cap here killed a
@@ -39,62 +40,62 @@ const quackHeartbeatTimeoutSeconds = 9223372036854775
 // 200-partition) lake with "context deadline exceeded" well before the
 // caller's own context did, even though compaction is expected to take
 // longer as data volume grows.
-func newQuackHTTPClient() *http.Client {
+func newHTTPClient() *http.Client {
 	return &http.Client{}
 }
 
-// quackCancelRequestTimeout bounds the CancelRequest query.watchForCancel
+// cancelRequestTimeout bounds the CancelRequest query.watchForCancel
 // fires once a caller's ctx ends mid-statement — a fresh, short-lived
 // context detached from that (already-done) ctx, since the request needs to
 // go out regardless of why the caller gave up.
-const quackCancelRequestTimeout = 5 * time.Second
+const cancelRequestTimeout = 5 * time.Second
 
-// quackSession implements sqlExecer (see conn.go) over DuckDB's quack wire
+// Session implements sqlExecer (see conn.go) over DuckDB's quack wire
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
 // server-assigned connection id for its lifetime; process.go recovers from a
 // lost session by discarding it and re-handshaking against a fresh subprocess.
-type quackSession struct {
+type Session struct {
 	httpClient   *http.Client
 	endpoint     string
 	connectionID string
 }
 
-// newQuackSession performs the ConnectionRequest handshake against listenURL
+// NewSession performs the ConnectionRequest handshake against listenURL
 // (as reported by `CALL quack_serve(...)`) and returns a session ready for exec.
-func newQuackSession(ctx context.Context, listenURL, token string) (*quackSession, error) {
-	s := &quackSession{
-		httpClient: newQuackHTTPClient(),
+func NewSession(ctx context.Context, listenURL, token string) (*Session, error) {
+	s := &Session{
+		httpClient: newHTTPClient(),
 		endpoint:   listenURL + "/quack",
 	}
 
-	req := quackConnectionRequest{
+	req := connectionRequest{
 		AuthString:               token,
-		ClientDuckDBVersion:      quackClientVersion,
-		ClientPlatform:           quackClientPlatform(),
-		MinSupportedQuackVersion: supportedQuackVersion,
-		MaxSupportedQuackVersion: supportedQuackVersion,
-		HeartbeatTimeoutSeconds:  quackHeartbeatTimeoutSeconds,
+		ClientDuckDBVersion:      clientVersion,
+		ClientPlatform:           clientPlatform(),
+		MinSupportedQuackVersion: supportedVersion,
+		MaxSupportedQuackVersion: supportedVersion,
+		HeartbeatTimeoutSeconds:  heartbeatTimeoutSeconds,
 	}
 	hdr, r, err := s.send(ctx, req.encode())
 	if err != nil {
 		return nil, fmt.Errorf("duckdb: quack handshake: %w", err)
 	}
-	if hdr.Type == quackMsgErrorResponse {
-		msg, derr := decodeQuackErrorResponseBody(r)
+	if hdr.Type == msgErrorResponse {
+		msg, derr := decodeErrorResponseBody(r)
 		if derr != nil {
 			return nil, fmt.Errorf("duckdb: quack handshake: server returned an error this client could not parse: %w", derr)
 		}
 		return nil, fmt.Errorf("duckdb: quack handshake rejected: %s", msg)
 	}
-	if hdr.Type != quackMsgConnectionResponse {
+	if hdr.Type != msgConnectionResponse {
 		return nil, fmt.Errorf("duckdb: quack handshake: unexpected response message type %d", hdr.Type)
 	}
-	resp, err := decodeQuackConnectionResponseBody(r)
+	resp, err := decodeConnectionResponseBody(r)
 	if err != nil {
 		return nil, fmt.Errorf("duckdb: quack handshake: %w", err)
 	}
-	if resp.QuackVersion != supportedQuackVersion {
-		return nil, fmt.Errorf("duckdb: quack server negotiated protocol version %d, but this client only supports version %d", resp.QuackVersion, supportedQuackVersion)
+	if resp.Version != supportedVersion {
+		return nil, fmt.Errorf("duckdb: quack server negotiated protocol version %d, but this client only supports version %d", resp.Version, supportedVersion)
 	}
 
 	s.connectionID = hdr.ConnectionID
@@ -103,24 +104,24 @@ func newQuackSession(ctx context.Context, listenURL, token string) (*quackSessio
 	return s, nil
 }
 
-// exec implements sqlExecer as query without the type-name conversion, for
+// Exec implements sqlExecer as query without the type-name conversion, for
 // ExecContext callers (DDL/INSERT/health checks) that don't need column types.
-func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string, rows []row, err error) {
-	cols, _, rows, err = s.query(ctx, sqlText)
+func (s *Session) Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error) {
+	cols, _, rows, err = s.Query(ctx, sqlText)
 	return cols, rows, err
 }
 
-// query implements sqlExecer. A statement DuckDB itself rejected (bad SQL, a
+// Query implements sqlExecer. A statement DuckDB itself rejected (bad SQL, a
 // missing table, a constraint violation) comes back wrapped in
-// errStatementFailed, matching rows.go's session.query so process.query's
+// result.ErrStatementFailed, matching jsonlines.Session.Query so process.Query's
 // restart-vs-surface classification works identically across transports. Any
 // other error (HTTP failure, malformed response) is left unwrapped, which
-// process.query treats as a dead subprocess warranting a restart.
+// process.Query treats as a dead subprocess warranting a restart.
 //
 // A result too large for one inline PrepareResponse (needsMoreFetch) is
 // paged in via a FetchRequest/FetchResponse loop, keyed off the
 // PrepareResponse's result_uuid, until a response comes back with zero
-// chunks — see decodeQuackFetchResponseBody for why that's the wire format's
+// chunks — see decodeFetchResponseBody for why that's the wire format's
 // only "done" signal.
 //
 // cols and types both come from the PrepareResponse's metadata, populated
@@ -130,13 +131,13 @@ func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string,
 // A caller whose ctx ends mid-statement doesn't just stop waiting: a
 // watchForCancel goroutine (started immediately below) fires a real
 // CancelRequest for this statement's queryID, which the server turns into
-// an actual DuckDB Connection::Interrupt() — see encodeQuackCancelRequest's
+// an actual DuckDB Connection::Interrupt() — see encodeCancelRequest's
 // doc comment for the wire format and quack_server.cpp's CANCEL_REQUEST
 // handler (verified against the real extension: this is what actually
 // stops the abandoned statement from continuing to burn CPU server-side,
 // which simply not waiting for the response never did on its own).
-func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string, types []string, rows []row, err error) {
-	queryID := randomQuackHugeint()
+func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error) {
+	queryID := randomHugeint()
 	stopCancelWatch := s.watchForCancel(ctx, queryID)
 	defer stopCancelWatch()
 
@@ -150,19 +151,19 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 	}
 	start := time.Now()
 
-	hdr, r, err := s.send(ctx, encodeQuackPrepareRequest(s.connectionID, sqlText, queryID))
+	hdr, r, err := s.send(ctx, encodePrepareRequest(s.connectionID, sqlText, queryID))
 	if err != nil {
 		return nil, nil, nil, phaseErr("prepare", err)
 	}
 
-	if hdr.Type == quackMsgErrorResponse {
-		return nil, nil, nil, decodeQuackStatementError(r)
+	if hdr.Type == msgErrorResponse {
+		return nil, nil, nil, decodeStatementError(r)
 	}
-	if hdr.Type != quackMsgPrepareResponse {
+	if hdr.Type != msgPrepareResponse {
 		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("unexpected response message type %d", hdr.Type))
 	}
 
-	cols, quackTypes, rows, needsMoreFetch, resultUUID, err := decodeQuackPrepareResponseBody(r)
+	cols, logicalTypes, rows, needsMoreFetch, resultUUID, err := decodePrepareResponseBody(r)
 	if err != nil {
 		return nil, nil, nil, phaseErr("prepare", fmt.Errorf("decoding prepare response: %w", err))
 	}
@@ -184,25 +185,25 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 	// delivered, plus one — trusting the server's own count rather than
 	// assuming this loop's iteration number always matches it.
 	// Function-local and never shared across goroutines: each query() call
-	// (even concurrent ones on different pooled quackSessions, see
-	// Options.QuackConns) runs its own independent fetch loop, so this
+	// (even concurrent ones on different pooled sessions, see
+	// driver.Options.QuackConns) runs its own independent fetch loop, so this
 	// needs no synchronization.
 	nextBatchIndex := uint64(1)
-	fetchCols := newColumns(cols)
+	fetchCols := result.NewColumns(cols)
 	for needsMoreFetch {
 		fetchPhase := fmt.Sprintf("fetch (result_uuid=%s batch_index=%d)", resultUUID, nextBatchIndex)
-		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
+		hdr, r, err := s.send(ctx, encodeFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
 		if err != nil {
 			return nil, nil, nil, phaseErr(fetchPhase, err)
 		}
-		if hdr.Type == quackMsgErrorResponse {
-			return nil, nil, nil, decodeQuackStatementError(r)
+		if hdr.Type == msgErrorResponse {
+			return nil, nil, nil, decodeStatementError(r)
 		}
-		if hdr.Type != quackMsgFetchResponse {
+		if hdr.Type != msgFetchResponse {
 			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("unexpected response message type %d", hdr.Type))
 		}
 
-		fetchedRows, chunkCount, batchIndex, ferr := decodeQuackFetchResponseBody(r, fetchCols)
+		fetchedRows, chunkCount, batchIndex, ferr := decodeFetchResponseBody(r, fetchCols)
 		if ferr != nil {
 			return nil, nil, nil, phaseErr(fetchPhase, fmt.Errorf("decoding fetch response: %w", ferr))
 		}
@@ -214,8 +215,8 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 		nextBatchIndex = batchIndex + 1
 	}
 
-	types = make([]string, len(quackTypes))
-	for i, lt := range quackTypes {
+	types = make([]string, len(logicalTypes))
+	for i, lt := range logicalTypes {
 		types[i] = lt.typeName()
 	}
 	return cols, types, rows, nil
@@ -231,31 +232,31 @@ func (s *quackSession) query(ctx context.Context, sqlText string) (cols []string
 // Sending the cancel late (after query() already returned) is harmless, not
 // just wasteful: the server rejects a CancelRequest whose query_uuid
 // doesn't match whatever is currently running on the connection (see
-// encodeQuackCancelRequest), so a stray cancel racing the statement's own
+// encodeCancelRequest), so a stray cancel racing the statement's own
 // natural completion — or racing a *new* statement already started on the
 // same connection by the time it arrives — can never interrupt the wrong
 // query. stop exists purely to avoid the noise/latency of sending a cancel
 // nobody needs, not for correctness.
 //
-// The cancel request itself runs under quackCancelRequestTimeout, detached
+// The cancel request itself runs under cancelRequestTimeout, detached
 // from ctx (already done by the time this fires) — its own result is
 // logged, not returned: query()'s caller already gets ctx's own error back
 // regardless of whether the server managed to actually interrupt anything.
-func (s *quackSession) watchForCancel(ctx context.Context, queryID quackHugeint) (stop func()) {
+func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop func()) {
 	done := make(chan struct{})
 	go func() {
 		select {
 		case <-ctx.Done():
-			cancelCtx, cancel := context.WithTimeout(context.Background(), quackCancelRequestTimeout)
+			cancelCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
 			defer cancel()
-			hdr, r, err := s.send(cancelCtx, encodeQuackCancelRequest(s.connectionID, queryID))
+			hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
 			l := logger.StdlibLogger(context.WithoutCancel(ctx)).With(
 				"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
 			switch {
 			case err != nil:
 				l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)
-			case hdr.Type == quackMsgErrorResponse:
-				msg, _ := decodeQuackErrorResponseBody(r)
+			case hdr.Type == msgErrorResponse:
+				msg, _ := decodeErrorResponseBody(r)
 				l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", msg)
 			}
 		case <-done:
@@ -264,51 +265,54 @@ func (s *quackSession) watchForCancel(ctx context.Context, queryID quackHugeint)
 	return func() { close(done) }
 }
 
-// decodeQuackStatementError decodes an ErrorResponse body into an error
-// wrapped in errStatementFailed: the server responded, it just rejected the
+// decodeStatementError decodes an ErrorResponse body into an error
+// wrapped in result.ErrStatementFailed: the server responded, it just rejected the
 // statement — not a transport or subprocess failure.
-func decodeQuackStatementError(r *quackReader) error {
-	msg, derr := decodeQuackErrorResponseBody(r)
+func decodeStatementError(r *reader) error {
+	msg, derr := decodeErrorResponseBody(r)
 	if derr != nil {
 		return fmt.Errorf("duckdb: quack: server returned an error this client could not parse: %w", derr)
 	}
-	return fmt.Errorf("%w: %s", errStatementFailed, msg)
+	return fmt.Errorf("%w: %s", result.ErrStatementFailed, msg)
 }
 
 // send POSTs one quack message and returns the decoded response header, with
 // r positioned at the start of the response body object (see
-// decodeQuackMessageHeader).
-func (s *quackSession) send(ctx context.Context, payload []byte) (quackMessageHeader, *quackReader, error) {
+// decodeMessageHeader).
+func (s *Session) send(ctx context.Context, payload []byte) (messageHeader, *reader, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: building request: %w", err)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: building request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/duckdb")
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: request to %s failed: %w", s.endpoint, err)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: request to %s failed: %w", s.endpoint, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: reading response body: %w", err)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: reading response body: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: HTTP %d from %s: %s", resp.StatusCode, s.endpoint, body)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: HTTP %d from %s: %s", resp.StatusCode, s.endpoint, body)
 	}
 
-	r := newQuackReader(body)
-	hdr, err := decodeQuackMessageHeader(r)
+	r := newReader(body)
+	hdr, err := decodeMessageHeader(r)
 	if err != nil {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: decoding response header: %w", err)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: decoding response header: %w", err)
 	}
 	// The server currently leaves connection_id empty on every response
 	// after the handshake, so only a present-but-different ID is rejected:
 	// that would mean this response belongs to some other session.
 	if s.connectionID != "" && hdr.ConnectionID != "" && hdr.ConnectionID != s.connectionID {
-		return quackMessageHeader{}, nil, fmt.Errorf("duckdb: quack: response for connection %s received on connection %s", hdr.ConnectionID, s.connectionID)
+		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: response for connection %s received on connection %s", hdr.ConnectionID, s.connectionID)
 	}
 	return hdr, r, nil
 }
+
+// ConnectionID is the server-assigned connection id, for correlating logs.
+func (s *Session) ConnectionID() string { return s.connectionID }
