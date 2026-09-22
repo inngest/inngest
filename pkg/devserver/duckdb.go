@@ -154,6 +154,14 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 // rather than also maintaining a separate local catalog file. Parquet data
 // stays under duckdbDir/data in either case: only the catalog moves.
 //
+// This applies to `inngest start` too (which always persists), so a
+// self-hosted `inngest start --duckdb --postgres-uri ...` with
+// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true creates DuckLake's catalog
+// tables in the production Postgres database, in DuckLake's default schema
+// alongside Inngest's own tables. That's accepted for this experimental
+// POC; a dedicated catalog URI or schema (DuckLakeOptions.MetadataSchema)
+// would be needed before this is production-ready.
+//
 // Kept as a pure function (no I/O) so this branching is unit-testable without
 // spawning a duckdb subprocess.
 func duckLakeOptionsFor(duckdbDir, postgresURI string) *driver.DuckLakeOptions {
