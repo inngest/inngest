@@ -971,7 +971,7 @@ func defaultSetupOpts() setupOpts {
 
 // Closer is implemented by the listener NewListener returns. Callers hold
 // an execution.SyncLifecycleListener, so reaching this requires a type
-// assertion (`l.(dualwrite.Closer)`).
+// assertion (`l.(tracing.Closer)`), as pkg/devserver's stopDualWrite does.
 type Closer interface {
 	// Close stops every batcher goroutine, waits for them to exit (bounded
 	// by ctx), then closes the db passed to NewListener. Call at most once.
