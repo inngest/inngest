@@ -55,7 +55,7 @@ func (m *Manager) GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[uli
 	// field name, not a further nested path) reads the field natively
 	// instead, no JSON round-trip at all; the trailing ::VARCHAR unwraps it
 	// from a VARIANT-typed result to a plain string, matching what ->>
-	// itself always returned — see pkg/execution/dualwrite/tracing.go's
+	// itself always returned — see pkg/duckdb/tracing/tracing.go's
 	// materializeRuns for the same fix on the write side.
 	hashedIDExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferHashedID.Key())
 	userlandIDExpr := fmt.Sprintf(`attributes."%s"::VARCHAR`, meta.Attrs.DeferUserlandID.Key())

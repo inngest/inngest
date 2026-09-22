@@ -1,4 +1,4 @@
-// Package dualwrite implements a DuckDB-writing execution.SyncLifecycleListener.
+// Package tracing implements a DuckDB-writing execution.SyncLifecycleListener.
 // The executor and runner call its hooks synchronously, so every hook must do
 // nothing but build a row and non-blocking-send it onto a per-table channel;
 // background goroutines (batch.go) drain those channels and flush batches
@@ -471,7 +471,7 @@ func (l *listener) OnExtendedTraceSpan(ctx context.Context, span execution.Exten
 	}
 
 	_, _ = l.createSpan(ctx, tracingv3.SpanNameExtendedTrace, &tracing.CreateSpanOptions{
-		Debug:              &tracing.SpanDebugData{Location: "dualwrite.listener.OnExtendedTraceSpan"},
+		Debug:              &tracing.SpanDebugData{Location: "duckdb/tracing.listener.OnExtendedTraceSpan"},
 		Attributes:         attrs,
 		StartTime:          span.StartTime,
 		EndTime:            span.EndTime,

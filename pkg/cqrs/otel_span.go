@@ -66,7 +66,7 @@ func isWaitForEventOutput(o map[string]any) bool {
 
 // UnwrapSpanOutputEnvelope applies one candidate row's raw output/input
 // bytes onto so, mirroring the "preview" span exporter's envelope shape
-// (pkg/execution/dualwrite/tracing.go and pkg/tracing/tracer_sqlc.go's
+// (pkg/duckdb/tracing/tracing.go and pkg/tracing/tracer_sqlc.go's
 // dbExporter both write this shape): output is either a
 // step.waitForEvent-shaped value (returned as-is, so.Data left set to the
 // raw bytes), an {"error": ...} envelope (so.IsError=true, so.Data set to

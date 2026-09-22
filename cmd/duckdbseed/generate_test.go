@@ -284,7 +284,7 @@ func TestGenerateRunsLinksEventsToTheRunsEventIDs(t *testing.T) {
 // replayed span shares its exact (unregenerated) SpanID -- rather than
 // choosing kinds/counts independently per span, so a run's metadata shape
 // is reproducible from a single sampled template, mirroring
-// pkg/execution/dualwrite/listener.go's OnMetadataEntry for each row's own
+// pkg/duckdb/tracing/listener.go's OnMetadataEntry for each row's own
 // shape.
 func TestGenerateRunsReplaysAMetadataProfileOntoTheSpanTree(t *testing.T) {
 	tmpl := testTemplates()

@@ -4,8 +4,8 @@
 # and DuckLake catalog that `inngest dev`/`inngest start --duckdb` use, so
 # you can poke at staged/lake data by hand between runs.
 #
-# Mirrors the layout setupDualWrite builds in pkg/devserver/dualwrite.go and
-# the ATTACH sequence bootstrapDuckLakeLocked runs in pkg/db/duckdb/process.go:
+# Mirrors the layout setupDualWrite builds in pkg/devserver/duckdb.go and
+# the ATTACH sequence bootstrapDuckLakeLocked runs in pkg/duckdb/driver/process.go:
 #
 #   <state-dir>/duckdb/main.duckdb     -- main db file (staging tables)
 #   <state-dir>/duckdb/catalog.duckdb  -- DuckLake catalog

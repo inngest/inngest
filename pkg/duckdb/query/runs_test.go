@@ -17,7 +17,7 @@ import (
 )
 
 // seedRunRow inserts one lifecycle row into inngest.runs, mirroring the
-// columns pkg/execution/dualwrite/listener.go's runCommonFields plus a
+// columns pkg/duckdb/tracing/listener.go's runCommonFields plus a
 // specific hook sets.
 func seedRunRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runID ulid.ULID, queuedAt time.Time, status *enums.StepStatus, startedAt, endedAt *time.Time, output *string) {
 	t.Helper()
