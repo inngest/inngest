@@ -39,3 +39,19 @@ export const getSignupAttribution = (): Record<string, string> => {
     return {};
   }
 };
+
+export const getSignupMetadata = (): Record<string, string> => {
+  if (typeof document === 'undefined') return {};
+
+  const prefix = 'ajs_anonymous_id=';
+  const cookie = document.cookie
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(prefix));
+  const anonymousID = cookie?.slice(prefix.length);
+
+  return {
+    ...(anonymousID && { anonymousID }),
+    ...getSignupAttribution(),
+  };
+};
