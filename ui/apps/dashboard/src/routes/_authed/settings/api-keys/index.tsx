@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill';
 import {
   Tooltip,
   TooltipContent,
@@ -75,50 +76,58 @@ function APIKeysPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 py-8">
-      <h1 className="text-basis text-2xl">API keys</h1>
+    <div className="mx-auto flex w-full max-w-[900px] flex-col gap-12 px-4 py-12">
       {canManage ? (
         <RestrictedAPIKeys key={organization?.id ?? 'marketplace'} />
       ) : (
-        <p className="text-subtle text-sm">
-          Only organization admins can view and manage API keys.
-        </p>
-      )}
-      <div className="border-subtle flex items-start justify-between gap-4 border-t pt-8">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-basis text-lg">Legacy API keys</h2>
-          <p className="text-subtle max-w-2xl text-sm">
-            These keys have no fine-grained permissions.{' '}
-            <Link
-              href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
-              className="inline-flex"
-            >
-              Learn more
-            </Link>
+        <div className="flex flex-col gap-4">
+          <h1 className="text-basis text-xl">API keys</h1>
+          <p className="text-subtle text-sm">
+            Only organization admins can view and manage API keys.
           </p>
         </div>
-        {canManage ? (
-          createButton
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>{createButton}</span>
-            </TooltipTrigger>
-            <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
-          </Tooltip>
-        )}
-      </div>
-
-      {keys.length === 0 ? (
-        <p className="text-subtle text-sm">No legacy API keys.</p>
-      ) : (
-        <APIKeysTable
-          keys={keys}
-          canManage={canManage}
-          onRename={setRenameTarget}
-          onDelete={setDeleteTarget}
-        />
       )}
+      <details className="border-subtle border-t pt-8">
+        <summary className="text-basis cursor-pointer text-sm font-medium">
+          Legacy keys <Pill appearance="outlined">{keys.length}</Pill>
+        </summary>
+        <div className="mt-6 flex flex-col gap-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-subtle max-w-2xl text-sm">
+                These keys have no fine-grained permissions.{' '}
+                <Link
+                  href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
+                  className="inline-flex"
+                >
+                  Learn more
+                </Link>
+              </p>
+            </div>
+            {canManage ? (
+              createButton
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>{createButton}</span>
+                </TooltipTrigger>
+                <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          {keys.length === 0 ? (
+            <p className="text-subtle text-sm">No legacy API keys.</p>
+          ) : (
+            <APIKeysTable
+              keys={keys}
+              canManage={canManage}
+              onRename={setRenameTarget}
+              onDelete={setDeleteTarget}
+            />
+          )}
+        </div>
+      </details>
 
       <CreateAPIKeyModal
         isOpen={createOpen}

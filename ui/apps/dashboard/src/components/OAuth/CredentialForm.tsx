@@ -15,6 +15,7 @@ type Props = {
   nameLabel: string;
   namePlaceholder?: string;
   nameRequired?: boolean;
+  nameFirst?: boolean;
   onNameChange: (name: string) => void;
   expiration?: {
     value: Option;
@@ -43,6 +44,7 @@ export function CredentialForm({
   nameLabel,
   namePlaceholder,
   nameRequired = false,
+  nameFirst = false,
   onNameChange,
   expiration,
   allEnvironments,
@@ -67,10 +69,26 @@ export function CredentialForm({
     }))
     .filter((group) => group.opts.length > 0);
 
+  const nameInput = (
+    <Input
+      id="credential-name"
+      name="credential-name"
+      label={nameLabel}
+      required={nameRequired}
+      error={fieldErrors?.name ?? undefined}
+      aria-invalid={Boolean(fieldErrors?.name)}
+      placeholder={namePlaceholder}
+      value={name}
+      onChange={(event) => onNameChange(event.target.value)}
+      disabled={disabled}
+    />
+  );
+
   return (
     <div className="flex w-full flex-col gap-8">
       <fieldset disabled={disabled} className="flex flex-col gap-6">
         <legend className="sr-only">Credential details</legend>
+        {nameFirst && nameInput}
         <div
           className="flex flex-col gap-2"
           role="group"
@@ -205,18 +223,7 @@ export function CredentialForm({
             </Select>
           </div>
         )}
-        <Input
-          id="credential-name"
-          name="credential-name"
-          label={nameLabel}
-          required={nameRequired}
-          error={fieldErrors?.name ?? undefined}
-          aria-invalid={Boolean(fieldErrors?.name)}
-          placeholder={namePlaceholder}
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          disabled={disabled}
-        />
+        {!nameFirst && nameInput}
       </fieldset>
 
       <div

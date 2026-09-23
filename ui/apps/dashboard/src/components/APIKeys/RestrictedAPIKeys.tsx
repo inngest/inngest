@@ -3,16 +3,23 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
 import { AlertModal } from '@inngest/components/Modal';
+import { Pill } from '@inngest/components/Pill';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
+import {
+  RiAddLine,
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+} from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 import { useMutation, useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import { EnvironmentType, type GetRestrictedApiKeysQuery } from '@/gql/graphql';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { APIKeyDetails, APIKeyStatus } from './APIKeyDetails';
 import { CreateRestrictedAPIKeyModal } from './CreateRestrictedAPIKeyModal';
 import { apiKeyErrorMessage } from './errorMessage';
+import { apiKeyEnvironment, type APICredential } from './keyDisplay';
 
 const Query = graphql(`
   query GetRestrictedAPIKeys($offset: Int!) {
@@ -31,7 +38,7 @@ const Policy = graphql(`
   mutation SetV2RestrictedAuth($enabled: Boolean!) { setV2RestrictedAuth(enabled: $enabled) }
 `);
 
-type Key = GetRestrictedApiKeysQuery['apiCredentials']['keys'][number];
+type Key = APICredential;
 type Confirmation =
   | { kind: 'revoke'; key: Key }
   | { kind: 'policy'; enabled: boolean };
@@ -40,6 +47,7 @@ const column = createColumnHelper<Key>();
 export function RestrictedAPIKeys() {
   const [offset, setOffset] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [selectedID, setSelectedID] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [{ data, fetching, error: loadError }, reload] = useQuery({
@@ -74,80 +82,63 @@ export function RestrictedAPIKeys() {
       header: 'Key',
       cell: ({ row }) => (
         <div className="flex flex-col gap-1">
-          <span className="text-basis text-sm">{row.original.name}</span>
+          <button
+            type="button"
+            className="text-basis focus-visible:outline-primary-moderate w-fit text-left text-sm hover:underline"
+            onClick={() => setSelectedID(row.original.id)}
+          >
+            {row.original.name}
+          </button>
           <code className="text-light text-xs">{row.original.maskedKey}</code>
-          <details className="text-subtle text-xs [contain:inline-size]">
-            <summary className="cursor-pointer">Permissions</summary>
-            <ul className="mt-2 space-y-1 pb-1 pl-4">
-              {row.original.permissions.map((permission) => (
-                <li key={permission}>
-                  <code className="break-all">{permission}</code>
-                </li>
-              ))}
-            </ul>
-          </details>
         </div>
       ),
     }),
-    column.accessor(
-      (key) =>
-        key.env?.type === EnvironmentType.BranchParent
-          ? 'Branch environments'
-          : key.env?.name ?? 'All environments',
-      {
-        id: 'environment',
-        header: 'Environment',
-        cell: (info) => (
-          <span className="text-subtle text-sm">{info.getValue()}</span>
-        ),
-      },
-    ),
+    column.accessor(apiKeyEnvironment, {
+      id: 'environment',
+      header: 'Environment',
+      cell: (info) => <Pill appearance="outlined">{info.getValue()}</Pill>,
+    }),
+    column.display({
+      id: 'status',
+      header: 'Status',
+      cell: ({ row }) => <APIKeyStatus apiKey={row.original} />,
+    }),
     column.accessor('expiresAt', {
-      header: 'Expires',
+      header: 'Expiration',
       cell: ({ row }) =>
         row.original.revokedAt ? (
-          <span className="text-subtle text-sm">Revoked</span>
+          <span className="text-muted text-sm">—</span>
         ) : row.original.expiresAt ? (
           <Time
             className="text-subtle text-sm"
             value={row.original.expiresAt}
+            format="relative"
+            copyable={false}
           />
         ) : (
           <span className="text-subtle text-sm">Never</span>
         ),
     }),
-    column.display({
-      id: 'actions',
-      header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) => (
-        <div className="flex justify-end">
-          <Button
-            label="Revoke"
-            kind="danger"
-            appearance="outlined"
-            size="small"
-            disabled={Boolean(row.original.revokedAt) || saving}
-            onClick={() => {
-              setError(null);
-              setConfirmation({ kind: 'revoke', key: row.original });
-            }}
-          />
-        </div>
-      ),
-    }),
   ];
 
   if (loadError) {
     return (
-      <Alert severity="error">
-        Could not load API keys.{' '}
-        <Button label="Retry" kind="secondary" onClick={refresh} />
-      </Alert>
+      <section className="flex flex-col gap-4">
+        <h1 className="text-basis text-xl">API keys</h1>
+        <Alert severity="error">
+          Could not load API keys.{' '}
+          <Button label="Retry" kind="secondary" onClick={refresh} />
+        </Alert>
+      </section>
     );
   }
   if (!data) {
     return <LoadingIcon />;
   }
+
+  const selectedKey = data.apiCredentials.keys.find(
+    (key) => key.id === selectedID,
+  );
 
   const policyButton = (
     <Button
@@ -166,9 +157,10 @@ export function RestrictedAPIKeys() {
   );
 
   return (
-    <section className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div className="text-subtle space-y-1 text-sm">
+          <h1 className="text-basis mb-2 text-xl">API keys</h1>
           <p>
             For the v2 API, CLI, and MCP.{' '}
             <Link href="https://api-docs.inngest.com/" className="inline-flex">
@@ -177,31 +169,53 @@ export function RestrictedAPIKeys() {
           </p>
           <p>We recommend using OAuth for the CLI and MCP instead.</p>
         </div>
-        <Button label="Create API key" onClick={() => setCreating(true)} />
+        <Button
+          label="Create API key"
+          icon={<RiAddLine />}
+          iconSide="left"
+          className="shrink-0"
+          onClick={() => setCreating(true)}
+        />
       </div>
       {data.apiCredentials.keys.length ? (
-        <Table
-          data={data.apiCredentials.keys}
-          columns={columns}
-          cellClassName="py-3 align-top"
-        />
+        <div className="overflow-x-auto">
+          <Table
+            data={data.apiCredentials.keys}
+            columns={columns}
+            cellClassName="py-3"
+            onRowClick={({ original }) => setSelectedID(original.id)}
+            isRowHighlighted={({ original }) => original.id === selectedID}
+          />
+        </div>
       ) : (
         <p className="text-subtle text-sm">No API keys yet.</p>
       )}
       {(offset > 0 || data.apiCredentials.hasMore) && (
-        <div className="flex justify-end gap-2">
-          <Button
-            label="Previous"
-            kind="secondary"
-            disabled={fetching || offset === 0}
-            onClick={() => setOffset(offset - 20)}
-          />
-          <Button
-            label="Next"
-            kind="secondary"
-            disabled={fetching || !data.apiCredentials.hasMore}
-            onClick={() => setOffset(offset + 20)}
-          />
+        <div className="text-muted flex items-center justify-between gap-4 text-xs">
+          <span>
+            {offset + 1}–{offset + data.apiCredentials.keys.length} keys
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              aria-label="Previous page"
+              icon={<RiArrowLeftSLine />}
+              kind="secondary"
+              appearance="ghost"
+              disabled={fetching || offset === 0}
+              onClick={() => setOffset(offset - 20)}
+            />
+            <span className="text-basis tabular-nums">
+              Page {offset / 20 + 1}
+            </span>
+            <Button
+              aria-label="Next page"
+              icon={<RiArrowRightSLine />}
+              kind="secondary"
+              appearance="ghost"
+              disabled={fetching || !data.apiCredentials.hasMore}
+              onClick={() => setOffset(offset + 20)}
+            />
+          </div>
         </div>
       )}
       {data.v2RestrictedAuth ? (
@@ -225,6 +239,17 @@ export function RestrictedAPIKeys() {
           <h3 className="font-medium">Legacy access to v2 is enabled</h3>
           <p>Legacy API keys and signing keys bypass these permissions.</p>
         </Alert>
+      )}
+      {selectedKey && (
+        <APIKeyDetails
+          apiKey={selectedKey}
+          onClose={() => setSelectedID(null)}
+          onRevoke={() => {
+            setSelectedID(null);
+            setError(null);
+            setConfirmation({ kind: 'revoke', key: selectedKey });
+          }}
+        />
       )}
       {creating && (
         <CreateRestrictedAPIKeyModal
