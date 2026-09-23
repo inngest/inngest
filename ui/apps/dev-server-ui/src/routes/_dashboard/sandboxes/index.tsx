@@ -253,31 +253,32 @@ function SandboxesPage() {
                 ? `Signed in to ${status.accountName}. Connect to ${status.environmentName || status.environmentId || 'the environment selected during sign-in'}. To change environments, sign in again and choose a single development environment.`
                 : 'Sign in using the browser device flow. Your Cloud credentials are never entered in this UI.'}
             </p>
-            <Button
-              loading={Boolean(busy)}
-              label={
-                status.accountName
-                  ? 'Connect existing login'
-                  : 'Sign in with Inngest'
-              }
-              onClick={() =>
-                action(
-                  status.accountName ? 'connect' : 'login',
-                  status.accountName
-                    ? '/dev/cloud/connect'
-                    : '/dev/cloud/login',
-                )
-              }
-            />
-            {status.accountName && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
-                className="ml-2"
-                appearance="outlined"
-                label="Sign in again"
-                disabled={Boolean(busy)}
-                onClick={() => action('login', '/dev/cloud/login')}
+                loading={Boolean(busy)}
+                label={
+                  status.accountName
+                    ? 'Connect existing login'
+                    : 'Sign in with Inngest'
+                }
+                onClick={() =>
+                  action(
+                    status.accountName ? 'connect' : 'login',
+                    status.accountName
+                      ? '/dev/cloud/connect'
+                      : '/dev/cloud/login',
+                  )
+                }
               />
-            )}
+              {status.accountName && (
+                <Button
+                  appearance="outlined"
+                  label="Sign in again"
+                  disabled={Boolean(busy)}
+                  onClick={() => action('login', '/dev/cloud/login')}
+                />
+              )}
+            </div>
           </Card.Content>
         </Card>
       ) : (
