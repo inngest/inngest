@@ -252,7 +252,6 @@ export function useRunsPagination({
 }
 
 const REST_PAGE_SIZE = 40;
-const PROGRESSIVE_MAX_PASSES = 10;
 const PROGRESSIVE_MAX_MS = 10_000;
 const PROGRESSIVE_MIN_PASS_INTERVAL_MS = 250;
 
@@ -383,7 +382,6 @@ export function useProgressiveRuns({
           },
           signal: controller.signal,
           displayTarget: REST_PAGE_SIZE,
-          maxPasses: PROGRESSIVE_MAX_PASSES,
           maxMilliseconds: PROGRESSIVE_MAX_MS,
         });
         if (!disposed) setPhase(reason === 'complete' ? 'complete' : 'paused');
