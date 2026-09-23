@@ -61,6 +61,13 @@ describe('pickSelfServePlans', () => {
         slug: 'pro-from-api',
       }),
       plan({
+        amount: 19_900,
+        isFree: false,
+        isLegacy: false,
+        name: 'Growth',
+        slug: 'growth-from-api',
+      }),
+      plan({
         amount: 7_500,
         isFree: false,
         isLegacy: true,
@@ -72,6 +79,7 @@ describe('pickSelfServePlans', () => {
     expect(pickSelfServePlans(plans)).toEqual({
       hobby: plans[0],
       pro: plans[1],
+      growth: plans[2],
     });
   });
 
@@ -99,8 +107,22 @@ describe('pickSelfServePlans', () => {
           name: 'Pro Plus',
           slug: 'pro-plus',
         }),
+        plan({
+          amount: 0,
+          isFree: true,
+          isLegacy: false,
+          name: 'Growth',
+          slug: 'free-growth',
+        }),
+        plan({
+          amount: 19_900,
+          isFree: false,
+          isLegacy: true,
+          name: 'Growth',
+          slug: 'retired-growth',
+        }),
       ]),
-    ).toEqual({ hobby: null, pro: null });
+    ).toEqual({ hobby: null, pro: null, growth: null });
   });
 
   it('reports multiple current Pro plans and selects the most expensive', () => {
@@ -136,6 +158,39 @@ describe('pickSelfServePlans', () => {
     );
   });
 
+  it('reports multiple current Growth plans and selects the most expensive', () => {
+    const plans = [
+      plan({
+        amount: 15_000,
+        isFree: false,
+        isLegacy: false,
+        name: 'Growth',
+        slug: 'growth-old',
+      }),
+      plan({
+        amount: 19_900,
+        isFree: false,
+        isLegacy: false,
+        name: 'Growth',
+        slug: 'growth-new',
+      }),
+    ];
+
+    expect(pickSelfServePlans(plans).growth).toBe(plans[1]);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      'Multiple active, visible Growth billing plans returned',
+      {
+        level: 'error',
+        extra: {
+          plans: [
+            { amount: 15_000, slug: 'growth-old' },
+            { amount: 19_900, slug: 'growth-new' },
+          ],
+        },
+      },
+    );
+  });
+
   it('reports missing plans after the backend response loads', () => {
     const plans = [
       plan({
@@ -150,9 +205,14 @@ describe('pickSelfServePlans', () => {
     expect(pickSelfServePlans(plans)).toEqual({
       hobby: plans[0],
       pro: null,
+      growth: null,
     });
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
       'Missing active, visible Pro billing plan',
+      { level: 'error' },
+    );
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      'Missing active, visible Growth billing plan',
       { level: 'error' },
     );
   });
