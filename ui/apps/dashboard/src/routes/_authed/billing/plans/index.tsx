@@ -85,7 +85,15 @@ function BillingPlansPage() {
         </div>
       )}
       <p className="text-subtle mb-4">Available plans</p>
-      <div className="mb-4 grid grid-cols-3 gap-4">
+      <div
+        className={`mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 ${
+          plans.length === 4
+            ? 'xl:grid-cols-4'
+            : plans.length === 3
+            ? 'xl:grid-cols-3'
+            : 'xl:grid-cols-2'
+        }`}
+      >
         {plans.map((plan) => (
           <VerticalPlanCard
             key={plan.id}

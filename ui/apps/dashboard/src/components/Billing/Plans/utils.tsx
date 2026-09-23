@@ -24,9 +24,8 @@ export type Plan = Omit<
 
 export type SelfServePlan = GetPlansQuery['plans'][number];
 
-// Under normal circumstances, we should only have one active + visible plan for
-// Hobby and Pro, but the backend doesn't guarantee that for us. Pick one here
-// using an arbitrary rule.
+// the billing API does not guarantee one active plan per name.  each card
+// needs one plan so checkout has one price.
 export function pickSelfServePlans(plans?: SelfServePlan[]): {
   hobby: SelfServePlan | null;
   pro: SelfServePlan | null;
