@@ -10,6 +10,8 @@ import BillingInformation from '@/components/Billing/BillingDetails/BillingInfor
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
 import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
+import { usageKind } from '@/components/ExecutionLimit/executionLimit';
+import { useExecutionLimit } from '@/components/ExecutionLimit/useExecutionLimit';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import { BillingPaymentStatusBanner } from '@/components/PaymentStatusBanner/BillingPaymentStatusBanner';
 import {
@@ -152,6 +154,7 @@ function BillingComponent() {
     isCurrentHobbyPlan,
     legacyNoRunsPlan,
   } = Route.useLoaderData();
+  const executionLimit = useExecutionLimit();
 
   const refetch = async () => {
     await getCurrentPlan();
@@ -249,6 +252,11 @@ function BillingComponent() {
                   <LimitBar
                     data={executions}
                     className="mb-6"
+                    kind={
+                      executionLimit
+                        ? usageKind(executionLimit.band)
+                        : undefined
+                    }
                     usageURL={pathCreator.billingUsage({
                       dimension: 'execution',
                     })}

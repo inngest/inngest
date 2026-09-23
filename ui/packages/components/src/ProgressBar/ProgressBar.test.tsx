@@ -47,4 +47,14 @@ describe('ProgressBar', () => {
     const indicator = container.querySelector('[style="width: 60%;"]');
     expect(indicator?.className).toContain('bg-accent-xSubtle');
   });
+
+  it('keeps the default track neutral while tinting the indicator', () => {
+    const { container } = render(<ProgressBar kind="warning" limit={100} value={80} />);
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar.className).not.toContain('bg-accent-xSubtle');
+
+    const indicator = container.querySelector('[style="width: 80%;"]');
+    expect(indicator?.className).toContain('bg-accent-moderate');
+  });
 });
