@@ -16,7 +16,7 @@ import { useRouter } from '@tanstack/react-router';
 const GetEventKeysDocument = graphql(/* GraphQL */ `
   query GetEventKeys($environmentID: ID!) {
     environment: workspace(id: $environmentID) {
-      eventKeys: ingestKeys {
+      eventKeys: ingestKeys(filter: { source: "key" }) {
         name
         value: presharedKey
       }
@@ -53,7 +53,7 @@ export function SendEventModal({
     async (payload: EventPayload | EventPayload[]) => {
       if (!eventKey) {
         throw new Error(
-          'No event key available. Please check your environment configuration.',
+          'No event key available. Create an event key in this environment to send or replay events.',
         );
       }
 
