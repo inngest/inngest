@@ -31,9 +31,9 @@ const ProgressBar = ({
         'relative flex overflow-hidden',
         size === 'default' && 'outline-subtle h-6 rounded-md outline outline-1 -outline-offset-1',
         size === 'small' && 'h-1 rounded-sm',
-        kind === 'error' && 'bg-tertiary-xSubtle',
-        kind === 'warning' && 'bg-accent-xSubtle',
-        kind === 'caution' && 'bg-accent-3xSubtle',
+        size === 'small' && kind === 'error' && 'bg-tertiary-xSubtle',
+        size === 'small' && kind === 'warning' && 'bg-accent-xSubtle',
+        size === 'small' && kind === 'caution' && 'bg-accent-3xSubtle',
         className
       )}
       value={progress}

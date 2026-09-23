@@ -7,6 +7,7 @@ import {
 } from '@inngest/components/Tooltip/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiInformationLine } from '@remixicon/react';
+import type { ComponentProps } from 'react';
 
 export type Data = {
   isVisible: boolean;
@@ -22,10 +23,12 @@ export function LimitBar({
   data,
   className,
   usageURL,
+  kind,
 }: {
   data: Data;
   className?: string;
   usageURL?: string;
+  kind?: ComponentProps<typeof ProgressBar>['kind'];
 }) {
   const { title, description, current, limit, overageAllowed, tooltipContent } =
     data;
@@ -50,6 +53,7 @@ export function LimitBar({
         value={current}
         limit={limit}
         overageAllowed={overageAllowed}
+        kind={kind}
       />
       <div className="mt-1 flex items-center justify-between">
         <div className="text-left">
