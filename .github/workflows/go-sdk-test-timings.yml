@@ -1,0 +1,201 @@
+name: Refresh Go SDK test timings
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-sdk-test-timings
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "Go SDK timing shard ${{ matrix.index }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4]
+    runs-on: depot-ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
+
+      - name: Split Go SDK tests
+        id: test-split
+        uses: hashicorp-forge/go-test-split-action@1485d57a7de487cd60ca5d56d8422ca16bb4f47b # v2.0.4
+        with:
+          total: 5
+          index: ${{ matrix.index }}
+          packages: ./tests/golang
+          junit-summary: .github/test-timings/go-sdk.xml
+
+      - name: Build dev server
+        run: go build -o ./inngest-bin ./cmd
+
+      - name: Run Go SDK tests
+        run: |
+          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
+          mkdir -p test-results
+          gotestsum --junitfile="test-results/junit-${{ matrix.index }}.xml" --format=standard-verbose -- \
+            ./tests/golang -run "${{ steps.test-split.outputs.run }}" -count=1
+        env:
+          API_URL: http://127.0.0.1:8288
+          DEBUG: "1"
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "false"
+          INNGEST_DEV: http://127.0.0.1:8288
+          INNGEST_EVENT_KEY: test
+          INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
+          TEST_DATABASE: sqlite
+          TEST_MODE: true
+
+      - name: Upload devserver logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: go-sdk-timing-devserver-${{ matrix.index }}
+          path: /tmp/dev-output.txt
+          retention-days: 1
+
+      - name: Upload timing shard
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: go-sdk-timing-${{ matrix.index }}
+          path: test-results/junit-${{ matrix.index }}.xml
+          retention-days: 1
+
+  update:
+    name: Update timing baseline
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      TIMING_BRANCH: automated/go-sdk-test-timings
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Download timing shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: go-sdk-timing-*
+          path: test-timings
+          merge-multiple: true
+
+      - name: Build timing baseline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import math
+          import xml.etree.ElementTree as ET
+
+          timings = {}
+          for path in Path("test-timings").glob("*.xml"):
+              for case in ET.parse(path).iter("testcase"):
+                  name = case.get("name", "")
+                  if not name.startswith("Test") or "/" in name:
+                      continue
+                  if name in timings:
+                      raise SystemExit(f"duplicate top-level test: {name}")
+                  duration = float(case.get("time", "0"))
+                  if not math.isfinite(duration) or duration < 0:
+                      raise SystemExit(f"invalid duration for {name}: {duration}")
+                  timings[name] = duration
+
+          if not timings:
+              raise SystemExit("no top-level Go test timings found")
+
+          root = ET.Element("testsuites")
+          suite = ET.SubElement(
+              root,
+              "testsuite",
+              name="go-sdk-e2e",
+              tests=str(len(timings)),
+          )
+          for name in sorted(timings):
+              ET.SubElement(suite, "testcase", name=name, time=f"{timings[name]:.2f}")
+
+          ET.indent(root, space="  ")
+          ET.ElementTree(root).write(
+              ".github/test-timings/go-sdk.xml",
+              encoding="unicode",
+              xml_declaration=True,
+          )
+          with Path(".github/test-timings/go-sdk.xml").open("a") as output:
+              output.write("\n")
+          PY
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet -- .github/test-timings/go-sdk.xml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit timing baseline
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git checkout -B "$TIMING_BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/test-timings/go-sdk.xml
+          git commit -m "ci(e2e): refresh Go SDK test timings"
+          git push --force-with-lease origin "$TIMING_BRANCH"
+
+      - name: Open or update PR
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          cat > /tmp/go-sdk-timings-pr-body.md <<'EOF'
+          ## Description
+
+          Refreshes the checked-in Go SDK E2E timing baseline used to balance CI shards.
+
+          ## Release note
+
+          None
+
+          ## Migration note
+
+          None
+          EOF
+
+          pr_number="$(gh pr list \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "$TIMING_BRANCH" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" \
+              --title "ci(e2e): refresh Go SDK test timings" \
+              --body-file /tmp/go-sdk-timings-pr-body.md
+          else
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$TIMING_BRANCH" \
+              --title "ci(e2e): refresh Go SDK test timings" \
+              --body-file /tmp/go-sdk-timings-pr-body.md
+          fi
