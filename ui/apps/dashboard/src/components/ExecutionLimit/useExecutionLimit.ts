@@ -7,7 +7,6 @@ import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import {
   isExecutionCapped,
   legacyExecutionCap,
-  shouldShowExecutionLimit,
   usageBand,
   type UsageBand,
 } from './executionLimit';
@@ -44,7 +43,7 @@ const executionCapQuery = graphql(`
         usage
         limit
         enforced
-        overageAllowed
+        exceeded
       }
     }
   }
@@ -93,7 +92,6 @@ export function useExecutionLimit(): ExecutionLimitData | null {
           usage: account.entitlements.usage.executions,
         });
   if (!cap) return null;
-  if (!shouldShowExecutionLimit(cap)) return null;
 
   const isEnterprise =
     'plan' in account &&

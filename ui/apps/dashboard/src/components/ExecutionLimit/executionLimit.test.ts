@@ -7,7 +7,6 @@ import {
   isExecutionCapped,
   legacyExecutionCap,
   pillContent,
-  shouldShowExecutionLimit,
   usageBand,
   usageKind,
 } from './executionLimit';
@@ -16,36 +15,17 @@ const atLimit = {
   usage: 50_000,
   limit: 50_000,
   enforced: true,
-  overageAllowed: false,
+  exceeded: true,
 };
 
-describe('shouldShowExecutionLimit', () => {
-  it('shows notices only when overage is disallowed, regardless of enforcement', () => {
-    for (const enforced of [false, true]) {
-      expect(shouldShowExecutionLimit({ ...atLimit, enforced })).toBe(true);
-      expect(
-        shouldShowExecutionLimit({
-          ...atLimit,
-          enforced,
-          overageAllowed: true,
-        }),
-      ).toBe(false);
-    }
-  });
-});
-
 describe('isExecutionCapped', () => {
-  it('caps once usage reaches the limit', () => {
+  it('caps once the backend reports the cap exceeded', () => {
     expect(isExecutionCapped(atLimit)).toBe(true);
-    expect(isExecutionCapped({ ...atLimit, usage: 49_999 })).toBe(false);
+    expect(isExecutionCapped({ ...atLimit, exceeded: false })).toBe(false);
   });
 
   it('never caps while enforcement is off', () => {
     expect(isExecutionCapped({ ...atLimit, enforced: false })).toBe(false);
-  });
-
-  it('never caps accounts billed for overage', () => {
-    expect(isExecutionCapped({ ...atLimit, overageAllowed: true })).toBe(false);
   });
 });
 
@@ -65,8 +45,10 @@ describe('legacyExecutionCap', () => {
     expect(cappedBy({ ...legacyAtLimit, usage: 49_999 })).toBe(false);
   });
 
-  it('never caps accounts billed for overage', () => {
-    expect(cappedBy({ ...legacyAtLimit, overageAllowed: true })).toBe(false);
+  it('treats accounts billed for overage as having no cap', () => {
+    expect(
+      legacyExecutionCap({ ...legacyAtLimit, overageAllowed: true }),
+    ).toBeNull();
   });
 });
 
