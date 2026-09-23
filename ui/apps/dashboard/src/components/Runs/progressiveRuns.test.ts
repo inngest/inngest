@@ -61,12 +61,13 @@ describe('scanProgressivePages', () => {
     expect(fetchPage.mock.calls).toEqual([['cursor-1'], ['cursor-2']]);
   });
 
-  it('pauses at the pass budget and rejects a non-advancing resumable cursor', async () => {
+  it('pauses at the time budget and rejects a non-advancing resumable cursor', async () => {
     const fetchPage = vi.fn(async (cursor?: string) => ({
       items: [],
       cursor: cursor ? `${cursor}-next` : 'cursor-1',
       hasMore: true,
     }));
+    const now = vi.fn().mockReturnValueOnce(0).mockReturnValue(2);
     await expect(
       scanProgressivePages<{ id: string }>({
         initialItems: [],
@@ -74,10 +75,11 @@ describe('scanProgressivePages', () => {
         onCommit: () => {},
         signal: new AbortController().signal,
         displayTarget: 40,
-        maxPasses: 2,
+        maxMilliseconds: 1,
+        now,
       }),
     ).resolves.toBe('budget');
-    expect(fetchPage).toHaveBeenCalledTimes(2);
+    expect(fetchPage).toHaveBeenCalledTimes(1);
 
     await expect(
       scanProgressivePages<{ id: string }>({

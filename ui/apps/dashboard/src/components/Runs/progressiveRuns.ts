@@ -7,7 +7,6 @@ export async function scanProgressivePages<T extends { id: string }>({
   onCommit,
   signal,
   displayTarget,
-  maxPasses = 10,
   maxMilliseconds = 10_000,
   now = Date.now,
 }: {
@@ -19,7 +18,6 @@ export async function scanProgressivePages<T extends { id: string }>({
   onCommit: (items: T[], cursor: string | undefined, hasMore: boolean) => void;
   signal: AbortSignal;
   displayTarget: number;
-  maxPasses?: number;
   maxMilliseconds?: number;
   now?: () => number;
 }): Promise<ProgressiveStopReason> {
@@ -28,7 +26,7 @@ export async function scanProgressivePages<T extends { id: string }>({
   const byID = new Map(initialItems.map((item) => [item.id, item]));
   const displayTargetSize = byID.size + displayTarget;
 
-  for (let pass = 0; pass < maxPasses; pass += 1) {
+  do {
     const page = await fetchPage(cursor);
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     if (page.hasMore && (!page.cursor || page.cursor === cursor)) {
@@ -42,7 +40,7 @@ export async function scanProgressivePages<T extends { id: string }>({
 
     if (!page.hasMore) return 'complete';
     if (items.length >= displayTargetSize) return 'display-target';
-    if (now() - startedAt >= maxMilliseconds) return 'budget';
-  }
+  } while (now() - startedAt < maxMilliseconds);
+
   return 'budget';
 }
