@@ -4,21 +4,14 @@ export type ExecutionCap = {
   usage: number;
   limit: number;
   enforced: boolean;
-  overageAllowed: boolean;
+  exceeded: boolean;
 };
 
-// Display policy is separate from whether execution is actually blocked.
-export function shouldShowExecutionLimit(cap: ExecutionCap): boolean {
-  return !cap.overageAllowed;
-}
-
 export function isExecutionCapped({
-  usage,
-  limit,
   enforced,
-  overageAllowed,
+  exceeded,
 }: ExecutionCap): boolean {
-  return enforced && !overageAllowed && usage >= limit;
+  return enforced && exceeded;
 }
 
 export function legacyExecutionCap({
@@ -26,8 +19,8 @@ export function legacyExecutionCap({
   limit,
   overageAllowed,
 }: ExecutionLimitCheckQuery['account']['entitlements']['executions']): ExecutionCap | null {
-  if (limit === null) return null;
-  return { usage, limit, overageAllowed, enforced: true };
+  if (limit === null || overageAllowed) return null;
+  return { usage, limit, enforced: true, exceeded: usage >= limit };
 }
 
 export type UsageBand = 'under50' | '50' | '75' | '90' | 'capped';

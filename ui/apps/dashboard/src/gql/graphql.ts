@@ -94,10 +94,13 @@ export type Account = {
   datadogConnections: Array<DatadogConnectionStatus>;
   datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
+  /** @deprecated Use ents instead. */
   entitlements: Entitlements;
+  ents: AccountEntitlements;
   /**
-   * Monthly execution cap for the account. Null when no enforceable cap applies:
-   * a plan outside the capped set, or an unlimited/exempt executions limit.
+   * Monthly execution cap for the account. Null when the account is not capped:
+   * its executions_overage_limit entitlement is -1, or its executions allowance
+   * is unlimited. The usage card and the capped banner read only this field.
    */
   executionCap: Maybe<AccountExecutionCap>;
   id: Scalars['ID']['output'];
@@ -149,14 +152,54 @@ export type AccountSearchArgs = {
   opts: SearchInput;
 };
 
+export type AccountEntitlementUsage = {
+  __typename?: 'AccountEntitlementUsage';
+  concurrency: Scalars['Int']['output'];
+  executions: Scalars['Int']['output'];
+  runCount: Scalars['Int']['output'];
+  stepCount: Scalars['Int']['output'];
+  userCount: Scalars['Int']['output'];
+};
+
+export type AccountEntitlements = {
+  __typename?: 'AccountEntitlements';
+  concurrency: EntitlementConcurrencyValue;
+  connect: EntitlementBool;
+  connectAppsPerConnection: EntitlementConnectAppsPerConnection;
+  connectWorkerConnections: EntitlementConnectWorkerConnections;
+  eventBatchCount: EntitlementInt;
+  eventBatchTimeout: EntitlementInt;
+  eventSize: EntitlementInt;
+  events: EntitlementWithOverage;
+  executions: EntitlementWithOverage;
+  functionBacklogSize: EntitlementNullableInt;
+  hipaa: EntitlementBool;
+  history: EntitlementInt;
+  metricsExport: EntitlementBool;
+  metricsExportFreshness: EntitlementInt;
+  metricsExportGranularity: EntitlementInt;
+  otelTraces: EntitlementBool;
+  realtimeConnections: EntitlementInt;
+  realtimeMessages: EntitlementInt;
+  runCount: EntitlementWithOverage;
+  runDuration: EntitlementInt;
+  slackChannel: EntitlementBool;
+  stepCount: EntitlementWithOverage;
+  tracingCustomSpans: EntitlementInt;
+  usage: AccountEntitlementUsage;
+  userCount: EntitlementNullableInt;
+};
+
 export type AccountExecutionCap = {
   __typename?: 'AccountExecutionCap';
   /** Whether the cap is being enforced for this account. Usage is counted and shown either way. */
   enforced: Scalars['Boolean']['output'];
-  /** Monthly execution allowance. Always above zero; the field is null otherwise. */
+  /** Whether usage has reached limit + overageLimit. New runs are refused only when enforced is also true. */
+  exceeded: Scalars['Boolean']['output'];
+  /** Monthly execution allowance: the executions entitlement, overrides and addons included. */
   limit: Scalars['Int']['output'];
-  /** When true the account is billed for overage and is never blocked. Suppresses the warning and capped states. */
-  overageAllowed: Scalars['Boolean']['output'];
+  /** Executions past limit before new runs are refused. Hobby is 0. */
+  overageLimit: Scalars['Int']['output'];
   /** Month-to-date executions, read from the usage counter. Lags real usage by seconds. */
   usage: Scalars['Int']['output'];
 };
@@ -381,7 +424,9 @@ export type BillingPlan = {
   amount: Scalars['Int']['output'];
   availableAddons: AvailableAddons;
   billingPeriod: Scalars['BillingPeriod']['output'];
+  /** @deprecated Use ents instead. */
   entitlements: Entitlements;
+  ents: PlanEntitlements;
   features: Scalars['Map']['output'];
   id: Scalars['ID']['output'];
   isFree: Scalars['Boolean']['output'];
@@ -606,6 +651,12 @@ export type CreateCancellationInputTestOnly = {
   queryLimit?: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type CreateEnvSecretInput = {
+  name: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
+};
+
 export type CreateFunctionReplayInput = {
   fromRange: Scalars['ULID']['input'];
   name: Scalars['String']['input'];
@@ -734,6 +785,12 @@ export type EntitlementConcurrency = {
   usage: Scalars['Int']['output'];
 };
 
+export type EntitlementConcurrencyValue = {
+  __typename?: 'EntitlementConcurrencyValue';
+  burstMode: BurstConcurrencyMode;
+  limit: Scalars['Int']['output'];
+};
+
 export type EntitlementConnectAppsPerConnection = {
   __typename?: 'EntitlementConnectAppsPerConnection';
   limit: Maybe<Scalars['Int']['output']>;
@@ -808,6 +865,12 @@ export type EntitlementUserCount = {
   usage: Scalars['Int']['output'];
 };
 
+export type EntitlementWithOverage = {
+  __typename?: 'EntitlementWithOverage';
+  limit: Maybe<Scalars['Int']['output']>;
+  overageAllowed: Scalars['Boolean']['output'];
+};
+
 export type Entitlements = {
   __typename?: 'Entitlements';
   accountID: Maybe<Scalars['UUID']['output']>;
@@ -842,6 +905,15 @@ export type EnvEdge = {
   __typename?: 'EnvEdge';
   cursor: Scalars['String']['output'];
   node: Workspace;
+};
+
+/** Workspace secret metadata. Values are only delivered to authorized sandbox launches. */
+export type EnvSecret = {
+  __typename?: 'EnvSecret';
+  createdAt: Scalars['Time']['output'];
+  id: Scalars['UUID']['output'];
+  name: Scalars['String']['output'];
+  updatedAt: Scalars['Time']['output'];
 };
 
 export enum EnvironmentType {
@@ -1356,6 +1428,7 @@ export enum MetricsScope {
 export type Mutation = {
   __typename?: 'Mutation';
   archiveApp: App;
+  archiveEnvSecret: Scalars['Boolean']['output'];
   archiveEnvironment: Workspace;
   archiveEvent: Maybe<Event>;
   archiveWorkflow: Maybe<WorkflowResponse>;
@@ -1370,6 +1443,7 @@ export type Mutation = {
   confirmSubscriptionUpgrade: ConfirmSubscriptionUpgradeResponse;
   createAPIKey: ApiKeyCreateResult;
   createCancellation: Cancellation;
+  createEnvSecret: EnvSecret;
   createFunctionReplay: Replay;
   createIngestKey: IngestKey;
   createInsightsQuery: InsightsQueryStatement;
@@ -1409,6 +1483,7 @@ export type Mutation = {
   updateAPIKey: ApiKey;
   updateAccount: Account;
   updateAccountAddonQuantity: Addon;
+  updateEnvSecretValue: EnvSecret;
   updateExperimentScoringConfig: ExperimentScoringConfig;
   updateIngestKey: IngestKey;
   updateInsightsQuery: InsightsQueryStatement;
@@ -1420,6 +1495,12 @@ export type Mutation = {
 
 export type MutationArchiveAppArgs = {
   id: Scalars['UUID']['input'];
+};
+
+
+export type MutationArchiveEnvSecretArgs = {
+  id: Scalars['UUID']['input'];
+  workspaceID: Scalars['UUID']['input'];
 };
 
 
@@ -1498,6 +1579,11 @@ export type MutationCreateApiKeyArgs = {
 
 export type MutationCreateCancellationArgs = {
   input: CreateCancellationInput;
+};
+
+
+export type MutationCreateEnvSecretArgs = {
+  input: CreateEnvSecretInput;
 };
 
 
@@ -1707,6 +1793,11 @@ export type MutationUpdateAccountAddonQuantityArgs = {
 };
 
 
+export type MutationUpdateEnvSecretValueArgs = {
+  input: UpdateEnvSecretValueInput;
+};
+
+
 export type MutationUpdateExperimentScoringConfigArgs = {
   experimentName: Scalars['String']['input'];
   functionID: Scalars['ID']['input'];
@@ -1869,6 +1960,34 @@ export enum PaymentStatusSeverity {
   /** failed payment / within grace window */
   Warning = 'WARNING'
 }
+
+export type PlanEntitlements = {
+  __typename?: 'PlanEntitlements';
+  concurrency: EntitlementConcurrencyValue;
+  connect: EntitlementBool;
+  connectAppsPerConnection: EntitlementConnectAppsPerConnection;
+  connectWorkerConnections: EntitlementConnectWorkerConnections;
+  eventBatchCount: EntitlementInt;
+  eventBatchTimeout: EntitlementInt;
+  eventSize: EntitlementInt;
+  events: EntitlementWithOverage;
+  executions: EntitlementWithOverage;
+  functionBacklogSize: EntitlementNullableInt;
+  hipaa: EntitlementBool;
+  history: EntitlementInt;
+  metricsExport: EntitlementBool;
+  metricsExportFreshness: EntitlementInt;
+  metricsExportGranularity: EntitlementInt;
+  otelTraces: EntitlementBool;
+  realtimeConnections: EntitlementInt;
+  realtimeMessages: EntitlementInt;
+  runCount: EntitlementWithOverage;
+  runDuration: EntitlementInt;
+  slackChannel: EntitlementBool;
+  stepCount: EntitlementWithOverage;
+  tracingCustomSpans: EntitlementInt;
+  userCount: EntitlementNullableInt;
+};
 
 export type Price = {
   __typename?: 'Price';
@@ -2698,6 +2817,12 @@ export type UpdateAccount = {
   securityEmail?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateEnvSecretValueInput = {
+  id: Scalars['UUID']['input'];
+  value: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
+};
+
 export type UpdateIngestKey = {
   filterList?: InputMaybe<FilterListInput>;
   metadata?: InputMaybe<Scalars['Map']['input']>;
@@ -2929,6 +3054,7 @@ export type Workspace = {
   cdcConnections: Array<CdcConnection>;
   connectWorkerMetrics: ScopedMetricsResponse;
   createdAt: Scalars['Time']['output'];
+  envSecrets: Array<EnvSecret>;
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventType: EventTypeV2;
@@ -3534,7 +3660,7 @@ export type ExecutionLimitCheckQuery = { __typename?: 'Query', account: { __type
 export type ExecutionCapCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ExecutionCapCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, marketplace: Marketplace | null, marketplaceBillingURL: string | null, executionCap: { __typename?: 'AccountExecutionCap', usage: number, limit: number, enforced: boolean, overageAllowed: boolean } | null } };
+export type ExecutionCapCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, marketplace: Marketplace | null, marketplaceBillingURL: string | null, executionCap: { __typename?: 'AccountExecutionCap', usage: number, limit: number, enforced: boolean, exceeded: boolean } | null } };
 
 export type GetExperimentsQueryVariables = Exact<{
   workspaceID: Scalars['ID']['input'];
@@ -4539,7 +4665,7 @@ export const GetEventV2Document = {"kind":"Document","definitions":[{"kind":"Ope
 export const GetEventPayloadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventPayload"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"raw"}}]}}]}}]}}]} as unknown as DocumentNode<GetEventPayloadQuery, GetEventPayloadQueryVariables>;
 export const GetEventV2RunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventV2Runs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"runs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"function"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}},{"kind":"Field","name":{"kind":"Name","value":"trace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"preview"},"value":{"kind":"BooleanValue","value":true}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"skipReason"}},{"kind":"Field","name":{"kind":"Name","value":"skipExistingRunID"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetEventV2RunsQuery, GetEventV2RunsQueryVariables>;
 export const ExecutionLimitCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ExecutionLimitCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"marketplaceBillingURL"}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"entitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"executions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"usage"}},{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"overageAllowed"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ExecutionLimitCheckQuery, ExecutionLimitCheckQueryVariables>;
-export const ExecutionCapCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ExecutionCapCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"marketplace"}},{"kind":"Field","name":{"kind":"Name","value":"marketplaceBillingURL"}},{"kind":"Field","name":{"kind":"Name","value":"executionCap"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"usage"}},{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"enforced"}},{"kind":"Field","name":{"kind":"Name","value":"overageAllowed"}}]}}]}}]}}]} as unknown as DocumentNode<ExecutionCapCheckQuery, ExecutionCapCheckQueryVariables>;
+export const ExecutionCapCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ExecutionCapCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"marketplace"}},{"kind":"Field","name":{"kind":"Name","value":"marketplaceBillingURL"}},{"kind":"Field","name":{"kind":"Name","value":"executionCap"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"usage"}},{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"enforced"}},{"kind":"Field","name":{"kind":"Name","value":"exceeded"}}]}}]}}]}}]} as unknown as DocumentNode<ExecutionCapCheckQuery, ExecutionCapCheckQueryVariables>;
 export const GetExperimentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperiments"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experiments"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"functionID"}},{"kind":"Field","name":{"kind":"Name","value":"functionSlug"}},{"kind":"Field","name":{"kind":"Name","value":"selectionStrategy"}},{"kind":"Field","name":{"kind":"Name","value":"totalRuns"}},{"kind":"Field","name":{"kind":"Name","value":"variantCount"}},{"kind":"Field","name":{"kind":"Name","value":"firstSeen"}},{"kind":"Field","name":{"kind":"Name","value":"lastSeen"}}]}}]}}]} as unknown as DocumentNode<GetExperimentsQuery, GetExperimentsQueryVariables>;
 export const GetExperimentDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperimentDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeRangeInput"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"variantFilter"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentDetail"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"functionID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}},{"kind":"Argument","name":{"kind":"Name","value":"experimentName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}}},{"kind":"Argument","name":{"kind":"Name","value":"timeRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"timeRange"}}},{"kind":"Argument","name":{"kind":"Name","value":"variantFilter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"variantFilter"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"firstSeen"}},{"kind":"Field","name":{"kind":"Name","value":"lastSeen"}},{"kind":"Field","name":{"kind":"Name","value":"selectionStrategy"}},{"kind":"Field","name":{"kind":"Name","value":"variantWeights"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"variantName"}},{"kind":"Field","name":{"kind":"Name","value":"weight"}}]}},{"kind":"Field","name":{"kind":"Name","value":"variants"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"variantName"}},{"kind":"Field","name":{"kind":"Name","value":"runCount"}},{"kind":"Field","name":{"kind":"Name","value":"metrics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"avg"}},{"kind":"Field","name":{"kind":"Name","value":"stddev"}},{"kind":"Field","name":{"kind":"Name","value":"min"}},{"kind":"Field","name":{"kind":"Name","value":"q1"}},{"kind":"Field","name":{"kind":"Name","value":"med"}},{"kind":"Field","name":{"kind":"Name","value":"q3"}},{"kind":"Field","name":{"kind":"Name","value":"max"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetExperimentDetailQuery, GetExperimentDetailQueryVariables>;
 export const GetExperimentScoringConfigDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetExperimentScoringConfig"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentScoringConfig"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"functionID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}},{"kind":"Argument","name":{"kind":"Name","value":"experimentName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"experimentName"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"experimentName"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"metrics"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"points"}},{"kind":"Field","name":{"kind":"Name","value":"minValue"}},{"kind":"Field","name":{"kind":"Name","value":"maxValue"}},{"kind":"Field","name":{"kind":"Name","value":"invert"}},{"kind":"Field","name":{"kind":"Name","value":"labelBest"}},{"kind":"Field","name":{"kind":"Name","value":"labelWorst"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}}]}}]}}]}}]} as unknown as DocumentNode<GetExperimentScoringConfigQuery, GetExperimentScoringConfigQueryVariables>;

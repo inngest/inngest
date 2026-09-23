@@ -44,7 +44,7 @@ describe('useExecutionLimit', () => {
       usage: number;
       limit: number;
       enforced: boolean;
-      overageAllowed: boolean;
+      exceeded: boolean;
     } | null;
   };
 
@@ -67,7 +67,7 @@ describe('useExecutionLimit', () => {
         usage: 50_000,
         limit: 50_000,
         enforced: false,
-        overageAllowed: false,
+        exceeded: true,
       },
     };
     mocks.useBooleanFlag.mockImplementation((name: string) =>
@@ -134,16 +134,11 @@ describe('useExecutionLimit', () => {
     ).toEqual([true, false]);
   });
 
-  it.each([false, true])(
-    'hides overage-eligible accounts (enhanced: %s)',
-    (value) => {
-      flag = { value, isReady: true };
-      legacyAccount.entitlements.executions.overageAllowed = true;
-      enhancedAccount.executionCap!.overageAllowed = true;
+  it('hides overage-eligible legacy accounts', () => {
+    legacyAccount.entitlements.executions.overageAllowed = true;
 
-      expect(useExecutionLimit()).toBeNull();
-    },
-  );
+    expect(useExecutionLimit()).toBeNull();
+  });
 
   it('returns null while the selected query has no account data', () => {
     mocks.useSkippableGraphQLQuery.mockReturnValue({ data: undefined });
