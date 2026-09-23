@@ -26,11 +26,9 @@ export const Route = createFileRoute('/_authed/billing/plans/')({
     ]);
 
     if (!currentPlan) throw new Error('Failed to fetch current plan');
-    const selfServePlans = pickSelfServePlans(availablePlans);
-    const availableSelfServePlans = [
-      selfServePlans.hobby,
-      selfServePlans.pro,
-    ].filter((plan) => plan !== null);
+    const availableSelfServePlans = Object.values(
+      pickSelfServePlans(availablePlans),
+    ).filter((plan) => plan !== null);
     if (availableSelfServePlans.length === 0) {
       throw new Error('Failed to fetch available plans');
     }

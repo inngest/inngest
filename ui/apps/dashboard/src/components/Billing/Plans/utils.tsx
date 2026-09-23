@@ -30,6 +30,7 @@ export type SelfServePlan = GetPlansQuery['plans'][number];
 export function pickSelfServePlans(plans?: SelfServePlan[]): {
   hobby: SelfServePlan | null;
   pro: SelfServePlan | null;
+  growth: SelfServePlan | null;
 } {
   const selectablePlans = plans ?? [];
 
@@ -68,6 +69,7 @@ export function pickSelfServePlans(plans?: SelfServePlan[]): {
   const selfServePlans = {
     hobby: pickPlan('Hobby', true),
     pro: pickPlan('Pro', false),
+    growth: pickPlan('Growth', false),
   };
 
   return selfServePlans;
@@ -77,6 +79,7 @@ export enum PlanNames {
   Free = 'Free Tier',
   Basic = 'Basic',
   Pro = 'Pro',
+  Growth = 'Growth',
   Hobby = 'Hobby - Free',
   Enterprise = 'Enterprise',
 }
