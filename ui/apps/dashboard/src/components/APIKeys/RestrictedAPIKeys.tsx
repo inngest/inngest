@@ -143,7 +143,12 @@ export function RestrictedAPIKeys() {
   const policyButton = (
     <Button
       kind="secondary"
-      appearance="outlined"
+      appearance={data.v2RestrictedAuth ? 'outlined' : 'ghost'}
+      className={
+        data.v2RestrictedAuth
+          ? undefined
+          : 'text-warning hover:text-accent-xIntense hover:bg-transparent focus:bg-transparent active:bg-transparent disabled:bg-transparent px-0 text-sm font-medium underline underline-offset-2'
+      }
       label={data.v2RestrictedAuth ? 'Enable' : 'Disable'}
       disabled={saving || fetching}
       onClick={() => {
@@ -233,7 +238,7 @@ export function RestrictedAPIKeys() {
       ) : (
         <Alert
           severity="warning"
-          className="text-sm sm:flex sm:items-center sm:justify-between sm:gap-4 sm:[&>div:last-child]:m-0 sm:[&>div:last-child]:shrink-0"
+          className="dark:bg-warning text-sm sm:flex sm:items-center sm:justify-between sm:gap-4 sm:[&>div:last-child]:m-0 sm:[&>div:last-child]:shrink-0"
           button={policyButton}
         >
           <h3 className="font-medium">Legacy access to v2 is enabled</h3>
