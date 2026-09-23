@@ -1,7 +1,7 @@
 import LogoWall from '@/components/SignIn/LogoWall';
 import SplitView from '@/components/SignIn/SplitView';
 import TrustPanel from '@/components/SignIn/TrustPanel';
-import { getSignupAttribution } from '@/utils/signupAttribution';
+import { getSignupMetadata } from '@/utils/signupAttribution';
 import { absoluteUrl, canonicalLink } from '@/utils/urls';
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
@@ -24,18 +24,6 @@ import { Link, createFileRoute, useLocation } from '@tanstack/react-router';
  */
 const MARKETING_CTA =
   '!bg-[#F65C4F] hover:!bg-[#DD5347] focus:!bg-[#DD5347] active:!bg-[#C54A3F]';
-
-const getAnonymousId = () => {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-
-  const cookie = document.cookie
-    .split('; ')
-    .find((c) => c.startsWith('ajs_anonymous_id='));
-
-  return cookie ? cookie.split('=')[1] : null;
-};
 
 const TITLE = 'Create a free account | Inngest';
 const DESCRIPTION =
@@ -105,7 +93,6 @@ function FormSkeleton() {
 }
 
 function RouteComponent() {
-  const anonymousId = getAnonymousId();
   const { pathname } = useLocation();
 
   // Clerk renders its "Already have an account?" action inside the card, which
@@ -137,10 +124,7 @@ function RouteComponent() {
             <ClerkLoading>{isStartStep ? <FormSkeleton /> : null}</ClerkLoading>
             <ClerkLoaded>
               <SignUp
-                unsafeMetadata={{
-                  ...(anonymousId && { anonymousID: anonymousId }),
-                  ...getSignupAttribution(),
-                }}
+                unsafeMetadata={getSignupMetadata()}
                 appearance={{
                   elements: {
                     footer: isStartStep ? 'hidden' : 'bg-none',
