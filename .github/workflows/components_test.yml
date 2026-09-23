@@ -19,7 +19,7 @@ jobs:
           version: "10.18.2"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".tool-versions"
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: ui/packages/components

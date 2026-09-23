@@ -23,13 +23,12 @@ jobs:
           version: "10.18.2"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".tool-versions"
       # Optional dependencies are packages like frameworks, which are actually
       # peer dependencies and are not installed in every usage, so we omit them
       # here and only check what's shipped directly by us.
       - run: pnpm audit --audit-level=critical --prod --no-optional --ignore-registry-errors
         working-directory: ui
               
-
 
 
