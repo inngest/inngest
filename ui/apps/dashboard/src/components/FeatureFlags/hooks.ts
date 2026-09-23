@@ -1,11 +1,12 @@
 import { useContext, useEffect } from 'react';
+import type { ClientFeatureFlagKey } from '@inngest/components/SharedContext/clientFeatureFlags';
 import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useFlags } from 'launchdarkly-react-client-sdk';
 
 import { IdentificationContext } from './ClientFeatureFlagProvider';
 
 export function useBooleanFlag(
-  flag: string,
+  flag: ClientFeatureFlagKey,
   defaultValue: boolean = false,
 ): BooleanFlag {
   const value: unknown = useFlags()[flag];

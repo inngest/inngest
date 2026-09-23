@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 
+import type { ClientFeatureFlagKey } from './clientFeatureFlags';
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
 import type { GetRunPayload, GetRunResult } from './useGetRun';
@@ -24,7 +25,7 @@ export type SharedDefinitions = {
   rerunFromStep: (payload: RerunFromStepPayload) => Promise<RerunFromStepResult>;
   rerun: (payload: RerunPayload) => Promise<RerunResult>;
   cancelRun: (payload: CancelRunPayload) => Promise<CancelRunResult>;
-  booleanFlag: (flag: string, defaultValue?: boolean) => BooleanFlag;
+  booleanFlag: (flag: ClientFeatureFlagKey, defaultValue?: boolean) => BooleanFlag;
   inngestStatus: InngestStatus | null;
   pathCreator: PathCreator;
   cloud: boolean;

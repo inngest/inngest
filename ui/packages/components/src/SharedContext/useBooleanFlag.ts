@@ -1,4 +1,5 @@
 import { useShared } from './SharedContext';
+import type { ClientFeatureFlagKey } from './clientFeatureFlags';
 
 export type BooleanFlag = {
   // Ready means the value can be used, including the default after an error.
@@ -9,7 +10,7 @@ export type BooleanFlag = {
 };
 
 export type BooleanFlagPayload = {
-  flag: string;
+  flag: ClientFeatureFlagKey;
   defaultValue: boolean;
   overrideable?: boolean;
 };
@@ -19,7 +20,7 @@ export const FEATURE_FLAG_NAMESPACE = 'inngest-feature-flag-';
 export const useBooleanFlag = () => {
   const shared = useShared();
   const booleanFlag = (
-    flag: string,
+    flag: ClientFeatureFlagKey,
     defaultValue: boolean = false,
     userOverrideable: boolean = false
   ): BooleanFlag => {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 
+import type { ClientFeatureFlagKey } from '../SharedContext/clientFeatureFlags';
 import { FEATURE_FLAG_NAMESPACE, useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { Switch } from '../Switch';
 import { cn } from '../utils/classNames';
 
 type featureToggleProps = {
-  featureFlagName: string;
+  featureFlagName: ClientFeatureFlagKey;
   defaultEnabled?: boolean;
   className?: string;
   toggle?: () => void;

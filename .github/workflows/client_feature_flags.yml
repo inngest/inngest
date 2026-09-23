@@ -1,0 +1,51 @@
+name: Client feature flag review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  pull_request:
+    paths:
+      - "ui/packages/components/src/SharedContext/clientFeatureFlags.ts"
+
+jobs:
+  launchdarkly-availability-reminder:
+    name: Check LaunchDarkly client-side availability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on pull request
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- client-feature-flag-reminder -->';
+            const body = `${marker}
+            ## LaunchDarkly client-side availability
+
+            The client feature flag registry changed in this PR.
+
+            If this PR adds a flag, verify that **SDKs using client-side ID** is enabled for it in LaunchDarkly before merging.`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
