@@ -58,6 +58,7 @@ vi.mock('launchdarkly-react-client-sdk', () => ({
   withLDProvider: () => (component: unknown) => component,
 }));
 const client = { identify: mocks.identify };
+const flag = 'traces-preview';
 vi.mock('@clerk/tanstack-react-start', () => ({
   useUser: () => ({ user: { externalId: 'user-1', fullName: 'User' } }),
   useOrganization: () => ({
@@ -79,12 +80,11 @@ it.each([undefined, 'true', null, 1])(
   'uses a ready default for invalid flag %s and recovers',
   async (value) => {
     mocks.identify.mockResolvedValue({});
-    mocks.flags = { test: value };
+    mocks.flags = { [flag]: value };
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const { result, rerender } = renderHook(
-      () => useBooleanFlag('test', false),
-      { wrapper: ClientFeatureFlagProvider },
-    );
+    const { result, rerender } = renderHook(() => useBooleanFlag(flag, false), {
+      wrapper: ClientFeatureFlagProvider,
+    });
     await waitFor(() =>
       expect(result.current).toEqual({ isReady: true, value: false }),
     );
@@ -94,7 +94,7 @@ it.each([undefined, 'true', null, 1])(
     const calls = log.mock.calls.length;
     rerender();
     expect(log).toHaveBeenCalledTimes(calls);
-    mocks.flags = { test: true };
+    mocks.flags = { [flag]: true };
     rerender();
     expect(result.current).toEqual({ isReady: true, value: true });
   },
@@ -106,9 +106,9 @@ it('keeps pending identification unready and uses defaults after rejection', asy
       reject = fail;
     }),
   );
-  mocks.flags = { test: false };
+  mocks.flags = { [flag]: false };
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  const { result, rerender } = renderHook(() => useBooleanFlag('test', true), {
+  const { result, rerender } = renderHook(() => useBooleanFlag(flag, true), {
     wrapper: ClientFeatureFlagProvider,
   });
   expect(result.current).toEqual({ isReady: false, value: true });
@@ -125,7 +125,7 @@ it('keeps pending identification unready and uses defaults after rejection', asy
 it('uses defaults on client initialization errors', () => {
   mocks.error = new Error('initialization failed');
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  const { result } = renderHook(() => useBooleanFlag('test', true), {
+  const { result } = renderHook(() => useBooleanFlag(flag, true), {
     wrapper: ClientFeatureFlagProvider,
   });
   expect(result.current).toEqual({ isReady: true, value: true });
@@ -138,7 +138,7 @@ it('ignores identification results from an old account', async () => {
     }),
   );
   mocks.identify.mockReturnValueOnce(new Promise(() => {}));
-  const { result, rerender } = renderHook(() => useBooleanFlag('test'), {
+  const { result, rerender } = renderHook(() => useBooleanFlag(flag), {
     wrapper: ClientFeatureFlagProvider,
   });
   await act(async () => {});
