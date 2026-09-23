@@ -11,6 +11,7 @@ export const clientFeatureFlags = [
   'legacy-scores-page-enabled',
   'overdue-invoice-banner',
   'polling-disabled',
+  'rest-runs-table',
   'supabase-integration',
   'traces-preview',
 ] as const;
