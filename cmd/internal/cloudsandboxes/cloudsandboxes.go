@@ -5,9 +5,7 @@ package cloudsandboxes
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,42 +25,29 @@ import (
 	"github.com/gofrs/flock"
 	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
-	"golang.org/x/oauth2"
 )
 
-type login struct {
-	VerificationURI string `json:"verificationUri"`
-	UserCode        string `json:"userCode"`
-}
+const loginRequiredMessage = "Run `inngest login` to use Cloud sandboxes from the dev server"
 
 type status struct {
-	Connected       bool     `json:"connected"`
 	AccountName     string   `json:"accountName,omitempty"`
 	EnvironmentName string   `json:"environmentName,omitempty"`
 	EnvironmentID   string   `json:"environmentId,omitempty"`
 	SandboxIDs      []string `json:"sandboxIds"`
-	Login           *login   `json:"login,omitempty"`
-	LoginError      string   `json:"loginError,omitempty"`
 	Warning         string   `json:"warning,omitempty"`
 }
 
 type Bridge struct {
-	Token string
-
 	ctx       context.Context
 	auth      *cliauth.Manager
-	issuer    string
 	resource  *url.URL
 	port      string
 	statePath string
 	router    http.Handler
 	transport http.RoundTripper
 
-	mu         sync.Mutex
-	bound      *cliauth.Metadata
-	login      *login
-	loginError string
-	warning    string
+	mu      sync.Mutex
+	warning string
 	// The journal contains resource IDs only, partitioned by Cloud identity.
 	// It survives dev-server restarts independently of local run persistence.
 	sandboxes map[string][]string
@@ -94,14 +79,15 @@ func New(ctx context.Context, port int) (*Bridge, error) {
 		dir = filepath.Join(home, ".config", "inngest")
 	}
 	b := &Bridge{
-		Token: rand.Text(), ctx: ctx, auth: manager, issuer: issuer,
+		ctx: ctx, auth: manager,
 		resource: resource, port: fmt.Sprint(port),
 		statePath: filepath.Join(dir, "dev-sandboxes", fmt.Sprintf("%x.json", sha256.Sum256([]byte(project)))),
 		transport: http.DefaultTransport.(*http.Transport).Clone(),
 	}
 	b.sandboxes, err = b.loadJournal()
 	if err != nil {
-		return nil, err
+		b.sandboxes = map[string][]string{}
+		b.warning = "Could not load saved sandbox IDs. Existing sandboxes remain accessible through the SDK or Cloud dashboard."
 	}
 	b.routes()
 	return b, nil
@@ -110,9 +96,6 @@ func New(ctx context.Context, port int) (*Bridge, error) {
 func (b *Bridge) routes() {
 	r := chi.NewRouter()
 	r.Get("/dev/cloud/status", b.getStatus)
-	r.Post("/dev/cloud/connect", b.connect)
-	r.Post("/dev/cloud/disconnect", b.disconnect)
-	r.Post("/dev/cloud/login", b.startLogin)
 	// Derive the allowlist from the public API contract, including snapshots
 	// and streaming routes. No other Cloud API is exposed through this bridge.
 	for _, endpoint := range apiv2endpoint.Discover() {
@@ -128,8 +111,13 @@ func (b *Bridge) routes() {
 func (b *Bridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	// Existing dev-server CORS is deliberately permissive. This privileged
-	// surface additionally requires a capability and a loopback, same-origin
-	// browser request. Remote development uses a local port forward.
+	// surface only accepts loopback connections and same-origin browser
+	// requests. Remote development uses a local port forward.
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil || !net.ParseIP(remoteHost).IsLoopback() {
+		writeError(w, http.StatusForbidden, "invalid_local_address", "Cloud sandboxes require a local connection to the dev server")
+		return
+	}
 	host, port, err := net.SplitHostPort(r.Host)
 	ip := net.ParseIP(host)
 	if err != nil || port != b.port || (host != "localhost" && (ip == nil || !ip.IsLoopback())) {
@@ -138,10 +126,6 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if origin := r.Header.Get("Origin"); origin != "" && origin != "http://"+r.Host {
 		writeError(w, http.StatusForbidden, "invalid_origin", "Open sandboxes from the dev server's own UI")
-		return
-	}
-	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+b.Token)) != 1 {
-		writeError(w, http.StatusUnauthorized, "local_auth_required", "Use the local access link or token printed by inngest dev --cloud-sandboxes")
 		return
 	}
 	// Reject escaped separators/dot paths rather than allowing the upstream
@@ -155,117 +139,30 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *Bridge) getStatus(w http.ResponseWriter, r *http.Request) {
+	_, metadata := b.accessToken(w, r)
+	if metadata == nil {
+		return
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	result := status{Connected: b.bound != nil, SandboxIDs: []string{}, Login: b.login, LoginError: b.loginError, Warning: b.warning}
-	metadata := b.bound
-	if metadata == nil {
-		metadata, _ = b.auth.Store().Metadata()
-	}
-	if metadata != nil && metadata.Resource == b.resource.String() {
-		result.AccountName = metadata.AccountName
-		result.EnvironmentName = metadata.WorkspaceName
-		if metadata.WorkspaceID != nil {
-			result.EnvironmentID = *metadata.WorkspaceID
-			result.SandboxIDs = append(result.SandboxIDs, b.sandboxes[b.identity(metadata)]...)
-		}
-	}
-	writeData(w, result)
+	writeData(w, status{
+		AccountName: metadata.AccountName, EnvironmentName: metadata.WorkspaceName,
+		EnvironmentID: *metadata.WorkspaceID, Warning: b.warning,
+		SandboxIDs: append([]string{}, b.sandboxes[b.identity(metadata)]...),
+	})
 }
 
-func (b *Bridge) connect(w http.ResponseWriter, r *http.Request) {
+func (b *Bridge) accessToken(w http.ResponseWriter, r *http.Request) (string, *cliauth.Metadata) {
 	token, metadata, err := b.auth.AccessToken(r.Context(), b.resource.String())
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "cloud_login_required", "Sign in to Inngest Cloud, then connect your environment")
-		return
+		writeError(w, http.StatusUnauthorized, "cloud_login_required", loginRequiredMessage)
+		return "", nil
 	}
 	if metadata.WorkspaceID == nil || *metadata.WorkspaceID == "" {
-		writeError(w, http.StatusBadRequest, "environment_required", "Sign in again and choose a single development environment in the Cloud consent screen")
-		return
+		writeError(w, http.StatusBadRequest, "environment_required", "Run `inngest login --force` and select a single development environment to use Cloud sandboxes")
+		return "", nil
 	}
-	if err := b.auth.Validate(r.Context(), metadata, token); err != nil {
-		writeError(w, http.StatusUnauthorized, "cloud_login_required", "Cloud login is no longer valid; sign in again")
-		return
-	}
-	b.mu.Lock()
-	if b.bound != nil && b.identity(b.bound) != b.identity(metadata) {
-		b.mu.Unlock()
-		writeError(w, http.StatusConflict, "environment_changed", "Disconnect before selecting another Cloud environment")
-		return
-	}
-	b.bound = metadata
-	b.loginError = ""
-	b.mu.Unlock()
-	b.getStatus(w, r)
-}
-
-func (b *Bridge) disconnect(w http.ResponseWriter, r *http.Request) {
-	b.mu.Lock()
-	b.bound = nil
-	b.mu.Unlock()
-	b.getStatus(w, r)
-}
-
-func (b *Bridge) startLogin(w http.ResponseWriter, r *http.Request) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.bound != nil {
-		writeError(w, http.StatusConflict, "already_connected", "Disconnect before signing in again")
-		return
-	}
-	if b.login != nil {
-		writeData(w, b.login)
-		return
-	}
-	config := cliauth.OAuthConfig(b.issuer)
-	config.Scopes = []string{"sandboxes:read:*", "sandboxes:write:*"}
-	device, err := config.DeviceAuth(b.auth.Context(r.Context()), oauth2.SetAuthURLParam("resource", b.resource.String()))
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "cloud_login_failed", "Unable to start Cloud login; check the Cloud API connection")
-		return
-	}
-	b.login = &login{VerificationURI: device.VerificationURIComplete, UserCode: device.UserCode}
-	if b.login.VerificationURI == "" {
-		b.login.VerificationURI = device.VerificationURI
-	}
-	b.loginError = ""
-	writeData(w, b.login)
-	go b.finishLogin(config, device)
-}
-
-func (b *Bridge) finishLogin(config *oauth2.Config, device *oauth2.DeviceAuthResponse) {
-	token, err := config.DeviceAccessToken(b.auth.Context(b.ctx), device, oauth2.SetAuthURLParam("resource", b.resource.String()))
-	if err == nil {
-		var metadata *cliauth.Metadata
-		var credential *cliauth.Credential
-		metadata, credential, err = cliauth.MetadataFromToken(b.issuer, b.resource.String(), token)
-		if err == nil {
-			if metadata.WorkspaceID == nil || *metadata.WorkspaceID == "" {
-				err = errors.New("single environment required")
-			} else {
-				var unlock func()
-				unlock, err = b.auth.Store().Lock(b.ctx)
-				if err == nil {
-					previous, previousCredential, loadErr := b.auth.Store().Load()
-					// Browser login never silently falls back to plaintext storage.
-					err = b.auth.Store().Save(*metadata, *credential, false)
-					if err == nil && loadErr == nil && previous.SessionID != metadata.SessionID {
-						_ = b.auth.Revoke(b.ctx, previous, previousCredential)
-					}
-					unlock()
-				}
-			}
-			if err != nil {
-				_ = b.auth.Revoke(b.ctx, metadata, credential)
-			}
-		}
-	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.login = nil
-	if err != nil {
-		b.loginError = "Login failed. Select a single development environment and allow OS keyring access. On headless machines, use inngest login --insecure-storage explicitly, then connect."
-	}
+	return token, metadata
 }
 
 func (b *Bridge) identity(metadata *cliauth.Metadata) string {
@@ -273,20 +170,8 @@ func (b *Bridge) identity(metadata *cliauth.Metadata) string {
 }
 
 func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
-	b.mu.Lock()
-	bound := b.bound
-	b.mu.Unlock()
-	if bound == nil {
-		writeError(w, http.StatusUnauthorized, "cloud_not_connected", "Connect a Cloud environment in the dev server's Sandboxes page")
-		return
-	}
-	token, metadata, err := b.auth.AccessToken(r.Context(), b.resource.String())
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, "cloud_login_required", "Cloud login expired or was removed; sign in again")
-		return
-	}
-	if metadata.WorkspaceID == nil || b.identity(metadata) != b.identity(bound) {
-		writeError(w, http.StatusConflict, "environment_changed", "Cloud login changed environments; disconnect and reconnect explicitly")
+	token, metadata := b.accessToken(w, r)
+	if metadata == nil {
 		return
 	}
 	path := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/api"), "/v2")
@@ -297,7 +182,7 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 			p.SetURL(b.resource)
 			p.Out.URL.Path = b.resource.Path + path
 			p.Out.URL.RawPath = ""
-			// Do not forward local capabilities, cookies, environment overrides,
+			// Do not forward caller credentials, cookies, environment overrides,
 			// tracing baggage, or arbitrary user headers to Cloud.
 			p.Out.Header = make(http.Header)
 			for _, name := range []string{"Accept", "Content-Type", "Content-Encoding", "X-Sandbox-File-Mode"} {
@@ -308,6 +193,9 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 			p.Out.Header.Set("Authorization", "Bearer "+token)
 		},
 		ModifyResponse: func(resp *http.Response) error {
+			if resp.StatusCode == http.StatusUnauthorized {
+				return cliauth.ErrNotLoggedIn
+			}
 			if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 				return errors.New("sandbox API redirects are not supported")
 			}
@@ -328,15 +216,19 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 					} `json:"data"`
 				}
 				if json.Unmarshal(data, &result) == nil && result.Data.ID != "" {
-					b.remember(bound, result.Data.ID, false)
+					b.remember(metadata, result.Data.ID, false)
 				}
 			}
 			if r.Method == http.MethodDelete && resp.StatusCode == http.StatusNoContent && strings.Count(path, "/") == 2 && strings.HasPrefix(path, "/sandboxes/") {
-				b.remember(bound, strings.TrimPrefix(path, "/sandboxes/"), true)
+				b.remember(metadata, strings.TrimPrefix(path, "/sandboxes/"), true)
 			}
 			return nil
 		},
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			if errors.Is(err, cliauth.ErrNotLoggedIn) {
+				writeError(w, http.StatusUnauthorized, "cloud_login_required", loginRequiredMessage)
+				return
+			}
 			writeError(w, http.StatusBadGateway, "cloud_transport_error", "Cloud connection failed. The operation may have executed; inspect its state before repeating a command")
 		},
 	}

@@ -3,7 +3,6 @@ package devserver
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -52,15 +51,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.CoreAPI.Port = port
 
 	host := localconfig.GetValue(cmd, "host", "")
-	cloudSandboxes := localconfig.GetBoolValue(cmd, "cloud-sandboxes", false)
-	if cloudSandboxes {
-		if host == "" {
-			host = "127.0.0.1"
-		}
-		if ip := net.ParseIP(host); host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-			return fmt.Errorf("--cloud-sandboxes requires a loopback --host; use a local port forward for remote development")
-		}
-	}
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -138,17 +128,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		)
 	}
 
-	if cloudSandboxes {
-		bridge, err := cloudsandboxes.New(ctx, opts.Config.EventAPI.Port)
-		if err != nil {
-			return err
-		}
-		opts.CloudSandboxes = bridge
-		address := net.JoinHostPort(host, fmt.Sprint(opts.Config.EventAPI.Port))
-		// This local capability is intentionally shown only in the terminal,
-		// never structured logs or API discovery responses.
-		fmt.Fprintf(cmd.Writer, "Cloud sandboxes: http://%s/sandboxes#token=%s\nSet in your local app: INNGEST_SANDBOX_DEV_TOKEN=%s\nUse INNGEST_DEV=http://%s if the dev server URL differs from its default.\nSandboxes remain in Cloud when this server stops.\n", address, bridge.Token, bridge.Token, address)
+	bridge, err := cloudsandboxes.New(ctx, opts.Config.EventAPI.Port)
+	if err != nil {
+		return err
 	}
+	opts.CloudSandboxes = bridge
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{

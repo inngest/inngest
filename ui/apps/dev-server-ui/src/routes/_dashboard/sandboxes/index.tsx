@@ -1,24 +1,19 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { createFileRoute } from '@tanstack/react-router';
 
-const tokenKey = 'inngest.cloud-sandboxes.local-capability';
 const pageSize = 10;
 
 function lastPage(count: number) {
   return Math.max(0, Math.ceil(count / pageSize) - 1);
 }
 
-type Login = { verificationUri: string; userCode: string };
 type CloudStatus = {
-  connected: boolean;
   accountName?: string;
   environmentName?: string;
   environmentId?: string;
   sandboxIds: string[];
-  login?: Login;
-  loginError?: string;
   warning?: string;
 };
 type Sandbox = { id: string; name: string; status: string };
@@ -28,10 +23,9 @@ export const Route = createFileRoute('/_dashboard/sandboxes/')({
   component: SandboxesPage,
 });
 
-async function request<T>(path: string, token: string, method = 'GET') {
+async function request<T>(path: string, method = 'GET') {
   const response = await fetch(path, {
     method,
-    headers: { Authorization: `Bearer ${token}` },
     redirect: 'error',
   });
   if (response.status === 204) return undefined as T;
@@ -49,8 +43,6 @@ async function request<T>(path: string, token: string, method = 'GET') {
 }
 
 function SandboxesPage() {
-  const [token, setToken] = useState('');
-  const [tokenInput, setTokenInput] = useState('');
   const [status, setStatus] = useState<CloudStatus>();
   const [sandboxes, setSandboxes] = useState<Sandbox[]>([]);
   const [error, setError] = useState('');
@@ -60,51 +52,34 @@ function SandboxesPage() {
   const refreshVersion = useRef(0);
   const currentPage = Math.min(page, lastPage(status?.sandboxIds.length ?? 0));
 
-  useEffect(() => {
-    const hashToken = new URLSearchParams(window.location.hash.slice(1)).get(
-      'token',
-    );
-    if (hashToken) {
-      sessionStorage.setItem(tokenKey, hashToken);
-      history.replaceState(null, '', `${location.pathname}${location.search}`);
-    }
-    setToken(hashToken || sessionStorage.getItem(tokenKey) || '');
-  }, []);
-
   const refresh = useCallback(async () => {
-    if (!token) return;
     const version = refreshVersion.current;
     try {
-      const next = await request<CloudStatus>('/dev/cloud/status', token);
+      const next = await request<CloudStatus>('/dev/cloud/status');
       if (version !== refreshVersion.current) return;
       setStatus(next);
-      setError(next.loginError || '');
-      if (next.connected) {
-        const start =
-          Math.min(page, lastPage(next.sandboxIds.length)) * pageSize;
-        const ids = next.sandboxIds.slice(start, start + pageSize);
-        const results = await Promise.allSettled(
-          ids.map((id) =>
-            request<Sandbox>(`/v2/sandboxes/${encodeURIComponent(id)}`, token),
-          ),
+      setError('');
+      const start = Math.min(page, lastPage(next.sandboxIds.length)) * pageSize;
+      const ids = next.sandboxIds.slice(start, start + pageSize);
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          request<Sandbox>(`/v2/sandboxes/${encodeURIComponent(id)}`),
+        ),
+      );
+      if (version !== refreshVersion.current) return;
+      setSandboxes((previous) =>
+        results.flatMap((result, index) => {
+          if (result.status === 'fulfilled') return [result.value];
+          return previous.filter((sandbox) => sandbox.id === ids[index]);
+        }),
+      );
+      const failed = results.find((result) => result.status === 'rejected');
+      if (failed?.status === 'rejected')
+        setError(
+          failed.reason instanceof Error
+            ? failed.reason.message
+            : 'Unable to load a sandbox',
         );
-        if (version !== refreshVersion.current) return;
-        setSandboxes((previous) =>
-          results.flatMap((result, index) => {
-            if (result.status === 'fulfilled') return [result.value];
-            return previous.filter((sandbox) => sandbox.id === ids[index]);
-          }),
-        );
-        const failed = results.find((result) => result.status === 'rejected');
-        if (failed?.status === 'rejected')
-          setError(
-            failed.reason instanceof Error
-              ? failed.reason.message
-              : 'Unable to load a sandbox',
-          );
-      } else {
-        setSandboxes([]);
-      }
     } catch (err) {
       if (version !== refreshVersion.current) return;
       setStatus(undefined);
@@ -112,41 +87,31 @@ function SandboxesPage() {
         err instanceof Error ? err.message : 'Unable to reach the server',
       );
     }
-  }, [token, page]);
+  }, [page]);
 
   useEffect(() => {
     void refresh();
     return () => {
-      // Ignore responses for a page or local token that is no longer selected.
+      // Ignore responses for a page that is no longer selected.
       refreshVersion.current++;
     };
   }, [refresh]);
   useEffect(() => {
-    if (!status?.login && !status?.connected) return;
     const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
-  }, [refresh, status?.login, status?.connected]);
+  }, [refresh]);
 
   const action = async (name: string, path: string, method = 'POST') => {
     setBusy(name);
     setActionError('');
     try {
-      await request<unknown>(path, token, method);
+      await request<unknown>(path, method);
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Request failed');
     } finally {
       setBusy('');
     }
-  };
-
-  const saveToken = (event: FormEvent) => {
-    event.preventDefault();
-    const value = tokenInput.trim();
-    if (!value) return;
-    sessionStorage.setItem(tokenKey, value);
-    setToken(value);
-    setTokenInput('');
   };
 
   return (
@@ -161,142 +126,34 @@ function SandboxesPage() {
       <div className="border-warning bg-warning/10 text-basis rounded-md border p-4 text-sm">
         <strong>Cloud compute, local workflows.</strong> Functions, events, and
         runs remain local. Sandboxes are real Cloud resources and persist when
-        this server stops or disconnects.
+        this server stops.
       </div>
 
-      {!token ? (
-        <Card>
-          <Card.Header>
-            <strong>Local access required</strong>
-          </Card.Header>
-          <Card.Content>
-            <p className="text-muted mb-4 text-sm">
-              Start the CLI with <code>inngest dev --cloud-sandboxes</code>,
-              then open its link or paste the local capability token below. Do
-              not paste Cloud credentials.
-            </p>
-            <form className="flex max-w-xl gap-2" onSubmit={saveToken}>
-              <input
-                aria-label="Local capability token"
-                type="password"
-                value={tokenInput}
-                onChange={(event) => setTokenInput(event.target.value)}
-                placeholder="Local capability token"
-                className="border-subtle bg-canvasBase text-basis min-w-0 grow rounded border px-3 py-2 text-sm"
-              />
-              <Button type="submit" label="Continue" />
-            </form>
-          </Card.Content>
-        </Card>
-      ) : !status ? (
+      {!status ? (
         <Card>
           <Card.Content>
             <p className="text-muted text-sm">
               {error || 'Checking Cloud connection…'}
             </p>
             {error && (
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4">
                 <Button
                   appearance="outlined"
                   label="Try again"
                   onClick={refresh}
                 />
-                <Button
-                  appearance="outlined"
-                  label="Replace local token"
-                  onClick={() => {
-                    sessionStorage.removeItem(tokenKey);
-                    setToken('');
-                    setError('');
-                    setActionError('');
-                  }}
-                />
               </div>
             )}
-          </Card.Content>
-        </Card>
-      ) : status.login ? (
-        <Card>
-          <Card.Header>
-            <strong>Finish signing in</strong>
-          </Card.Header>
-          <Card.Content>
-            <p className="text-muted text-sm">
-              Open the verification page and enter this code:
-            </p>
-            <div className="my-4 font-mono text-2xl font-semibold tracking-widest">
-              {status.login.userCode}
-            </div>
-            <Button
-              href={status.login.verificationUri}
-              target="_blank"
-              rel="noopener noreferrer"
-              label="Open verification page"
-            />
-            <p className="text-muted mt-3 text-xs">
-              Waiting for sign-in to complete…
-            </p>
-          </Card.Content>
-        </Card>
-      ) : !status.connected ? (
-        <Card>
-          <Card.Header>
-            <strong>
-              {status.accountName
-                ? 'Connect Cloud environment'
-                : 'Sign in to Inngest Cloud'}
-            </strong>
-          </Card.Header>
-          <Card.Content>
-            <p className="text-muted mb-4 text-sm">
-              {status.accountName
-                ? `Signed in to ${status.accountName}. Connect to ${status.environmentName || status.environmentId || 'the environment selected during sign-in'}. To change environments, sign in again and choose a single development environment.`
-                : 'Sign in using the browser device flow. Your Cloud credentials are never entered in this UI.'}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                loading={Boolean(busy)}
-                label={
-                  status.accountName
-                    ? 'Connect existing login'
-                    : 'Sign in with Inngest'
-                }
-                onClick={() =>
-                  action(
-                    status.accountName ? 'connect' : 'login',
-                    status.accountName
-                      ? '/dev/cloud/connect'
-                      : '/dev/cloud/login',
-                  )
-                }
-              />
-              {status.accountName && (
-                <Button
-                  appearance="outlined"
-                  label="Sign in again"
-                  disabled={Boolean(busy)}
-                  onClick={() => action('login', '/dev/cloud/login')}
-                />
-              )}
-            </div>
           </Card.Content>
         </Card>
       ) : (
         <>
           <Card>
-            <Card.Content className="flex items-center justify-between gap-4">
-              <div>
-                <strong>
-                  Connected to {status.environmentName || status.environmentId}
-                </strong>
-                <p className="text-muted text-sm">{status.accountName}</p>
-              </div>
-              <Button
-                appearance="outlined"
-                label="Disconnect"
-                loading={busy === 'disconnect'}
-                onClick={() => action('disconnect', '/dev/cloud/disconnect')}
-              />
+            <Card.Content>
+              <strong>
+                Connected to {status.environmentName || status.environmentId}
+              </strong>
+              <p className="text-muted text-sm">{status.accountName}</p>
             </Card.Content>
           </Card>
           {status.sandboxIds.length === 0 ? (

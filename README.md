@@ -83,33 +83,35 @@ Follow our [Next.js](https://www.inngest.com/docs/getting-started/nextjs-quick-s
 
 ### Cloud sandboxes in local development (experimental)
 
-With a CLI and JavaScript SDK build that supports Cloud sandboxes, start the CLI
-from your project directory:
+With a CLI and JavaScript SDK build that supports Cloud sandboxes, log in once,
+then start the dev server from your project directory:
 
 ```sh
-inngest dev --cloud-sandboxes
+inngest login
+inngest dev
 ```
 
-Open the **Cloud sandboxes** link printed in the terminal. Sign in, explicitly
-select a single existing Cloud development environment, then connect. That
+Select a single existing Cloud development environment during login. That
 environment needs sandbox access and a default VPC; branch-child environments
-without a VPC are not supported. No deployed Cloud app is required.
+without a VPC are not supported. No deployed Cloud app is required. To change
+environments, run `inngest login --force`.
 
-Set the printed `INNGEST_SANDBOX_DEV_TOKEN` in your local application's environment
-and set `INNGEST_DEV` to the printed dev-server URL. The token is local-only and
-changes when the dev server restarts. Do not use a Cloud signing key in its place.
 Use `inngest.sandboxes` normally, or `step.sandbox` with `sandboxMiddleware`.
+No sandbox token or signing key is needed in your local application. Set
+`INNGEST_DEV` to your dev-server URL if it differs from the default.
 Only sandbox REST requests go to Cloud; functions, events, and runs stay local.
+The dev server uses your saved CLI login and refreshes credentials automatically.
 Cloud credentials remain in the CLI's OS credential store. On headless machines,
-`inngest login --insecure-storage` explicitly opts into private plaintext storage;
-the UI never silently falls back to it.
+`inngest login --insecure-storage` explicitly opts into private plaintext storage.
+Cloud sandbox routes only accept local connections; use a local port forward
+for remote development.
 
-Sandboxes are real, billable Cloud resources. Disconnecting or stopping the dev
+Sandboxes are real, billable Cloud resources. Stopping the dev
 server does **not** destroy them. The Sandboxes page lists resources created
 through this project's bridge and supports pause, resume, and explicit destroy.
 Their IDs are saved under `~/.config/inngest/dev-sandboxes` (or
 `INNGEST_CONFIG_DIR`) independently of `--persist`. Restart from the same project
-directory and reconnect to the same environment to recover the list. Resources
+directory with the same CLI environment selected to recover the list. Resources
 created elsewhere remain accessible through the SDK or Cloud dashboard.
 
 The bridge requires loopback access and the dev server's own UI origin. For a
