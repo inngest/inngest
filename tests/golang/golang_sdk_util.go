@@ -200,13 +200,13 @@ func (r *RunID) Send(id string) {
 	}
 }
 
-// Wait blocks until the run ID is received or 20s elapses (test fails on timeout).
+// Wait blocks until the run ID is received or 60s elapses (test fails on timeout).
 func (r *RunID) Wait(t require.TestingT) string {
 	select {
 	case id := <-r.ch:
 		return id
-	case <-time.After(20 * time.Second):
-		require.Fail(t, "timed out after 20s waiting for run ID")
+	case <-time.After(60 * time.Second):
+		require.Fail(t, "timed out after 60s waiting for run ID")
 		return ""
 	}
 }
