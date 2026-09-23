@@ -511,9 +511,31 @@ type batchKeyGenerator struct {
 	queueItemKeyGenerator
 }
 
+type batchGenerationKey struct{}
+
+// WithBatchGeneration isolates a new function-level batch generation from
+// older draining/shadow batches. Generation zero preserves legacy key names.
+func WithBatchGeneration(ctx context.Context, generation string) context.Context {
+	return context.WithValue(ctx, batchGenerationKey{}, generation)
+}
+
+// BatchGeneration returns the batch key namespace selected for ctx.
+func BatchGeneration(ctx context.Context) string {
+	return batchGeneration(ctx)
+}
+
+func batchGeneration(ctx context.Context) string {
+	generation, _ := ctx.Value(batchGenerationKey{}).(string)
+	return generation
+}
+
 func (u batchKeyGenerator) PrefixByFunctionId(ctx context.Context, defaultPrefix string, isSharded bool, functionId uuid.UUID) string {
 	if isSharded {
-		return fmt.Sprintf("%s:%s", defaultPrefix, functionId.String())
+		prefix := fmt.Sprintf("%s:%s", defaultPrefix, functionId.String())
+		if generation := batchGeneration(ctx); generation != "" {
+			return fmt.Sprintf("%s:batchgen:%s", prefix, generation)
+		}
+		return prefix
 	}
 	return defaultPrefix
 }
