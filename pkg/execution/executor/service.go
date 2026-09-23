@@ -418,6 +418,7 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 		AccountID:       item.Identifier.AccountID,
 		WorkspaceID:     item.Identifier.WorkspaceID,
 		AppID:           item.Identifier.AppID,
+		AppName:         opts.AppName,
 		FunctionID:      item.Identifier.WorkflowID,
 		FunctionVersion: fn.FunctionVersion,
 	}, nil); err != nil {

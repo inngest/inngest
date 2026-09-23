@@ -593,9 +593,14 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	}
 
 	if fn.IsBatchEnabled() {
+		app, err := s.cqrs.GetAppByID(ctx, appID)
+		if err != nil {
+			return err
+		}
 		bi := batch.BatchItem{
 			WorkspaceID:     wsID,
 			AppID:           appID,
+			AppName:         app.Name,
 			FunctionID:      fn.ID,
 			FunctionVersion: fn.FunctionVersion,
 			EventID:         evt.GetInternalID(),

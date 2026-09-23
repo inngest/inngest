@@ -5637,6 +5637,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 				AccountID:       bi.AccountID,
 				WorkspaceID:     bi.WorkspaceID,
 				AppID:           bi.AppID,
+				AppName:         bi.AppName,
 				FunctionID:      bi.FunctionID,
 				FunctionVersion: bi.FunctionVersion,
 				BatchPointer:    result.BatchPointerKey,
@@ -5661,6 +5662,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 			AccountID:       bi.AccountID,
 			WorkspaceID:     bi.WorkspaceID,
 			AppID:           bi.AppID,
+			AppName:         bi.AppName,
 			FunctionID:      bi.FunctionID,
 			FunctionVersion: bi.FunctionVersion,
 		}, &execution.BatchExecOpts{
@@ -5745,6 +5747,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		AccountID:        payload.AccountID,
 		WorkspaceID:      payload.WorkspaceID,
 		AppID:            payload.AppID,
+		AppName:          payload.AppName,
 		Function:         fn,
 		Events:           events,
 		BatchID:          &payload.BatchID,

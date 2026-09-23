@@ -94,6 +94,10 @@ func (d *debugAPI) RunBatch(ctx context.Context, req *pb.RunBatchRequest) (*pb.R
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve function: %w", err)
 	}
+	app, err := d.db.GetAppByID(ctx, fn.AppID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve app: %w", err)
+	}
 
 	result, err := d.batchManager.RunBatch(ctx, batch.RunBatchOpts{
 		FunctionID:  fnID,
@@ -101,6 +105,7 @@ func (d *debugAPI) RunBatch(ctx context.Context, req *pb.RunBatchRequest) (*pb.R
 		AccountID:   consts.DevServerAccountID,
 		WorkspaceID: fn.EnvID,
 		AppID:       fn.AppID,
+		AppName:     app.Name,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run batch: %w", err)

@@ -41,6 +41,24 @@ func (r *recordingBatchMetricRecorder) RecordDelete(_ context.Context, residency
 	})
 }
 
+func TestScheduleBatchPayloadAppNameSerialization(t *testing.T) {
+	encoded, err := json.Marshal(ScheduleBatchPayload{AppName: "customer-facing-app"})
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"appName":"customer-facing-app"`)
+
+	encoded, err = json.Marshal(BatchItem{AppName: "customer-facing-app"})
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), `"appName"`)
+
+	var legacy ScheduleBatchPayload
+	require.NoError(t, json.Unmarshal([]byte(`{}`), &legacy))
+	require.Empty(t, legacy.AppName)
+
+	encoded, err = json.Marshal(legacy)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), `"appName"`)
+}
+
 func TestAppendCommittedBytes(t *testing.T) {
 	r := miniredis.RunT(t)
 

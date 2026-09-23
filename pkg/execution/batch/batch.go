@@ -123,6 +123,7 @@ type RunBatchOpts struct {
 	AccountID   uuid.UUID
 	WorkspaceID uuid.UUID
 	AppID       uuid.UUID
+	AppName     string
 }
 
 // RunBatchResult contains information about a scheduled batch execution.
@@ -140,6 +141,7 @@ type BatchItem struct {
 	AccountID       uuid.UUID   `json:"acctID"`
 	WorkspaceID     uuid.UUID   `json:"wsID"`
 	AppID           uuid.UUID   `json:"appID"`
+	AppName         string      `json:"-"` // Used when scheduling, but not persisted per event.
 	FunctionID      uuid.UUID   `json:"fnID"`
 	FunctionVersion int         `json:"fnV"`
 	EventID         ulid.ULID   `json:"evtID"`
@@ -194,6 +196,7 @@ type ScheduleBatchPayload struct {
 	AccountID                  uuid.UUID  `json:"acctID"`
 	WorkspaceID                uuid.UUID  `json:"wsID"`
 	AppID                      uuid.UUID  `json:"appID"`
+	AppName                    string     `json:"appName,omitempty"`
 	FunctionID                 uuid.UUID  `json:"fnID"`
 	FunctionVersion            int        `json:"fnV"`
 	DeprecatedFunctionPausedAt *time.Time `json:"fpAt,omitempty"` // deprecated

@@ -31,11 +31,16 @@ import (
 // the methods actually used by the code under test.
 type mockCQRSManager struct {
 	cqrs.Manager
-	fn *cqrs.Function
+	fn  *cqrs.Function
+	app *cqrs.App
 }
 
 func (m *mockCQRSManager) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
 	return m.fn, nil
+}
+
+func (m *mockCQRSManager) GetAppByID(context.Context, uuid.UUID) (*cqrs.App, error) {
+	return m.app, nil
 }
 
 func setupTestRedis(t *testing.T) (rueidis.Client, *miniredis.Miniredis) {
@@ -766,6 +771,7 @@ func TestRunBatchHandler(t *testing.T) {
 			EnvID: workspaceID,
 			AppID: appID,
 		},
+		app: &cqrs.App{ID: appID, Name: "customer-facing-app"},
 	}
 
 	d := &debugAPI{batchManager: batchManager, db: mockDB}

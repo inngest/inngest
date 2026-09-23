@@ -538,6 +538,7 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 			AccountID:       firstItem.AccountID,
 			WorkspaceID:     firstItem.WorkspaceID,
 			AppID:           firstItem.AppID,
+			AppName:         firstItem.AppName,
 			FunctionID:      fn.ID,
 			FunctionVersion: firstItem.FunctionVersion,
 		},

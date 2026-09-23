@@ -504,6 +504,7 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 			AccountID:       opts.AccountID,
 			WorkspaceID:     opts.WorkspaceID,
 			AppID:           opts.AppID,
+			AppName:         opts.AppName,
 			FunctionID:      opts.FunctionID,
 			FunctionVersion: functionVersion,
 		},
