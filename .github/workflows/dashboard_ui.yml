@@ -29,3 +29,6 @@ jobs:
       - name: Type check
         run: pnpm type-check
         working-directory: ui/apps/dashboard
+      - name: Test
+        run: pnpm test
+        working-directory: ui/apps/dashboard
