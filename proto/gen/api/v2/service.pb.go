@@ -9110,7 +9110,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\rcron_schedule\x18\x05 \x01(\tH\x02R\fcronSchedule\x88\x01\x01B\r\n" +
 	"\v_event_nameB\v\n" +
 	"\t_batch_idB\x10\n" +
-	"\x0e_cron_schedule\"\xfa\x05\n" +
+	"\x0e_cron_schedule\"\xf9\x05\n" +
 	"\vFunctionRun\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
 	"\bfunction\x18\x02 \x01(\v2\x13.api.v2.FunctionRefR\bfunction\x12 \n" +
@@ -9126,8 +9126,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06output\x18\n" +
 	" \x01(\v2\x17.google.protobuf.StructH\x03R\x06output\x88\x01\x01\x12$\n" +
 	"\vis_deferred\x18\v \x01(\bH\x04R\n" +
-	"isDeferred\x88\x01\x01\x12\x9a\x01\n" +
-	"\rdeferred_from\x18\r \x01(\v2\x17.api.v2.RunDeferredFromB\\\x92AY2WThe function that deferred this run. Present when requested with include=deferred_from.R\fdeferredFromB\r\n" +
+	"isDeferred\x88\x01\x01\x12\x99\x01\n" +
+	"\rdeferred_from\x18\r \x01(\v2\x17.api.v2.RunDeferredFromB[\x92AX2VThe function that deferred this run. Present when requested with include=deferredFrom.R\fdeferredFromB\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\x0e\n" +
 	"\f_duration_msB\t\n" +
@@ -9696,10 +9696,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xcf\n" +
-	"\n" +
-	"\x0fListRunsRequest\x12*\n" +
-	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\t_ended_at\"\x83\f\n" +
+	"\x0fListRunsRequest\x12t\n" +
+	"\x0einclude_output\x18\x01 \x01(\bBH\x92AE2CWhether to include run output. Prefer include=output for run lists.H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
 	"\x05limit\x18\x03 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
 	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
@@ -9714,21 +9713,20 @@ const file_api_v2_service_proto_rawDesc = "" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
 	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
-	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12X\n" +
-	"\ainclude\x18\r \x03(\tB>\x92A;29Optional run expansions. Supported values: deferred_from.R\aincludeB\x11\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12\xc1\x01\n" +
+	"\ainclude\x18\r \x03(\tB\xa6\x01\x92A\xa2\x012\x9f\x01Optional run expansions named by their lowerCamelCase response fields. Supported values: output, deferredFrom. The legacy deferred_from alias is also accepted.R\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
 	"\f_is_deferredB\b\n" +
-	"\x06_query\"\xa0\n" +
-	"\n" +
+	"\x06_query\"\xd4\v\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
-	"functionId\x12*\n" +
-	"\x0einclude_output\x18\x03 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"functionId\x12t\n" +
+	"\x0einclude_output\x18\x03 \x01(\bBH\x92AE2CWhether to include run output. Prefer include=output for run lists.H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x04 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
 	"\x05limit\x18\x05 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
 	"\x04from\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
@@ -9740,8 +9738,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
 	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
-	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12X\n" +
-	"\ainclude\x18\r \x03(\tB>\x92A;29Optional run expansions. Supported values: deferred_from.R\aincludeB\x11\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01\x12\xc1\x01\n" +
+	"\ainclude\x18\r \x03(\tB\xa6\x01\x92A\xa2\x012\x9f\x01Optional run expansions named by their lowerCamelCase response fields. Supported values: output, deferredFrom. The legacy deferred_from alias is also accepted.R\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +

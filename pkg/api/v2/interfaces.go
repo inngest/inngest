@@ -109,7 +109,10 @@ type GetRunsOpts struct {
 
 type RunListInclude string
 
-const RunListIncludeDeferredFrom RunListInclude = "deferred_from"
+const (
+	RunListIncludeDeferredFrom RunListInclude = "deferredFrom"
+	RunListIncludeOutput       RunListInclude = "output"
+)
 
 type RunTimeField int
 

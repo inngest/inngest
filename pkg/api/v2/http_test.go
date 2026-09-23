@@ -314,50 +314,67 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 }
 
 func TestHTTPGateway_RunListRoutes(t *testing.T) {
-	t.Run("binds list filters with a slash-containing function ID", func(t *testing.T) {
+	t.Run("binds list filters with canonical include", func(t *testing.T) {
 		isDeferred := true
+		runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 		runs := &mockRunProvider{}
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
-			Limit:       3,
-			TimeField:   RunTimeFieldStartedAt,
-			Status:      []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
-			AppIDs:      []string{"my-app"},
-			FunctionIDs: []string{"teams/member.created"},
-			IsDeferred:  &isDeferred,
-			Order:       OrderDirectionAsc,
-			CEL:         `event.data.userId == "123"`,
-			Include:     []RunListInclude{RunListIncludeDeferredFrom},
-		}).Return(&GetRunsResult{}, nil).Once()
+			Limit:         3,
+			IncludeOutput: true,
+			TimeField:     RunTimeFieldStartedAt,
+			Status:        []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
+			AppIDs:        []string{"my-app"},
+			FunctionIDs:   []string{"teams/member.created"},
+			IsDeferred:    &isDeferred,
+			Order:         OrderDirectionAsc,
+			CEL:           `event.data.userId == "123"`,
+			Include:       []RunListInclude{RunListIncludeDeferredFrom},
+		}).Return(&GetRunsResult{Runs: []*RunListItem{{
+			RunID:  runID,
+			Output: json.RawMessage(`{"ok":true}`),
+			DeferredFrom: &RunDeferredFrom{
+				FunctionSlug: "parent-function",
+			},
+		}}}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=teams%2Fmember.created&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22&include=deferred_from", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=teams%2Fmember.created&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22&include=deferredFrom&include=output", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		data := body["data"].([]any)
+		run := data[0].(map[string]any)
+		deferredFrom := run["deferredFrom"].(map[string]any)
+		require.Equal(t, "parent-function", deferredFrom["functionSlug"])
+		require.Equal(t, true, run["output"].(map[string]any)["ok"])
+		require.NotContains(t, run, "deferred_from")
 	})
 
-	t.Run("binds function path", func(t *testing.T) {
+	t.Run("accepts legacy snake case include", func(t *testing.T) {
 		runs := &mockRunProvider{}
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
-			Limit:       defaultRunsLimit,
-			TimeField:   RunTimeFieldQueuedAt,
-			Status:      []v2pb.FunctionRunStatus{},
-			AppIDs:      []string{"my-app"},
-			FunctionIDs: []string{"test-fn"},
-			Order:       OrderDirectionDesc,
-			CEL:         `output.status == "sent"`,
-			Include:     []RunListInclude{RunListIncludeDeferredFrom},
+			Limit:         defaultRunsLimit,
+			IncludeOutput: true,
+			TimeField:     RunTimeFieldQueuedAt,
+			Status:        []v2pb.FunctionRunStatus{},
+			AppIDs:        []string{"my-app"},
+			FunctionIDs:   []string{"test-fn"},
+			Order:         OrderDirectionDesc,
+			CEL:           `output.status == "sent"`,
+			Include:       []RunListInclude{RunListIncludeDeferredFrom},
 		}).Return(&GetRunsResult{}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs?query=output.status%20%3D%3D%20%22sent%22&include=deferred_from", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs?query=output.status%20%3D%3D%20%22sent%22&include=deferred_from&includeOutput=true", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 

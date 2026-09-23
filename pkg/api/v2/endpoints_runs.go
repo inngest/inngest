@@ -316,20 +316,24 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 	if err != nil {
 		return GetRunsOpts{}, err
 	}
+	includeOutput := req.GetIncludeOutput()
 	var include []RunListInclude
 	for _, value := range req.GetInclude() {
-		switch RunListInclude(value) {
-		case RunListIncludeDeferredFrom:
-			include = append(include, RunListIncludeDeferredFrom)
-		default:
-			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
+		parsed, err := runListIncludeFromAPI(value)
+		if err != nil {
+			return GetRunsOpts{}, err
 		}
+		if parsed == RunListIncludeOutput {
+			includeOutput = true
+			continue
+		}
+		include = append(include, parsed)
 	}
 
 	return GetRunsOpts{
 		Cursor:        cursor,
 		Limit:         limit,
-		IncludeOutput: req.GetIncludeOutput(),
+		IncludeOutput: includeOutput,
 		From:          from,
 		Until:         until,
 		TimeField:     timeField,
@@ -341,6 +345,17 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		CEL:           req.GetQuery(),
 		Include:       include,
 	}, nil
+}
+
+func runListIncludeFromAPI(value string) (RunListInclude, error) {
+	switch value {
+	case string(RunListIncludeDeferredFrom), "deferred_from":
+		return RunListIncludeDeferredFrom, nil
+	case string(RunListIncludeOutput):
+		return RunListIncludeOutput, nil
+	default:
+		return "", fmt.Errorf("unsupported include value %q", value)
+	}
 }
 
 func listRunsPageOpts(cursor string, requestedLimit int32) (string, int, error) {

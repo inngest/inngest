@@ -1099,19 +1099,18 @@ func TestService_ListRuns(t *testing.T) {
 
 		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
-			Cursor:        new(pageCursor),
-			Limit:         &limit,
-			IncludeOutput: new(true),
-			From:          timestamppb.New(from),
-			Until:         timestamppb.New(until),
-			TimeField:     "startedAt",
-			Status:        []string{"COMPLETED"},
-			AppId:         []string{"my-app"},
-			FunctionId:    []string{"test-fn"},
-			IsDeferred:    &isDeferred,
-			Order:         "asc",
-			Query:         new(`event.data.userId == "123"`),
-			Include:       []string{"deferred_from"},
+			Cursor:     new(pageCursor),
+			Limit:      &limit,
+			From:       timestamppb.New(from),
+			Until:      timestamppb.New(until),
+			TimeField:  "startedAt",
+			Status:     []string{"COMPLETED"},
+			AppId:      []string{"my-app"},
+			FunctionId: []string{"test-fn"},
+			IsDeferred: &isDeferred,
+			Order:      "asc",
+			Query:      new(`event.data.userId == "123"`),
+			Include:    []string{"output", "deferredFrom"},
 		})
 
 		require.NoError(t, err)
@@ -1309,6 +1308,23 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, apiv2base.ErrorQueryTooLong)
 	})
+}
+
+func TestRunListIncludeFromAPI(t *testing.T) {
+	for value, expected := range map[string]RunListInclude{
+		"deferredFrom":  RunListIncludeDeferredFrom,
+		"deferred_from": RunListIncludeDeferredFrom,
+		"output":        RunListIncludeOutput,
+	} {
+		t.Run(value, func(t *testing.T) {
+			got, err := runListIncludeFromAPI(value)
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
+		})
+	}
+
+	_, err := runListIncludeFromAPI("unknown")
+	require.ErrorContains(t, err, `unsupported include value "unknown"`)
 }
 
 func TestRunStatusesFromAPI(t *testing.T) {
