@@ -68,11 +68,17 @@ type SecureDialerOpts struct {
 	// dial is a function used to actually dial, allowed to override in testing
 	// for success.
 	dial DialFunc
+
+	// resolver overrides the DNS resolver used in testing.
+	resolver dnscache.DNSResolver
 }
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	// make sure to initialize it if absent
-	resolver := initResolver()
+	resolver := o.resolver
+	if resolver == nil {
+		resolver = initResolver()
+	}
 
 	dial := resolver.Dialer()
 	if o.dial != nil {
