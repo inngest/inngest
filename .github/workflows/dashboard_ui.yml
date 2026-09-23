@@ -22,10 +22,13 @@ jobs:
           version: "10.18.2"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: ".tool-versions"
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: ui/apps/dashboard
       - name: Type check
         run: pnpm type-check
+        working-directory: ui/apps/dashboard
+      - name: Test
+        run: pnpm test
         working-directory: ui/apps/dashboard
