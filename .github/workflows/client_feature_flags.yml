@@ -1,0 +1,43 @@
+name: Client feature flag review
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - "ui/packages/components/src/SharedContext/clientFeatureFlags.ts"
+
+jobs:
+  launchdarkly-availability-reminder:
+    name: Check LaunchDarkly client-side availability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - name: Warn about client feature flag changes
+        run: |
+          mapfile -t flags < <(
+            git diff --unified=0 HEAD^ HEAD -- \
+              ui/packages/components/src/SharedContext/clientFeatureFlags.ts |
+              sed -n "s/^+  '\([^']*\)',$/\1/p"
+          )
+
+          if (( ${#flags[@]} == 0 )); then
+            exit 0
+          fi
+
+          flag_list=$(printf ' `%s`' "${flags[@]}")
+          echo "::warning file=ui/packages/components/src/SharedContext/clientFeatureFlags.ts,title=LaunchDarkly client-side availability::New client feature flags:${flag_list}. Verify that 'SDKs using client-side ID' is enabled for each flag in LaunchDarkly."
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## LaunchDarkly client-side availability
+          EOF
+
+          echo "New client feature flags:${flag_list}" >> "$GITHUB_STEP_SUMMARY"
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+
+          Before merging, verify that **SDKs using client-side ID** is enabled
+          for each flag in LaunchDarkly.
+          EOF
