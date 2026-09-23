@@ -71,6 +71,11 @@ message CreateStateResponse {
   Metadata           metadata = 1;
   repeated bytes     events   = 2;
   map<string, bytes> steps    = 3;
+
+  // True when the idempotency key matched an existing run. The response carries
+  // that run's state so callers can handle the duplicate without carrying state
+  // in gRPC error details.
+  bool already_exists = 4;
 }
 
 message DeleteStateRequest {
