@@ -615,3 +615,22 @@ was there and I proposed inventing a value instead — an earlier `queuedAt` to
 close a gap, a backoff derived from `TableBackoff`'s defaults. Both would have
 been guesses over measurements: the gap is real executor latency, and the
 backoff is 15s plus up to 30s of jitter so the defaults cannot give it.
+
+---
+
+## 36. A rule made global reaches the figures that illustrate it
+
+`24e130601` made every figure a run in milliseconds so the trim and the elastic
+axis would reach the Scenarios tab. It also reached the Concepts primer, whose
+numbers are proportions picked to show one mark. Moments lost `queued`, the
+marks drifted off the labels written under them, and Durations lost its queued
+interval. Its check counted trims and bands on Scenarios, and never looked at
+Concepts.
+
+**Detection**: Jack saw it on the page. `validate.mjs` passed throughout; a row
+missing its opening `queued` is still a legal sequence.
+
+**Prevention**: when a rule is widened to "every figure", screenshot the
+Concepts tab before and after, not just the tab the change was for. Reference
+figures now opt out with `setLiteral(true)` per generator; a new illustration
+generator needs it too.

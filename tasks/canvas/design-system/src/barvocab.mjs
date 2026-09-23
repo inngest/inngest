@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {setNotes,fig,px,cy,dot,tag,EV,C,W,LBL,PLOT,ROW,TOP,HATCH,NOCOMPUTE,COMPUTE,BAR_INFO,FILL} from './micro.mjs';
+import {setNotes,setLiteral,fig,px,cy,dot,tag,EV,C,W,LBL,PLOT,ROW,TOP,HATCH,NOCOMPUTE,COMPUTE,BAR_INFO,FILL} from './micro.mjs';
+setLiteral(true);
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 const O={};
 

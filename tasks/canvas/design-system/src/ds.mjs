@@ -430,6 +430,7 @@ const FEATURES = [
   {k:'trim',     n:'hide the opening queue', d:'name a run’s first wait instead of drawing it'},
   {k:'compress', n:'compress dead time',     d:'collapse a stretch with nothing executing to a band'},
   {k:'compressCompute', n:'compress compute too', d:'…and a stretch of work that dwarfs the rest of the run'},
+  {k:'logs',     n:'logs',                   d:'a tick under the bar for each one a step said'},
 ];
 
 /**
@@ -443,7 +444,7 @@ const FEATURES = [
  * resolve them. Nothing is transformed on the way in — what the page runs is
  * what the build ran, byte for byte apart from the specifiers.
  */
-const MODULES=['rules','vocabulary','micro'];
+const MODULES=['rules','vocabulary','micro','copyfig'];
 const dsmod=`<script type="module">
   /**
    * Every figure on the page, drawn by the component.
@@ -456,6 +457,8 @@ const dsmod=`<script type="module">
    */
   import * as micro from 'ds:micro';
   import * as rules from 'ds:rules';
+  // Right-click any figure for Copy image. Installs itself.
+  import 'ds:copyfig';
   window.DS = {fig:micro.fig, layout:micro.layout, RESOLVED:rules.RESOLVED,
                setFeatures:rules.setFeatures};
 
@@ -485,7 +488,7 @@ const dsmod=`<script type="module">
       m.root.render(K.React.createElement(K.Trace, {
         key: m.d.id,
         rows: m.d.rows, extra: m.d.extra, under: m.d.under, label: m.d.label,
-        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true, compressCompute:false, multiple:${MULT_DEFAULT}} : feat),
+        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true, compressCompute:false, logs:true, multiple:${MULT_DEFAULT}} : feat),
       }));
   };
 
@@ -883,6 +886,13 @@ ${fig(EX.o1.frames[0].svg,'Expanded: indented, thinner, same status colours. The
 <p>The nesting is a claim, and the trace has to be able to keep it.</p>
 ${fig(EX.o2.frames[0].svg,'A span sits inside its step, because that is where it ran. One that outruns it is a clock disagreement between your process and ours, not a slow query, and the row says so rather than clamping quietly.')}
 
+<h2>Logs</h2>
+<p><em>Ideated, not built:</em> nothing in the trace carries logs yet. This is what they would look like if it did &mdash; and the shape of the answer is decided by density, not by taste. A step can say hundreds of things.</p>
+${fig(EX.l1.frames[0].svg,'A log is not an event. Events are the moments a row passes through and take circles; a log is something said while it worked, so it takes a tick under the bar.')}
+<div class="rule">No minimum width. A bar gets one so it can be pointed at; a log must not, or five hundred would claim more of the axis than they occupied.</div>
+${fig(EX.l2.frames[0].svg,'Warn and above take the failure colour. A red tick under a green bar says the step returned and something still went wrong inside it.')}
+<p>Inside a compressed band they are dropped rather than moved, like the axis ticks: the band is not to scale, so a tick drawn in it would sit where it never was &mdash; and hundreds piled on the band&rsquo;s edge would read as a burst that never happened.</p>
+
 <h2>The selected row</h2>
 <p>A row is plotted against the whole run, so a step that took ten seconds inside a twenty minute run is a few pixels wide and its marks overlap. Selecting it replots that row across the full width using the same bars and marks, and names each piece: intervals with their durations, marks with what happened. Hover a piece for its description.</p>
 <div class="frames two">${J.detail.frames.map(f=>`<figure class="frame"><div class="figure">${f.svg}</div><figcaption class="fl">${f.l}</figcaption></figure>`).join('')}</div>
@@ -1164,7 +1174,7 @@ ${dsmod}
   // ---- feature toggles -------------------------------------------------
   // These change what is DRAWN, so the page carries a variant per combination
   // and this picks one. Everything else in the panel is a CSS variable.
-  var FKEY='tds.feat.v1', feat={trim:true, compress:true, compressCompute:false, multiple:${MULT_DEFAULT}};
+  var FKEY='tds.feat.v1', feat={trim:true, compress:true, compressCompute:false, logs:true, multiple:${MULT_DEFAULT}};
   try{ feat=Object.assign(feat, JSON.parse(localStorage.getItem(FKEY)||'{}')); }catch(e){}
   function featKey(){ return (feat.trim?'1':'0')+(feat.compress?'1':'0'); }
   /**
@@ -1252,7 +1262,7 @@ ${dsmod}
     // The features are properties of a drawing. Every figure re-renders from
     // the events it was drawn from, through the same component.
     if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress,
-      compressCompute:feat.compressCompute, multiple:feat.multiple});
+      compressCompute:feat.compressCompute, logs:feat.logs, multiple:feat.multiple});
     document.querySelectorAll('#side [data-feat]').forEach(function(b){
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';

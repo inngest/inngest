@@ -3,7 +3,7 @@ import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
 export { C, EV, HATCH, dot, base, isFail, FILL, COMPUTE, NOCOMPUTE, ACTIVE, OPEN, paint, autoDots, discovered, lineage, barSvg, markSvg, cyOf, pxOf, BAR_INFO, EVENT_INFO, EVC, SUBSTANCE, substanceCSS, eventCSS } from './vocabulary.mjs';
-import { C, EV, HATCH, dot, base, paint, autoDots, lineage, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, remapX, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
+import { C, EV, HATCH, dot, logSvg, base, paint, autoDots, lineage, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, remapX, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
@@ -234,6 +234,10 @@ export function row(i,r,sc=1,yy){
     const b=base(k); bn[b]=(bn[b]||0)+1;
     put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh,key:i+':b:'+b+':'+bn[b]}));
   });
+  // Under the bars and before the marks, so a mark is never hidden by one.
+  if(R.FEAT.logs && !r.span) (r.logs||[]).forEach(l=>{
+    lo+=logSvg(px(l.t), y, !!l.bad);
+  });
   const en={};
   if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
@@ -365,6 +369,19 @@ let FRAMED=false;
 // user-facing docs: the blurred surround is a design-review device for us, and
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=R.ENV.DS_FRAME==='0'?false:on;};
+
+/**
+ * Reference figures are also LITERAL: drawn exactly as declared.
+ *
+ * A primer figure's numbers are proportions chosen to show one mark or one
+ * bar, not a run that was measured. Reading them as milliseconds let the run
+ * rules reach them -- the opening-queue trim took the `queued` mark out of the
+ * figure whose subject is `queued`, and the elastic layout moved the marks off
+ * the labels written under them. Separate from `setFrame` because the docs
+ * export unframes everything, and a scenario is still a run there.
+ */
+let LITERAL=false;
+export const setLiteral=on=>{LITERAL=!!on;};
 
 /**
  * The surround: the Run row, and nothing else.
@@ -641,6 +658,16 @@ export function layout(total, rows, opts={}){
         w:el.at(r.group.to!=null?r.group.to:total)}:r.group,
       segs:(r.segs||[]).map(map),
       at:(r.at||[]).map(mo=>mo.length===3?[mo[0],el.at(mo[1]),mo[2]]:[mo[0],el.at(mo[1])]),
+      /**
+       * A log inside a compressed band is dropped, not moved.
+       *
+       * The band says the width is not to scale, so a tick drawn in it would
+       * sit at a position it never had -- and hundreds of them would pile onto
+       * the band's edge and read as a burst that did not happen. Same rule the
+       * axis ticks follow.
+       */
+      logs:r.logs?r.logs.filter(l=>!(el.cuts||[]).some(([a2,b2])=>l.t>a2 && l.t<b2))
+        .map(l=>({...l, t:el.at(l.t)})):r.logs,
       cp:r.cp?r.cp.map(el.at):r.cp,
       end:r.end!=null?el.at(r.end):r.end};
   });
@@ -866,7 +893,11 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * Positions are unchanged where no rule fires: laying 0..86 out across the
    * axis puts it exactly where 0..86 was.
    */
-  if(opts.ms==null && rows.some(r=>r.at&&r.at.length)){
+  // A literal figure is not a run, so none of this reaches it: no inferred
+  // duration, no trim, no compression. Read from the call as recorded, since a
+  // figure can hand its options over in the `under` slot.
+  const literal=opts0.literal!==undefined?!!opts0.literal:LITERAL;
+  if(!literal && opts.ms==null && rows.some(r=>r.at&&r.at.length)){
     let end=0;
     for(const rw of rows){
       for(const [,x] of (rw.at||[])) end=Math.max(end,x);
@@ -890,7 +921,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // flow control, finalization -- and trimming those leaves three identical
   // pictures where there were three different points. The feature hides a
   // real run's first wait; it is not a global eraser.
-  if(R.FEAT.trim && opts.ms && opts.trimLead!==false){
+  if(!literal && R.FEAT.trim && opts.ms && opts.trimLead!==false){
     let first=Infinity;
     // Stops at the first thing that is not plain waiting. Being held by flow
     // control is queue time WITH A REASON, and hiding it would hide the reason.
@@ -926,7 +957,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
         if(at.length>1 && (at[0][0]==='queued'||at[0][0]==='held')
            && Math.abs(at[0][1])<1e-9 && Math.abs(at[1][1])<1e-9) at=at.slice(1);
         const cp0=(rw.cp||[]).map(t=>t-first).filter(t=>t>=-1e-9).map(t=>Math.max(0,t));
-        return {...rw, cp:rw.cp?cp0:undefined, at,
+        const logs0=(rw.logs||[]).map(l=>({...l, t:l.t-first})).filter(l=>l.t>=-1e-9);
+        return {...rw, cp:rw.cp?cp0:undefined, logs:rw.logs?logs0:undefined, at,
           end:rw.end!=null?Math.max(0,rw.end-first):rw.end,
           segs:undefined};
       }).map(resolveRow);
@@ -946,7 +978,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     rows.forEach(r=>{ (r.at||[]).forEach(([,t])=>{ last=Math.max(last,t); });
                       if(r.end!=null) last=Math.max(last,r.end); });
     if(last>0) opts={...opts, ms:last};
-    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear});
+    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear||literal});
     rows=L.rows; opts={...opts, breaks:L.breaks};
     // Kept so the tick strip reads the same axis the bars were laid on.
     axisAt=L.el.at; axisTotal=opts.ms;
@@ -970,7 +1002,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * The pre-drawn content — arrows, ribbons, cables, annotations — is remapped
    * through the same function, which is what made this possible at all.
    */
-  if(R.FEAT.compress && !opts.breaks && !opts.linear && rows.some(r=>r.segs)){
+  if(R.FEAT.compress && !literal && !opts.breaks && !opts.linear && rows.some(r=>r.segs)){
     const compute=[]; let end=0;
     rows.forEach(r=>(r.segs||[]).forEach(([kd,a,w])=>{
       end=Math.max(end,a+w);
@@ -1008,6 +1040,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
              litDots:r.litDots?r.litDots.map(at):r.litDots,
              noHalo:r.noHalo?r.noHalo.map(at):r.noHalo,
              cp:r.cp?r.cp.map(at):r.cp,
+             logs:r.logs?r.logs.map(l=>({...l, t:at(l.t)})):r.logs,
              rail:r.rail?r.rail.map(([x,w,k])=>[at(x),at(x+w)-at(x),k]):r.rail});
         if(typeof extra==='string') extra=remapX(extra,LBL,at);
         if(typeof under==='string') under=remapX(under,LBL,at);
@@ -1201,7 +1234,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // Run row and a finalization under the Concepts figures, which are about one
   // mark or one bar and have no run to overview.
   FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0,
-                opts:{...opts0, frame:framed}});
+                opts:{...opts0, frame:framed, literal}});
   return `<svg data-fig="${fid}" viewBox="${-M} ${-AXH} ${W+M*2} ${h+AXH}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+gutter(bandH)+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+ax+over+cab+lin+`</svg>`;
 }

@@ -154,6 +154,17 @@ export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false, sub=''
 }
 export const dot = markSvg;
 
+/**
+ * One log, as a tick under the bar. `bad` is warn-and-above: a red tick under a
+ * green bar says the step returned and something still went wrong in it, which
+ * is the most useful thing a log adds to a trace.
+ */
+export function logSvg(x, y, bad=false){
+  return `<rect class="log${bad?' bad':''}" x="${(x-GEOM.LOG_W/2).toFixed(2)}" `+
+    `y="${(y+GEOM.LOG_TOP).toFixed(1)}" width="${GEOM.LOG_W}" height="${GEOM.LOG_H}" `+
+    `fill="${bad?C.bad:C.mut}" opacity="${bad?0.95:0.5}"/>`;
+}
+
 
 /**
  * Ring weights are per mark — `queued` and `retry` were drawn heavier than the

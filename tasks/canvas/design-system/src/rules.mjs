@@ -13,6 +13,7 @@ export const FEAT = {
   // Off by default. Compressing the WORK is a stronger claim than compressing
   // the gaps between it, and most runs do not need it.
   compressCompute: ENV.DS_COMPRESSCOMPUTE === '1',
+  logs: ENV.DS_NOLOGS !== '1',
 };
 
 /**
@@ -27,6 +28,7 @@ export function setFeatures(f){
   if(f && 'trim' in f) FEAT.trim=!!f.trim;
   if(f && 'compress' in f) FEAT.compress=!!f.compress;
   if(f && 'compressCompute' in f) FEAT.compressCompute=!!f.compressCompute;
+  if(f && 'logs' in f) FEAT.logs=!!f.logs;
   // The threshold is a rule, not a feature -- but it is the rule most worth
   // arguing with, so it is reachable from the panel too. Written back onto
   // ELASTIC because that is where every caller reads it.
@@ -70,6 +72,20 @@ export const GEOM = {
                                      // — clear of the mark that sits on the plot's first pixel
   LBL_PAD:3,                         // clearance kept between a label and the divider
   LBL_FONT:5.5, LBL_SPAN_FONT:5,     // row label size, and the smaller one a span gets
+  /**
+   * A log is not an event.
+   *
+   * Events are the moments a row passes THROUGH -- queued, started, resolved --
+   * and they get circles. A log is something said while the row was working, so
+   * it gets a tick under the bar instead: a different shape, in a different
+   * place, because it is a different kind of fact.
+   *
+   * Deliberately no minimum width. A bar gets one so it can be pointed at; a
+   * log must not, or five hundred of them would claim more of the axis than
+   * they occupied. Sparse logs stay countable and a burst merges into a solid
+   * strip -- the overlap IS the density, rather than a failure to draw it.
+   */
+  LOG_W:0.55, LOG_H:2.4, LOG_TOP:4.6,
   LBL_CH:0.6,                        // monospace advance, as a fraction of the font size
   /**
    * The ring that says a moment arrived by CHECKPOINT.

@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,EV,px,cy,lineage} from './micro.mjs';
+import {fig,EV,px,cy,lineage,setLiteral} from './micro.mjs';
+setLiteral(true);
 const E=86;
 
 /**
