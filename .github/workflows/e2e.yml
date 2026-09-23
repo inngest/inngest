@@ -130,6 +130,18 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
+
+      - name: Split Go SDK tests
+        id: test-split
+        uses: hashicorp-forge/go-test-split-action@1485d57a7de487cd60ca5d56d8422ca16bb4f47b # v2.0.4
+        with:
+          total: ${{ matrix.parallelism }}
+          index: ${{ matrix.index }}
+          packages: ./tests/golang
+          junit-summary: .github/test-timings/go-sdk.xml
+
       - name: Start postgres container
         if: matrix.database == 'postgres'
         run: |
@@ -155,9 +167,6 @@ jobs:
       - name: Build dev server
         run: go build -cover -o ./inngest-bin ./cmd
 
-      - name: Install tools
-        run: go install tool
-
       - name: Run E2E tests
         run: |
           echo "Running dev server"
@@ -170,7 +179,8 @@ jobs:
           echo "Ran dev server"
           ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
-          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir test-results ./tests/golang -- -v -count=1
+          gotestsum --junitfile=test-results/junit-${{ matrix.index }}-0.xml --format=standard-verbose -- \
+            ./tests/golang -run "${{ steps.test-split.outputs.run }}" -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
