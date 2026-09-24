@@ -61,7 +61,8 @@ type LeaseOptions struct {
 }
 
 // LeaseRequireDue prevents direct hints from leasing items rescheduled into the
-// future. Ordinary scanners retain their existing peek-ahead behavior.
+// future or superseded by a newer generation. Ordinary scanners retain their
+// existing peek-ahead behavior.
 func LeaseRequireDue() LeaseOptionFn {
 	return func(o *LeaseOptions) { o.RequireDue = true }
 }

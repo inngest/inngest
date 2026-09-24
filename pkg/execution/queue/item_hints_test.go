@@ -15,16 +15,14 @@ import (
 
 type hintTestShard struct {
 	*mockShardForIterator
-	item    QueueItem
-	loadErr error
-	loads   atomic.Int32
+	item        QueueItem
+	validateErr error
+	validations atomic.Int32
 }
 
-func (s *hintTestShard) LoadItemForHint(ctx context.Context, id string) (*QueueItem, error) {
-	s.loads.Add(1)
-	item := s.item
-	item.ID = id
-	return &item, s.loadErr
+func (s *hintTestShard) ValidateItemForHint(ctx context.Context, item QueueItem) error {
+	s.validations.Add(1)
+	return s.validateErr
 }
 
 func hintTestQueue(t *testing.T, source ItemHintSource) (*queueProcessor, *hintTestShard, *clockwork.FakeClock) {
@@ -45,8 +43,8 @@ func hintTestQueue(t *testing.T, source ItemHintSource) (*queueProcessor, *hintT
 }
 
 func TestItemHintAdmissionAndActiveBudget(t *testing.T) {
-	ready := make(chan func(string) bool, 1)
-	q, shard, clock := hintTestQueue(t, func(ctx context.Context, _ QueueShard, offer func(string) bool) error {
+	ready := make(chan func(QueueItem) bool, 1)
+	q, shard, clock := hintTestQueue(t, func(ctx context.Context, _ QueueShard, offer func(QueueItem) bool) error {
 		ready <- offer
 		<-ctx.Done()
 		return ctx.Err()
@@ -59,9 +57,9 @@ func TestItemHintAdmissionAndActiveBudget(t *testing.T) {
 	})
 	t.Cleanup(stop)
 	offer := <-ready
-	require.True(t, offer("first"))
-	require.True(t, offer("second"))
-	require.False(t, offer("overflow"))
+	require.True(t, offer(hintItem(shard.item, "first")))
+	require.True(t, offer(hintItem(shard.item, "second")))
+	require.False(t, offer(hintItem(shard.item, "overflow")))
 	clock.BlockUntil(1)
 	clock.Advance(time.Millisecond)
 	var first *dispatchedItemHandle
@@ -70,33 +68,33 @@ func TestItemHintAdmissionAndActiveBudget(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("hint not dispatched")
 	}
-	require.EqualValues(t, 1, shard.loads.Load(), "overflow and budget-limited hints must not read or lease")
-	require.True(t, offer("while-active"))
-	require.True(t, offer("also-while-active"))
-	require.False(t, offer("still-full"))
+	require.EqualValues(t, 1, shard.validations.Load(), "overflow and budget-limited hints must not validate or lease")
+	require.True(t, offer(hintItem(shard.item, "while-active")))
+	require.True(t, offer(hintItem(shard.item, "also-while-active")))
+	require.False(t, offer(hintItem(shard.item, "still-full")))
 	clock.Advance(time.Millisecond)
 	// Let the tick consume this hint while the first job still holds its slot.
 	require.Eventually(t, func() bool {
-		return offer("probe")
+		return offer(hintItem(shard.item, "probe"))
 	}, time.Second, time.Millisecond)
 	stop()
 	q.Semaphore().Release(1) // stand in for normal worker completion
 	first.complete(DispatchedItemResult{})
-	require.False(t, offer("after-shutdown"))
-	require.EqualValues(t, 1, shard.loads.Load())
+	require.False(t, offer(hintItem(shard.item, "after-shutdown")))
+	require.EqualValues(t, 1, shard.validations.Load())
 }
 
 func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		loadErr     error
+		validateErr error
 		kind        string
 		dispatchErr error
 		immediate   bool
 		workerErr   error
 	}{
-		{name: "missing", loadErr: ErrQueueItemNotFound},
-		{name: "read-error", loadErr: errors.New("read failed")},
+		{name: "missing", validateErr: ErrQueueItemNotFound},
+		{name: "eligibility-error", validateErr: errors.New("eligibility failed")},
 		{name: "ineligible-kind", kind: KindSleep},
 		{name: "dispatch-error", dispatchErr: errors.New("dispatch failed")},
 		{name: "completed"},
@@ -106,12 +104,12 @@ func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			q, shard, _ := hintTestQueue(t, nil)
 			q.runMode.Continuations = true
-			shard.loadErr = tc.loadErr
+			shard.validateErr = tc.validateErr
 			if tc.kind != "" {
 				shard.item.Data.Kind = tc.kind
 			}
 			var calls int
-			q.processItemHint(t.Context(), shard, "item", func(context.Context, ProcessItem) (DispatchedItem, error) {
+			q.processItemHint(t.Context(), shard, hintItem(shard.item, "item"), func(context.Context, ProcessItem) (DispatchedItem, error) {
 				calls++
 				if tc.dispatchErr != nil {
 					return nil, tc.dispatchErr
@@ -120,13 +118,18 @@ func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 				return NewCompletedDispatchedItem(DispatchedItemResult{ScheduledImmediateJob: tc.immediate, Err: tc.workerErr}), nil
 			})
 			require.EqualValues(t, 4, q.Semaphore().Available())
-			if tc.loadErr != nil || tc.kind != "" {
+			if tc.validateErr != nil || tc.kind != "" {
 				require.Zero(t, calls)
 			} else {
 				require.Equal(t, 1, calls)
 			}
-			require.EqualValues(t, 1, shard.loads.Load())
+			require.EqualValues(t, 1, shard.validations.Load())
 			require.Equal(t, tc.immediate && tc.workerErr == nil, len(q.continues) == 1)
 		})
 	}
+}
+
+func hintItem(item QueueItem, id string) QueueItem {
+	item.ID = id
+	return item
 }

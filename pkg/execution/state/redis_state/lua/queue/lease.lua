@@ -21,6 +21,7 @@ local currentTime = tonumber(ARGV[4]) -- in ms
 local setEarliestPeekTime = tonumber(ARGV[5])
 local itemEarliestPeekTime = tonumber(ARGV[6])
 local requireDue = ARGV[7] == "1"
+local generation = tonumber(ARGV[8])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -45,9 +46,10 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -2
 end
 
--- Hints may lease backlog items directly, but must not bypass due time.
+-- Hints may lease backlog items directly, but must not bypass due time or
+-- dispatch a snapshot superseded by requeue. Ordinary leases are unchanged.
 -- Ordinary scanners retain their existing peek-ahead behavior.
-if requireDue and item.at > currentTime then
+if requireDue and (item.at > currentTime or item.genID ~= generation) then
 	return -3
 end
 
