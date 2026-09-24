@@ -41,6 +41,7 @@ type ExtractedValues struct {
 	RunScheduleType *enums.ScheduleType
 	SkipReason *enums.SkipReason
 	SkipExistingRunID *string
+	CustomConcurrencyKeys *[]CustomConcurrencyKey
 	IsDurableEndpointRun *bool
 	DurableEndpointModeChangedAt *time.Time
 	DeferChildRunID *ulid.ULID
