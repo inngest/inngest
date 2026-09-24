@@ -219,7 +219,9 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 					b.remember(metadata, result.Data.ID, false)
 				}
 			}
-			if r.Method == http.MethodDelete && resp.StatusCode == http.StatusNoContent && strings.Count(path, "/") == 2 && strings.HasPrefix(path, "/sandboxes/") {
+			// Cloud answers 202 while termination is in progress and 204 once it is done;
+			// either way the delete has been recorded.
+			if r.Method == http.MethodDelete && (resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted) && strings.Count(path, "/") == 2 && strings.HasPrefix(path, "/sandboxes/") {
 				b.remember(metadata, strings.TrimPrefix(path, "/sandboxes/"), true)
 			}
 			return nil
