@@ -184,7 +184,15 @@ func (q *queueProcessor) ProcessItem(
 	extendCapacityLeaseCtx, cancelExtendCapacityLease := context.WithCancel(jobCtx)
 	defer cancelExtendCapacityLease()
 
-	releaseCapacityLeaseOnceBody := func() {
+	releaseCapacityLeaseMu := sync.Mutex{}
+	capacityReleased := false
+	releaseCapacityLease := func() {
+		releaseCapacityLeaseMu.Lock()
+		defer releaseCapacityLeaseMu.Unlock()
+		if capacityReleased {
+			return
+		}
+
 		cancelExtendCapacityLease()
 
 		currentLeaseID := capacityLeaseID.get()
@@ -214,6 +222,7 @@ func (q *queueProcessor) ProcessItem(
 			}))
 			return
 		}
+		capacityReleased = true
 
 		if instrumentCapacityLease {
 			l.Debug(
@@ -230,10 +239,6 @@ func (q *queueProcessor) ProcessItem(
 		if notifier, ok := shard.(CapacityReleaseNotifier); ok {
 			notifier.CapacityReleased(context.Background(), capacityReleaseItem)
 		}
-	}
-	releaseCapacityLeaseOnce := sync.Once{}
-	releaseCapacityLease := func() {
-		releaseCapacityLeaseOnce.Do(releaseCapacityLeaseOnceBody)
 	}
 
 	if capacityLeaseID.has() {
