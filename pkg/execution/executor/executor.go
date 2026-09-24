@@ -1737,9 +1737,11 @@ func (e *executor) schedule(
 	_, queueSpan := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
 	enqueueOpts := queue.EnqueueOpts{}
 	var enqueueListeners []execution.EnqueueLifecycleListener
-	for _, listener := range e.lifecycles {
-		if listener, ok := listener.(execution.EnqueueLifecycleListener); ok {
-			enqueueListeners = append(enqueueListeners, listener)
+	if req.FastPath.Enabled {
+		for _, listener := range e.lifecycles {
+			if listener, ok := listener.(execution.EnqueueLifecycleListener); ok {
+				enqueueListeners = append(enqueueListeners, listener)
+			}
 		}
 	}
 	if len(enqueueListeners) > 0 {
