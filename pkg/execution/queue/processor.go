@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/VividCortex/ewma"
@@ -128,6 +129,7 @@ func New(
 }
 
 type queueProcessor struct {
+	hintsStopped atomic.Bool
 	*QueueOptions
 
 	Producer
@@ -293,7 +295,9 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		return ErrQueueScannerMissingLeaser
 	}
 
+	stopHints := q.startItemHints(ctx, dispatch)
 	err := scanner.Run(ctx, rt)
+	stopHints()
 
 	l.Info("queue waiting to quit", "err", err)
 	q.wg.Wait()

@@ -123,6 +123,9 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		LeaseShadowPartition(shadowPartition),
 		LeaseConstraints(constraints),
 	}
+	if req.RequireReady {
+		leaseOptions = append(leaseOptions, LeaseRequireReady())
+	}
 
 	// Acquire capacity lease, in case the Constraint API is enabled and the current queue item should use capacity leases.
 	// We only ignore capacity leases for system queues and items missing account ID / env ID / function ID combinations.
@@ -405,6 +408,8 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		// fn and fnkey semaphores are only on start items.  later steps of runs that
 		// already hold the semaphore carry none, so keep scanning.
 		return result, nil
+	case errors.Is(cause, ErrQueueItemNotReady):
+		return LeaseItemResult{Status: LeaseItemStatusNotReady}, nil
 	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
