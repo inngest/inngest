@@ -10,7 +10,9 @@ export function useBooleanFlag(
   defaultValue: boolean = false,
 ): BooleanFlag {
   const value: unknown = useFlags()[flag];
-  const { isIdentified, hasError } = useContext(IdentificationContext);
+  const { isIdentified, hasError, isUnavailable } = useContext(
+    IdentificationContext,
+  );
   const failure = hasError
     ? 'feature flag initialization or identification failed'
     : !isIdentified
@@ -30,6 +32,7 @@ export function useBooleanFlag(
   }, [flag, failure, defaultValue]);
 
   if (failure) return { isReady: true, value: defaultValue };
+  if (isUnavailable) return { isReady: true, value: defaultValue };
   if (!isIdentified) return { isReady: false, value: defaultValue };
   return { isReady: true, value: value as boolean };
 }

@@ -10,6 +10,7 @@ import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 export const IdentificationContext = createContext({
   isIdentified: false,
   hasError: false,
+  isUnavailable: false,
 });
 
 function LaunchDarkly({ children }: { children: React.ReactNode }) {
@@ -21,8 +22,8 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
   const client = useLDClient();
   const clientError = useLDClientError();
 
-  const { user } = useUser();
-  const { organization } = useOrganization();
+  const { isLoaded: isUserLoaded, user } = useUser();
+  const { isLoaded: isOrganizationLoaded, organization } = useOrganization();
 
   const accountID = organization?.publicMetadata.accountID;
   const externalID = user?.externalId;
@@ -74,11 +75,17 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
     identification?.externalID === externalID
       ? identification?.status
       : undefined;
+  const hasIdentity = Boolean(accountID && externalID);
   const hasError = Boolean(clientError) || status === 'error';
+  const isUnavailable = isUserLoaded && isOrganizationLoaded && !hasIdentity;
 
   return (
     <IdentificationContext.Provider
-      value={{ isIdentified: status === 'ready', hasError }}
+      value={{
+        isIdentified: status === 'ready',
+        hasError,
+        isUnavailable,
+      }}
     >
       {children}
     </IdentificationContext.Provider>
