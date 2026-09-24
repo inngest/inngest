@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
@@ -28,31 +28,46 @@ export function useDeepLinkHandler({
   search,
 }: UseDeepLinkHandlerParams) {
   const { queries, isSavedQueriesFetching } = useStoredQueries();
-  const hasProcessedInitialDeepLink = useRef(false);
+  const lastProcessedDeepLink = useRef<string>();
+  const [processedDeepLink, setProcessedDeepLink] = useState<string>();
 
-  // Handle initial page load with query_id or sql parameter.
+  const queryIdFromUrl =
+    typeof search.query_id === 'string' ? search.query_id : undefined;
+  const sqlFromUrl =
+    typeof search.sql === 'string' && search.sql.length > 0
+      ? search.sql
+      : undefined;
+  const nameFromUrl =
+    typeof search.name === 'string' && search.name.length > 0
+      ? search.name
+      : undefined;
+  const deepLinkKey = queryIdFromUrl
+    ? `query:${queryIdFromUrl}`
+    : sqlFromUrl
+    ? `sql:${sqlFromUrl}\u0000${nameFromUrl ?? ''}`
+    : undefined;
+
+  // Handle query_id or sql whenever the current deep link changes.
   // Gated on isHydrated to ensure tab state has been restored from localStorage
   // before we attempt to create a deep-linked tab. Without this gate, the hydration
   // effect (in a parent component) can overwrite the tab created here, leaving
   // activeTabId pointing to a nonexistent tab and causing a blank screen.
   useEffect(() => {
-    if (hasProcessedInitialDeepLink.current) return;
     if (!isHydrated) return;
 
-    const queryIdFromUrl =
-      typeof search.query_id === 'string' ? search.query_id : undefined;
-    const sqlFromUrl =
-      typeof search.sql === 'string' && search.sql.length > 0
-        ? search.sql
-        : undefined;
+    if (!deepLinkKey) {
+      lastProcessedDeepLink.current = undefined;
+      setProcessedDeepLink(undefined);
+      return;
+    }
+    if (lastProcessedDeepLink.current === deepLinkKey) return;
 
-    // If there's a query_id, handle it (takes precedence over sql)
     if (queryIdFromUrl) {
       // Wait for saved queries to finish loading and have data
       if (isSavedQueriesFetching || !queries.data) return;
 
-      // Mark as processed to prevent re-running
-      hasProcessedInitialDeepLink.current = true;
+      lastProcessedDeepLink.current = deepLinkKey;
+      setProcessedDeepLink(deepLinkKey);
 
       // Check if the query exists
       const savedQuery = queries.data.find((q) => q.id === queryIdFromUrl);
@@ -74,12 +89,8 @@ export function useDeepLinkHandler({
     // Failed Functions "Open in Insights" button) can label the tab without
     // depending on a built-in Insights template existing.
     if (sqlFromUrl) {
-      hasProcessedInitialDeepLink.current = true;
-
-      const nameFromUrl =
-        typeof search.name === 'string' && search.name.length > 0
-          ? search.name
-          : undefined;
+      lastProcessedDeepLink.current = deepLinkKey;
+      setProcessedDeepLink(deepLinkKey);
 
       // Synthesize a QueryTemplate so the tab manager's template branch picks
       // it up and honors the name (the snapshot branch ignores name and falls
@@ -93,7 +104,7 @@ export function useDeepLinkHandler({
         explanation: '',
         templateKind: 'time',
       };
-      actions.createTabFromQuery(template, { runOnMount: true });
+      actions.createTabFromQuery(template);
 
       // Clear the deep-link params from the URL so refresh/bookmark doesn't
       // respawn duplicate tabs.
@@ -106,12 +117,12 @@ export function useDeepLinkHandler({
         },
         replace: true,
       });
-      return;
     }
-
-    hasProcessedInitialDeepLink.current = true;
   }, [
-    search,
+    deepLinkKey,
+    queryIdFromUrl,
+    sqlFromUrl,
+    nameFromUrl,
     queries.data,
     isSavedQueriesFetching,
     actions,
@@ -119,19 +130,20 @@ export function useDeepLinkHandler({
     navigate,
   ]);
 
-  const currentQueryId =
-    typeof search.query_id === 'string' ? search.query_id : undefined;
-
   // Update URL when active tab changes
   useEffect(() => {
-    // Don't sync URL until we've processed the initial query_id and tabs are hydrated
-    if (!hasProcessedInitialDeepLink.current) return;
     if (!isHydrated) return;
+    // Don't replace an incoming deep link while it is waiting for hydration or
+    // saved-query data. A processed SQL link can safely proceed: its unsaved tab
+    // has no query_id to synchronize.
+    if (deepLinkKey && lastProcessedDeepLink.current !== deepLinkKey) {
+      return;
+    }
 
     const newQueryId = activeSavedQueryId;
 
     // Don't update if URL already has the correct query_id
-    if (currentQueryId === newQueryId) return;
+    if (queryIdFromUrl === newQueryId) return;
 
     // Update URL without triggering navigation. Return prev unchanged when the
     // value matches so callers that short-circuit on same-reference don't replace.
@@ -150,5 +162,7 @@ export function useDeepLinkHandler({
       },
       replace: true,
     });
-  }, [activeSavedQueryId, currentQueryId, navigate, isHydrated]);
+  }, [activeSavedQueryId, deepLinkKey, queryIdFromUrl, navigate, isHydrated]);
+
+  return Boolean(deepLinkKey && processedDeepLink !== deepLinkKey);
 }

@@ -3,6 +3,7 @@ import { useQuery } from 'urql';
 
 import { createFileRoute } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
+import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
   useInsightsTabManager,
   type TabManagerActions,
@@ -17,21 +18,11 @@ import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/Tab
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
-
-export type InsightsSearchParams = {
-  query_id?: string;
-  sql?: string;
-  name?: string;
-};
+import { validateInsightsSearch } from '@/components/Insights/insightsSearchParams';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   component: InsightsComponent,
-  validateSearch: (search: Record<string, unknown>): InsightsSearchParams => ({
-    query_id:
-      typeof search?.query_id === 'string' ? search.query_id : undefined,
-    sql: typeof search?.sql === 'string' ? search.sql : undefined,
-    name: typeof search?.name === 'string' ? search.name : undefined,
-  }),
+  validateSearch: validateInsightsSearch,
 });
 
 // Initial placeholder actions used before real actions are available from useInsightsTabManager
@@ -152,14 +143,22 @@ function InsightsContentWithDeepLink({
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
 
-  // Handle deep linking with query_id parameter
-  useDeepLinkHandler({
+  // Handle saved-query and SQL deep links after tab state has hydrated.
+  const isDeepLinkPending = useDeepLinkHandler({
     actions,
     activeSavedQueryId,
     isHydrated,
     navigate,
     search,
   });
+
+  if (isDeepLinkPending) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-1 overflow-hidden">
