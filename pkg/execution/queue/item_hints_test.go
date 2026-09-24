@@ -92,15 +92,20 @@ func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 		loadErr     error
 		kind        string
 		dispatchErr error
+		immediate   bool
+		workerErr   error
 	}{
 		{name: "missing", loadErr: ErrQueueItemNotFound},
 		{name: "read-error", loadErr: errors.New("read failed")},
 		{name: "ineligible-kind", kind: KindSleep},
 		{name: "dispatch-error", dispatchErr: errors.New("dispatch failed")},
 		{name: "completed"},
+		{name: "continuation", immediate: true},
+		{name: "failed-worker", immediate: true, workerErr: errors.New("worker failed")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q, shard, _ := hintTestQueue(t, nil)
+			q.runMode.Continuations = true
 			shard.loadErr = tc.loadErr
 			if tc.kind != "" {
 				shard.item.Data.Kind = tc.kind
@@ -112,7 +117,7 @@ func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 					return nil, tc.dispatchErr
 				}
 				q.Semaphore().Release(1)
-				return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+				return NewCompletedDispatchedItem(DispatchedItemResult{ScheduledImmediateJob: tc.immediate, Err: tc.workerErr}), nil
 			})
 			require.EqualValues(t, 4, q.Semaphore().Available())
 			if tc.loadErr != nil || tc.kind != "" {
@@ -121,6 +126,7 @@ func TestItemHintOutcomesReleaseWorkerCapacity(t *testing.T) {
 				require.Equal(t, 1, calls)
 			}
 			require.EqualValues(t, 1, shard.loads.Load())
+			require.Equal(t, tc.immediate && tc.workerErr == nil, len(q.continues) == 1)
 		})
 	}
 }

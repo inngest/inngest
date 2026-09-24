@@ -404,6 +404,13 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	refillUntil time.Time,
 	constraints PartitionConstraintConfig,
 ) (*BacklogRefillResult, enums.QueueConstraint, error) {
+	return q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil, constraints, nil)
+}
+
+// A hinted refill shares normalization, constraint acquisition, mutation and
+// requeue handling with the scanner, but only considers its exact stored item.
+// The caller must hold the normal shadow-partition lease.
+func (q *queueProcessor) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints PartitionConstraintConfig, hint *QueueItem) (*BacklogRefillResult, enums.QueueConstraint, error) {
 	l := logger.StdlibLogger(ctx).With(
 		"backlog_id", backlog.BacklogID,
 	)
@@ -481,12 +488,18 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	//
 	// Items that were added between backlogPeek and BacklogRefill will be considered in the next refill.
 	// Items that were moved between backlogPeek and BacklogRefill will still be refilled.
-	peekResult, err := shard.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
-	if err != nil {
-		return nil, enums.QueueConstraintNotLimited, fmt.Errorf("could not peek backlog items for refill: %w", err)
+	var items []*QueueItem
+	var total int
+	var err error
+	if hint != nil {
+		items, total = []*QueueItem{hint}, 1
+	} else {
+		peekResult, peekErr := shard.BacklogPeek(ctx, backlog, time.Time{}, refillUntil, refillLimit)
+		if peekErr != nil {
+			return nil, enums.QueueConstraintNotLimited, fmt.Errorf("could not peek backlog items for refill: %w", peekErr)
+		}
+		items, total = peekResult.Items, peekResult.TotalCount
 	}
-
-	items, total := peekResult.Items, peekResult.TotalCount
 	if len(items) == 0 {
 		return nil, enums.QueueConstraintNotLimited, nil
 	}
