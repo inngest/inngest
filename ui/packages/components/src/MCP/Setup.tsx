@@ -126,6 +126,12 @@ const createClients = (
             mcpServers: {
               [serverName]: {
                 url: endpoint,
+                ...(!isDevServer &&
+                  !bearerTokenEnvVar && {
+                    auth: {
+                      CLIENT_ID: 'inngest-mcp-static',
+                    },
+                  }),
                 ...(bearerTokenEnvVar && {
                   headers: {
                     Authorization: `Bearer \${env:${bearerTokenEnvVar}}`,
@@ -478,7 +484,10 @@ const ClientNotes = ({
           Cursor.
         </p>
         {!isDevServer && !bearerTokenEnvVar && (
-          <p className="mt-2">If OAuth sign-in fails, use the API-key instructions above.</p>
+          <p className="mt-2">
+            Until Cursor supports Client ID Metadata Documents (CIMD), use the static{' '}
+            <InlineCode>auth.CLIENT_ID</InlineCode> shown above to sign in with OAuth.
+          </p>
         )}
         {bearerTokenEnvVar && (
           <p className="mt-2">
