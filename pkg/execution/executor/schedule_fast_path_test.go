@@ -58,6 +58,8 @@ func TestScheduleFastPathIntent(t *testing.T) {
 					Name: "test/fast-path", Timestamp: time.Now().UnixMilli(), Data: map[string]any{},
 				}}},
 				RunMode: tc.mode, FastPath: tc.fastPath,
+				IdempotencyKey: new("request-idempotency-key"),
+				Context:        map[string]any{"caller": "original-request"},
 			}
 			done := make(chan error, 1)
 			go func() {
@@ -79,6 +81,15 @@ func TestScheduleFastPathIntent(t *testing.T) {
 			if tc.wantNotify {
 				select {
 				case got := <-listener.calls:
+					require.Equal(t, req.FastPath, got.req.FastPath)
+					require.Equal(t, req.RunMode, got.req.RunMode)
+					require.Equal(t, req.AccountID, got.req.AccountID)
+					require.Equal(t, req.WorkspaceID, got.req.WorkspaceID)
+					require.Equal(t, req.AppID, got.req.AppID)
+					require.Equal(t, req.Function, got.req.Function)
+					require.Equal(t, req.Events, got.req.Events)
+					require.Equal(t, req.IdempotencyKey, got.req.IdempotencyKey)
+					require.Equal(t, "original-request", got.req.Context["caller"])
 					require.Equal(t, shard.stored, got.item, "notify with the finalized backend result")
 					require.Equal(t, "persisted-item", got.item.ID)
 					require.EqualValues(t, 7, got.item.GenerationID)
@@ -127,6 +138,7 @@ func (q *scheduleFastPathQueue) Enqueue(ctx context.Context, item queue.Item, at
 
 type enqueueNotification struct {
 	ctx   context.Context
+	req   execution.ScheduleRequest
 	item  queue.QueueItem
 	shard string
 }
@@ -137,7 +149,7 @@ type scheduleEnqueueListener struct {
 	release chan struct{}
 }
 
-func (l *scheduleEnqueueListener) OnFunctionEnqueued(ctx context.Context, item queue.QueueItem, shard string) {
-	l.calls <- enqueueNotification{ctx: ctx, item: item, shard: shard}
+func (l *scheduleEnqueueListener) OnFunctionEnqueued(ctx context.Context, req execution.ScheduleRequest, item queue.QueueItem, shard string) {
+	l.calls <- enqueueNotification{ctx: ctx, req: req, item: item, shard: shard}
 	<-l.release
 }

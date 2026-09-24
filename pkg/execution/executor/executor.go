@@ -1747,7 +1747,7 @@ func (e *executor) schedule(
 	if len(enqueueListeners) > 0 {
 		enqueueOpts.OnEnqueued = func(enqueued queue.QueueItem, shard string) {
 			for _, listener := range enqueueListeners {
-				go listener.OnFunctionEnqueued(context.WithoutCancel(ctx), enqueued, shard)
+				go listener.OnFunctionEnqueued(context.WithoutCancel(ctx), reqSnapshot, enqueued, shard)
 			}
 		}
 	}
