@@ -20,7 +20,7 @@ type hintTestShard struct {
 	loads   atomic.Int32
 }
 
-func (s *hintTestShard) LoadReadyItem(ctx context.Context, id string) (*QueueItem, error) {
+func (s *hintTestShard) LoadItemForHint(ctx context.Context, id string) (*QueueItem, error) {
 	s.loads.Add(1)
 	item := s.item
 	item.ID = id
@@ -79,9 +79,9 @@ func TestItemHintAdmissionAndActiveBudget(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return offer("probe")
 	}, time.Second, time.Millisecond)
+	stop()
 	q.Semaphore().Release(1) // stand in for normal worker completion
 	first.complete(DispatchedItemResult{})
-	stop()
 	require.False(t, offer("after-shutdown"))
 	require.EqualValues(t, 1, shard.loads.Load())
 }

@@ -20,7 +20,7 @@ local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
 local setEarliestPeekTime = tonumber(ARGV[5])
 local itemEarliestPeekTime = tonumber(ARGV[6])
-local requireReady = ARGV[7] == "1"
+local requireDue = ARGV[7] == "1"
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -45,9 +45,9 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -2
 end
 
--- Hints must not lease items still in backlogs or rescheduled into the future.
+-- Hints may lease backlog items directly, but must not bypass due time.
 -- Ordinary scanners retain their existing peek-ahead behavior.
-if requireReady and (redis.call("ZSCORE", keyReadyQueue, queueID) == false or item.at > currentTime) then
+if requireDue and item.at > currentTime then
 	return -3
 end
 

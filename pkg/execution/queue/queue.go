@@ -57,7 +57,7 @@ type QueueItemLeaser interface {
 }
 
 type LeaseItemRequest struct {
-	RequireReady               bool
+	RequireDue                 bool
 	Item                       *QueueItem
 	Priority                   uint
 	ContinueCount              uint
