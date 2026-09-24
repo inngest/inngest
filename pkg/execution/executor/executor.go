@@ -1541,7 +1541,11 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
-	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, nil); len(keys) > 0 {
+	var firstEvent json.RawMessage
+	if len(evts) > 0 {
+		firstEvent = evts[0]
+	}
+	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, firstEvent); len(keys) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 	if len(sessions) > 0 {

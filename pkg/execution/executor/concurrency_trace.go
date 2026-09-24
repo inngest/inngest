@@ -12,6 +12,19 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
+const maxConcurrencyTraceKeyChars = 512
+
+func truncateConcurrencyTraceKey(value string) (string, bool) {
+	chars := 0
+	for i := range value {
+		if chars == maxConcurrencyTraceKeyChars {
+			return value[:i], true
+		}
+		chars++
+	}
+	return value, false
+}
+
 // customConcurrencyTraceKeys only pairs an expression with a queue key when
 // both hashes agree. A function may have changed since the item was queued.
 func customConcurrencyTraceKeys(ctx context.Context, fn *inngest.Function, keys []state.CustomConcurrency, rawEvent json.RawMessage) []meta.CustomConcurrencyKey {
@@ -52,10 +65,14 @@ func customConcurrencyTraceKeys(ctx context.Context, fn *inngest.Function, keys 
 					continue
 				}
 			}
+			expression, expressionTruncated := truncateConcurrencyTraceKey(*limit.Key)
+			value, valueTruncated := truncateConcurrencyTraceKey(value)
 			result = append(result, meta.CustomConcurrencyKey{
-				Scope:      strings.ToLower(scope.String()),
-				Expression: *limit.Key,
-				Value:      value,
+				Scope:               strings.ToLower(scope.String()),
+				Expression:          expression,
+				Value:               value,
+				ExpressionTruncated: expressionTruncated,
+				ValueTruncated:      valueTruncated,
 			})
 			break
 		}

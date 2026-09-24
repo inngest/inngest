@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -46,6 +47,7 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 	require.NoError(t, err)
 	otherEvent, err := json.Marshal(event.Event{Data: map[string]any{"customer": "customer-b"}})
 	require.NoError(t, err)
+	longValue := strings.Repeat("é", maxConcurrencyTraceKeyChars+1)
 
 	tests := []struct {
 		name  string
@@ -72,6 +74,9 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 		{name: "empty evaluated value", keys: []state.CustomConcurrency{emptyValue}, want: []meta.CustomConcurrencyKey{
 			{Scope: "fn", Expression: fnExpr, Value: ""},
 		}},
+		{name: "truncate evaluated value by characters", keys: []state.CustomConcurrency{key(enums.ConcurrencyScopeFn, fnID, fnHash, longValue)}, want: []meta.CustomConcurrencyKey{
+			{Scope: "fn", Expression: fnExpr, Value: strings.Repeat("é", maxConcurrencyTraceKeyChars), ValueTruncated: true},
+		}},
 	}
 
 	for _, tt := range tests {
@@ -79,4 +84,24 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 			require.Equal(t, tt.want, customConcurrencyTraceKeys(context.Background(), fn, tt.keys, tt.event))
 		})
 	}
+}
+
+func TestCustomConcurrencyTraceKeysTruncatesExpression(t *testing.T) {
+	expr := strings.Repeat("x", maxConcurrencyTraceKeyChars+1)
+	hash := util.XXHash(expr)
+	fn := &inngest.Function{Concurrency: &inngest.ConcurrencyLimits{Limits: []inngest.StepConcurrency{
+		{Key: &expr, Hash: hash, Scope: enums.ConcurrencyScopeFn, Limit: 1},
+	}}}
+	key := state.CustomConcurrency{
+		Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, uuid.New(), "value"),
+		Hash:                      hash,
+		UnhashedEvaluatedKeyValue: "value",
+	}
+
+	require.Equal(t, []meta.CustomConcurrencyKey{{
+		Scope:               "fn",
+		Expression:          strings.Repeat("x", maxConcurrencyTraceKeyChars),
+		Value:               "value",
+		ExpressionTruncated: true,
+	}}, customConcurrencyTraceKeys(context.Background(), fn, []state.CustomConcurrency{key}, nil))
 }
