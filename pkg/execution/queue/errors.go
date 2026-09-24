@@ -60,6 +60,7 @@ func QueueItemExists(jobID string, runID *ulid.ULID) error {
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
 	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")
+	ErrQueueItemNotReady             = fmt.Errorf("queue item not ready")
 	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
 	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
 	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")

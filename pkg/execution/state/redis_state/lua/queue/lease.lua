@@ -4,6 +4,7 @@ Output:
   0: Successfully leased item
   -1: Queue item not found
   -2: Queue item already leased
+  -3: Hinted item is not ready
 ]]
 
 local keyQueueMap = KEYS[1]
@@ -19,6 +20,7 @@ local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
 local setEarliestPeekTime = tonumber(ARGV[5])
 local itemEarliestPeekTime = tonumber(ARGV[6])
+local requireReady = ARGV[7] == "1"
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -41,6 +43,12 @@ local nextTime = decode_ulid_time(newLeaseID)
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- This is already leased;  don't let this requester lease the item.
 	return -2
+end
+
+-- Hints must not lease items still in backlogs or rescheduled into the future.
+-- Ordinary scanners retain their existing peek-ahead behavior.
+if requireReady and (redis.call("ZSCORE", keyReadyQueue, queueID) == false or item.at > currentTime) then
+	return -3
 end
 
 if setEarliestPeekTime == 1 and itemEarliestPeekTime ~= nil and itemEarliestPeekTime > 0 then

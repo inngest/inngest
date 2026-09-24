@@ -471,6 +471,7 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
+	itemHints                        *ItemHintOptions
 	PartitionPriorityFinder          PartitionPriorityFinder
 	AccountPriorityFinder            AccountPriorityFinder
 	AccountExists                    AccountExists
