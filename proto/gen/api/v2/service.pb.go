@@ -2215,6 +2215,7 @@ type GetFunctionRunRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Include       []string               `protobuf:"bytes,3,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2261,6 +2262,13 @@ func (x *GetFunctionRunRequest) GetIncludeOutput() bool {
 		return *x.IncludeOutput
 	}
 	return false
+}
+
+func (x *GetFunctionRunRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetFunctionRunResponse struct {
@@ -2321,6 +2329,7 @@ type GetEventRunsRequest struct {
 	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
 	Cursor        *string                `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
 	Limit         *int32                 `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Include       []string               `protobuf:"bytes,5,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2381,6 +2390,13 @@ func (x *GetEventRunsRequest) GetLimit() int32 {
 		return *x.Limit
 	}
 	return 0
+}
+
+func (x *GetEventRunsRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetEventRunsResponse struct {
@@ -2907,6 +2923,7 @@ type GetFunctionTraceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Include       []string               `protobuf:"bytes,3,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2953,6 +2970,13 @@ func (x *GetFunctionTraceRequest) GetIncludeOutput() bool {
 		return *x.IncludeOutput
 	}
 	return false
+}
+
+func (x *GetFunctionTraceRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetFunctionTraceResponse struct {
@@ -9132,19 +9156,21 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\t_ended_atB\x0e\n" +
 	"\f_duration_msB\t\n" +
 	"\a_outputB\x0e\n" +
-	"\f_is_deferredJ\x04\b\f\x10\rR\x06has_ai\"m\n" +
+	"\f_is_deferredJ\x04\b\f\x10\rR\x06has_ai\"\xee\x01\n" +
 	"\x15GetFunctionRunRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
+	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12\x7f\n" +
+	"\ainclude\x18\x03 \x03(\tBe\x92Ab2`Optional run expansions named by their lowerCamelCase response fields. Supported values: output.R\aincludeB\x11\n" +
 	"\x0f_include_output\"w\n" +
 	"\x16GetFunctionRunResponse\x12'\n" +
 	"\x04data\x18\x01 \x01(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa9\x02\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xaa\x03\n" +
 	"\x13GetEventRunsRequest\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12*\n" +
 	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x03 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12W\n" +
-	"\x05limit\x18\x04 \x01(\x05B<\x92A923Number of runs to return per page (min: 1, max: 40):\x0220H\x02R\x05limit\x88\x01\x01B\x11\n" +
+	"\x05limit\x18\x04 \x01(\x05B<\x92A923Number of runs to return per page (min: 1, max: 40):\x0220H\x02R\x05limit\x88\x01\x01\x12\x7f\n" +
+	"\ainclude\x18\x05 \x03(\tBe\x92Ab2`Optional run expansions named by their lowerCamelCase response fields. Supported values: output.R\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x97\x01\n" +
@@ -9203,10 +9229,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\a_output\"V\n" +
 	"\rFunctionTrace\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12.\n" +
-	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"o\n" +
+	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"\xf3\x01\n" +
 	"\x17GetFunctionTraceRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
+	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12\x81\x01\n" +
+	"\ainclude\x18\x03 \x03(\tBg\x92Ad2bOptional trace expansions named by their lowerCamelCase response fields. Supported values: output.R\aincludeB\x11\n" +
 	"\x0f_include_output\"{\n" +
 	"\x18GetFunctionTraceResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.FunctionTraceR\x04data\x124\n" +

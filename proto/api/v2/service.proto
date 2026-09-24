@@ -2678,6 +2678,11 @@ message FunctionRun {
 message GetFunctionRunRequest {
   string run_id = 1;
   optional bool include_output = 2;
+  repeated string include = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional run expansions named by their lowerCamelCase response fields. Supported values: output."
+    }
+  ];
 }
 
 message GetFunctionRunResponse {
@@ -2697,6 +2702,11 @@ message GetEventRunsRequest {
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Number of runs to return per page (min: 1, max: 40)"
       default: "20"
+    }
+  ];
+  repeated string include = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional run expansions named by their lowerCamelCase response fields. Supported values: output."
     }
   ];
 }
@@ -2776,6 +2786,11 @@ message FunctionTrace {
 message GetFunctionTraceRequest {
   string run_id = 1;
   optional bool include_output = 2;
+  repeated string include = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional trace expansions named by their lowerCamelCase response fields. Supported values: output."
+    }
+  ];
 }
 
 message GetFunctionTraceResponse {

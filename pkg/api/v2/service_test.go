@@ -878,8 +878,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 	t.Run("returns mapped run data", func(t *testing.T) {
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
-			RunId:         runID.String(),
-			IncludeOutput: new(true),
+			RunId:   runID.String(),
+			Include: []string{"output"},
 		})
 		require.NoError(t, err)
 		require.Equal(t, runID.String(), resp.Data.Id)
@@ -908,6 +908,17 @@ func TestService_GetFunctionRun(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, resp)
 		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
+	})
+
+	t.Run("rejects unsupported include", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}, Runs: &mockRunProvider{}})
+		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
+			RunId:   runID.String(),
+			Include: []string{"deferredFrom"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "deferredFrom")
 	})
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
@@ -1310,20 +1321,20 @@ func TestService_ListFunctionRuns(t *testing.T) {
 	})
 }
 
-func TestRunListIncludeFromAPI(t *testing.T) {
+func TestRunIncludeFromAPI(t *testing.T) {
 	for value, expected := range map[string]RunListInclude{
 		"deferredFrom":  RunListIncludeDeferredFrom,
 		"deferred_from": RunListIncludeDeferredFrom,
 		"output":        RunListIncludeOutput,
 	} {
 		t.Run(value, func(t *testing.T) {
-			got, err := runListIncludeFromAPI(value)
+			got, err := runIncludeFromAPI(value)
 			require.NoError(t, err)
 			require.Equal(t, expected, got)
 		})
 	}
 
-	_, err := runListIncludeFromAPI("unknown")
+	_, err := runIncludeFromAPI("unknown")
 	require.ErrorContains(t, err, `unsupported include value "unknown"`)
 }
 
@@ -1443,8 +1454,8 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
-			EventId:       eventID.String(),
-			IncludeOutput: new(true),
+			EventId: eventID.String(),
+			Include: []string{"output"},
 		})
 
 		require.NoError(t, err)
@@ -1518,6 +1529,17 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Event ID must be a valid ULID")
+	})
+
+	t.Run("rejects unsupported include", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Include: []string{"deferredFrom"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "deferredFrom")
 	})
 
 	t.Run("returns internal error when reader fails", func(t *testing.T) {
@@ -1933,8 +1955,8 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		service := newService(t, true)
 
 		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
-			RunId:         runID.String(),
-			IncludeOutput: new(true),
+			RunId:   runID.String(),
+			Include: []string{"output"},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp)
@@ -1972,6 +1994,16 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		require.Nil(t, resp)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Run ID must be a valid ULID")
+	})
+
+	t.Run("rejects unsupported include", func(t *testing.T) {
+		resp, err := validationService.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
+			RunId:   runID.String(),
+			Include: []string{"deferredFrom"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "deferredFrom")
 	})
 
 	t.Run("omits output when not requested", func(t *testing.T) {
