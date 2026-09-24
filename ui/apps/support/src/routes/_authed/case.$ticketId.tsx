@@ -10,8 +10,8 @@ import {
   RiUserLine,
 } from "@remixicon/react";
 import { Button } from "@inngest/components/Button";
-import { formatDistanceToNow } from "date-fns";
 import { InngestLogoSmall } from "@inngest/components/icons/logos/InngestLogoSmall";
+import { relativeTime } from "@inngest/components/utils/date";
 import { Image } from "@unpic/react";
 import type { TicketDetail, TimeLineEntryEdge } from "@/data/plain";
 import {
@@ -497,9 +497,7 @@ function TimelineEntry({
       ? staffName || "Inngest Support Team"
       : "Unknown";
 
-  const timeAgo = formatDistanceToNow(new Date(entry.node.timestamp.iso8601), {
-    addSuffix: true,
-  });
+  const timeAgo = relativeTime(entry.node.timestamp.iso8601);
 
   const messageContent =
     entry.node.entry.__typename === "EmailEntry"
