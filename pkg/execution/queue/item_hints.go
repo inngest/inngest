@@ -28,15 +28,10 @@ func WithItemHints(opts ItemHintOptions) QueueOpt {
 }
 
 // ItemHintShard opts a backend into direct processing with its own eligibility
-// checks. LoadReadyItem must preserve ready/backlog, pause, and migration rules.
+// checks. LoadItemForHint must reload stored state and preserve due-time, scope,
+// pause and migration rules; LeaseItem owns capacity, leasing and dispatch.
 type ItemHintShard interface {
-	LoadReadyItem(context.Context, string) (*QueueItem, error)
-}
-
-// ItemHintBacklogShard exposes stored backlog membership to the processor.
-// Refilling still requires the normal shadow lease and constraint transition.
-type ItemHintBacklogShard interface {
-	LoadBacklogItem(context.Context, string) (*QueueItem, *QueueBacklog, error)
+	LoadItemForHint(context.Context, string) (*QueueItem, error)
 }
 
 func (q *queueProcessor) hintsAllowed() bool {
@@ -126,15 +121,12 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 }
 
 func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShard, id string, dispatch DispatchFunc) {
+	if ctx.Err() != nil {
+		return
+	}
 	attemptCtx, cancel := context.WithTimeout(ctx, q.itemHints.AttemptTimeout)
 	defer cancel()
-	var backlog *QueueBacklog
-	item, err := shard.LoadReadyItem(attemptCtx, id)
-	if errors.Is(err, ErrQueueItemNotReady) {
-		if b, ok := shard.(ItemHintBacklogShard); ok {
-			item, backlog, err = b.LoadBacklogItem(attemptCtx, id)
-		}
-	}
+	item, err := shard.LoadItemForHint(attemptCtx, id)
 	if err != nil {
 		status := "read_error"
 		if errors.Is(err, ErrQueueItemNotFound) || errors.Is(err, ErrQueueItemNotReady) {
@@ -156,17 +148,10 @@ func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShar
 		q.recordItemHint(ctx, "ineligible")
 		return
 	}
-	if backlog != nil {
-		item, err = q.refillItemHint(attemptCtx, shard.(ItemHintBacklogShard), id, item)
-		if err != nil {
-			q.recordItemHint(ctx, "refill_not_ready")
-			return
-		}
-	}
 	partition := ItemPartition(ctx, *item)
 	var dispatched DispatchedItem
 	result, err := q.LeaseItem(attemptCtx, LeaseItemRequest{
-		Item: item, RequireReady: true, StaticTime: q.Clock().Now(),
+		Item: item, RequireDue: true, StaticTime: q.Clock().Now(),
 		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
 		var err error
@@ -193,31 +178,4 @@ func (q *queueProcessor) recordItemHint(ctx context.Context, outcome string) {
 		PkgName: pkgName, MetricName: "queue_item_hint_total",
 		Tags: map[string]any{"queue_shard": q.Shard().Name(), "outcome": outcome},
 	})
-}
-
-// refillItemHint acquires the same exclusive refill ownership as a shadow scan,
-// then revalidates the item before the existing constrained refill transition.
-func (q *queueProcessor) refillItemHint(ctx context.Context, backend ItemHintBacklogShard, id string, item *QueueItem) (*QueueItem, error) {
-	shadow := ItemShadowPartition(ctx, *item)
-	shard := q.Shard()
-	lease, err := shard.ShadowPartitionLease(ctx, &shadow, ShadowPartitionLeaseDuration)
-	if err != nil {
-		return nil, err
-	}
-	shadow.LeaseID = lease
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
-		defer cancel()
-		_ = shard.ShadowPartitionRequeue(cleanup, &shadow, nil)
-	}()
-	item, backlog, err := backend.LoadBacklogItem(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	constraints := q.PartitionConstraintConfigGetter(ctx, shadow.Identifier())
-	_, _, err = q.processShadowPartitionBacklog(ctx, &shadow, backlog, q.Clock().Now(), constraints, item)
-	if err != nil {
-		return nil, err
-	}
-	return shard.(ItemHintShard).LoadReadyItem(ctx, id)
 }

@@ -123,8 +123,8 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		LeaseShadowPartition(shadowPartition),
 		LeaseConstraints(constraints),
 	}
-	if req.RequireReady {
-		leaseOptions = append(leaseOptions, LeaseRequireReady())
+	if req.RequireDue {
+		leaseOptions = append(leaseOptions, LeaseRequireDue())
 	}
 
 	// Acquire capacity lease, in case the Constraint API is enabled and the current queue item should use capacity leases.

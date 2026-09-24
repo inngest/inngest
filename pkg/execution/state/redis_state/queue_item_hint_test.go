@@ -8,6 +8,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
@@ -58,21 +59,21 @@ func TestItemHintReadiness(t *testing.T) {
 				until := clock.Now().Add(time.Minute)
 				require.NoError(t, shard.SetFunctionMigrate(t.Context(), osqueue.Scope{FunctionID: fn}, &until))
 			}
-			loaded, err := shard.(osqueue.ItemHintShard).LoadReadyItem(t.Context(), item.ID)
-			if tc.name == "ready" {
+			loaded, err := shard.(osqueue.ItemHintShard).LoadItemForHint(t.Context(), item.ID)
+			if tc.name == "ready" || tc.backlog {
 				require.NoError(t, err)
 				require.Equal(t, item.ID, loaded.ID)
-				lease, err := shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireReady())
+				lease, err := shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
 				require.NoError(t, err)
 				require.NotNil(t, lease)
-				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireReady())
+				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
 				require.ErrorIs(t, err, osqueue.ErrQueueItemAlreadyLeased)
 			} else {
 				require.ErrorIs(t, err, osqueue.ErrQueueItemNotReady)
 			}
-			if tc.backlog || tc.future {
+			if tc.future {
 				// The mutation guard also rejects a stale or bypassed point read.
-				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireReady())
+				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
 				require.ErrorIs(t, err, osqueue.ErrQueueItemNotReady)
 				stored, err := shard.LoadQueueItem(t.Context(), item.ID)
 				require.NoError(t, err)
@@ -82,12 +83,11 @@ func TestItemHintReadiness(t *testing.T) {
 	}
 }
 
-// Suspend discovery to prove that backlog hints use constrained refill before
-// leasing. The ordinary worker and completion path remain real.
+// Suspend discovery to prove that backlog hints lease directly without refill.
+// The ordinary worker and completion path remain real.
 type hintOnlyRedisShard struct {
 	RedisQueueShard
 	osqueue.ItemHintShard
-	osqueue.ItemHintBacklogShard
 }
 
 func (s hintOnlyRedisShard) Run(ctx context.Context, _ osqueue.QueueScannerRuntime) error {
@@ -97,9 +97,9 @@ func (s hintOnlyRedisShard) Run(ctx context.Context, _ osqueue.QueueScannerRunti
 
 func TestItemHintBacklogHandoff(t *testing.T) {
 	for _, blocked := range []bool{false, true} {
-		name := "refill and execute"
+		name := "direct backlog lease"
 		if blocked {
-			name = "shadow lease held"
+			name = "direct lease while refill ownership held"
 		}
 		t.Run(name, func(t *testing.T) {
 			r := miniredis.RunT(t)
@@ -109,7 +109,7 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			opts := []osqueue.QueueOpt{osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }),
 				osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithPollTick(5 * time.Millisecond), osqueue.WithNumWorkers(2)}
 			base := NewQueueShard("ss3", NewQueueClient(rc, "{hints}"), opts...)
-			wrapper := hintOnlyRedisShard{RedisQueueShard: base, ItemHintShard: base.(osqueue.ItemHintShard), ItemHintBacklogShard: base.(osqueue.ItemHintBacklogShard)}
+			wrapper := hintOnlyRedisShard{RedisQueueShard: base, ItemHintShard: base.(osqueue.ItemHintShard)}
 			reg, err := osqueue.NewSingleShardRegistry(wrapper)
 			require.NoError(t, err)
 			offers := make(chan func(string) bool, 1)
@@ -125,8 +125,9 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			item := osqueue.Item{Kind: osqueue.KindStart, JobID: &job, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}
 			require.NoError(t, proc.Enqueue(t.Context(), item, time.Now(), osqueue.EnqueueOpts{}))
 			id := osqueue.HashID(t.Context(), job)
-			stored, backlog, err := wrapper.LoadBacklogItem(t.Context(), id)
+			stored, err := wrapper.LoadItemForHint(t.Context(), id)
 			require.NoError(t, err)
+			backlog := osqueue.ItemBacklog(t.Context(), *stored)
 			shadow := osqueue.ItemShadowPartition(t.Context(), *stored)
 			if blocked {
 				_, err = base.ShadowPartitionLease(t.Context(), &shadow, time.Minute)
@@ -156,29 +157,15 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 				t.Fatal("hint receiver not ready")
 			}
 			require.True(t, offer(id))
-			if blocked {
-				select {
-				case <-executed:
-					t.Fatal("hint bypassed the shadow lease")
-				case <-time.After(50 * time.Millisecond):
-				}
-				after, err := base.LoadQueueItem(t.Context(), id)
-				require.NoError(t, err)
-				require.Nil(t, after.LeaseID)
-				count, err := base.BacklogSize(t.Context(), backlog.BacklogID)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, count)
-			} else {
-				select {
-				case <-executed:
-				case <-time.After(2 * time.Second):
-					t.Fatal("backlog hint did not dispatch")
-				}
-				require.Eventually(t, func() bool { _, err := base.LoadQueueItem(t.Context(), id); return err == osqueue.ErrQueueItemNotFound }, time.Second, time.Millisecond)
-				count, err := base.BacklogSize(t.Context(), backlog.BacklogID)
-				require.NoError(t, err)
-				require.Zero(t, count)
+			select {
+			case <-executed:
+			case <-time.After(2 * time.Second):
+				t.Fatal("backlog hint did not dispatch")
 			}
+			require.Eventually(t, func() bool { _, err := base.LoadQueueItem(t.Context(), id); return err == osqueue.ErrQueueItemNotFound }, time.Second, time.Millisecond)
+			count, err := base.BacklogSize(t.Context(), backlog.BacklogID)
+			require.NoError(t, err)
+			require.Zero(t, count)
 		})
 	}
 }
@@ -199,7 +186,7 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 		osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithPollTick(5 * time.Millisecond), osqueue.WithNumWorkers(2),
 	}
 	base := NewQueueShard("ss3", NewQueueClient(rc, "{capacity-hints}"), opts...)
-	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base, base.(osqueue.ItemHintShard), base.(osqueue.ItemHintBacklogShard)})
+	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base, base.(osqueue.ItemHintShard)})
 	require.NoError(t, err)
 	offers := make(chan func(string) bool, 1)
 	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, MaxActive: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(string) bool) error {
@@ -258,5 +245,103 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 	backlog := osqueue.ItemBacklog(t.Context(), *stored)
 	count, err := base.BacklogSize(t.Context(), backlog.BacklogID)
 	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
+	require.EqualValues(t, 2, count)
+}
+
+// Ordinary refill can encounter a directly leased backlog item. It must not
+// execute it twice, and its extra reservation must expire without renewal.
+func TestItemHintBacklogRefillReservationCleanup(t *testing.T) {
+	for _, refill := range []bool{false, true} {
+		name := "without-refill"
+		if refill {
+			name = "ordinary-refill-races-direct-lease"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			clock := clockwork.NewFakeClock()
+			cm, err := constraintapi.NewRedisCapacityManager(constraintapi.WithClient(rc), constraintapi.WithShardName("hint-refill"), constraintapi.WithClock(clock))
+			require.NoError(t, err)
+			constraints := osqueue.PartitionConstraintConfig{FunctionVersion: 1, Concurrency: osqueue.PartitionConcurrency{AccountConcurrency: 3, FunctionConcurrency: 3}}
+			proc, shard := newQueue(t, rc, osqueue.WithClock(clock), osqueue.WithCapacityManager(cm), osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+				osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }),
+				osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+					return constraints
+				}))
+			acct, env, fn := uuid.New(), uuid.New(), uuid.New()
+			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "direct-backlog", FunctionID: fn, WorkspaceID: env,
+				Data: osqueue.Item{Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}}, clock.Now(), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			loaded, err := shard.(osqueue.ItemHintShard).LoadItemForHint(ctx, item.ID)
+			require.NoError(t, err)
+			var work osqueue.ProcessItem
+			leased, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: loaded, RequireDue: true, StaticTime: clock.Now()}, func(_ context.Context, i osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
+				work = i
+				return osqueue.NewCompletedDispatchedItem(osqueue.DispatchedItemResult{}), nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, osqueue.LeaseItemStatusDispatched, leased.Status)
+			require.NotNil(t, work.CapacityLease)
+			defer proc.Semaphore().Release(1)
+			capacity := func() int {
+				res, userErr, internalErr := cm.Check(ctx, &constraintapi.CapacityCheckRequest{AccountID: acct, EnvID: env, FunctionID: fn, Configuration: osqueue.ConstraintConfigFromConstraints(constraints), Constraints: []constraintapi.ConstraintItem{
+					{Kind: constraintapi.ConstraintKindConcurrency, Concurrency: &constraintapi.ConcurrencyConstraint{Scope: enums.ConcurrencyScopeAccount, Mode: enums.ConcurrencyModeStep}},
+					{Kind: constraintapi.ConstraintKindConcurrency, Concurrency: &constraintapi.ConcurrencyConstraint{Scope: enums.ConcurrencyScopeFn, Mode: enums.ConcurrencyModeStep}},
+				}})
+				require.NoError(t, userErr)
+				require.NoError(t, internalErr)
+				return res.AvailableCapacity
+			}
+			require.Equal(t, 2, capacity())
+			shadow := osqueue.ItemShadowPartition(ctx, item)
+			backlog := osqueue.ItemBacklog(ctx, item)
+			if refill {
+				require.NoError(t, proc.ProcessShadowPartition(ctx, &shadow, 0))
+				refilled, err := shard.LoadQueueItem(ctx, item.ID)
+				require.NoError(t, err)
+				require.NotNil(t, refilled.CapacityLease)
+				require.NotEqual(t, work.CapacityLease.LeaseID, refilled.CapacityLease.LeaseID)
+				require.Equal(t, work.I.LeaseID, refilled.LeaseID, "refill must preserve the execution lease")
+				require.Equal(t, 1, capacity(), "refill temporarily holds one additional slot")
+				duplicate, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: refilled, StaticTime: clock.Now()}, func(context.Context, osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
+					t.Fatal("refill dispatched the already-leased item")
+					return nil, nil
+				})
+				require.NoError(t, err)
+				require.Equal(t, osqueue.LeaseItemStatusAlreadyLeased, duplicate.Status)
+			}
+			executions := 0
+			_, err = proc.ProcessItem(ctx, work, func(context.Context, osqueue.RunInfo, osqueue.Item) (osqueue.RunResult, error) {
+				executions++
+				return osqueue.RunResult{}, nil
+			})
+			require.NoError(t, err)
+			require.Equal(t, 1, executions)
+			_, err = shard.LoadQueueItem(ctx, item.ID)
+			require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+			count, err := shard.BacklogSize(ctx, backlog.BacklogID)
+			require.NoError(t, err)
+			require.Zero(t, count)
+			readyKey := shadowPartitionReadyQueueKey(shadow, shard.(*queue).RedisClient.kg)
+			count, err = rc.Do(ctx, rc.B().Zcard().Key(readyKey).Build()).ToInt64()
+			require.NoError(t, err)
+			require.Zero(t, count)
+			remaining := 3
+			if refill {
+				remaining = 2
+			}
+			require.Eventually(t, func() bool { return capacity() == remaining }, time.Second, time.Millisecond, "worker releases its own reservation")
+			clock.Advance(osqueue.QueueLeaseDuration + time.Second)
+			r.FastForward(osqueue.QueueLeaseDuration + time.Second)
+			scavenged, internalErr := cm.Scavenge(ctx)
+			require.NoError(t, internalErr)
+			if refill {
+				require.Equal(t, 1, scavenged.ReclaimedLeases)
+			}
+			require.Equal(t, 3, capacity(), "expired refill reservation must be reclaimed")
+		})
+	}
 }
