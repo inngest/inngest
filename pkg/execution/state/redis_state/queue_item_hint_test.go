@@ -76,7 +76,7 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			reg, err := osqueue.NewSingleShardRegistry(wrapper)
 			require.NoError(t, err)
 			offers := make(chan func(osqueue.QueueItem) bool, 1)
-			opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
+			opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
 				offers <- offer
 				<-ctx.Done()
 				return nil
@@ -151,7 +151,7 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base})
 	require.NoError(t, err)
 	offers := make(chan func(osqueue.QueueItem) bool, 1)
-	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, MaxActive: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
+	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
 		offers <- offer
 		<-ctx.Done()
 		return nil
@@ -337,7 +337,7 @@ func TestItemHintDiscardStaleBufferedSnapshot(t *testing.T) {
 				reg, err := osqueue.NewSingleShardRegistry(wrapper)
 				require.NoError(t, err)
 				offers := make(chan func(osqueue.QueueItem) bool, 1)
-				opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
+				opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
 					offers <- offer
 					<-ctx.Done()
 					return nil
