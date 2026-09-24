@@ -54,6 +54,9 @@ func (q *queueProcessor) ProcessItem(
 	}
 
 	qi := i.I
+	capacityReleaseItem := qi
+	queueMutationDone := make(chan struct{})
+	defer close(queueMutationDone)
 	continuationCtr := i.ContinueCount
 
 	// An item holding a capacity lease has that capacity released after the
@@ -181,7 +184,7 @@ func (q *queueProcessor) ProcessItem(
 	extendCapacityLeaseCtx, cancelExtendCapacityLease := context.WithCancel(jobCtx)
 	defer cancelExtendCapacityLease()
 
-	releaseCapacityLease := func() {
+	releaseCapacityLeaseOnceBody := func() {
 		cancelExtendCapacityLease()
 
 		currentLeaseID := capacityLeaseID.get()
@@ -193,7 +196,7 @@ func (q *queueProcessor) ProcessItem(
 
 		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 			AccountID:      accountID,
-			IdempotencyKey: qi.ID,
+			IdempotencyKey: capacityReleaseItem.ID,
 			LeaseID:        *currentLeaseID,
 			Source: constraintapi.LeaseSource{
 				Location:          constraintapi.CallerLocationItemLease,
@@ -220,11 +223,17 @@ func (q *queueProcessor) ProcessItem(
 			)
 		}
 
-		// Only now is the capacity actually free. A wakeup for the partition
-		// parked on this constraint must not be emitted before this point.
+		// Capacity may be released early while the run function is still active.
+		// Wait for ProcessItem's final Dequeue/Requeue attempt before waking the
+		// shard, otherwise the wakeup can be consumed while the old item remains.
+		<-queueMutationDone
 		if notifier, ok := shard.(CapacityReleaseNotifier); ok {
-			notifier.CapacityReleased(context.Background(), qi)
+			notifier.CapacityReleased(context.Background(), capacityReleaseItem)
 		}
+	}
+	releaseCapacityLeaseOnce := sync.Once{}
+	releaseCapacityLease := func() {
+		releaseCapacityLeaseOnce.Do(releaseCapacityLeaseOnceBody)
 	}
 
 	if capacityLeaseID.has() {
