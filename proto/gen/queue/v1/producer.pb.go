@@ -120,12 +120,13 @@ func (*EnqueueResponse) Descriptor() ([]byte, []int) {
 }
 
 type RequeueRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ShardName     string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
-	Item          *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	At            *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
+	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	At             *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	CapacityLeased bool                   `protobuf:"varint,4,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RequeueRequest) Reset() {
@@ -177,6 +178,13 @@ func (x *RequeueRequest) GetAt() *timestamppb.Timestamp {
 		return x.At
 	}
 	return nil
+}
+
+func (x *RequeueRequest) GetCapacityLeased() bool {
+	if x != nil {
+		return x.CapacityLeased
+	}
+	return false
 }
 
 type RequeueResponse struct {
@@ -396,12 +404,13 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x04item\x18\x01 \x01(\v2\x0e.queue.v1.ItemR\x04item\x12*\n" +
 	"\x02at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12,\n" +
 	"\x04opts\x18\x03 \x01(\v2\x18.queue.v1.EnqueueOptionsR\x04opts\"\x11\n" +
-	"\x0fEnqueueResponse\"\x84\x01\n" +
+	"\x0fEnqueueResponse\"\xad\x01\n" +
 	"\x0eRequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12*\n" +
-	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\x11\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12'\n" +
+	"\x0fcapacity_leased\x18\x04 \x01(\bR\x0ecapacityLeased\"\x11\n" +
 	"\x0fRequeueResponse\"\xa0\x01\n" +
 	"\x15RequeueByJobIDRequest\x12\x1d\n" +
 	"\n" +

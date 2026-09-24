@@ -1159,16 +1159,14 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 	})
 }
 
-// TestQueueProxyVariadicOptionCompatibilityGuard documents that queue-proxy
-// does not serialize Requeue or Dequeue variadic options. This is safe while
-// the option structs are empty; if fields are added, the proxy contract must
-// carry those options explicitly.
+// TestQueueProxyVariadicOptionCompatibilityGuard keeps the variadic options
+// aligned with the queue-proxy request fields that carry them between client
+// and server.
 func TestQueueProxyVariadicOptionCompatibilityGuard(t *testing.T) {
-	require.Equal(t, 0, reflect.TypeOf(RequeueOptions{}).NumField())
-	require.Equal(t, 0, reflect.TypeOf(DequeueOptions{}).NumField())
-
-	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), fieldCoverage{covered: []string{}})
-	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), fieldCoverage{covered: []string{}})
+	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
+	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
+	require.NotNil(t, (&pb.RequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
+	require.NotNil(t, (&pb.DequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
 }
 
 func assertItemEqual(t *testing.T, expected, actual Item) {

@@ -14,11 +14,44 @@ import (
 
 type DequeueOptionFn func(o *DequeueOptions)
 
-type DequeueOptions struct{}
+type DequeueOptions struct {
+	// CapacityLeased reports that the processed item held a Constraint API
+	// capacity lease which the processor releases after this mutation. Shards
+	// that wake parked partitions on capacity release should wait for
+	// CapacityReleaseNotifier.CapacityReleased instead of waking at dequeue.
+	CapacityLeased bool
+}
 
-type RequeueOptions struct{}
+// DequeueCapacityLeased marks the dequeued item as holding a capacity lease
+// that will be released after the dequeue completes.
+func DequeueCapacityLeased() DequeueOptionFn {
+	return func(o *DequeueOptions) { o.CapacityLeased = true }
+}
+
+type RequeueOptions struct {
+	// CapacityLeased has the same meaning as DequeueOptions.CapacityLeased.
+	CapacityLeased bool
+}
+
+// RequeueCapacityLeased marks the requeued item as holding a capacity lease
+// that will be released after the requeue completes.
+func RequeueCapacityLeased() RequeueOptionFn {
+	return func(o *RequeueOptions) { o.CapacityLeased = true }
+}
 
 type RequeueOptionFn func(o *RequeueOptions)
+
+// CapacityReleaseNotifier is an optional QueueShard extension. The processor
+// calls CapacityReleased after the Constraint API has confirmed the release of
+// the capacity lease held by a processed item. A shard that wakes partitions
+// parked on a user constraint should emit that wakeup here: the item leaves
+// the queue (Dequeue/Requeue) before its capacity is released, so a wakeup
+// emitted at dequeue time can be consumed while the constraint is still full,
+// which parks the partition again for its full retry delay with no further
+// wakeup once the capacity does free.
+type CapacityReleaseNotifier interface {
+	CapacityReleased(ctx context.Context, item QueueItem)
+}
 
 type LeaseOptions struct {
 	Backlog         QueueBacklog

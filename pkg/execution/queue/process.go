@@ -54,7 +54,20 @@ func (q *queueProcessor) ProcessItem(
 	}
 
 	qi := i.I
+	capacityReleaseItem := qi
+	queueMutationDone := make(chan struct{})
+	defer close(queueMutationDone)
 	continuationCtr := i.ContinueCount
+
+	// An item holding a capacity lease has that capacity released after the
+	// final queue mutation (see releaseCapacityLease). Tell the shard so it can
+	// defer any capacity-release wakeup until CapacityReleased is called.
+	var dequeueOpts []DequeueOptionFn
+	var requeueOpts []RequeueOptionFn
+	if i.CapacityLease != nil {
+		dequeueOpts = append(dequeueOpts, DequeueCapacityLeased())
+		requeueOpts = append(requeueOpts, RequeueCapacityLeased())
+	}
 
 	leaseID := qi.LeaseID
 	leaseMu := sync.RWMutex{}
@@ -171,7 +184,15 @@ func (q *queueProcessor) ProcessItem(
 	extendCapacityLeaseCtx, cancelExtendCapacityLease := context.WithCancel(jobCtx)
 	defer cancelExtendCapacityLease()
 
+	releaseCapacityLeaseMu := sync.Mutex{}
+	capacityReleased := false
 	releaseCapacityLease := func() {
+		releaseCapacityLeaseMu.Lock()
+		defer releaseCapacityLeaseMu.Unlock()
+		if capacityReleased {
+			return
+		}
+
 		cancelExtendCapacityLease()
 
 		currentLeaseID := capacityLeaseID.get()
@@ -183,7 +204,7 @@ func (q *queueProcessor) ProcessItem(
 
 		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 			AccountID:      accountID,
-			IdempotencyKey: qi.ID,
+			IdempotencyKey: capacityReleaseItem.ID,
 			LeaseID:        *currentLeaseID,
 			Source: constraintapi.LeaseSource{
 				Location:          constraintapi.CallerLocationItemLease,
@@ -201,6 +222,7 @@ func (q *queueProcessor) ProcessItem(
 			}))
 			return
 		}
+		capacityReleased = true
 
 		if instrumentCapacityLease {
 			l.Debug(
@@ -208,6 +230,14 @@ func (q *queueProcessor) ProcessItem(
 				"res", res,
 				"lease_id", currentLeaseID.String(),
 			)
+		}
+
+		// Capacity may be released early while the run function is still active.
+		// Wait for ProcessItem's final Dequeue/Requeue attempt before waking the
+		// shard, otherwise the wakeup can be consumed while the old item remains.
+		<-queueMutationDone
+		if notifier, ok := shard.(CapacityReleaseNotifier); ok {
+			notifier.CapacityReleased(context.Background(), capacityReleaseItem)
 		}
 	}
 
@@ -521,7 +551,7 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
-			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); requeueErr != nil {
+			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at, requeueOpts...); requeueErr != nil {
 				if requeueErr == ErrQueueItemNotFound {
 					// The item is gone, so there is nothing to requeue and this retry is
 					// dropped.
@@ -560,7 +590,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi), dequeueOpts...); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return ProcessItemResult{}, nil
@@ -575,7 +605,7 @@ func (q *queueProcessor) ProcessItem(
 		}
 	case <-jobCtx.Done():
 		stopItemLeaseRenewal()
-		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi), dequeueOpts...); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return processResult, nil

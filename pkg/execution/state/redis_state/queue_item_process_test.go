@@ -575,8 +575,8 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		// Expect at least 1 extend call
 		require.Greater(t, len(cmLifecycles.ExtendCalls), 0)
 
-		// Expect exactly 2 release calls
-		require.Equal(t, 2, len(cmLifecycles.ReleaseCalls))
+		// Early release and deferred cleanup share one successful release.
+		require.Equal(t, 1, len(cmLifecycles.ReleaseCalls))
 	})
 
 	t.Run("with constraint api and early release racing extend tick", func(t *testing.T) {
