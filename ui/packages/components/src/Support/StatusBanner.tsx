@@ -7,8 +7,8 @@ import {
   RiCheckboxCircleFill,
   RiExternalLinkLine,
 } from '@remixicon/react';
-import { formatDistanceToNow } from 'date-fns';
 
+import { relativeTime } from '../utils/date';
 import type { Event, ExtendedStatus } from './Status';
 
 type StatusBannerProps = {
@@ -85,9 +85,7 @@ function Event({ event }: { event: Event }) {
         {event.name}
         {event.status === 'maintenance_scheduled' && event.starts_at && (
           <>
-            {` - ${formatDistanceToNow(new Date(event.starts_at), {
-              addSuffix: true,
-            })} `}
+            {` - ${relativeTime(event.starts_at)} `}
             <span className="font-mono">({event.starts_at})</span>
           </>
         )}
