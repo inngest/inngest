@@ -2,6 +2,7 @@ package apiv2
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -22,6 +23,57 @@ import (
 
 type skipScheduler struct {
 	err error
+}
+
+type invokeScheduleFunc func(context.Context, execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error)
+
+func (f invokeScheduleFunc) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	return f(ctx, req)
+}
+
+func TestService_InvokeFunctionFastPath(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{name: "success"},
+		{name: "duplicate", err: executor.ErrFunctionSkippedIdempotency},
+		{name: "failed", err: errors.New("schedule failed")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fn := inngest.DeployedFunction{
+				ID: uuid.New(), AccountID: uuid.New(), EnvironmentID: uuid.New(), AppID: uuid.New(),
+			}
+			functions := &mockFunctionProvider{}
+			functions.On("GetFunctionByApp", mock.Anything, "app", "fn").Return(fn, nil).Once()
+			t.Cleanup(func() { functions.AssertExpectations(t) })
+			runID := ulid.Make()
+			calls := 0
+			service := NewService(ServiceOptions{
+				Functions: functions, EventPublisher: noopEventPublisher{},
+				Executor: invokeScheduleFunc(func(_ context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+					calls++
+					require.True(t, req.FastPath.Enabled)
+					require.Equal(t, enums.RunModeAsync, req.RunMode)
+					require.Equal(t, fn.AccountID, req.AccountID)
+					require.Len(t, req.Events, 1)
+					return &runID, nil, tc.err
+				}),
+			})
+			resp, err := service.InvokeFunction(t.Context(), &apiv2.InvokeFunctionRequest{
+				AppId: "app", FunctionId: "fn", Data: &structpb.Struct{},
+			})
+			require.Equal(t, 1, calls)
+			if tc.name == "failed" {
+				require.ErrorContains(t, err, apiv2base.ErrorInternalError)
+				require.Nil(t, resp)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, runID.String(), resp.Data.RunId)
+			require.NotNil(t, resp.Metadata.FetchedAt)
+		})
+	}
 }
 
 func (s *skipScheduler) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
