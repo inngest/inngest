@@ -14,7 +14,7 @@ import (
 
 // ItemHintSource serves notifications for the owned shard until ctx is canceled.
 // offer is nonblocking and acknowledges buffer admission, not execution.
-type ItemHintSource func(ctx context.Context, shard QueueShard, offer func(itemID string) bool) error
+type ItemHintSource func(ctx context.Context, shard QueueShard, offer func(QueueItem) bool) error
 
 type ItemHintOptions struct {
 	Source         ItemHintSource
@@ -28,10 +28,11 @@ func WithItemHints(opts ItemHintOptions) QueueOpt {
 }
 
 // ItemHintShard opts a backend into direct processing with its own eligibility
-// checks. LoadItemForHint must reload stored state and preserve due-time, scope,
-// pause and migration rules; LeaseItem owns capacity, leasing and dispatch.
+// checks. ValidateItemForHint preserves scope, pause and migration rules without
+// reloading the supplied item. LeaseItem owns capacity, authoritative item
+// checks, leasing and dispatch.
 type ItemHintShard interface {
-	LoadItemForHint(context.Context, string) (*QueueItem, error)
+	ValidateItemForHint(context.Context, QueueItem) error
 }
 
 func (q *queueProcessor) hintsAllowed() bool {
@@ -57,14 +58,14 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
-	pending := make(chan string, opts.BufferSize)
+	pending := make(chan QueueItem, opts.BufferSize)
 	active := make(chan struct{}, opts.MaxActive)
-	offer := func(id string) bool {
-		if id == "" || ctx.Err() != nil || !q.hintsAllowed() {
+	offer := func(item QueueItem) bool {
+		if item.ID == "" || ctx.Err() != nil || !q.hintsAllowed() {
 			return false
 		}
 		select {
-		case pending <- id:
+		case pending <- item:
 			return true
 		default:
 			return false
@@ -93,7 +94,7 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 				}
 				// Snapshot the pending count so arrivals cannot extend this pass.
 				for range len(pending) {
-					id := <-pending
+					item := <-pending
 					if !q.hintsAllowed() {
 						q.recordItemHint(ctx, "inactive")
 						continue
@@ -102,7 +103,7 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 					case active <- struct{}{}:
 						wg.Go(func() {
 							defer func() { <-active }()
-							q.processItemHint(ctx, shard, id, dispatch)
+							q.processItemHint(ctx, shard, item, dispatch)
 						})
 					default:
 						q.recordItemHint(ctx, "budget_full")
@@ -120,13 +121,16 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 	return func() { cancel(); <-done }
 }
 
-func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShard, id string, dispatch DispatchFunc) {
+func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShard, item QueueItem, dispatch DispatchFunc) {
 	if ctx.Err() != nil {
 		return
 	}
 	attemptCtx, cancel := context.WithTimeout(ctx, q.itemHints.AttemptTimeout)
 	defer cancel()
-	item, err := shard.LoadItemForHint(attemptCtx, id)
+	// Scanners attach the stored queue ID to the worker-facing Item. Enqueue's
+	// returned envelope may still carry the original (unhashed) producer JobID.
+	item.Data.JobID = &item.ID
+	err := shard.ValidateItemForHint(attemptCtx, item)
 	if err != nil {
 		status := "read_error"
 		if errors.Is(err, ErrQueueItemNotFound) || errors.Is(err, ErrQueueItemNotReady) {
@@ -148,10 +152,10 @@ func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShar
 		q.recordItemHint(ctx, "ineligible")
 		return
 	}
-	partition := ItemPartition(ctx, *item)
+	partition := ItemPartition(ctx, item)
 	var dispatched DispatchedItem
 	result, err := q.LeaseItem(attemptCtx, LeaseItemRequest{
-		Item: item, RequireDue: true, StaticTime: q.Clock().Now(),
+		Item: &item, RequireDue: true, StaticTime: q.Clock().Now(),
 		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
 		var err error

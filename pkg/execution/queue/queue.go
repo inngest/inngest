@@ -103,6 +103,10 @@ type ProcessItemResult struct {
 }
 
 type EnqueueOpts struct {
+	// OnEnqueued optionally observes the finalized item and selected shard after
+	// durable enqueue succeeds. It runs synchronously; observers must not block.
+	// Queue proxies carry the result back to the caller, not the callback itself.
+	OnEnqueued             func(QueueItem, string) `json:"-"`
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string

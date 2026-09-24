@@ -26,6 +26,13 @@ type SkipState struct {
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
 
+// EnqueueLifecycleListener is an optional extension for observers that need the
+// actual initial item, including backend-populated fields, after durable enqueue.
+// It is not called for synchronous runs, duplicate items or failed enqueues.
+type EnqueueLifecycleListener interface {
+	OnFunctionEnqueued(context.Context, queue.QueueItem, string)
+}
+
 // LifecycleListener listens to lifecycle events on the executor.
 type LifecycleListener interface {
 	// OnFunctionScheduled is called when a new function is initialized from

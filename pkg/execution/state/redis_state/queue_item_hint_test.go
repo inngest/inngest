@@ -2,6 +2,8 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -59,10 +61,9 @@ func TestItemHintReadiness(t *testing.T) {
 				until := clock.Now().Add(time.Minute)
 				require.NoError(t, shard.SetFunctionMigrate(t.Context(), osqueue.Scope{FunctionID: fn}, &until))
 			}
-			loaded, err := shard.(osqueue.ItemHintShard).LoadItemForHint(t.Context(), item.ID)
+			err = shard.(osqueue.ItemHintShard).ValidateItemForHint(t.Context(), item)
 			if tc.name == "ready" || tc.backlog {
 				require.NoError(t, err)
-				require.Equal(t, item.ID, loaded.ID)
 				lease, err := shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
 				require.NoError(t, err)
 				require.NotNil(t, lease)
@@ -112,8 +113,8 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			wrapper := hintOnlyRedisShard{RedisQueueShard: base, ItemHintShard: base.(osqueue.ItemHintShard)}
 			reg, err := osqueue.NewSingleShardRegistry(wrapper)
 			require.NoError(t, err)
-			offers := make(chan func(string) bool, 1)
-			opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(string) bool) error {
+			offers := make(chan func(osqueue.QueueItem) bool, 1)
+			opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
 				offers <- offer
 				<-ctx.Done()
 				return nil
@@ -123,12 +124,11 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			job := "start"
 			acct, env, fn := uuid.New(), uuid.New(), uuid.New()
 			item := osqueue.Item{Kind: osqueue.KindStart, JobID: &job, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}
-			require.NoError(t, proc.Enqueue(t.Context(), item, time.Now(), osqueue.EnqueueOpts{}))
-			id := osqueue.HashID(t.Context(), job)
-			stored, err := wrapper.LoadItemForHint(t.Context(), id)
-			require.NoError(t, err)
-			backlog := osqueue.ItemBacklog(t.Context(), *stored)
-			shadow := osqueue.ItemShadowPartition(t.Context(), *stored)
+			var stored osqueue.QueueItem
+			require.NoError(t, proc.Enqueue(t.Context(), item, time.Now(), osqueue.EnqueueOpts{OnEnqueued: func(qi osqueue.QueueItem, shard string) { stored = qi }}))
+			id := stored.ID
+			backlog := osqueue.ItemBacklog(t.Context(), stored)
+			shadow := osqueue.ItemShadowPartition(t.Context(), stored)
 			if blocked {
 				_, err = base.ShadowPartitionLease(t.Context(), &shadow, time.Minute)
 				require.NoError(t, err)
@@ -150,13 +150,13 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 					t.Error("processor did not stop")
 				}
 			}()
-			var offer func(string) bool
+			var offer func(osqueue.QueueItem) bool
 			select {
 			case offer = <-offers:
 			case <-time.After(time.Second):
 				t.Fatal("hint receiver not ready")
 			}
-			require.True(t, offer(id))
+			require.True(t, offer(stored))
 			select {
 			case <-executed:
 			case <-time.After(2 * time.Second):
@@ -188,8 +188,8 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 	base := NewQueueShard("ss3", NewQueueClient(rc, "{capacity-hints}"), opts...)
 	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base, base.(osqueue.ItemHintShard)})
 	require.NoError(t, err)
-	offers := make(chan func(string) bool, 1)
-	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, MaxActive: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(string) bool) error {
+	offers := make(chan func(osqueue.QueueItem) bool, 1)
+	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, MaxActive: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
 		offers <- offer
 		<-ctx.Done()
 		return nil
@@ -218,16 +218,17 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 	}()
 	offer := <-offers
 	acct, env, fn := uuid.New(), uuid.New(), uuid.New()
-	enqueue := func(job string) string {
+	enqueue := func(job string) osqueue.QueueItem {
 		item := osqueue.Item{Kind: osqueue.KindStart, JobID: &job, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}
-		require.NoError(t, proc.Enqueue(t.Context(), item, time.Now(), osqueue.EnqueueOpts{}))
-		return osqueue.HashID(t.Context(), job)
+		var enqueued osqueue.QueueItem
+		require.NoError(t, proc.Enqueue(t.Context(), item, time.Now(), osqueue.EnqueueOpts{OnEnqueued: func(qi osqueue.QueueItem, shard string) { enqueued = qi }}))
+		return enqueued
 	}
 	first := enqueue("first")
 	require.True(t, offer(first))
 	select {
 	case id := <-entered:
-		require.Equal(t, first, id)
+		require.Equal(t, first.ID, id)
 	case <-time.After(2 * time.Second):
 		t.Fatal("first hint did not dispatch")
 	}
@@ -238,7 +239,7 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 		t.Fatal("hint bypassed function/account concurrency")
 	case <-time.After(100 * time.Millisecond):
 	}
-	stored, err := base.LoadQueueItem(t.Context(), second)
+	stored, err := base.LoadQueueItem(t.Context(), second.ID)
 	require.NoError(t, err)
 	require.Nil(t, stored.LeaseID)
 	require.Empty(t, stored.CapacityLease)
@@ -275,10 +276,9 @@ func TestItemHintBacklogRefillReservationCleanup(t *testing.T) {
 			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "direct-backlog", FunctionID: fn, WorkspaceID: env,
 				Data: osqueue.Item{Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}}, clock.Now(), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			loaded, err := shard.(osqueue.ItemHintShard).LoadItemForHint(ctx, item.ID)
-			require.NoError(t, err)
+			require.NoError(t, shard.(osqueue.ItemHintShard).ValidateItemForHint(ctx, item))
 			var work osqueue.ProcessItem
-			leased, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: loaded, RequireDue: true, StaticTime: clock.Now()}, func(_ context.Context, i osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
+			leased, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: &item, RequireDue: true, StaticTime: clock.Now()}, func(_ context.Context, i osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
 				work = i
 				return osqueue.NewCompletedDispatchedItem(osqueue.DispatchedItemResult{}), nil
 			})
@@ -343,5 +343,103 @@ func TestItemHintBacklogRefillReservationCleanup(t *testing.T) {
 			}
 			require.Equal(t, 3, capacity(), "expired refill reservation must be reclaimed")
 		})
+	}
+}
+
+// The buffered snapshot is never reloaded. Only the normal atomic lease may
+// decide whether an item still exists, is unleased and has the same generation.
+type observedHintRedisShard struct {
+	hintOnlyRedisShard
+	attempts chan error
+}
+
+func (s observedHintRedisShard) LoadQueueItem(context.Context, string) (*osqueue.QueueItem, error) {
+	panic("hint processor must not reconstruct the item with a fetch")
+}
+func (s observedHintRedisShard) Lease(ctx context.Context, item osqueue.QueueItem, duration time.Duration, now time.Time, opts ...osqueue.LeaseOptionFn) (*ulid.ULID, error) {
+	lease, err := s.RedisQueueShard.Lease(ctx, item, duration, now, opts...)
+	s.attempts <- err
+	return lease, err
+}
+
+func TestItemHintDiscardStaleBufferedSnapshot(t *testing.T) {
+	for _, backlog := range []bool{false, true} {
+		for _, name := range []string{"missing", "ordinary-leased", "requeued"} {
+			t.Run(fmt.Sprintf("backlog=%t/%s", backlog, name), func(t *testing.T) {
+				rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{miniredis.RunT(t).Addr()}, DisableCache: true})
+				require.NoError(t, err)
+				t.Cleanup(rc.Close)
+				clock := clockwork.NewFakeClock()
+				opts := []osqueue.QueueOpt{osqueue.WithClock(clock), osqueue.WithPollTick(time.Second), osqueue.WithNumWorkers(2), osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return backlog })}
+				base := NewQueueShard("ss3", NewQueueClient(rc, "{stale-hint}"), opts...)
+				wrapper := observedHintRedisShard{hintOnlyRedisShard: hintOnlyRedisShard{base, base.(osqueue.ItemHintShard)}, attempts: make(chan error, 4)}
+				reg, err := osqueue.NewSingleShardRegistry(wrapper)
+				require.NoError(t, err)
+				offers := make(chan func(osqueue.QueueItem) bool, 1)
+				opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
+					offers <- offer
+					<-ctx.Done()
+					return nil
+				}}))
+				proc, err := osqueue.New(t.Context(), "stale-hint", reg, opts...)
+				require.NoError(t, err)
+				acct, env, fn := uuid.New(), uuid.New(), uuid.New()
+				job := "hint"
+				var stored osqueue.QueueItem
+				require.NoError(t, proc.Enqueue(t.Context(), osqueue.Item{JobID: &job, Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}, clock.Now(), osqueue.EnqueueOpts{OnEnqueued: func(qi osqueue.QueueItem, _ string) { stored = qi }}))
+				require.NotZero(t, stored.GenerationID)
+				require.NotEmpty(t, stored.ID)
+				ctx, cancel := context.WithCancel(t.Context())
+				done := make(chan error, 1)
+				var dispatches atomic.Int32
+				go func() {
+					done <- proc.Run(ctx, func(context.Context, osqueue.RunInfo, osqueue.Item) (osqueue.RunResult, error) {
+						dispatches.Add(1)
+						return osqueue.RunResult{}, nil
+					})
+				}()
+				defer func() {
+					cancel()
+					select {
+					case <-done:
+					case <-time.After(3 * time.Second):
+						t.Error("processor did not stop")
+					}
+				}()
+				offer := <-offers
+				require.True(t, offer(stored))
+				var want error
+				switch name {
+				case "missing":
+					require.NoError(t, base.Dequeue(t.Context(), stored))
+					want = osqueue.ErrQueueItemNotFound
+				case "ordinary-leased":
+					_, err = base.Lease(t.Context(), stored, time.Minute, clock.Now())
+					require.NoError(t, err)
+					want = osqueue.ErrQueueItemAlreadyLeased
+				case "requeued":
+					require.NoError(t, base.Requeue(t.Context(), stored, clock.Now()))
+					want = osqueue.ErrQueueItemNotReady
+				}
+				clock.Advance(time.Second)
+				select {
+				case err := <-wrapper.attempts:
+					require.ErrorIs(t, err, want)
+				case <-time.After(2 * time.Second):
+					t.Fatal("hint lease not attempted")
+				}
+				clock.Advance(2 * time.Second)
+				select {
+				case <-wrapper.attempts:
+					t.Fatal("hint retried")
+				case <-time.After(20 * time.Millisecond):
+				}
+				require.Zero(t, dispatches.Load())
+				if name == "missing" {
+					_, err = base.LoadQueueItem(t.Context(), stored.ID)
+					require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+				}
+			})
+		}
 	}
 }

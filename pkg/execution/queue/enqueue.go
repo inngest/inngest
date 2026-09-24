@@ -91,9 +91,12 @@ func (q *queueProducer) Enqueue(ctx context.Context, item Item, at time.Time, op
 		},
 	})
 
-	_, err = shard.EnqueueItem(ctx, qi, next, opts)
+	enqueued, err := shard.EnqueueItem(ctx, qi, next, opts)
 	if err != nil {
 		return err
+	}
+	if opts.OnEnqueued != nil {
+		opts.OnEnqueued(enqueued, shard.Name())
 	}
 
 	// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,

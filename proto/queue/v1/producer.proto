@@ -17,9 +17,14 @@ message EnqueueRequest {
   Item item = 1;
   google.protobuf.Timestamp at = 2;
   EnqueueOptions opts = 3;
+  // Return the finalized item only to callers observing durable enqueue.
+  bool return_item = 4;
 }
 
-message EnqueueResponse {}
+message EnqueueResponse {
+  QueueItem item = 1;
+  string shard_name = 2;
+}
 
 message RequeueRequest {
   string shard_name = 1;

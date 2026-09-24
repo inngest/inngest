@@ -928,6 +928,7 @@ func (q *queue) Lease(
 		setEarliestPeekTime,
 		item.EarliestPeekTime,
 		o.RequireDue,
+		item.GenerationID,
 	})
 	if err != nil {
 		return nil, err
