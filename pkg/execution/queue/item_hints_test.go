@@ -3,6 +3,8 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -46,7 +48,7 @@ func (s *hintTestShard) LoadQueueItem(context.Context, string) (*QueueItem, erro
 	panic("hints must not reload the item")
 }
 
-func hintTestQueue(t *testing.T, source ItemHintSource) (*queueProcessor, *hintTestShard, *clockwork.FakeClock) {
+func hintTestQueue(t *testing.T, source ItemHintSource, extra ...QueueOpt) (*queueProcessor, *hintTestShard, *clockwork.FakeClock) {
 	t.Helper()
 	clock := clockwork.NewFakeClock()
 	shard := &hintTestShard{mockShardForIterator: &mockShardForIterator{name: "ss3"}, item: QueueItem{
@@ -55,10 +57,11 @@ func hintTestQueue(t *testing.T, source ItemHintSource) (*queueProcessor, *hintT
 	}}
 	registry, err := NewSingleShardRegistry(shard)
 	require.NoError(t, err)
-	q, err := New(t.Context(), "hint-test", registry, WithClock(clock), WithPollTick(time.Millisecond),
+	opts := []QueueOpt{WithClock(clock), WithPollTick(time.Millisecond),
 		WithNumWorkers(2), WithRunMode(QueueRunMode{Partition: true}),
-		WithItemHints(ItemHintOptions{Source: source, BufferSize: 2, MaxActive: 1, AttemptTimeout: time.Second}),
-	)
+		WithItemHints(ItemHintOptions{Source: source, BufferSize: 2, AttemptTimeout: time.Second}),
+	}
+	q, err := New(t.Context(), "hint-test", registry, append(opts, extra...)...)
 	require.NoError(t, err)
 	return q, shard, clock
 }
@@ -73,27 +76,89 @@ func (h *observedHintCompletion) Done() <-chan DispatchedItemResult {
 	return h.dispatchedItemHandle.Done()
 }
 
-func TestItemHintAttemptBudgetAndWorkerCapacity(t *testing.T) {
+func TestItemHintWorkerCapacity(t *testing.T) {
+	for _, workers := range []int{2, 32} {
+		t.Run(fmt.Sprintf("workers=%d", workers), func(t *testing.T) {
+			ready := make(chan func(QueueItem) bool, 1)
+			q, shard, clock := hintTestQueue(t, func(ctx context.Context, _ QueueShard, offer func(QueueItem) bool) error {
+				ready <- offer
+				<-ctx.Done()
+				return ctx.Err()
+			}, WithNumWorkers(int32(workers)))
+			q.itemHints.BufferSize = workers + 3
+			q.runMode.Continuations = true
+			dispatched := make(chan *observedHintCompletion, workers+3)
+			stop := q.startItemHints(t.Context(), func(context.Context, ProcessItem) (DispatchedItem, error) {
+				h := &observedHintCompletion{newDispatchedItemHandle(), make(chan struct{})}
+				dispatched <- h
+				return h, nil
+			})
+			t.Cleanup(stop)
+			offer := <-ready
+			for i := range workers + 3 {
+				require.True(t, offer(hintItem(shard.item, fmt.Sprintf("item-%d", i))))
+			}
+			require.False(t, offer(hintItem(shard.item, "buffer-full")))
+			clock.BlockUntil(1)
+			clock.Advance(time.Millisecond)
+			var handles []*observedHintCompletion
+			// All available workers can receive hints on one tick, including
+			// more than 16, while every previous dispatch is still executing.
+			for range workers {
+				select {
+				case h := <-dispatched:
+					handles = append(handles, h)
+					select {
+					case <-h.observing:
+					case <-time.After(time.Second):
+						t.Fatal("completion not observed")
+					}
+				case <-time.After(time.Second):
+					t.Fatal("hint did not dispatch despite available workers")
+				}
+			}
+			require.Eventually(t, func() bool { return shard.migrationCalls.Load() == int32(workers+3) }, time.Second, time.Millisecond)
+			require.Zero(t, q.Semaphore().Available())
+			// Completion observation remains independent of buffer draining.
+			handles[0].complete(DispatchedItemResult{ScheduledImmediateJob: true})
+			require.Eventually(t, func() bool {
+				q.continuesLock.Lock()
+				defer q.continuesLock.Unlock()
+				return len(q.continues) == 1
+			}, time.Second, time.Millisecond)
+			stop()
+			require.EqualValues(t, workers, shard.leaseCalls.Load(), "normal worker capacity prevents additional backend leases")
+			require.Empty(t, dispatched)
+			q.Semaphore().Release(int64(workers))
+			for _, h := range handles[1:] {
+				h.complete(DispatchedItemResult{})
+			}
+			require.False(t, offer(hintItem(shard.item, "after-shutdown")))
+		})
+	}
+}
+
+func TestItemHintDrainsSnapshotSerially(t *testing.T) {
 	ready := make(chan func(QueueItem) bool, 1)
 	q, shard, clock := hintTestQueue(t, func(ctx context.Context, _ QueueShard, offer func(QueueItem) bool) error {
 		ready <- offer
 		<-ctx.Done()
 		return ctx.Err()
 	})
-	q.runMode.Continuations = true
-	entered := make(chan struct{}, 4)
+	entered := make(chan struct{}, 3)
 	releaseLease := make(chan struct{})
+	release := sync.OnceFunc(func() { close(releaseLease) })
 	shard.beforeLease = func() { entered <- struct{}{}; <-releaseLease }
-	dispatched := make(chan *observedHintCompletion, 4)
-	stop := q.startItemHints(t.Context(), func(context.Context, ProcessItem) (DispatchedItem, error) {
-		h := &observedHintCompletion{newDispatchedItemHandle(), make(chan struct{})}
-		dispatched <- h
-		return h, nil
+	dispatched := make(chan string, 3)
+	stop := q.startItemHints(t.Context(), func(_ context.Context, work ProcessItem) (DispatchedItem, error) {
+		dispatched <- work.I.ID
+		q.Semaphore().Release(1)
+		return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 	})
-	t.Cleanup(stop)
+	t.Cleanup(func() { release(); stop() })
 	offer := <-ready
 	require.True(t, offer(hintItem(shard.item, "first")))
-	require.True(t, offer(hintItem(shard.item, "attempt-budget")))
+	require.True(t, offer(hintItem(shard.item, "second")))
 	require.False(t, offer(hintItem(shard.item, "buffer-full")))
 	clock.BlockUntil(1)
 	clock.Advance(time.Millisecond)
@@ -102,47 +167,31 @@ func TestItemHintAttemptBudgetAndWorkerCapacity(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("lease not attempted")
 	}
+	// A new arrival fits after the first hint is removed but must wait for
+	// another tick. The blocked first lease must not fan out other attempts.
+	require.True(t, offer(hintItem(shard.item, "next-tick")))
 	require.Never(t, func() bool { return shard.leaseCalls.Load() > 1 }, 20*time.Millisecond, time.Millisecond)
-	close(releaseLease)
-	next := func() *observedHintCompletion {
-		t.Helper()
+	release()
+	for _, want := range []string{"first", "second"} {
 		select {
-		case h := <-dispatched:
-			select {
-			case <-h.observing:
-			case <-time.After(time.Second):
-				t.Fatal("completion not observed")
-			}
-			return h
+		case got := <-dispatched:
+			require.Equal(t, want, got)
 		case <-time.After(time.Second):
-			t.Fatal("hint not dispatched")
-			return nil
+			t.Fatal("snapshot did not drain")
 		}
 	}
-	first := next()
-	require.EqualValues(t, 1, q.Semaphore().Available())
-	// The first worker is still running, but its attempt slot is already free.
-	require.True(t, offer(hintItem(shard.item, "second-worker")))
-	clock.Advance(time.Millisecond)
-	second := next()
-	require.Zero(t, q.Semaphore().Available())
-	require.True(t, offer(hintItem(shard.item, "worker-full")))
-	clock.Advance(time.Millisecond)
-	require.Eventually(t, func() bool { return shard.migrationCalls.Load() == 3 }, time.Second, time.Millisecond)
 	require.Never(t, func() bool { return shard.leaseCalls.Load() > 2 }, 20*time.Millisecond, time.Millisecond)
-	// Failed capacity checks release the attempt too; workers remain authoritative.
-	q.Semaphore().Release(1)
-	first.complete(DispatchedItemResult{ScheduledImmediateJob: true})
-	require.True(t, offer(hintItem(shard.item, "after-worker")))
 	clock.Advance(time.Millisecond)
-	third := next()
+	select {
+	case got := <-dispatched:
+		require.Equal(t, "next-tick", got)
+	case <-time.After(time.Second):
+		t.Fatal("new arrival was not processed on next tick")
+	}
+	clock.Advance(time.Millisecond)
+	require.Never(t, func() bool { return shard.migrationCalls.Load() > 3 }, 20*time.Millisecond, time.Millisecond)
 	stop()
-	q.Semaphore().Release(2)
-	second.complete(DispatchedItemResult{})
-	third.complete(DispatchedItemResult{})
-	require.False(t, offer(hintItem(shard.item, "after-shutdown")))
-	require.EqualValues(t, 3, shard.leaseCalls.Load(), "dropped hints are never replayed")
-	require.Len(t, q.continues, 1)
+	require.EqualValues(t, 3, shard.leaseCalls.Load(), "each admitted hint is attempted once")
 }
 
 func TestItemHintLookahead(t *testing.T) {

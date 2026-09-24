@@ -17,10 +17,8 @@ import (
 type ItemHintSource func(ctx context.Context, shard QueueShard, offer func(QueueItem) bool) error
 
 type ItemHintOptions struct {
-	Source     ItemHintSource
-	BufferSize int
-	// MaxActive bounds concurrent eligibility/lease attempts, not running work.
-	MaxActive      int
+	Source         ItemHintSource
+	BufferSize     int
 	AttemptTimeout time.Duration
 }
 
@@ -44,14 +42,13 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 	if opts == nil || opts.Source == nil || !q.hintsAllowed() {
 		return func() {}
 	}
-	if opts.BufferSize <= 0 || opts.MaxActive <= 0 || opts.AttemptTimeout <= 0 {
+	if opts.BufferSize <= 0 || opts.AttemptTimeout <= 0 {
 		logger.StdlibLogger(ctx).Warn("item hints disabled: invalid limits")
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	pending := make(chan QueueItem, opts.BufferSize)
-	active := make(chan struct{}, opts.MaxActive)
 	offer := func(item QueueItem) bool {
 		if item.ID == "" || ctx.Err() != nil || !q.hintsAllowed() {
 			return false
@@ -91,24 +88,14 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 						q.recordItemHint(ctx, "inactive")
 						continue
 					}
-					select {
-					case active <- struct{}{}:
-						wg.Go(func() {
-							dispatched := q.processItemHint(ctx, item, dispatch)
-							<-active
-							// Normal worker capacity bounds execution. Completion
-							// observation must not retain a hint attempt slot.
-							if dispatched != nil && q.runMode.Continuations {
-								q.observeItemHint(ctx, ItemPartition(ctx, item), dispatched)
-							}
-						})
-					default:
-						q.recordItemHint(ctx, "budget_full")
+					// Lease/dispatch serially; LeaseItem owns worker capacity.
+					dispatched := q.processItemHint(ctx, item, dispatch)
+					if dispatched != nil && q.runMode.Continuations {
+						// Observe only dispatched work without blocking this drain
+						// on execution. Attempts never fan out into goroutines.
+						wg.Go(func() { q.observeItemHint(ctx, ItemPartition(ctx, item), dispatched) })
 					}
 				}
-				metrics.RecordGaugeMetric(ctx, int64(len(active)), metrics.GaugeOpt{
-					PkgName: pkgName, MetricName: "queue_item_hint_active", Tags: map[string]any{"queue_shard": q.Shard().Name()},
-				})
 				metrics.RecordGaugeMetric(ctx, int64(len(pending)), metrics.GaugeOpt{
 					PkgName: pkgName, MetricName: "queue_item_hint_pending", Tags: map[string]any{"queue_shard": q.Shard().Name()},
 				})
