@@ -7,6 +7,8 @@ import {
 } from 'launchdarkly-react-client-sdk';
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
 
+export const IDENTIFICATION_TIMEOUT_MS = 5_000;
+
 export const IdentificationContext = createContext({
   isIdentified: false,
   hasError: false,
@@ -35,7 +37,17 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
     }
 
     let active = true;
+    let settled = false;
     setIdentification(undefined);
+
+    const timeout = window.setTimeout(() => {
+      if (!active || settled) return;
+      settled = true;
+      console.error(
+        "Couldn't identify feature flag context before timeout; using flag defaults",
+      );
+      setIdentification({ accountID, externalID, status: 'error' });
+    }, IDENTIFICATION_TIMEOUT_MS);
 
     Promise.resolve()
       .then(() =>
@@ -53,11 +65,15 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
         }),
       )
       .then(() => {
-        if (active)
-          setIdentification({ accountID, externalID, status: 'ready' });
+        if (!active || settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        setIdentification({ accountID, externalID, status: 'ready' });
       })
       .catch((error: unknown) => {
-        if (!active) return;
+        if (!active || settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
         console.error(
           "Couldn't identify feature flag context; using flag defaults",
           error,
@@ -67,6 +83,7 @@ function LaunchDarkly({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
+      window.clearTimeout(timeout);
     };
   }, [accountID, client, externalID, organization?.name, userName]);
 

@@ -3,7 +3,10 @@ import type { PropsWithChildren } from 'react';
 import { act } from 'react-dom/test-utils';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ClientFeatureFlagProvider } from './ClientFeatureFlagProvider';
+import {
+  ClientFeatureFlagProvider,
+  IDENTIFICATION_TIMEOUT_MS,
+} from './ClientFeatureFlagProvider';
 import { useBooleanFlag } from './hooks';
 
 const roots: Array<{ root: Root; container: HTMLDivElement }> = [];
@@ -85,6 +88,7 @@ afterEach(() => {
   mocks.error = undefined;
   mocks.accountID = 'account-1';
   mocks.hasClerkIdentity = true;
+  vi.useRealTimers();
 });
 it.each([undefined, 'true', null, 1])(
   'uses a ready default for invalid flag %s and recovers',
@@ -142,14 +146,38 @@ it('uses defaults on client initialization errors', () => {
 });
 it('uses ready defaults when JWT auth has no Clerk identity', () => {
   mocks.hasClerkIdentity = false;
-  mocks.flags = { test: true };
+  mocks.flags = { [flag]: true };
 
-  const { result } = renderHook(() => useBooleanFlag('test'), {
+  const { result } = renderHook(() => useBooleanFlag(flag), {
     wrapper: ClientFeatureFlagProvider,
   });
 
   expect(result.current).toEqual({ isReady: true, value: false });
   expect(mocks.identify).not.toHaveBeenCalled();
+});
+it('uses ready defaults when identification times out', async () => {
+  vi.useFakeTimers();
+  let resolve!: () => void;
+  mocks.flags = { [flag]: false };
+  mocks.identify.mockReturnValue(
+    new Promise<void>((done) => {
+      resolve = done;
+    }),
+  );
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+
+  const { result } = renderHook(() => useBooleanFlag(flag, true), {
+    wrapper: ClientFeatureFlagProvider,
+  });
+  expect(result.current).toEqual({ isReady: false, value: true });
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(IDENTIFICATION_TIMEOUT_MS);
+  });
+
+  expect(result.current).toEqual({ isReady: true, value: true });
+  await act(async () => resolve());
+  expect(result.current).toEqual({ isReady: true, value: true });
 });
 it('ignores identification results from an old account', async () => {
   let resolve!: () => void;
