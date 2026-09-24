@@ -2677,7 +2677,12 @@ message FunctionRun {
 
 message GetFunctionRunRequest {
   string run_id = 1;
-  optional bool include_output = 2;
+  optional bool include_output = 2 [
+    deprecated = true,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Deprecated. Use include=output."
+    }
+  ];
   repeated string include = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional run expansions named by their lowerCamelCase response fields. Supported values: output."
@@ -2692,7 +2697,12 @@ message GetFunctionRunResponse {
 
 message GetEventRunsRequest {
   string event_id = 1;
-  optional bool include_output = 2;
+  optional bool include_output = 2 [
+    deprecated = true,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Deprecated. Use include=output."
+    }
+  ];
   optional string cursor = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
@@ -2785,7 +2795,12 @@ message FunctionTrace {
 
 message GetFunctionTraceRequest {
   string run_id = 1;
-  optional bool include_output = 2;
+  optional bool include_output = 2 [
+    deprecated = true,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Deprecated. Use include=output."
+    }
+  ];
   repeated string include = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional trace expansions named by their lowerCamelCase response fields. Supported values: output."
@@ -3897,8 +3912,9 @@ message SessionRun {
 
 message ListRunsRequest {
   optional bool include_output = 1 [
+    deprecated = true,
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Whether to include run output. Prefer include=output for run lists."
+      description: "Deprecated. Use include=output."
     }
   ];
   optional string cursor = 2 [
@@ -3970,8 +3986,9 @@ message ListFunctionRunsRequest {
   string app_id = 1;
   string function_id = 2;
   optional bool include_output = 3 [
+    deprecated = true,
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Whether to include run output. Prefer include=output for run lists."
+      description: "Deprecated. Use include=output."
     }
   ];
   optional string cursor = 4 [

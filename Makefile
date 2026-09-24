@@ -87,6 +87,7 @@ docs: ## Generate OpenAPI documentation
 	cd proto && protoc --proto_path=. --proto_path=third_party \
 		--openapiv2_out=../docs/openapi/v2 \
 		--openapiv2_opt=allow_delete_body=true \
+		--openapiv2_opt=enable_field_deprecation=true \
 		--openapiv2_opt=json_names_for_fields=true \
 		api/v2/service.proto
 	@echo "Converting OpenAPI v2 to v3..."

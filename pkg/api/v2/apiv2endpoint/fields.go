@@ -5,6 +5,7 @@ import (
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 func FieldDescription(field protoreflect.FieldDescriptor) string {
@@ -35,4 +36,9 @@ func IsRequired(field protoreflect.FieldDescriptor) bool {
 		}
 	}
 	return false
+}
+
+func IsDeprecated(field protoreflect.FieldDescriptor) bool {
+	opts, ok := field.Options().(*descriptorpb.FieldOptions)
+	return ok && opts.GetDeprecated()
 }

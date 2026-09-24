@@ -264,19 +264,21 @@ func endpointFlags(ep endpoint) []cli.Flag {
 
 func flagForField(category, name string, field protoreflect.FieldDescriptor) cli.Flag {
 	usage := fieldUsage(field)
+	hidden := apiv2endpoint.IsDeprecated(field)
 	if field.IsList() {
 		return &cli.StringSliceFlag{
 			Category: category,
 			Name:     name,
 			Usage:    usage,
+			Hidden:   hidden,
 		}
 	}
 
 	switch field.Kind() {
 	case protoreflect.BoolKind:
-		return &cli.BoolFlag{Category: category, Name: name, Usage: usage}
+		return &cli.BoolFlag{Category: category, Name: name, Usage: usage, Hidden: hidden}
 	default:
-		return &cli.StringFlag{Category: category, Name: name, Usage: usage}
+		return &cli.StringFlag{Category: category, Name: name, Usage: usage, Hidden: hidden}
 	}
 }
 

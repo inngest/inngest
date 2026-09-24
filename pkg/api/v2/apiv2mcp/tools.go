@@ -246,6 +246,9 @@ func fieldSchema(field protoreflect.FieldDescriptor, seen map[protoreflect.FullN
 	if description := apiv2endpoint.FieldDescription(field); description != "" {
 		schema["description"] = description
 	}
+	if apiv2endpoint.IsDeprecated(field) {
+		schema["deprecated"] = true
+	}
 	return schema
 }
 

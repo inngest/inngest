@@ -74,6 +74,14 @@ func TestInputSchema(t *testing.T) {
 	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
 }
 
+func TestInputSchemaMarksDeprecatedFields(t *testing.T) {
+	endpoint := endpointByMethod(t, "GetFunctionTrace")
+	properties := InputSchema(endpoint)["properties"].(map[string]any)
+
+	require.Equal(t, true, properties["includeOutput"].(map[string]any)["deprecated"])
+	require.NotContains(t, properties["include"].(map[string]any), "deprecated")
+}
+
 func TestToolAnnotations(t *testing.T) {
 	for _, tt := range []struct {
 		method      string

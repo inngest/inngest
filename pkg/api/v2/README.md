@@ -933,8 +933,8 @@ names. For example, request optional run fields with
 `include=output&include=deferredFrom`. Parsers may continue to accept a field's
 protobuf snake_case name, such as `include=deferred_from`, for compatibility,
 but API documentation and generated examples use the lowerCamelCase spelling.
-The legacy `includeOutput=true` query parameter also remains supported on run
-list endpoints, but new clients should use `include=output`.
+The deprecated `includeOutput=true` query parameter remains supported for
+compatibility, but new clients should use `include=output`.
 
 ## Standard Parameter Patterns
 
