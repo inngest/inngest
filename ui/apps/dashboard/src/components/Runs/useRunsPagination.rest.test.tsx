@@ -52,13 +52,15 @@ type RunsPaginationResult = ReturnType<typeof useRunsPagination>;
 function RunsPaginationHarness({
   onRender,
   pause = false,
+  celQuery,
 }: {
   onRender: (result: RunsPaginationResult) => void;
   pause?: boolean;
+  celQuery?: string;
 }) {
   onRender(
     useRunsPagination({
-      commonQueryVars,
+      commonQueryVars: { ...commonQueryVars, celQuery },
       tracePreviewEnabled: false,
       shouldUseREST: true,
       pause,
@@ -181,6 +183,131 @@ describe('REST runs pagination refresh', () => {
 
     expect(mocks.apiFetch).not.toHaveBeenCalled();
     expect(result?.isLoadingInitial).toBe(true);
+  });
+
+  it('distinguishes the pending scan from a completed zero-match response', async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    mocks.apiFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+
+    let result: RunsPaginationResult | undefined;
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness
+            celQuery="event.data.userId == 'missing'"
+            onRender={(value) => (result = value)}
+          />
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(result?.progressiveSearch).toMatchObject({
+      phase: 'searching',
+      hasCompletedScanResponse: false,
+    });
+    expect(result?.runs).toEqual([]);
+
+    await act(async () => {
+      resolveResponse?.(
+        new Response(
+          JSON.stringify({
+            data: [],
+            page: { cursor: 'frontier', hasMore: false, limit: 40 },
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    await vi.waitFor(() =>
+      expect(result?.progressiveSearch).toMatchObject({
+        phase: 'complete',
+        hasCompletedScanResponse: true,
+      }),
+    );
+    expect(result?.runs).toEqual([]);
+  });
+
+  it('does not expose the previous result while a changed query awaits its first response', async () => {
+    let resolveChangedQuery: ((response: Response) => void) | undefined;
+    mocks.apiFetch.mockImplementation((pathname: string) => {
+      if (pathname.includes('second-query')) {
+        return new Promise<Response>((resolve) => {
+          resolveChangedQuery = resolve;
+        });
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [run('old-run')],
+            page: { cursor: 'old-frontier', hasMore: false, limit: 40 },
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    let result: RunsPaginationResult | undefined;
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness
+            celQuery="event.data.userId == 'first-query'"
+            onRender={(value) => (result = value)}
+          />
+        </QueryClientProvider>,
+      );
+    });
+    await vi.waitFor(() =>
+      expect(result?.progressiveSearch).toMatchObject({
+        phase: 'complete',
+        hasCompletedScanResponse: true,
+      }),
+    );
+    expect(result?.runs.map(({ id }) => id)).toEqual(['old-run']);
+
+    const changedQueryRenders: RunsPaginationResult[] = [];
+    await act(async () => {
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <RunsPaginationHarness
+            celQuery="event.data.userId == 'second-query'"
+            onRender={(value) => {
+              result = value;
+              changedQueryRenders.push(value);
+            }}
+          />
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(resolveChangedQuery).toBeTypeOf('function');
+    expect(changedQueryRenders.length).toBeGreaterThan(0);
+    expect(
+      changedQueryRenders.every(
+        (rendered) =>
+          rendered.runs.length === 0 &&
+          rendered.progressiveSearch?.phase === 'searching' &&
+          rendered.progressiveSearch.hasCompletedScanResponse === false,
+      ),
+    ).toBe(true);
   });
 
   it('does not start another page request after pagination fails', async () => {

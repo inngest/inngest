@@ -254,7 +254,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
               searchedThrough: decodeRunsFrontier(
                 progressiveSearch.cursor,
                 timeField,
-              )?.toLocaleString(),
+              ),
             }
           : undefined
       }

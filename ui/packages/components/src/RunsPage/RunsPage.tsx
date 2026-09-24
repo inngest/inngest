@@ -18,7 +18,9 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import {
   RiArrowRightUpLine,
+  RiCloseCircleLine,
   RiInformationLine,
+  RiPlayCircleLine,
   RiRefreshLine,
   RiSearchLine,
 } from '@remixicon/react';
@@ -38,6 +40,7 @@ import {
   useValidatedSearchParam,
 } from '../hooks/useSearchParams';
 import type { Features } from '../types/features';
+import { ProgressiveSearchStatus } from './ProgressiveSearchStatus';
 import RunsStatusFilter from './RunsStatusFilter';
 import RunsTable from './RunsTable';
 import RunsTypeFilter from './RunsTypeFilter';
@@ -64,7 +67,8 @@ type Props = {
   error?: Error | null;
   progressiveSearch?: {
     phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
-    searchedThrough?: string;
+    hasCompletedScanResponse: boolean;
+    searchedThrough?: Date;
     cancel: () => void;
     resume: () => void;
   };
@@ -297,18 +301,6 @@ export function RunsPage({
   const disableRefreshButton =
     pollInterval && pollInterval < 1000 ? isLoadingInitial : isLoadingMore || isLoadingInitial;
 
-  const progressiveSearchStatus = progressiveSearch
-    ? progressiveSearch.phase === 'searching'
-      ? 'Searching'
-      : progressiveSearch.phase === 'complete'
-      ? 'Search complete'
-      : progressiveSearch.phase === 'error'
-      ? 'Paused after an error'
-      : progressiveSearch.phase === 'cancelled'
-      ? 'Search cancelled'
-      : 'Automatic search paused'
-    : undefined;
-
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
@@ -404,14 +396,13 @@ export function RunsPage({
           <div className="flex items-center gap-2">
             {progressiveSearch ? (
               <div className="text-muted flex items-center gap-1 text-xs">
-                <span>
-                  {new Intl.NumberFormat().format(data.length)}{' '}
-                  {data.length === 1 ? 'match' : 'matches'}
-                  {` · ${progressiveSearchStatus}`}
-                  {progressiveSearch.searchedThrough
-                    ? ` · through ${progressiveSearch.searchedThrough}`
-                    : ''}
-                </span>
+                <ProgressiveSearchStatus
+                  compact
+                  phase={progressiveSearch.phase}
+                  hasCompletedScanResponse={progressiveSearch.hasCompletedScanResponse}
+                  matchCount={data.length}
+                  searchedThrough={progressiveSearch.searchedThrough}
+                />
                 <Tooltip>
                   <TooltipTrigger aria-label="About progressive run search">
                     <RiInformationLine className="h-4 w-4" />
@@ -477,11 +468,12 @@ export function RunsPage({
         {progressiveSearch && (
           <div className="border-subtle mx-3 mt-2 flex min-h-24 flex-col items-center justify-center gap-3 rounded border px-4 py-4">
             <p className="text-muted text-center text-xs">
-              {progressiveSearchStatus}
-              {` · ${data.length} ${data.length === 1 ? 'match' : 'matches'}`}
-              {progressiveSearch.searchedThrough
-                ? ` · searched through ${progressiveSearch.searchedThrough}`
-                : ''}
+              <ProgressiveSearchStatus
+                phase={progressiveSearch.phase}
+                hasCompletedScanResponse={progressiveSearch.hasCompletedScanResponse}
+                matchCount={data.length}
+                searchedThrough={progressiveSearch.searchedThrough}
+              />
             </p>
             <div className="flex items-center gap-2">
               {progressiveSearch.phase === 'searching' ? (
@@ -489,7 +481,8 @@ export function RunsPage({
                   appearance="outlined"
                   kind="secondary"
                   label="Cancel search"
-                  size="small"
+                  icon={<RiCloseCircleLine />}
+                  iconSide="left"
                   onClick={progressiveSearch.cancel}
                 />
               ) : progressiveSearch.phase !== 'complete' ? (
@@ -497,7 +490,8 @@ export function RunsPage({
                   appearance="outlined"
                   kind="secondary"
                   label="Continue searching"
-                  size="small"
+                  icon={<RiPlayCircleLine />}
+                  iconSide="left"
                   onClick={progressiveSearch.resume}
                 />
               ) : null}

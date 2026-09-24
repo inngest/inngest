@@ -42,6 +42,7 @@ type UseRunsPaginationParams = {
 export type ProgressiveSearchState = {
   phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
   cursor?: string;
+  hasCompletedScanResponse: boolean;
   error?: Error;
   cancel: () => void;
   resume: () => void;
@@ -319,6 +320,8 @@ export function useProgressiveRuns({
   const [runs, setRuns] = useState<Run[]>([]);
   const [cursor, setCursor] = useState<string>();
   const [hasMore, setHasMore] = useState(true);
+  const [hasCompletedScanResponse, setHasCompletedScanResponse] =
+    useState(false);
   const [phase, setPhase] =
     useState<ProgressiveSearchState['phase']>('searching');
   const [error, setError] = useState<Error>();
@@ -330,6 +333,7 @@ export function useProgressiveRuns({
     setRuns([]);
     setCursor(undefined);
     setHasMore(true);
+    setHasCompletedScanResponse(false);
     setError(undefined);
     setPhase('searching');
     setAttempt((value) => value + 1);
@@ -379,6 +383,7 @@ export function useProgressiveRuns({
             setRuns(items);
             setCursor(nextCursor);
             setHasMore(more);
+            setHasCompletedScanResponse(true);
           },
           signal: controller.signal,
           displayTarget: REST_PAGE_SIZE,
@@ -424,17 +429,22 @@ export function useProgressiveRuns({
     setRuns([]);
     setCursor(undefined);
     setHasMore(true);
+    setHasCompletedScanResponse(false);
     setError(undefined);
     setPhase('searching');
     setAttempt((value) => value + 1);
   }, []);
+  const isCurrentLifecycle = activeLifecycleKey === lifecycleKey;
 
   return {
-    runs,
+    runs: isCurrentLifecycle ? runs : [],
     state: {
-      phase,
-      cursor,
-      error,
+      phase: isCurrentLifecycle ? phase : 'searching',
+      cursor: isCurrentLifecycle ? cursor : undefined,
+      hasCompletedScanResponse: isCurrentLifecycle
+        ? hasCompletedScanResponse
+        : false,
+      error: isCurrentLifecycle ? error : undefined,
       cancel,
       resume,
     } satisfies ProgressiveSearchState,
