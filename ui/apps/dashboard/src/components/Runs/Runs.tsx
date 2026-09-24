@@ -24,6 +24,7 @@ import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
+import { runsInsightsHref } from './runsInsights';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -255,6 +256,15 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
                 progressiveSearch.cursor,
                 timeField,
               ),
+              insightsHref: runsInsightsHref({
+                envSlug: environment.slug,
+                celQuery: search ?? '',
+                startTime: commonQueryVars.startTime,
+                endTime: commonQueryVars.endTime,
+                timeField,
+                appIDs: scope === 'env' ? restAppIDs : null,
+                functionSlug: scope === 'fn' ? functionSlug : null,
+              }),
             }
           : undefined
       }
