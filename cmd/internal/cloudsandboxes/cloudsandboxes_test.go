@@ -249,8 +249,23 @@ func TestCommandTransportFailureIsNotRetried(t *testing.T) {
 		_ = conn.Close() // Command may have executed but response is lost.
 	})
 	w := request(b, "POST", "/v2/sandboxes/"+sandboxID+"/exec")
-	require.Equal(t, 502, w.Code)
+	require.Equal(t, 409, w.Code)
+	require.Contains(t, w.Body.String(), "operation_ambiguous")
 	require.Contains(t, w.Body.String(), "may have executed")
+	require.Equal(t, int32(1), calls.Load())
+}
+
+func TestReadTransportFailureIsRetryable(t *testing.T) {
+	var calls atomic.Int32
+	b, _ := testBridge(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		conn, _, err := w.(http.Hijacker).Hijack()
+		require.NoError(t, err)
+		_ = conn.Close()
+	})
+	w := request(b, "GET", "/v2/sandboxes/"+sandboxID+"/processes/5f0c7a4e-2b1d-4c8e-9a3f-6d2e1b0c4a7f/output")
+	require.Equal(t, 503, w.Code)
+	require.Contains(t, w.Body.String(), "compute_unavailable")
 	require.Equal(t, int32(1), calls.Load())
 }
 

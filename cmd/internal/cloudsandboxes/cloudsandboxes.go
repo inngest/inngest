@@ -224,12 +224,17 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 			}
 			return nil
 		},
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+		ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
 			if errors.Is(err, cliauth.ErrNotLoggedIn) {
 				writeError(w, http.StatusUnauthorized, "cloud_login_required", loginRequiredMessage)
 				return
 			}
-			writeError(w, http.StatusBadGateway, "cloud_transport_error", "Cloud connection failed. The operation may have executed; inspect its state before repeating a command")
+			// Assume this is a blip and allow it to retry.
+			if req.Method == http.MethodGet || req.Method == http.MethodHead {
+				writeError(w, http.StatusServiceUnavailable, "compute_unavailable", "Cloud connection failed. Retry the request")
+				return
+			}
+			writeError(w, http.StatusConflict, "operation_ambiguous", "Cloud connection failed. The operation may have executed; inspect its state before repeating a command")
 		},
 	}
 	proxy.ServeHTTP(w, r)
