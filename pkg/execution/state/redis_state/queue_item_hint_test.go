@@ -19,68 +19,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestItemHintReadiness(t *testing.T) {
-	for _, tc := range []struct {
-		name                                       string
-		backlog, future, paused, migrating, denied bool
-	}{
-		{name: "ready"}, {name: "backlog", backlog: true},
-		{name: "future", future: true}, {name: "paused", paused: true},
-		{name: "migrating", migrating: true}, {name: "denied", denied: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			r := miniredis.RunT(t)
-			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
-			require.NoError(t, err)
-			t.Cleanup(rc.Close)
-			clock := clockwork.NewFakeClock()
-			fn, acct, env := uuid.New(), uuid.New(), uuid.New()
-			opts := []osqueue.QueueOpt{
-				osqueue.WithClock(clock),
-				osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return tc.backlog }),
-				osqueue.WithPartitionPausedGetter(func(context.Context, uuid.UUID) osqueue.PartitionPausedInfo {
-					return osqueue.PartitionPausedInfo{Paused: tc.paused}
-				}),
-			}
-			if tc.denied {
-				opts = append(opts, osqueue.WithDenyQueueNames(fn.String()))
-			}
-			_, shard := newQueue(t, rc, opts...)
-			at := clock.Now()
-			if tc.future {
-				at = at.Add(time.Hour)
-			}
-			item, err := shard.EnqueueItem(t.Context(), osqueue.QueueItem{
-				ID: "hint-test", AtMS: at.UnixMilli(), FunctionID: fn, WorkspaceID: env,
-				Data: osqueue.Item{Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{
-					WorkflowID: fn, AccountID: acct, WorkspaceID: env, RunID: ulid.Make(),
-				}},
-			}, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-			if tc.migrating {
-				until := clock.Now().Add(time.Minute)
-				require.NoError(t, shard.SetFunctionMigrate(t.Context(), osqueue.Scope{FunctionID: fn}, &until))
-			}
-			err = shard.(osqueue.ItemHintShard).ValidateItemForHint(t.Context(), item)
-			if tc.name == "ready" || tc.backlog {
+func TestItemHintLeaseLookahead(t *testing.T) {
+	for _, backlog := range []bool{false, true} {
+		for _, ahead := range []time.Duration{0, 2 * time.Second} {
+			t.Run(fmt.Sprintf("backlog=%t/ahead=%s", backlog, ahead), func(t *testing.T) {
+				rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{miniredis.RunT(t).Addr()}, DisableCache: true})
 				require.NoError(t, err)
-				lease, err := shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
+				t.Cleanup(rc.Close)
+				clock := clockwork.NewFakeClock()
+				_, shard := newQueue(t, rc, osqueue.WithClock(clock), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return backlog }))
+				fn, acct, env := uuid.New(), uuid.New(), uuid.New()
+				at := clock.Now().Add(ahead)
+				item, err := shard.EnqueueItem(t.Context(), osqueue.QueueItem{ID: "hint", FunctionID: fn, WorkspaceID: env,
+					Data: osqueue.Item{Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{WorkflowID: fn, AccountID: acct, WorkspaceID: env, RunID: ulid.Make()}}}, at, osqueue.EnqueueOpts{})
 				require.NoError(t, err)
-				require.NotNil(t, lease)
-				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
-				require.ErrorIs(t, err, osqueue.ErrQueueItemAlreadyLeased)
-			} else {
-				require.ErrorIs(t, err, osqueue.ErrQueueItemNotReady)
-			}
-			if tc.future {
-				// The mutation guard also rejects a stale or bypassed point read.
-				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now(), osqueue.LeaseRequireDue())
-				require.ErrorIs(t, err, osqueue.ErrQueueItemNotReady)
+				lease, err := shard.Lease(t.Context(), item, time.Minute, clock.Now())
+				require.NoError(t, err)
+				require.Equal(t, ulid.Timestamp(clock.Now().Add(time.Minute)), lease.Time())
 				stored, err := shard.LoadQueueItem(t.Context(), item.ID)
 				require.NoError(t, err)
-				require.Nil(t, stored.LeaseID)
-			}
-		})
+				require.Equal(t, at.UnixMilli(), stored.AtMS)
+				// Actual now, not the lookahead horizon, decides whether the lease is active.
+				_, err = shard.Lease(t.Context(), item, time.Minute, clock.Now())
+				require.ErrorIs(t, err, osqueue.ErrQueueItemAlreadyLeased)
+			})
+		}
 	}
 }
 
@@ -88,7 +51,6 @@ func TestItemHintReadiness(t *testing.T) {
 // The ordinary worker and completion path remain real.
 type hintOnlyRedisShard struct {
 	RedisQueueShard
-	osqueue.ItemHintShard
 }
 
 func (s hintOnlyRedisShard) Run(ctx context.Context, _ osqueue.QueueScannerRuntime) error {
@@ -110,7 +72,7 @@ func TestItemHintBacklogHandoff(t *testing.T) {
 			opts := []osqueue.QueueOpt{osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }),
 				osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithPollTick(5 * time.Millisecond), osqueue.WithNumWorkers(2)}
 			base := NewQueueShard("ss3", NewQueueClient(rc, "{hints}"), opts...)
-			wrapper := hintOnlyRedisShard{RedisQueueShard: base, ItemHintShard: base.(osqueue.ItemHintShard)}
+			wrapper := hintOnlyRedisShard{RedisQueueShard: base}
 			reg, err := osqueue.NewSingleShardRegistry(wrapper)
 			require.NoError(t, err)
 			offers := make(chan func(osqueue.QueueItem) bool, 1)
@@ -186,7 +148,7 @@ func TestItemHintBacklogPreservesCapacity(t *testing.T) {
 		osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithPollTick(5 * time.Millisecond), osqueue.WithNumWorkers(2),
 	}
 	base := NewQueueShard("ss3", NewQueueClient(rc, "{capacity-hints}"), opts...)
-	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base, base.(osqueue.ItemHintShard)})
+	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base})
 	require.NoError(t, err)
 	offers := make(chan func(osqueue.QueueItem) bool, 1)
 	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, MaxActive: 2, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
@@ -276,9 +238,8 @@ func TestItemHintBacklogRefillReservationCleanup(t *testing.T) {
 			item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "direct-backlog", FunctionID: fn, WorkspaceID: env,
 				Data: osqueue.Item{Kind: osqueue.KindStart, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}}, clock.Now(), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			require.NoError(t, shard.(osqueue.ItemHintShard).ValidateItemForHint(ctx, item))
 			var work osqueue.ProcessItem
-			leased, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: &item, RequireDue: true, StaticTime: clock.Now()}, func(_ context.Context, i osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
+			leased, err := proc.(osqueue.QueueItemLeaser).LeaseItem(ctx, osqueue.LeaseItemRequest{Item: &item, StaticTime: clock.Now()}, func(_ context.Context, i osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
 				work = i
 				return osqueue.NewCompletedDispatchedItem(osqueue.DispatchedItemResult{}), nil
 			})
@@ -372,7 +333,7 @@ func TestItemHintDiscardStaleBufferedSnapshot(t *testing.T) {
 				clock := clockwork.NewFakeClock()
 				opts := []osqueue.QueueOpt{osqueue.WithClock(clock), osqueue.WithPollTick(time.Second), osqueue.WithNumWorkers(2), osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return backlog })}
 				base := NewQueueShard("ss3", NewQueueClient(rc, "{stale-hint}"), opts...)
-				wrapper := observedHintRedisShard{hintOnlyRedisShard: hintOnlyRedisShard{base, base.(osqueue.ItemHintShard)}, attempts: make(chan error, 4)}
+				wrapper := observedHintRedisShard{hintOnlyRedisShard: hintOnlyRedisShard{base}, attempts: make(chan error, 4)}
 				reg, err := osqueue.NewSingleShardRegistry(wrapper)
 				require.NoError(t, err)
 				offers := make(chan func(osqueue.QueueItem) bool, 1)
@@ -419,7 +380,7 @@ func TestItemHintDiscardStaleBufferedSnapshot(t *testing.T) {
 					want = osqueue.ErrQueueItemAlreadyLeased
 				case "requeued":
 					require.NoError(t, base.Requeue(t.Context(), stored, clock.Now()))
-					want = osqueue.ErrQueueItemNotReady
+					want = osqueue.ErrQueueItemNotFound
 				}
 				clock.Advance(time.Second)
 				select {

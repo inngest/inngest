@@ -927,7 +927,6 @@ func (q *queue) Lease(
 		now.UnixMilli(),
 		setEarliestPeekTime,
 		item.EarliestPeekTime,
-		o.RequireDue,
 		item.GenerationID,
 	})
 	if err != nil {
@@ -999,8 +998,6 @@ func (q *queue) Lease(
 		return nil, osqueue.ErrQueueItemNotFound
 	case -2:
 		return nil, osqueue.ErrQueueItemAlreadyLeased
-	case -3:
-		return nil, osqueue.ErrQueueItemNotReady
 	default:
 		return nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
