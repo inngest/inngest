@@ -54,17 +54,9 @@ type CapacityReleaseNotifier interface {
 }
 
 type LeaseOptions struct {
-	RequireDue      bool
 	Backlog         QueueBacklog
 	ShadowPartition QueueShadowPartition
 	Constraints     PartitionConstraintConfig
-}
-
-// LeaseRequireDue prevents direct hints from leasing items rescheduled into the
-// future or superseded by a newer generation. Ordinary scanners retain their
-// existing peek-ahead behavior.
-func LeaseRequireDue() LeaseOptionFn {
-	return func(o *LeaseOptions) { o.RequireDue = true }
 }
 
 func LeaseBacklog(b QueueBacklog) LeaseOptionFn {

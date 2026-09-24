@@ -2,8 +2,8 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,22 +17,15 @@ import (
 type ItemHintSource func(ctx context.Context, shard QueueShard, offer func(QueueItem) bool) error
 
 type ItemHintOptions struct {
-	Source         ItemHintSource
-	BufferSize     int
+	Source     ItemHintSource
+	BufferSize int
+	// MaxActive bounds concurrent eligibility/lease attempts, not running work.
 	MaxActive      int
 	AttemptTimeout time.Duration
 }
 
 func WithItemHints(opts ItemHintOptions) QueueOpt {
 	return func(o *QueueOptions) { o.itemHints = &opts }
-}
-
-// ItemHintShard opts a backend into direct processing with its own eligibility
-// checks. ValidateItemForHint preserves scope, pause and migration rules without
-// reloading the supplied item. LeaseItem owns capacity, authoritative item
-// checks, leasing and dispatch.
-type ItemHintShard interface {
-	ValidateItemForHint(context.Context, QueueItem) error
 }
 
 func (q *queueProcessor) hintsAllowed() bool {
@@ -48,8 +41,7 @@ func (q *queueProcessor) hintsAllowed() bool {
 
 func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFunc) func() {
 	opts := q.itemHints
-	shard, ok := q.Shard().(ItemHintShard)
-	if opts == nil || opts.Source == nil || !ok || !q.hintsAllowed() {
+	if opts == nil || opts.Source == nil || !q.hintsAllowed() {
 		return func() {}
 	}
 	if opts.BufferSize <= 0 || opts.MaxActive <= 0 || opts.AttemptTimeout <= 0 {
@@ -102,8 +94,13 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 					select {
 					case active <- struct{}{}:
 						wg.Go(func() {
-							defer func() { <-active }()
-							q.processItemHint(ctx, shard, item, dispatch)
+							dispatched := q.processItemHint(ctx, item, dispatch)
+							<-active
+							// Normal worker capacity bounds execution. Completion
+							// observation must not retain a hint attempt slot.
+							if dispatched != nil && q.runMode.Continuations {
+								q.observeItemHint(ctx, ItemPartition(ctx, item), dispatched)
+							}
 						})
 					default:
 						q.recordItemHint(ctx, "budget_full")
@@ -121,41 +118,55 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 	return func() { cancel(); <-done }
 }
 
-func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShard, item QueueItem, dispatch DispatchFunc) {
+func (q *queueProcessor) processItemHint(ctx context.Context, item QueueItem, dispatch DispatchFunc) DispatchedItem {
 	if ctx.Err() != nil {
-		return
+		return nil
+	}
+	// Match the existing two-second lookahead. Only admission uses this future
+	// time; leases use actual now and the worker waits until the item's AtMS.
+	now := q.Clock().Now()
+	if item.Data.Kind != KindStart || item.Data.Attempt != 0 || item.AtMS > now.Add(2*time.Second).UnixMilli() ||
+		item.QueueName != nil || item.Data.QueueName != nil || !q.hintsAllowed() {
+		q.recordItemHint(ctx, "ineligible")
+		return nil
+	}
+	account := item.Data.Identifier.AccountID
+	partition := ItemPartition(ctx, item)
+	matches := func(name string) bool {
+		return name == partition.Queue() || (strings.HasSuffix(name, "*") && strings.HasPrefix(partition.Queue(), strings.TrimSuffix(name, "*")))
+	}
+	if (len(q.AllowQueues) > 0 && !slices.ContainsFunc(q.AllowQueues, matches)) || slices.ContainsFunc(q.DenyQueues, matches) ||
+		(len(q.runMode.ExclusiveAccounts) > 0 && !slices.Contains(q.runMode.ExclusiveAccounts, account)) {
+		q.recordItemHint(ctx, "ineligible")
+		return nil
 	}
 	attemptCtx, cancel := context.WithTimeout(ctx, q.itemHints.AttemptTimeout)
 	defer cancel()
-	// Scanners attach the stored queue ID to the worker-facing Item. Enqueue's
-	// returned envelope may still carry the original (unhashed) producer JobID.
-	item.Data.JobID = &item.ID
-	err := shard.ValidateItemForHint(attemptCtx, item)
+	// Direct hints bypass scanner eligibility, not pause/migration policy. Use
+	// the same callbacks/operation without scanner pointer requeues or refills.
+	if q.PartitionPausedGetter(attemptCtx, item.FunctionID).Paused || attemptCtx.Err() != nil {
+		q.recordItemHint(ctx, "ineligible")
+		return nil
+	}
+	locked, err := q.Shard().IsMigrationLocked(attemptCtx, Scope{AccountID: account, EnvID: item.WorkspaceID, FunctionID: item.FunctionID})
 	if err != nil {
-		status := "read_error"
-		if errors.Is(err, ErrQueueItemNotFound) || errors.Is(err, ErrQueueItemNotReady) {
-			status = "ineligible"
-		}
-		q.recordItemHint(ctx, status)
-		return
+		q.recordItemHint(ctx, "read_error")
+		return nil
 	}
-	if item.Data.Kind != KindStart || item.Data.Attempt != 0 || item.AtMS > q.Clock().Now().UnixMilli() || !q.hintsAllowed() {
+	if locked != nil && locked.After(q.Clock().Now()) {
 		q.recordItemHint(ctx, "ineligible")
-		return
-	}
-	account := item.Data.Identifier.AccountID
-	if len(q.runMode.ExclusiveAccounts) > 0 && !slices.Contains(q.runMode.ExclusiveAccounts, account) {
-		q.recordItemHint(ctx, "ineligible")
-		return
+		return nil
 	}
 	if exists, err := q.accountExists(attemptCtx, account); err != nil || !exists {
 		q.recordItemHint(ctx, "ineligible")
-		return
+		return nil
 	}
-	partition := ItemPartition(ctx, item)
+	// Scanners attach the stored queue ID to the worker-facing Item. Enqueue's
+	// returned envelope may still carry the original (unhashed) producer JobID.
+	item.Data.JobID = &item.ID
 	var dispatched DispatchedItem
 	result, err := q.LeaseItem(attemptCtx, LeaseItemRequest{
-		Item: &item, RequireDue: true, StaticTime: q.Clock().Now(),
+		Item: &item, StaticTime: q.Clock().Now(),
 		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
 		var err error
@@ -165,9 +176,13 @@ func (q *queueProcessor) processItemHint(ctx context.Context, shard ItemHintShar
 	cancel()
 	if err != nil || dispatched == nil || result.Status != LeaseItemStatusDispatched {
 		q.recordItemHint(ctx, "not_dispatched")
-		return
+		return nil
 	}
 	q.recordItemHint(ctx, "dispatched")
+	return dispatched
+}
+
+func (q *queueProcessor) observeItemHint(ctx context.Context, partition QueuePartition, dispatched DispatchedItem) {
 	select {
 	case result := <-dispatched.Done():
 		if q.runMode.Continuations && result.Err == nil && result.ScheduledImmediateJob {

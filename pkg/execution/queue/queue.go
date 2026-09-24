@@ -57,7 +57,6 @@ type QueueItemLeaser interface {
 }
 
 type LeaseItemRequest struct {
-	RequireDue                 bool
 	Item                       *QueueItem
 	Priority                   uint
 	ContinueCount              uint
@@ -80,7 +79,6 @@ const (
 	LeaseItemStatusLeaseContention
 	LeaseItemStatusLeaseError
 	LeaseItemStatusDropped
-	LeaseItemStatusNotReady
 )
 
 type LeaseItemResult struct {

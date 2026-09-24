@@ -4,7 +4,6 @@ Output:
   0: Successfully leased item
   -1: Queue item not found
   -2: Queue item already leased
-  -3: Hinted item is not ready
 ]]
 
 local keyQueueMap = KEYS[1]
@@ -20,8 +19,7 @@ local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
 local setEarliestPeekTime = tonumber(ARGV[5])
 local itemEarliestPeekTime = tonumber(ARGV[6])
-local requireDue = ARGV[7] == "1"
-local generation = tonumber(ARGV[8])
+local generation = tonumber(ARGV[7])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -46,11 +44,10 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -2
 end
 
--- Hints may lease backlog items directly, but must not bypass due time or
--- dispatch a snapshot superseded by requeue. Ordinary leases are unchanged.
--- Ordinary scanners retain their existing peek-ahead behavior.
-if requireDue and (item.at > currentTime or item.genID ~= generation) then
-	return -3
+-- A buffered/peeked snapshot superseded by requeue must not dispatch old data.
+-- Legacy callers without a generation retain their existing lease behavior.
+if generation ~= nil and generation > 0 and item.genID ~= generation then
+	return -1
 end
 
 if setEarliestPeekTime == 1 and itemEarliestPeekTime ~= nil and itemEarliestPeekTime > 0 then
