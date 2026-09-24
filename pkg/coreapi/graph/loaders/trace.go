@@ -220,6 +220,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		IsUserland:     isUserland,
 		UserlandSpan:   userlandSpan,
 	}
+	if span.Attributes.CustomConcurrencyKeys != nil {
+		gqlSpan.CustomConcurrencyKeys = *span.Attributes.CustomConcurrencyKeys
+	}
 
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
@@ -579,4 +582,3 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	return gqlSpan, nil
 }
-

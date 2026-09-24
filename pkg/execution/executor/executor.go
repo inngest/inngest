@@ -1571,6 +1571,13 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
+	var firstEvent json.RawMessage
+	if len(evts) > 0 {
+		firstEvent = evts[0]
+	}
+	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, firstEvent); len(keys) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.CustomConcurrencyKeys, &keys)
+	}
 	if len(sessions) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.Sessions, &sessions)
 	}
@@ -2231,6 +2238,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	runningStatus := enums.StepStatusRunning
 	meta.AddAttr(execAttrs, meta.Attrs.DynamicStatus, &runningStatus)
 	tracing.AddQueueTimestampAttrs(execAttrs, item)
+	var firstEvent json.RawMessage
+	if len(events) > 0 {
+		firstEvent = events[0]
+	}
+	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), firstEvent); len(keys) > 0 {
+		meta.AddAttr(execAttrs, meta.Attrs.CustomConcurrencyKeys, &keys)
+	}
 
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,

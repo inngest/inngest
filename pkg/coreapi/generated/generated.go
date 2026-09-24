@@ -22,6 +22,7 @@ import (
 	types "github.com/inngest/inngest/pkg/gql_scalars"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/history_reader"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	ulid "github.com/oklog/ulid/v2"
 	gqlparser "github.com/vektah/gqlparser/v2"
@@ -445,40 +446,49 @@ type ComplexityRoot struct {
 		Type func(childComplexity int) int
 	}
 
+	RunTraceConcurrencyKey struct {
+		Expression          func(childComplexity int) int
+		ExpressionTruncated func(childComplexity int) int
+		Scope               func(childComplexity int) int
+		Value               func(childComplexity int) int
+		ValueTruncated      func(childComplexity int) int
+	}
+
 	RunTraceSpan struct {
-		AppID             func(childComplexity int) int
-		Attempts          func(childComplexity int) int
-		ChildrenSpans     func(childComplexity int) int
-		DebugPaused       func(childComplexity int) int
-		DebugRunID        func(childComplexity int) int
-		DebugSessionID    func(childComplexity int) int
-		Duration          func(childComplexity int) int
-		EndedAt           func(childComplexity int) int
-		FunctionID        func(childComplexity int) int
-		GroupID           func(childComplexity int) int
-		IsRoot            func(childComplexity int) int
-		IsUserland        func(childComplexity int) int
-		Metadata          func(childComplexity int) int
-		Name              func(childComplexity int) int
-		OutputID          func(childComplexity int) int
-		ParentSpan        func(childComplexity int) int
-		ParentSpanID      func(childComplexity int) int
-		QueuedAt          func(childComplexity int) int
-		Response          func(childComplexity int) int
-		Run               func(childComplexity int) int
-		RunID             func(childComplexity int) int
-		ScheduledAt       func(childComplexity int) int
-		SkipExistingRunID func(childComplexity int) int
-		SkipReason        func(childComplexity int) int
-		SpanID            func(childComplexity int) int
-		StartedAt         func(childComplexity int) int
-		Status            func(childComplexity int) int
-		StepID            func(childComplexity int) int
-		StepInfo          func(childComplexity int) int
-		StepOp            func(childComplexity int) int
-		StepType          func(childComplexity int) int
-		TraceID           func(childComplexity int) int
-		UserlandSpan      func(childComplexity int) int
+		AppID                 func(childComplexity int) int
+		Attempts              func(childComplexity int) int
+		ChildrenSpans         func(childComplexity int) int
+		CustomConcurrencyKeys func(childComplexity int) int
+		DebugPaused           func(childComplexity int) int
+		DebugRunID            func(childComplexity int) int
+		DebugSessionID        func(childComplexity int) int
+		Duration              func(childComplexity int) int
+		EndedAt               func(childComplexity int) int
+		FunctionID            func(childComplexity int) int
+		GroupID               func(childComplexity int) int
+		IsRoot                func(childComplexity int) int
+		IsUserland            func(childComplexity int) int
+		Metadata              func(childComplexity int) int
+		Name                  func(childComplexity int) int
+		OutputID              func(childComplexity int) int
+		ParentSpan            func(childComplexity int) int
+		ParentSpanID          func(childComplexity int) int
+		QueuedAt              func(childComplexity int) int
+		Response              func(childComplexity int) int
+		Run                   func(childComplexity int) int
+		RunID                 func(childComplexity int) int
+		ScheduledAt           func(childComplexity int) int
+		SkipExistingRunID     func(childComplexity int) int
+		SkipReason            func(childComplexity int) int
+		SpanID                func(childComplexity int) int
+		StartedAt             func(childComplexity int) int
+		Status                func(childComplexity int) int
+		StepID                func(childComplexity int) int
+		StepInfo              func(childComplexity int) int
+		StepOp                func(childComplexity int) int
+		StepType              func(childComplexity int) int
+		TraceID               func(childComplexity int) int
+		UserlandSpan          func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -2654,6 +2664,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunStepInfo.Type(childComplexity), true
 
+	case "RunTraceConcurrencyKey.expression":
+		if e.complexity.RunTraceConcurrencyKey.Expression == nil {
+			break
+		}
+
+		return e.complexity.RunTraceConcurrencyKey.Expression(childComplexity), true
+
+	case "RunTraceConcurrencyKey.expressionTruncated":
+		if e.complexity.RunTraceConcurrencyKey.ExpressionTruncated == nil {
+			break
+		}
+
+		return e.complexity.RunTraceConcurrencyKey.ExpressionTruncated(childComplexity), true
+
+	case "RunTraceConcurrencyKey.scope":
+		if e.complexity.RunTraceConcurrencyKey.Scope == nil {
+			break
+		}
+
+		return e.complexity.RunTraceConcurrencyKey.Scope(childComplexity), true
+
+	case "RunTraceConcurrencyKey.value":
+		if e.complexity.RunTraceConcurrencyKey.Value == nil {
+			break
+		}
+
+		return e.complexity.RunTraceConcurrencyKey.Value(childComplexity), true
+
+	case "RunTraceConcurrencyKey.valueTruncated":
+		if e.complexity.RunTraceConcurrencyKey.ValueTruncated == nil {
+			break
+		}
+
+		return e.complexity.RunTraceConcurrencyKey.ValueTruncated(childComplexity), true
+
 	case "RunTraceSpan.appID":
 		if e.complexity.RunTraceSpan.AppID == nil {
 			break
@@ -2674,6 +2719,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.ChildrenSpans(childComplexity), true
+
+	case "RunTraceSpan.customConcurrencyKeys":
+		if e.complexity.RunTraceSpan.CustomConcurrencyKeys == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.CustomConcurrencyKeys(childComplexity), true
 
 	case "RunTraceSpan.debugPaused":
 		if e.complexity.RunTraceSpan.DebugPaused == nil {
@@ -4237,8 +4289,17 @@ type RunTraceSpan {
   debugPaused: Boolean!
   skipReason: String
   skipExistingRunID: String
+  customConcurrencyKeys: [RunTraceConcurrencyKey!]!
   metadata: [SpanMetadata!]!
   response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type RunTraceConcurrencyKey {
+  scope: String!
+  expression: String!
+  value: String!
+  expressionTruncated: Boolean!
+  valueTruncated: Boolean!
 }
 
 type RunTraceSpanResponseInfo {
@@ -12005,6 +12066,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
 			case "skipExistingRunID":
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
+			case "customConcurrencyKeys":
+				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
@@ -14925,6 +14988,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
 			case "skipExistingRunID":
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
+			case "customConcurrencyKeys":
+				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
@@ -17910,6 +17975,226 @@ func (ec *executionContext) fieldContext_RunStepInfo_type(ctx context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceConcurrencyKey_scope(ctx context.Context, field graphql.CollectedField, obj *meta.CustomConcurrencyKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceConcurrencyKey_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceConcurrencyKey_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceConcurrencyKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceConcurrencyKey_expression(ctx context.Context, field graphql.CollectedField, obj *meta.CustomConcurrencyKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceConcurrencyKey_expression(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Expression, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceConcurrencyKey_expression(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceConcurrencyKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceConcurrencyKey_value(ctx context.Context, field graphql.CollectedField, obj *meta.CustomConcurrencyKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceConcurrencyKey_value(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceConcurrencyKey_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceConcurrencyKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceConcurrencyKey_expressionTruncated(ctx context.Context, field graphql.CollectedField, obj *meta.CustomConcurrencyKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceConcurrencyKey_expressionTruncated(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpressionTruncated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceConcurrencyKey_expressionTruncated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceConcurrencyKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceConcurrencyKey_valueTruncated(ctx context.Context, field graphql.CollectedField, obj *meta.CustomConcurrencyKey) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceConcurrencyKey_valueTruncated(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ValueTruncated, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceConcurrencyKey_valueTruncated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceConcurrencyKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_appID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_appID(ctx, field)
 	if err != nil {
@@ -18732,6 +19017,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
 			case "skipExistingRunID":
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
+			case "customConcurrencyKeys":
+				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
@@ -19093,6 +19380,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_skipReason(ctx, field)
 			case "skipExistingRunID":
 				return ec.fieldContext_RunTraceSpan_skipExistingRunID(ctx, field)
+			case "customConcurrencyKeys":
+				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
@@ -19408,6 +19697,62 @@ func (ec *executionContext) fieldContext_RunTraceSpan_skipExistingRunID(ctx cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_customConcurrencyKeys(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CustomConcurrencyKeys, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]meta.CustomConcurrencyKey)
+	fc.Result = res
+	return ec.marshalNRunTraceConcurrencyKey2ᚕgithubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetaᚐCustomConcurrencyKeyᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_customConcurrencyKeys(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "scope":
+				return ec.fieldContext_RunTraceConcurrencyKey_scope(ctx, field)
+			case "expression":
+				return ec.fieldContext_RunTraceConcurrencyKey_expression(ctx, field)
+			case "value":
+				return ec.fieldContext_RunTraceConcurrencyKey_value(ctx, field)
+			case "expressionTruncated":
+				return ec.fieldContext_RunTraceConcurrencyKey_expressionTruncated(ctx, field)
+			case "valueTruncated":
+				return ec.fieldContext_RunTraceConcurrencyKey_valueTruncated(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunTraceConcurrencyKey", field.Name)
 		},
 	}
 	return fc, nil
@@ -28173,6 +28518,62 @@ func (ec *executionContext) _RunStepInfo(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var runTraceConcurrencyKeyImplementors = []string{"RunTraceConcurrencyKey"}
+
+func (ec *executionContext) _RunTraceConcurrencyKey(ctx context.Context, sel ast.SelectionSet, obj *meta.CustomConcurrencyKey) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runTraceConcurrencyKeyImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunTraceConcurrencyKey")
+		case "scope":
+
+			out.Values[i] = ec._RunTraceConcurrencyKey_scope(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "expression":
+
+			out.Values[i] = ec._RunTraceConcurrencyKey_expression(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "value":
+
+			out.Values[i] = ec._RunTraceConcurrencyKey_value(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "expressionTruncated":
+
+			out.Values[i] = ec._RunTraceConcurrencyKey_expressionTruncated(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "valueTruncated":
+
+			out.Values[i] = ec._RunTraceConcurrencyKey_valueTruncated(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var runTraceSpanImplementors = []string{"RunTraceSpan"}
 
 func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.SelectionSet, obj *models.RunTraceSpan) graphql.Marshaler {
@@ -28349,6 +28750,13 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._RunTraceSpan_skipExistingRunID(ctx, field, obj)
 
+		case "customConcurrencyKeys":
+
+			out.Values[i] = ec._RunTraceSpan_customConcurrencyKeys(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "metadata":
 
 			out.Values[i] = ec._RunTraceSpan_metadata(ctx, field, obj)
@@ -30509,6 +30917,54 @@ func (ec *executionContext) marshalNRunHistoryItem2ᚖgithubᚗcomᚋinngestᚋi
 		return graphql.Null
 	}
 	return ec._RunHistoryItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRunTraceConcurrencyKey2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetaᚐCustomConcurrencyKey(ctx context.Context, sel ast.SelectionSet, v meta.CustomConcurrencyKey) graphql.Marshaler {
+	return ec._RunTraceConcurrencyKey(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRunTraceConcurrencyKey2ᚕgithubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetaᚐCustomConcurrencyKeyᚄ(ctx context.Context, sel ast.SelectionSet, v []meta.CustomConcurrencyKey) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunTraceConcurrencyKey2githubᚗcomᚋinngestᚋinngestᚋpkgᚋtracingᚋmetaᚐCustomConcurrencyKey(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNRunTraceSpan2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx context.Context, sel ast.SelectionSet, v models.RunTraceSpan) graphql.Marshaler {
