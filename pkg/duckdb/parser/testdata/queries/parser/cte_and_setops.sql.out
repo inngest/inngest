@@ -1,0 +1,114 @@
+-- WITH cte AS (SELECT a FROM t) SELECT a FROM cte
+SelectStatement
+  SelectItem()
+    Ident(a)
+  WithClause(recursive=false)
+    CTE(cte)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+  FromClause
+    BaseTableRef(cte,alias=)
+
+-- WITH RECURSIVE base AS (SELECT 1 AS n), next AS (SELECT n + 1 FROM base WHERE n < 10) SELECT n FROM next
+SelectStatement
+  SelectItem()
+    Ident(n)
+  WithClause(recursive=true)
+    CTE(base)
+      SelectStatement
+        SelectItem(n)
+          Literal(1,1)
+    CTE(next)
+      SelectStatement
+        SelectItem()
+          BinaryExpr(+)
+            Ident(n)
+            Literal(1,1)
+        FromClause
+          BaseTableRef(base,alias=)
+        BinaryExpr(<)
+          Ident(n)
+          Literal(1,10)
+  FromClause
+    BaseTableRef(next,alias=)
+
+-- SELECT a FROM t1 UNION SELECT a FROM t2
+SelectStatement(UNION,all=false,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t2,alias=)
+
+-- SELECT a FROM t1 UNION ALL SELECT a FROM t2
+SelectStatement(UNION,all=true,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t2,alias=)
+
+-- SELECT a FROM t1 EXCEPT SELECT a FROM t2
+SelectStatement(EXCEPT,all=false,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t2,alias=)
+
+-- SELECT a FROM t1 INTERSECT SELECT a FROM t2
+SelectStatement(INTERSECT,all=false,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t2,alias=)
+
+-- (SELECT a FROM t1 ORDER BY a LIMIT 5) UNION (SELECT a FROM t2)
+SelectStatement(UNION,all=false,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+    OrderByClause
+      OrderByItem(desc=false,nulls=false/false)
+        Ident(a)
+    LimitClause(all=false,percent=false)
+      Literal(1,5)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t2,alias=)
+
+-- VALUES (1, 'a'), (2, 'b');
+SelectStatement(VALUES,rows=2)
+  Literal(1,1)
+  Literal(0,a)
+  Literal(1,2)
+  Literal(0,b)
+

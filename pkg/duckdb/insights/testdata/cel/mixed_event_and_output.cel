@@ -1,0 +1,1 @@
+event.name == "x" && output.ok == true

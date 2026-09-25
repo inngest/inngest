@@ -1,0 +1,1 @@
+SELECT run_id, sessions.key, sessions.id FROM runs

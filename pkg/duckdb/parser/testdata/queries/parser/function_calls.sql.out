@@ -1,0 +1,47 @@
+-- SELECT count(*) FROM t
+SelectStatement
+  SelectItem()
+    FunctionExpr(count,distinct=false)
+      StarExpr(,exclude=[])
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT count(DISTINCT a) FROM t
+SelectStatement
+  SelectItem()
+    FunctionExpr(count,distinct=true)
+      Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT sum(a) FILTER (WHERE a > 0) FROM t
+SelectStatement
+  SelectItem()
+    FunctionExpr(sum,distinct=false)
+      Ident(a)
+      BinaryExpr(>)
+        Ident(a)
+        Literal(1,0)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT row_number() OVER (PARTITION BY a ORDER BY b) FROM t
+SelectStatement
+  SelectItem()
+    FunctionExpr(row_number,distinct=false)
+      WindowSpec()
+        Ident(a)
+        OrderByClause
+          OrderByItem(desc=false,nulls=false/false)
+            Ident(b)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT row_number() OVER win FROM t;
+SelectStatement
+  SelectItem()
+    FunctionExpr(row_number,distinct=false)
+      WindowSpec(win)
+  FromClause
+    BaseTableRef(t,alias=)
+

@@ -1,0 +1,125 @@
+-- SELECT 1
+SelectStatement
+  SelectItem()
+    Literal(1,1)
+
+-- SELECT a, b FROM t
+SelectStatement
+  SelectItem()
+    Ident(a)
+  SelectItem()
+    Ident(b)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT a AS x, b AS y FROM orders
+SelectStatement
+  SelectItem(x)
+    Ident(a)
+  SelectItem(y)
+    Ident(b)
+  FromClause
+    BaseTableRef(orders,alias=)
+
+-- SELECT t.a, t.b FROM orders t
+SelectStatement
+  SelectItem()
+    Ident(t.a)
+  SelectItem()
+    Ident(t.b)
+  FromClause
+    BaseTableRef(orders,alias=t)
+
+-- SELECT * FROM orders
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    BaseTableRef(orders,alias=)
+
+-- SELECT a, b FROM orders WHERE a = 1
+SelectStatement
+  SelectItem()
+    Ident(a)
+  SelectItem()
+    Ident(b)
+  FromClause
+    BaseTableRef(orders,alias=)
+  BinaryExpr(=)
+    Ident(a)
+    Literal(1,1)
+
+-- SELECT DISTINCT a FROM t
+SelectStatement
+  SelectItem()
+    Ident(a)
+  DistinctClause
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT DISTINCT ON (a) a, b FROM t ORDER BY a
+SelectStatement
+  SelectItem()
+    Ident(a)
+  SelectItem()
+    Ident(b)
+  DistinctClause
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  OrderByClause
+    OrderByItem(desc=false,nulls=false/false)
+      Ident(a)
+
+-- SELECT a, count(*) FROM t GROUP BY a HAVING count(*) > 1
+SelectStatement
+  SelectItem()
+    Ident(a)
+  SelectItem()
+    FunctionExpr(count,distinct=false)
+      StarExpr(,exclude=[])
+  FromClause
+    BaseTableRef(t,alias=)
+  GroupByClause(all=false)
+    GroupByExprItem
+      Ident(a)
+  BinaryExpr(>)
+    FunctionExpr(count,distinct=false)
+      StarExpr(,exclude=[])
+    Literal(1,1)
+
+-- SELECT a FROM t GROUP BY CUBE (a, b)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  GroupByClause(all=false)
+    GroupByCube
+      Ident(a)
+      Ident(b)
+
+-- SELECT a FROM t ORDER BY a DESC, b
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  OrderByClause
+    OrderByItem(desc=true,nulls=false/false)
+      Ident(a)
+    OrderByItem(desc=false,nulls=false/false)
+      Ident(b)
+
+-- SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5;
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  OrderByClause
+    OrderByItem(desc=false,nulls=false/false)
+  LimitClause(all=false,percent=false)
+    Literal(1,10)
+    Literal(1,5)
+
