@@ -14,17 +14,65 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+type asyncCheckpointRecorder struct{ called bool }
+
+func (m *asyncCheckpointRecorder) CheckpointAsyncSteps(context.Context, checkpoint.AsyncCheckpoint) error {
+	m.called = true
+	return nil
+}
+func (*asyncCheckpointRecorder) CheckpointSyncSteps(context.Context, checkpoint.SyncCheckpoint) error {
+	return nil
+}
+func (*asyncCheckpointRecorder) Metrics() checkpoint.MetricsProvider { return nil }
+
+func TestCheckpointAsyncStepsRouteAfterDecode(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		handled    bool
+		status     int
+	}{
+		{"routed", `{"qi_id":"old-job","steps":[]}`, true, http.StatusAccepted},
+		{"local", `{"qi_id":"new-job","steps":[]}`, false, http.StatusOK},
+		{"malformed body", `{"qi_id":`, true, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkpointer := &asyncCheckpointRecorder{}
+			called := false
+			api := &checkpointAPI{
+				Opts:         Opts{AuthFinder: apiv1auth.NilAuthFinder},
+				checkpointer: checkpointer,
+				routeAsyncCheckpoint: func(w http.ResponseWriter, _ *http.Request, accountID uuid.UUID, input CheckpointAsyncStepsRequest) bool {
+					called = true
+					require.Equal(t, consts.DevServerAccountID, accountID)
+					require.NotEmpty(t, input.QueueItemRef)
+					if tc.handled {
+						w.WriteHeader(http.StatusAccepted)
+					}
+					return tc.handled
+				},
+			}
+			rec := httptest.NewRecorder()
+			api.CheckpointAsyncSteps(rec, httptest.NewRequest(http.MethodPost, "/v1/checkpoint/run/async", bytes.NewBufferString(tc.body)))
+			require.Equal(t, tc.status, rec.Code)
+			require.Equal(t, tc.status != http.StatusBadRequest, called)
+			require.Equal(t, !tc.handled && tc.status == http.StatusOK, checkpointer.called)
+		})
+	}
+}
 
 // mockOutputReader implements RunOutputReader for testing
 type mockOutputReader struct {
