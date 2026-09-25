@@ -16,9 +16,7 @@ const (
 	prefix = "inngest"
 )
 
-var (
-	registry = newRegistry()
-)
+var registry = newRegistry()
 
 //
 // NOTE:

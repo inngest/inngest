@@ -242,9 +242,6 @@ type FastPathOptions struct {
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function
-	// FastPath opts this request into enqueue notifications. The zero value is off;
-	// synchronous runs never enqueue or notify, even when enabled.
-	FastPath FastPathOptions
 	// At allows functions to be scheduled in the future.
 	At *time.Time
 	// AccountID is the account that the request belongs to.
@@ -317,6 +314,10 @@ type ScheduleRequest struct {
 	// if we're queuing a function as a result of a sync run going async, as
 	// the SDK has already been run at that point.
 	RequestVersion *int
+
+	// FastPath opts this request into enqueue notifications, which broadcast the
+	// enqueue to executors for immediate lease and execution (depending on capacity).
+	FastPath FastPathOptions
 }
 
 // NewScheduleRequest creates an initial ScheduleRequest given a deployed
