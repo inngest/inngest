@@ -2,10 +2,16 @@ export const MAX_INSIGHTS_QUERY_ID_BYTES = 128;
 export const MAX_INSIGHTS_SQL_BYTES = 8 * 1024;
 export const MAX_INSIGHTS_NAME_BYTES = 128;
 
+export type InsightsDeepLinkIntent =
+  | { kind: 'saved-query'; id: string }
+  | {
+      kind: 'sql-prefill';
+      sql: string;
+      name: string | undefined;
+    };
+
 export type InsightsSearchParams = {
-  query_id?: string;
-  sql?: string;
-  name?: string;
+  intent?: InsightsDeepLinkIntent;
 };
 
 const encoder = new TextEncoder();
@@ -25,7 +31,7 @@ export function validateInsightsSearch(
   // malformed query_id links cannot fall through to a co-supplied SQL value.
   if (queryID) {
     return isWithinByteLimit(queryID, MAX_INSIGHTS_QUERY_ID_BYTES)
-      ? { query_id: queryID }
+      ? { intent: { kind: 'saved-query', id: queryID } }
       : {};
   }
 
@@ -35,11 +41,10 @@ export function validateInsightsSearch(
   }
 
   const name = typeof search.name === 'string' ? search.name.trim() : undefined;
-  if (name && isWithinByteLimit(name, MAX_INSIGHTS_NAME_BYTES)) {
-    return { sql, name };
-  }
+  const validName =
+    name && isWithinByteLimit(name, MAX_INSIGHTS_NAME_BYTES) ? name : undefined;
 
-  return { sql };
+  return { intent: { kind: 'sql-prefill', sql, name: validName } };
 }
 
 export function insightsURL(envSlug: string): string {
@@ -51,10 +56,45 @@ export function sqlPrefillInsightsURL(
   sql: string,
   name?: string,
 ): string | undefined {
-  const search = validateInsightsSearch({ sql, name });
-  if (!search.sql) return undefined;
+  const intent = validateInsightsSearch({ sql, name }).intent;
+  if (intent?.kind !== 'sql-prefill') return undefined;
 
-  const params = new URLSearchParams({ sql: search.sql });
-  if (search.name) params.set('name', search.name);
+  const params = new URLSearchParams({ sql: intent.sql });
+  if (intent.name) params.set('name', intent.name);
   return `${insightsURL(envSlug)}?${params.toString()}`;
+}
+
+export function consumeSQLPrefillURL(href: string): string {
+  return updateInsightsURL(href, (params) => {
+    params.delete('intent');
+    params.delete('sql');
+    params.delete('name');
+  });
+}
+
+export function syncSavedQueryURL(
+  href: string,
+  queryID: string | undefined,
+): string | undefined {
+  const intent = queryID
+    ? validateInsightsSearch({ query_id: queryID }).intent
+    : undefined;
+  if (queryID && intent?.kind !== 'saved-query') return undefined;
+
+  return updateInsightsURL(href, (params) => {
+    params.delete('intent');
+    params.delete('query_id');
+    params.delete('sql');
+    params.delete('name');
+    if (intent?.kind === 'saved-query') params.set('query_id', intent.id);
+  });
+}
+
+function updateInsightsURL(
+  href: string,
+  update: (params: URLSearchParams) => void,
+): string {
+  const url = new URL(href, 'https://app.inngest.local');
+  update(url.searchParams);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
