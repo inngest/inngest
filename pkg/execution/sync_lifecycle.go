@@ -186,8 +186,9 @@ type SyncLifecycleListener interface {
 	// explicitly excludes. status is enums.StepStatusErrored when the step
 	// will be retried (a non-final OpcodeStepError) or enums.StepStatusFailed
 	// once no attempts remain, matching executor.emitStepSpan's own status
-	// switch for these opcodes. attempt is the (1-indexed) attempt number
-	// this failure occurred on — used for both the span's step.attempt
+	// switch for these opcodes. attempt is the zero-indexed attempt number
+	// this failure occurred on (runCtx.AttemptCount(), i.e. queue.Item's
+	// Attempt) — used for both the span's step.attempt
 	// attribute and, when status is Errored, to compute a per-attempt span
 	// identity (see tracing.RetryStepDynamicSeed) distinct from the step's
 	// eventual finalized span. now is the caller's own "this just happened"
