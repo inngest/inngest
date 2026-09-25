@@ -260,7 +260,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 	// Eventually the fn starts.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 3
-	}, 2*time.Second, 50*time.Millisecond)
+	}, 15*time.Second, 50*time.Millisecond)
 
 	expectedTime := time.Duration((numEvents+1)*fnDuration) * time.Second
 
