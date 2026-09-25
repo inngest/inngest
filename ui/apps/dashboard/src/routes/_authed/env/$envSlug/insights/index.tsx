@@ -32,6 +32,7 @@ const INITIAL_TAB_ACTIONS: TabManagerActions = {
   createNewTab: () => {},
   createTabFromQuery: () => {},
   focusTab: () => {},
+  openQueryTab: () => {},
   openTemplatesTab: () => {},
   updateTab: () => {},
 };
@@ -45,12 +46,6 @@ function InsightsComponent() {
   });
   const historyWindow = entitlementsData?.account.entitlements.history.limit;
 
-  const search = Route.useSearch();
-  const deepLinkQueryId =
-    typeof search.query_id === 'string' && search.query_id.length > 0
-      ? search.query_id
-      : undefined;
-
   // Create a ref for actions that will be populated inside InsightsWithTabManager
   // This allows StoredQueriesProvider to use the latest actions without recreating the provider
   const actionsRef = useRef<TabManagerActions>(INITIAL_TAB_ACTIONS);
@@ -63,7 +58,6 @@ function InsightsComponent() {
         onToggleQueryHelperPanelVisibility={() =>
           setIsQueryHelperPanelVisible((visible) => !visible)
         }
-        deepLinkQueryId={deepLinkQueryId}
         actionsRef={actionsRef}
       />
     </StoredQueriesProvider>
@@ -74,7 +68,6 @@ interface InsightsWithTabManagerProps {
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  deepLinkQueryId?: string;
   actionsRef: React.MutableRefObject<TabManagerActions>;
 }
 
@@ -82,7 +75,6 @@ function InsightsWithTabManager({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  deepLinkQueryId,
   actionsRef,
 }: InsightsWithTabManagerProps) {
   const { isSavedQueriesFetching } = useStoredQueries();
@@ -93,7 +85,6 @@ function InsightsWithTabManager({
       isQueryHelperPanelVisible,
       onToggleQueryHelperPanelVisibility,
       isSavedQueriesFetching,
-      deepLinkQueryId,
     });
 
   // Update the ref with real actions so StoredQueriesProvider can use them
