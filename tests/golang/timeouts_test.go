@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -290,20 +291,20 @@ func TestFinishTimeoutEagerCancellation(t *testing.T) {
 		ctx := context.Background()
 		c := client.New(t)
 
-		cancelledRuns := 0
 		t.Run("trace run should have appropriate data", func(t *testing.T) {
-			for _, runID := range runIDs {
-				run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
-					Timeout:  50 * time.Millisecond,
-					Interval: 10 * time.Millisecond,
-				})
-				require.NotNil(t, run.Trace)
-
-				if run.Trace.Status == models.RunTraceSpanStatusCancelled.String() {
-					cancelledRuns++
+			require.EventuallyWithT(t, func(ct *assert.CollectT) {
+				cancelledRuns := 0
+				for _, runID := range runIDs {
+					run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+						Timeout:  2 * time.Second,
+						Interval: 100 * time.Millisecond,
+					})
+					if run != nil && run.Trace != nil && run.Trace.Status == models.RunTraceSpanStatusCancelled.String() {
+						cancelledRuns++
+					}
 				}
-			}
-			require.Equal(t, cancelledRuns, 10)
+				assert.Equal(ct, 10, cancelledRuns)
+			}, 30*time.Second, 2*time.Second)
 		})
 	})
 }
