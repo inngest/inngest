@@ -112,6 +112,37 @@ type RunMetadataTarget struct {
 	SpanID      *string `json:"span_id"`
 }
 
+// hashedStepID returns the internal hashed step ID (meta.Attrs.StepID) for
+// the target's userland StepID and StepIndex. StepID must be non-nil.
+func (t *RunMetadataTarget) hashedStepID() string {
+	if t.StepIndex == nil || *t.StepIndex == 0 {
+		sum := sha1.Sum([]byte(*t.StepID))
+		return hex.EncodeToString(sum[:])
+	}
+	sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *t.StepID, *t.StepIndex))
+	return hex.EncodeToString(sum[:])
+}
+
+// addStepIdentity adds the target's step identity to a metadata span's attrs
+// so OnMetadataEntry listeners can attribute it to a step (see
+// tracing.buildSyncMetadataEntry). No-op for run-scoped targets.
+func (t *RunMetadataTarget) addStepIdentity(attrs *meta.SerializableAttrs) {
+	if t.StepID == nil {
+		return
+	}
+	hashed := t.hashedStepID()
+	meta.AddAttr(attrs, meta.Attrs.StepID, &hashed)
+	meta.AddAttr(attrs, meta.Attrs.StepUserlandID, t.StepID)
+	if t.StepIndex != nil {
+		meta.AddAttr(attrs, meta.Attrs.StepUserlandIndex, t.StepIndex)
+	}
+	// A nil or negative attempt means "latest attempt", which isn't known
+	// without a span lookup.
+	if t.StepAttempt != nil && *t.StepAttempt >= 0 {
+		meta.AddAttr(attrs, meta.Attrs.StepAttempt, t.StepAttempt)
+	}
+}
+
 type AddRunMetadataRequest struct {
 	Target   RunMetadataTarget `json:"target"`
 	Metadata []metadata.Update `json:"metadata"`
@@ -201,14 +232,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	case req.Target.StepAttempt == nil || req.Target.SpanID == nil:
 		scope = enums.MetadataScopeStep
 
-		var hashedStepID string
-		if req.Target.StepIndex == nil || *req.Target.StepIndex == 0 {
-			sum := sha1.Sum([]byte(*req.Target.StepID))
-			hashedStepID = hex.EncodeToString(sum[:])
-		} else {
-			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *req.Target.StepID, *req.Target.StepIndex))
-			hashedStepID = hex.EncodeToString(sum[:])
-		}
+		hashedStepID := req.Target.hashedStepID()
 
 		if req.Target.StepAttempt == nil || *req.Target.StepAttempt < 0 {
 			parentSpanRef = tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID)
@@ -236,6 +260,14 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &stateMetadata.ID.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &stateMetadata.ID.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &stateMetadata.ID.Tenant.AppID)
+		req.Target.addStepIdentity(cfg.Attrs)
+	}
+	spanOpts := []tracing.MetadataSpanAttrOpts{addTenantIDs}
+	// The request-local fallback only carries partialID (no FunctionID or
+	// AppID), so only dispatch to sync listeners once the full identity was
+	// loaded from state.
+	if loadedFromState {
+		spanOpts = append(spanOpts, tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...))
 	}
 
 	for _, md := range req.Metadata {
@@ -248,8 +280,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			stateMetadata,
 			md,
 			scope,
-			addTenantIDs,
-			tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
+			spanOpts...,
 		)
 		if err != nil {
 			return err
@@ -390,6 +421,24 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &parentSpan.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &parentSpan.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)
+		req.Target.addStepIdentity(cfg.Attrs)
+		// Prefer the step identity resolved from the parent span, which
+		// pins the concrete attempt when the request asked for the latest.
+		if req.Target.StepID != nil && parentSpan.Attributes != nil {
+			pa := parentSpan.Attributes
+			if pa.StepID != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, pa.StepID)
+			}
+			if pa.StepUserlandID != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandID, pa.StepUserlandID)
+			}
+			if pa.StepUserlandIndex != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandIndex, pa.StepUserlandIndex)
+			}
+			if pa.StepAttempt != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, pa.StepAttempt)
+			}
+		}
 	}
 
 	for _, md := range req.Metadata {
@@ -447,14 +496,7 @@ func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID 
 		scope = enums.MetadataScopeRun
 		span, err = a.opts.TraceReader.GetRunSpanByRunID(ctx, runID, auth.AccountID(), auth.WorkspaceID())
 	case target.StepAttempt == nil || target.SpanID == nil:
-		var stepID string
-		if target.StepIndex == nil || *target.StepIndex == 0 {
-			sum := sha1.Sum([]byte(*target.StepID))
-			stepID = hex.EncodeToString(sum[:])
-		} else {
-			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *target.StepID, *target.StepIndex))
-			stepID = hex.EncodeToString(sum[:])
-		}
+		stepID := target.hashedStepID()
 
 		if target.StepAttempt == nil || *target.StepAttempt < 0 {
 			scope = enums.MetadataScopeStep
