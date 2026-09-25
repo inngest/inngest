@@ -69,7 +69,9 @@ type RunOutputReader interface {
 }
 
 // AsyncCheckpointRouter may handle an authenticated, decoded checkpoint before
-// the local state store is written. A true result means it wrote the response.
+// the local state store is written. The request body has already been consumed;
+// a callback that forwards the checkpoint must build a new body from the decoded
+// CheckpointAsyncStepsRequest. A true result means it wrote the response.
 type AsyncCheckpointRouter func(http.ResponseWriter, *http.Request, uuid.UUID, CheckpointAsyncStepsRequest) bool
 
 // CheckpointAPIOpts represents options for the checkpoint API.
