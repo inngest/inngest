@@ -246,7 +246,7 @@ export const MCPSetup = ({
               />
               {!isDevServer && (
                 <p className="text-muted mt-3 text-sm">
-                  The key&apos;s permissions and environment limits apply to every tool call.
+                  Environment limits apply to every tool call. New keys also enforce permissions.
                 </p>
               )}
               {apiKeysHref && (
