@@ -4,6 +4,7 @@ import {
   MAX_INSIGHTS_NAME_BYTES,
   MAX_INSIGHTS_QUERY_ID_BYTES,
   MAX_INSIGHTS_SQL_BYTES,
+  sqlPrefillInsightsURL,
   validateInsightsSearch,
 } from './insightsSearchParams';
 
@@ -58,5 +59,26 @@ describe('validateInsightsSearch', () => {
     expect(
       validateInsightsSearch({ name: 'orphan', cel: 'event.data.x' }),
     ).toEqual({});
+  });
+
+  it('builds encoded SQL-prefill links through the same validation boundary', () => {
+    expect(
+      sqlPrefillInsightsURL(
+        'production/eu',
+        "SELECT 'A & B + C' AS marker",
+        '  Runs / café  ',
+      ),
+    ).toBe(
+      '/env/production%2Feu/insights?sql=SELECT+%27A+%26+B+%2B+C%27+AS+marker&name=Runs+%2F+caf%C3%A9',
+    );
+  });
+
+  it('refuses to emit SQL-prefill links the route would discard', () => {
+    expect(
+      sqlPrefillInsightsURL(
+        'production',
+        'é'.repeat(MAX_INSIGHTS_SQL_BYTES / 2 + 1),
+      ),
+    ).toBeUndefined();
   });
 });

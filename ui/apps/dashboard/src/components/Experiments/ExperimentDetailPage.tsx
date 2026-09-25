@@ -264,12 +264,14 @@ export function ExperimentDetailPage({
   const onOpenInsights = useCallback(() => {
     const sql = insightsQuery.data;
     if (!sql) return;
+    const href = insightsUrl(environment.slug, sql);
+    if (!href) return;
     trackOpenedInInsights({
       feature: 'experiments',
       variantCount: detail.data?.variants.length ?? 0,
       selectedVariantCount: selectedVariants.length,
     });
-    window.open(insightsUrl(environment.slug, sql), '_blank');
+    window.open(href, '_blank');
   }, [
     insightsQuery.data,
     environment.slug,

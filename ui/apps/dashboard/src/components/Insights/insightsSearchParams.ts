@@ -41,3 +41,20 @@ export function validateInsightsSearch(
 
   return { sql };
 }
+
+export function insightsURL(envSlug: string): string {
+  return `/env/${encodeURIComponent(envSlug)}/insights`;
+}
+
+export function sqlPrefillInsightsURL(
+  envSlug: string,
+  sql: string,
+  name?: string,
+): string | undefined {
+  const search = validateInsightsSearch({ sql, name });
+  if (!search.sql) return undefined;
+
+  const params = new URLSearchParams({ sql: search.sql });
+  if (search.name) params.set('name', search.name);
+  return `${insightsURL(envSlug)}?${params.toString()}`;
+}
