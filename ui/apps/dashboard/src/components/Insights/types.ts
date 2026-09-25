@@ -15,8 +15,4 @@ export interface Tab {
   name: string;
   query: string;
   savedQueryId?: string;
-  // Set transiently when a tab is created with a seeded query that should
-  // execute automatically on first mount. Cleared by the state machine
-  // provider after firing.
-  runOnMount?: boolean;
 }

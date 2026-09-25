@@ -40,12 +40,12 @@ import { HOME_TAB, TEMPLATES_TAB, UNTITLED_QUERY } from './constants';
 
 const TABS_STORAGE_KEY = 'insights-tabs-state';
 
-interface TabsStorageState {
+export interface TabsState {
   tabs: Tab[];
   activeTabId: string;
 }
 
-function getStoredTabs(): TabsStorageState | null {
+function getStoredTabs(): TabsState | null {
   // Skip during SSR - localStorage only exists in browser
   if (typeof window === 'undefined') return null;
   try {
@@ -68,21 +68,15 @@ function saveTabsToStorage(tabs: Tab[], activeTabId: string) {
   } catch {}
 }
 
-export interface CreateTabFromQueryOptions {
-  // Auto-run the seeded query after the new tab mounts. Used by deep-link
-  // entry points (e.g. the Failed Functions "Open in Insights" button).
-  runOnMount?: boolean;
-}
-
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTabFromQuery: (
     query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
-    options?: CreateTabFromQueryOptions,
   ) => void;
   focusTab: (id: string) => void;
+  openQueryTab: (tab: Tab) => void;
   openTemplatesTab: () => void;
   updateTab: (id: string, patch: Partial<Omit<Tab, 'id'>>) => void;
 }
@@ -100,15 +94,17 @@ export interface UseInsightsTabManagerProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   isSavedQueriesFetching: boolean;
-  deepLinkQueryId?: string;
 }
 
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps,
 ): UseInsightsTabManagerReturn {
   // Always initialize with default state to ensure SSR and hydration match
-  const [tabs, setTabs] = useState<Tab[]>([HOME_TAB]);
-  const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const [tabState, setTabState] = useState<TabsState>({
+    tabs: [HOME_TAB],
+    activeTabId: HOME_TAB.id,
+  });
+  const { tabs, activeTabId } = tabState;
   const hasHydratedRef = useRef(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -118,29 +114,12 @@ export function useInsightsTabManager(
 
     const stored = getStoredTabs();
     if (stored) {
-      setTabs(stored.tabs);
-
-      // Handle activeTabId based on deep link
-      if (props.deepLinkQueryId) {
-        // If there's a deep link, check if the query is already in restored tabs
-        const existingTab = stored.tabs.find(
-          (tab) => tab.savedQueryId === props.deepLinkQueryId,
-        );
-        if (existingTab) {
-          // Focus the existing tab
-          setActiveTabId(existingTab.id);
-        }
-        // If not found, useDeepLinkHandler will create it and focus it
-        // See: ui/apps/dashboard/src/components/Insights/useDeepLinkHandler.ts
-      } else {
-        // No deep link, restore the previous activeTabId
-        setActiveTabId(stored.activeTabId);
-      }
+      setTabState(stored);
     }
 
     hasHydratedRef.current = true;
     setIsHydrated(true);
-  }, [props.isSavedQueriesFetching, props.deepLinkQueryId]);
+  }, [props.isSavedQueriesFetching]);
 
   // Save tabs to local storage whenever they change (skip first render)
   useEffect(() => {
@@ -158,50 +137,59 @@ export function useInsightsTabManager(
     return id;
   }, []);
 
-  const createTabBase = useCallback(
-    (tab: Tab) => {
-      setTabs((prev) => [...prev, tab]);
-      setActiveTabId(tab.id);
-    },
-    [setActiveTabId],
-  );
+  const createTabBase = useCallback((tab: Tab) => {
+    setTabState((state) => ({
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
+    }));
+  }, []);
+
+  const openQueryTab = useCallback((tab: Tab) => {
+    setTabState((state) => openQueryTabInState(state, tab));
+  }, []);
 
   const actions = useMemo(
     () => ({
       breakQueryAssociation: (savedQueryId: string) => {
-        setTabs((prevTabs) => {
+        setTabState((state) => {
           // Find the tab associated with this savedQueryId
-          const tabToClose = prevTabs.find(
+          const tabToClose = state.tabs.find(
             (tab) => tab.savedQueryId === savedQueryId,
           );
 
           if (tabToClose) {
             // Close the tab entirely when query is deleted
-            const newTabs = prevTabs.filter((tab) => tab.id !== tabToClose.id);
-            const newActiveTabId = getNewActiveTabAfterClose(
-              prevTabs,
-              tabToClose.id,
-              activeTabId,
+            const newTabs = state.tabs.filter(
+              (tab) => tab.id !== tabToClose.id,
             );
-            if (newActiveTabId !== undefined) setActiveTabId(newActiveTabId);
-            return newTabs;
+            const newActiveTabId = getNewActiveTabAfterClose(
+              state.tabs,
+              tabToClose.id,
+              state.activeTabId,
+            );
+            return {
+              tabs: newTabs,
+              activeTabId: newActiveTabId ?? state.activeTabId,
+            };
           }
 
-          return prevTabs;
+          return state;
         });
       },
       closeTab: (id: string) => {
-        setTabs((prevTabs) => {
-          const newTabs = prevTabs.filter((tab) => tab.id !== id);
+        setTabState((state) => {
+          const newTabs = state.tabs.filter((tab) => tab.id !== id);
 
           const newActiveTabId = getNewActiveTabAfterClose(
-            prevTabs,
+            state.tabs,
             id,
-            activeTabId,
+            state.activeTabId,
           );
-          if (newActiveTabId !== undefined) setActiveTabId(newActiveTabId);
 
-          return newTabs;
+          return {
+            tabs: newTabs,
+            activeTabId: newActiveTabId ?? state.activeTabId,
+          };
         });
       },
       createNewTab: () => {
@@ -209,61 +197,50 @@ export function useInsightsTabManager(
       },
       createTabFromQuery: (
         query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
-        options?: CreateTabFromQueryOptions,
       ) => {
-        const runOnMount = options?.runOnMount ? true : undefined;
-
         if (isQueryTemplate(query)) {
-          createTabBase({
+          openQueryTab({
             ...makeEmptyUnsavedTab(),
             query: query.query,
             name: query.name,
-            runOnMount,
           });
           return;
         }
 
         if (isQuerySnapshot(query)) {
-          createTabBase({
-            ...makeEmptyUnsavedTab(),
-            query: query.query,
-            runOnMount,
-          });
+          openQueryTab({ ...makeEmptyUnsavedTab(), query: query.query });
           return;
         }
 
-        const tabWithSameSavedQueryId = tabs.find(
-          (tab) => tab.savedQueryId === query.id,
-        );
-        if (tabWithSameSavedQueryId !== undefined) {
-          setActiveTabId(tabWithSameSavedQueryId.id);
-          return;
-        }
-
-        createTabBase({
+        openQueryTab({
           id: ulid(),
           name: query.name,
           query: query.sql,
           savedQueryId: query.id,
-          runOnMount,
         });
       },
-      focusTab: setActiveTabId,
-      openTemplatesTab: () => {
-        const hasTemplatesTab = tabs.some((tab) => tab.id === TEMPLATES_TAB.id);
-        if (!hasTemplatesTab) {
-          createTabBase(TEMPLATES_TAB);
-        } else {
-          setActiveTabId(TEMPLATES_TAB.id);
-        }
+      focusTab: (id: string) => {
+        setTabState((state) => ({ ...state, activeTabId: id }));
       },
-      updateTab: (id: string, tab: Partial<Omit<Tab, 'id'>>) => {
-        setTabs((prevTabs) =>
-          prevTabs.map((t) => (t.id === id ? { ...t, ...tab } : t)),
+      openQueryTab,
+      openTemplatesTab: () => {
+        setTabState((state) =>
+          state.tabs.some((tab) => tab.id === TEMPLATES_TAB.id)
+            ? { ...state, activeTabId: TEMPLATES_TAB.id }
+            : {
+                tabs: [...state.tabs, TEMPLATES_TAB],
+                activeTabId: TEMPLATES_TAB.id,
+              },
         );
       },
+      updateTab: (id: string, tab: Partial<Omit<Tab, 'id'>>) => {
+        setTabState((state) => ({
+          ...state,
+          tabs: state.tabs.map((t) => (t.id === id ? { ...t, ...tab } : t)),
+        }));
+      },
     }),
-    [activeTabId, createTabBase, tabs],
+    [createTabBase, openQueryTab],
   );
 
   const tabManager = useMemo(
@@ -327,15 +304,11 @@ function SingleTabRenderer({
   return (
     <InsightsStateMachineContextProvider
       key={tab.id}
-      onAutoRunConsumed={() =>
-        actions.updateTab(tab.id, { runOnMount: undefined })
-      }
       onQueryChange={(query) => actions.updateTab(tab.id, { query })}
       onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
       query={tab.query}
       queryName={tab.name}
       renderChildren={isActive}
-      runOnMount={tab.runOnMount}
       tabId={tab.id}
     >
       <CellDetailProvider onOpenPanel={handleOpenCellDetailPanel}>
@@ -605,6 +578,23 @@ function getNewActiveTabAfterClose(
     remainingTabs[closingTabIndex]?.id ??
     remainingTabs[closingTabIndex - 1]?.id;
   return newlySelectedTabId;
+}
+
+export function openQueryTabInState(state: TabsState, tab: Tab): TabsState {
+  const existingTab = tab.savedQueryId
+    ? state.tabs.find(
+        (candidate) => candidate.savedQueryId === tab.savedQueryId,
+      )
+    : state.tabs.find((candidate) => candidate.id === tab.id);
+
+  if (existingTab) {
+    return { ...state, activeTabId: existingTab.id };
+  }
+
+  return {
+    tabs: [...state.tabs, tab],
+    activeTabId: tab.id,
+  };
 }
 
 export function hasDiffWithSavedQuery(
