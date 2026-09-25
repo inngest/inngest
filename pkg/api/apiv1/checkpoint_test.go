@@ -45,7 +45,7 @@ func TestCheckpointAsyncStepsRouteAfterDecode(t *testing.T) {
 		handled    bool
 		status     int
 	}{
-		{"routed", `{"qi_id":"old-job","steps":[]}`, true, http.StatusAccepted},
+		{"routed", `{"qi_id":"old-job","steps":[{"op":"Step","opts":{"input":{"id":9007199254740993}}}]}`, true, http.StatusAccepted},
 		{"local", `{"qi_id":"new-job","steps":[]}`, false, http.StatusOK},
 		{"malformed body", `{"qi_id":`, true, http.StatusBadRequest},
 	} {
@@ -55,10 +55,11 @@ func TestCheckpointAsyncStepsRouteAfterDecode(t *testing.T) {
 			api := &checkpointAPI{
 				Opts:         Opts{AuthFinder: apiv1auth.NilAuthFinder},
 				checkpointer: checkpointer,
-				routeAsyncCheckpoint: func(w http.ResponseWriter, _ *http.Request, accountID uuid.UUID, input CheckpointAsyncStepsRequest) bool {
+				routeAsyncCheckpoint: func(w http.ResponseWriter, _ *http.Request, accountID uuid.UUID, input CheckpointAsyncStepsRequest, original []byte) bool {
 					called = true
 					require.Equal(t, consts.DevServerAccountID, accountID)
 					require.NotEmpty(t, input.QueueItemRef)
+					require.Equal(t, tc.body, string(original))
 					if tc.handled {
 						w.WriteHeader(http.StatusAccepted)
 					}

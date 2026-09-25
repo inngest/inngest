@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -69,10 +70,10 @@ type RunOutputReader interface {
 }
 
 // AsyncCheckpointRouter may handle an authenticated, decoded checkpoint before
-// the local state store is written. The request body has already been consumed;
-// a callback that forwards the checkpoint must build a new body from the decoded
-// CheckpointAsyncStepsRequest. A true result means it wrote the response.
-type AsyncCheckpointRouter func(http.ResponseWriter, *http.Request, uuid.UUID, CheckpointAsyncStepsRequest) bool
+// the local state store is written. The callback also receives the original JSON
+// bytes read during decoding so forwarding does not change values in untyped
+// fields. The request body has been consumed. A true result means it wrote the response.
+type AsyncCheckpointRouter func(http.ResponseWriter, *http.Request, uuid.UUID, CheckpointAsyncStepsRequest, []byte) bool
 
 // CheckpointAPIOpts represents options for the checkpoint API.
 type CheckpointAPIOpts struct {
@@ -385,11 +386,16 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 
 	// checkpoint those steps by writing to state.
 	input := CheckpointAsyncStepsRequest{}
-	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
+	body := io.Reader(r.Body)
+	var original bytes.Buffer
+	if a.routeAsyncCheckpoint != nil {
+		body = io.TeeReader(body, &original)
+	}
+	if err = json.NewDecoder(body).Decode(&input); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
-	if a.routeAsyncCheckpoint != nil && a.routeAsyncCheckpoint(w, r.WithContext(ctx), auth.AccountID(), input) {
+	if a.routeAsyncCheckpoint != nil && a.routeAsyncCheckpoint(w, r.WithContext(ctx), auth.AccountID(), input, original.Bytes()) {
 		return
 	}
 
