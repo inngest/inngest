@@ -39,8 +39,6 @@ function APIKeysPage() {
     organizationRole: membership?.role,
   });
 
-  // Create modal state is owned here so it survives the empty->populated
-  // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
