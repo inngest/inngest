@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -26,6 +27,14 @@ type hintTestShard struct {
 	migrationErr   error
 	beforeLease    func()
 	leaseNow       time.Time
+	kind           enums.QueueShardKind
+}
+
+func (s *hintTestShard) Kind() enums.QueueShardKind {
+	if s.kind != "" {
+		return s.kind
+	}
+	return enums.QueueShardKindRedis
 }
 
 func (s *hintTestShard) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, opts ...LeaseOptionFn) (*ulid.ULID, error) {
@@ -312,7 +321,9 @@ func TestItemHintLeasesEarlyButWorkerWaits(t *testing.T) {
 	waiting := make(chan time.Duration, 1)
 	q.QueueOptions.Clock = hintWaitClock{clock, waiting}
 	item := hintItem(shard.item, "early")
+	item.EnqueuedAt = clock.Now().Add(-100 * time.Millisecond).UnixMilli()
 	item.AtMS = clock.Now().Add(2 * time.Second).UnixMilli()
+	beforeCount, beforeSum, _ := hintMetrics(t)
 	executed := make(chan time.Time, 1)
 	done := make(chan error, 1)
 	got := q.processItemHint(t.Context(), item, func(ctx context.Context, work ProcessItem) (DispatchedItem, error) {
@@ -336,6 +347,8 @@ func TestItemHintLeasesEarlyButWorkerWaits(t *testing.T) {
 		t.Fatal("worker did not wait")
 	}
 	clock.Advance(1999 * time.Millisecond)
+	count, _, _ := hintMetrics(t)
+	require.Equal(t, beforeCount, count, "leasing and waiting must not record a work start")
 	select {
 	case <-executed:
 		t.Fatal("worker executed early")
@@ -354,6 +367,9 @@ func TestItemHintLeasesEarlyButWorkerWaits(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("worker did not finish")
 	}
+	count, sum, _ := hintMetrics(t)
+	require.Equal(t, beforeCount+1, count)
+	require.EqualValues(t, 2100, sum-beforeSum, "include enqueue delay and the wait until due")
 }
 
 func hintItem(item QueueItem, id string) QueueItem { item.ID = id; return item }

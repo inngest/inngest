@@ -430,6 +430,14 @@ func (q *queueProcessor) ProcessItem(
 			)
 		}
 		n := q.Clock().Now()
+		// Measure only work dispatched by a hint, after the wait-until-due.
+		// Unlike qi.Latency, this includes time waiting for capacity or a backlog.
+		if i.fromHint && qi.EnqueuedAt > 0 && n.UnixMilli() >= qi.EnqueuedAt {
+			metrics.HistogramFastPathExecutionLatency(ctx, n.UnixMilli()-qi.EnqueuedAt, metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"queue_shard": shard.Name(), "queue_backend": string(shard.Kind())},
+			})
+		}
 
 		// Track the sojourn (concurrency) latency.
 		sojourn := qi.SojournLatency(n)

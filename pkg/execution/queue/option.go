@@ -842,7 +842,9 @@ type ProcessItem struct {
 	CapacityLease *CapacityLease
 
 	ConditionalTraceCtx context.Context
-	result              *dispatchedItemHandle
+	// fromHint identifies the dispatch that won the lease, not enqueue intent.
+	fromHint bool
+	result   *dispatchedItemHandle
 }
 
 type capacityLease struct {
