@@ -47,6 +47,7 @@ export function EventsTable({
   standalone = false,
   pollInterval,
   autoRefresh,
+  celSearchEnabled,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -83,9 +84,15 @@ export function EventsTable({
   standalone?: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
+  // Whether the CEL search button is enabled. Defaults to `cloud` (the
+  // shared-context flag) when omitted, so cloud callers keep their
+  // existing behavior; self-hosted callers pass this explicitly (e.g. once
+  // duckdb mode makes CEL event search available).
+  celSearchEnabled?: boolean;
 }) {
   const { pathCreator } = usePathCreator();
   const { cloud } = useShared();
+  const searchEnabled = celSearchEnabled ?? cloud;
   const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
@@ -235,8 +242,7 @@ export function EventsTable({
               selectedEntities={filteredEvent ?? []}
               entities={eventTypesData ?? []}
             /> */}
-            {/* TODO: Remove disabled prop when search is implemented in Dev Server */}
-            {cloud ? (
+            {searchEnabled ? (
               <Button
                 icon={<RiSearchLine />}
                 size="small"
