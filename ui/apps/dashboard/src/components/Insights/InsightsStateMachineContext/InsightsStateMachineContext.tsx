@@ -10,8 +10,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
+import { trackInsightsQueryRan } from '@/utils/analyticsEvents';
+import type { InsightsQueryRunTrigger } from '../types';
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
+
+type RunQueryOptions = {
+  trigger?: InsightsQueryRunTrigger;
+};
 
 interface InsightsStateMachineContextValue {
   data: InsightsFetchResult | undefined;
@@ -20,7 +26,7 @@ interface InsightsStateMachineContextValue {
   queryName: string;
   onChange: (value: string) => void;
   onNameChange: (name: string) => void;
-  runQuery: () => void;
+  runQuery: (options?: RunQueryOptions) => void;
   status: InsightsStatus;
 }
 
@@ -36,6 +42,7 @@ type InsightsStateMachineContextProviderProps = {
   queryName: string;
   renderChildren: boolean;
   runOnMount?: boolean;
+  savedQueryId?: string;
   tabId: string;
 };
 
@@ -48,27 +55,81 @@ export function InsightsStateMachineContextProvider({
   queryName,
   renderChildren,
   runOnMount,
+  savedQueryId,
   tabId,
 }: InsightsStateMachineContextProviderProps) {
   const { fetchInsights } = useFetchInsights();
   const { saveQuerySnapshot } = useStoredQueries();
+  const runQueryTriggerRef = useRef<InsightsQueryRunTrigger>('unknown');
 
   const { data, error, isError, isFetching, refetch } = useQuery({
     enabled: false,
     gcTime: 0,
     queryKey: ['insights', tabId],
-    queryFn: () => {
-      return fetchInsights({ query, queryName }, (query, queryName) => {
-        saveQuerySnapshot(makeQuerySnapshot(query, queryName));
-      });
+    queryFn: async () => {
+      const trigger = runQueryTriggerRef.current;
+      const startedAt =
+        typeof performance === 'undefined' ? Date.now() : performance.now();
+      const getDurationMs = () =>
+        Math.round(
+          (typeof performance === 'undefined'
+            ? Date.now()
+            : performance.now()) - startedAt,
+        );
+
+      try {
+        const result = await fetchInsights(
+          { query, queryName },
+          (query, queryName) => {
+            saveQuerySnapshot(makeQuerySnapshot(query, queryName));
+          },
+        );
+        const hasDiagnosticErrors = result.diagnostics.some(
+          (diagnostic) => diagnostic.severity === 'error',
+        );
+
+        trackInsightsQueryRan({
+          feature: 'insights',
+          data: result,
+          durationMs: getDurationMs(),
+          errorType: hasDiagnosticErrors ? 'diagnostic' : undefined,
+          query,
+          queryName,
+          result: hasDiagnosticErrors ? 'failure' : 'success',
+          savedQueryId,
+          tabId,
+          trigger,
+        });
+
+        return result;
+      } catch (error) {
+        trackInsightsQueryRan({
+          feature: 'insights',
+          durationMs: getDurationMs(),
+          errorType: 'network',
+          query,
+          queryName,
+          result: 'failure',
+          savedQueryId,
+          tabId,
+          trigger,
+        });
+        throw error;
+      } finally {
+        runQueryTriggerRef.current = 'unknown';
+      }
     },
     staleTime: 0,
     retry: false,
   });
 
-  const runQuery = useCallback(() => {
-    refetch();
-  }, [refetch]);
+  const runQuery = useCallback(
+    (options: RunQueryOptions = {}) => {
+      runQueryTriggerRef.current = options.trigger ?? 'unknown';
+      refetch();
+    },
+    [refetch],
+  );
 
   // Fire refetch() once per tab when a tab is created with a seeded query
   // that should execute automatically (e.g. the Failed Functions "Open in

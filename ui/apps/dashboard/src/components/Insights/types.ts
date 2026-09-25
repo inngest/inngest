@@ -1,3 +1,13 @@
+// How a query run was initiated. Threaded through runQuery() and
+// setQueryAndRun(), and reported as the `trigger` property on the
+// "Insights Query Ran" analytics event.
+export type InsightsQueryRunTrigger =
+  | 'ai_assistant'
+  | 'button'
+  | 'context_menu'
+  | 'keyboard'
+  | 'unknown';
+
 export interface QuerySnapshot {
   id: string;
   isSnapshot: true;
