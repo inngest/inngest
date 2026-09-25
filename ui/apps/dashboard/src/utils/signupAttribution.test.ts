@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getSignupAttribution } from './signupAttribution';
+import {
+  getGoogleAttribution,
+  getSignupAttribution,
+  getSignupMetadata,
+  parseGaClientId,
+  parseGaSessionId,
+  parseGclCookie,
+} from './signupAttribution';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -68,6 +75,101 @@ describe('getSignupAttribution', () => {
     expect(getSignupAttribution()).toEqual({
       utmSource: 'test',
       firstLandingUrl: 'https://www.inngest.com/?x=a=b',
+    });
+  });
+});
+
+describe('parseGaClientId', () => {
+  it.each([
+    ['GA1.1.1247616174.1788106374', '1247616174.1788106374'],
+    ['GA1.2.1247616174.1788106374', '1247616174.1788106374'],
+    [undefined, undefined],
+    ['', undefined],
+    ['GA1.1.abc.123', undefined],
+    ['1247616174.1788106374', undefined],
+  ])('%s -> %s', (cookie, expected) => {
+    expect(parseGaClientId(cookie)).toBe(expected);
+  });
+});
+
+describe('parseGaSessionId', () => {
+  it.each([
+    ['GS2.1.s1790347813$o3$g0$t1790347813$j60$l0$h0', '1790347813'],
+    ['GS2.1.o3$s1790347813$g0', '1790347813'],
+    ['GS1.1.1675243172.3.1.1675243500.0.0.0', '1675243172'],
+    [undefined, undefined],
+    ['GS2.1.o3$g0', undefined],
+    ['GS3.1.s123', undefined],
+    ['garbage', undefined],
+  ])('%s -> %s', (cookie, expected) => {
+    expect(parseGaSessionId(cookie)).toBe(expected);
+  });
+});
+
+describe('parseGclCookie', () => {
+  it('reads the click ID and click time', () => {
+    expect(parseGclCookie('GCL.1790347814.Cj0KCQ_abc-123')).toEqual({
+      clickId: 'Cj0KCQ_abc-123',
+      clickedAtMs: 1790347814000,
+    });
+  });
+
+  it.each([undefined, '', 'GCL.abc.xyz', 'GCL.1790347814.', 'GCL.1.bad id'])(
+    'ignores %s',
+    (cookie) => {
+      expect(parseGclCookie(cookie)).toBeUndefined();
+    },
+  );
+});
+
+describe('getGoogleAttribution', () => {
+  const setLocation = (search: string) =>
+    vi.stubGlobal('window', { location: { search } });
+
+  it('returns nothing without cookies or a browser', () => {
+    expect(getGoogleAttribution()).toEqual({});
+  });
+
+  it('reads GA IDs and Conversion Linker click IDs from cookies', () => {
+    setCookie(
+      [
+        '_ga=GA1.1.1247616174.1788106374',
+        '_ga_4YPM75W7D9=GS2.1.s1790347813$o3$g0$t1790347813$j60$l0$h0',
+        '_ga_OTHER=GS2.1.s999$o1',
+        '_gcl_aw=GCL.1790347814.gclid_from_cookie',
+        '_gcl_gb=GCL.1790340000.gbraid_from_cookie',
+      ].join('; '),
+    );
+    expect(getGoogleAttribution()).toEqual({
+      gaClientId: '1247616174.1788106374',
+      gaSessionId: '1790347813',
+      gclid: 'gclid_from_cookie',
+      gbraid: 'gbraid_from_cookie',
+      clickTs: new Date(1790347814000).toISOString(),
+    });
+  });
+
+  it('prefers click IDs on the current URL over stored ones', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-25T12:00:00Z'));
+    setCookie('_gcl_aw=GCL.1790347814.older_click');
+    setLocation('?utm_source=google&gclid=newer_click&wbraid=bad%20value');
+    expect(getGoogleAttribution()).toEqual({
+      gclid: 'newer_click',
+      clickTs: '2026-09-25T12:00:00.000Z',
+    });
+    vi.useRealTimers();
+  });
+
+  it('is included in the Clerk signup metadata', () => {
+    setCookie(
+      'ajs_anonymous_id=anon; _ga=GA1.1.1.2; _gcl_aw=GCL.1790347814.abc',
+    );
+    expect(getSignupMetadata()).toEqual({
+      anonymousID: 'anon',
+      gaClientId: '1.2',
+      gclid: 'abc',
+      clickTs: new Date(1790347814000).toISOString(),
     });
   });
 });
