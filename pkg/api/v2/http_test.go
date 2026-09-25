@@ -314,7 +314,7 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 }
 
 func TestHTTPGateway_RunListRoutes(t *testing.T) {
-	t.Run("binds list filters", func(t *testing.T) {
+	t.Run("binds list filters with a slash-containing function ID", func(t *testing.T) {
 		isDeferred := true
 		runs := &mockRunProvider{}
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
@@ -322,7 +322,7 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 			TimeField:   RunTimeFieldStartedAt,
 			Status:      []v2pb.FunctionRunStatus{v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, v2pb.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED},
 			AppIDs:      []string{"my-app"},
-			FunctionIDs: []string{"test-fn"},
+			FunctionIDs: []string{"teams/member.created"},
 			IsDeferred:  &isDeferred,
 			Order:       OrderDirectionAsc,
 			CEL:         `event.data.userId == "123"`,
@@ -333,7 +333,7 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22&include=deferred_from", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=teams%2Fmember.created&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22&include=deferred_from", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 

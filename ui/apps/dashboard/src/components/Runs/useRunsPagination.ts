@@ -278,12 +278,6 @@ export function fetchRestRuns(
     vars.functionSlug.startsWith(`${vars.functionAppID}-`)
       ? vars.functionSlug.slice(vars.functionAppID.length + 1)
       : vars.functionSlug;
-  const pathname =
-    functionID && vars.functionAppID
-      ? `/v2/apps/${encodeURIComponent(
-          vars.functionAppID,
-        )}/functions/${encodeURIComponent(functionID)}/runs`
-      : '/v2/runs';
   const params = new URLSearchParams({
     from: vars.startTime,
     timeField: vars.timeField,
@@ -298,10 +292,13 @@ export function fetchRestRuns(
     params.set('isDeferred', String(vars.isDeferred));
   }
   for (const status of vars.status ?? []) params.append('status', status);
-  if (!vars.functionSlug) {
+  if (functionID && vars.functionAppID) {
+    params.set('appId', vars.functionAppID);
+    params.set('functionId', functionID);
+  } else if (!vars.functionSlug) {
     for (const appID of vars.restAppIDs ?? []) params.append('appId', appID);
   }
-  return fetchRunsPage(apiFetch, pathname, params, signal);
+  return fetchRunsPage(apiFetch, '/v2/runs', params, signal);
 }
 
 export function useProgressiveRuns({

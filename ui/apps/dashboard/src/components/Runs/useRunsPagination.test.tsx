@@ -28,11 +28,13 @@ const baseVars = {
 
 describe('fetchRestRuns', () => {
   it.each([
-    ['app-test-fn', 'test-fn'],
+    ['app-teams/member.created', 'teams%2Fmember.created'],
+    ['app-reports/daily.generate', 'reports%2Fdaily.generate'],
+    ['app-send-reminder', 'send-reminder'],
     ['app-app-test-fn', 'app-test-fn'],
   ])(
-    'sends the configured ID for stored function slug %s',
-    async (functionSlug, expectedFunctionID) => {
+    'sends the configured ID in query parameters for stored function slug %s',
+    async (functionSlug, encodedFunctionID) => {
       const apiFetch = vi.fn<InngestAPIFetch>(() =>
         Promise.resolve(
           new Response(
@@ -58,11 +60,46 @@ describe('fetchRestRuns', () => {
       );
 
       expect(apiFetch).toHaveBeenCalledOnce();
-      expect(apiFetch.mock.calls[0]?.[0]).toMatch(
-        new RegExp(`/v2/apps/app/functions/${expectedFunctionID}/runs\\?`),
+      expect(apiFetch).toHaveBeenCalledWith(
+        `/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&appId=app&functionId=${encodedFunctionID}`,
+        { signal: expect.any(AbortSignal) },
       );
     },
   );
+
+  it('preserves pagination and CEL parameters for function-scoped lists', async () => {
+    const apiFetch = vi.fn<InngestAPIFetch>(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [],
+            page: { hasMore: false, limit: 40 },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    await fetchRestRuns(
+      apiFetch,
+      {
+        ...baseVars,
+        functionSlug: 'app-teams/member.created',
+        functionAppID: 'app',
+        endTime: '2026-09-16T00:00:00Z',
+        status: ['RUNNING', 'FAILED'],
+        celQuery: 'event.data.user == "test"',
+        isDeferred: false,
+      },
+      'next/page',
+      new AbortController().signal,
+    );
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&until=2026-09-16T00%3A00%3A00Z&cursor=next%2Fpage&query=event.data.user+%3D%3D+%22test%22&isDeferred=false&status=RUNNING&status=FAILED&appId=app&functionId=teams%2Fmember.created',
+      { signal: expect.any(AbortSignal) },
+    );
+  });
 });
 
 function ProgressiveRunsHarness({
