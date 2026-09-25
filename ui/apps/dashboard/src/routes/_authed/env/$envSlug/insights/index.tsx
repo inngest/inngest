@@ -1,9 +1,8 @@
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { useQuery } from 'urql';
 
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useLocation } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
-import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
   useInsightsTabManager,
   type TabManagerActions,
@@ -17,8 +16,9 @@ import { SaveTabProvider } from '@/components/Insights/InsightsSQLEditor/SaveTab
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
-import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
+import { useInsightsDeepLinkCoordinator } from '@/components/Insights/useInsightsDeepLinkCoordinator';
 import { validateInsightsSearch } from '@/components/Insights/insightsSearchParams';
+import type { Tab } from '@/components/Insights/types';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   component: InsightsComponent,
@@ -33,6 +33,7 @@ const INITIAL_TAB_ACTIONS: TabManagerActions = {
   createNewTab: () => {},
   createTabFromQuery: () => {},
   focusTab: () => {},
+  openQueryTab: () => {},
   openTemplatesTab: () => {},
   updateTab: () => {},
 };
@@ -46,12 +47,6 @@ function InsightsComponent() {
   });
   const historyWindow = entitlementsData?.account.entitlements.history.limit;
 
-  const search = Route.useSearch();
-  const deepLinkQueryId =
-    typeof search.query_id === 'string' && search.query_id.length > 0
-      ? search.query_id
-      : undefined;
-
   // Create a ref for actions that will be populated inside InsightsWithTabManager
   // This allows StoredQueriesProvider to use the latest actions without recreating the provider
   const actionsRef = useRef<TabManagerActions>(INITIAL_TAB_ACTIONS);
@@ -64,7 +59,6 @@ function InsightsComponent() {
         onToggleQueryHelperPanelVisibility={() =>
           setIsQueryHelperPanelVisible((visible) => !visible)
         }
-        deepLinkQueryId={deepLinkQueryId}
         actionsRef={actionsRef}
       />
     </StoredQueriesProvider>
@@ -75,7 +69,6 @@ interface InsightsWithTabManagerProps {
   historyWindow?: number;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
-  deepLinkQueryId?: string;
   actionsRef: React.MutableRefObject<TabManagerActions>;
 }
 
@@ -83,7 +76,6 @@ function InsightsWithTabManager({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  deepLinkQueryId,
   actionsRef,
 }: InsightsWithTabManagerProps) {
   const { isSavedQueriesFetching } = useStoredQueries();
@@ -94,7 +86,6 @@ function InsightsWithTabManager({
       isQueryHelperPanelVisible,
       onToggleQueryHelperPanelVisibility,
       isSavedQueriesFetching,
-      deepLinkQueryId,
     });
 
   // Update the ref with real actions so StoredQueriesProvider can use them
@@ -108,7 +99,6 @@ function InsightsWithTabManager({
   ]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const activeSavedQueryId = activeTab?.savedQueryId;
 
   return (
     <SaveTabProvider>
@@ -116,7 +106,7 @@ function InsightsWithTabManager({
         <SchemasProvider>
           <InsightsContentWithDeepLink
             isQueryHelperPanelVisible={isQueryHelperPanelVisible}
-            activeSavedQueryId={activeSavedQueryId}
+            activeTab={activeTab}
             isHydrated={isHydrated}
             tabManager={tabManager}
             actions={actions}
@@ -129,42 +119,36 @@ function InsightsWithTabManager({
 
 function InsightsContentWithDeepLink({
   isQueryHelperPanelVisible,
-  activeSavedQueryId,
+  activeTab,
   isHydrated,
   tabManager,
   actions,
 }: {
   isQueryHelperPanelVisible: boolean;
-  activeSavedQueryId: string | undefined;
+  activeTab: Tab | undefined;
   isHydrated: boolean;
   tabManager: JSX.Element;
   actions: TabManagerActions;
 }) {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
+  const { href: currentHref } = useLocation();
 
   // Handle saved-query and SQL deep links after tab state has hydrated.
-  const isDeepLinkPending = useDeepLinkHandler({
+  useInsightsDeepLinkCoordinator({
     actions,
-    activeSavedQueryId,
+    activeTab,
+    currentHref,
+    intent: search.intent,
     isHydrated,
     navigate,
-    search,
   });
-
-  if (isDeepLinkPending) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-full w-full flex-1 overflow-hidden">
       {isQueryHelperPanelVisible && (
         <div className="w-[240px] flex-shrink-0">
-          <QueryHelperPanel activeSavedQueryId={activeSavedQueryId} />
+          <QueryHelperPanel activeSavedQueryId={activeTab?.savedQueryId} />
         </div>
       )}
       <div className="flex h-full w-full flex-1 flex-col overflow-hidden">

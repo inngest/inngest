@@ -6,8 +6,8 @@ import { RiArrowRightUpLine } from '@remixicon/react';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { sqlPrefillInsightsURL } from '@/components/Insights/insightsSearchParams';
 import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
 import { getLineChartOptions, mapEntityLines, sum } from './utils';
@@ -87,22 +87,14 @@ export const FailedFunctions = ({
           icon={<RiArrowRightUpLine />}
           iconSide="left"
           label="Open in Insights"
-          // Programmatic client-side navigation rather than a Link `to` with
-          // an embedded query string. Passing `search` as an object lets
-          // TanStack route it through `stringifySearch`, which preserves
-          // newlines (`\n` -> `%0A`). Embedding `?sql=...` inside a string
-          // `to` makes the path resolver treat the query as part of the
-          // pathname, and @tanstack/history's sanitizePath then strips out
-          // all ASCII control chars — including the SQL's newlines.
-          onClick={() =>
-            navigate({
-              to: pathCreator.insights({ envSlug: env.slug }),
-              search: {
-                sql: INSIGHTS_QUERY,
-                name: INSIGHTS_QUERY_NAME,
-              },
-            })
-          }
+          onClick={() => {
+            const href = sqlPrefillInsightsURL(
+              env.slug,
+              INSIGHTS_QUERY,
+              INSIGHTS_QUERY_NAME,
+            );
+            if (href) navigate({ href });
+          }}
         />
       </div>
       <div className="flex h-full flex-row items-center">

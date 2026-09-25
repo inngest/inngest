@@ -5,15 +5,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { RiArrowRightUpLine, RiInformationLine, RiMoreFill } from '@remixicon/react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import {
+  RiArrowRightUpLine,
+  RiInformationLine,
+  RiMoreFill,
+} from '@remixicon/react';
 import { useNavigate } from '@tanstack/react-router';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { pathCreator } from '@/utils/urls';
+import { sqlPrefillInsightsURL } from '@/components/Insights/insightsSearchParams';
 
-export function SectionGroupHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-basis mb-3 mt-6 text-lg font-normal">{children}</h2>;
+export function SectionGroupHeading({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <h2 className="text-basis mb-3 mt-6 text-lg font-normal">{children}</h2>
+  );
 }
 
 export function Section({
@@ -50,7 +64,11 @@ export function Section({
       // container (see the surrounding grids below), which already spaces
       // rows/columns evenly at 16px; an own-margin here would double the
       // vertical gap without affecting the horizontal one.
-      className={`${plain ? '' : 'border-subtle bg-canvasBase shadow-xs rounded-md border p-4'} ${className ?? ''}`}
+      className={`${
+        plain
+          ? ''
+          : 'border-subtle bg-canvasBase shadow-xs rounded-md border p-4'
+      } ${className ?? ''}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         {title && (
@@ -61,7 +79,9 @@ export function Section({
                 <TooltipTrigger>
                   <RiInformationLine className="text-subtle h-3.5 w-3.5" />
                 </TooltipTrigger>
-                <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>
+                <TooltipContent className="whitespace-pre-line">
+                  {tooltip}
+                </TooltipContent>
               </Tooltip>
             )}
           </h2>
@@ -69,7 +89,12 @@ export function Section({
         {query && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="ml-auto">
-              <Button size="small" kind="secondary" appearance="ghost" icon={<RiMoreFill />} />
+              <Button
+                size="small"
+                kind="secondary"
+                appearance="ghost"
+                icon={<RiMoreFill />}
+              />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
@@ -79,12 +104,14 @@ export function Section({
                 // inset gap — same rounded-md radius as the container, now
                 // with zero inset, so the corners align exactly.
                 className="-m-0.5 rounded-md focus:outline-none"
-                onSelect={() =>
-                  navigate({
-                    to: pathCreator.insights({ envSlug: env.slug }),
-                    search: { sql: query, name: queryName ?? title },
-                  })
-                }
+                onSelect={() => {
+                  const href = sqlPrefillInsightsURL(
+                    env.slug,
+                    query,
+                    queryName ?? title,
+                  );
+                  if (href) navigate({ href });
+                }}
               >
                 <RiArrowRightUpLine className="h-4 w-4" />
                 Open in Insights
