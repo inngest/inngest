@@ -224,7 +224,7 @@ export function CreateRestrictedAPIKeyModal({
               <div className="flex flex-col gap-3">
                 <p className="text-subtle text-sm">
                   Access includes future operations in each selected group. Keys
-                  cannot read signing keys, event keys, or webhook secrets.
+                  cannot read signing keys or event keys.
                 </p>
                 <PermissionPicker
                   groups={groups}

@@ -15,6 +15,6 @@ it.each([
 
 it('keeps the webhook credential warning', () => {
   expect(permissionResourceCopy('webhooks').description).toBe(
-    'Read access includes URLs that can send events. Copied URLs still work after logout or session revocation. Revoke the webhook to disable them.',
+    'Read access includes URLs that can send events. Copied URLs still work after key or session revocation. Revoke the webhook to disable them.',
   );
 });
