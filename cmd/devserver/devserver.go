@@ -21,16 +21,26 @@ import (
 )
 
 func action(ctx context.Context, cmd *cli.Command) error {
+	// duckDBClosed is closed by pkg/devserver's start() only once the DuckDB
+	// dual-write subprocess has been fully torn down -- which, since start()
+	// calls service.StartAll synchronously before its shutdown defers run,
+	// is necessarily after every other service has already finished its own
+	// graceful stop too. With --duckdb, the signal handler below waits for it
+	// before exiting rather than exiting immediately on signal, which is what
+	// keeps it from reintroducing the dual-write data-loss bug the naive
+	// version of this handler caused (unflushed batches dropped on exit). A
+	// second signal still forces an immediate exit, so a wedged shutdown can
+	// always be interrupted. Without --duckdb it is closed as soon as the
+	// flags are read, preserving the exit-on-first-signal behavior.
+	duckDBClosed := make(chan struct{})
 	go func() {
-		ctx, cleanup := signal.NotifyContext(
-			context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-			syscall.SIGINT,
-			syscall.SIGQUIT,
-		)
-		defer cleanup()
-		<-ctx.Done()
+		sigs := make(chan os.Signal, 2)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+		<-sigs
+		select {
+		case <-duckDBClosed:
+		case <-sigs:
+		}
 		os.Exit(0)
 	}()
 
@@ -66,6 +76,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
 	persist := localconfig.GetBoolValue(cmd, "persist", false)
 	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
+	enableDuckDB := localconfig.GetBoolValue(cmd, "duckdb", false)
+	enableDuckDBReads := localconfig.GetBoolValue(cmd, "duckdb-reads", false)
+	// start() only closes DuckDBClosed when it is set; see duckDBClosed above.
+	var startDuckDBClosed chan struct{}
+	if enableDuckDB {
+		startDuckDBClosed = duckDBClosed
+	} else {
+		close(duckDBClosed)
+	}
 
 	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", devserver.DefaultDebugAPIPort)
 
@@ -104,12 +123,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		),
 		Persist:                 persist,
 		SQLiteDir:               sqliteDir,
+		EnableDuckDB:            enableDuckDB,
+		EnableDuckDBReads:       enableDuckDBReads,
 		PostgresURI:             postgresURI,
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,
 		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
 		PostgresConnMaxLifetime: postgresConnMaxLifetime,
 		DebugAPIPort:            debugAPIPort,
+		DuckDBClosed:            startDuckDBClosed,
 	}
 
 	l := logger.StdlibLogger(ctx)
