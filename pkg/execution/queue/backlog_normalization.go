@@ -114,7 +114,7 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 	eg := errgroup.Group{}
 	for _, account := range peekedAccounts {
 		eg.Go(func() error {
-			return q.iterateNormalizationShadowPartition(ctx, &account, accountShadowPartitionPeekMax, until, bc)
+			return q.iterateNormalizationShadowPartition(ctx, account, accountShadowPartitionPeekMax, until, bc)
 		})
 	}
 
@@ -126,11 +126,12 @@ func (q *queueProcessor) iterateNormalizationPartition(ctx context.Context, unti
 	return nil
 }
 
-func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, accountID *uuid.UUID, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
+func (q *queueProcessor) iterateNormalizationShadowPartition(ctx context.Context, accountID uuid.UUID, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg) error {
 	shard := q.Shard()
-	// Find partitions in account or globally with backlogs to normalize
-	sequential := false
-	shadowPartitions, err := shard.PeekShadowPartitions(ctx, accountID, sequential, peekLimit, until)
+	// Find partitions in the account with backlogs to normalize. This must read the account's
+	// normalize set, not its shadow partition set: a partition whose only backlog is pending
+	// normalization is removed from the shadow partition set and would never be found.
+	shadowPartitions, err := shard.PeekAccountNormalizePartitions(ctx, accountID, until, peekLimit)
 	if err != nil {
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}

@@ -291,6 +291,9 @@ type ShadowProcessingOperations interface {
 	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
 	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
 	PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error)
+	// PeekAccountNormalizePartitions returns shadow partitions in the account that have
+	// backlogs pending normalization.
+	PeekAccountNormalizePartitions(ctx context.Context, accountID uuid.UUID, until time.Time, limit int64) ([]*QueueShadowPartition, error)
 	PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error)
 	ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error)
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)

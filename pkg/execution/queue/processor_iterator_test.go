@@ -345,6 +345,10 @@ func (m *mockShardForIterator) PeekGlobalNormalizeAccounts(ctx context.Context, 
 	return nil, nil
 }
 
+func (m *mockShardForIterator) PeekAccountNormalizePartitions(ctx context.Context, accountID uuid.UUID, until time.Time, limit int64) ([]*QueueShadowPartition, error) {
+	return nil, nil
+}
+
 func (m *mockShardForIterator) PeekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	return nil, nil
 }
