@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useCallback, useMemo, useState } from 'react';
+import {
+  StrictMode,
+  useCallback,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InsightsQueryStatement } from '@/gql/graphql';
@@ -10,7 +16,11 @@ import {
   type TabsState,
 } from './InsightsTabManager/InsightsTabManager';
 import { HOME_TAB } from './InsightsTabManager/constants';
-import { validateInsightsSearch } from './insightsSearchParams';
+import {
+  insightsDeepLinkError,
+  insightsDeepLinkIntent,
+  validateInsightsSearch,
+} from './insightsSearchParams';
 import { useInsightsDeepLinkCoordinator } from './useInsightsDeepLinkCoordinator';
 
 const mocks = vi.hoisted(() => ({
@@ -90,11 +100,31 @@ function useCoordinatorHarness({
   );
   const actions = useMemo<TabManagerActions>(
     () => ({
-      breakQueryAssociation: () => {},
+      breakQueryAssociation: (savedQueryId) => {
+        setTabState((state) => {
+          const tabIndex = state.tabs.findIndex(
+            (tab) => tab.savedQueryId === savedQueryId,
+          );
+          if (tabIndex === -1) return state;
+
+          const removed = state.tabs[tabIndex];
+          const tabs = state.tabs.filter((tab) => tab !== removed);
+          const fallback = tabs[Math.max(0, tabIndex - 1)] ?? HOME_TAB;
+          return {
+            tabs,
+            activeTabId:
+              state.activeTabId === removed?.id
+                ? fallback.id
+                : state.activeTabId,
+          };
+        });
+      },
       closeTab: () => {},
       createNewTab: () => {},
       createTabFromQuery: () => {},
-      focusTab: () => {},
+      focusTab: (tabID) => {
+        setTabState((state) => ({ ...state, activeTabId: tabID }));
+      },
       openQueryTab: (tab) => {
         setOpenCount((count) => count + 1);
         setTabState((state) => openQueryTabInState(state, tab));
@@ -107,11 +137,13 @@ function useCoordinatorHarness({
   const activeTab = tabState.tabs.find(
     (tab) => tab.id === tabState.activeTabId,
   );
-  const intent = validateInsightsSearch(searchFromHref(currentHref)).intent;
+  const search = validateInsightsSearch(searchFromHref(currentHref));
+  const intent = insightsDeepLinkIntent(search);
   const coordinator = useInsightsDeepLinkCoordinator({
     actions,
     activeTab,
     currentHref,
+    deepLinkError: insightsDeepLinkError(search),
     intent,
     isHydrated,
     navigate,
@@ -271,14 +303,71 @@ describe('useInsightsDeepLinkCoordinator', () => {
     );
   });
 
-  it('terminates a failed saved-query fetch and removes the unresolvable ID', async () => {
-    mocks.queries = undefined;
-    mocks.queryError = 'upstream unavailable';
+  it('preserves a restored saved tab only after confirming the query still exists', async () => {
+    const restoredB = {
+      ...savedTab(SAVED_B, 'restored-B'),
+      query: 'SELECT locally_edited_value',
+    };
+    const { result } = renderHook(() =>
+      useCoordinatorHarness({
+        initialHref: '/env/production/insights?query_id=saved-B',
+        initialTabState: {
+          tabs: [HOME_TAB, restoredB],
+          activeTabId: restoredB.id,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('applied'));
+
+    expect(result.current.activeTab).toEqual(restoredB);
+    expect(result.current.openCount).toBe(1);
+    expect(result.current.tabState.tabs).toHaveLength(2);
+    expect(result.current.currentHref).toBe(
+      '/env/production/insights?query_id=saved-B',
+    );
+  });
+
+  it('removes a restored tab and permalink when the saved query no longer exists', async () => {
+    mocks.queries = [];
+    const restoredB = savedTab(SAVED_B, 'restored-B');
     const { result } = renderHook(() =>
       useCoordinatorHarness({
         initialHref:
           '/env/production/insights?query_id=saved-B&keep=recoverable#results',
-        initialTabState: { tabs: [HOME_TAB], activeTabId: HOME_TAB.id },
+        initialTabState: {
+          tabs: [HOME_TAB, restoredB],
+          activeTabId: restoredB.id,
+        },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(result.current.currentHref).toBe(
+        '/env/production/insights?keep=recoverable#results',
+      ),
+    );
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.activeTab).toEqual(HOME_TAB);
+    expect(result.current.tabState.tabs).toEqual([HOME_TAB]);
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Unable to load query; please ensure that you have access to it',
+    );
+  });
+
+  it('terminates a failed saved-query fetch but keeps its retryable permalink', async () => {
+    mocks.queries = undefined;
+    mocks.queryError = 'upstream unavailable';
+    const restoredB = savedTab(SAVED_B, 'restored-B');
+    const { result } = renderHook(() =>
+      useCoordinatorHarness({
+        initialHref:
+          '/env/production/insights?query_id=saved-B&keep=recoverable#results',
+        initialTabState: {
+          tabs: [HOME_TAB, restoredB],
+          activeTabId: restoredB.id,
+        },
       }),
     );
 
@@ -286,12 +375,62 @@ describe('useInsightsDeepLinkCoordinator', () => {
 
     expect(result.current.activeTab).toEqual(HOME_TAB);
     expect(result.current.currentHref).toBe(
-      '/env/production/insights?keep=recoverable#results',
+      '/env/production/insights?query_id=saved-B&keep=recoverable#results',
     );
+    expect(result.current.tabState.tabs).toEqual([HOME_TAB, restoredB]);
     expect(mocks.toastError).toHaveBeenCalledOnce();
     expect(mocks.toastError).toHaveBeenCalledWith(
       'Unable to load saved queries; please try again',
     );
+  });
+
+  it('reports and removes oversized SQL supplied by an external link', async () => {
+    const sql = 'x'.repeat(8 * 1024 + 1);
+    const { result } = renderHook(() =>
+      useCoordinatorHarness({
+        initialHref: `/env/production/insights?sql=${sql}&name=agent-generated&keep=89#results`,
+        initialTabState: { tabs: [HOME_TAB], activeTabId: HOME_TAB.id },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(result.current.currentHref).toBe(
+        '/env/production/insights?keep=89#results',
+      ),
+    );
+
+    expect(result.current.activeTab).toEqual(HOME_TAB);
+    expect(result.current.openCount).toBe(0);
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'This query is too large to open in Insights.',
+    );
+  });
+
+  it('applies a SQL prefill once when StrictMode replays mount effects', async () => {
+    const { result } = renderHook(
+      () =>
+        useCoordinatorHarness({
+          initialHref:
+            '/env/production/insights?sql=SELECT+83&name=StrictMode+prefill',
+          initialTabState: { tabs: [HOME_TAB], activeTabId: HOME_TAB.id },
+        }),
+      {
+        wrapper: ({ children }: PropsWithChildren) => (
+          <StrictMode>{children}</StrictMode>
+        ),
+      },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('idle'));
+
+    expect(result.current.openCount).toBe(1);
+    expect(
+      result.current.tabState.tabs.filter(
+        (tab) => tab.name === 'StrictMode prefill',
+      ),
+    ).toHaveLength(1);
+    expect(result.current.activeTab?.query).toBe('SELECT\n  83');
   });
 
   it('prefills SQL once without running it, cleans command fields after commit, and can repeat later', async () => {

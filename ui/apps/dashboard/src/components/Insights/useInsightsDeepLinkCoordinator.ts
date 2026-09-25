@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
@@ -8,9 +8,11 @@ import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQ
 import {
   consumeSQLPrefillURL,
   syncSavedQueryURL,
+  type InsightsDeepLinkError,
   type InsightsDeepLinkIntent,
 } from '@/components/Insights/insightsSearchParams';
 import type { Tab } from '@/components/Insights/types';
+import { HOME_TAB } from './InsightsTabManager/constants';
 
 const DEEP_LINK_DEFAULT_NAME = 'Untitled query';
 
@@ -53,6 +55,7 @@ interface UseInsightsDeepLinkCoordinatorParams {
   actions: TabManagerActions;
   activeTab: Tab | undefined;
   currentHref: string;
+  deepLinkError: InsightsDeepLinkError | undefined;
   intent: InsightsDeepLinkIntent | undefined;
   isHydrated: boolean;
   navigate: (options: { href: string; replace?: boolean }) => void;
@@ -62,6 +65,7 @@ export function useInsightsDeepLinkCoordinator({
   actions,
   activeTab,
   currentHref,
+  deepLinkError,
   intent,
   isHydrated,
   navigate,
@@ -73,44 +77,58 @@ export function useInsightsDeepLinkCoordinator({
   const [storedLifecycle, dispatch] = useReducer(coordinatorReducer, {
     status: 'idle',
   });
-  const navigationKey = intentKey(intent);
+  const claimedNavigationKey = useRef<string>();
+  const navigationKey = intentKey(intent, deepLinkError);
   const lifecycle = lifecycleForNavigation(storedLifecycle, navigationKey);
 
   // Resolve and apply inbound intent. Applying is complete only after the
   // tab manager's committed active tab matches the requested destination.
   useEffect(() => {
     if (lifecycle.status === 'idle') {
+      claimedNavigationKey.current = undefined;
       if (storedLifecycle.status !== 'idle') dispatch({ type: 'reset' });
       return;
     }
 
-    if (!intent || !navigationKey) return;
+    if (!navigationKey) return;
 
     if (lifecycle.status === 'waiting-for-hydration/resources') {
       if (!isHydrated) return;
 
+      if (deepLinkError === 'sql-too-large') {
+        if (claimedNavigationKey.current === navigationKey) return;
+        claimedNavigationKey.current = navigationKey;
+        toast.error('This query is too large to open in Insights.');
+        dispatch({ type: 'error', navigationKey });
+        navigate({ href: consumeSQLPrefillURL(currentHref), replace: true });
+        return;
+      }
+
+      if (!intent) return;
+
       if (intent.kind === 'saved-query') {
-        if (activeTab?.savedQueryId === intent.id) {
-          const href = syncSavedQueryURL(currentHref, intent.id);
-          if (href && href !== currentHref) navigate({ href, replace: true });
-          dispatch({ type: 'applied', navigationKey });
+        if (isSavedQueriesFetching) return;
+        if (claimedNavigationKey.current === navigationKey) return;
+        claimedNavigationKey.current = navigationKey;
+
+        if (queries.error && !queries.data) {
+          toast.error('Unable to load saved queries; please try again');
+          actions.openQueryTab(HOME_TAB);
+          dispatch({ type: 'error', navigationKey });
           return;
         }
-        if (isSavedQueriesFetching) return;
 
         const savedQuery = queries.data?.find(
           (query) => query.id === intent.id,
         );
         if (!savedQuery) {
           toast.error(
-            queries.error
-              ? 'Unable to load saved queries; please try again'
-              : 'Unable to load query; please ensure that you have access to it',
+            'Unable to load query; please ensure that you have access to it',
           );
+          actions.breakQueryAssociation(intent.id);
           dispatch({ type: 'error', navigationKey });
-          // An unresolved query_id would otherwise reproduce the failure on
-          // every reload. Remove it and let committed active-tab state become
-          // the next declarative URL, if that tab is itself saved.
+          // The resource fetch succeeded, so the missing query_id is known to
+          // be invalid for this user. Remove it together with any stale tab.
           const href = syncSavedQueryURL(currentHref, undefined);
           if (href) navigate({ href, replace: true });
           return;
@@ -134,6 +152,8 @@ export function useInsightsDeepLinkCoordinator({
         return;
       }
 
+      if (claimedNavigationKey.current === navigationKey) return;
+      claimedNavigationKey.current = navigationKey;
       const tab: Tab = {
         id: ulid(),
         name: intent.name ?? DEEP_LINK_DEFAULT_NAME,
@@ -149,6 +169,7 @@ export function useInsightsDeepLinkCoordinator({
     }
 
     if (
+      intent &&
       lifecycle.status === 'applying' &&
       isExpectedTabActive(lifecycle.expectedActiveTab, activeTab)
     ) {
@@ -167,6 +188,7 @@ export function useInsightsDeepLinkCoordinator({
     actions,
     activeTab,
     currentHref,
+    deepLinkError,
     intent,
     isHydrated,
     isSavedQueriesFetching,
@@ -250,7 +272,9 @@ function lifecycleForNavigation(
 
 function intentKey(
   intent: InsightsDeepLinkIntent | undefined,
+  deepLinkError: InsightsDeepLinkError | undefined,
 ): string | undefined {
+  if (deepLinkError) return `error:${deepLinkError}`;
   if (!intent) return undefined;
   return intent.kind === 'saved-query'
     ? `saved-query:${intent.id}`

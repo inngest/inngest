@@ -16,6 +16,7 @@ import {
   RiMoreFill,
 } from '@remixicon/react';
 import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { sqlPrefillInsightsURL } from '@/components/Insights/insightsSearchParams';
@@ -110,7 +111,11 @@ export function Section({
                     query,
                     queryName ?? title,
                   );
-                  if (href) navigate({ href });
+                  if (!href) {
+                    toast.error('This query is too large to open in Insights.');
+                    return;
+                  }
+                  navigate({ href });
                 }}
               >
                 <RiArrowRightUpLine className="h-4 w-4" />

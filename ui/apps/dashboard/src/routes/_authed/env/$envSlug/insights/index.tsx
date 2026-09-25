@@ -17,7 +17,11 @@ import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/Tab
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { useInsightsDeepLinkCoordinator } from '@/components/Insights/useInsightsDeepLinkCoordinator';
-import { validateInsightsSearch } from '@/components/Insights/insightsSearchParams';
+import {
+  insightsDeepLinkError,
+  insightsDeepLinkIntent,
+  validateInsightsSearch,
+} from '@/components/Insights/insightsSearchParams';
 import type { Tab } from '@/components/Insights/types';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
@@ -139,7 +143,8 @@ function InsightsContentWithDeepLink({
     actions,
     activeTab,
     currentHref,
-    intent: search.intent,
+    deepLinkError: insightsDeepLinkError(search),
+    intent: insightsDeepLinkIntent(search),
     isHydrated,
     navigate,
   });

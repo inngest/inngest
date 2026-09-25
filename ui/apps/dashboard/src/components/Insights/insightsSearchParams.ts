@@ -10,8 +10,13 @@ export type InsightsDeepLinkIntent =
       name: string | undefined;
     };
 
+export type InsightsDeepLinkError = 'sql-too-large';
+
 export type InsightsSearchParams = {
-  intent?: InsightsDeepLinkIntent;
+  query_id?: string;
+  sql?: string;
+  name?: string;
+  deep_link_error?: InsightsDeepLinkError;
 };
 
 const encoder = new TextEncoder();
@@ -31,20 +36,38 @@ export function validateInsightsSearch(
   // malformed query_id links cannot fall through to a co-supplied SQL value.
   if (queryID) {
     return isWithinByteLimit(queryID, MAX_INSIGHTS_QUERY_ID_BYTES)
-      ? { intent: { kind: 'saved-query', id: queryID } }
+      ? { query_id: queryID }
       : {};
   }
 
   const sql = typeof search.sql === 'string' ? search.sql : undefined;
-  if (!sql?.trim() || !isWithinByteLimit(sql, MAX_INSIGHTS_SQL_BYTES)) {
-    return {};
+  if (!sql?.trim()) return {};
+  if (!isWithinByteLimit(sql, MAX_INSIGHTS_SQL_BYTES)) {
+    return { deep_link_error: 'sql-too-large' };
   }
 
   const name = typeof search.name === 'string' ? search.name.trim() : undefined;
   const validName =
     name && isWithinByteLimit(name, MAX_INSIGHTS_NAME_BYTES) ? name : undefined;
 
-  return { intent: { kind: 'sql-prefill', sql, name: validName } };
+  return validName ? { sql, name: validName } : { sql };
+}
+
+export function insightsDeepLinkIntent(
+  search: InsightsSearchParams,
+): InsightsDeepLinkIntent | undefined {
+  if (search.query_id) {
+    return { kind: 'saved-query', id: search.query_id };
+  }
+  if (search.sql) {
+    return { kind: 'sql-prefill', sql: search.sql, name: search.name };
+  }
+}
+
+export function insightsDeepLinkError(
+  search: InsightsSearchParams,
+): InsightsDeepLinkError | undefined {
+  return search.deep_link_error;
 }
 
 export function insightsURL(envSlug: string): string {
@@ -56,11 +79,11 @@ export function sqlPrefillInsightsURL(
   sql: string,
   name?: string,
 ): string | undefined {
-  const intent = validateInsightsSearch({ sql, name }).intent;
-  if (intent?.kind !== 'sql-prefill') return undefined;
+  const search = validateInsightsSearch({ sql, name });
+  if (!search.sql) return undefined;
 
-  const params = new URLSearchParams({ sql: intent.sql });
-  if (intent.name) params.set('name', intent.name);
+  const params = new URLSearchParams({ sql: search.sql });
+  if (search.name) params.set('name', search.name);
   return `${insightsURL(envSlug)}?${params.toString()}`;
 }
 
@@ -69,6 +92,7 @@ export function consumeSQLPrefillURL(href: string): string {
     params.delete('intent');
     params.delete('sql');
     params.delete('name');
+    params.delete('deep_link_error');
   });
 }
 
@@ -76,17 +100,16 @@ export function syncSavedQueryURL(
   href: string,
   queryID: string | undefined,
 ): string | undefined {
-  const intent = queryID
-    ? validateInsightsSearch({ query_id: queryID }).intent
-    : undefined;
-  if (queryID && intent?.kind !== 'saved-query') return undefined;
+  const search = queryID ? validateInsightsSearch({ query_id: queryID }) : {};
+  if (queryID && !search.query_id) return undefined;
 
   return updateInsightsURL(href, (params) => {
     params.delete('intent');
     params.delete('query_id');
     params.delete('sql');
     params.delete('name');
-    if (intent?.kind === 'saved-query') params.set('query_id', intent.id);
+    params.delete('deep_link_error');
+    if (search.query_id) params.set('query_id', search.query_id);
   });
 }
 

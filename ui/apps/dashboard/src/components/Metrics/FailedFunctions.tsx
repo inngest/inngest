@@ -4,6 +4,7 @@ import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
 import { RiArrowRightUpLine } from '@remixicon/react';
 import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { sqlPrefillInsightsURL } from '@/components/Insights/insightsSearchParams';
@@ -93,7 +94,11 @@ export const FailedFunctions = ({
               INSIGHTS_QUERY,
               INSIGHTS_QUERY_NAME,
             );
-            if (href) navigate({ href });
+            if (!href) {
+              toast.error('This query is too large to open in Insights.');
+              return;
+            }
+            navigate({ href });
           }}
         />
       </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   consumeSQLPrefillURL,
+  insightsDeepLinkIntent,
   MAX_INSIGHTS_NAME_BYTES,
   MAX_INSIGHTS_QUERY_ID_BYTES,
   MAX_INSIGHTS_SQL_BYTES,
@@ -18,30 +19,40 @@ describe('validateInsightsSearch', () => {
         sql: "SELECT 'must-not-survive'",
         name: 'also discarded',
       }),
-    ).toEqual({
-      intent: { kind: 'saved-query', id: 'saved-query-17' },
-    });
+    ).toEqual({ query_id: 'saved-query-17' });
   });
 
   it('accepts SQL-prefill mode with an optional name', () => {
     const sql = "SELECT 'space & plus + slash /' AS marker";
 
     expect(validateInsightsSearch({ sql, name: '  Failed: café  ' })).toEqual({
-      intent: {
-        kind: 'sql-prefill',
-        sql,
-        name: 'Failed: café',
-      },
+      sql,
+      name: 'Failed: café',
     });
   });
 
-  it('rejects blank and oversized SQL', () => {
+  it('keeps serialized route state flat and derives one internal intent', () => {
+    const search = validateInsightsSearch({
+      sql: 'SELECT 19',
+      name: '  Flat route state  ',
+    });
+
+    expect(search).toEqual({ sql: 'SELECT 19', name: 'Flat route state' });
+    expect(new URLSearchParams(search).has('intent')).toBe(false);
+    expect(insightsDeepLinkIntent(search)).toEqual({
+      kind: 'sql-prefill',
+      sql: 'SELECT 19',
+      name: 'Flat route state',
+    });
+  });
+
+  it('rejects blank SQL and reports oversized SQL without retaining its body', () => {
     expect(validateInsightsSearch({ sql: ' \n\t ' })).toEqual({});
     expect(
       validateInsightsSearch({
         sql: 'é'.repeat(MAX_INSIGHTS_SQL_BYTES / 2 + 1),
       }),
-    ).toEqual({});
+    ).toEqual({ deep_link_error: 'sql-too-large' });
   });
 
   it('omits an oversized name without discarding valid SQL', () => {
@@ -50,13 +61,7 @@ describe('validateInsightsSearch', () => {
         sql: 'SELECT 17',
         name: 'é'.repeat(MAX_INSIGHTS_NAME_BYTES / 2 + 1),
       }),
-    ).toEqual({
-      intent: {
-        kind: 'sql-prefill',
-        sql: 'SELECT 17',
-        name: undefined,
-      },
-    });
+    ).toEqual({ sql: 'SELECT 17' });
   });
 
   it('does not fall through to SQL when a query ID is oversized', () => {
