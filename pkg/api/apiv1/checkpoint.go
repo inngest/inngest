@@ -68,6 +68,12 @@ type RunOutputReader interface {
 	RunOutput(ctx context.Context, envID uuid.UUID, runID ulid.ULID) ([]byte, error)
 }
 
+// AsyncCheckpointRouter may handle an authenticated, decoded checkpoint before
+// the local state store is written. The request body has already been consumed;
+// a callback that forwards the checkpoint must build a new body from the decoded
+// CheckpointAsyncStepsRequest. A true result means it wrote the response.
+type AsyncCheckpointRouter func(http.ResponseWriter, *http.Request, uuid.UUID, CheckpointAsyncStepsRequest) bool
+
 // CheckpointAPIOpts represents options for the checkpoint API.
 type CheckpointAPIOpts struct {
 	// CheckpointMetrics records metrics for checkpoints.
@@ -84,6 +90,10 @@ type CheckpointAPIOpts struct {
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
+	// RouteAsyncCheckpoint can handle an authenticated async checkpoint after
+	// decoding its queue item reference, before writing run state. Returning
+	// true means the callback wrote the HTTP response.
+	RouteAsyncCheckpoint AsyncCheckpointRouter
 }
 
 // checkpointAPI is the base implementation.
@@ -100,7 +110,8 @@ type checkpointAPI struct {
 	// runClaimsSecret is the secret for creating run claims JWTs
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
-	outputReader RunOutputReader
+	outputReader         RunOutputReader
+	routeAsyncCheckpoint AsyncCheckpointRouter
 }
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
@@ -121,12 +132,13 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 	})
 
 	api := checkpointAPI{
-		Router:          chi.NewRouter(),
-		Opts:            o,
-		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
-		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
-		outputReader:    o.CheckpointOpts.RunOutputReader,
-		checkpointer:    c,
+		Router:               chi.NewRouter(),
+		Opts:                 o,
+		upserted:             ccache.New(ccache.Configure().MaxSize(10_000)),
+		runClaimsSecret:      o.CheckpointOpts.RunJWTSecret,
+		outputReader:         o.CheckpointOpts.RunOutputReader,
+		checkpointer:         c,
+		routeAsyncCheckpoint: o.CheckpointOpts.RouteAsyncCheckpoint,
 	}
 
 	api.Post("/", api.CheckpointNewRun)             // sync, API-based fns
@@ -372,9 +384,12 @@ func (a checkpointAPI) CheckpointAsyncSteps(w http.ResponseWriter, r *http.Reque
 	}
 
 	// checkpoint those steps by writing to state.
-	input := checkpointAsyncSteps{}
+	input := CheckpointAsyncStepsRequest{}
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
+		return
+	}
+	if a.routeAsyncCheckpoint != nil && a.routeAsyncCheckpoint(w, r.WithContext(ctx), auth.AccountID(), input) {
 		return
 	}
 
