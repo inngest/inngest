@@ -74,7 +74,8 @@ export function useInsightsDeepLinkCoordinator({
   isPending: boolean;
   status: DeepLinkCoordinatorStatus;
 } {
-  const { queries, isSavedQueriesFetching } = useStoredQueries();
+  const { queries, isSavedQueriesFetching, refetchSavedQueries } =
+    useStoredQueries();
   const [storedLifecycle, dispatch] = useReducer(coordinatorReducer, {
     status: 'idle',
   });
@@ -96,8 +97,7 @@ export function useInsightsDeepLinkCoordinator({
     if (
       lifecycle.status === 'error' &&
       intent?.kind === 'saved-query' &&
-      !isSavedQueriesFetching &&
-      queries.data !== undefined
+      (isSavedQueriesFetching || (!queries.error && queries.data !== undefined))
     ) {
       claimedNavigationKey.current = undefined;
       dispatch({ type: 'retry', navigationKey });
@@ -123,8 +123,13 @@ export function useInsightsDeepLinkCoordinator({
         if (claimedNavigationKey.current === navigationKey) return;
         claimedNavigationKey.current = navigationKey;
 
-        if (queries.error && !queries.data) {
-          toast.error('Unable to load saved queries; please try again');
+        if (queries.error) {
+          toast.error('Unable to load saved queries; please try again', {
+            action: {
+              label: 'Retry',
+              onClick: refetchSavedQueries,
+            },
+          });
           actions.openQueryTab(HOME_TAB);
           dispatch({ type: 'error', navigationKey });
           return;
@@ -209,6 +214,7 @@ export function useInsightsDeepLinkCoordinator({
     navigationKey,
     queries.data,
     queries.error,
+    refetchSavedQueries,
     storedLifecycle.status,
   ]);
 

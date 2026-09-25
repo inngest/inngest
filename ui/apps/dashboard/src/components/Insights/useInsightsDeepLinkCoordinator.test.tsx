@@ -27,12 +27,14 @@ const mocks = vi.hoisted(() => ({
   isSavedQueriesFetching: false,
   queries: undefined as InsightsQueryStatement[] | undefined,
   queryError: undefined as string | undefined,
+  refetchSavedQueries: vi.fn(),
   toastError: vi.fn(),
 }));
 
 vi.mock('./QueryHelperPanel/StoredQueriesContext', () => ({
   useStoredQueries: () => ({
     isSavedQueriesFetching: mocks.isSavedQueriesFetching,
+    refetchSavedQueries: mocks.refetchSavedQueries,
     queries: {
       data: mocks.queries,
       error: mocks.queryError,
@@ -167,6 +169,7 @@ describe('useInsightsDeepLinkCoordinator', () => {
     mocks.isSavedQueriesFetching = false;
     mocks.queries = [SAVED_A, SAVED_B, SAVED_C];
     mocks.queryError = undefined;
+    mocks.refetchSavedQueries.mockReset();
     mocks.toastError.mockReset();
   });
 
@@ -381,6 +384,35 @@ describe('useInsightsDeepLinkCoordinator', () => {
     expect(mocks.toastError).toHaveBeenCalledOnce();
     expect(mocks.toastError).toHaveBeenCalledWith(
       'Unable to load saved queries; please try again',
+      expect.objectContaining({
+        action: expect.objectContaining({ label: 'Retry' }),
+      }),
+    );
+  });
+
+  it('does not treat cached saved-query data as authoritative when the fetch errors', async () => {
+    mocks.queries = [SAVED_A, SAVED_C];
+    mocks.queryError = 'network unavailable';
+    const restoredB = {
+      ...savedTab(SAVED_B, 'restored-B'),
+      query: 'SELECT locally_edited_value',
+    };
+    const { result } = renderHook(() =>
+      useCoordinatorHarness({
+        initialHref: '/env/production/insights?query_id=saved-B',
+        initialTabState: {
+          tabs: [HOME_TAB, restoredB],
+          activeTabId: restoredB.id,
+        },
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+
+    expect(result.current.activeTab).toEqual(HOME_TAB);
+    expect(result.current.tabState.tabs).toEqual([HOME_TAB, restoredB]);
+    expect(result.current.currentHref).toBe(
+      '/env/production/insights?query_id=saved-B',
     );
   });
 
@@ -400,6 +432,18 @@ describe('useInsightsDeepLinkCoordinator', () => {
       '/env/production/insights?query_id=saved-B',
     );
 
+    const retry = mocks.toastError.mock.calls[0]?.[1]?.action?.onClick;
+    expect(retry).toBeTypeOf('function');
+    retry?.();
+    expect(mocks.refetchSavedQueries).toHaveBeenCalledOnce();
+
+    mocks.isSavedQueriesFetching = true;
+    rerender();
+    await waitFor(() =>
+      expect(result.current.status).toBe('waiting-for-hydration/resources'),
+    );
+
+    mocks.isSavedQueriesFetching = false;
     mocks.queryError = undefined;
     mocks.queries = [SAVED_A, SAVED_B, SAVED_C];
     rerender();
