@@ -158,13 +158,14 @@ func (q *queueProcessor) processItemHint(ctx context.Context, item QueueItem, di
 		Item: &item, StaticTime: q.Clock().Now(), SkipRequeueOnLimit: true,
 		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
+		item.fromHint = true
 		var err error
 		dispatched, err = dispatch(ctx, item)
 		return dispatched, err
 	})
 	cancel()
 	if err != nil || dispatched == nil || result.Status != LeaseItemStatusDispatched {
-		q.recordItemHint(ctx, "not_dispatched")
+		q.recordItemHint(ctx, itemHintLeaseOutcome(result.Status))
 		return nil
 	}
 	q.recordItemHint(ctx, "dispatched")
@@ -184,6 +185,33 @@ func (q *queueProcessor) observeItemHint(ctx context.Context, partition QueuePar
 func (q *queueProcessor) recordItemHint(ctx context.Context, outcome string) {
 	metrics.RecordCounterMetric(ctx, 1, metrics.CounterOpt{
 		PkgName: pkgName, MetricName: "queue_item_hint_total",
-		Tags: map[string]any{"queue_shard": q.Shard().Name(), "outcome": outcome},
+		Tags: map[string]any{"queue_shard": q.Shard().Name(), "queue_backend": string(q.Shard().Kind()), "outcome": outcome},
 	})
+}
+
+func itemHintLeaseOutcome(status LeaseItemStatus) string {
+	switch status {
+	case LeaseItemStatusAlreadyLeased:
+		return "already_leased"
+	case LeaseItemStatusNoWorkerCapacity:
+		return "no_worker_capacity"
+	case LeaseItemStatusThrottled:
+		return "throttled"
+	case LeaseItemStatusConcurrencyLimited:
+		return "concurrency_limited"
+	case LeaseItemStatusCustomConcurrencyLimited:
+		return "custom_concurrency_limited"
+	case LeaseItemStatusSemaphoreLimited:
+		return "semaphore_limited"
+	case LeaseItemStatusNotFound:
+		return "not_found"
+	case LeaseItemStatusLeaseContention:
+		return "lease_contention"
+	case LeaseItemStatusLeaseError:
+		return "lease_error"
+	case LeaseItemStatusDropped:
+		return "dropped"
+	default:
+		return "not_dispatched"
+	}
 }
