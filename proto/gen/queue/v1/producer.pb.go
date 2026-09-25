@@ -24,10 +24,12 @@ const (
 )
 
 type EnqueueRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Item          *Item                  `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	At            *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
-	Opts          *EnqueueOptions        `protobuf:"bytes,3,opt,name=opts,proto3" json:"opts,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Item  *Item                  `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	At    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=at,proto3" json:"at,omitempty"`
+	Opts  *EnqueueOptions        `protobuf:"bytes,3,opt,name=opts,proto3" json:"opts,omitempty"`
+	// Return the finalized item only to callers observing durable enqueue.
+	ReturnItem    bool `protobuf:"varint,4,opt,name=return_item,json=returnItem,proto3" json:"return_item,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -83,8 +85,17 @@ func (x *EnqueueRequest) GetOpts() *EnqueueOptions {
 	return nil
 }
 
+func (x *EnqueueRequest) GetReturnItem() bool {
+	if x != nil {
+		return x.ReturnItem
+	}
+	return false
+}
+
 type EnqueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Item          *QueueItem             `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	ShardName     string                 `protobuf:"bytes,2,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -117,6 +128,20 @@ func (x *EnqueueResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use EnqueueResponse.ProtoReflect.Descriptor instead.
 func (*EnqueueResponse) Descriptor() ([]byte, []int) {
 	return file_queue_v1_producer_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *EnqueueResponse) GetItem() *QueueItem {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *EnqueueResponse) GetShardName() string {
+	if x != nil {
+		return x.ShardName
+	}
+	return ""
 }
 
 type RequeueRequest struct {
@@ -399,12 +424,17 @@ var File_queue_v1_producer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_producer_proto_rawDesc = "" +
 	"\n" +
-	"\x17queue/v1/producer.proto\x12\bqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14queue/v1/types.proto\"\x8e\x01\n" +
+	"\x17queue/v1/producer.proto\x12\bqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14queue/v1/types.proto\"\xaf\x01\n" +
 	"\x0eEnqueueRequest\x12\"\n" +
 	"\x04item\x18\x01 \x01(\v2\x0e.queue.v1.ItemR\x04item\x12*\n" +
 	"\x02at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12,\n" +
-	"\x04opts\x18\x03 \x01(\v2\x18.queue.v1.EnqueueOptionsR\x04opts\"\x11\n" +
-	"\x0fEnqueueResponse\"\xad\x01\n" +
+	"\x04opts\x18\x03 \x01(\v2\x18.queue.v1.EnqueueOptionsR\x04opts\x12\x1f\n" +
+	"\vreturn_item\x18\x04 \x01(\bR\n" +
+	"returnItem\"Y\n" +
+	"\x0fEnqueueResponse\x12'\n" +
+	"\x04item\x18\x01 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12\x1d\n" +
+	"\n" +
+	"shard_name\x18\x02 \x01(\tR\tshardName\"\xad\x01\n" +
 	"\x0eRequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
@@ -461,22 +491,23 @@ var file_queue_v1_producer_proto_depIdxs = []int32{
 	7,  // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
 	8,  // 1: queue.v1.EnqueueRequest.at:type_name -> google.protobuf.Timestamp
 	6,  // 2: queue.v1.EnqueueRequest.opts:type_name -> queue.v1.EnqueueOptions
-	9,  // 3: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
-	8,  // 4: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
-	8,  // 5: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
-	10, // 6: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
-	11, // 7: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
-	0,  // 8: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
-	2,  // 9: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
-	4,  // 10: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
-	1,  // 11: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
-	3,  // 12: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
-	5,  // 13: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	9,  // 3: queue.v1.EnqueueResponse.item:type_name -> queue.v1.QueueItem
+	9,  // 4: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
+	8,  // 5: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
+	8,  // 6: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
+	10, // 7: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
+	11, // 8: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
+	0,  // 9: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
+	2,  // 10: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
+	4,  // 11: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
+	1,  // 12: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
+	3,  // 13: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
+	5,  // 14: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_producer_proto_init() }

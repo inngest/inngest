@@ -62,6 +62,9 @@ type LeaseItemRequest struct {
 	ContinueCount              uint
 	EarliestPeekTimeFallbackMS int64
 	StaticTime                 time.Time
+	// SkipRequeueOnLimit leaves a constraint-limited item where it is instead of
+	// requeueing the caller's copy. Direct hints set it: their copy may be stale.
+	SkipRequeueOnLimit bool
 }
 
 type LeaseItemStatus int
@@ -101,6 +104,10 @@ type ProcessItemResult struct {
 }
 
 type EnqueueOpts struct {
+	// OnEnqueued optionally observes the finalized item and selected shard after
+	// durable enqueue succeeds. It runs synchronously; observers must not block.
+	// Queue proxies carry the result back to the caller, not the callback itself.
+	OnEnqueued             func(QueueItem, string) `json:"-"`
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string

@@ -268,7 +268,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			Tags:    map[string]any{"status": "throttled", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
-		if q.Options().ItemEnableKeyQueues(ctx, *item) {
+		if !req.SkipRequeueOnLimit && q.Options().ItemEnableKeyQueues(ctx, *item) {
 			err := q.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
@@ -324,7 +324,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			Tags:    map[string]any{"status": status, "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
-		if q.Options().ItemEnableKeyQueues(ctx, *item) {
+		if !req.SkipRequeueOnLimit && q.Options().ItemEnableKeyQueues(ctx, *item) {
 			err := q.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
@@ -358,7 +358,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 
-		if q.Options().ItemEnableKeyQueues(ctx, *item) {
+		if !req.SkipRequeueOnLimit && q.Options().ItemEnableKeyQueues(ctx, *item) {
 			err := q.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",

@@ -233,6 +233,12 @@ type InvokeFailHandler func(context.Context, InvokeFailHandlerOpts, []event.Even
 // item.
 type HandleInvokeEvent func(context.Context, event.TrackedEvent) error
 
+// FastPathOptions controls best-effort notification after durable async enqueue.
+// Transport and rollout policy belong to the enqueue listener.
+type FastPathOptions struct {
+	Enabled bool
+}
+
 // ScheduleRequest represents all data necessary to schedule a new function.
 type ScheduleRequest struct {
 	Function inngest.Function
@@ -308,6 +314,10 @@ type ScheduleRequest struct {
 	// if we're queuing a function as a result of a sync run going async, as
 	// the SDK has already been run at that point.
 	RequestVersion *int
+
+	// FastPath opts this request into enqueue notifications, which broadcast the
+	// enqueue to executors for immediate lease and execution (depending on capacity).
+	FastPath FastPathOptions
 }
 
 // NewScheduleRequest creates an initial ScheduleRequest given a deployed

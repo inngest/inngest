@@ -221,6 +221,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	// Schedule the function directly, instead of waiting for pubsub.  This improves latency
 	// in the fast path, and is necessary for us to return the run ID.
 	sr := execution.NewScheduleRequest(f)
+	sr.FastPath = execution.FastPathOptions{Enabled: true}
 	sr.IdempotencyKey = &idempotencyHash
 	sr.Events = append(sr.Events, event)
 	runID, _, err := s.executor.Schedule(ctx, sr)

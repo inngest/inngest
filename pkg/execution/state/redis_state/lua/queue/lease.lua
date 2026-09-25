@@ -19,6 +19,7 @@ local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
 local setEarliestPeekTime = tonumber(ARGV[5])
 local itemEarliestPeekTime = tonumber(ARGV[6])
+local generation = tonumber(ARGV[7])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -41,6 +42,12 @@ local nextTime = decode_ulid_time(newLeaseID)
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- This is already leased;  don't let this requester lease the item.
 	return -2
+end
+
+-- A buffered/peeked snapshot superseded by requeue must not dispatch old data.
+-- Legacy callers without a generation retain their existing lease behavior.
+if generation ~= nil and generation > 0 and item.genID ~= generation then
+	return -1
 end
 
 if setEarliestPeekTime == 1 and itemEarliestPeekTime ~= nil and itemEarliestPeekTime > 0 then

@@ -1742,7 +1742,23 @@ func (e *executor) schedule(
 
 	// Schedule for async functons (the default)
 	_, queueSpan := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
-	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+	enqueueOpts := queue.EnqueueOpts{}
+	var enqueueListeners []execution.EnqueueLifecycleListener
+	if req.FastPath.Enabled {
+		for _, listener := range e.lifecycles {
+			if listener, ok := listener.(execution.EnqueueLifecycleListener); ok {
+				enqueueListeners = append(enqueueListeners, listener)
+			}
+		}
+	}
+	if len(enqueueListeners) > 0 {
+		enqueueOpts.OnEnqueued = func(enqueued queue.QueueItem, shard string) {
+			for _, listener := range enqueueListeners {
+				go listener.OnFunctionEnqueued(context.WithoutCancel(ctx), reqSnapshot, enqueued, shard)
+			}
+		}
+	}
+	err = e.queue.Enqueue(ctx, item, at, enqueueOpts)
 	queueSpan.End()
 
 	switch {
