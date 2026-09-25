@@ -4,8 +4,8 @@ import SignInRedirectErrors, {
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
 import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
-import { getSignupMetadata } from '@/utils/signupAttribution';
 import { canonicalLink } from '@/utils/urls';
+import { useSignupMetadata } from '@/utils/useSignupMetadata';
 import { SignIn } from '@clerk/tanstack-react-start';
 import { Alert } from '@inngest/components/Alert';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
@@ -32,6 +32,7 @@ function RouteComponent() {
   const { error } = Route.useSearch();
   const location = useLocation();
   const isRedirect = !location.pathname.startsWith('/sign-in');
+  const signupMetadata = useSignupMetadata();
 
   return (
     <SplitView>
@@ -47,7 +48,7 @@ function RouteComponent() {
                 of relying on a dark-mode filter over a PNG. */}
             <InngestLogo className="text-basis mb-8" width={132} />
             <SignIn
-              unsafeMetadata={getSignupMetadata()}
+              unsafeMetadata={signupMetadata}
               appearance={{
                 elements: {
                   footer: 'bg-none',

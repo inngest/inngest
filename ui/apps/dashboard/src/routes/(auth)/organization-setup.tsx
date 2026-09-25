@@ -1,6 +1,7 @@
 import ReloadClerkAndRedirect from '@/components/Clerk/ReloadClerkAndRedirect';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
+import { trackAccountCreated } from '@/utils/accountCreatedTracking';
 import { canonicalLink, pathCreator } from '@/utils/urls';
 import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
@@ -26,10 +27,24 @@ export const Route = createFileRoute('/(auth)/organization-setup')({
     meta: [{ name: 'robots', content: 'noindex' }],
   }),
   beforeLoad: async () => {
-    await setUpAccount();
+    const result = await setUpAccount();
+    return { setUpAccountID: result.setUpAccount?.account?.id ?? null };
   },
 });
 
 function OrganizationSetupComponent() {
-  return <ReloadClerkAndRedirect redirectURL={pathCreator.onboarding()} />;
+  const { setUpAccountID } = Route.useRouteContext();
+
+  return (
+    <ReloadClerkAndRedirect
+      redirectURL={pathCreator.onboarding()}
+      beforeRedirect={(user) =>
+        trackAccountCreated({
+          accountID: setUpAccountID,
+          email: user.primaryEmailAddress?.emailAddress,
+          isFirstOrganization: user.organizationMemberships.length === 1,
+        })
+      }
+    />
+  );
 }

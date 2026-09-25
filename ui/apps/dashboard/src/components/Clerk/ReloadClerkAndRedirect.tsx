@@ -1,10 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useUser } from '@clerk/tanstack-react-start';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 
+type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
+
 type ReloadClerkAndRedirectProps = {
   redirectURL: string;
+  /**
+   * Runs after Clerk has reloaded the user and before the redirect, which
+   * waits for it. Errors are swallowed so they can never block the redirect.
+   */
+  beforeRedirect?: (user: ClerkUser) => Promise<void>;
 };
 
 /**
@@ -16,13 +23,23 @@ type ReloadClerkAndRedirectProps = {
  */
 export default function ReloadClerkAndRedirect({
   redirectURL,
+  beforeRedirect,
 }: ReloadClerkAndRedirectProps) {
   const { isLoaded, user } = useUser();
+  // Held in a ref so a new callback identity on re-render doesn't re-run the
+  // reload/redirect effect.
+  const beforeRedirectRef = useRef(beforeRedirect);
+  beforeRedirectRef.current = beforeRedirect;
 
   useEffect(() => {
     if (!isLoaded) return;
 
-    user?.reload().then(() => {
+    user?.reload().then(async (reloadedUser) => {
+      try {
+        await beforeRedirectRef.current?.(reloadedUser);
+      } catch {
+        // Never block the redirect.
+      }
       window.location.replace(redirectURL);
     });
   }, [isLoaded, redirectURL]);
