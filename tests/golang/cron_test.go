@@ -396,10 +396,11 @@ func TestCronJitterRemovalAppliesToCurrentOccurrence(t *testing.T) {
 	r.NotNil(run.CronSchedule)
 	r.Equal("* * * * *", *run.CronSchedule)
 
-	trigger := c.RunTrigger(ctx, runID)
-	require.NotNil(t, trigger)
-	require.NotNil(t, trigger.Cron)
-	require.GreaterOrEqual(t, len(trigger.Payloads), 1)
+	var trigger *models.RunTraceTrigger
+	require.Eventually(t, func() bool {
+		trigger = c.RunTrigger(ctx, runID)
+		return trigger != nil && trigger.Cron != nil && len(trigger.Payloads) >= 1
+	}, 15*time.Second, 1*time.Second, "trigger payloads should be populated within 15s")
 
 	_, scheduledAt, fireAt := parseCronTriggerPayload(t, trigger.Payloads[0])
 	executedAtVal := executedAt.Load()
