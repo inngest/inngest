@@ -1,43 +1,14 @@
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
-import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
-import type { ColumnDef } from '@tanstack/react-table';
 
-import { permissionResourceCopy } from '@/components/OAuth/permissionResourceCopy';
 import { APIKeyPanel } from './APIKeyPanel';
+import { APIKeyPermissions } from './APIKeyPermissions';
 import {
   apiKeyEnvironment,
   apiKeyStatus,
   type APICredential,
 } from './keyDisplay';
-
-type PermissionRow = { resource: string; grants: string[] };
-
-const columns: ColumnDef<PermissionRow>[] = [
-  {
-    accessorKey: 'resource',
-    header: 'Resource',
-    cell: ({ row }) => permissionResourceCopy(row.original.resource).label,
-  },
-  {
-    id: 'access',
-    header: 'Access',
-    cell: ({ row }) => (
-      <div className="flex flex-col gap-1">
-        {row.original.grants.map((grant) => {
-          const [, access, operation] = grant.split(':');
-          return (
-            <span key={grant}>
-              {access === 'write' ? 'Write' : 'Read'}
-              {operation !== '*' && `: ${operation}`}
-            </span>
-          );
-        })}
-      </div>
-    ),
-  },
-];
 
 export function APIKeyStatus({ apiKey }: { apiKey: APICredential }) {
   const status = apiKeyStatus(apiKey);
@@ -66,16 +37,6 @@ export function APIKeyDetails({
   onClose: () => void;
   onRevoke: () => void;
 }) {
-  const resources = [
-    ...new Set(apiKey.permissions.map((grant) => grant.split(':')[0])),
-  ].sort();
-  const permissions = resources.map((resource) => ({
-    resource,
-    grants: apiKey.permissions.filter((grant) =>
-      grant.startsWith(`${resource}:`),
-    ),
-  }));
-
   return (
     <APIKeyPanel title="API key details" onClose={onClose}>
       <div className="flex flex-col gap-6">
@@ -112,16 +73,7 @@ export function APIKeyDetails({
             </dd>
           </div>
         </dl>
-        <div className="flex flex-col gap-3">
-          <h3 className="text-basis text-sm font-medium">Permissions</h3>
-          <div className="border-subtle overflow-hidden rounded border text-sm">
-            <Table
-              columns={columns}
-              data={permissions}
-              cellClassName="py-2 text-subtle"
-            />
-          </div>
-        </div>
+        <APIKeyPermissions permissions={apiKey.permissions} />
         <div>
           <Button
             label="Revoke key"

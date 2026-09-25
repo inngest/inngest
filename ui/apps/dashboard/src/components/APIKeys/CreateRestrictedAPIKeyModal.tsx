@@ -19,6 +19,7 @@ import {
 import { selectedPermissionGrants } from '@/components/OAuth/permissionSelection';
 import { apiKeyErrorMessage } from './errorMessage';
 import { APIKeyPanel } from './APIKeyPanel';
+import { APIKeyPermissions } from './APIKeyPermissions';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateRestrictedAPIKey } from './validation';
 
@@ -164,18 +165,9 @@ export function CreateRestrictedAPIKeyModal({
                 )}
               </dd>
             </dl>
-            <details className="text-subtle mt-4 text-sm">
-              <summary className="text-basis cursor-pointer">
-                Permissions
-              </summary>
-              <ul className="mt-3 space-y-1">
-                {permissions.map((permission) => (
-                  <li key={permission}>
-                    <code className="break-all text-xs">{permission}</code>
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <div className="mt-6">
+              <APIKeyPermissions permissions={permissions} />
+            </div>
           </div>
           <div>
             <Button kind="secondary" label="Done" onClick={onClose} />
