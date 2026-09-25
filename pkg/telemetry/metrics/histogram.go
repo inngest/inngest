@@ -15,6 +15,12 @@ var (
 		600_000, 1_800_000, // < 1h
 	}
 
+	fastPathExecutionLatencyBoundaries = []float64{
+		1, 2, 5, 10, 20, 50, 100, 200, 500,
+		1000, 2000, 5000, 10_000, 15_000, 20_000, 30_000,
+		60_000, 300_000, 600_000,
+	}
+
 	cancellationReadDurationBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
@@ -116,6 +122,17 @@ func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramO
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}
+
+func HistogramFastPathExecutionLatency(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "fast_path_execution_latency",
+		Description: "Time from queue enqueue to hinted work starting, including scheduled and capacity delays",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  fastPathExecutionLatencyBoundaries,
 	})
 }
 
