@@ -404,3 +404,104 @@ func TestItemHintDiscardStaleBufferedSnapshot(t *testing.T) {
 		}
 	}
 }
+
+// A buffered hint can arrive after ordinary scanning already refilled, leased
+// and started its item. Refill reserved capacity under a different operation
+// key, so the hint's Acquire counts the item's own slot and is limited. The
+// hint must be dropped: requeueing its stale copy would clear the running
+// item's lease and return it to the backlog for a second execution.
+func TestItemHintLimitedStaleSnapshotKeepsActiveLease(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	t.Cleanup(rc.Close)
+	cm, err := constraintapi.NewRedisCapacityManager(constraintapi.WithClient(rc), constraintapi.WithShardName("limited-stale"))
+	require.NoError(t, err)
+	opts := []osqueue.QueueOpt{
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool { return true }),
+		osqueue.WithCapacityManager(cm), osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{FunctionVersion: 1, Concurrency: osqueue.PartitionConcurrency{AccountConcurrency: 1, FunctionConcurrency: 1}}
+		}),
+		osqueue.WithRunMode(osqueue.QueueRunMode{Partition: true}), osqueue.WithPollTick(5 * time.Millisecond), osqueue.WithNumWorkers(4),
+	}
+	base := NewQueueShard("ss3", NewQueueClient(rc, "{limited-stale}"), opts...)
+	reg, err := osqueue.NewSingleShardRegistry(hintOnlyRedisShard{base})
+	require.NoError(t, err)
+	offers := make(chan func(osqueue.QueueItem) bool, 1)
+	opts = append(opts, osqueue.WithItemHints(osqueue.ItemHintOptions{BufferSize: 4, AttemptTimeout: time.Second, Source: func(ctx context.Context, _ osqueue.QueueShard, offer func(osqueue.QueueItem) bool) error {
+		offers <- offer
+		<-ctx.Done()
+		return nil
+	}}))
+	proc, err := osqueue.New(t.Context(), "limited-stale", reg, opts...)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	entered := make(chan string, 4)
+	release := make(chan struct{})
+	run := func(_ context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+		entered <- *item.JobID
+		<-release
+		return osqueue.RunResult{}, nil
+	}
+	go func() { done <- proc.Run(ctx, run) }()
+	defer func() {
+		close(release)
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Error("processor did not stop")
+		}
+	}()
+	offer := <-offers
+	enqueue := func(job string) osqueue.QueueItem {
+		acct, env, fn := uuid.New(), uuid.New(), uuid.New()
+		var enqueued osqueue.QueueItem
+		require.NoError(t, proc.Enqueue(t.Context(), osqueue.Item{Kind: osqueue.KindStart, JobID: &job, WorkspaceID: env, Identifier: state.Identifier{AccountID: acct, WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}, time.Now(), osqueue.EnqueueOpts{OnEnqueued: func(qi osqueue.QueueItem, _ string) { enqueued = qi }}))
+		require.NotEmpty(t, enqueued.ID)
+		return enqueued
+	}
+	snapshot := enqueue("stale")
+
+	// Ordinary scanning refills, leases and starts the item first.
+	shadow := osqueue.ItemShadowPartition(t.Context(), snapshot)
+	require.NoError(t, proc.ProcessShadowPartition(t.Context(), &shadow, 0))
+	refilled, err := base.LoadQueueItem(t.Context(), snapshot.ID)
+	require.NoError(t, err)
+	require.NotNil(t, refilled.CapacityLease)
+	leased, err := proc.LeaseItem(t.Context(), osqueue.LeaseItemRequest{Item: refilled, StaticTime: time.Now()}, func(_ context.Context, item osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
+		go func() { _, _ = proc.ProcessItem(ctx, item, run) }()
+		return osqueue.NewCompletedDispatchedItem(osqueue.DispatchedItemResult{}), nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, osqueue.LeaseItemStatusDispatched, leased.Status)
+	select {
+	case <-entered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ordinary lease did not execute")
+	}
+	running, err := base.LoadQueueItem(t.Context(), snapshot.ID)
+	require.NoError(t, err)
+	require.NotNil(t, running.LeaseID)
+
+	// The stale hint drains first; an unrelated hint behind it proves the attempt ran.
+	require.True(t, offer(snapshot))
+	marker := enqueue("marker")
+	require.True(t, offer(marker))
+	select {
+	case id := <-entered:
+		require.Equal(t, marker.ID, id)
+	case <-time.After(2 * time.Second):
+		t.Fatal("hints were not drained")
+	}
+	after, err := base.LoadQueueItem(t.Context(), snapshot.ID)
+	require.NoError(t, err)
+	require.Equal(t, running.LeaseID, after.LeaseID, "limited stale hint must not clear the active lease")
+	require.Equal(t, running.GenerationID, after.GenerationID)
+	backlog := osqueue.ItemBacklog(t.Context(), snapshot)
+	count, err := base.BacklogSize(t.Context(), backlog.BacklogID)
+	require.NoError(t, err)
+	require.Zero(t, count, "running item must not return to the backlog")
+}

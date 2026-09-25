@@ -62,6 +62,9 @@ type LeaseItemRequest struct {
 	ContinueCount              uint
 	EarliestPeekTimeFallbackMS int64
 	StaticTime                 time.Time
+	// SkipRequeueOnLimit leaves a constraint-limited item where it is instead of
+	// requeueing the caller's copy. Direct hints set it: their copy may be stale.
+	SkipRequeueOnLimit bool
 }
 
 type LeaseItemStatus int

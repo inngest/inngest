@@ -151,9 +151,11 @@ func (q *queueProcessor) processItemHint(ctx context.Context, item QueueItem, di
 	// Scanners attach the stored queue ID to the worker-facing Item. Enqueue's
 	// returned envelope may still carry the original (unhashed) producer JobID.
 	item.Data.JobID = &item.ID
+	// The buffered copy may be stale. Scanning may already run the item, so a
+	// limited hint is dropped rather than requeued over the stored item.
 	var dispatched DispatchedItem
 	result, err := q.LeaseItem(attemptCtx, LeaseItemRequest{
-		Item: &item, StaticTime: q.Clock().Now(),
+		Item: &item, StaticTime: q.Clock().Now(), SkipRequeueOnLimit: true,
 		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
 		var err error
