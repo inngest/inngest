@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -7,6 +7,8 @@ type SlideOverProps = {
   children?: React.ReactNode;
   onClose: () => void;
   size?: 'small' | 'large' | 'fixed-500';
+  isDismissible?: boolean;
+  initialFocus?: RefObject<HTMLElement>;
 };
 
 function getSizeClassName(size: SlideOverProps['size']) {
@@ -20,7 +22,13 @@ function getSizeClassName(size: SlideOverProps['size']) {
   }
 }
 
-export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps) {
+export function SlideOver({
+  children,
+  onClose,
+  size = 'large',
+  isDismissible = true,
+  initialFocus,
+}: SlideOverProps) {
   // This hack is needed to prevent hydration errors.
   // The Radix Dialog is not rendered correctly server side, so we need to prevent it from rendering until the client side hydration is complete (and `useEffect` is run).
   // The issue is reported here: https://github.com/radix-ui/primitives/issues/1386
@@ -31,6 +39,9 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
   }, []);
 
   function handleClose() {
+    if (!isDismissible) {
+      return;
+    }
     setOpen(false);
     // Allows the exit transition to happen before unmounting
     setTimeout(() => {
@@ -69,7 +80,10 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
                 }}
               >
                 <Dialog.Content
-                  onOpenAutoFocus={(event: Event) => event.preventDefault()}
+                  onOpenAutoFocus={(event: Event) => {
+                    event.preventDefault();
+                    initialFocus?.current?.focus();
+                  }}
                   className={cn(
                     getSizeClassName(size),
                     'bg-canvasBase flex h-full flex-col shadow-xl'
