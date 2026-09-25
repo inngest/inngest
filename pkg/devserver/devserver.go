@@ -125,6 +125,10 @@ type StartOpts struct {
 	// given key.
 	EventKeys []string `json:"-"`
 
+	// CloudSandboxes optionally handles authenticated Cloud compute requests.
+	// Local events, functions, runs, and executor state are never forwarded.
+	CloudSandboxes http.Handler `json:"-"`
+
 	// RequireKeys defines whether event and signing keys are required for the
 	// server to function. If this is true and signing keys are not defined,
 	// the server will still boot but core actions such as syncing, runs, and
@@ -765,6 +769,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/v2", Handler: apiv2Handler},
 		{At: "/debug", Handler: middleware.Profiler()},
 		{At: "/metrics", Router: metricsAPI.Router},
+	}
+
+	if opts.CloudSandboxes != nil {
+		for _, path := range []string{"/dev/cloud", "/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots"} {
+			mounts = append(mounts, api.Mount{At: path, Handler: opts.CloudSandboxes})
+		}
 	}
 
 	if testapi.ShouldEnable() {
