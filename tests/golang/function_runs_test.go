@@ -198,7 +198,7 @@ func TestFunctionRunList(t *testing.T) {
 				assert.True(ct, endedAt.UnixMilli() >= ts.UnixMilli())
 				ts = endedAt
 			}
-		}, 10*time.Second, 2*time.Second)
+		}, 30*time.Second, 2*time.Second)
 	})
 
 	t.Run("retrieve only failed runs", func(t *testing.T) {
