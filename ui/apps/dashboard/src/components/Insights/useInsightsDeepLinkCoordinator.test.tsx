@@ -384,6 +384,35 @@ describe('useInsightsDeepLinkCoordinator', () => {
     );
   });
 
+  it('retries the same saved-query navigation when its fetch recovers', async () => {
+    mocks.queries = undefined;
+    mocks.queryError = 'transient upstream failure';
+    const { result, rerender } = renderHook(() =>
+      useCoordinatorHarness({
+        initialHref: '/env/production/insights?query_id=saved-B',
+        initialTabState: { tabs: [HOME_TAB], activeTabId: HOME_TAB.id },
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.activeTab).toEqual(HOME_TAB);
+    expect(result.current.currentHref).toBe(
+      '/env/production/insights?query_id=saved-B',
+    );
+
+    mocks.queryError = undefined;
+    mocks.queries = [SAVED_A, SAVED_B, SAVED_C];
+    rerender();
+
+    await waitFor(() => expect(result.current.status).toBe('applied'));
+    expect(result.current.activeTab).toMatchObject({ savedQueryId: 'saved-B' });
+    expect(result.current.currentHref).toBe(
+      '/env/production/insights?query_id=saved-B',
+    );
+    expect(result.current.openCount).toBe(2);
+    expect(mocks.toastError).toHaveBeenCalledOnce();
+  });
+
   it('reports and removes oversized SQL supplied by an external link', async () => {
     const sql = 'x'.repeat(8 * 1024 + 1);
     const { result } = renderHook(() =>

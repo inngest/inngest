@@ -43,6 +43,7 @@ type CoordinatorState =
 
 type CoordinatorEvent =
   | { type: 'reset' }
+  | { type: 'retry'; navigationKey: string }
   | {
       type: 'applying';
       navigationKey: string;
@@ -91,6 +92,17 @@ export function useInsightsDeepLinkCoordinator({
     }
 
     if (!navigationKey) return;
+
+    if (
+      lifecycle.status === 'error' &&
+      intent?.kind === 'saved-query' &&
+      !isSavedQueriesFetching &&
+      queries.data !== undefined
+    ) {
+      claimedNavigationKey.current = undefined;
+      dispatch({ type: 'retry', navigationKey });
+      return;
+    }
 
     if (lifecycle.status === 'waiting-for-hydration/resources') {
       if (!isHydrated) return;
@@ -246,6 +258,11 @@ function coordinatorReducer(
   switch (event.type) {
     case 'reset':
       return { status: 'idle' };
+    case 'retry':
+      return {
+        status: 'waiting-for-hydration/resources',
+        navigationKey: event.navigationKey,
+      };
     case 'applying':
       return {
         status: 'applying',
