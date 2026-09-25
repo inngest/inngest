@@ -16,22 +16,12 @@ import { SaveTabProvider } from '@/components/Insights/InsightsSQLEditor/SaveTab
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { SchemasProvider } from '@/components/Insights/InsightsTabManager/InsightsHelperPanel/features/SchemaExplorer/SchemasContext/SchemasContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
+import { validateInsightsSearch } from '@/components/Insights/insightsSearchParams';
 import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
-
-export type InsightsSearchParams = {
-  query_id?: string;
-  sql?: string;
-  name?: string;
-};
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
   component: InsightsComponent,
-  validateSearch: (search: Record<string, unknown>): InsightsSearchParams => ({
-    query_id:
-      typeof search?.query_id === 'string' ? search.query_id : undefined,
-    sql: typeof search?.sql === 'string' ? search.sql : undefined,
-    name: typeof search?.name === 'string' ? search.name : undefined,
-  }),
+  validateSearch: validateInsightsSearch,
 });
 
 // Initial placeholder actions used before real actions are available from useInsightsTabManager
