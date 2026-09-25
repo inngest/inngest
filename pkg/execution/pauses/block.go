@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -201,6 +202,10 @@ type blockstore struct {
 
 	// enableBlockCompaction, if it returns false, prevents block compaction for the workspace.
 	enableBlockCompaction FeatureCallback
+
+	// compactingIndexes tracks in-flight compaction goroutines per index key,
+	// preventing concurrent goroutines from racing within the same process.
+	compactingIndexes sync.Map
 }
 
 func (b blockstore) BlockSize() int {
@@ -741,9 +746,15 @@ func (b *blockstore) maybeCompact(ctx context.Context, index Index, blockIDs []u
 		return
 	}
 
+	indexKey := index.WorkspaceID.String() + ":" + index.EventName
+	if _, loaded := b.compactingIndexes.LoadOrStore(indexKey, struct{}{}); loaded {
+		return // compaction already in flight for this index
+	}
+
 	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	go func() {
 		defer cancel()
+		defer b.compactingIndexes.Delete(indexKey)
 
 		var maxDeletes int64
 		for _, blockID := range blockIDs {
