@@ -50,6 +50,7 @@ var Attrs = struct {
 
 	// Defer attributes
 	DeferChildRunID   attr[*ulid.ULID]
+	DeferEventID      attr[*ulid.ULID]
 	DeferFnSlug       attr[*string]
 	DeferHashedID     attr[*string]
 	DeferParentFnSlug attr[*string]
@@ -187,6 +188,7 @@ var Attrs = struct {
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
+	DeferEventID:                       ULIDAttr("defer.event_id"),
 	DeferFnSlug:                        StringAttr("defer.fn_slug"),
 	DeferHashedID:                      StringAttr("defer.hashed_id"),
 	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),

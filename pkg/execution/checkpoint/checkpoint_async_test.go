@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -162,6 +163,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			TracerProvider:  mocks.tracer,
 			Queue:           mocks.queue,
 			MetricsProvider: mocks.metrics,
+			Executor:        mocks.executor,
 		})
 
 		expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}
@@ -423,6 +425,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 			TracerProvider:  &mockTracerProvider{},
 			Queue:           &mockQueue{},
 			MetricsProvider: &mockMetricsProvider{},
+			Executor:        &mockExecutor{},
 		})
 
 		err := checkpointer.CheckpointAsyncSteps(ctx, asyncCheckpoint)
@@ -609,6 +612,115 @@ func TestCheckpointAsyncSteps_BackCompatNoGenerationID(t *testing.T) {
 	mocks.queue.AssertExpectations(t)
 }
 
+// TestCheckpointAsyncSteps_NotifiesRunStepRunFinishedLifecycle proves the
+// async step path actually dispatches executor.RunStepRunFinishedLifecycle
+// -- with the documented placeholder zero-value queue.Item (see
+// checkpoint.go's comment on that call: reconstructing the real
+// queue.Item behind input.QueueItemRef isn't needed for a sync listener to
+// record this step) -- and that a duplicate save suppresses it, mirroring
+// the sync path's equivalent test. mockExecutor's RunStepRunFinishedLifecycle
+// only records a call when a test registers an expectation for it, so this
+// closes the gap where deleting the production dispatch would otherwise
+// still pass every existing async test.
+func TestCheckpointAsyncSteps_NotifiesRunStepRunFinishedLifecycle(t *testing.T) {
+	t.Run("dispatches with the documented zero-value queue.Item on success", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		expectedData, err := json.Marshal(map[string]any{
+			"data": json.RawMessage(`{"result": "step 1 output"}`),
+		})
+		require.NoError(err)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		mocks.executor.On("RunStepRunFinishedLifecycle", ctx, testData.metadata, queue.Item{}, inngest.SourceEdge, mock.MatchedBy(func(o state.GeneratorOpcode) bool {
+			return o.ID == "step-1"
+		}), mock.AnythingOfType("time.Time")).Return()
+
+		err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		mocks.executor.AssertExpectations(t)
+	})
+
+	t.Run("does not dispatch on a duplicate save", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		expectedData, err := json.Marshal(map[string]any{
+			"data": json.RawMessage(`{"result": "step 1 output"}`),
+		})
+		require.NoError(err)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).
+			Return(false, state.ErrDuplicateResponse)
+
+		// Registering the expectation (rather than omitting it) means the
+		// mock would fail this test with "unexpected call" if production
+		// code called it anyway -- proving the negative, not just failing
+		// to prove the positive.
+		mocks.executor.On("RunStepRunFinishedLifecycle", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+
+		// A duplicate save `continue`s past the dispatch for this opcode,
+		// but the loop still ends normally and ResetAttemptsByJobID always
+		// runs afterward for a valid QueueItemRef.
+		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+		err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.NoError(err)
+
+		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+	})
+
+	t.Run("does not dispatch when SaveStep fails", func(t *testing.T) {
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:   "step-1",
+			Op:   enums.OpcodeStepRun,
+			Data: json.RawMessage(`{"result": "step 1 output"}`),
+		}
+
+		mocks, testData := setupAsyncCheckpointTest(t, op)
+
+		expectedData, err := json.Marshal(map[string]any{
+			"data": json.RawMessage(`{"result": "step 1 output"}`),
+		})
+		require.NoError(err)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).
+			Return(false, errors.New("redis dead"))
+		mocks.executor.On("RunStepRunFinishedLifecycle", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+
+		// A save failure returns immediately, before the loop reaches
+		// ResetAttemptsByJobID -- no expectation registered for it here.
+		err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+		require.Error(err)
+
+		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+		mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+	})
+}
+
 //
 //
 // Testing utils.
@@ -627,10 +739,11 @@ func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool
 
 	// Create mock dependencies
 	mocks := &testMocks{
-		state:   &mockRunService{},
-		tracer:  &mockTracerProvider{},
-		queue:   &mockQueue{},
-		metrics: &mockMetricsProvider{},
+		state:    &mockRunService{},
+		tracer:   &mockTracerProvider{},
+		queue:    &mockQueue{},
+		metrics:  &mockMetricsProvider{},
+		executor: &mockExecutor{},
 	}
 
 	// Create test IDs
@@ -678,6 +791,7 @@ func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		Executor:        mocks.executor,
 		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
 			return validationEnabled
 		},
@@ -841,10 +955,11 @@ func (m *mockMetricsProvider) OnFnFinished(ctx context.Context, mc MetricCardina
 // Test helper types and functions
 
 type testMocks struct {
-	state   *mockRunService
-	tracer  *mockTracerProvider
-	queue   *mockQueue
-	metrics *mockMetricsProvider
+	state    *mockRunService
+	tracer   *mockTracerProvider
+	queue    *mockQueue
+	metrics  *mockMetricsProvider
+	executor *mockExecutor
 }
 
 type testData struct {
