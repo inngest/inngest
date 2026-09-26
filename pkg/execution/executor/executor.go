@@ -1094,53 +1094,38 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
 	req.Context = maps.Clone(req.Context)
 	req.Events = slices.Clone(req.Events)
-	req.SerializedEvents = slices.Clone(req.SerializedEvents)
 	return req
 }
 
-func prepareEventPayloads(events []event.TrackedEvent, serialized []string) ([]json.RawMessage, []string, string, error) {
-	if len(serialized) > 0 {
-		if len(serialized) != len(events) {
-			return nil, nil, "", fmt.Errorf("serialized event count does not match event count")
+func prepareEventPayloads(events []event.TrackedEvent, serialized event.SerializedEvents) ([]json.RawMessage, event.SerializedEvents, string, error) {
+	if serialized.Len() > 0 {
+		if serialized.Len() != len(events) {
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("serialized event count does not match event count")
 		}
-		serialized = slices.Clone(serialized)
-		var input strings.Builder
-		input.WriteByte('[')
-		for i, item := range serialized {
-			if i > 0 {
-				input.WriteByte(',')
-			}
-			input.WriteString(item)
-		}
-		input.WriteByte(']')
-		return nil, serialized, input.String(), nil
+		return nil, serialized, serialized.Input(), nil
 	}
 
 	evts := make([]json.RawMessage, len(events))
 	for n, item := range events {
 		byt, err := json.Marshal(item.GetEvent())
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("error marshalling event: %w", err)
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling event: %w", err)
 		}
 		evts[n] = byt
 	}
 	bytEvts, err := json.Marshal(evts)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("error marshalling events: %w", err)
+		return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling events: %w", err)
 	}
 
-	return evts, nil, string(bytEvts), nil
+	return evts, event.SerializedEvents{}, string(bytEvts), nil
 }
 
-func rawEventPayloads(events []json.RawMessage, serialized []string) []json.RawMessage {
-	if len(events) > 0 || len(serialized) == 0 {
+func rawEventPayloads(events []json.RawMessage, serialized event.SerializedEvents) []json.RawMessage {
+	if len(events) > 0 || serialized.Len() == 0 {
 		return events
 	}
-	events = make([]json.RawMessage, len(serialized))
-	for i, item := range serialized {
-		events[i] = json.RawMessage(item)
-	}
-	return events
+	return serialized.RawMessages()
 }
 
 func cloneMetadata(md sv2.Metadata) sv2.Metadata {
@@ -1558,7 +1543,7 @@ func (e *executor) schedule(
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
 		newState.Events = rawEventPayloads(newState.Events, newState.SerializedEvents)
-		newState.SerializedEvents = nil
+		newState.SerializedEvents = event.SerializedEvents{}
 		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)

@@ -82,18 +82,15 @@ type v2 struct {
 
 // Create creates new state in the store for the given run ID.
 func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
-	if len(s.Events) > 0 && len(s.SerializedEvents) > 0 {
+	if len(s.Events) > 0 && s.SerializedEvents.Len() > 0 {
 		return state.State{}, fmt.Errorf("create state contains mutable and immutable event payloads")
 	}
-	events := s.Events
-	if len(s.SerializedEvents) > 0 {
-		events = make([]json.RawMessage, len(s.SerializedEvents))
-		for i, event := range s.SerializedEvents {
-			events[i] = json.RawMessage(event)
-		}
+	rawEvents := s.Events
+	if s.SerializedEvents.Len() > 0 {
+		rawEvents = s.SerializedEvents.RawMessages()
 	}
-	batchData := make([]map[string]any, len(events))
-	for n, evt := range events {
+	batchData := make([]map[string]any, len(rawEvents))
+	for n, evt := range rawEvents {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
 			return state.State{}, err
