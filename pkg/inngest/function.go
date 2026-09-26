@@ -577,7 +577,7 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		// Event data is JSON-decoded, so numbers in expressions
 		// evaluate as CEL doubles. Accept integral values and reject
 		// anything with a fractional part or outside the int64 range.
-		if v != math.Trunc(v) || v > math.MaxInt64 || v < math.MinInt64 {
+		if v != math.Trunc(v) || v >= float64(uint64(1)<<63) || v < math.MinInt64 {
 			return 0, fmt.Errorf("Priority.Run expression returned non-int: %v", val)
 		}
 		result = int64(v)

@@ -215,6 +215,13 @@ func TestRunPriorityFactor(t *testing.T) {
 			"data": map[string]any{"priority": float64(1e30)},
 		})
 		require.ErrorContains(t, err, "Priority.Run expression returned non-int")
+
+		// MaxInt64 rounds up to 2^63 as a float64; reject that boundary
+		// before converting to int64, rather than overflowing to MinInt64.
+		_, err = f.RunPriorityFactor(ctx, map[string]any{
+			"data": map[string]any{"priority": float64(uint64(1) << 63)},
+		})
+		require.ErrorContains(t, err, "Priority.Run expression returned non-int")
 	})
 
 	t.Run("With missing data", func(t *testing.T) {
