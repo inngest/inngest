@@ -2,12 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.46.0] - 2026-09-26
+
+### 🚀 Features
+
+- *(api)* Add sandbox secret name arrays (#4864)
+- *(queue)* Support pooled role leases (#4896)
+- *(queue)* Support dynamic partition peek limits per shard (#4877)
+- *(dashboard)* Add REST backed run lists (using backend traces v2) (#4890)
+- *(dashboard)* Manage sandbox secrets in the sidebar (#4876)
+- *(tracing)* Include custom concurrency keys in spans (#4915)
+- *(api)* Add async checkpoint routing hook (#4925)
+
+### 🐛 Bug Fixes
+
+- *(api)* Preserve run list timestamps (#4887)
+- *(dashboard)* Resolve failed boolean flags to ready on error (#4900)
+- *(ui)* Require registered client feature flags (#4904)
+- *(dashboard)* Fix UI for progressive CEL search status (#4913)
+- *(queue)* Notify shards after capacity release (#4914)
+- *(jank)* Remove code block title scrollbar (#4920)
+- *(dashboard)* Switch function runs from nested route to /v2/runs (#4922)
+- *(mcp)* Document cursor static mcp client config (#4916)
+
+### 🚜 Refactor
+
+- *(dashboard)* Omit unused deferred parent run IDs (#4888)
+- *(ui)* Use shared relative time helper (#4919)
+- *(api-docs)* Clean up generation and deployment (#4931)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(dashboard)* Run Vitest tests and align UI on Node 22 (#4902)
+- *(ci)* Pin GitHub Actions to commit SHAs (#4932)
+
 ## [v1.45.1] - 2026-09-17
 
 ### 🐛 Bug Fixes
 
 - *(cli)* Better message when cli is unauthed (#4883)
 - *(queue)* Drop permanently unroutable items (#4878)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.45.1 (#4884)
 
 ## [v1.45.0] - 2026-09-17
 
