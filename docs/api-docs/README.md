@@ -36,15 +36,25 @@ Generate the API docs first, then start the dev server from this directory:
 pnpm run dev
 ```
 
-## Release
+## Deployment
 
-Requires the Vercel API and this directory linked to the `api-docs.inngest.com` project.
-The GitHub Action expects `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
-`VERCEL_PROJECT_ID` repository secrets.
+The `API Docs` workflow generates and builds the site for relevant pull requests
+and every push to `main`. Production deployment belongs to the tag-driven
+`Release` workflow: after GoReleaser and npm publishing succeed for a stable
+release, it regenerates the docs from the tagged commit and deploys the prebuilt
+output to Vercel. Prereleases do not update the production site.
+
+The `API Docs deploy` workflow remains manually dispatchable with either the
+preview or production environment for operational overrides.
+
+The release job expects a `VERCEL_TOKEN` Actions secret. `vercel pull` uses it
+to find and link this directory to the existing `inngest/api-docs` project. Its
+production commands are equivalent to:
 
 ```sh
 make docs
 cd docs/api-docs
-vercel build
-vercel deploy --prebuilt
+vercel pull --yes --environment=production
+vercel build --prod
+vercel deploy --prebuilt --prod
 ```

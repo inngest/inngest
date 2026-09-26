@@ -153,6 +153,17 @@ jobs:
             npm publish --tag ${{ needs.check-release-type.outputs.prerelease }} --access public --provenance
           fi
 
+  api-docs:
+    if: needs.check-release-type.outputs.prerelease == ''
+    needs: [check-release-type, goreleaser, npm]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/api_docs_deploy.yml
+    with:
+      environment: production
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
   linear-release:
     runs-on: depot-ubuntu-22.04
     permissions:
