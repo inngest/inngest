@@ -109,22 +109,13 @@ describe('deepLinkUtils', () => {
         org: 'org_123',
         expires: 100,
         sig: 'a'.repeat(64),
-        forceRestRuns: 'true',
+        forceRestRuns: 'false',
       }),
     ).toEqual({
       acct: 'acct_123',
       org: 'org_123',
       expires: undefined,
       sig: 'a'.repeat(64),
-      forceRestRuns: 'true',
-    });
-
-    expect(validateDashboardDeepLinkSearch({ forceRestRuns: false })).toEqual({
-      acct: undefined,
-      org: undefined,
-      expires: undefined,
-      sig: undefined,
-      forceRestRuns: 'false',
     });
   });
 });

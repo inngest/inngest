@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Runs } from './Runs';
 
 const mocks = vi.hoisted(() => ({
-  flag: { isReady: false, value: false },
+  booleanFlag: vi.fn(() => ({ isReady: true, value: true })),
   functionResult: {
     data: undefined as
       | {
@@ -55,8 +55,7 @@ vi.mock('@inngest/components/RunsPage/RunsPage', () => ({
 
 vi.mock('@inngest/components/SharedContext/useBooleanFlag', () => ({
   useBooleanFlag: () => ({
-    booleanFlag: (flag: string) =>
-      flag === 'rest-runs-table' ? mocks.flag : { isReady: true, value: true },
+    booleanFlag: mocks.booleanFlag,
   }),
 }));
 
@@ -103,14 +102,12 @@ describe('Runs transport selection', () => {
     container?.remove();
     root = undefined;
     container = undefined;
-    mocks.flag.isReady = false;
-    mocks.flag.value = false;
     mocks.functionResult.data = undefined;
     mocks.functionResult.fetching = true;
     vi.clearAllMocks();
   });
 
-  it('waits for the REST flag and function metadata before choosing a transport', async () => {
+  it('waits for function metadata before requesting REST runs', async () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -118,18 +115,12 @@ describe('Runs transport selection', () => {
     await act(async () => {
       root?.render(<Runs scope="fn" functionSlug="app-function" />);
     });
-    expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: true, shouldUseREST: false }),
+    expect(mocks.booleanFlag).toHaveBeenCalledOnce();
+    expect(mocks.booleanFlag).toHaveBeenCalledWith(
+      'traces-preview',
+      true,
+      true,
     );
-    expect(mocks.useQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: true }),
-    );
-
-    mocks.flag.isReady = true;
-    mocks.flag.value = true;
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
     expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
       expect.objectContaining({ pause: true, shouldUseREST: false }),
     );
@@ -151,14 +142,6 @@ describe('Runs transport selection', () => {
     );
     expect(mocks.useQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ pause: false }),
-    );
-
-    mocks.flag.value = false;
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
-    expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: false, shouldUseREST: false }),
     );
   });
 });

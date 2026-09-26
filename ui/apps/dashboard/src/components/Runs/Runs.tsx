@@ -84,11 +84,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     true,
     true,
   );
-  const { isReady: isRestRunsFlagReady, value: restRunsEnabled } = booleanFlag(
-    'rest-runs-table',
-    false,
-    true,
-  );
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] =
@@ -98,7 +93,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const [excludeDeferred = false] = useBooleanSearchParam('excludeDeferred');
-  const [forceRestRuns] = useBooleanSearchParam('forceRestRuns');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -152,19 +146,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ],
   );
 
-  const isRestRunsSelectionReady =
-    forceRestRuns !== undefined || isRestRunsFlagReady;
-  const isRestRunsRequested = forceRestRuns ?? restRunsEnabled;
   const isRestRunsMetadataLoading =
-    isRestRunsRequested &&
-    ((scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
-      (scope === 'fn' &&
-        commonQueryVars.functionAppID === null &&
-        isFunctionLoading));
-  const pauseRuns = !isRestRunsSelectionReady || isRestRunsMetadataLoading;
+    (scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
+    (scope === 'fn' &&
+      commonQueryVars.functionAppID === null &&
+      isFunctionLoading);
+  const pauseRuns = isRestRunsMetadataLoading;
   const shouldUseREST =
     !pauseRuns &&
-    isRestRunsRequested &&
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
