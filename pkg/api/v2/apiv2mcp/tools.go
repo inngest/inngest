@@ -115,7 +115,23 @@ func call(ctx context.Context, request *mcp.CallToolRequest, endpoint apiv2endpo
 	if err != nil {
 		return ToolError(err.Error(), map[string]any{"error": err.Error()}), nil
 	}
+	forwardAuthorization(request, req)
 	return opts.Execute(ctx, endpoint, req)
+}
+
+// forwardAuthorization copies the Authorization header of the MCP HTTP request
+// onto the REST API v2 request built for the tool call. When the server runs
+// with a signing key, REST API v2 is guarded by signing-key authentication;
+// without this the generated tools always fail with HTTP 401 even though the
+// caller presented the key to the MCP endpoint. Requests that arrive without an
+// Authorization header (for example over stdio) are left untouched.
+func forwardAuthorization(request *mcp.CallToolRequest, req *http.Request) {
+	if request == nil || request.Extra == nil || request.Extra.Header == nil {
+		return
+	}
+	if authz := request.Extra.Header.Get("Authorization"); authz != "" {
+		req.Header.Set("Authorization", authz)
+	}
 }
 
 func Request(ctx context.Context, endpoint apiv2endpoint.Endpoint, args map[string]any, opts Options) (*http.Request, error) {
