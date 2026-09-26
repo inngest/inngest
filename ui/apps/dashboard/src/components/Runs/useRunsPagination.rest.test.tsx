@@ -14,18 +14,10 @@ import { useRunsPagination } from './useRunsPagination';
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
-  gqlRefetch: vi.fn(),
 }));
 
 vi.mock('@/queries/useInngestAPIFetch', () => ({
   useInngestAPIFetch: () => mocks.apiFetch,
-}));
-
-vi.mock('urql', () => ({
-  useQuery: () => [
-    { data: undefined, error: undefined, fetching: false },
-    mocks.gqlRefetch,
-  ],
 }));
 
 (
@@ -61,8 +53,6 @@ function RunsPaginationHarness({
   onRender(
     useRunsPagination({
       commonQueryVars: { ...commonQueryVars, celQuery },
-      tracePreviewEnabled: false,
-      shouldUseREST: true,
       pause,
     }),
   );
@@ -164,7 +154,7 @@ describe('REST runs pagination refresh', () => {
     expect(mocks.apiFetch.mock.calls[2]?.[0]).not.toContain('cursor=');
   });
 
-  it('does not start either transport while selection is paused', async () => {
+  it('does not start REST while metadata loading is paused', async () => {
     let result: RunsPaginationResult | undefined;
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
