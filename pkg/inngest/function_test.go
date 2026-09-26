@@ -185,6 +185,38 @@ func TestRunPriorityFactor(t *testing.T) {
 		require.EqualValues(t, consts.PriorityFactorMin, pf)
 	})
 
+	t.Run("With JSON-decoded (float64) event data", func(t *testing.T) {
+		f.Priority = &Priority{
+			Run: new("event.data.priority"),
+		}
+
+		// Real event data is JSON-decoded, so numbers arrive as float64
+		// and CEL evaluates them as doubles. Integral values must work.
+		pf, err := f.RunPriorityFactor(ctx, map[string]any{
+			"data": map[string]any{"priority": float64(-50)},
+		})
+		require.NoError(t, err)
+		require.EqualValues(t, -50, pf)
+
+		pf, err = f.RunPriorityFactor(ctx, map[string]any{
+			"data": map[string]any{"priority": float64(100)},
+		})
+		require.NoError(t, err)
+		require.EqualValues(t, 100, pf)
+
+		// Fractional values cannot be a priority factor.
+		_, err = f.RunPriorityFactor(ctx, map[string]any{
+			"data": map[string]any{"priority": float64(1.5)},
+		})
+		require.ErrorContains(t, err, "Priority.Run expression returned non-int")
+
+		// Values outside int64 range cannot be a priority factor.
+		_, err = f.RunPriorityFactor(ctx, map[string]any{
+			"data": map[string]any{"priority": float64(1e30)},
+		})
+		require.ErrorContains(t, err, "Priority.Run expression returned non-int")
+	})
+
 	t.Run("With missing data", func(t *testing.T) {
 		f.Priority = &Priority{
 			Run: new("event.data.priority"),
