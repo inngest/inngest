@@ -282,6 +282,10 @@ type ScheduleRequest struct {
 
 	// Events represent one or more events that the function is being triggered with.
 	Events []event.TrackedEvent
+	// SerializedEvents optionally contains the immutable JSON encoding of Events.
+	// Callers may share the encoded bytes across requests to avoid serializing the
+	// same event once per function in a fan-out.
+	SerializedEvents []json.RawMessage
 	// BatchID refers to the batch ID, if this function is started as a batch.
 	BatchID *ulid.ULID
 	// IdempotencyKey represents an optional idempotency key for the function.

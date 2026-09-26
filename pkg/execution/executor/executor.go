@@ -1094,7 +1094,34 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
 	req.Context = maps.Clone(req.Context)
 	req.Events = slices.Clone(req.Events)
+	req.SerializedEvents = slices.Clone(req.SerializedEvents)
 	return req
+}
+
+func prepareEventPayloads(events []event.TrackedEvent, serialized []json.RawMessage) ([]json.RawMessage, string, error) {
+	var evts []json.RawMessage
+	if len(serialized) > 0 {
+		if len(serialized) != len(events) {
+			return nil, "", fmt.Errorf("serialized event count does not match event count")
+		}
+		evts = slices.Clone(serialized)
+	} else {
+		evts = make([]json.RawMessage, len(events))
+		for n, item := range events {
+			byt, err := json.Marshal(item.GetEvent())
+			if err != nil {
+				return nil, "", fmt.Errorf("error marshalling event: %w", err)
+			}
+			evts[n] = byt
+		}
+	}
+
+	bytEvts, err := json.Marshal(evts)
+	if err != nil {
+		return nil, "", fmt.Errorf("error marshalling events: %w", err)
+	}
+
+	return evts, string(bytEvts), nil
 }
 
 func cloneMetadata(md sv2.Metadata) sv2.Metadata {
@@ -1259,9 +1286,8 @@ func (e *executor) schedule(
 
 	var eventName *string
 
-	evts := make([]json.RawMessage, len(req.Events))
 	sessions := meta.EventSessions{}
-	for n, item := range req.Events {
+	for _, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
@@ -1271,13 +1297,11 @@ func (e *executor) schedule(
 		for name, id := range evt.Meta.Sessions {
 			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
+	}
 
-		// serialize this data to the span at the same time
-		byt, err := json.Marshal(evt)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
-		}
-		evts[n] = byt
+	evts, strEvts, err := prepareEventPayloads(req.Events, req.SerializedEvents)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var droppedSessions int
@@ -1363,13 +1387,6 @@ func (e *executor) schedule(
 		},
 		Config: config,
 	}
-
-	bytEvts, err := json.Marshal(evts)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error marshalling events: %w", err)
-	}
-
-	strEvts := string(bytEvts)
 
 	var (
 		runSpanRef       *tracing.DroppableSpan
