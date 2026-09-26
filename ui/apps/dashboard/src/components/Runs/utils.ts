@@ -1,9 +1,7 @@
-import type { Run } from '@inngest/components/RunsPage/types';
 import {
   isFunctionRunStatus,
   type FunctionRunStatus,
 } from '@inngest/components/types/functionRun';
-import { toMaybeDate } from '@inngest/components/utils/date';
 
 import {
   FunctionRunStatus as FunctionRunStatusEnum,
@@ -70,32 +68,4 @@ export function toTimeField(
     default:
       console.error(`unexpected time field: ${time}`);
   }
-}
-
-type PickedFunctionRunV2EdgeWithNode = {
-  node: Omit<Run, 'durationMS'>;
-};
-
-/**
- * Parses the runs data into the table format
- */
-export function parseRunsData(
-  runsData: PickedFunctionRunV2EdgeWithNode[] | undefined,
-): Run[] {
-  return (
-    runsData?.map((edge) => {
-      const startedAt = toMaybeDate(edge.node.startedAt);
-      let durationMS = null;
-      if (startedAt) {
-        durationMS =
-          (toMaybeDate(edge.node.endedAt) ?? new Date()).getTime() -
-          startedAt.getTime();
-      }
-
-      return {
-        ...edge.node,
-        durationMS,
-      };
-    }) ?? []
-  );
 }

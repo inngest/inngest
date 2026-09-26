@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from 'react-dom/test-utils';
-import { createRoot, type Root } from 'react-dom/client';
+import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Runs } from './Runs';
 
 const mocks = vi.hoisted(() => ({
-  flag: { isReady: false, value: false },
   functionResult: {
     data: undefined as
       | {
@@ -19,8 +17,10 @@ const mocks = vi.hoisted(() => ({
           };
         }
       | undefined,
+    error: undefined as Error | undefined,
     fetching: true,
   },
+  runsPage: vi.fn((_props: { error?: Error }) => null),
   useQuery: vi.fn(() => [
     { data: undefined, error: undefined, fetching: false },
     vi.fn(),
@@ -50,14 +50,7 @@ vi.mock(
 );
 
 vi.mock('@inngest/components/RunsPage/RunsPage', () => ({
-  RunsPage: () => null,
-}));
-
-vi.mock('@inngest/components/SharedContext/useBooleanFlag', () => ({
-  useBooleanFlag: () => ({
-    booleanFlag: (flag: string) =>
-      flag === 'rest-runs-table' ? mocks.flag : { isReady: true, value: true },
-  }),
+  RunsPage: mocks.runsPage,
 }));
 
 vi.mock('@inngest/components/hooks/useCalculatedStartTime', () => ({
@@ -94,44 +87,21 @@ vi.mock('./useRunsPagination', () => ({
   useRunsPagination: mocks.useRunsPagination,
 }));
 
-describe('Runs transport selection', () => {
-  let root: Root | undefined;
-  let container: HTMLDivElement | undefined;
-
-  afterEach(async () => {
-    if (root) await act(async () => root?.unmount());
-    container?.remove();
-    root = undefined;
-    container = undefined;
-    mocks.flag.isReady = false;
-    mocks.flag.value = false;
+describe('Runs metadata', () => {
+  afterEach(() => {
+    cleanup();
     mocks.functionResult.data = undefined;
+    mocks.functionResult.error = undefined;
     mocks.functionResult.fetching = true;
     vi.clearAllMocks();
   });
 
-  it('waits for the REST flag and function metadata before choosing a transport', async () => {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
-    expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: true, shouldUseREST: false }),
+  it('waits for function metadata before requesting REST runs', () => {
+    const { rerender } = render(
+      <Runs scope="fn" functionSlug="app-function" />,
     );
-    expect(mocks.useQuery).toHaveBeenLastCalledWith(
+    expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
       expect.objectContaining({ pause: true }),
-    );
-
-    mocks.flag.isReady = true;
-    mocks.flag.value = true;
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
-    expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: true, shouldUseREST: false }),
     );
     expect(mocks.useQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ pause: true }),
@@ -143,22 +113,30 @@ describe('Runs transport selection', () => {
         workflow: { app: { externalID: 'app' }, isPaused: false },
       },
     };
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
+    rerender(<Runs scope="fn" functionSlug="app-function" />);
     expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: false, shouldUseREST: true }),
+      expect.objectContaining({ pause: false }),
     );
     expect(mocks.useQuery).toHaveBeenLastCalledWith(
       expect.objectContaining({ pause: false }),
     );
+  });
 
-    mocks.flag.value = false;
-    await act(async () => {
-      root?.render(<Runs scope="fn" functionSlug="app-function" />);
-    });
+  it('surfaces function metadata failures instead of falling back', () => {
+    const metadataError = new Error('metadata request failed');
+    mocks.functionResult.fetching = false;
+    mocks.functionResult.error = metadataError;
+    render(<Runs scope="fn" functionSlug="app-function" />);
+
     expect(mocks.useRunsPagination).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pause: false, shouldUseREST: false }),
+      expect.objectContaining({ pause: true }),
+    );
+    expect(mocks.runsPage.mock.lastCall?.[0]).toEqual(
+      expect.objectContaining({
+        error: metadataError,
+        isLoadingInitial: false,
+        isLoadingMore: false,
+      }),
     );
   });
 });

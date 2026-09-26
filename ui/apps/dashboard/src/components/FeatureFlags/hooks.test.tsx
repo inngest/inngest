@@ -62,7 +62,7 @@ vi.mock('launchdarkly-react-client-sdk', () => ({
   withLDProvider: () => (component: unknown) => component,
 }));
 const client = { identify: mocks.identify };
-const flag = 'traces-preview';
+const flag = 'polling-disabled';
 vi.mock('@clerk/tanstack-react-start', () => ({
   useUser: () => ({
     isLoaded: true,

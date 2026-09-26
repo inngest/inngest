@@ -7,7 +7,6 @@ import {
 } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
-import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useBooleanSearchParam,
@@ -66,7 +65,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 ) {
   const env = useEnvironment();
 
-  const [{ data: functionData, fetching: isFunctionLoading }] = useFunction({
+  const [
+    { data: functionData, error: functionError, fetching: isFunctionLoading },
+  ] = useFunction({
     functionSlug: functionSlug ?? '',
     pause: scope !== 'fn',
   });
@@ -77,18 +78,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: { envSlug: env.slug },
   });
 
-  const { booleanFlag } = useBooleanFlag();
-
-  const { value: tracePreviewEnabled } = booleanFlag(
-    'traces-preview',
-    true,
-    true,
-  );
-  const { isReady: isRestRunsFlagReady, value: restRunsEnabled } = booleanFlag(
-    'rest-runs-table',
-    false,
-    true,
-  );
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] =
@@ -98,7 +87,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const [excludeDeferred = false] = useBooleanSearchParam('excludeDeferred');
-  const [forceRestRuns] = useBooleanSearchParam('forceRestRuns');
 
   const timeField = toTimeField(rawTimeField) ?? RunsOrderByField.QueuedAt;
 
@@ -152,21 +140,21 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ],
   );
 
-  const isRestRunsSelectionReady =
-    forceRestRuns !== undefined || isRestRunsFlagReady;
-  const isRestRunsRequested = forceRestRuns ?? restRunsEnabled;
   const isRestRunsMetadataLoading =
-    isRestRunsRequested &&
-    ((scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
-      (scope === 'fn' &&
-        commonQueryVars.functionAppID === null &&
-        isFunctionLoading));
-  const pauseRuns = !isRestRunsSelectionReady || isRestRunsMetadataLoading;
-  const shouldUseREST =
-    !pauseRuns &&
-    isRestRunsRequested &&
-    restAppIDs !== undefined &&
-    (scope === 'env' || commonQueryVars.functionAppID !== null);
+    (scope === 'env' && restAppIDs === undefined && appsRes.fetching) ||
+    (scope === 'fn' &&
+      commonQueryVars.functionAppID === null &&
+      isFunctionLoading);
+  let metadataError: Error | undefined;
+  if (!isRestRunsMetadataLoading) {
+    if (scope === 'env' && restAppIDs === undefined) {
+      metadataError = appsRes.error ?? new Error('Unable to load app metadata');
+    } else if (scope === 'fn' && commonQueryVars.functionAppID === null) {
+      metadataError =
+        functionError ?? new Error('Unable to load function metadata');
+    }
+  }
+  const pauseRuns = isRestRunsMetadataLoading || metadataError !== undefined;
 
   // Use the new hook to manage pagination
   const {
@@ -180,13 +168,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     progressiveSearch,
   } = useRunsPagination({
     commonQueryVars,
-    tracePreviewEnabled,
-    shouldUseREST,
     pause: pauseRuns,
   });
 
   const [countRes, countRefetch] = useQuery({
-    pause: pauseRuns || (shouldUseREST && Boolean(search)),
+    pause: pauseRuns || Boolean(search),
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
@@ -211,9 +197,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
-    if (!(shouldUseREST && search)) countRefetch();
+    if (!search) countRefetch();
     setRefreshNonce((n) => n + 1);
-  }, [countRefetch, reset, search, shouldUseREST]);
+  }, [countRefetch, reset, search]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -233,12 +219,11 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       data={runs}
       features={{
         history: features.data?.history ?? 7,
-        tracesPreview: tracePreviewEnabled,
         isDeferred: true,
       }}
       hasMore={hasNextPage}
-      isLoadingInitial={isLoadingInitial}
-      isLoadingMore={isLoadingMore}
+      isLoadingInitial={metadataError ? false : isLoadingInitial}
+      isLoadingMore={metadataError ? false : isLoadingMore}
       onRefresh={onRefresh}
       onScrollToTop={onScrollToTop}
       getTrigger={getTrigger}
@@ -246,7 +231,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       searchError={searchError}
-      error={paginationError}
+      error={metadataError ?? paginationError}
       progressiveSearch={
         progressiveSearch
           ? {

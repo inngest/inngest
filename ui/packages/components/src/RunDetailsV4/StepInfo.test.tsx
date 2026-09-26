@@ -152,6 +152,15 @@ function renderStepInfo(trace: Trace, { debug = false }: { debug?: boolean } = {
   );
 }
 
+describe('StepInfo trace result', () => {
+  it('requests trace results from the preview backend', () => {
+    const trace = makeTrace();
+    renderStepInfo(trace);
+
+    expect(useGetTraceResultMock).toHaveBeenCalledWith(expect.objectContaining({ preview: true }));
+  });
+});
+
 describe('StepInfo retry attempt badge', () => {
   it('renders "2 retries" when trace.attempts = 2', () => {
     const trace = makeTrace({ attempts: 2 });
