@@ -26,12 +26,12 @@ jobs:
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -41,11 +41,11 @@ jobs:
       # pnpm must be set up before setup-node so the "pnpm" cache can resolve
       # the pnpm store path.
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.18.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: ".tool-versions"
           cache: pnpm
@@ -91,7 +91,7 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api
           path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt
@@ -126,12 +126,12 @@ jobs:
         index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-golang-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}-split-${{ matrix.index }}
           path: /tmp/dev-output.txt
@@ -226,12 +226,12 @@ jobs:
         splitBatchPartition: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -293,7 +293,7 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-batch-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}-split-${{ matrix.splitBatchPartition }}
           path: /tmp/dev-output.txt
@@ -324,12 +324,12 @@ jobs:
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
@@ -390,7 +390,7 @@ jobs:
 
       - name: Upload devserver logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: devserver-logs-api-kq-${{ matrix.experimentalKeyQueues }}-db-${{ matrix.database }}
           path: /tmp/dev-output.txt
@@ -420,12 +420,12 @@ jobs:
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: ./go.mod
 
