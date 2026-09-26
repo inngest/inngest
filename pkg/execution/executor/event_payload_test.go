@@ -12,28 +12,34 @@ import (
 const benchmarkEventFanout = 119
 
 var (
-	benchmarkPreparedEvents []json.RawMessage
-	benchmarkEventInput     string
+	benchmarkPreparedEvents           []json.RawMessage
+	benchmarkPreparedSerializedEvents []string
+	benchmarkEventInput               string
 )
 
 func TestPrepareEventPayloads(t *testing.T) {
 	events := benchmarkEvents(1024)
 
-	encoded, input, err := prepareEventPayloads(events, nil)
+	encoded, _, input, err := prepareEventPayloads(events, nil)
 	require.NoError(t, err)
 
 	shared, err := json.Marshal(events[0].GetEvent())
 	require.NoError(t, err)
-	sharedEncoded, sharedInput, err := prepareEventPayloads(events, []json.RawMessage{shared})
+	immutable := string(shared)
+	sharedEncoded, sharedSerialized, sharedInput, err := prepareEventPayloads(events, []string{immutable})
 	require.NoError(t, err)
 
-	require.Equal(t, encoded, sharedEncoded)
+	require.Nil(t, sharedEncoded)
+	require.Equal(t, []string{immutable}, sharedSerialized)
 	require.Equal(t, input, sharedInput)
-	require.Same(t, &shared[0], &sharedEncoded[0][0])
+
+	shared[0] = 'x'
+	require.Equal(t, byte('{'), immutable[0], "immutable snapshot must not alias its source bytes")
+	require.NotEqual(t, string(encoded[0]), string(shared))
 }
 
 func TestPrepareEventPayloadsRejectsMismatchedSerializedEvents(t *testing.T) {
-	_, _, err := prepareEventPayloads(benchmarkEvents(1024), []json.RawMessage{json.RawMessage(`{}`), json.RawMessage(`{}`)})
+	_, _, _, err := prepareEventPayloads(benchmarkEvents(1024), []string{`{}`, `{}`})
 	require.EqualError(t, err, "serialized event count does not match event count")
 }
 
@@ -43,7 +49,7 @@ func BenchmarkPrepareEventPayloadsFanout(b *testing.B) {
 	b.Run("before_per_run_serialization", func(b *testing.B) {
 		for range b.N {
 			for range benchmarkEventFanout {
-				benchmarkPreparedEvents, benchmarkEventInput, _ = prepareEventPayloads(events, nil)
+				benchmarkPreparedEvents, benchmarkPreparedSerializedEvents, benchmarkEventInput, _ = prepareEventPayloads(events, nil)
 			}
 		}
 	})
@@ -51,9 +57,9 @@ func BenchmarkPrepareEventPayloadsFanout(b *testing.B) {
 	b.Run("after_shared_serialization", func(b *testing.B) {
 		for range b.N {
 			shared, _ := json.Marshal(events[0].GetEvent())
-			serialized := []json.RawMessage{shared}
+			serialized := []string{string(shared)}
 			for range benchmarkEventFanout {
-				benchmarkPreparedEvents, benchmarkEventInput, _ = prepareEventPayloads(events, serialized)
+				benchmarkPreparedEvents, benchmarkPreparedSerializedEvents, benchmarkEventInput, _ = prepareEventPayloads(events, serialized)
 			}
 		}
 	})

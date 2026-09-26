@@ -26,6 +26,10 @@ type CreateState struct {
 	Metadata Metadata
 	// Events contains a slice of JSON-encoded events.
 	Events []json.RawMessage
+	// SerializedEvents contains immutable JSON-encoded events. Implementations
+	// should prefer this representation when present and materialize bytes only
+	// within the transport or backend that owns them.
+	SerializedEvents []string
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
 	Steps []state.MemoizedStep

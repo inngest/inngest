@@ -1098,30 +1098,49 @@ func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleReque
 	return req
 }
 
-func prepareEventPayloads(events []event.TrackedEvent, serialized []json.RawMessage) ([]json.RawMessage, string, error) {
-	var evts []json.RawMessage
+func prepareEventPayloads(events []event.TrackedEvent, serialized []string) ([]json.RawMessage, []string, string, error) {
 	if len(serialized) > 0 {
 		if len(serialized) != len(events) {
-			return nil, "", fmt.Errorf("serialized event count does not match event count")
+			return nil, nil, "", fmt.Errorf("serialized event count does not match event count")
 		}
-		evts = slices.Clone(serialized)
-	} else {
-		evts = make([]json.RawMessage, len(events))
-		for n, item := range events {
-			byt, err := json.Marshal(item.GetEvent())
-			if err != nil {
-				return nil, "", fmt.Errorf("error marshalling event: %w", err)
+		serialized = slices.Clone(serialized)
+		var input strings.Builder
+		input.WriteByte('[')
+		for i, item := range serialized {
+			if i > 0 {
+				input.WriteByte(',')
 			}
-			evts[n] = byt
+			input.WriteString(item)
 		}
+		input.WriteByte(']')
+		return nil, serialized, input.String(), nil
 	}
 
+	evts := make([]json.RawMessage, len(events))
+	for n, item := range events {
+		byt, err := json.Marshal(item.GetEvent())
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("error marshalling event: %w", err)
+		}
+		evts[n] = byt
+	}
 	bytEvts, err := json.Marshal(evts)
 	if err != nil {
-		return nil, "", fmt.Errorf("error marshalling events: %w", err)
+		return nil, nil, "", fmt.Errorf("error marshalling events: %w", err)
 	}
 
-	return evts, string(bytEvts), nil
+	return evts, nil, string(bytEvts), nil
+}
+
+func rawEventPayloads(events []json.RawMessage, serialized []string) []json.RawMessage {
+	if len(events) > 0 || len(serialized) == 0 {
+		return events
+	}
+	events = make([]json.RawMessage, len(serialized))
+	for i, item := range serialized {
+		events[i] = json.RawMessage(item)
+	}
+	return events
 }
 
 func cloneMetadata(md sv2.Metadata) sv2.Metadata {
@@ -1299,7 +1318,7 @@ func (e *executor) schedule(
 		}
 	}
 
-	evts, strEvts, err := prepareEventPayloads(req.Events, req.SerializedEvents)
+	evts, serializedEvents, strEvts, err := prepareEventPayloads(req.Events, req.SerializedEvents)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1530,13 +1549,16 @@ func (e *executor) schedule(
 	//
 
 	newState := sv2.CreateState{
-		Events:   evts,
-		Metadata: metadata,
-		Steps:    []state.MemoizedStep{},
+		Events:           evts,
+		SerializedEvents: serializedEvents,
+		Metadata:         metadata,
+		Steps:            []state.MemoizedStep{},
 	}
 	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		newState.Events = rawEventPayloads(newState.Events, newState.SerializedEvents)
+		newState.SerializedEvents = nil
 		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
@@ -1715,7 +1737,7 @@ func (e *executor) schedule(
 	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, skipReason)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(evts, serializedEvents), skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1924,7 +1946,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(evts, serializedEvents), enums.SkipReasonSingleton)
 
 	case errors.Is(err, queue.ErrQueueShardNotFound):
 		if stateCreated {
