@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 
@@ -15,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -67,6 +72,63 @@ func (t *Test) SetAssertions(items ...func()) {
 // SendTrigger sends the triggering event, kicking off the function run.
 func (t *Test) SendTrigger() func() {
 	return t.Send(t.EventTrigger)
+}
+
+// registerDirect fetches all functions from the JS introspect endpoint and
+// registers them with the dev server pointing at the real SDK URL.
+func registerDirect(t *testing.T) {
+	t.Helper()
+
+	url := sdkURL
+	url.Path = "/api/introspect"
+	resp, err := http.Get(url.String())
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	fns := []sdk.SDKFunction{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&fns))
+
+	rr := sdk.RegisterRequest{
+		URL:       "http://127.0.0.1:3000/api/inngest",
+		AppName:   "test-suite",
+		Functions: fns,
+	}
+
+	byt, err := json.Marshal(rr)
+	require.NoError(t, err)
+
+	regURL := apiURL
+	regURL.Path = "/fn/register"
+	req, err := http.NewRequest(http.MethodPost, regURL.String(), bytes.NewReader(byt))
+	require.NoError(t, err)
+
+	key := regexp.MustCompile(`^signkey-[\w]+-`).ReplaceAllString(signingKey, "")
+	keyBytes, _ := hex.DecodeString(key)
+	sum := sha256.Sum256(keyBytes)
+	keyHash := hex.EncodeToString(sum[:])
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer signkey-test-%s", keyHash))
+
+	regResp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer regResp.Body.Close()
+	require.Less(t, regResp.StatusCode, 300, "register returned %d", regResp.StatusCode)
+}
+
+// deregisterDirect removes the app registered by registerDirect.
+func deregisterDirect(t *testing.T) {
+	t.Helper()
+	u := apiURL
+	u.Path = "/fn/remove"
+	fv := u.Query()
+	fv.Add("url", "http://127.0.0.1:3000/api/inngest")
+	u.RawQuery = fv.Encode()
+	req, err := http.NewRequest(http.MethodDelete, u.String(), nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
 }
 
 func (t *Test) Func(f func() error) func() {
