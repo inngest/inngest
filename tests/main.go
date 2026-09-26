@@ -160,6 +160,16 @@ func run(t *testing.T, test *Test) {
 		// Forward the response from the SDK to the executor.
 
 		for header, values := range sdkResponse.Header {
+			// We've already read the full body into `byt` (decompressing it
+			// above if it was gzipped), so the SDK's framing headers no longer
+			// describe what we're about to write. Skip them and let net/http
+			// recompute Content-Length and framing for the decoded body;
+			// forwarding a stale Content-Encoding/Content-Length would make the
+			// executor read a body that doesn't match its headers.
+			switch http.CanonicalHeaderKey(header) {
+			case "Content-Encoding", "Content-Length", "Transfer-Encoding":
+				continue
+			}
 			// Multi-headers not supported
 			w.Header().Add(header, values[0])
 		}

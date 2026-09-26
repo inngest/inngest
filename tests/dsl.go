@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -271,6 +272,33 @@ func (t *Test) ExpectJSONResponse(status int, expected any) func() {
 	})
 }
 
+// opcodeFieldsEqual reports whether two opcodes match on the fields these tests
+// assert. The SDK also populates fields we deliberately ignore because they
+// drift across minor versions and no test depends on them: Timing (which
+// carries non-deterministic timestamps), Userland, and an empty Opts map.
+//
+// Keep the field list in sync with the per-field assertions in
+// ExpectGeneratorResponse.
+func opcodeFieldsEqual(expected, actual state.GeneratorOpcode) bool {
+	if expected.Op != actual.Op ||
+		expected.ID != actual.ID ||
+		expected.Name != actual.Name {
+		return false
+	}
+	if !reflect.DeepEqual(expected.DisplayName, actual.DisplayName) ||
+		!reflect.DeepEqual(expected.Error, actual.Error) ||
+		!bytes.Equal(expected.Data, actual.Data) {
+		return false
+	}
+	// Only compare Opts when the expected opcode specifies it (e.g.
+	// waitForEvent's match expression); otherwise the SDK's empty Opts map is
+	// ignored.
+	if expected.Opts != nil && !reflect.DeepEqual(expected.Opts, actual.Opts) {
+		return false
+	}
+	return true
+}
+
 func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() {
 	return func() {
 		select {
@@ -283,20 +311,33 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 			err = json.Unmarshal(byt, &actual)
 			require.NoError(t.test, err)
 
-			// If this is of type OpcodeError, we ignore the Stack field for now.
-			// The Stack field contains absolute paths, which means the content
-			// changes depending on the machine that runs the tests.
-			//
-			// NOTE: This obviously also changes the opcode ID, so we also
-			// recreate the ID after clearing the stack.
-			if len(actual) == 1 && actual[0].Op == enums.OpcodeStepError {
-				actual[0].Error.Stack = "[proxy-redact]"
-				if len(expected) == 1 && expected[0].Error != nil {
-					expected[0].Error.Stack = "[proxy-redact]"
+			require.Len(t.test, actual, len(expected))
+			for i := range actual {
+				exp, act := expected[i], actual[i]
+
+				// For step errors/failures we ignore the Stack field: it
+				// contains absolute paths, which vary by machine.
+				if (act.Op == enums.OpcodeStepError || act.Op == enums.OpcodeStepFailed) && act.Error != nil {
+					act.Error.Stack = "[proxy-redact]"
+					if exp.Error != nil {
+						exp.Error.Stack = "[proxy-redact]"
+					}
+				}
+
+				// Assert only the fields these tests care about. The SDK also
+				// populates Timing, Userland, and an empty Opts map that drift
+				// across minor versions and are intentionally not checked.
+				require.Equal(t.test, exp.Op, act.Op, "opcode Op mismatch")
+				require.Equal(t.test, exp.ID, act.ID, "opcode ID mismatch")
+				require.Equal(t.test, exp.Name, act.Name, "opcode Name mismatch")
+				require.Equal(t.test, exp.DisplayName, act.DisplayName, "opcode DisplayName mismatch")
+				require.Equal(t.test, exp.Error, act.Error, "opcode Error mismatch")
+				require.Equal(t.test, exp.Data, act.Data, "opcode Data mismatch")
+				// Only assert Opts when the test specifies it (e.g. waitForEvent).
+				if exp.Opts != nil {
+					require.Equal(t.test, exp.Opts, act.Opts, "opcode Opts mismatch")
 				}
 			}
-
-			require.EqualValues(t.test, expected, actual)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
 		}
@@ -340,7 +381,7 @@ func (t *Test) ExpectParallelStepRuns(stepFunc func() []state.GeneratorOpcode, t
 
 				found := false
 				for _, s := range steps {
-					if reflect.DeepEqual(s, op[0]) {
+					if opcodeFieldsEqual(s, op[0]) {
 						if s.Op == enums.OpcodeNone {
 							// Do nothing.
 							found = true
