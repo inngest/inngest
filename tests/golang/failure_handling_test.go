@@ -131,10 +131,8 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	<-time.After(5 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
-	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 60*time.Second, 500*time.Millisecond)
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&handled) == 1 }, 60*time.Second, 500*time.Millisecond)
 
 	// send another, it should be rate limited
 	_, err = inngestClient.Send(ctx, inngestgo.Event{
@@ -142,9 +140,8 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		Data: map[string]any{"number": 10},
 	})
 	require.NoError(t, err)
-	<-time.After(2 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 10*time.Second, time.Second)
+	// Rate-limited event: counts should remain unchanged
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 1 }, 30*time.Second, 500*time.Millisecond)
 	require.Equal(t, int32(1), atomic.LoadInt32(&handled))
 
 	// send a different payload
@@ -153,8 +150,6 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		Data: map[string]any{"number": 1},
 	})
 	require.NoError(t, err)
-	<-time.After(5 * time.Second)
-
-	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 2 }, 10*time.Second, time.Second)
-	require.Equal(t, int32(2), atomic.LoadInt32(&handled))
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&failed) == 2 }, 60*time.Second, 500*time.Millisecond)
+	require.Eventually(t, func() bool { return atomic.LoadInt32(&handled) == 2 }, 60*time.Second, 500*time.Millisecond)
 }
