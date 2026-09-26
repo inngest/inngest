@@ -1,28 +1,25 @@
 # api-docs.inngest.com
 
-This is an API docs site using TanStack Start and Fumadocs which auto-generates API pages based on generated OpenAPI specs from the codebase.
+This is an API docs site using TanStack Start and Fumadocs which generates API
+pages from OpenAPI specifications in the codebase.
 
-## Generating OpenAPI specs
+## Generating API docs
 
-From the root directory of this repo:
+Generate the public OpenAPI assets and endpoint pages from the root directory of
+this repository:
 
-```
+```sh
 make docs
 ```
 
+Use `make openapi` when you only need the intermediate OpenAPI v2 and v3 files.
+
 ## Development
 
-From this directory, install deps and start the dev server to preview:
+Generate the API docs first, then start the dev server from this directory:
 
-```
-pnpm install
+```sh
 pnpm run dev
-```
-
-Generate the docs pages from the generated OpenAPI files: (generated w/ `make docs`)
-
-```
-pnpm generate
 ```
 
 ## Release
@@ -31,7 +28,9 @@ Requires the Vercel API and this directory linked to the `api-docs.inngest.com` 
 The GitHub Action expects `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
 `VERCEL_PROJECT_ID` repository secrets.
 
-```
+```sh
+make docs
+cd docs/api-docs
 vercel build
 vercel deploy --prebuilt
 ```
