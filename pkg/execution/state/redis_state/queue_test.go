@@ -3448,3 +3448,46 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		require.EqualValues(t, 1, count)
 	})
 }
+
+// An item enqueued after its intended time — for example a cron run delivered
+// late by the system queue — keeps that intended time as its wall time, so the
+// delay before it reached the queue is reported as latency rather than hidden.
+// A producer-set wall time and an unset one behave the same.
+func TestQueueEnqueueItemKeepsOverdueWallTime(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	_, shard := newQueue(t, rc)
+	ctx := context.Background()
+	late := 3 * time.Minute
+
+	for _, tc := range []struct {
+		name      string
+		presetSet bool
+	}{
+		{name: "wall time set by the producer", presetSet: true},
+		{name: "wall time unset", presetSet: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			at := time.Now().Add(-late).Truncate(time.Millisecond)
+			qi := osqueue.QueueItem{
+				FunctionID: uuid.New(),
+				Data:       osqueue.Item{Identifier: state.Identifier{AccountID: uuid.New()}},
+			}
+			if tc.presetSet {
+				qi.WallTimeMS = at.UnixMilli()
+			}
+
+			item, err := shard.EnqueueItem(ctx, qi, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			require.Equal(t, at.UnixMilli(), item.WallTimeMS)
+			require.Equal(t, item.WallTimeMS, getQueueItem(t, r, item.ID).WallTimeMS)
+			require.GreaterOrEqual(t, item.Latency(time.Now()), late)
+		})
+	}
+}
