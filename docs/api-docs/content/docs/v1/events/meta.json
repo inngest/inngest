@@ -1,8 +1,0 @@
-{
-  "title": "Events",
-  "pages": [
-    "ListEvents",
-    "GetEvent",
-    "ListEventRuns"
-  ]
-}

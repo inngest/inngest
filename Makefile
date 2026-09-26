@@ -3,7 +3,7 @@ help: ## Print help
 	@grep -E '^[/a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: dev
-dev: docs ## Build dev binary with goreleaser
+dev: ## Build dev binary with goreleaser
 	goreleaser build --single-target --snapshot --clean
 
 .PHONY: run
@@ -77,8 +77,8 @@ build-ui: ## Build dev server UI
 	cd ui/apps/dev-server-ui && pnpm build
 	cp -r ./ui/apps/dev-server-ui/dist/* ./pkg/devserver/static/
 
-.PHONY: docs
-docs: ## Generate OpenAPI documentation
+.PHONY: openapi
+openapi: ## Generate intermediate OpenAPI specifications
 	@echo "Validating examples JSON structure..."
 	@cd tools/convert-openapi && go test -run TestExamplesJSONStructure -v
 	@echo "Generating protobuf files..."
@@ -92,8 +92,13 @@ docs: ## Generate OpenAPI documentation
 	@echo "Converting OpenAPI v2 to v3..."
 	go run ./tools/convert-openapi docs/openapi/v2 docs/openapi/v3
 
+.PHONY: docs
+docs: openapi ## Generate public OpenAPI specifications and API docs pages
+	pnpm --dir docs/api-docs install --frozen-lockfile
+	pnpm --dir docs/api-docs generate
+
 .PHONY: build
-build: docs ## Build release binaries
+build: ## Build release binaries
 	goreleaser build
 
 .PHONY: gql
@@ -115,4 +120,4 @@ constraintapi-snapshots: ## Regenerate constraint API Lua snapshots
 clean: ## Remove build artifacts
 	rm -f __debug_bin*
 	rm -rf docs/openapi/v2/*
-	rm -rf docs/openapi/v3/*
+	rm -rf docs/openapi/v3/api/v2/*
