@@ -1,8 +1,0 @@
-{
-  "title": "Function runs",
-  "pages": [
-    "GetRun",
-    "CancelRun",
-    "GetRunJobs"
-  ]
-}

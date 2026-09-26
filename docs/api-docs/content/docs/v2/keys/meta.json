@@ -1,8 +1,0 @@
-{
-  "title": "Keys",
-  "description": "Manage event and signing keys",
-  "pages": [
-    "FetchAccountEventKeys",
-    "FetchAccountSigningKeys"
-  ]
-}

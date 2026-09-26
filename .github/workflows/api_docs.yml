@@ -1,0 +1,45 @@
+name: API Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - ".github/workflows/api_docs.yml"
+      - "Makefile"
+      - "docs/api-docs/**"
+      - "docs/api_v2_examples.json"
+      - "docs/openapi/v3/api/v1/spec.yaml"
+      - "proto/api/v2/**"
+      - "tools/convert-openapi/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Generate and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: DeterminateSystems/nix-installer-action@v22
+      - uses: nicknovitski/nix-develop@v1.2.1
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10.18.2"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".tool-versions"
+          cache: pnpm
+          cache-dependency-path: docs/api-docs/pnpm-lock.yaml
+
+      - name: Generate API docs
+        run: make docs
+
+      - name: Build API docs
+        working-directory: docs/api-docs
+        run: pnpm build

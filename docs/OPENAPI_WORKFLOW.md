@@ -225,8 +225,8 @@ rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
 
 - Intermediate OpenAPI v2 and v3 files are excluded from Git via `.gitignore`.
 - Source protobuf files, examples, and conversion utilities are tracked.
-- Public OpenAPI assets and generated endpoint pages are produced by
-  `make docs`.
+- Public OpenAPI assets and generated endpoint pages are ignored build
+  artifacts produced by `make docs`.
 
 ## Troubleshooting
 
