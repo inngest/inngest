@@ -11,6 +11,18 @@ const (
 	RunListIncludeOutput
 )
 
+var getEventRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
+	"output": RunListIncludeOutput,
+})
+
+var getFunctionRunIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
+	"output": RunListIncludeOutput,
+})
+
+var getFunctionTraceIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
+	"output": RunListIncludeOutput,
+})
+
 var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
 	"deferredFrom":  RunListIncludeDeferredFrom,
 	"deferred_from": RunListIncludeDeferredFrom,
