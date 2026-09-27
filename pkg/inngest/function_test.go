@@ -48,53 +48,48 @@ func TestURI(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	t.Run("Failures", func(t *testing.T) {
-		t.Run("With a non-HTTP URI", func(t *testing.T) {
-			f := Function{
-				Name: "hi",
-				Triggers: []Trigger{
-					{
-						EventTrigger: &EventTrigger{
-							Event: "fail",
+		stepURITests := []struct {
+			name        string
+			uri         string
+			expectedErr string
+		}{
+			{
+				name:        "With a non-HTTP URI",
+				uri:         "htt://lol/what.xml.api",
+				expectedErr: "Non-supported step schema: htt",
+			},
+			{
+				name:        "With an unparseable URI",
+				uri:         "http://[::1",
+				expectedErr: "Steps must have a valid URI",
+			},
+		}
+
+		for _, tt := range stepURITests {
+			t.Run(tt.name, func(t *testing.T) {
+				f := Function{
+					Name: "hi",
+					Triggers: []Trigger{
+						{
+							EventTrigger: &EventTrigger{
+								Event: "fail",
+							},
 						},
 					},
-				},
-				Steps: []Step{
-					{
-						ID:   "step",
-						Name: "Function body",
-						URI:  "htt://lol/what.xml.api",
-					},
-				},
-			}
-
-			err := f.Validate(context.Background())
-			require.NotNil(t, err)
-			require.Contains(t, err.Error(), "Non-supported step schema: htt")
-		})
-
-		t.Run("With an unparseable URI", func(t *testing.T) {
-			f := Function{
-				Name: "hi",
-				Triggers: []Trigger{
-					{
-						EventTrigger: &EventTrigger{
-							Event: "fail",
+					Steps: []Step{
+						{
+							ID:   "step",
+							Name: "Function body",
+							URI:  tt.uri,
 						},
 					},
-				},
-				Steps: []Step{
-					{
-						ID:   "step",
-						Name: "Function body",
-						URI:  "http://[::1",
-					},
-				},
-			}
+				}
 
-			err := f.Validate(context.Background())
-			require.NotNil(t, err)
-			require.Contains(t, err.Error(), "Steps must have a valid URI")
-		})
+				err := f.Validate(context.Background())
+				require.NotNil(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
+			})
+		}
 
 		t.Run("With an invalid cache expression", func(t *testing.T) {
 			f := Function{
