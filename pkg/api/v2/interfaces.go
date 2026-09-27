@@ -107,9 +107,9 @@ type GetRunsOpts struct {
 	Include       []RunListInclude
 }
 
-type RunListInclude string
-
-const RunListIncludeDeferredFrom RunListInclude = "deferred_from"
+// RunListInclude is an internal expansion selected by generated API parsers.
+// Its values are generated from protobuf OpenAPI metadata.
+type RunListInclude uint8
 
 type RunTimeField int
 
