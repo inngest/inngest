@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.inngest.com/schemas/sdk-conformance/v0.1/probe.schema.json",
+  "title": "Inngest SDK conformance observation probe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "request"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+    "fixture": { "type": "string" },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "path"],
+      "properties": {
+        "method": { "enum": ["GET", "PUT", "POST", "DELETE", "OPTIONS"] },
+        "path": { "type": "string" },
+        "sign": { "type": "boolean" },
+        "signing_key": { "enum": ["primary", "fallback", "wrong"] },
+        "signature_timestamp_offset_seconds": { "type": "integer" },
+        "query": { "type": "object", "additionalProperties": { "type": "string" } },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "json": {}
+      }
+    }
+  }
+}

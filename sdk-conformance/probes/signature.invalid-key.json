@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "id": "signature.invalid-key",
+  "request": {
+    "method": "GET",
+    "path": "{{cloud_serve_path}}",
+    "sign": true,
+    "signing_key": "wrong"
+  }
+}

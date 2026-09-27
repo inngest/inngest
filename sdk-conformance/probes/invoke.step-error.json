@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1",
+  "id": "invoke.step-error",
+  "fixture": "step-error",
+  "request": {
+    "method": "POST",
+    "path": "{{serve_path}}",
+    "query": { "fnId": "{{function_id}}", "stepId": "step" },
+    "json": {
+      "event": { "name": "{{event}}", "data": {}, "user": {}, "ts": 1700000000000 },
+      "events": [{ "name": "{{event}}", "data": {}, "user": {}, "ts": 1700000000000 }],
+      "steps": {},
+      "use_api": false,
+      "ctx": {
+        "fn_id": "00000000-0000-0000-0000-000000000006",
+        "run_id": "01HF7YAT000000000000000006",
+        "env": "conformance",
+        "step_id": "step",
+        "attempt": 0,
+        "max_attempts": 1,
+        "stack": { "stack": [], "current": 0 },
+        "disable_immediate_execution": false,
+        "use_api": false
+      },
+      "version": 1
+    }
+  }
+}

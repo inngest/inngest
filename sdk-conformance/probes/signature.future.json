@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1",
+  "id": "signature.future",
+  "request": {
+    "method": "GET",
+    "path": "{{cloud_serve_path}}",
+    "sign": true,
+    "signing_key": "primary",
+    "signature_timestamp_offset_seconds": 600
+  }
+}

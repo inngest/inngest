@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1",
+  "id": "serve.introspection",
+  "status": "reference",
+  "profiles": ["serve.http.v1"],
+  "capabilities": ["serve.introspection"],
+  "request": {
+    "method": "GET",
+    "path": "{{serve_path}}"
+  },
+  "expect": {
+    "status": 200,
+    "assertions": [
+      { "path": "$.sdk_language", "operator": "type", "type": "string" },
+      { "path": "$.sdk_version", "operator": "type", "type": "string" }
+    ]
+  },
+  "evidence": {
+    "source": "Independent source inspection of pinned Go, TypeScript, and Python SDK releases; wire captures are still required to verify the observation.",
+    "reference_revision": "inngest-js@197812b9e20d87315998027b0ad810ca8644c4ee",
+    "specification": "SDK_SPEC.md section 4.5",
+    "observations": {
+      "go": "GET serve handler returns an inspection response containing SDK identity.",
+      "typescript": "GET serve handler returns an inspection response containing SDK identity.",
+      "python": "GET serve handler returns an inspection response containing SDK identity."
+    }
+  }
+}

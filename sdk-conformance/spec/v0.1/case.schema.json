@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.inngest.com/schemas/sdk-conformance/v0.1/case.schema.json",
+  "title": "Inngest SDK conformance case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "status", "profiles", "request", "expect", "evidence"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+    "status": { "enum": ["reference", "compatibility", "disputed"] },
+    "profiles": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+    "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "path"],
+      "properties": {
+        "method": { "enum": ["GET", "PUT", "POST", "DELETE", "OPTIONS"] },
+        "path": { "type": "string", "pattern": "^(?:/.*|\\{\\{serve_path\\}\\})$" },
+        "query": { "type": "object", "additionalProperties": { "type": "string" } },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "json": {}
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "operator"],
+            "properties": {
+              "path": { "type": "string", "pattern": "^\\$" },
+              "operator": { "enum": ["present", "absent", "equals", "type"] },
+              "value": {},
+              "type": { "enum": ["object", "array", "string", "number", "boolean", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "observations"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "reference_revision": { "type": "string" },
+        "specification": { "type": "string" },
+        "decision_record": { "type": "string" },
+        "decision_owner": { "type": "string" },
+        "observations": {
+          "type": "object",
+          "required": ["go", "typescript", "python"],
+          "properties": {
+            "go": { "type": "string" },
+            "typescript": { "type": "string" },
+            "python": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "reference" } } },
+      "then": { "properties": { "evidence": { "required": ["reference_revision"] } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "disputed" } } },
+      "then": {
+        "properties": {
+          "evidence": { "required": ["reference_revision", "decision_owner"] }
+        }
+      }
+    }
+  ]
+}

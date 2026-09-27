@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "id": "sync.in-band",
+  "request": {
+    "method": "PUT",
+    "path": "{{serve_path}}",
+    "sign": true,
+    "headers": {
+      "X-Inngest-Server-Kind": "dev",
+      "X-Inngest-Sync-Kind": "in_band"
+    },
+    "json": {
+      "url": "http://127.0.0.1:9999/api/inngest"
+    }
+  }
+}

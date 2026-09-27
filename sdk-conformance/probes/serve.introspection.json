@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1",
+  "id": "serve.introspection",
+  "request": {
+    "method": "GET",
+    "path": "{{serve_path}}"
+  }
+}

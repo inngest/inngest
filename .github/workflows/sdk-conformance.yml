@@ -1,0 +1,36 @@
+name: SDK conformance observations
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "sdk-conformance/**"
+      - ".github/workflows/sdk-conformance.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "sdk-conformance/**"
+      - ".github/workflows/sdk-conformance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    name: Compare canonical SDKs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # main
+
+      - name: Run observation matrix
+        run: nix develop --command ./sdk-conformance/run-matrix.sh sdk-conformance-report.json
+
+      - name: Upload observation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sdk-conformance-report
+          path: sdk-conformance-report.json

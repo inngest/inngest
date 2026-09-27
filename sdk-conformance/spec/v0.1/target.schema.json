@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.inngest.com/schemas/sdk-conformance/v0.1/target.schema.json",
+  "title": "Inngest SDK conformance target",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sdk", "profiles", "capabilities", "serve_path", "fixtures"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "sdk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "version"],
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string" }
+      }
+    },
+    "profiles": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "serve_path": { "type": "string", "pattern": "^/" },
+    "cloud_serve_path": { "type": "string", "pattern": "^/" },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "behavior"],
+        "properties": {
+          "id": { "type": "string" },
+          "behavior": { "type": "string" },
+          "function_id": { "type": "string" },
+          "event": { "type": "string" }
+        }
+      }
+    }
+  }
+}

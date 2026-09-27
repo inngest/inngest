@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "id": "signature.fallback",
+  "request": {
+    "method": "GET",
+    "path": "{{cloud_serve_path}}",
+    "sign": true,
+    "signing_key": "fallback"
+  }
+}

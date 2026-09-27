@@ -1,0 +1,22 @@
+[project]
+name = "inngest-sdk-conformance-python-fixture"
+version = "0.1.0"
+description = "Python SDK fixture for the independent Inngest conformance harness"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "fastapi==0.117.1",
+    "inngest==0.5.19",
+    "uvicorn[standard]==0.37.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy==1.18.2",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.uv]
+package = false
