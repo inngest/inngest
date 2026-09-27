@@ -8,16 +8,27 @@ import (
 )
 
 func FieldDescription(field protoreflect.FieldDescriptor) string {
+	if schema := openAPISchema(field); schema != nil && schema.GetDescription() != "" {
+		return schema.GetDescription()
+	}
+	return string(field.JSONName())
+}
+
+func FieldEnum(field protoreflect.FieldDescriptor) []string {
+	schema := openAPISchema(field)
+	if schema == nil {
+		return nil
+	}
+	return append([]string(nil), schema.GetEnum()...)
+}
+
+func openAPISchema(field protoreflect.FieldDescriptor) *openapiv2.JSONSchema {
 	opts := field.Options()
 	if !proto.HasExtension(opts, openapiv2.E_Openapiv2Field) {
-		return string(field.JSONName())
+		return nil
 	}
-
-	schema, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema)
-	if !ok || schema.GetDescription() == "" {
-		return string(field.JSONName())
-	}
-	return schema.GetDescription()
+	schema, _ := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema)
+	return schema
 }
 
 func IsRequired(field protoreflect.FieldDescriptor) bool {
