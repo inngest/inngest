@@ -72,6 +72,30 @@ func TestValidate(t *testing.T) {
 			require.Contains(t, err.Error(), "Non-supported step schema: htt")
 		})
 
+		t.Run("With an unparseable URI", func(t *testing.T) {
+			f := Function{
+				Name: "hi",
+				Triggers: []Trigger{
+					{
+						EventTrigger: &EventTrigger{
+							Event: "fail",
+						},
+					},
+				},
+				Steps: []Step{
+					{
+						ID:   "step",
+						Name: "Function body",
+						URI:  "http://[::1",
+					},
+				},
+			}
+
+			err := f.Validate(context.Background())
+			require.NotNil(t, err)
+			require.Contains(t, err.Error(), "Steps must have a valid URI")
+		})
+
 		t.Run("With an invalid cache expression", func(t *testing.T) {
 			f := Function{
 				Name: "hi",
