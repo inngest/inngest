@@ -74,6 +74,15 @@ func TestInputSchema(t *testing.T) {
 	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
 }
 
+func TestInputSchemaUsesOpenAPIEnumValues(t *testing.T) {
+	schema := InputSchema(endpointByMethod(t, "ListRuns"))
+	properties := schema["properties"].(map[string]any)
+	include := properties["include"].(map[string]any)
+	items := include["items"].(map[string]any)
+	require.Equal(t, []string{"output", "deferredFrom"}, items["enum"])
+	require.NotContains(t, items["enum"], "deferred_from")
+}
+
 func TestToolAnnotations(t *testing.T) {
 	for _, tt := range []struct {
 		method      string

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -32,6 +33,8 @@ const (
 )
 
 var runsCELTooLongMessage = fmt.Sprintf("Query cannot exceed %d bytes", maxRunsCELBytes)
+
+const RunListIncludeDeferredFrom RunListInclude = ListRunsIncludeDeferredFrom
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
 	if req.RunId == "" {
@@ -85,7 +88,7 @@ func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*ap
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "List runs is not yet implemented")
 	}
 
-	opts, err := listRunsOpts(req)
+	opts, err := listRunsOpts(req, listRunsIncludeSelector, ListRunsIncludeOutput)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
@@ -125,7 +128,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		Order:         req.Order,
 		Query:         req.Query,
 		Include:       req.Include,
-	})
+	}, listFunctionRunsIncludeSelector, ListFunctionRunsIncludeOutput)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
@@ -282,7 +285,7 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 	}, nil
 }
 
-func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
+func listRunsOpts(req *apiv2.ListRunsRequest, selector apiv2endpoint.IncludeSelector, outputValue string) (GetRunsOpts, error) {
 	if len(req.GetFunctionId()) > 0 && len(req.GetAppId()) == 0 {
 		return GetRunsOpts{}, fmt.Errorf("appId is required when filtering by functionId")
 	}
@@ -316,20 +319,24 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 	if err != nil {
 		return GetRunsOpts{}, err
 	}
+	includeOutput := req.GetIncludeOutput()
 	var include []RunListInclude
 	for _, value := range req.GetInclude() {
-		switch RunListInclude(value) {
-		case RunListIncludeDeferredFrom:
-			include = append(include, RunListIncludeDeferredFrom)
-		default:
-			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
+		parsed, err := selector.Parse(value)
+		if err != nil {
+			return GetRunsOpts{}, err
 		}
+		if parsed == outputValue {
+			includeOutput = true
+			continue
+		}
+		include = append(include, RunListInclude(parsed))
 	}
 
 	return GetRunsOpts{
 		Cursor:        cursor,
 		Limit:         limit,
-		IncludeOutput: req.GetIncludeOutput(),
+		IncludeOutput: includeOutput,
 		From:          from,
 		Until:         until,
 		TimeField:     timeField,
