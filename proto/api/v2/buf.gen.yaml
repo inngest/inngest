@@ -16,6 +16,7 @@ plugins:
     out: docs/openapi/v2
     opt:
       - allow_delete_body=true
+      - enable_field_deprecation=true
       - json_names_for_fields=true
   - plugin: connect-go
     out: proto/gen
