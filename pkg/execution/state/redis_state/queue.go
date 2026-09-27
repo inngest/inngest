@@ -142,6 +142,19 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 	now := q.Clock.Now()
 
+	// The overdue wall time is normalized to now below, so record the delay
+	// here to keep late arrivals visible internally.
+	if overdueMS := enqueueOverdueMS(i, at, now); overdueMS > 0 {
+		metrics.HistogramQueueEnqueueOverdue(ctx, overdueMS, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.Name(),
+				"kind":        i.Data.Kind,
+				"backend":     "redis",
+			},
+		})
+	}
+
 	// XXX: If the length of ID >= max, error.
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
@@ -302,6 +315,19 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
+}
+
+// enqueueOverdueMS returns how far past its intended wall time an item is when
+// it reaches the shard, or 0 if it is not overdue.
+func enqueueOverdueMS(i osqueue.QueueItem, at time.Time, now time.Time) int64 {
+	if !at.Before(now) {
+		return 0
+	}
+	wallTimeMS := i.WallTimeMS
+	if wallTimeMS == 0 {
+		wallTimeMS = at.UnixMilli()
+	}
+	return max(now.UnixMilli()-wallTimeMS, 0)
 }
 
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
