@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -17,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -32,6 +34,82 @@ const (
 )
 
 var runsCELTooLongMessage = fmt.Sprintf("Query cannot exceed %d bytes", maxRunsCELBytes)
+
+type runIncludeSelector struct {
+	values map[string]RunListInclude
+}
+
+var (
+	v2Methods                       = apiv2.File_api_v2_service_proto.Services().ByName("V2").Methods()
+	listRunsIncludeSelector         = newRunIncludeSelector(v2Methods.ByName("ListRuns"))
+	listFunctionRunsIncludeSelector = newRunIncludeSelector(v2Methods.ByName("ListFunctionRuns"))
+	RunListIncludeDeferredFrom      = listRunsIncludeSelector.mustValue("deferred_from")
+)
+
+func newRunIncludeSelector(method protoreflect.MethodDescriptor) runIncludeSelector {
+	if method == nil {
+		panic("run include RPC does not exist")
+	}
+	request := method.Input()
+	include := request.Fields().ByJSONName("include")
+	if include == nil {
+		panic("run request does not have an include field: " + request.FullName())
+	}
+
+	canonicalValues := apiv2endpoint.FieldEnum(include)
+	if len(canonicalValues) == 0 {
+		panic("run include field does not declare supported values: " + request.FullName())
+	}
+
+	selector := runIncludeSelector{values: map[string]RunListInclude{}}
+	for _, canonical := range canonicalValues {
+		fields := responseFieldsByJSONName(method.Output(), canonical, map[protoreflect.FullName]bool{})
+		if len(fields) == 0 {
+			panic(fmt.Sprintf("run include value %q does not name a response field for %s", canonical, request.FullName()))
+		}
+		value := RunListInclude(canonical)
+		selector.add(canonical, value)
+		for _, field := range fields {
+			selector.add(field.TextName(), value)
+		}
+	}
+	return selector
+}
+
+func (s runIncludeSelector) add(apiValue string, value RunListInclude) {
+	if existing, ok := s.values[apiValue]; ok && existing != value {
+		panic(fmt.Sprintf("run include value %q is ambiguous", apiValue))
+	}
+	s.values[apiValue] = value
+}
+
+func (s runIncludeSelector) mustValue(apiValue string) RunListInclude {
+	value, ok := s.values[apiValue]
+	if !ok {
+		panic(fmt.Sprintf("run include value %q is not supported", apiValue))
+	}
+	return value
+}
+
+func responseFieldsByJSONName(message protoreflect.MessageDescriptor, name string, visited map[protoreflect.FullName]bool) []protoreflect.FieldDescriptor {
+	if visited[message.FullName()] {
+		return nil
+	}
+	visited[message.FullName()] = true
+
+	var matches []protoreflect.FieldDescriptor
+	fields := message.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if field.JSONName() == name {
+			matches = append(matches, field)
+		}
+		if field.Message() != nil && !field.IsMap() {
+			matches = append(matches, responseFieldsByJSONName(field.Message(), name, visited)...)
+		}
+	}
+	return matches
+}
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
 	if req.RunId == "" {
@@ -85,7 +163,7 @@ func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*ap
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "List runs is not yet implemented")
 	}
 
-	opts, err := listRunsOpts(req)
+	opts, err := listRunsOpts(req, listRunsIncludeSelector)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
@@ -125,7 +203,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		Order:         req.Order,
 		Query:         req.Query,
 		Include:       req.Include,
-	})
+	}, listFunctionRunsIncludeSelector)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
@@ -282,7 +360,7 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 	}, nil
 }
 
-func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
+func listRunsOpts(req *apiv2.ListRunsRequest, selector runIncludeSelector) (GetRunsOpts, error) {
 	if len(req.GetFunctionId()) > 0 && len(req.GetAppId()) == 0 {
 		return GetRunsOpts{}, fmt.Errorf("appId is required when filtering by functionId")
 	}
@@ -316,20 +394,24 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 	if err != nil {
 		return GetRunsOpts{}, err
 	}
+	includeOutput := req.GetIncludeOutput()
 	var include []RunListInclude
 	for _, value := range req.GetInclude() {
-		switch RunListInclude(value) {
-		case RunListIncludeDeferredFrom:
-			include = append(include, RunListIncludeDeferredFrom)
-		default:
-			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
+		parsed, err := selector.fromAPI(value)
+		if err != nil {
+			return GetRunsOpts{}, err
 		}
+		if parsed == selector.mustValue("output") {
+			includeOutput = true
+			continue
+		}
+		include = append(include, parsed)
 	}
 
 	return GetRunsOpts{
 		Cursor:        cursor,
 		Limit:         limit,
-		IncludeOutput: req.GetIncludeOutput(),
+		IncludeOutput: includeOutput,
 		From:          from,
 		Until:         until,
 		TimeField:     timeField,
@@ -341,6 +423,13 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		CEL:           req.GetQuery(),
 		Include:       include,
 	}, nil
+}
+
+func (s runIncludeSelector) fromAPI(value string) (RunListInclude, error) {
+	if parsed, ok := s.values[value]; ok {
+		return parsed, nil
+	}
+	return "", fmt.Errorf("unsupported include value %q", value)
 }
 
 func listRunsPageOpts(cursor string, requestedLimit int32) (string, int, error) {
