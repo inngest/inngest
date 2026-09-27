@@ -173,8 +173,7 @@ func ParseResponse(byt []byte) any {
 	if byt[0] == '{' {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.
-		respjson := map[string]interface{}{}
-		if err := json.Unmarshal(byt, &respjson); err == nil {
+		if respjson, err := unmarshalObject(byt); err == nil {
 			return respjson
 		}
 	}
@@ -194,8 +193,7 @@ func ParseResponse(byt []byte) any {
 			// Treat this as raw text.
 			return string(byt)
 		}
-		respjson := map[string]interface{}{}
-		if err := json.Unmarshal([]byte(respstr), &respjson); err == nil {
+		if respjson, err := unmarshalObject([]byte(respstr)); err == nil {
 			return respjson
 		}
 	}
@@ -206,4 +204,25 @@ func ParseResponse(byt []byte) any {
 	}
 
 	return string(byt)
+}
+
+// unmarshalObject decodes a JSON object into a map, decoding numbers as
+// json.Number rather than float64.  This preserves the precision of large
+// integers (e.g. snowflake IDs) that would otherwise be rounded by float64's
+// 53-bit mantissa when the output is later re-marshalled.
+func unmarshalObject(byt []byte) (map[string]interface{}, error) {
+	respjson := map[string]interface{}{}
+	dec := json.NewDecoder(bytes.NewReader(byt))
+	dec.UseNumber()
+	if err := dec.Decode(&respjson); err != nil {
+		return nil, err
+	}
+	// json.Unmarshal rejects trailing data after a single JSON value; mirror
+	// that here so a malformed payload such as `{...}garbage` still falls
+	// through to the raw-text handling below rather than being silently
+	// accepted as an object.
+	if dec.More() {
+		return nil, fmt.Errorf("unexpected trailing data after JSON object")
+	}
+	return respjson, nil
 }
