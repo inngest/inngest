@@ -6,6 +6,24 @@ import (
 	apiv2endpoint "github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 )
 
+const GetEventRunsIncludeOutput = "output"
+
+var getEventRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]string{
+	"output": "output",
+})
+
+const GetFunctionRunIncludeOutput = "output"
+
+var getFunctionRunIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]string{
+	"output": "output",
+})
+
+const GetFunctionTraceIncludeOutput = "output"
+
+var getFunctionTraceIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]string{
+	"output": "output",
+})
+
 const ListFunctionRunsIncludeOutput = "output"
 const ListFunctionRunsIncludeDeferredFrom = "deferredFrom"
 
