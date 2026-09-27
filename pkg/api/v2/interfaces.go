@@ -107,9 +107,12 @@ type GetRunsOpts struct {
 	Include       []RunListInclude
 }
 
-type RunListInclude string
+// RunListInclude is an expansion understood by the run provider.
+type RunListInclude uint8
 
-const RunListIncludeDeferredFrom RunListInclude = "deferred_from"
+const (
+	RunListIncludeDeferredFrom RunListInclude = iota + 1
+)
 
 type RunTimeField int
 
