@@ -97,6 +97,25 @@ Probe requests include asymmetric input and fixed IDs so implementations cannot
 pass by returning a convenient constant or by generating mutually consistent
 random values.
 
+## Dev-server-backed spike
+
+The initial end-to-end spike removes the hand-authored execution request from
+one basic-completion scenario. It starts the real OSS dev server and Go fixture,
+registers the fixture through the SDK's out-of-band sync path, sends an event to
+the real Event API, and records the executor-to-SDK exchange through a transparent
+proxy. It then reads the run ID from the real executor request and polls the dev
+server until the durable run output is complete.
+
+```bash
+nix develop --command ./sdk-conformance/run-devserver-spike.sh
+```
+
+The resulting report is written to
+`.amp/in/artifacts/sdk-conformance-devserver-report.json`. This is deliberately
+a one-SDK, one-scenario vertical slice; extending this path replaces static
+invocation probes with semantic scenarios rather than adding more copied wire
+payloads.
+
 ## Profiles and capabilities
 
 Profiles version incompatible protocol shapes, for example `serve.execution.v1`

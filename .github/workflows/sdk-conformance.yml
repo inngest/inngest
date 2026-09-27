@@ -25,6 +25,9 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # main
 
+      - name: Run dev-server-backed spike
+        run: nix develop --command ./sdk-conformance/run-devserver-spike.sh sdk-conformance-devserver-report.json
+
       - name: Run observation matrix
         run: nix develop --command ./sdk-conformance/run-matrix.sh sdk-conformance-report.json
 
@@ -33,4 +36,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sdk-conformance-report
-          path: sdk-conformance-report.json
+          path: |
+            sdk-conformance-report.json
+            sdk-conformance-devserver-report.json
