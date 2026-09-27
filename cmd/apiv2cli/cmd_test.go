@@ -564,11 +564,11 @@ func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 		"--api-host", srv.URL,
 		"get-function-trace",
 		"--run-id", "01J00000000000000000000000",
-		"--include-output",
+		"--include", "output",
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, "includeOutput=true", gotQuery)
+	require.Equal(t, "include=output", gotQuery)
 }
 
 func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {
