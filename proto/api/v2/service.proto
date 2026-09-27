@@ -1027,7 +1027,7 @@ service V2 {
 
   rpc ListFunctionRuns(ListFunctionRunsRequest) returns (ListFunctionRunsResponse) {
     option (google.api.http) = {
-      get: "/apps/{app_id}/functions/{function_id}/runs"
+      get: "/apps/{app_id}/functions/{function_id=**}/runs"
     };
     option (authz) = {
       require_authz: true

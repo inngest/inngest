@@ -99,6 +99,38 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_ListFunctionRunsWithSlashInFunctionID(t *testing.T) {
+	for _, functionID := range []string{
+		"infra/anti-abuse.create-partition",
+		"users/account.delete",
+	} {
+		t.Run(functionID, func(t *testing.T) {
+			reader := &mockRunProvider{}
+			reader.On("GetRuns", mock.Anything, mock.MatchedBy(func(opts GetRunsOpts) bool {
+				return len(opts.AppIDs) == 1 && opts.AppIDs[0] == "resend" &&
+					len(opts.FunctionIDs) == 1 && opts.FunctionIDs[0] == functionID
+			})).Return(nil, nil).Once()
+			t.Cleanup(func() { reader.AssertExpectations(t) })
+
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: reader}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			path := "/v2/apps/resend/functions/" + strings.ReplaceAll(functionID, "/", "%2F") + "/runs"
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			require.NotEmpty(t, req.URL.RawPath)
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code)
+			var response struct {
+				Data []json.RawMessage `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			require.Empty(t, response.Data)
+		})
+	}
+}
+
 func TestHTTPGateway_RejectsUnexpectedRequestBodyFields(t *testing.T) {
 	for _, test := range []struct {
 		name string

@@ -3642,7 +3642,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListFunctionRuns", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/runs"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListFunctionRuns", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id=**}/runs"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -4759,7 +4759,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListFunctionRuns", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/runs"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListFunctionRuns", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id=**}/runs"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -5521,7 +5521,7 @@ var (
 	pattern_V2_PatchEnv_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"envs", "id"}, ""))
 	pattern_V2_GetFunctionRun_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"runs", "run_id"}, ""))
 	pattern_V2_ListRuns_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"runs"}, ""))
-	pattern_V2_ListFunctionRuns_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "app_id", "functions", "function_id", "runs"}, ""))
+	pattern_V2_ListFunctionRuns_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 3, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "app_id", "functions", "function_id", "runs"}, ""))
 	pattern_V2_GetEventRuns_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"events", "event_id", "runs"}, ""))
 	pattern_V2_Rerun_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"runs", "run_id", "rerun"}, ""))
 	pattern_V2_CancelRun_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"runs", "run_id", "cancel"}, ""))

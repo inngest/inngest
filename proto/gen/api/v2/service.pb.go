@@ -9836,7 +9836,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x88\xbd\x01\n" +
+	"\x04INFO\x10\x032\x8b\xbd\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10096,13 +10096,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\tList runs\x1aXLists runs in the authenticated environment, optionally filtered by app and function IDsb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x9a\x02\n" +
-	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xc2\x01\x92Av\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x9d\x02\n" +
+	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xc5\x01\x92Av\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x18List runs for a function\x1a<Lists runs for one function in the authenticated environmentb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02-\x12+/apps/{app_id}/functions/{function_id}/runs\x12\xe5\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x020\x12./apps/{app_id}/functions/{function_id=**}/runs\x12\xe5\x01\n" +
 	"\fGetEventRuns\x12\x1b.api.v2.GetEventRunsRequest\x1a\x1c.api.v2.GetEventRunsResponse\"\x99\x01\x92Aa\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x0eGet event runs\x1a1Lists function runs triggered by a specific eventb\x10\n" +
