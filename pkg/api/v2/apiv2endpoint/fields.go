@@ -1,6 +1,8 @@
 package apiv2endpoint
 
 import (
+	"strings"
+
 	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/proto"
@@ -8,10 +10,14 @@ import (
 )
 
 func FieldDescription(field protoreflect.FieldDescriptor) string {
+	description := string(field.JSONName())
 	if schema := openAPISchema(field); schema != nil && schema.GetDescription() != "" {
-		return schema.GetDescription()
+		description = schema.GetDescription()
 	}
-	return string(field.JSONName())
+	if values := FieldEnum(field); len(values) > 0 {
+		description = strings.TrimSuffix(description, ".") + ". Accepted values: " + strings.Join(values, ", ") + "."
+	}
+	return description
 }
 
 func FieldEnum(field protoreflect.FieldDescriptor) []string {

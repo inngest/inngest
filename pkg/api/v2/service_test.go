@@ -1099,19 +1099,18 @@ func TestService_ListRuns(t *testing.T) {
 
 		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
-			Cursor:        new(pageCursor),
-			Limit:         &limit,
-			IncludeOutput: new(true),
-			From:          timestamppb.New(from),
-			Until:         timestamppb.New(until),
-			TimeField:     "startedAt",
-			Status:        []string{"COMPLETED"},
-			AppId:         []string{"my-app"},
-			FunctionId:    []string{"test-fn"},
-			IsDeferred:    &isDeferred,
-			Order:         "asc",
-			Query:         new(`event.data.userId == "123"`),
-			Include:       []string{"deferred_from"},
+			Cursor:     new(pageCursor),
+			Limit:      &limit,
+			From:       timestamppb.New(from),
+			Until:      timestamppb.New(until),
+			TimeField:  "startedAt",
+			Status:     []string{"COMPLETED"},
+			AppId:      []string{"my-app"},
+			FunctionId: []string{"test-fn"},
+			IsDeferred: &isDeferred,
+			Order:      "asc",
+			Query:      new(`event.data.userId == "123"`),
+			Include:    []string{"output", "deferredFrom"},
 		})
 
 		require.NoError(t, err)
@@ -1309,6 +1308,26 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, apiv2base.ErrorQueryTooLong)
 	})
+}
+
+func TestRunListIncludeFromAPI(t *testing.T) {
+	for value, expected := range map[string]string{
+		"deferredFrom":  string(RunListIncludeDeferredFrom),
+		"deferred_from": string(RunListIncludeDeferredFrom),
+		"output":        listRunsIncludeSelector.MustValue("output"),
+	} {
+		t.Run(value, func(t *testing.T) {
+			got, err := listRunsIncludeSelector.Parse(value)
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
+		})
+	}
+
+	_, err := listRunsIncludeSelector.Parse("unknown")
+	require.ErrorContains(t, err, `unsupported include value "unknown"`)
+
+	_, err = listRunsIncludeSelector.Parse("id")
+	require.ErrorContains(t, err, `unsupported include value "id"`)
 }
 
 func TestRunStatusesFromAPI(t *testing.T) {
