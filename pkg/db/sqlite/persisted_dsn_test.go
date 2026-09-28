@@ -16,23 +16,23 @@ import (
 // segment: SQLite rejects any authority except empty/localhost, so a
 // relative path or a Windows drive path must not become file://<authority>.
 func TestPersistedDSNShapes(t *testing.T) {
-	dsn := persistedDSN("/tmp/x/main.db")
-	assert.True(t, strings.HasPrefix(dsn, "file:///tmp/x/main.db?"),
-		"absolute path must root as file:///, got %q", dsn)
+	tests := []struct {
+		name       string
+		file       string
+		wantPrefix string
+	}{
+		{"absolute", "/tmp/x/main.db", "file:///tmp/x/main.db?"},
+		{"drive", "C:/Users/x/.inngest/main.db", "file:///C:/Users/x/.inngest/main.db?"},
+		{"relative", ".inngest/main.db", "file:///.inngest/main.db?"},
+		{"special chars", "/tmp/dir with spaces & special=chars/main.db", "file:///tmp/dir%20with%20spaces%20&%20special=chars/main.db?"},
+	}
 
-	dsn = persistedDSN("C:/Users/x/.inngest/main.db")
-	assert.True(t, strings.HasPrefix(dsn, "file:///C:/Users/x/.inngest/main.db?"),
-		"drive path must not become an authority, got %q", dsn)
-
-	dsn = persistedDSN(".inngest/main.db")
-	assert.True(t, strings.HasPrefix(dsn, "file:///.inngest/main.db?"),
-		"relative path must root, got %q", dsn)
-	assert.NotContains(t, dsn, "file://.inngest/")
-
-	// URI-sensitive characters in directory names must survive the round trip.
-	dsn = persistedDSN("/tmp/dir with spaces & special=chars/main.db")
-	assert.Contains(t, dsn, "file:///")
-	assert.NotContains(t, dsn, "file://dir")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dsn := persistedDSN(tt.file)
+			assert.True(t, strings.HasPrefix(dsn, tt.wantPrefix), "got %q", dsn)
+		})
+	}
 }
 
 // TestOpenPersistedDefaultDirectory exercises the path every default-flags
@@ -40,11 +40,7 @@ func TestPersistedDSNShapes(t *testing.T) {
 // instead of building a file://.inngest authority URI.
 func TestOpenPersistedDefaultDirectory(t *testing.T) {
 	wd := t.TempDir()
-	require.NoError(t, os.Chdir(wd))
-	t.Cleanup(func() {
-		// Restore best-effort; test binaries chdir per test process.
-		_ = os.Chdir("/")
-	})
+	t.Chdir(wd)
 
 	ctx := context.Background()
 	conn, err := Open(ctx, Options{Persist: true, ForTest: true})

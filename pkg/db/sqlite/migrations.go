@@ -26,6 +26,11 @@ var MigrationsFS embed.FS
 var (
 	openOnce sync.Once
 	openDB   *sql.DB
+	// openErr preserves a failed singleton initialization so later Open
+	// calls return the original error instead of proceeding with a nil
+	// connection. sync.Once never reruns, so without this a first failure
+	// (e.g. lock held past the busy timeout) would panic on conn.Ping.
+	openErr error
 )
 
 // persistedBusyTimeoutMillis bounds how long a persisted connection waits on
@@ -57,9 +62,9 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 			conn, err = openPersisted(opts)
 		} else {
 			openOnce.Do(func() {
-				openDB, err = openPersisted(opts)
+				openDB, openErr = openPersisted(opts)
 			})
-			conn = openDB
+			conn, err = openDB, openErr
 		}
 		l = l.With("db", "sqlite", "mode", "persisted")
 	} else {
@@ -67,9 +72,9 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 			conn, err = openTemporaryMemory()
 		} else {
 			openOnce.Do(func() {
-				openDB, err = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+				openDB, openErr = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
 			})
-			conn = openDB
+			conn, err = openDB, openErr
 		}
 		l = l.With("db", "sqlite", "mode", "memory")
 	}

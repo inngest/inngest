@@ -229,6 +229,23 @@ func TestOpenPersistedInitFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "persisted sqlite")
 }
 
+func TestOpenPersistedForTestFailureReturnsError(t *testing.T) {
+	// A failed non-singleton open must surface the wrapped error (with the
+	// database path) rather than a nil-pointer panic downstream. This is
+	// the ForTest path through the same code the openOnce singleton guards.
+	blocker := filepath.Join(t.TempDir(), "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0600))
+
+	conn, err := Open(context.Background(), Options{
+		Persist:   true,
+		ForTest:   true,
+		Directory: filepath.Join(blocker, "sub"),
+	})
+	require.Error(t, err)
+	assert.Nil(t, conn)
+	assert.Contains(t, err.Error(), "persisted sqlite")
+}
+
 func TestOpenInMemoryRegression(t *testing.T) {
 	ctx := context.Background()
 
