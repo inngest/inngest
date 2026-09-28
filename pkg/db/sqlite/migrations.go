@@ -110,14 +110,17 @@ func openPersisted(opts Options) (*sql.DB, error) {
 	dir := consts.DefaultInngestConfigDir
 	if opts.Directory != "" {
 		dir = opts.Directory
-		if !filepath.IsAbs(opts.Directory) {
-			wd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-
-			dir = filepath.Join(wd, opts.Directory)
+	}
+	// Resolve to an absolute path unconditionally. A relative path would
+	// become the URI authority (file://.inngest/...) which SQLite rejects,
+	// and the default config dir is relative.
+	if !filepath.IsAbs(dir) {
+		wd, err := os.Getwd()
+		if err != nil {
+			return nil, err
 		}
+
+		dir = filepath.Join(wd, dir)
 	}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
@@ -128,28 +131,7 @@ func openPersisted(opts Options) (*sql.DB, error) {
 
 	file := filepath.Join(dir, consts.SQLiteDbFileName)
 
-	// Every pooled connection configures itself through DSN _pragma
-	// parameters: database/sql opens connections lazily, so one-time PRAGMAs
-	// via Exec would miss replacement connections. Journal mode persists in
-	// the database header (migrating existing DELETE-mode databases on
-	// first open); busy timeout and synchronous mode are connection-local
-	// and reapplied per connection by the driver. The driver applies
-	// busy_timeout before the other PRAGMAs, so concurrent connections
-	// racing the initial journal-mode switch wait instead of failing.
-	// Shared cache is intentionally absent: it is discouraged with WAL and
-	// increases lock contention. Synchronous stays FULL to preserve the
-	// pre-WAL durability guarantee (WAL mode alone would default to NORMAL).
-	params := url.Values{}
-	params.Add("_pragma", "journal_mode(WAL)")
-	params.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", persistedBusyTimeoutMillis))
-	params.Add("_pragma", "synchronous(FULL)")
-	dsn := (&url.URL{
-		Scheme:   "file",
-		Path:     filepath.ToSlash(file),
-		RawQuery: params.Encode(),
-	}).String()
-
-	conn, err := sql.Open("sqlite", dsn)
+	conn, err := sql.Open("sqlite", persistedDSN(file))
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +150,36 @@ func openPersisted(opts Options) (*sql.DB, error) {
 	}
 
 	return conn, nil
+}
+
+// persistedDSN builds the file: URI for a persisted database. Every pooled
+// connection configures itself through DSN _pragma parameters: database/sql
+// opens connections lazily, so one-time PRAGMAs via Exec would miss
+// replacement connections. Journal mode persists in the database header
+// (migrating existing DELETE-mode databases on first open); busy timeout and
+// synchronous mode are connection-local and reapplied per connection by the
+// driver. The driver applies busy_timeout before the other PRAGMAs, so
+// concurrent connections racing the initial journal-mode switch wait instead
+// of failing. Shared cache is intentionally absent: it is discouraged with
+// WAL and increases lock contention. Synchronous stays FULL: the vendored
+// engine already defaults WAL synchronization to FULL
+// (SQLITE_DEFAULT_WAL_SYNCHRONOUS=2), and the explicit pin keeps that
+// durability independent of engine build flags rather than relying on them.
+func persistedDSN(file string) string {
+	params := url.Values{}
+	params.Add("_pragma", "journal_mode(WAL)")
+	params.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", persistedBusyTimeoutMillis))
+	params.Add("_pragma", "synchronous(FULL)")
+	// Root the path so it never becomes the URI authority: a relative path
+	// or a Windows drive path (C:/...) would otherwise parse as
+	// file://<authority>/..., which SQLite rejects. url.URL also escapes
+	// URI-sensitive characters in the path.
+	uriPath := "/" + strings.TrimPrefix(filepath.ToSlash(file), "/")
+	return (&url.URL{
+		Scheme:   "file",
+		Path:     uriPath,
+		RawQuery: params.Encode(),
+	}).String()
 }
 
 // verifyPersistedSettings checks the effective journal mode, busy timeout,
