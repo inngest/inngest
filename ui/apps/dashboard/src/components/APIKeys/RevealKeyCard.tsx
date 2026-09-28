@@ -12,7 +12,7 @@ type Props = {
 // maskedKey format used in the list ("sk-inn-api••••<preview>"). Hiding the
 // full body by default matches how event- and signing-key surfaces behave.
 function maskKey(plaintext: string): string {
-  const prefixMatch = plaintext.match(/^(sk-inn-[a-z]+-)/);
+  const prefixMatch = plaintext.match(/^(sk-inn-[a-z]+-|inngest_api_)/);
   const prefix = prefixMatch?.[1] ?? 'sk-inn-api-';
   return prefix + '••••••••••••••••';
 }

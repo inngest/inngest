@@ -57,7 +57,7 @@ describe('webhook consent', () => {
       );
 
       expect(html).toContain('URLs that can send events');
-      expect(html).toContain('still work after logout or session revocation');
+      expect(html).toContain('still work after key or session revocation');
       expect(html).toContain('Revoke the webhook to disable them');
       expect(html).not.toContain('text-subtle truncate');
     },
