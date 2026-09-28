@@ -5,10 +5,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -124,4 +127,28 @@ func TestInvoke_ValidatesAfterResolve(t *testing.T) {
 
 	require.Equal(t, 400, w.Code, w.Body.String())
 	require.Nil(t, got, "an invalid invocation event must never reach the handler")
+}
+
+// TestReceiveEvent_OversizedEventReturns413 proves an event over
+// AbsoluteMaxEventSize is rejected with 413 rather than the generic 400, so
+// clients can tell a size rejection apart from a malformed payload.
+func TestReceiveEvent_OversizedEventReturns413(t *testing.T) {
+	body := `{"name": "test/too-large", "data": {"blob": "` +
+		strings.Repeat("x", consts.AbsoluteMaxEventSize) + `"}}`
+
+	w, got := postEvent(t, body)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"status":413`)
+	require.Contains(t, w.Body.String(), eventstream.ErrEventTooLarge.Error())
+	require.Nil(t, got, "oversized event must not reach the handler")
+}
+
+// TestReceiveEvent_InvalidBodyReturns400 guards the generic path: parse errors
+// that are not size rejections keep returning 400.
+func TestReceiveEvent_InvalidBodyReturns400(t *testing.T) {
+	w, got := postEvent(t, `"not an event"`)
+
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	require.Nil(t, got)
 }
