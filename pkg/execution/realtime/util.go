@@ -73,7 +73,7 @@ func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL stri
 		return reader, err
 	}
 	req.Header.Add("Content-Type", "text/stream")
-	req.Header.Add("Authorization", opts.Token)
+	req.Header.Set("Authorization", "Bearer "+opts.Token)
 
 	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
