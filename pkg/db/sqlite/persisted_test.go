@@ -229,21 +229,34 @@ func TestOpenPersistedInitFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "persisted sqlite")
 }
 
-func TestOpenPersistedForTestFailureReturnsError(t *testing.T) {
-	// A failed non-singleton open must surface the wrapped error (with the
-	// database path) rather than a nil-pointer panic downstream. This is
-	// the ForTest path through the same code the openOnce singleton guards.
+func TestOpenPersistedSingletonFailurePreserved(t *testing.T) {
+	// The shared singleton never reruns init: a failed first init must be
+	// preserved so a second Open returns the stored error instead of
+	// panicking on a nil connection. Swap in a fresh singleton so no
+	// other test observes the poisoned state.
+	prev := sharedSingleton
+	t.Cleanup(func() { sharedSingleton = prev })
+	sharedSingleton = &singletonDB{}
+
+	// A regular file where the database directory should be: the open
+	// fails, poisoning the singleton.
 	blocker := filepath.Join(t.TempDir(), "blocker")
 	require.NoError(t, os.WriteFile(blocker, []byte("x"), 0600))
+	dir := filepath.Join(blocker, "sub")
 
-	conn, err := Open(context.Background(), Options{
-		Persist:   true,
-		ForTest:   true,
-		Directory: filepath.Join(blocker, "sub"),
-	})
+	conn, err := Open(context.Background(), Options{Persist: true, Directory: dir})
 	require.Error(t, err)
 	assert.Nil(t, conn)
 	assert.Contains(t, err.Error(), "persisted sqlite")
+
+	// Second call: without the stored-error fix, once skips re-init, err
+	// stays nil, and conn.Ping() panics on the nil connection.
+	assert.NotPanics(t, func() {
+		conn2, err2 := Open(context.Background(), Options{Persist: true, Directory: dir})
+		require.Error(t, err2)
+		assert.Nil(t, conn2)
+		assert.Contains(t, err2.Error(), "persisted sqlite")
+	})
 }
 
 func TestOpenInMemoryRegression(t *testing.T) {

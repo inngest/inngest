@@ -23,15 +23,24 @@ import (
 //go:embed migrations/*.sql
 var MigrationsFS embed.FS
 
-var (
-	openOnce sync.Once
-	openDB   *sql.DB
-	// openErr preserves a failed singleton initialization so later Open
-	// calls return the original error instead of proceeding with a nil
-	// connection. sync.Once never reruns, so without this a first failure
-	// (e.g. lock held past the busy timeout) would panic on conn.Ping.
-	openErr error
-)
+// singletonDB guards the process-wide database handle behind sync.Once and
+// preserves a failed initialization: Once never reruns, so without the
+// stored error a first failure (e.g. lock held past the busy timeout) would
+// leave a nil handle and panic on the next conn.Ping.
+type singletonDB struct {
+	once sync.Once
+	db   *sql.DB
+	err  error
+}
+
+func (s *singletonDB) getOrInit(init func() (*sql.DB, error)) (*sql.DB, error) {
+	s.once.Do(func() {
+		s.db, s.err = init()
+	})
+	return s.db, s.err
+}
+
+var sharedSingleton = &singletonDB{}
 
 // persistedBusyTimeoutMillis bounds how long a persisted connection waits on
 // a locked database before returning SQLITE_BUSY. Connection-local, so it
@@ -61,20 +70,18 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 		if opts.ForTest {
 			conn, err = openPersisted(opts)
 		} else {
-			openOnce.Do(func() {
-				openDB, openErr = openPersisted(opts)
+			conn, err = sharedSingleton.getOrInit(func() (*sql.DB, error) {
+				return openPersisted(opts)
 			})
-			conn, err = openDB, openErr
 		}
 		l = l.With("db", "sqlite", "mode", "persisted")
 	} else {
 		if opts.ForTest {
 			conn, err = openTemporaryMemory()
 		} else {
-			openOnce.Do(func() {
-				openDB, openErr = sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
+			conn, err = sharedSingleton.getOrInit(func() (*sql.DB, error) {
+				return sql.Open("sqlite", "file:inngest?mode=memory&cache=shared")
 			})
-			conn, err = openDB, openErr
 		}
 		l = l.With("db", "sqlite", "mode", "memory")
 	}
