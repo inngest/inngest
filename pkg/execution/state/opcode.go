@@ -505,6 +505,8 @@ func (g GeneratorOpcode) DeferAbortOpts() (*DeferAbortOpts, error) {
 
 type DeferAbortOpts struct {
 	TargetHashedID string `json:"target_hashed_id"`
+
+	FnSlug string `json:"fn_slug"`
 }
 
 func (d *DeferAbortOpts) Validate() error {

@@ -27,6 +27,17 @@ func (k Kind) String() string {
 	return string(k)
 }
 
+func (k Kind) Suffix() string {
+	switch {
+	case strings.HasPrefix(string(k), KindPrefixUserland):
+		return string(k[len(KindPrefixUserland):])
+	case strings.HasPrefix(string(k), KindPrefixInngest):
+		return string(k[len(KindPrefixInngest):])
+	default:
+		return string(k)
+	}
+}
+
 func (k Kind) IsInngest() bool {
 	return strings.HasPrefix(string(k), KindPrefixInngest)
 }

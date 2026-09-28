@@ -27,6 +27,7 @@ type mockRunContext struct {
 	md            sv2.Metadata
 	lifecycleItem queue.Item
 	httpClient    exechttp.RequestExecutor
+	attempt       int
 }
 
 func (m *mockRunContext) Metadata() *sv2.Metadata                                              { return &m.md }
@@ -36,7 +37,7 @@ func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                  
 func (m *mockRunContext) ExecutionSpan() *meta.SpanReference                                   { return &meta.SpanReference{} }
 func (m *mockRunContext) ParentSpan() *meta.SpanReference                                      { return &meta.SpanReference{} }
 func (m *mockRunContext) GroupID() string                                                      { return "" }
-func (m *mockRunContext) AttemptCount() int                                                    { return 0 }
+func (m *mockRunContext) AttemptCount() int                                                    { return m.attempt }
 func (m *mockRunContext) MaxAttempts() *int                                                    { return nil }
 func (m *mockRunContext) ShouldRetry() bool                                                    { return false }
 func (m *mockRunContext) IncrementAttempt()                                                    {}
@@ -289,4 +290,34 @@ func TestCreateMetadataSpan_CrossStepAccumulation(t *testing.T) {
 	// The delta for persistence should only include the span that succeeded
 	delta := rc.md.Metrics.MetadataSize - rc.md.Metrics.MetadataSizeLoaded
 	require.Equal(t, spanSize, delta)
+}
+
+type metadataEntryRecorder struct {
+	execution.NoopSyncLifecycleListener
+	entries []execution.MetadataEntry
+}
+
+func (r *metadataEntryRecorder) OnMetadataEntry(_ context.Context, entry execution.MetadataEntry) {
+	r.entries = append(r.entries, entry)
+}
+
+func TestCreateMetadataSpan_StepScopesCarryAttempt(t *testing.T) {
+	for _, scope := range []metadata.Scope{enums.MetadataScopeStep, enums.MetadataScopeStepAttempt} {
+		t.Run(scope.String(), func(t *testing.T) {
+			rec := &metadataEntryRecorder{}
+			e := newTestExecutor()
+			e.syncLifecycles = []execution.SyncLifecycleListener{rec}
+			rc := newTestRunContext()
+			rc.attempt = 2
+
+			md := &mockStructured{kind: "test.kind", values: makeValues(16)}
+			_, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, scope, &state.GeneratorOpcode{ID: "hashed-step"})
+			require.NoError(t, err)
+
+			require.Len(t, rec.entries, 1)
+			require.NotNil(t, rec.entries[0].StepAttempt)
+			require.Equal(t, 2, *rec.entries[0].StepAttempt)
+			require.Equal(t, "hashed-step", rec.entries[0].StepHashedID)
+		})
+	}
 }
