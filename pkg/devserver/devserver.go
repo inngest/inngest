@@ -870,7 +870,7 @@ func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic strin
 		}
 
 		carrier := itrace.NewTraceCarrier()
-		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+		itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 		err = pb.Publish(
 			ctx,

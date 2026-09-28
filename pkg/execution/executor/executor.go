@@ -1341,7 +1341,7 @@ func (e *executor) schedule(
 	}
 
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
 	// Event lifecycles that run after scheduling should observe the fully
@@ -5278,7 +5278,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Default to failing if there's a conflict
 	shouldReplaceSignalOnConflict := false
@@ -5481,7 +5481,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
@@ -5744,7 +5744,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// SDK-based event coordination is called both when an event is received
 	// OR on timeout, depending on which happens first.  Both routes consume
@@ -6233,7 +6233,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
 			return ctx

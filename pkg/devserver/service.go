@@ -408,7 +408,7 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event
 	)
 
 	carrier := itrace.NewTraceCarrier()
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = d.publisher.Publish(
 		ctx,

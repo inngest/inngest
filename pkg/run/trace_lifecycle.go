@@ -102,7 +102,6 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 			))
 		}
 	}
-
 }
 
 func (l traceLifecycle) OnFunctionStarted(
@@ -908,7 +907,7 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 
 	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			// Used for spans
 			triggeringEventID := ""
@@ -1055,7 +1054,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 
 	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			_, span := NewSpan(ctx,
 				WithScope(consts.OtelScopeStep),
@@ -1168,7 +1167,7 @@ func (l traceLifecycle) OnWaitForSignalResumed(
 
 	carrier := itrace.NewTraceCarrier()
 	if err := carrier.Unmarshal(meta); err == nil {
-		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		ctx = itrace.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 		if carrier.CanResumePause() {
 			_, span := NewSpan(ctx,
 				WithScope(consts.OtelScopeStep),
@@ -1217,7 +1216,7 @@ func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md statev2.Metadat
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		// NOTE: this is getting complex
 		// need the original with the parent span
 		if isFnSpan {

@@ -155,7 +155,7 @@ func (a *apiServer) handleEvent(
 	)
 
 	carrier := itrace.NewTraceCarrier()
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = a.publisher.Publish(
 		ctx,

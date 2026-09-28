@@ -194,7 +194,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Create a new trace that may have a link to a previous one
-	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+	ctx = itrace.Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)

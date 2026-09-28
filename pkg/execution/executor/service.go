@@ -202,7 +202,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 				}
 
 				carrier := itrace.NewTraceCarrier()
-				itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+				itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 				err = pb.Publish(
 					ctx,
