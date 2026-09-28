@@ -135,19 +135,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	opts.CloudSandboxes = bridge
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
-	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseUserTracer(ctx)
-	}()
-
 	systemTraceEndpoint := localconfig.GetValue(cmd, "system-trace-endpoint", traceEndpoint)
 	systemTraceURLPath := localconfig.GetValue(cmd, "system-trace-url-path", "/dev/traces/system")
 

@@ -41,9 +41,6 @@ const (
 )
 
 var (
-	userTracer Tracer
-	onceUser   sync.Once
-
 	systemTracer Tracer
 	onceSystem   sync.Once
 )
@@ -117,33 +114,6 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 	}
 
 	return (consts.AbsoluteMaxEventSize + consts.MaxSDKResponseBodySize) * 2
-}
-
-func NewUserTracer(ctx context.Context, opts TracerOpts) error {
-	var err error
-	onceUser.Do(func() {
-		userTracer, err = newTracer(ctx, opts)
-	})
-	return err
-}
-
-func UserTracer() Tracer {
-	if userTracer == nil {
-		if err := NewUserTracer(context.Background(), TracerOpts{
-			ServiceName: "default",
-			Type:        TracerTypeNoop,
-		}); err != nil {
-			panic("fail to setup default user tracer")
-		}
-	}
-	return userTracer
-}
-
-func CloseUserTracer(ctx context.Context) error {
-	if userTracer != nil {
-		userTracer.Shutdown(ctx)
-	}
-	return nil
 }
 
 func NewSystemTracer(ctx context.Context, opts TracerOpts) error {

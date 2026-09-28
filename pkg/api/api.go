@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -254,15 +253,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				sessionsMetrics.Nulling,
 				metrics.CounterOpt{PkgName: metricsPkgName},
 			)
-
-			ctx, span := itrace.UserTracer().Provider().
-				Tracer(consts.OtelScopeEvent).
-				Start(ctx, consts.OtelSpanEvent,
-					trace.WithTimestamp(ts),
-					trace.WithNewRoot(),
-					trace.WithLinks(trace.LinkFromContext(ctx)),
-				)
-			defer span.End()
 
 			seed := event.SeededIDFromString(
 				r.Header.Get(headers.HeaderEventIDSeed),

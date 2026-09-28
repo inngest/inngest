@@ -42,19 +42,6 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
-	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseUserTracer(ctx)
-	}()
-
 	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing-system",
 		TraceEndpoint: traceEndpoint,

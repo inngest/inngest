@@ -19,10 +19,8 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/history_reader"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -305,19 +303,6 @@ func (r *mutationResolver) Rerun(
 	if err != nil {
 		return ulid.Zero, fmt.Errorf("failed to get run event: %w", err)
 	}
-
-	ctx, span := run.NewSpan(ctx,
-		run.WithName(consts.OtelSpanRerun),
-		run.WithScope(consts.OtelScopeRerun),
-		run.WithNewRoot(),
-		run.WithSpanAttributes(
-			attribute.String(consts.OtelSysAppID, fnCQRS.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
-			attribute.String(consts.OtelSysFunctionSlug, fnCQRS.Slug),
-			attribute.String(consts.OtelSysEventIDs, evt.GetInternalID().String()),
-		),
-	)
-	defer span.End()
 
 	var fromStepReq *execution.ScheduleRequestFromStep
 	if fromStep != nil {
