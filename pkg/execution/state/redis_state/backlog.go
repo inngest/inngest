@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -413,10 +414,31 @@ func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, fro
 	)
 
 	kg := q.RedisClient.kg
+	shadowPartitionSet := kg.ShadowPartitionSet(partitionID)
+	minScore := "-inf"
+	if !from.IsZero() {
+		minScore = strconv.FormatInt(from.UnixMilli(), 10)
+	}
+	maxScore := strconv.FormatInt(until.UnixMilli(), 10)
+	// Save the current maximum score so concurrent requeues to later scores cannot extend the scan.
+	// IDs are deduplicated below so requeues within the range aren't counted twice.
+	snapshotTail, err := q.RedisClient.Client().Do(
+		ctx,
+		q.RedisClient.Client().B().Zrevrangebyscore().Key(shadowPartitionSet).
+			Max(maxScore).Min(minScore).Withscores().Limit(0, 1).Build(),
+	).AsZScores()
+	if err != nil {
+		return nil, fmt.Errorf("could not snapshot partition backlog range: %w", err)
+	}
+	if len(snapshotTail) == 0 {
+		return func(func(*osqueue.QueueBacklog) bool) {}, nil
+	}
+	until = time.UnixMilli(int64(snapshotTail[0].Score))
 
 	return func(yield func(*osqueue.QueueBacklog) bool) {
 		hashKey := kg.BacklogMeta()
 		ptFrom := from
+		seen := map[string]struct{}{}
 
 		for {
 			var iterated int
@@ -438,16 +460,23 @@ func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, fro
 			}
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.BatchSize)
+			res, err := peeker.peek(ctx, shadowPartitionSet, isSequential, until, opt.BatchSize)
 			if err != nil {
 				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
 				return
+			}
+			if res.TotalCount == 0 {
+				break
 			}
 
 			for _, bl := range res.Items {
 				if bl == nil {
 					continue
 				}
+				if _, ok := seen[bl.BacklogID]; ok {
+					continue
+				}
+				seen[bl.BacklogID] = struct{}{}
 
 				if !yield(bl) {
 					return
@@ -459,11 +488,6 @@ func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, fro
 			ptFrom = time.UnixMilli(res.Cursor)
 
 			l.Trace("iterated backlogs in partition", "count", iterated)
-
-			// didn't process anything, exit loop
-			if iterated == 0 {
-				break
-			}
 
 			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
