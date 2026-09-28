@@ -6343,8 +6343,9 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		parent = tracing.RunSpanRefFromMetadata(runMD)
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
 		attrs = tracing.GeneratorAttrs(op)
+		attempt := runCtx.AttemptCount()
+		meta.AddAttr(attrs, meta.Attrs.StepAttempt, &attempt)
 		if op.Op == enums.OpcodeStepError && IsStepRetryable(op, runCtx) {
-			attempt := runCtx.AttemptCount()
 			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, attempt)
 		} else {
 			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
@@ -6412,7 +6413,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 	return ref, nil
 }
 
-func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, attrs *meta.SerializableAttrs, extra ...metadata.Structured) {
+func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
@@ -6506,7 +6507,7 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 		logger.StdlibLogger(ctx).Warn("error creating step span", "error", err)
 	}
 
-	e.handleGeneratorMetadata(ctx, runCtx, gen, attrs, extraMetadata...)
+	e.handleGeneratorMetadata(ctx, runCtx, gen, extraMetadata...)
 
 	// Extract experiment metadata from opcode opts. The SDK spreads
 	// group.experiment() variant context (experimentName, variant,
