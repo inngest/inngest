@@ -135,6 +135,8 @@ function OAuthAuthorizationForm({
   );
   const environmentOptions = environmentGroups.flatMap((group) => group.opts);
 
+  const sharesIdentity = details?.requested_scopes.includes('openid') ?? false;
+
   const selectedPermissions = useMemo(() => {
     return selectedPermissionGrants(
       details?.permission_groups ?? [],
@@ -243,7 +245,7 @@ function OAuthAuthorizationForm({
       setError('Session name must be at most 128 characters.');
       return;
     }
-    if (selectedPermissions.length === 0) {
+    if (selectedPermissions.length === 0 && !sharesIdentity) {
       setError('Select at least one permission.');
       return;
     }
@@ -392,6 +394,16 @@ function OAuthAuthorizationForm({
         </div>
       )}
 
+      {sharesIdentity && (
+        <p className="text-subtle text-sm">
+          This connection will also share your Inngest user ID
+          {details.requested_scopes.includes('email')
+            ? ', primary email address, and email verification status'
+            : ''}{' '}
+          with {details.client_name}.
+        </p>
+      )}
+
       <CredentialForm
         name={sessionName}
         nameLabel="Session name"
@@ -447,7 +459,7 @@ function OAuthAuthorizationForm({
               loading={submitting}
               disabled={
                 submitting ||
-                selectedPermissions.length === 0 ||
+                (selectedPermissions.length === 0 && !sharesIdentity) ||
                 (boundary === 'single_env' &&
                   (!workspace ||
                     environmentsLoading ||

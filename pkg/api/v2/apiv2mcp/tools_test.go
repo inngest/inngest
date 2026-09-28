@@ -158,3 +158,30 @@ func endpointByMethod(t *testing.T, method string) apiv2endpoint.Endpoint {
 	t.Fatalf("endpoint %s not found", method)
 	return apiv2endpoint.Endpoint{}
 }
+
+func TestToolEffectAnnotations(t *testing.T) {
+	for _, tc := range []struct {
+		method                           string
+		readOnly, destructive, openWorld bool
+	}{
+		{"QueryInsights", true, false, false},
+		{"QueryInsightsPrompt", true, false, true},
+		{"WaitSandboxProcess", true, false, false},
+		{"CreateEnv", false, false, false},
+		{"CreateWebhook", false, false, false},
+		{"CreateScore", false, false, false},
+		{"SyncApp", false, true, true},
+		{"Rerun", false, true, true},
+		{"ExecSandbox", false, true, true},
+		{"CreateSandbox", false, false, true},
+		{"WriteSandboxFile", false, true, false},
+		{"UnknownFutureMethod", false, true, true},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			hints := toolAnnotations(tc.method)
+			require.Equal(t, tc.readOnly, hints.ReadOnlyHint)
+			require.Equal(t, tc.destructive, *hints.DestructiveHint)
+			require.Equal(t, tc.openWorld, *hints.OpenWorldHint)
+		})
+	}
+}
