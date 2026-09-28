@@ -41,6 +41,9 @@ var Attrs = struct {
 	SkipReason          attr[*enums.SkipReason]
 	SkipExistingRunID   attr[*string]
 
+	// Custom step concurrency attributes
+	CustomConcurrencyKeys attr[*[]CustomConcurrencyKey]
+
 	// Durable endpoint attributes
 	IsDurableEndpointRun         attr[*bool]
 	DurableEndpointModeChangedAt attr[*time.Time]
@@ -222,6 +225,7 @@ var Attrs = struct {
 	RunScheduleType:                    TextAttr[enums.ScheduleType]("run.schedule_type"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
+	CustomConcurrencyKeys:              JsonAttr[[]CustomConcurrencyKey]("concurrency.keys"),
 	StartedAt:                          TimeAttr("started_at"),
 	ScheduledAt:                        TimeAttr("scheduled_at"),
 	StepAttempt:                        IntAttr("step.attempt"),

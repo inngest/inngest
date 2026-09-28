@@ -394,6 +394,9 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 		if int64(len(body)) > maxResponseBytes {
 			return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
 		}
+		if resp.StatusCode == http.StatusUnauthorized && req.Header.Get("Authorization") == "" {
+			return errors.New("Authentication required. Log into Inngest Cloud with:\n\ninngest login\n\nor\n\nnpx inngest-cli@latest login\n\nor provide an API key\n")
+		}
 		return fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 

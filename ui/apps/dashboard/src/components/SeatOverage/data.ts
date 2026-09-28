@@ -5,10 +5,12 @@ const seatOverageQuery = graphql(`
   query SeatOverageCheck {
     account {
       id
-      entitlements {
+      entitlements: ents {
         userCount {
-          usage
           limit
+        }
+        usage {
+          userCount
         }
       }
     }
@@ -34,7 +36,7 @@ export function parseSeatOverageData(data: any): SeatOverageData | null {
   const { entitlements } = data.account;
   const { userCount } = entitlements;
 
-  const usage = userCount.usage;
+  const usage = entitlements.usage.userCount;
   const limit = userCount.limit;
 
   // null limit means no limit

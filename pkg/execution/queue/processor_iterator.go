@@ -269,7 +269,7 @@ func (p *ProcessorIterator) LeaseItem(ctx context.Context, item *QueueItem) erro
 
 func (p *ProcessorIterator) applyLeaseItemResult(result LeaseItemResult) {
 	switch result.Status {
-	case LeaseItemStatusDispatched, LeaseItemStatusNotFound, LeaseItemStatusLeaseContention:
+	case LeaseItemStatusDispatched, LeaseItemStatusNotFound, LeaseItemStatusLeaseContention, LeaseItemStatusDropped:
 		p.CtrSuccess.Add(1)
 	case LeaseItemStatusThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)

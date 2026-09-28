@@ -1,8 +1,2 @@
-#
-# This file allows the asdf tooling version manager to transparently
-# use the expected tool versions for this repository.
-# See: https://asdf-vm.com/manage/configuration.html
-#
-
 nodejs 22.16.0
 pnpm 10.18.2

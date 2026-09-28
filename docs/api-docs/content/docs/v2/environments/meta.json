@@ -1,9 +1,0 @@
-{
-  "title": "Environments",
-  "description": "Create and manage environments",
-  "pages": [
-    "FetchAccountEnvs",
-    "CreateEnv",
-    "PatchEnv"
-  ]
-}

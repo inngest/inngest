@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,64 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestCommandLoginGuidance(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		args      []string
+		status    int
+		wantLogin bool
+	}{
+		{"cloud without credentials", []string{"--prod"}, 401, true},
+		{"explicit cloud host", []string{"--api-host", "https://api.inngest.com"}, 401, true},
+		{"API key rejected", []string{"--prod", "--api-key", "test-key"}, 401, false},
+		{"signing key rejected", []string{"--prod", "--signing-key", "test-key"}, 401, false},
+		{"forbidden", []string{"--prod"}, 403, false},
+		{"server error", []string{"--prod"}, 500, false},
+		{"local server", nil, 401, true},
+		{"custom server", []string{"--api-host", "https://example.com"}, 401, true},
+		{"public endpoint", []string{"--prod"}, 200, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+			t.Setenv("INNGEST_API_KEY", "")
+			t.Setenv("INNGEST_SIGNING_KEY", "")
+			const body = `{"errors":[{"code":"authorization_header_missing","message":"authorization header missing or invalid"}]}`
+			transport := http.DefaultTransport
+			t.Cleanup(func() { http.DefaultTransport = transport })
+			http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: test.status,
+					Status:     fmt.Sprintf("%d %s", test.status, http.StatusText(test.status)),
+					Body:       io.NopCloser(strings.NewReader(body)),
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			})
+			cmd := Command()
+			cmd.Writer = &bytes.Buffer{}
+			err := cmd.Run(context.Background(), append([]string{"api", "get-apps"}, test.args...))
+			if test.status == http.StatusOK {
+				require.NoError(t, err)
+			} else if test.wantLogin {
+				require.ErrorContains(t, err, "Authentication required. Log into Inngest Cloud with:")
+				lines := strings.Split(err.Error(), "\n")
+				require.Contains(t, lines, "inngest login")
+				require.Contains(t, lines, "npx inngest-cli@latest login")
+				require.ErrorContains(t, err, "or provide an API key")
+				require.True(t, strings.HasSuffix(err.Error(), "or provide an API key\n"))
+			} else {
+				require.EqualError(t, err, fmt.Sprintf("%d %s: %s", test.status, http.StatusText(test.status), body))
+			}
+		})
+	}
+}
 
 func TestAPIRedirectCredentialSafety(t *testing.T) {
 	for _, test := range []struct {

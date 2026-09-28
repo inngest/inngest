@@ -3,34 +3,33 @@ import * as Sentry from '@sentry/tanstackstart-react';
 
 import type {
   BillingPlan,
-  EntitlementConcurrency,
-  EntitlementExecutions,
+  EntitlementConcurrencyValue,
   EntitlementInt,
-  EntitlementRunCount,
+  EntitlementWithOverage,
   GetPlansQuery,
 } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 export type Plan = Omit<
   BillingPlan,
-  'entitlements' | 'features' | 'availableAddons' | 'addons'
+  'entitlements' | 'ents' | 'features' | 'availableAddons' | 'addons'
 > & {
   entitlements: {
-    concurrency: Pick<EntitlementConcurrency, 'limit'>;
-    executions?: Pick<EntitlementExecutions, 'limit'>;
-    runCount: Pick<EntitlementRunCount, 'limit'>;
+    concurrency: Pick<EntitlementConcurrencyValue, 'limit'>;
+    executions?: Pick<EntitlementWithOverage, 'limit'>;
+    runCount: Pick<EntitlementWithOverage, 'limit'>;
     history: Pick<EntitlementInt, 'limit'>;
   };
 };
 
 export type SelfServePlan = GetPlansQuery['plans'][number];
 
-// Under normal circumstances, we should only have one active + visible plan for
-// Hobby and Pro, but the backend doesn't guarantee that for us. Pick one here
-// using an arbitrary rule.
+// the billing API does not guarantee one active plan per name.  each card
+// needs one plan so checkout has one price.
 export function pickSelfServePlans(plans?: SelfServePlan[]): {
   hobby: SelfServePlan | null;
   pro: SelfServePlan | null;
+  growth: SelfServePlan | null;
 } {
   const selectablePlans = plans ?? [];
 
@@ -69,6 +68,7 @@ export function pickSelfServePlans(plans?: SelfServePlan[]): {
   const selfServePlans = {
     hobby: pickPlan('Hobby', true),
     pro: pickPlan('Pro', false),
+    growth: pickPlan('Growth', false),
   };
 
   return selfServePlans;
@@ -78,6 +78,7 @@ export enum PlanNames {
   Free = 'Free Tier',
   Basic = 'Basic',
   Pro = 'Pro',
+  Growth = 'Growth',
   Hobby = 'Hobby - Free',
   Enterprise = 'Enterprise',
 }

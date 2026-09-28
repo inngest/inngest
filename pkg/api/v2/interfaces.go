@@ -129,6 +129,7 @@ const (
 type RunListItem struct {
 	RunID        ulid.ULID
 	Cursor       string
+	QueuedAt     time.Time
 	RunStartedAt time.Time
 	EventID      ulid.ULID
 	BatchID      *ulid.ULID

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from '@inngest/components/Link';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { formatDistanceToNow } from '@inngest/components/utils/date';
+import { relativeTime } from '@inngest/components/utils/date';
 
 import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
@@ -122,8 +122,7 @@ export const FailedRate = ({
                 r.lastOccurence && 'cursor-pointer'
               }`}
             >
-              {r.lastOccurence &&
-                formatDistanceToNow(r.lastOccurence, { addSuffix: true })}
+              {r.lastOccurence && relativeTime(r.lastOccurence)}
             </div>
           </OptionalTooltip>
         </React.Fragment>

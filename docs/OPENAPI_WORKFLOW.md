@@ -4,12 +4,12 @@ This document explains the automated OpenAPI documentation generation workflow f
 
 ## Overview
 
-The project automatically generates comprehensive OpenAPI documentation from protobuf files during the build process. This includes:
+The project generates comprehensive OpenAPI documentation from protobuf files. This includes:
 
 1. **OpenAPI v2 generation** from protobuf files with gRPC-gateway HTTP annotations
 2. **OpenAPI v3 conversion** with custom enhancements using the kin-openapi library
 3. **Advanced features** including custom error responses, authentication, and multi-server configuration
-4. **Automatic integration** into the existing Makefile build process
+4. **Public specification and endpoint page generation** with Fumadocs
 
 ## Generated Files
 
@@ -22,6 +22,9 @@ docs/
 │   │   └── api/v2/service.swagger.json
 │   └── v3/          # OpenAPI 3.0 specs (converted and enhanced)
 │       └── api/v2/service.swagger.json
+└── api-docs/
+    ├── public/api-specs/ # Public OpenAPI assets
+    └── content/docs/     # Hand-written and generated documentation pages
 ```
 
 ## Build Commands
@@ -32,14 +35,16 @@ docs/
 make docs
 ```
 
-This generates both OpenAPI v2 and v3 documentation with all custom enhancements.
+This installs the locked API docs dependencies and generates the intermediate
+OpenAPI specifications, public OpenAPI assets, and endpoint pages.
 
-### Automatic Generation
+### Intermediate OpenAPI only
 
-Documentation is also generated when running:
+```bash
+make openapi
+```
 
-- `make build` - Production build with documentation  
-- `make dev` - Development build with documentation
+Go development and release builds do not generate API documentation.
 
 ### Cleaning Generated Files
 
@@ -218,9 +223,10 @@ rpc _SchemaOnly(HealthRequest) returns (ErrorResponse);
 
 ## Git Integration
 
-- Generated documentation files are excluded from git via `.gitignore`
-- Only source protobuf files and conversion utility are tracked
-- Documentation regenerates on each build to stay current
+- Intermediate OpenAPI v2 and v3 files are excluded from Git via `.gitignore`.
+- Source protobuf files, examples, and conversion utilities are tracked.
+- Public OpenAPI assets and generated endpoint pages are ignored build
+  artifacts produced by `make docs`.
 
 ## Troubleshooting
 

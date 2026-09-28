@@ -654,8 +654,17 @@ type RunTraceSpan {
   debugPaused: Boolean!
   skipReason: String
   skipExistingRunID: String
+  customConcurrencyKeys: [RunTraceConcurrencyKey!]!
   metadata: [SpanMetadata!]!
   response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type RunTraceConcurrencyKey {
+  scope: String!
+  expression: String!
+  value: String!
+  expressionTruncated: Boolean!
+  valueTruncated: Boolean!
 }
 
 type RunTraceSpanResponseInfo {

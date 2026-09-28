@@ -494,6 +494,20 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	}
 }
 
+type ExecutionCapLimitDecision struct {
+	Exceeded bool
+	Enforce  bool
+}
+
+type ExecutionCapFn func(ctx context.Context, accountId uuid.UUID) ExecutionCapLimitDecision
+
+func WithAccountExecutionCap(capFn ExecutionCapFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).accountExecutionCap = capFn
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -546,6 +560,7 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
+	accountExecutionCap      ExecutionCapFn
 
 	accountPlanMetricTagResolver AccountPlanMetricTagResolver
 
@@ -894,6 +909,19 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	}
 
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
+}
+
+func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
+	if e.accountExecutionCap == nil {
+		return enums.SkipReasonNone
+	}
+
+	decision := e.accountExecutionCap(ctx, req.AccountID)
+	if !decision.Exceeded || !decision.Enforce {
+		return enums.SkipReasonNone
+	}
+
+	return enums.SkipReasonAccountExecutionCapHit
 }
 
 // Schedule initializes a new function run, ensuring that the function will be
@@ -1355,13 +1383,15 @@ func (e *executor) schedule(
 	var skipReason enums.SkipReason
 	var singletonSkipRunID *ulid.ULID
 
+	skipReason = e.checkExecutionCap(ctx, req)
+
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
 	var singletonConfig *queue.Singleton
 	data := req.Events[0].GetEvent().Map()
 
-	if req.Function.Singleton != nil {
+	if skipReason == enums.SkipReasonNone && req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
@@ -1540,6 +1570,13 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
+	}
+	var firstEvent json.RawMessage
+	if len(evts) > 0 {
+		firstEvent = evts[0]
+	}
+	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, firstEvent); len(keys) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 	if len(sessions) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.Sessions, &sessions)
@@ -1796,6 +1833,16 @@ func (e *executor) schedule(
 		}
 		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 
+	case errors.Is(err, queue.ErrQueueShardNotFound):
+		if stateCreated {
+			deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
+			if deleteErr != nil && !errors.Is(deleteErr, state.ErrRunNotFound) {
+				l.ReportError(deleteErr, "error deleting function state after permanent queue routing failure")
+				return nil, nil, fmt.Errorf("error deleting function state after queue routing failure: %w", deleteErr)
+			}
+		}
+		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
+
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
@@ -1884,7 +1931,19 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 				})
 			})
 	}
-	return nil, nil, ErrFunctionSkipped
+	return nil, nil, SkippedError{Reason: reason}
+}
+
+type SkippedError struct {
+	Reason enums.SkipReason
+}
+
+func (e SkippedError) Error() string {
+	return "function skipped: " + e.Reason.String()
+}
+
+func (e SkippedError) Is(target error) bool {
+	return target == ErrFunctionSkipped
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -2179,6 +2238,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	runningStatus := enums.StepStatusRunning
 	meta.AddAttr(execAttrs, meta.Attrs.DynamicStatus, &runningStatus)
 	tracing.AddQueueTimestampAttrs(execAttrs, item)
+	var firstEvent json.RawMessage
+	if len(events) > 0 {
+		firstEvent = events[0]
+	}
+	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), firstEvent); len(keys) > 0 {
+		meta.AddAttr(execAttrs, meta.Attrs.CustomConcurrencyKeys, &keys)
+	}
 
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,

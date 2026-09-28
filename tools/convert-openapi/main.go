@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -85,7 +84,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		addParameterConstraints(v3Doc)
 
 		// Apply examples from external JSON file
-		applyExamples(v3Doc, inputDir)
+		if err := applyExamples(v3Doc, inputDir); err != nil {
+			return fmt.Errorf("failed to apply examples to %s: %w", path, err)
+		}
 
 		// Generate output filename
 		relPath, err := filepath.Rel(inputDir, path)
@@ -452,108 +453,52 @@ func shortenPublicEnumString(value string, prefixes []string) string {
 	return value
 }
 
-// applyExamples reads examples from external JSON file and applies them to OpenAPI v3 responses
-func applyExamples(v3Doc *openapi3.T, inputDir string) {
+// applyExamples reads authored examples and applies them to OpenAPI v3 responses.
+func applyExamples(v3Doc *openapi3.T, inputDir string) error {
 	// Construct path to examples file (go up from docs/openapi/v2 to docs/)
 	examplesPath := filepath.Join(filepath.Dir(filepath.Dir(inputDir)), "api_v2_examples.json")
 
-	// Initialize examples structure
-	var examples map[string]map[string]map[string]interface{}
-
-	// Read examples file
 	examplesData, err := os.ReadFile(examplesPath)
 	if err != nil {
-		// File doesn't exist or can't be read, start with empty structure
-		fmt.Printf("Examples file %s doesn't exist or can't be read, creating new structure\n", examplesPath)
-		examples = make(map[string]map[string]map[string]interface{})
-	} else if len(examplesData) == 0 {
-		// File exists but is empty, start with empty structure
-		fmt.Printf("Examples file %s is empty, creating new structure\n", examplesPath)
-		examples = make(map[string]map[string]map[string]interface{})
-	} else {
-		// Parse examples JSON with new structure: path -> method -> statusCode -> example
-		if err := json.Unmarshal(examplesData, &examples); err != nil {
-			fmt.Printf("Warning: Could not parse examples file: %v, creating new structure\n", err)
-			examples = make(map[string]map[string]map[string]interface{})
-		}
+		return fmt.Errorf("read examples file %s: %w", examplesPath, err)
 	}
 
-	// Ensure examples is not nil
-	if examples == nil {
-		examples = make(map[string]map[string]map[string]interface{})
+	var examples map[string]map[string]map[string]interface{}
+	if err := json.Unmarshal(examplesData, &examples); err != nil {
+		return fmt.Errorf("parse examples file %s: %w", examplesPath, err)
 	}
 
-	// Generate missing entries in examples structure
-	generateMissingExamples(v3Doc, &examples)
-
-	// Sort examples structure for better maintainability
-	sortedExamples := sortExamplesStructure(examples)
-
-	// Write updated examples back to file
-	updatedExamplesData, err := json.MarshalIndent(sortedExamples, "", "  ")
-	if err != nil {
-		fmt.Printf("Warning: Could not marshal updated examples: %v\n", err)
-	} else if err := os.WriteFile(examplesPath, updatedExamplesData, 0644); err != nil {
-		fmt.Printf("Warning: Could not write updated examples file: %v\n", err)
-	} else {
-		fmt.Printf("Updated examples file with missing entries: %s\n", examplesPath)
+	if v3Doc.Paths == nil && len(examples) > 0 {
+		return fmt.Errorf("examples file contains entries but OpenAPI document has no paths")
 	}
 
-	if v3Doc.Paths == nil {
-		return
-	}
-
-	// Apply examples to each path and operation
-	for pathKey, pathItem := range v3Doc.Paths.Map() {
+	for pathKey, pathExamples := range examples {
+		pathItem := v3Doc.Paths.Find(pathKey)
 		if pathItem == nil {
-			continue
+			return fmt.Errorf("example references unknown path %s", pathKey)
 		}
 
-		// Find examples for this path
-		pathExamples, pathExists := examples[pathKey]
-		if !pathExists {
-			continue
-		}
-
-		// Check each HTTP method
-		operations := map[string]*openapi3.Operation{
-			"get":    pathItem.Get,
-			"post":   pathItem.Post,
-			"put":    pathItem.Put,
-			"patch":  pathItem.Patch,
-			"delete": pathItem.Delete,
-		}
-
-		for method, operation := range operations {
-			if operation == nil || operation.Responses == nil {
-				continue
+		for method, methodExamples := range pathExamples {
+			operation := operationForMethod(pathItem, method)
+			if operation == nil {
+				return fmt.Errorf("example references unknown operation %s %s", strings.ToUpper(method), pathKey)
 			}
 
-			// Find examples for this method
-			methodExamples, methodExists := pathExamples[method]
-			if !methodExists {
-				continue
-			}
-
-			// Apply examples to each response status code
 			for statusCode, exampleData := range methodExamples {
 				responseRef, exists := operation.Responses.Map()[statusCode]
-				if !exists || responseRef == nil || responseRef.Value == nil || responseRef.Value.Content == nil {
-					continue
+				if !exists || responseRef == nil || responseRef.Value == nil || len(responseRef.Value.Content) == 0 {
+					return fmt.Errorf("example references unknown response %s for %s %s", statusCode, strings.ToUpper(method), pathKey)
 				}
 
-				// Skip TODO entries - don't add them to the generated documentation
 				if isTodoExample(exampleData) {
-					continue
+					return fmt.Errorf("example for %s %s response %s is a TODO placeholder", strings.ToUpper(method), pathKey, statusCode)
 				}
 
-				// Add example to each content type
 				for _, mediaType := range responseRef.Value.Content {
 					if mediaType == nil {
 						continue
 					}
 
-					// Add the example
 					if mediaType.Examples == nil {
 						mediaType.Examples = make(map[string]*openapi3.ExampleRef)
 					}
@@ -567,62 +512,34 @@ func applyExamples(v3Doc *openapi3.T, inputDir string) {
 			}
 		}
 	}
+
+	return nil
 }
 
-// generateMissingExamples creates empty example entries for any missing path/method/statusCode combinations
-func generateMissingExamples(v3Doc *openapi3.T, examples *map[string]map[string]map[string]interface{}) {
-	if v3Doc.Paths == nil {
-		return
-	}
-
-	// Initialize examples map if nil
-	if *examples == nil {
-		*examples = make(map[string]map[string]map[string]interface{})
-	}
-
-	// Scan all paths and operations in the OpenAPI spec
-	for pathKey, pathItem := range v3Doc.Paths.Map() {
-		if pathItem == nil {
-			continue
-		}
-
-		// Initialize path entry if missing
-		if (*examples)[pathKey] == nil {
-			(*examples)[pathKey] = make(map[string]map[string]interface{})
-		}
-
-		// Check each HTTP method
-		operations := map[string]*openapi3.Operation{
-			"get":    pathItem.Get,
-			"post":   pathItem.Post,
-			"put":    pathItem.Put,
-			"patch":  pathItem.Patch,
-			"delete": pathItem.Delete,
-		}
-
-		for method, operation := range operations {
-			if operation == nil || operation.Responses == nil {
-				continue
-			}
-
-			// Initialize method entry if missing
-			if (*examples)[pathKey][method] == nil {
-				(*examples)[pathKey][method] = make(map[string]interface{})
-			}
-
-			// Add missing status codes with empty objects
-			for statusCode := range operation.Responses.Map() {
-				if (*examples)[pathKey][method][statusCode] == nil {
-					(*examples)[pathKey][method][statusCode] = map[string]interface{}{
-						"// TODO": "Add example data for " + method + " " + pathKey + " " + statusCode,
-					}
-				}
-			}
-		}
+func operationForMethod(pathItem *openapi3.PathItem, method string) *openapi3.Operation {
+	switch method {
+	case "get":
+		return pathItem.Get
+	case "post":
+		return pathItem.Post
+	case "put":
+		return pathItem.Put
+	case "patch":
+		return pathItem.Patch
+	case "delete":
+		return pathItem.Delete
+	case "head":
+		return pathItem.Head
+	case "options":
+		return pathItem.Options
+	case "trace":
+		return pathItem.Trace
+	default:
+		return nil
 	}
 }
 
-// isTodoExample checks if an example is a TODO placeholder that should not be included in documentation
+// isTodoExample checks whether an example is only a TODO/comment placeholder.
 func isTodoExample(exampleData interface{}) bool {
 	if exampleMap, ok := exampleData.(map[string]interface{}); ok {
 		// Check if it has a TODO field
@@ -643,80 +560,4 @@ func isTodoExample(exampleData interface{}) bool {
 	}
 
 	return false
-}
-
-// sortExamplesStructure sorts the examples structure for better maintainability
-// Sorts: paths alphabetically, then methods (get, post, put, patch, delete), then status codes numerically
-func sortExamplesStructure(examples map[string]map[string]map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	// Sort paths
-	paths := make([]string, 0, len(examples))
-	for path := range examples {
-		paths = append(paths, path)
-	}
-	sort.Strings(paths)
-
-	// Method order preference
-	methodOrder := map[string]int{
-		"get": 1, "post": 2, "put": 3, "patch": 4, "delete": 5, "head": 6, "options": 7,
-	}
-
-	for _, path := range paths {
-		pathMethods := examples[path]
-		sortedPath := make(map[string]interface{})
-
-		// Sort methods by preferred order
-		methods := make([]string, 0, len(pathMethods))
-		for method := range pathMethods {
-			methods = append(methods, method)
-		}
-		sort.Slice(methods, func(i, j int) bool {
-			orderI, okI := methodOrder[methods[i]]
-			orderJ, okJ := methodOrder[methods[j]]
-			if okI && okJ {
-				return orderI < orderJ
-			}
-			if okI {
-				return true
-			}
-			if okJ {
-				return false
-			}
-			return methods[i] < methods[j]
-		})
-
-		for _, method := range methods {
-			methodStatuses := pathMethods[method]
-			sortedMethod := make(map[string]interface{})
-
-			// Sort status codes numerically
-			statusCodes := make([]string, 0, len(methodStatuses))
-			for status := range methodStatuses {
-				statusCodes = append(statusCodes, status)
-			}
-			sort.Slice(statusCodes, func(i, j int) bool {
-				// Convert to int for proper numerical sorting
-				iVal := 0
-				jVal := 0
-				if val, err := strconv.Atoi(statusCodes[i]); err == nil {
-					iVal = val
-				}
-				if val, err := strconv.Atoi(statusCodes[j]); err == nil {
-					jVal = val
-				}
-				return iVal < jVal
-			})
-
-			for _, status := range statusCodes {
-				sortedMethod[status] = methodStatuses[status]
-			}
-
-			sortedPath[method] = sortedMethod
-		}
-
-		result[path] = sortedPath
-	}
-
-	return result
 }

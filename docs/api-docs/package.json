@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm generate && tsc --noEmit && vite build --mode=production",
+    "build": "tsc --noEmit && vite build --mode=production",
     "generate": "tsx scripts/generate-docs.ts",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
@@ -42,7 +42,7 @@
     "vite-tsconfig-paths": "^6.0.5"
   },
   "engines": {
-    "node": "24.x",
+    "node": "22.x",
     "pnpm": "10.x"
   },
   "packageManager": "pnpm@10.18.2"

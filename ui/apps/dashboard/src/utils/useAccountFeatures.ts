@@ -6,7 +6,7 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 const query = graphql(`
   query GetAccountEntitlements {
     account {
-      entitlements {
+      entitlements: ents {
         history {
           limit
         }

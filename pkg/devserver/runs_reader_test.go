@@ -17,12 +17,14 @@ func TestRunListItemFromCQRSUsesTraceRunOutput(t *testing.T) {
 	runID := ulid.Make()
 	eventID := ulid.Make()
 	startedAt := time.Now().UTC()
+	queuedAt := startedAt.Add(-time.Second)
 	finishedAt := startedAt.Add(time.Second)
 	appID := uuid.New()
 	functionID := uuid.New()
 
 	result := runListItemFromCQRS(&cqrs.TraceRun{
 		RunID:        runID.String(),
+		QueuedAt:     queuedAt,
 		StartedAt:    startedAt,
 		EndedAt:      finishedAt,
 		Status:       enums.RunStatusCompleted,
@@ -35,6 +37,7 @@ func TestRunListItemFromCQRSUsesTraceRunOutput(t *testing.T) {
 		Output:       []byte(`{"data":{"ok":true}}`),
 	}, true, false)
 
+	require.Equal(t, queuedAt, result.QueuedAt)
 	require.NotNil(t, result.Output)
 	var output map[string]bool
 	require.NoError(t, json.Unmarshal(result.Output, &output))

@@ -1,15 +1,16 @@
 import { useShared } from './SharedContext';
+import type { ClientFeatureFlagKey } from './clientFeatureFlags';
 
 export type BooleanFlag = {
-  // Whether the flag is ready to be used. This will be false if the user has
-  // not been identified in the LaunchDarkly client.
+  // Ready means the value can be used, including the default after an error.
+  // False means flag identification is still pending.
   isReady: boolean;
 
   value: boolean;
 };
 
 export type BooleanFlagPayload = {
-  flag: string;
+  flag: ClientFeatureFlagKey;
   defaultValue: boolean;
   overrideable?: boolean;
 };
@@ -19,7 +20,7 @@ export const FEATURE_FLAG_NAMESPACE = 'inngest-feature-flag-';
 export const useBooleanFlag = () => {
   const shared = useShared();
   const booleanFlag = (
-    flag: string,
+    flag: ClientFeatureFlagKey,
     defaultValue: boolean = false,
     userOverrideable: boolean = false
   ): BooleanFlag => {

@@ -54,9 +54,15 @@ describe('MCP setup', () => {
     expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cursor' }), { button: 0, ctrlKey: false });
-    expect(
-      screen.getByText('If OAuth sign-in fails, use the API-key instructions above.')
-    ).toBeTruthy();
+    expect(screen.getByText(/Until Cursor supports Client ID Metadata Documents/)).toBeTruthy();
+    expect(JSON.parse(screen.getByText(/"CLIENT_ID"/).textContent ?? '')).toEqual({
+      mcpServers: {
+        'inngest-cloud': {
+          url: cloudProps.endpoint,
+          auth: { CLIENT_ID: 'inngest-mcp-static' },
+        },
+      },
+    });
     expect(screen.queryByText(/"Authorization": "Bearer/)).toBeNull();
   });
 
@@ -70,6 +76,7 @@ describe('MCP setup', () => {
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cursor' }), { button: 0, ctrlKey: false });
     expect(screen.getByText(/"Authorization": "Bearer/)).toBeTruthy();
+    expect(screen.queryByText(/"CLIENT_ID"/)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'View OAuth instructions' }));
     expect(screen.getByText('Sign in and approve access')).toBeTruthy();
@@ -93,5 +100,9 @@ describe('MCP setup', () => {
     expect(screen.getByRole('tab', { name: 'Cursor' })).toBeTruthy();
     expect(screen.queryByText('Sign in and approve access')).toBeNull();
     expect(screen.queryByRole('button', { name: 'View API-key instructions' })).toBeNull();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Cursor' }), { button: 0, ctrlKey: false });
+    expect(JSON.parse(screen.getByText(/"inngest-dev"/).textContent ?? '')).toEqual({
+      mcpServers: { 'inngest-dev': { url: 'http://localhost:8288/mcp' } },
+    });
   });
 });

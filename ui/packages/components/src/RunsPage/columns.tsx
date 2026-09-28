@@ -107,7 +107,9 @@ const columns = [
 
       const parentFunction = data.deferredFrom?.[0]?.function;
       const parentLabel =
-        parentFunction?.name || parentFunction?.slug || 'Parent function unavailable';
+        parentFunction?.name ||
+        parentFunction?.slug ||
+        'Parent function unavailable';
 
       return (
         <div className="flex max-w-md items-center gap-1">

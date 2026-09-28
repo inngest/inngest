@@ -687,12 +687,19 @@ func (x *DestroySandboxResponse) GetMetadata() *SandboxResponseMetadata {
 }
 
 type CreateSandboxRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Vcpu          uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
-	MemoryMb      uint32                 `protobuf:"varint,3,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
-	Environment   map[string]string      `protobuf:"bytes,4,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	SnapshotId    *string                `protobuf:"bytes,5,opt,name=snapshot_id,json=snapshotId,proto3,oneof" json:"snapshot_id,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Vcpu        uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
+	MemoryMb    uint32                 `protobuf:"varint,3,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
+	Environment map[string]string      `protobuf:"bytes,4,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SnapshotId  *string                `protobuf:"bytes,5,opt,name=snapshot_id,json=snapshotId,proto3,oneof" json:"snapshot_id,omitempty"`
+	// Exact workspace secret names, each injected under that same environment
+	// variable name. Names must be unique, valid environment keys, and must not
+	// overlap with environment. Names resolve to UUID bindings when creating the
+	// workload; create recovery retains those bindings even if a secret is archived
+	// and its name reused. Values are fetched at launch and may remain in the guest
+	// and its snapshots. Cannot be supplied with snapshot_id.
+	Secrets       []string `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -760,6 +767,13 @@ func (x *CreateSandboxRequest) GetSnapshotId() string {
 		return *x.SnapshotId
 	}
 	return ""
+}
+
+func (x *CreateSandboxRequest) GetSecrets() []string {
+	if x != nil {
+		return x.Secrets
+	}
+	return nil
 }
 
 type ListSandboxesRequest struct {
@@ -3217,14 +3231,15 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxH\x00R\x04data\x88\x01\x01\x12@\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataH\x01R\bmetadata\x88\x01\x01B\a\n" +
 	"\x05_dataB\v\n" +
-	"\t_metadata\"\xa2\x02\n" +
+	"\t_metadata\"\xbc\x02\n" +
 	"\x14CreateSandboxRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1b\n" +
 	"\tmemory_mb\x18\x03 \x01(\rR\bmemoryMb\x12O\n" +
 	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x12$\n" +
 	"\vsnapshot_id\x18\x05 \x01(\tH\x00R\n" +
-	"snapshotId\x88\x01\x01\x1a>\n" +
+	"snapshotId\x88\x01\x01\x12\x18\n" +
+	"\asecrets\x18\x06 \x03(\tR\asecrets\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +

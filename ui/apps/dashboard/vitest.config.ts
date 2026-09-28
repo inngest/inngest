@@ -9,6 +9,7 @@ export default defineConfig({
         new URL('../../packages/components/src', import.meta.url),
       ),
     },
+    dedupe: ['react', 'react-dom', '@tanstack/react-router'],
   },
   plugins: [
     tsConfigPaths({

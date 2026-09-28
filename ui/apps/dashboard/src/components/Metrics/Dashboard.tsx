@@ -142,7 +142,7 @@ const AccountConcurrencyLookupDocument = graphql(`
   query AccountConcurrencyLookup {
     account {
       marketplace
-      entitlements {
+      entitlements: ents {
         concurrency {
           limit
         }

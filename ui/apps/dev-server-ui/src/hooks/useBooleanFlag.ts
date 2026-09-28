@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
+import type { ClientFeatureFlagKey } from '@inngest/components/SharedContext/clientFeatureFlags.js';
 import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag.js';
 
 import { createDevServerURL } from './useFeatureFlags';
 
-export const useBooleanFlag = (flag: string, defaultValue: boolean = false): BooleanFlag => {
+export const useBooleanFlag = (
+  flag: ClientFeatureFlagKey,
+  defaultValue: boolean = false,
+): BooleanFlag => {
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
