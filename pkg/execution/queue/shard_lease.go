@@ -163,6 +163,7 @@ func (q *queueProcessor) releaseShardLease() {
 
 // renewShardLease continuously renews the shard lease until the context is cancelled
 func (q *queueProcessor) renewShardLease(ctx context.Context) {
+	defer q.hintsStopped.Store(true)
 	l := logger.StdlibLogger(ctx)
 
 	tick := q.Clock().NewTicker(ShardLeaseDuration / 3)

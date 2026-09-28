@@ -927,6 +927,7 @@ func (q *queue) Lease(
 		now.UnixMilli(),
 		setEarliestPeekTime,
 		item.EarliestPeekTime,
+		item.GenerationID,
 	})
 	if err != nil {
 		return nil, err

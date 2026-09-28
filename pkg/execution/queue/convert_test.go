@@ -1150,6 +1150,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 	})
 
 	assertCoveredFields(t, reflect.TypeOf(EnqueueOpts{}), fieldCoverage{
+		ignored: map[string]string{"OnEnqueued": "local observer; proxies request and return the finalized item separately"},
 		covered: []string{
 			"PassthroughJobId",
 			"ForceQueueShardName",
