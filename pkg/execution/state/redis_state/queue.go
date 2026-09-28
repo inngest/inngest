@@ -142,18 +142,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 	now := q.Clock.Now()
 
-	// The overdue wall time is normalized to now below, so record the delay
-	// here to keep late arrivals visible internally.
-	if overdueMS := enqueueOverdueMS(i, at, now); overdueMS > 0 {
-		metrics.HistogramQueueEnqueueOverdue(ctx, overdueMS, metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"queue_shard": q.Name(),
-				"kind":        i.Data.Kind,
-				"backend":     "redis",
-			},
-		})
-	}
+	// The overdue wall time is normalized to now below, so capture the delay
+	// first; it is recorded once the enqueue succeeds.
+	overdueMS := enqueueOverdueMS(i, at, now)
 
 	// XXX: If the length of ID >= max, error.
 	if i.WallTimeMS == 0 {
@@ -300,6 +291,16 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	}
 	switch status {
 	case 0:
+		if overdueMS > 0 {
+			metrics.HistogramQueueEnqueueOverdue(ctx, overdueMS, metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.Name(),
+					"kind":        i.Data.Kind,
+					"backend":     "redis",
+				},
+			})
+		}
 		return i, nil
 	case 1:
 		var runID *ulid.ULID
