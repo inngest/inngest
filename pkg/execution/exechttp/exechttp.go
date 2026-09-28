@@ -70,6 +70,15 @@ func WithRealtimePublishing() ClientOpt {
 	}
 }
 
+// WithDevServerRealtimePublishing permits HTTP only to the configured dev
+// server callback. This is a client-level setting, never a request option.
+func WithDevServerRealtimePublishing(publishURL string) ClientOpt {
+	return func(e *ExtendedClient) {
+		e.publish = true
+		e.devServerPublishURL = publishURL
+	}
+}
+
 type ClientOpt func(e *ExtendedClient)
 
 // Client returns a new HTTP client which fulfils the ClientExecutor interface, allowing us to
@@ -96,7 +105,8 @@ type ExtendedClient struct {
 	// publish is used to publish the request in real-time using Inngest's realtime APIs.  Note that
 	// this is false by default;  without this set, any SerializableRequest structs executed will not be
 	// streamed to the realtime publishing endpoint specified in each request.
-	publish bool
+	publish             bool
+	devServerPublishURL string
 }
 
 // DoRequest performs the SerializableRequest with tracking, reading the response and handling
@@ -156,9 +166,10 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 
 	if e.publish && r.Publish.ShouldPublish() {
 		rdr, err := realtime.TeeStreamReaderToAPIWithContext(ctx, body, r.Publish.PublishURL, realtime.TeeStreamOptions{
-			Channel: r.Publish.Channel,
-			Topic:   r.Publish.Topic,
-			Token:   r.Publish.Token,
+			AllowedHTTPURL: e.devServerPublishURL,
+			Channel:        r.Publish.Channel,
+			Topic:          r.Publish.Topic,
+			Token:          r.Publish.Token,
 			Metadata: map[string]any{
 				"url":          req.URL,
 				"content-type": resp.Header.Get("content-type"),

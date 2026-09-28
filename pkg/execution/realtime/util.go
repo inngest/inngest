@@ -14,10 +14,13 @@ import (
 )
 
 type TeeStreamOptions struct {
-	Channel  string
-	Topic    string
-	Token    string
-	Metadata map[string]any
+	// AllowedHTTPURL is a trusted, exact dev-server callback URL. Never populate
+	// this from request data; production callers leave it empty.
+	AllowedHTTPURL string
+	Channel        string
+	Topic          string
+	Token          string
+	Metadata       map[string]any
 }
 
 // TeeStreamReaderToAPI is a utility function that publishes a reader to the HTTP API,
@@ -47,8 +50,7 @@ func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL stri
 	if err != nil {
 		return reader, fmt.Errorf("invalid publishing URL")
 	}
-	ip := net.ParseIP(u.Hostname())
-	if u.User != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && ip != nil && ip.IsLoopback())) {
+	if !allowedPublishURL(u, publishURL, opts.AllowedHTTPURL) {
 		return reader, fmt.Errorf("publishing requires HTTPS (HTTP is allowed only for literal loopback addresses)")
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -114,4 +116,12 @@ func (r *publishingReader) remainder() io.Reader {
 	defer r.mu.Unlock()
 	r.stopped = true
 	return io.MultiReader(&r.buf, r.reader)
+}
+
+func allowedPublishURL(u *url.URL, raw, allowedHTTP string) bool {
+	if u.User != nil || u.Host == "" {
+		return false
+	}
+	ip := net.ParseIP(u.Hostname())
+	return u.Scheme == "https" || (u.Scheme == "http" && ((ip != nil && ip.IsLoopback()) || raw == allowedHTTP))
 }

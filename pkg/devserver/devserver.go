@@ -460,6 +460,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	// automatically transform dev requests to lambda invocations.
 	//
 	// We also make sure to allow local requests.
+	url := opts.Config.CoreAPI.Addr
+	if url == "0.0.0.0" {
+		url = "127.0.0.1"
+	}
+	publishURL := fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port)
 	httpClient := exechttp.Client(
 		exechttp.SecureDialerOpts{
 			AllowHostDocker: true, // In local dev, this is OK
@@ -468,7 +473,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		},
 		// Enable publishing of any requests made directly from the dev server.  Note that this
 		// is different from the cloud.
-		exechttp.WithRealtimePublishing(),
+		exechttp.WithDevServerRealtimePublishing(publishURL),
 	)
 
 	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
@@ -494,11 +499,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	tp := tracing.NewSqlcTracerProvider(adapter.Q())
-
-	url := opts.Config.CoreAPI.Addr
-	if url == "0.0.0.0" {
-		url = "127.0.0.1"
-	}
 
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
@@ -559,7 +559,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithTraceReader(dbcqrs),
 		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
 			Secret:     consts.DevServerRealtimeJWTSecret,
-			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
+			PublishURL: publishURL,
 		}),
 		executor.WithTracerProvider(tp),
 
