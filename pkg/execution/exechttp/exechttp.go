@@ -155,7 +155,7 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	body = io.LimitReader(body, consts.MaxSDKResponseBodySize+1)
 
 	if e.publish && r.Publish.ShouldPublish() {
-		rdr, err := realtime.TeeStreamReaderToAPI(body, r.Publish.PublishURL, realtime.TeeStreamOptions{
+		rdr, err := realtime.TeeStreamReaderToAPIWithContext(ctx, body, r.Publish.PublishURL, realtime.TeeStreamOptions{
 			Channel: r.Publish.Channel,
 			Topic:   r.Publish.Topic,
 			Token:   r.Publish.Token,

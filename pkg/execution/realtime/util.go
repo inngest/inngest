@@ -2,11 +2,15 @@ package realtime
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"sync"
+	"time"
 )
 
 type TeeStreamOptions struct {
@@ -26,10 +30,32 @@ func TeeStreamReaderToAPI(reader io.Reader, publishURL string, opts TeeStreamOpt
 		return reader, nil
 	}
 
-	buf := bytes.NewBuffer(nil)
-	tee := io.TeeReader(reader, buf)
+	return teeStreamReaderToAPI(context.Background(), reader, publishURL, opts, 5*time.Minute)
+}
 
-	qp := url.Values{}
+// TeeStreamReaderToAPIWithContext publishes using the caller's cancellation and
+// a five-minute publishing deadline. Failure preserves the remaining response.
+func TeeStreamReaderToAPIWithContext(ctx context.Context, reader io.Reader, publishURL string, opts TeeStreamOptions) (io.Reader, error) {
+	return teeStreamReaderToAPI(ctx, reader, publishURL, opts, 5*time.Minute)
+}
+
+func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL string, opts TeeStreamOptions, timeout time.Duration) (io.Reader, error) {
+	if opts.Channel == "" || opts.Topic == "" || opts.Token == "" {
+		return reader, nil
+	}
+	u, err := url.Parse(publishURL)
+	if err != nil {
+		return reader, fmt.Errorf("invalid publishing URL")
+	}
+	ip := net.ParseIP(u.Hostname())
+	if u.User != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && ip != nil && ip.IsLoopback())) {
+		return reader, fmt.Errorf("publishing requires HTTPS (HTTP is allowed only for literal loopback addresses)")
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	tee := &publishingReader{reader: reader}
+
+	qp := u.Query()
 	qp.Add("channel", opts.Channel)
 	qp.Add("topic", opts.Topic)
 
@@ -38,30 +64,54 @@ func TeeStreamReaderToAPI(reader io.Reader, publishURL string, opts TeeStreamOpt
 		qp.Add("metadata", string(byt))
 	}
 
-	// This pushes the request directly to the API,
-	req, err := http.NewRequest(http.MethodPost, publishURL+"?"+qp.Encode(), tee)
+	// Preserve existing endpoint query parameters.
+	u.RawQuery = qp.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), tee)
 	if err != nil {
-		// The tee reader hasn't been consumed yet, so drain the original
-		// reader into buf to preserve the full body for the caller.
-		_, _ = io.Copy(buf, reader)
-		return buf, err
+		return reader, err
 	}
 	req.Header.Add("Content-Type", "text/stream")
 	req.Header.Add("Authorization", opts.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Do(req)
+	cancel()
+	// Stop transport reads before handing the stream back to the executor.
+	remainder := tee.remainder()
 	if err != nil {
-		// Do() may have partially consumed the tee reader. Drain whatever
-		// remains from the original reader into buf so the caller gets the
-		// complete body.
-		_, _ = io.Copy(buf, reader)
-		return buf, err
+		return remainder, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return buf, fmt.Errorf("invalid status code publishing stream: %d", resp.StatusCode)
+		return remainder, fmt.Errorf("invalid status code publishing stream: %d", resp.StatusCode)
 	}
 
-	return buf, nil
+	return remainder, nil
+}
+
+// publishingReader serializes transport reads with returning the response to the
+// caller: HTTP may return before its request-body writer has finished.
+type publishingReader struct {
+	mu      sync.Mutex
+	reader  io.Reader
+	buf     bytes.Buffer
+	stopped bool
+}
+
+func (r *publishingReader) Read(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopped {
+		return 0, io.EOF
+	}
+	n, err := r.reader.Read(p)
+	_, _ = r.buf.Write(p[:n])
+	return n, err
+}
+func (r *publishingReader) remainder() io.Reader {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stopped = true
+	return io.MultiReader(&r.buf, r.reader)
 }
