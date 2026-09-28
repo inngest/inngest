@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,11 @@ var (
 	openOnce sync.Once
 	openDB   *sql.DB
 )
+
+// persistedBusyTimeoutMillis bounds how long a persisted connection waits on
+// a locked database before returning SQLITE_BUSY. Connection-local, so it
+// must be applied to every pooled connection via the DSN.
+const persistedBusyTimeoutMillis = 5000
 
 type Options struct {
 	// Persist indicates that the sqlite db should persist data to disk.
@@ -121,7 +127,89 @@ func openPersisted(opts Options) (*sql.DB, error) {
 	}
 
 	file := filepath.Join(dir, consts.SQLiteDbFileName)
-	return sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared", file))
+
+	// Every pooled connection configures itself through DSN _pragma
+	// parameters: database/sql opens connections lazily, so one-time PRAGMAs
+	// via Exec would miss replacement connections. Journal mode persists in
+	// the database header (migrating existing DELETE-mode databases on
+	// first open); busy timeout and synchronous mode are connection-local
+	// and reapplied per connection by the driver. The driver applies
+	// busy_timeout before the other PRAGMAs, so concurrent connections
+	// racing the initial journal-mode switch wait instead of failing.
+	// Shared cache is intentionally absent: it is discouraged with WAL and
+	// increases lock contention. Synchronous stays FULL to preserve the
+	// pre-WAL durability guarantee (WAL mode alone would default to NORMAL).
+	params := url.Values{}
+	params.Add("_pragma", "journal_mode(WAL)")
+	params.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", persistedBusyTimeoutMillis))
+	params.Add("_pragma", "synchronous(FULL)")
+	dsn := (&url.URL{
+		Scheme:   "file",
+		Path:     filepath.ToSlash(file),
+		RawQuery: params.Encode(),
+	}).String()
+
+	conn, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	// sql.Open is lazy: force a connection so DSN errors surface here with
+	// the database path attached, then verify the effective settings. A
+	// filesystem without WAL support silently keeps DELETE mode instead of
+	// failing, which would lose the concurrency fix without warning.
+	if err := conn.Ping(); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("open persisted sqlite database %q: %w", file, err)
+	}
+	if err := verifyPersistedSettings(file, conn); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+// verifyPersistedSettings checks the effective journal mode, busy timeout,
+// and synchronous mode on a pooled connection. All pooled connections share
+// the same DSN, so verifying one verifies the pool's configuration.
+func verifyPersistedSettings(file string, conn *sql.DB) error {
+	var journalMode string
+	if err := conn.QueryRow("PRAGMA journal_mode").Scan(&journalMode); err != nil {
+		return fmt.Errorf("verify persisted sqlite database %q journal mode: %w", file, err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		return fmt.Errorf(
+			"persisted sqlite database %q did not enter WAL journal mode (got %q); "+
+				"the filesystem may not support WAL",
+			file, journalMode,
+		)
+	}
+
+	var busyTimeout int
+	if err := conn.QueryRow("PRAGMA busy_timeout").Scan(&busyTimeout); err != nil {
+		return fmt.Errorf("verify persisted sqlite database %q busy timeout: %w", file, err)
+	}
+	if busyTimeout != persistedBusyTimeoutMillis {
+		return fmt.Errorf(
+			"persisted sqlite database %q has unexpected busy timeout %d, want %d",
+			file, busyTimeout, persistedBusyTimeoutMillis,
+		)
+	}
+
+	// Synchronous FULL reads back as 2 (0=OFF, 1=NORMAL, 2=FULL, 3=EXTRA).
+	var synchronous int
+	if err := conn.QueryRow("PRAGMA synchronous").Scan(&synchronous); err != nil {
+		return fmt.Errorf("verify persisted sqlite database %q synchronous mode: %w", file, err)
+	}
+	if synchronous != 2 {
+		return fmt.Errorf(
+			"persisted sqlite database %q has unexpected synchronous mode %d, want FULL (2)",
+			file, synchronous,
+		)
+	}
+
+	return nil
 }
 
 func openTemporaryMemory() (*sql.DB, error) {
