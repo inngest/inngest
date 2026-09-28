@@ -14,6 +14,11 @@ var (
 		60_000, 300_000, // < 10m
 		600_000, 1_800_000, // < 1h
 	}
+	QueueEnqueueOverdueBoundaries = []float64{
+		500, 1000, 2000, 5000, 15_000, 30_000, // < 1m
+		60_000, 120_000, 300_000, // < 10m
+		600_000, 900_000, 1_800_000, // < 1h
+	}
 
 	cancellationReadDurationBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
@@ -116,6 +121,20 @@ func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramO
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  QueueItemLatencyBoundaries,
+	})
+}
+
+// HistogramQueueEnqueueOverdue records how far past its intended wall time an
+// item was when it reached its queue shard. Shards reset an overdue wall time
+// to now, so this delay is otherwise missing from step latency.
+func HistogramQueueEnqueueOverdue(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_enqueue_overdue_duration",
+		Description: "How far past its intended wall time an item was when enqueued to its shard",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  QueueEnqueueOverdueBoundaries,
 	})
 }
 

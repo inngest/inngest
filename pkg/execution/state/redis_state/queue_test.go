@@ -250,6 +250,32 @@ func TestQueueItemIsLeased(t *testing.T) {
 	}
 }
 
+func TestEnqueueOverdueMS(t *testing.T) {
+	now := time.Now().Truncate(time.Millisecond)
+
+	for _, tc := range []struct {
+		name     string
+		at       time.Duration
+		wallTime time.Duration // relative to now; 0 leaves the wall time unset
+		want     int64
+	}{
+		{name: "overdue with wall time set", at: -3 * time.Minute, wallTime: -3 * time.Minute, want: (3 * time.Minute).Milliseconds()},
+		{name: "overdue with wall time unset", at: -3 * time.Minute, want: (3 * time.Minute).Milliseconds()},
+		{name: "wall time earlier than at", at: -time.Minute, wallTime: -2 * time.Minute, want: (2 * time.Minute).Milliseconds()},
+		{name: "due now", at: 0, want: 0},
+		{name: "future", at: time.Minute, wallTime: time.Minute, want: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			item := osqueue.QueueItem{}
+			if tc.wallTime != 0 {
+				item.WallTimeMS = now.Add(tc.wallTime).UnixMilli()
+			}
+
+			require.Equal(t, tc.want, enqueueOverdueMS(item, now.Add(tc.at), now))
+		})
+	}
+}
+
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
