@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestPublishingDeadlineAndCancellation(t *testing.T) {
@@ -148,7 +150,7 @@ func TestDevServerHTTPPublishing(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.Header.Get("Authorization") != "dev-token" {
+		if r.Header.Get("Authorization") != "Bearer dev-token" {
 			t.Error("missing token")
 		}
 		_, _ = io.Copy(io.Discard, r.Body)
@@ -257,4 +259,35 @@ func (r *notifySecondRead) Read(p []byte) (int, error) {
 		close(r.blocked)
 	}
 	return r.reader.Read(p)
+}
+
+// Exercise the real JWT producer and API middleware so a missing auth scheme
+// cannot pass a fake publishing endpoint unnoticed.
+func TestPublishingAuthenticatesWithRealtimeAPI(t *testing.T) {
+	ctx := context.Background()
+	secret := []byte("test-realtime-secret")
+	account, env := uuid.New(), uuid.New()
+	token, err := NewPublishJWT(ctx, secret, account, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var accepted atomic.Bool
+	server := httptest.NewServer(realtimeAuthMW(secret, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, err := realtimeAuth(r.Context())
+		if err != nil || !claims.Publish || claims.Env != env || claims.Subject != account.String() {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_, _ = io.Copy(io.Discard, r.Body)
+		accepted.Store(true)
+	})))
+	defer server.Close()
+	body, err := TeeStreamReaderToAPIWithContext(ctx, strings.NewReader("complete response"), server.URL, TeeStreamOptions{Channel: "c", Topic: "t", Token: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(body)
+	if err != nil || string(got) != "complete response" || !accepted.Load() {
+		t.Fatalf("accepted=%v response=%q err=%v", accepted.Load(), got, err)
+	}
 }
