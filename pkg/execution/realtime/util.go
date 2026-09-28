@@ -55,7 +55,7 @@ func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL stri
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	tee := &publishingReader{reader: reader}
+	tee := &publishingReader{ctx: ctx, reader: reader}
 
 	qp := u.Query()
 	qp.Add("channel", opts.Channel)
@@ -78,7 +78,8 @@ func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL stri
 	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := client.Do(req)
 	cancel()
-	// Stop transport reads before handing the stream back to the executor.
+	// Stop new transport reads without waiting for an idle source read. The
+	// returned reader waits for that read only when the caller requests bytes.
 	remainder := tee.remainder()
 	if err != nil {
 		return remainder, err
@@ -92,13 +93,22 @@ func teeStreamReaderToAPI(ctx context.Context, reader io.Reader, publishURL stri
 	return remainder, nil
 }
 
-// publishingReader serializes transport reads with returning the response to the
-// caller: HTTP may return before its request-body writer has finished.
+// publishingReader allows the transport to stop without closing the SDK stream.
+// At most one source read is outstanding; its owned buffer remains available to
+// the response reader if publishing ends while the source is idle.
 type publishingReader struct {
-	mu      sync.Mutex
-	reader  io.Reader
-	buf     bytes.Buffer
-	stopped bool
+	mu        sync.Mutex
+	ctx       context.Context
+	reader    io.Reader
+	buf       bytes.Buffer
+	pending   chan sourceRead
+	sourceErr error
+	stopped   bool
+}
+
+type sourceRead struct {
+	data []byte
+	err  error
 }
 
 func (r *publishingReader) Read(p []byte) (int, error) {
@@ -107,15 +117,68 @@ func (r *publishingReader) Read(p []byte) (int, error) {
 	if r.stopped {
 		return 0, io.EOF
 	}
-	n, err := r.reader.Read(p)
-	_, _ = r.buf.Write(p[:n])
-	return n, err
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	pending := make(chan sourceRead, 1)
+	r.pending = pending
+	go func() {
+		// The transport may reuse p immediately after cancellation, so the
+		// source must read into a buffer owned by this outstanding read.
+		buf := make([]byte, len(p))
+		n, err := r.reader.Read(buf)
+		pending <- sourceRead{data: buf[:n], err: err}
+	}()
+	select {
+	case result := <-pending:
+		r.pending = nil
+		r.sourceErr = result.err
+		_, _ = r.buf.Write(result.data)
+		return copy(p, result.data), result.err
+	case <-r.ctx.Done():
+		return 0, r.ctx.Err()
+	}
 }
+
 func (r *publishingReader) remainder() io.Reader {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.stopped = true
-	return io.MultiReader(&r.buf, r.reader)
+	return &publishingRemainder{source: r}
+}
+
+// publishingRemainder waits for an outstanding source read only when the caller
+// requests response bytes, after first returning everything already buffered.
+type publishingRemainder struct {
+	source *publishingReader
+}
+
+func (r *publishingRemainder) Read(p []byte) (int, error) {
+	s := r.source
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if s.buf.Len() > 0 {
+		return s.buf.Read(p)
+	}
+	if s.pending != nil {
+		result := <-s.pending
+		s.pending = nil
+		s.sourceErr = result.err
+		_, _ = s.buf.Write(result.data)
+		if s.buf.Len() > 0 {
+			return s.buf.Read(p)
+		}
+	}
+	if s.sourceErr != nil {
+		return 0, s.sourceErr
+	}
+	return s.reader.Read(p)
 }
 
 func allowedPublishURL(u *url.URL, raw, allowedHTTP string) bool {

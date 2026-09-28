@@ -170,3 +170,91 @@ func TestDevServerHTTPPublishing(t *testing.T) {
 		t.Fatal("publishing did not reach the configured server")
 	}
 }
+
+// An idle SDK stream must not prevent publishing from returning on rejection,
+// deadline, or cancellation. Its next bytes still belong to the response reader.
+func TestPublishingIdleSourceHandoff(t *testing.T) {
+	for _, outcome := range []string{"rejection", "timeout", "cancellation"} {
+		t.Run(outcome, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			source, writer := io.Pipe()
+			defer source.Close()
+			defer writer.Close()
+			blocked := make(chan struct{})
+			release := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Do not let the HTTP server drain the idle request before replying.
+				if err := http.NewResponseController(w).EnableFullDuplex(); err != nil {
+					t.Error(err)
+					return
+				}
+				prefix := make([]byte, len("first"))
+				if _, err := io.ReadFull(r.Body, prefix); err != nil {
+					t.Error(err)
+					return
+				}
+				<-blocked
+				switch outcome {
+				case "rejection":
+					w.WriteHeader(http.StatusUnauthorized)
+					w.(http.Flusher).Flush()
+				case "cancellation":
+					cancel()
+				}
+				<-release
+			}))
+			defer server.Close()
+			// Release the server before Close waits for its handler.
+			defer close(release)
+			type result struct {
+				body io.Reader
+				err  error
+			}
+			done := make(chan result, 1)
+			timeout := 3 * time.Second
+			if outcome == "timeout" {
+				timeout = 100 * time.Millisecond
+			}
+			go func() {
+				body, err := teeStreamReaderToAPI(ctx, &notifySecondRead{reader: source, blocked: blocked}, server.URL, TeeStreamOptions{Channel: "c", Topic: "t", Token: "secret"}, timeout)
+				done <- result{body, err}
+			}()
+			go func() { _, _ = writer.Write([]byte("first")) }()
+			var got result
+			select {
+			case got = <-done:
+				if got.err == nil {
+					t.Error("expected publishing failure")
+				}
+			case <-time.After(2 * time.Second):
+				// Unblock transport cleanup before failing the regression test.
+				_ = writer.Close()
+				t.Error("publishing handoff waited for the idle SDK source")
+				got = <-done
+			}
+			go func() {
+				_, _ = writer.Write([]byte("second"))
+				_ = writer.Close()
+			}()
+			body, err := io.ReadAll(got.body)
+			if err != nil || string(body) != "firstsecond" {
+				t.Errorf("response = %q, %v; want full response", body, err)
+			}
+		})
+	}
+}
+
+type notifySecondRead struct {
+	reader  io.Reader
+	blocked chan struct{}
+	reads   int
+}
+
+func (r *notifySecondRead) Read(p []byte) (int, error) {
+	r.reads++
+	if r.reads == 2 {
+		close(r.blocked)
+	}
+	return r.reader.Read(p)
+}
