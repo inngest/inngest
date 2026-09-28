@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	telemetrytrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -61,9 +62,11 @@ func TestScheduleFastPathIntent(t *testing.T) {
 				IdempotencyKey: new("request-idempotency-key"),
 				Context:        map[string]any{"caller": "original-request"},
 			}
+			var metadata *statev2.Metadata
 			done := make(chan error, 1)
 			go func() {
-				_, _, err := e.Schedule(t.Context(), req)
+				var err error
+				_, metadata, err = e.Schedule(t.Context(), req)
 				done <- err
 			}()
 			select {
@@ -81,6 +84,13 @@ func TestScheduleFastPathIntent(t *testing.T) {
 			if tc.wantNotify {
 				select {
 				case got := <-listener.calls:
+					require.NotNil(t, metadata)
+					require.Equal(t, *metadata, got.metadata, "notify with the resolved run metadata")
+					require.Equal(t, got.item.Data.Identifier.RunID, got.metadata.ID.RunID)
+					require.Equal(t, req.Function.FunctionVersion, got.metadata.Config.FunctionVersion)
+					require.NotEmpty(t, got.metadata.Config.SpanID)
+					metadata.Config.Context["caller"] = "changed-after-scheduling"
+					require.Equal(t, "original-request", got.metadata.Config.Context["caller"], "metadata context is a snapshot")
 					require.Equal(t, req.FastPath, got.req.FastPath)
 					require.Equal(t, req.RunMode, got.req.RunMode)
 					require.Equal(t, req.AccountID, got.req.AccountID)
@@ -137,10 +147,11 @@ func (q *scheduleFastPathQueue) Enqueue(ctx context.Context, item queue.Item, at
 }
 
 type enqueueNotification struct {
-	ctx   context.Context
-	req   execution.ScheduleRequest
-	item  queue.QueueItem
-	shard string
+	ctx      context.Context
+	req      execution.ScheduleRequest
+	metadata statev2.Metadata
+	item     queue.QueueItem
+	shard    string
 }
 
 type scheduleEnqueueListener struct {
@@ -149,7 +160,7 @@ type scheduleEnqueueListener struct {
 	release chan struct{}
 }
 
-func (l *scheduleEnqueueListener) OnFunctionEnqueued(ctx context.Context, req execution.ScheduleRequest, item queue.QueueItem, shard string) {
-	l.calls <- enqueueNotification{ctx: ctx, req: req, item: item, shard: shard}
+func (l *scheduleEnqueueListener) OnFunctionEnqueued(ctx context.Context, req execution.ScheduleRequest, metadata statev2.Metadata, item queue.QueueItem, shard string) {
+	l.calls <- enqueueNotification{ctx: ctx, req: req, metadata: metadata, item: item, shard: shard}
 	<-l.release
 }
