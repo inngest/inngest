@@ -97,7 +97,7 @@ SelectStatement
   FromClause
     BaseTableRef(t,alias=)
 
--- SELECT a FROM t WHERE a = NOT b;
+-- SELECT a FROM t WHERE a = NOT b
 SelectStatement
   SelectItem()
     Ident(a)
@@ -107,4 +107,18 @@ SelectStatement
     Ident(a)
     UnaryExpr(NOT)
       Ident(b)
+
+-- SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(AND)
+    InExpr(not=false,contains)
+      Ident(a)
+      Ident(tags)
+    InExpr(not=true)
+      Ident(b)
+      Ident(tags)
 
