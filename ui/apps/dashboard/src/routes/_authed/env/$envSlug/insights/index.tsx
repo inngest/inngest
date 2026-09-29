@@ -2,7 +2,7 @@ import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { useQuery } from 'urql';
 
 import { createFileRoute, useLocation } from '@tanstack/react-router';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   useInsightsTabManager,
   type TabManagerActions,
@@ -134,9 +134,16 @@ function InsightsContentWithDeepLink({
   tabManager: JSX.Element;
   actions: TabManagerActions;
 }) {
-  const navigate = Route.useNavigate();
-  const search = Route.useSearch();
-  const { href: currentHref } = useLocation();
+  const routeNavigate = Route.useNavigate();
+  const { href: currentHref, search: locationSearch } = useLocation({
+    select: ({ href, search }) => ({ href, search }),
+  });
+  const search = validateInsightsSearch(locationSearch);
+  const navigate = useCallback(
+    ({ href, replace }: { href: string; replace?: boolean }) =>
+      routeNavigate({ to: href, replace }),
+    [routeNavigate],
+  );
 
   // Handle saved-query and SQL deep links after tab state has hydrated.
   useInsightsDeepLinkCoordinator({

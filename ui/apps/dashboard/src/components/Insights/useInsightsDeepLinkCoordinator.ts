@@ -195,9 +195,6 @@ export function useInsightsDeepLinkCoordinator({
       if (intent.kind === 'sql-prefill') {
         const href = consumeSQLPrefillURL(currentHref);
         if (href !== currentHref) navigate({ href, replace: true });
-      } else {
-        const href = syncSavedQueryURL(currentHref, intent.id);
-        if (href && href !== currentHref) navigate({ href, replace: true });
       }
       dispatch({ type: 'applied', navigationKey });
     }
@@ -234,6 +231,8 @@ export function useInsightsDeepLinkCoordinator({
 
     const activeSavedQueryId = activeTab?.savedQueryId;
     if (intent?.kind === 'saved-query' && intent.id === activeSavedQueryId) {
+      const href = syncSavedQueryURL(currentHref, activeSavedQueryId);
+      if (href && href !== currentHref) navigate({ href, replace: true });
       return;
     }
     if (!intent && !activeSavedQueryId) return;

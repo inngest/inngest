@@ -95,9 +95,13 @@ function useCoordinatorHarness({
   const [currentHref, setCurrentHref] = useState(initialHref);
   const [isHydrated, setIsHydrated] = useState(initialHydrated);
   const [tabState, setTabState] = useState(initialTabState);
+  const [navigationCount, setNavigationCount] = useState(0);
   const [openCount, setOpenCount] = useState(0);
   const navigate = useCallback(
-    ({ href }: { href: string; replace?: boolean }) => setCurrentHref(href),
+    ({ href }: { href: string; replace?: boolean }) => {
+      setNavigationCount((count) => count + 1);
+      setCurrentHref(href);
+    },
     [],
   );
   const actions = useMemo<TabManagerActions>(
@@ -156,6 +160,7 @@ function useCoordinatorHarness({
     activeTab,
     currentHref,
     navigateTo: setCurrentHref,
+    navigationCount,
     openCount,
     focusTab: (tabID: string) =>
       setTabState((state) => ({ ...state, activeTabId: tabID })),
@@ -191,6 +196,7 @@ describe('useInsightsDeepLinkCoordinator', () => {
     expect(result.current.currentHref).toBe(
       '/env/production/insights?keep=53&query_id=saved-B',
     );
+    expect(result.current.navigationCount).toBe(1);
     expect(result.current.tabState.tabs).toHaveLength(3);
   });
 
