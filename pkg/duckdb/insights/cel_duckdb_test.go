@@ -84,3 +84,41 @@ func TestCELEventAndOutputFiltersMatchWholeExpression(t *testing.T) {
 		})
 	}
 }
+
+// TestCELNumericFilterSkipsNonNumericValues checks that a numeric CEL
+// comparison treats a row whose JSON value isn't a number (a string, an
+// object, an array) as not matching, like a missing key, rather than
+// failing the whole query with a conversion error.
+func TestCELNumericFilterSkipsNonNumericValues(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE cel_outputs (id INTEGER, output JSON);`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO cel_outputs VALUES
+		(1, '{"data":{"n":5}}'),
+		(2, '{"data":{"n":"abc"}}'),
+		(3, '{"data":{"n":{"x":1}}}'),
+		(4, '{"data":{"n":[1,2]}}'),
+		(5, '{"data":{}}'),
+		(6, '{"data":{"n":1}}');`)
+	require.NoError(t, err)
+
+	filters, err := insights.CELOutputFilters(ctx, []string{`output.n > 2`})
+	require.NoError(t, err)
+	frag, args, err := insights.RenderWhereSQL(filters)
+	require.NoError(t, err)
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT id FROM cel_outputs WHERE %s ORDER BY id;", frag), args...)
+	require.NoError(t, err)
+	defer rows.Close()
+	got := []int{}
+	for rows.Next() {
+		var id int
+		require.NoError(t, rows.Scan(&id))
+		got = append(got, id)
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, []int{1}, got)
+}
