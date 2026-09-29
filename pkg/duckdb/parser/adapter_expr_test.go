@@ -158,7 +158,7 @@ func TestAdaptComparisonOperatorsBindBelowOtherOperators(t *testing.T) {
 func TestAdaptOperatorsSharingComparisonPrefixes(t *testing.T) {
 	// Operators that start with a comparison character keep their own
 	// identity (and '->' stays a lambda).
-	for _, op := range []string{"<@", "<<", ">>", "->>", "<=>", "<->", "<<=", ">>=", "!~~"} {
+	for _, op := range []string{"<@", "<<", ">>", "->>", "<=>", "<->", "<<=", ">>="} {
 		t.Run(op, func(t *testing.T) {
 			e := parseExprForTest(t, "a "+op+" b")
 			bin, ok := e.(*BinaryExpr)
@@ -243,6 +243,42 @@ func TestAdaptLike(t *testing.T) {
 	require.True(t, l.Not)
 	require.Equal(t, "LIKE", l.Op)
 	require.NotNil(t, l.Escape)
+}
+
+func TestAdaptLikeSymbolOperators(t *testing.T) {
+	// The grammar's LikeVariations symbol spellings must reach LikeClause
+	// (not OperatorLiteral at OtherOperator level), so they bind looser
+	// than ->> and multi-char spellings aren't split.
+	cases := []struct{ sql, op, pattern string }{
+		{"a ~~ 'x'", "~~", "Literal(0,x)"},
+		{"a !~~ 'x'", "!~~", "Literal(0,x)"},
+		{"a ~~* 'x'", "~~*", "Literal(0,x)"},
+		{"a !~~* 'x'", "!~~*", "Literal(0,x)"},
+		{"a ~~~ 'x'", "~~~", "Literal(0,x)"},
+		{"a ~ 'x'", "~", "Literal(0,x)"},
+		{"a !~ 'x'", "!~", "Literal(0,x)"},
+		{"a ~* 'x'", "~*", "Literal(0,x)"},
+		{"a !~* 'x'", "!~*", "Literal(0,x)"},
+		{"a~~'x'", "~~", "Literal(0,x)"},
+		{"'x' ~~ a ->> 'b'", "~~", "BinaryExpr(->>)"},
+		{"'x' ~ a || 'b'", "~", "BinaryExpr(||)"},
+	}
+	for _, c := range cases {
+		t.Run(c.sql, func(t *testing.T) {
+			e := parseExprForTest(t, c.sql)
+			l, ok := e.(*LikeExpr)
+			require.Truef(t, ok, "got %s", Dump(e))
+			require.Equal(t, c.op, l.Op)
+			require.False(t, l.Not)
+			require.Equal(t, c.pattern, l.Pattern.String())
+		})
+	}
+
+	e := parseExprForTest(t, "a NOT ~~ 'x'")
+	l, ok := e.(*LikeExpr)
+	require.Truef(t, ok, "got %s", Dump(e))
+	require.True(t, l.Not)
+	require.Equal(t, "~~", l.Op)
 }
 
 func TestAdaptCast(t *testing.T) {
