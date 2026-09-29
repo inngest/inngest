@@ -103,7 +103,7 @@ func celColumnEqHandler(column string) celFieldHandler {
 		if !ok {
 			return nil, fmt.Errorf("expects %q to be a string: %v", ident, literal)
 		}
-		return handleStringOp(column, v, op)
+		return handleStringOp(sq.L(column), v, op)
 	}
 }
 
@@ -117,6 +117,6 @@ func celColumnTimestampHandler(column string) celFieldHandler {
 		if !ok {
 			return nil, fmt.Errorf("expects %q to be an integer: %v", ident, literal)
 		}
-		return handleNumericOp(fmt.Sprintf("epoch_ms(%s)", column), ts, op)
+		return handleNumericOp(sq.L(fmt.Sprintf("epoch_ms(%s)", column)), ts, op)
 	}
 }
