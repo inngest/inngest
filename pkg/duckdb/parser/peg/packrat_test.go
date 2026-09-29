@@ -91,6 +91,30 @@ func TestParseRejectsTrailingGarbage(t *testing.T) {
 	require.ErrorAs(t, err, &perr)
 }
 
+// TestParseCallMemoDistinguishesArguments checks that a parameterized rule
+// invoked at the same position with different argument expressions never
+// shares a memo entry — neither for composite arguments (`X?` vs `Y?`) nor
+// for a bare parameter forwarded from an enclosing call (`D` bound to X vs
+// to Y), either of which would hand the second alternative the first's
+// cached failure.
+func TestParseCallMemoDistinguishesArguments(t *testing.T) {
+	g, err := ParseGrammar(`
+Composite <- Parens(X?) 'a' / Parens(Y?) 'b'
+Forwarded <- Wrap(X) 'a' / Wrap(Y) 'b'
+Wrap(D) <- Parens(D)
+Parens(D) <- '(' D ')'
+X <- 'x'
+Y <- 'y'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, SkipTrivia: skipASCIIWhitespace}
+
+	_, err = p.Parse("(y) b", "Composite")
+	require.NoError(t, err)
+	_, err = p.Parse("(y) b", "Forwarded")
+	require.NoError(t, err)
+}
+
 func TestParseMemoizesRepeatedRuleAtSamePosition(t *testing.T) {
 	// Several alternatives all try Shared at the same starting position
 	// before falling through to Word — not exponential (this engine
