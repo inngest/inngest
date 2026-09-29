@@ -82,7 +82,7 @@ SelectStatement
     Ident(a)
     Ident(b)
 
--- SELECT (1 + 2) * 3 - 4 / 2 AS calc FROM t;
+-- SELECT (1 + 2) * 3 - 4 / 2 AS calc FROM t
 SelectStatement
   SelectItem(calc)
     BinaryExpr(-)
@@ -96,4 +96,15 @@ SelectStatement
         Literal(1,2)
   FromClause
     BaseTableRef(t,alias=)
+
+-- SELECT a FROM t WHERE a = NOT b;
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(=)
+    Ident(a)
+    UnaryExpr(NOT)
+      Ident(b)
 
