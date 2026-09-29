@@ -23,6 +23,7 @@ import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
+import { runsInsightsHref } from './runsInsights';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -220,6 +221,16 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     },
   }));
 
+  const functionInsightsSlug = functionData?.workspace.workflow?.slug;
+  const insightsHref =
+    scope === 'fn' && !functionInsightsSlug
+      ? undefined
+      : runsInsightsHref({
+          envSlug: environment.slug,
+          celQuery: search ?? '',
+          functionSlug: scope === 'fn' ? functionInsightsSlug ?? null : null,
+        });
+
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -253,6 +264,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
                 progressiveSearch.cursor,
                 timeField,
               ),
+              insightsHref,
             }
           : undefined
       }
