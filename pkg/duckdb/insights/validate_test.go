@@ -462,3 +462,35 @@ func TestValidateRejectsListComprehensionVariableLeakingOutsideItsScope(t *testi
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown column")
 }
+
+// A set operation's own ORDER BY/LIMIT/OFFSET hang off the set-op node,
+// not either operand, and used to skip validation entirely.
+func TestValidateChecksSetOpModifiers(t *testing.T) {
+	rejected := []struct{ sql, want string }{
+		{"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs LIMIT 5 OFFSET length(read_text('x'))", "not allowed"},
+		{"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs LIMIT length(read_text('x'))", "not allowed"},
+		{"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY read_text('x')", "not allowed"},
+		{"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY nonexistent_column", "unknown column"},
+		{"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY (SELECT 1 FROM nonexistent_table)", "unknown table"},
+		{"SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM runs UNION SELECT run_id FROM runs OFFSET length(read_text('x')))", "not allowed"},
+	}
+	for _, c := range rejected {
+		t.Run(c.sql, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, c.sql))
+			require.ErrorContains(t, err, c.want)
+		})
+	}
+
+	accepted := []string{
+		"SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY run_id LIMIT 5 OFFSET 2",
+		"SELECT r.run_id FROM runs r UNION ALL SELECT run_id FROM runs ORDER BY r.run_id",
+		"SELECT count(*) AS n FROM runs UNION ALL SELECT count(*) FROM runs ORDER BY n",
+		"SELECT now() AS t FROM runs UNION ALL SELECT now() FROM runs ORDER BY now()",
+	}
+	for _, sql := range accepted {
+		t.Run(sql, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, sql))
+			require.NoError(t, err)
+		})
+	}
+}

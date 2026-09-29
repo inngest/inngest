@@ -158,3 +158,24 @@ func TestRewriteArrayOfStructAccessLeavesTableQualifiedColumnAlone(t *testing.T)
 	require.Equal(t, "SELECT events.id FROM events", parser.String(stmt))
 	require.Empty(t, diags)
 }
+
+func TestRewriteArrayOfStructAccessInSetOpOrderBy(t *testing.T) {
+	stmt, diags := mustRewriteArrayOfStructAccess(t,
+		"SELECT sessions.key FROM runs UNION ALL SELECT sessions.key FROM runs ORDER BY sessions.key")
+	require.Equal(t,
+		"SELECT sessions ->> '$[*].key' AS key FROM runs UNION ALL SELECT sessions ->> '$[*].key' AS key FROM runs ORDER BY sessions ->> '$[*].key'",
+		parser.String(stmt),
+	)
+	require.Len(t, diags, 3)
+}
+
+// DuckDB binds a set operation's ORDER BY by matching it against the
+// SELECT list, so it must be rewritten the same way or it stops matching.
+func TestRewriteTZFunctionsInSetOpModifiers(t *testing.T) {
+	stmt := mustParse(t, "SELECT now() AS t FROM runs UNION ALL SELECT now() FROM runs ORDER BY now() LIMIT 5 OFFSET (SELECT count(*) FROM runs WHERE queued_at < now())")
+	rewriteTZFunctions(stmt)
+	require.Equal(t,
+		"SELECT now()::TIMESTAMP AS t FROM runs UNION ALL SELECT now()::TIMESTAMP FROM runs ORDER BY now()::TIMESTAMP LIMIT 5 OFFSET (SELECT count(*) FROM runs WHERE queued_at < now()::TIMESTAMP)",
+		parser.String(stmt),
+	)
+}
