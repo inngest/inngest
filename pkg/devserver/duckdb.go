@@ -130,6 +130,11 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		DuckLake:   duckLake,
 		QuackAddr:  &quackAddr,
 		QuackConns: dualWriteQuackConns,
+		// Insights runs user-written SQL on this same handle, so sandbox the
+		// subprocess (no file/env access beyond the lake's own data) as
+		// defense in depth behind insights' validator. Left off for a
+		// Postgres catalog, which hasn't been verified under the sandbox.
+		RestrictExternalAccess: duckLake == nil || duckLake.PostgresCatalogURI == "",
 	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)
