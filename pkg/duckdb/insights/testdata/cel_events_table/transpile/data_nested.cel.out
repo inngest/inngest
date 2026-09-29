@@ -2,7 +2,7 @@ INPUT
 event.data.nested.value == "x"
 
 EVENTS SQL
-((event_data::JSON->>'$.nested.value') = ?)
+((event_data::JSON->>?) = ?)
 
 EVENTS ARGS
-[x]
+[$.nested.value x]
