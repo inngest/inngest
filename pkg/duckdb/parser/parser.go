@@ -72,6 +72,9 @@ const MaxSQLBytes = 64 << 10
 // of MB instead of overflowing it, which Go can't recover from.
 const maxRuleDepth = 4096
 
+// errPrefix starts every non-ParseError error ParseString returns.
+const errPrefix = "duckdb/parser: "
+
 // ParseString parses a single DuckDB SELECT statement into a typed AST. A
 // trailing ';' and surrounding whitespace are tolerated; anything else
 // after the statement is a parse error, as is input longer than
@@ -98,9 +101,15 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 
 	// Registered before sess.Parse, not just before adapting, so a panic
 	// from the peg engine or a primitive is also returned as an error.
+	// The adapter's own panics already carry the package prefix; only
+	// foreign ones (runtime errors, the peg engine) need it added.
 	defer func() {
 		if r := recover(); r != nil {
-			stmt, err = nil, fmt.Errorf("duckdb/parser: %v", r)
+			msg := fmt.Sprint(r)
+			if !strings.HasPrefix(msg, errPrefix) {
+				msg = errPrefix + msg
+			}
+			stmt, err = nil, errors.New(msg)
 		}
 	}()
 
