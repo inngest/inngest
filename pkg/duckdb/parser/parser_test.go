@@ -60,6 +60,22 @@ func TestParseStringRecoversPanicAsError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseStringPrefixesRecoveredPanicsOnce(t *testing.T) {
+	// Adapter panics already carry the package prefix; the recover in
+	// ParseString must not add a second one.
+	for _, sql := range []string{
+		"DESCRIBE t",
+		"SELECT * REPLACE (a + 1 AS a) FROM t",
+		"SELECT * RENAME (a AS b) FROM t",
+		"SELECT * FROM t TABLESAMPLE 10%",
+	} {
+		_, err := ParseString(sql)
+		require.Error(t, err, sql)
+		require.True(t, strings.HasPrefix(err.Error(), "duckdb/parser: "), err.Error())
+		require.Equal(t, 1, strings.Count(err.Error(), "duckdb/parser:"), err.Error())
+	}
+}
+
 func TestParseStringRejectsOversizedInput(t *testing.T) {
 	// Padding stays within the limit and parses normally.
 	atLimit := "SELECT 1" + strings.Repeat(" ", MaxSQLBytes-len("SELECT 1"))
