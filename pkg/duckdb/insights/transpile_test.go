@@ -1,8 +1,10 @@
 package insights
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,6 +58,44 @@ func TestTranspileRespectsExistingLimit(t *testing.T) {
 	tr, err := Transpile("SELECT run_id FROM runs LIMIT 5", testAccountID, testEnvID)
 	require.NoError(t, err)
 	require.False(t, tr.Limited)
+}
+
+// A quoted list-comprehension loop variable used to be written back
+// unquoted, so arbitrary text inside it -- here a bare inngest.runs that
+// skips the tenant-scoping macro -- reached DuckDB as live SQL.
+func TestTranspileQuotesListComprehensionVars(t *testing.T) {
+	tr, err := Transpile(`SELECT [1 FOR "x IN [1]] a, (SELECT count(*) FROM inngest.runs) n, [1 FOR y" IN [1]] c FROM runs`, testAccountID, testEnvID)
+	require.NoError(t, err)
+	require.Contains(t, tr.SQL, `[1 FOR "x IN [1]] a, (SELECT count(*) FROM inngest.runs) n, [1 FOR y" IN [1]]`)
+	requireSingleMacroScopedTable(t, tr.SQL)
+}
+
+// Same bypass through a named argument's name (struct_pack is allowlisted).
+func TestTranspileQuotesNamedArgNames(t *testing.T) {
+	tr, err := Transpile(`SELECT struct_pack("a := 1, b := (SELECT count(*) FROM inngest.runs), c" := 1) AS s FROM runs`, testAccountID, testEnvID)
+	require.NoError(t, err)
+	require.Contains(t, tr.SQL, `struct_pack("a := 1, b := (SELECT count(*) FROM inngest.runs), c" := 1)`)
+	requireSingleMacroScopedTable(t, tr.SQL)
+}
+
+// requireSingleMacroScopedTable reparses sql and checks its only table
+// reference is a tenant-scoped insights macro call.
+func requireSingleMacroScopedTable(t *testing.T, sql string) {
+	t.Helper()
+	stmt, err := parser.ParseString(sql)
+	require.NoError(t, err, "reparsing %q", sql)
+	v := &bareTableCollector{}
+	parser.Walk(v, stmt)
+	require.Empty(t, v.names, "bare table references in %q", sql)
+}
+
+type bareTableCollector struct{ names []string }
+
+func (c *bareTableCollector) Visit(n parser.Node) parser.Visitor {
+	if r, ok := n.(*parser.BaseTableRef); ok {
+		c.names = append(c.names, strings.Join(r.Name, "."))
+	}
+	return c
 }
 
 // OPERATOR(op) used to adapt to an empty-Op BinaryExpr, which Write
