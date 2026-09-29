@@ -8,7 +8,7 @@ EVENT ARGS
 []
 
 OUTPUT SQL
-((output::JSON->>'$.data.success') = ?)
+((output::JSON->>?) = ?)
 
 OUTPUT ARGS
-[true]
+[$.data.success true]
