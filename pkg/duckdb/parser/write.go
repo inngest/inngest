@@ -186,12 +186,10 @@ func isSimpleIdent(s string) bool {
 // package's adapter decodes a quoted identifier's escapes away (see
 // primitives.go's scanQuotedIdentifier), so whether the source quoted a
 // given name isn't preserved — this always re-quotes when the plain form
-// wouldn't parse back to the same identifier, but doesn't reserved-word
-// check (that needs the loaded keyword sets, not just the identifier
-// text), so a name that collides with a reserved keyword round-trips only
-// if it also fails isSimpleIdent for some other reason.
+// wouldn't parse back to the same identifier, including a name that
+// collides with a non-unreserved keyword (`"group"`, `"order"`).
 func writeIdentPart(sw *sqlWriter, s string) {
-	if isSimpleIdent(s) {
+	if isSimpleIdent(s) && !isNonIdentKeyword(s) {
 		sw.str(s)
 		return
 	}
@@ -624,7 +622,17 @@ func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 		sw.exprAtLeast(f.Receiver, precAtom)
 		sw.str(".")
 	}
-	writeDottedName(sw, f.Name)
+	// Function names skip writeIdentPart's keyword check: keyword-named
+	// functions (left, right, ...) are spelled bare in DuckDB, and quoting
+	// them would needlessly depend on quoted function-name resolution.
+	for i, p := range f.Name {
+		sw.sep(i, ".")
+		if isSimpleIdent(p) {
+			sw.str(p)
+		} else {
+			writeIdentPart(sw, p)
+		}
+	}
 	sw.str("(")
 	if f.Distinct {
 		sw.str("DISTINCT ")
