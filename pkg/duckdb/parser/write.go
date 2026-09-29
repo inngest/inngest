@@ -342,7 +342,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str("DISTINCT FROM ")
 		sw.exprAtLeast(v.Right, precDistinctFrom+1)
 	case *BetweenExpr:
-		sw.exprAtLeast(v.X, precBetweenInLike)
+		sw.exprAtLeast(v.X, precOther)
 		if v.Not {
 			sw.str(" NOT BETWEEN ")
 		} else {
@@ -352,7 +352,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(" AND ")
 		sw.exprAtLeast(v.High, precOther)
 	case *InExpr:
-		sw.exprAtLeast(v.X, precBetweenInLike)
+		sw.exprAtLeast(v.X, precOther)
 		if v.Contains && len(v.List) == 1 {
 			// No parens: `x IN (y)` would reparse as equality, not containment.
 			if v.Not {
@@ -375,7 +375,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		}
 		sw.str(")")
 	case *LikeExpr:
-		sw.exprAtLeast(v.X, precBetweenInLike)
+		sw.exprAtLeast(v.X, precOther)
 		sw.str(" ")
 		if v.Not {
 			sw.str("NOT ")
@@ -385,7 +385,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.exprAtLeast(v.Pattern, precOther)
 		if v.Escape != nil {
 			sw.str(" ESCAPE ")
-			sw.exprTop(v.Escape)
+			sw.exprAtLeast(v.Escape, precComparison)
 		}
 	case *CastExpr:
 		if v.TryCast {

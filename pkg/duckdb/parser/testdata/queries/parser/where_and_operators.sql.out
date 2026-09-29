@@ -147,7 +147,7 @@ SelectStatement
       UnaryExpr(-)
         Literal(1,1)
 
--- SELECT a FROM t WHERE 'x' ~~ data ->> 'name' AND b !~* 'y' AND c NOT ~~~ 'z*' AND d ~ 'r' || s;
+-- SELECT a FROM t WHERE 'x' ~~ data ->> 'name' AND b !~* 'y' AND c NOT ~~~ 'z*' AND d ~ 'r' || s
 SelectStatement
   SelectItem()
     Ident(a)
@@ -172,4 +172,31 @@ SelectStatement
       BinaryExpr(||)
         Literal(0,r)
         Ident(s)
+
+-- SELECT a FROM t WHERE (a LIKE 'x') IN (TRUE) AND (b BETWEEN 1 AND 2) NOT BETWEEN FALSE AND TRUE AND c LIKE 'y' ESCAPE (d OR e);
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(AND)
+    BinaryExpr(AND)
+      InExpr(not=false)
+        LikeExpr(LIKE,not=false)
+          Ident(a)
+          Literal(0,x)
+        Literal(3,)
+      BetweenExpr(not=true)
+        BetweenExpr(not=false)
+          Ident(b)
+          Literal(1,1)
+          Literal(1,2)
+        Literal(4,)
+        Literal(3,)
+    LikeExpr(LIKE,not=false)
+      Ident(c)
+      Literal(0,y)
+      BinaryExpr(OR)
+        Ident(d)
+        Ident(e)
 
