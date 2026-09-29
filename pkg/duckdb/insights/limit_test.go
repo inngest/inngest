@@ -67,6 +67,27 @@ func TestAddDefaultLimitDefaultsOffsetOnly(t *testing.T) {
 	require.Equal(t, "SELECT run_id FROM runs LIMIT 1000 OFFSET 5", parser.String(stmt))
 }
 
+func TestAddDefaultLimitCapsOverflowingLimit(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs LIMIT 99999999999999999999")
+	outcome, err := addDefaultLimit(stmt)
+	require.NoError(t, err)
+	require.Equal(t, limitCapped, outcome)
+	require.Equal(t, "SELECT run_id FROM runs LIMIT 1000", parser.String(stmt))
+}
+
+func TestAddDefaultLimitRejectsNonIntegerLiteral(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT run_id FROM runs LIMIT 1e9",
+		"SELECT run_id FROM runs LIMIT 10.5",
+	} {
+		t.Run(sql, func(t *testing.T) {
+			stmt := mustParse(t, sql)
+			_, err := addDefaultLimit(stmt)
+			require.ErrorContains(t, err, "LIMIT must be a literal, non-negative integer")
+		})
+	}
+}
+
 func TestAddDefaultLimitCapsFetch(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM runs FETCH FIRST 5000000 ROWS ONLY")
 	outcome, err := addDefaultLimit(stmt)
