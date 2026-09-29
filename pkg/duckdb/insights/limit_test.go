@@ -59,6 +59,14 @@ func TestAddDefaultLimitRejectsComputedExpression(t *testing.T) {
 	require.ErrorContains(t, err, "LIMIT must be a literal, non-negative integer")
 }
 
+func TestAddDefaultLimitDefaultsOffsetOnly(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs OFFSET 5")
+	outcome, err := addDefaultLimit(stmt)
+	require.NoError(t, err)
+	require.Equal(t, limitDefaulted, outcome)
+	require.Equal(t, "SELECT run_id FROM runs LIMIT 1000 OFFSET 5", parser.String(stmt))
+}
+
 func TestAddDefaultLimitCapsFetch(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM runs FETCH FIRST 5000000 ROWS ONLY")
 	outcome, err := addDefaultLimit(stmt)
