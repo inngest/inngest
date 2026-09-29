@@ -274,3 +274,23 @@ func TestWriteBetweenInLikeOperandParens(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteIntervalValueParens checks a non-literal INTERVAL value keeps
+// its parens: IntervalParameter only accepts a string, an unsigned number,
+// or a ParensExpression.
+func TestWriteIntervalValueParens(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"string", "SELECT INTERVAL '1' DAY", "SELECT INTERVAL '1' DAY"},
+		{"number", "SELECT INTERVAL 1.5 DAY", "SELECT INTERVAL 1.5 DAY"},
+		{"column", "SELECT INTERVAL (n) DAY", "SELECT INTERVAL (n) DAY"},
+		{"sum", "SELECT INTERVAL (1 + 2) DAY", "SELECT INTERVAL (1 + 2) DAY"},
+		{"negative number", "SELECT INTERVAL (-1) DAY", "SELECT INTERVAL (-1) DAY"},
+		{"no unit", "SELECT INTERVAL (n)", "SELECT INTERVAL (n)"},
+		{"redundant parens around a literal dropped", "SELECT INTERVAL (2) HOUR", "SELECT INTERVAL 2 HOUR"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
