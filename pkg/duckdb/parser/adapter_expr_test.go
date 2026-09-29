@@ -9,7 +9,7 @@ import (
 
 func parseExprForTest(t *testing.T, sql string) Expr {
 	t.Helper()
-	p, err := newPegParser()
+	p, _, err := newPegParser()
 	require.NoError(t, err)
 	n, err := p.Parse(sql, "Expression")
 	require.NoErrorf(t, err, "parsing %q", sql)
