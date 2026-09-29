@@ -442,13 +442,17 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 	})
+	processCtx := context.WithoutCancel(ctx)
+	if constraintRes.ArchivedWorkspaceAppSemaphoreBypassed {
+		processCtx = WithArchivedWorkspaceAppSemaphoreBypass(processCtx)
+	}
 	_, err = dispatch(ctx, ProcessItem{
 		I:             *item,
 		Priority:      req.Priority,
 		ContinueCount: req.ContinueCount,
 
 		CapacityLease:       constraintRes.CapacityLease,
-		ConditionalTraceCtx: context.WithoutCancel(ctx),
+		ConditionalTraceCtx: processCtx,
 	})
 	result := LeaseItemResult{Status: LeaseItemStatusDispatched}
 	if err != nil {
