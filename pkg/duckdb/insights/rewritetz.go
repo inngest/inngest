@@ -65,7 +65,9 @@ func rewriteTZFunctions(stmt *parser.SelectStatement) []Diagnostic {
 	if stmt.SetOp != parser.SetOpNone {
 		diagnostics = append(diagnostics, rewriteTZFunctions(stmt.SetLeft)...)
 		diagnostics = append(diagnostics, rewriteTZFunctions(stmt.SetRight)...)
-		return diagnostics
+		r := &tzFunctionRewriter{}
+		r.rewriteModifiers(stmt)
+		return append(diagnostics, r.diagnostics...)
 	}
 
 	if stmt.From != nil {
@@ -97,11 +99,7 @@ func rewriteTZFunctions(stmt *parser.SelectStatement) []Diagnostic {
 			r.rewriteGroupByItem(item)
 		}
 	}
-	if stmt.OrderBy != nil {
-		for _, item := range stmt.OrderBy.Items {
-			item.X = r.rewrite(item.X)
-		}
-	}
+	r.rewriteModifiers(stmt)
 	for _, w := range stmt.Windows {
 		r.rewriteWindowSpec(w.Spec)
 	}
@@ -214,6 +212,20 @@ func (r *tzFunctionRewriter) rewrite(expr parser.Expr) parser.Expr {
 		e.Body = r.rewrite(e.Body)
 	}
 	return expr
+}
+
+// rewriteModifiers rewrites stmt's ORDER BY/LIMIT/OFFSET -- the clauses a
+// set-op node carries too, alongside its operands.
+func (r *tzFunctionRewriter) rewriteModifiers(stmt *parser.SelectStatement) {
+	if stmt.OrderBy != nil {
+		for _, item := range stmt.OrderBy.Items {
+			item.X = r.rewrite(item.X)
+		}
+	}
+	if stmt.Limit != nil {
+		stmt.Limit.Limit = r.rewrite(stmt.Limit.Limit)
+		stmt.Limit.Offset = r.rewrite(stmt.Limit.Offset)
+	}
 }
 
 func (r *tzFunctionRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
