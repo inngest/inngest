@@ -255,18 +255,8 @@ describe('Runs metadata', () => {
     expect(mocks.runsPage.mock.lastCall?.[0].progressiveSearch).toBeUndefined();
   });
 
-  it("uses the function query's fully qualified slug for Insights", () => {
+  it("waits for the function query's fully qualified slug for Insights", () => {
     mocks.searchParams = { search: 'event.data.ready == true' };
-    mocks.functionResult.fetching = false;
-    mocks.functionResult.data = {
-      workspace: {
-        workflow: {
-          app: { externalID: 'billing-app' },
-          isPaused: false,
-          slug: 'billing-app-charge-invoice',
-        },
-      },
-    };
     mocks.useRunsPagination.mockReturnValue({
       runs: [],
       isLoadingInitial: false,
@@ -284,7 +274,24 @@ describe('Runs metadata', () => {
       },
     });
 
-    render(<Runs scope="fn" functionSlug="billing-app-charge-invoice" />);
+    const { rerender } = render(
+      <Runs scope="fn" functionSlug="billing-app-charge-invoice" />,
+    );
+    expect(
+      mocks.runsPage.mock.lastCall?.[0].progressiveSearch.insightsHref,
+    ).toBeUndefined();
+
+    mocks.functionResult.fetching = false;
+    mocks.functionResult.data = {
+      workspace: {
+        workflow: {
+          app: { externalID: 'billing-app' },
+          isPaused: false,
+          slug: 'billing-app-charge-invoice',
+        },
+      },
+    };
+    rerender(<Runs scope="fn" functionSlug="billing-app-charge-invoice" />);
 
     const href =
       mocks.runsPage.mock.lastCall?.[0].progressiveSearch.insightsHref;

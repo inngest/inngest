@@ -61,14 +61,7 @@ describe('RunsPage progressive search actions', () => {
       </TooltipProvider>
     );
 
-    const action = screen.getByRole('link', { name: 'Search with Insights' });
-    expect(action.getAttribute('href')).toBe(
-      '/env/production/insights?sql=SELECT+%2A+FROM+runs&name=Runs+search'
-    );
-    const onClick = vi.fn((event: Event) => event.preventDefault());
-    action.addEventListener('click', onClick);
-    fireEvent.click(action);
-    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('link', { name: 'Search with Insights instead' })).toBeNull();
 
     rerender(
       <TooltipProvider>
@@ -83,13 +76,55 @@ describe('RunsPage progressive search actions', () => {
         />
       </TooltipProvider>
     );
-    expect(screen.queryByRole('link', { name: 'Search with Insights' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Search with Insights instead' })).toBeNull();
+
+    for (const phase of ['paused', 'cancelled', 'error'] as const) {
+      rerender(
+        <TooltipProvider>
+          <RunsPage
+            {...baseProps}
+            progressiveSearch={{
+              phase,
+              hasCompletedScanResponse: true,
+              cancel: vi.fn(),
+              resume: vi.fn(),
+              insightsHref: '/env/production/insights?sql=SELECT+%2A+FROM+runs&name=Runs+search',
+            }}
+          />
+        </TooltipProvider>
+      );
+      expect(screen.getByRole('link', { name: 'Search with Insights instead' })).not.toBeNull();
+    }
+
+    rerender(
+      <TooltipProvider>
+        <RunsPage
+          {...baseProps}
+          progressiveSearch={{
+            phase: 'complete',
+            hasCompletedScanResponse: true,
+            cancel: vi.fn(),
+            resume: vi.fn(),
+            insightsHref: '/env/production/insights?sql=SELECT+%2A+FROM+runs&name=Runs+search',
+          }}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getAllByText(/Search complete/)).not.toHaveLength(0);
+    const action = screen.getByRole('link', { name: 'Search with Insights instead' });
+    expect(action.getAttribute('href')).toBe(
+      '/env/production/insights?sql=SELECT+%2A+FROM+runs&name=Runs+search'
+    );
+    const onClick = vi.fn((event: Event) => event.preventDefault());
+    action.addEventListener('click', onClick);
+    fireEvent.click(action);
+    expect(onClick).toHaveBeenCalledOnce();
 
     rerender(
       <TooltipProvider>
         <RunsPage {...baseProps} />
       </TooltipProvider>
     );
-    expect(screen.queryByRole('link', { name: 'Search with Insights' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Search with Insights instead' })).toBeNull();
   });
 });

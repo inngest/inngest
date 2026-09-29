@@ -411,7 +411,7 @@ export function RunsPage({
                   <TooltipContent className="max-w-xs whitespace-normal text-left">
                     For performance, CEL search scans runs incrementally. The total remains partial
                     until the entire time range is scanned, which may be impractical for large data
-                    sets. Search with Insights when you need exact counts.
+                    sets. Search with Insights when you want to explore runs using SQL.
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -496,11 +496,11 @@ export function RunsPage({
                   onClick={progressiveSearch.resume}
                 />
               ) : null}
-              {progressiveSearch.insightsHref ? (
+              {progressiveSearch.phase !== 'searching' && progressiveSearch.insightsHref ? (
                 <Button
                   appearance="outlined"
                   kind="secondary"
-                  label="Search with Insights"
+                  label="Search with Insights instead"
                   icon={<RiArrowRightUpLine />}
                   iconSide="left"
                   href={progressiveSearch.insightsHref}

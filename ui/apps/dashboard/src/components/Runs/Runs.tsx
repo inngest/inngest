@@ -221,6 +221,16 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     },
   }));
 
+  const functionInsightsSlug = functionData?.workspace.workflow?.slug;
+  const insightsHref =
+    scope === 'fn' && !functionInsightsSlug
+      ? undefined
+      : runsInsightsHref({
+          envSlug: environment.slug,
+          celQuery: search ?? '',
+          functionSlug: scope === 'fn' ? functionInsightsSlug ?? null : null,
+        });
+
   return (
     <RunsPage
       apps={appsRes.data?.env?.apps.map((app) => ({
@@ -254,14 +264,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
                 progressiveSearch.cursor,
                 timeField,
               ),
-              insightsHref: runsInsightsHref({
-                envSlug: environment.slug,
-                celQuery: search ?? '',
-                functionSlug:
-                  scope === 'fn'
-                    ? functionData?.workspace.workflow?.slug ?? null
-                    : null,
-              }),
+              insightsHref,
             }
           : undefined
       }
