@@ -71,6 +71,7 @@ type Props = {
     searchedThrough?: Date;
     cancel: () => void;
     resume: () => void;
+    insightsHref?: string;
   };
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
   // Rendered above the filter row, inside the sticky header so it stays put
@@ -410,7 +411,7 @@ export function RunsPage({
                   <TooltipContent className="max-w-xs whitespace-normal text-left">
                     For performance, CEL search scans runs incrementally. The total remains partial
                     until the entire time range is scanned, which may be impractical for large data
-                    sets. Use Insights when you need exact counts.
+                    sets. Search with Insights when you need exact counts.
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -493,6 +494,16 @@ export function RunsPage({
                   icon={<RiPlayCircleLine />}
                   iconSide="left"
                   onClick={progressiveSearch.resume}
+                />
+              ) : null}
+              {progressiveSearch.insightsHref ? (
+                <Button
+                  appearance="outlined"
+                  kind="secondary"
+                  label="Search with Insights"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="left"
+                  href={progressiveSearch.insightsHref}
                 />
               ) : null}
             </div>
