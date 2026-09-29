@@ -109,3 +109,36 @@ Shared <- Word
 	require.NoError(t, err)
 	require.NotNil(t, n)
 }
+
+func TestSymbolTokensMaximalMunch(t *testing.T) {
+	// Op lists the short spelling first, like DuckDB's ComparisonOperator:
+	// without SymbolTokens '<' commits and leaves "= b" unparseable.
+	g, err := ParseGrammar(`
+Cmp <- Word Op Word
+Op <- '<' / '<=' / '!'
+`)
+	require.NoError(t, err)
+	prims := map[string]Primitive{"Word": wordPrimitive}
+
+	plain := &Parser{Grammar: g, Primitives: prims, SkipTrivia: skipASCIIWhitespace}
+	_, err = plain.Parse("a <= b", "Cmp")
+	require.Error(t, err)
+
+	p := &Parser{Grammar: g, Primitives: prims, SkipTrivia: skipASCIIWhitespace, SymbolTokens: []string{"<=", "!="}}
+	n, err := p.Parse("a <= b", "Cmp")
+	require.NoError(t, err)
+	op := n.Children[0].Children[1]
+	require.Equal(t, "Op", op.Name)
+	require.Equal(t, 1, op.Children[0].Alt)
+
+	// A shorter literal still matches when the longer token isn't there.
+	_, err = p.Parse("a < b", "Cmp")
+	require.NoError(t, err)
+	_, err = p.Parse("a <b", "Cmp")
+	require.NoError(t, err)
+	_, err = p.Parse("a ! b", "Cmp")
+	require.NoError(t, err)
+	// ...but never splits one that is: "!=" isn't '!' followed by "=b".
+	_, err = p.Parse("a !=b", "Cmp")
+	require.Error(t, err)
+}

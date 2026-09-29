@@ -5,16 +5,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/inngest/inngest/pkg/duckdb/parser/grammar"
 	"github.com/inngest/inngest/pkg/duckdb/parser/peg"
 )
 
 func newSmokeParser(t *testing.T) *peg.Parser {
 	t.Helper()
-	g, kl, err := grammar.Load()
+	p, err := newPegParser()
 	require.NoError(t, err)
-	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia}
+	return p
 }
 
 func TestSmokeParseMinimalSelect(t *testing.T) {
