@@ -28,9 +28,9 @@ const kindStyles = {
     link: 'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
   },
   caution: {
-    collapsed: 'border-accent-xSubtle bg-warning',
-    icon: 'text-warning',
-    link: 'text-warning decoration-warning hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+    collapsed: 'border-accent-xSubtle bg-accent-3xSubtle',
+    icon: 'text-accent-subtle',
+    link: 'text-accent-intense decoration-accent-intense hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
   },
 } as const;
 
