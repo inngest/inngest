@@ -348,3 +348,30 @@ func TestWriteSetOpRightOperandParens(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteQuotesBoundNames checks names that bind rather than reference
+// (named-argument names, lambda params, list-comprehension loop vars, a
+// PIVOT enum target) are quoted like any other identifier. Printed bare,
+// a quoted name's contents became live SQL.
+func TestWriteQuotesBoundNames(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"named arg", `SELECT struct_pack("a b" := 1)`, `SELECT struct_pack("a b" := 1)`},
+		{"named arg keyword", `SELECT struct_pack("select" := 1)`, `SELECT struct_pack("select" := 1)`},
+		{"named arg simple", `SELECT struct_pack(a := 1)`, `SELECT struct_pack(a := 1)`},
+		{"lambda param", `SELECT list_transform(l, "a b" -> 1) FROM t`, `SELECT list_transform(l, "a b" -> 1) FROM t`},
+		{"lambda params", `SELECT list_reduce(l, ("a b", c) -> 1) FROM t`, `SELECT list_reduce(l, ("a b", c) -> 1) FROM t`},
+		{"list comprehension var", `SELECT [1 FOR "x IN [1]] a, (SELECT 1 FROM u) n, [1 FOR y" IN [1]] c FROM t`, `SELECT [1 FOR "x IN [1]] a, (SELECT 1 FROM u) n, [1 FOR y" IN [1]] AS c FROM t`},
+		{"list comprehension vars", `SELECT [x FOR x, "select" IN l] FROM t`, `SELECT [x FOR x, "select" IN l] FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+func TestWritePivotEnumTargetKeepsQuoting(t *testing.T) {
+	stmt, err := ParseString(`SELECT * FROM t PIVOT (sum(x) FOR y IN "a b")`)
+	require.NoError(t, err)
+	require.Contains(t, String(stmt), `IN ("a b")`)
+}
