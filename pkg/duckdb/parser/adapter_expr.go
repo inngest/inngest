@@ -270,10 +270,16 @@ func (a *adapter) adaptComparisonExpression(n *peg.Node) Expr {
 	head := a.adaptBetweenInLikeExpression(seq.Children[0])
 	return foldLeftAssoc(head, seq.Children[1], func(left Expr, tail *peg.Node) Expr {
 		// ComparisonExpressionTail <- ComparisonOperator NotExpression? BetweenInLikeExpression
-		// The optional NotExpression here is unused/vestigial upstream syntax — not modeled (see this task's scope note).
+		// NotExpression <- NotKeyword+ negates the right operand only:
+		// `a = NOT b` is `a = (NOT b)`.
 		tseq := body(tail)
 		op := literalText(tseq.Children[0])
-		right := a.adaptBetweenInLikeExpression(tseq.Children[len(tseq.Children)-1])
+		right := a.adaptBetweenInLikeExpression(tseq.Children[2])
+		if notOpt, ok := present(tseq.Children[1]); ok {
+			for range body(notOpt).Children {
+				right = &UnaryExpr{baseExpr: a.at(tseq.Children[1]), Op: "NOT", X: right}
+			}
+		}
 		return &BinaryExpr{baseExpr: a.at(tail), Op: op, Left: left, Right: right}
 	})
 }
