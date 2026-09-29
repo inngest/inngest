@@ -81,6 +81,16 @@ func TestRewriteArrayOfStructAccessInCorrelatedSubquery(t *testing.T) {
 	require.Len(t, diags, 1)
 }
 
+func TestRewriteArrayOfStructAccessInQuantifiedSubquery(t *testing.T) {
+	stmt, diags := mustRewriteArrayOfStructAccess(t,
+		"SELECT run_id FROM runs WHERE sessions.key = ANY (SELECT id FROM events WHERE status = runs.sessions.key)")
+	require.Equal(t,
+		"SELECT run_id FROM runs WHERE sessions ->> '$[*].key' = ANY (SELECT id FROM events WHERE status = runs.sessions ->> '$[*].key')",
+		parser.String(stmt),
+	)
+	require.Len(t, diags, 2)
+}
+
 func TestRewriteArrayOfStructAccessInCTE(t *testing.T) {
 	stmt, diags := mustRewriteArrayOfStructAccess(t,
 		"WITH x AS (SELECT sessions.key AS k FROM runs) SELECT k FROM x")
