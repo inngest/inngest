@@ -77,6 +77,9 @@ func TestWritePrecedencePreservesGrouping(t *testing.T) {
 		{"unary minus operand", "-(a + b)", "-(a + b)"},
 		{"unary minus tight operand no parens", "-a + b", "-a + b"},
 		{"not in comparison right operand keeps parens", "a = NOT b", "a = (NOT b)"},
+		{"in list containment stays unparenthesized", "x IN list_col", "x IN list_col"},
+		{"not in list containment", "x NOT IN [1, 2]", "x NOT IN [1, 2]"},
+		{"in parenthesized single element stays a list", "x IN (list_col)", "x IN (list_col)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

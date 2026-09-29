@@ -144,6 +144,24 @@ func TestAdaptInList(t *testing.T) {
 	require.Nil(t, in.Subquery)
 }
 
+func TestAdaptInContainsVsParenthesizedList(t *testing.T) {
+	// `x IN list_col` (no parens) is DuckDB list containment; `x IN (y)`
+	// is a one-element IN list, i.e. equality. Both must stay distinct.
+	e := parseExprForTest(t, "x NOT IN list_col")
+	in, ok := e.(*InExpr)
+	require.True(t, ok)
+	require.True(t, in.Contains)
+	require.True(t, in.Not)
+	require.Len(t, in.List, 1)
+	require.Equal(t, []string{"list_col"}, in.List[0].(*Ident).Parts)
+
+	e = parseExprForTest(t, "x IN (list_col)")
+	in, ok = e.(*InExpr)
+	require.True(t, ok)
+	require.False(t, in.Contains)
+	require.Len(t, in.List, 1)
+}
+
 func TestAdaptInSubquery(t *testing.T) {
 	e := parseExprForTest(t, "a IN (SELECT id FROM t)")
 	in, ok := e.(*InExpr)
