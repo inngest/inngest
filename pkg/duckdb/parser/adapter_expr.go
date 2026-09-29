@@ -314,7 +314,7 @@ func (a *adapter) adaptBetweenInLikeExpression(n *peg.Node) Expr {
 			return &InExpr{baseExpr: a.at(n), X: x, Not: not, Subquery: a.adaptParenSelect(body(in))}
 		default: // InContainsExpression <- OtherOperatorExpression
 			rhs := a.adaptOtherOperatorExpression(body(in))
-			return &InExpr{baseExpr: a.at(n), X: x, Not: not, List: []Expr{rhs}}
+			return &InExpr{baseExpr: a.at(n), X: x, Not: not, List: []Expr{rhs}, Contains: true}
 		}
 	default: // LikeClause <- LikeVariations OtherOperatorExpression EscapeClause?
 		lseq := body(inner)
