@@ -345,11 +345,11 @@ func resolveArrayElementHint(x parser.Expr, scope *tableScope) ColumnHint {
 }
 
 // isSingleIndex reports whether s is a single-element index ("expr[n]"),
-// not a range slice ("expr[a:b]" / "expr[a:b:c]") -- only a single index
+// not a range slice ("expr[a:b]" / "expr[a:]" / "expr[a:b:c]") -- only a single index
 // extracts exactly one array element, so only that shape can inherit its
 // operand's hint.
 func isSingleIndex(s *parser.SliceExpr) bool {
-	return !s.HasStep && s.Stop == nil
+	return !s.HasStop && !s.HasStep
 }
 
 func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
