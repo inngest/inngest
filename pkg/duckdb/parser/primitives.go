@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser/peg"
@@ -257,26 +258,40 @@ const operatorChars = "+-*/%^<>=~!@#&|?"
 
 // operatorLiteralReserved holds operator-symbol tokens that OperatorLiteral
 // must never claim, even though every one of their characters is in
-// operatorChars — each is reserved for a different, non-adjacent grammar
-// rule (LambdaArrowExpression's '->', not any of NamedOtherOperator's own
-// sibling alternatives). Comparison/arithmetic/bitwise operators ('=', '+',
-// '&', ...) don't need an entry here even though OperatorLiteral can also
-// match them at the wrong grammar level (OtherOperatorExpression sits
-// *inside* ComparisonExpression's own head-recursion, so it sees them
-// first) — that misrouting is harmless because both paths build the exact
-// same BinaryExpr{Op, Left, Right} shape. '->' is the one case with an
-// observable difference: LambdaArrowExpression's handling isn't a generic
-// BinaryExpr, so losing the token to OperatorLiteral silently drops lambda
-// support instead of just taking a different internal path to the same AST.
+// operatorChars — each belongs to a grammar rule at a *lower* precedence
+// level than NamedOtherOperator. OtherOperatorExpression sits inside
+// ComparisonExpression's (and LambdaArrowExpression's) operands, so it sees
+// these tokens first; if OperatorLiteral took them they would bind at
+// OtherOperator precedence, left-associative with '->>'/'||'/'@>':
+// `'x' = data ->> 'name'` would become `('x' = data) ->> 'name'`.
+//
+//   - '->' belongs to LambdaArrowExpression.
+//   - The comparison spellings belong to ComparisonExpressionTail.
+//
+// Arithmetic/bitwise operators ('+', '&', ...) need no entry: their rules
+// sit *below* OtherOperatorExpression, so they always match first.
 var operatorLiteralReserved = map[string]struct{}{
 	"->": {},
+	"=":  {}, "==": {}, "!=": {}, "<>": {},
+	"<": {}, ">": {}, "<=": {}, ">=": {},
 }
+
+// operatorTrailingSignExempt: a multi-character operator may end in '+' or
+// '-' only if it contains one of these characters. This is the Postgres
+// lexer rule DuckDB inherits, and it's what makes `a=-1` mean `a = -1`
+// rather than a custom `=-` operator.
+const operatorTrailingSignExempt = "~!@#%^&|`?"
 
 func operatorLiteralPrimitive() peg.Primitive {
 	return func(newNode func(peg.Node) *peg.Node, input string, pos int) (*peg.Node, int, bool) {
 		i := pos
 		for i < len(input) && strings.IndexByte(operatorChars, input[i]) >= 0 {
 			i++
+		}
+		if i-pos > 1 && !strings.ContainsAny(input[pos:i], operatorTrailingSignExempt) {
+			for i-pos > 1 && (input[i-1] == '+' || input[i-1] == '-') {
+				i--
+			}
 		}
 		if i == pos {
 			return nil, 0, false
@@ -287,6 +302,29 @@ func operatorLiteralPrimitive() peg.Primitive {
 		}
 		return newNode(peg.Node{Kind: peg.KindPrimitive, Text: text, Value: text, HasValue: true, Start: pos, End: i}), i, true
 	}
+}
+
+// symbolTokens returns the multi-character operators from the grammar's own
+// AnyOp rule (DuckDB's full operator-token list), for peg.Parser's
+// SymbolTokens maximal munch. Without it, ordered choices written
+// shortest-first upstream (ComparisonOperator tries '<' before '<=', '='
+// before '==') commit to the short literal and fail, and the postfix '!'
+// splits `a != b` into `(a!) = b`.
+func symbolTokens(g *peg.Grammar) ([]string, error) {
+	rule, ok := g.Rules["AnyOp"]
+	if !ok || rule.Expr.Kind != peg.ExprChoice {
+		return nil, fmt.Errorf("vendored grammar has no AnyOp choice rule to derive operator tokens from")
+	}
+	var tokens []string
+	for _, alt := range rule.Expr.Children {
+		if alt.Kind != peg.ExprLiteral {
+			return nil, fmt.Errorf("AnyOp alternative is not a literal (kind %v)", alt.Kind)
+		}
+		if len(alt.Literal) > 1 {
+			tokens = append(tokens, alt.Literal)
+		}
+	}
+	return tokens, nil
 }
 
 func endOfInputPrimitive() peg.Primitive {
