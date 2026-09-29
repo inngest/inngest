@@ -162,6 +162,17 @@ func TestWriteReturnsWriterError(t *testing.T) {
 	require.ErrorIs(t, err, errBoom)
 }
 
+// An empty operator would render its operands adjacent (`f  (x)`), which
+// DuckDB reparses as something else entirely, so Write refuses it.
+func TestWriteRejectsEmptyOperator(t *testing.T) {
+	for _, n := range []Node{
+		&BinaryExpr{Left: &Ident{Parts: []string{"f"}}, Right: &Ident{Parts: []string{"x"}}},
+		&UnaryExpr{X: &Ident{Parts: []string{"x"}}},
+	} {
+		require.PanicsWithValue(t, "duckdb/parser: Write: empty operator", func() { _ = Write(&strings.Builder{}, n) })
+	}
+}
+
 func TestWriteQuotesKeywordIdentifiers(t *testing.T) {
 	cases := []struct{ name, sql, want string }{
 		{"reserved column", `SELECT "group" FROM t`, `SELECT "group" FROM t`},
