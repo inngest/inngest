@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/insights"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -175,5 +177,49 @@ func TestInsightsPromptAndEventSchemasStillStubbed(t *testing.T) {
 		_, err := service.ListInsightsEventSchemas(context.Background(), &apiv2.ListInsightsEventSchemasRequest{})
 		require.Equal(t, codes.Unimplemented, status.Code(err))
 		require.ErrorContains(t, err, "Insights not implemented in OSS")
+	})
+}
+
+// TestQueryInsights_RecoversPanics pins that a panic anywhere in the
+// insights pipeline becomes a 500 for this one request instead of
+// propagating out of the handler (which, served over gRPC, would crash the
+// process).
+func TestQueryInsights_RecoversPanics(t *testing.T) {
+	service := NewService(ServiceOptions{DuckDB: &sql.DB{}})
+	req := &apiv2.QueryInsightsRequest{Query: "SELECT run_id FROM runs"}
+
+	t.Run("transpile", func(t *testing.T) {
+		orig := transpileInsights
+		t.Cleanup(func() { transpileInsights = orig })
+		transpileInsights = func(string, uuid.UUID, uuid.UUID) (*insights.TranspileResult, error) {
+			panic("boom")
+		}
+
+		var (
+			resp *apiv2.QueryInsightsResponse
+			err  error
+		)
+		require.NotPanics(t, func() { resp, err = service.QueryInsights(context.Background(), req) })
+		require.Nil(t, resp)
+		require.Equal(t, codes.Internal, status.Code(err))
+		require.ErrorContains(t, err, "Internal error running the Insights query")
+	})
+
+	t.Run("execute", func(t *testing.T) {
+		orig := executeInsights
+		t.Cleanup(func() { executeInsights = orig })
+		executeInsights = func(context.Context, *sql.DB, *insights.TranspileResult) (*insights.Result, error) {
+			var m map[string]int
+			m["x"]++ // a real runtime panic, not just panic(...)
+			return nil, nil
+		}
+
+		var (
+			resp *apiv2.QueryInsightsResponse
+			err  error
+		)
+		require.NotPanics(t, func() { resp, err = service.QueryInsights(context.Background(), req) })
+		require.Nil(t, resp)
+		require.Equal(t, codes.Internal, status.Code(err))
 	})
 }
