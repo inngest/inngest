@@ -47,6 +47,14 @@ func addDefaultLimit(stmt *parser.SelectStatement) (limitOutcome, error) {
 		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), End: stmt.Limit.End(), Message: "PERCENT-based LIMIT is not supported"}
 	}
 
+	// "OFFSET n" with no LIMIT parses as a LimitClause whose Limit is nil
+	// -- just as unbounded as no clause at all, so it gets the same
+	// default, keeping the user's OFFSET.
+	if stmt.Limit.Limit == nil && !stmt.Limit.All {
+		stmt.Limit.Limit = &parser.Literal{Kind: parser.LitNumber, Text: strconv.Itoa(defaultInsightsLimit)}
+		return limitDefaulted, nil
+	}
+
 	if stmt.Limit.All {
 		stmt.Limit.All = false
 		stmt.Limit.Limit = &parser.Literal{Kind: parser.LitNumber, Text: strconv.Itoa(defaultInsightsLimit)}
