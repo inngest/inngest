@@ -147,9 +147,13 @@ func (b *BetweenExpr) String() string   { return fmt.Sprintf("BetweenExpr(not=%v
 
 type InExpr struct {
 	baseExpr
-	X        Expr
-	Not      bool
-	List     []Expr
+	X    Expr
+	Not  bool
+	List []Expr
+	// Contains marks the unparenthesized `x IN list_expr` form (DuckDB list
+	// containment, like list_contains). List then holds exactly that one
+	// list-valued expression — `x IN (y)` is equality, not containment.
+	Contains bool
 	Subquery *SelectStatement
 }
 
@@ -163,7 +167,12 @@ func (i *InExpr) Children() []Node {
 	}
 	return children
 }
-func (i *InExpr) String() string { return fmt.Sprintf("InExpr(not=%v)", i.Not) }
+func (i *InExpr) String() string {
+	if i.Contains {
+		return fmt.Sprintf("InExpr(not=%v,contains)", i.Not)
+	}
+	return fmt.Sprintf("InExpr(not=%v)", i.Not)
+}
 
 type LikeExpr struct {
 	baseExpr
