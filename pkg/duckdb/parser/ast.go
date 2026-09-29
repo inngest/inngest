@@ -447,11 +447,18 @@ func (d *DotExpr) String() string   { return "DotExpr(" + d.Field + ")" }
 type SliceExpr struct {
 	baseExpr
 	X, Start, Stop, Step Expr // Stop, not End — End() is Node's span-end method
-	HasStep              bool
+	// HasStop records the stop colon: x[i:] is a slice (a list), x[i] a
+	// single element, though both have Stop == nil.
+	HasStop bool
+	// StopMinus records DuckDB's x[i:-] form (EndSliceMinus); Stop is nil.
+	StopMinus bool
+	HasStep   bool
 }
 
 func (s *SliceExpr) Children() []Node { return nonNil(s.X, s.Start, s.Stop, s.Step) }
-func (s *SliceExpr) String() string   { return "SliceExpr" }
+func (s *SliceExpr) String() string {
+	return fmt.Sprintf("SliceExpr(stop=%t,minus=%t,step=%t)", s.HasStop, s.StopMinus, s.HasStep)
+}
 
 type LambdaExpr struct {
 	baseExpr
