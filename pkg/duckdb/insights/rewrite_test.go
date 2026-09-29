@@ -63,6 +63,14 @@ func TestRewriteArrayOfStructAccessInJoinCondition(t *testing.T) {
 	require.Len(t, diags, 1)
 }
 
+func TestRewriteArrayOfStructAccessInListContainment(t *testing.T) {
+	// The unparenthesized IN is list containment; the rewritten operand
+	// must stay unparenthesized, or it would print as `IN (...)` equality.
+	stmt, diags := mustRewriteArrayOfStructAccess(t, "SELECT run_id FROM runs WHERE 'x' IN sessions.key")
+	require.Equal(t, "SELECT run_id FROM runs WHERE 'x' IN sessions ->> '$[*].key'", parser.String(stmt))
+	require.Len(t, diags, 1)
+}
+
 func TestRewriteArrayOfStructAccessInCorrelatedSubquery(t *testing.T) {
 	stmt, diags := mustRewriteArrayOfStructAccess(t,
 		"SELECT run_id FROM runs WHERE run_id IN (SELECT id FROM events WHERE status = runs.sessions.key)")
