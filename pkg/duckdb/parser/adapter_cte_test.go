@@ -104,3 +104,54 @@ func TestAdaptCTEWithSubquery(t *testing.T) {
 	sub := stmt.Columns[0].Expr.(*SubqueryExpr)
 	require.NotNil(t, sub.Select.With)
 }
+
+// TestAdaptParenSelectKeepsInnerModifiers checks that a parenthesized
+// statement's own WITH/ORDER BY/LIMIT survive when the outer statement adds
+// clauses of its own — merging those onto the inner statement would
+// silently change which rows the query returns.
+func TestAdaptParenSelectKeepsInnerModifiers(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{
+			"outer limit over inner limit",
+			"(SELECT a FROM t LIMIT 10) LIMIT 100",
+			"SELECT * FROM (SELECT a FROM t LIMIT 10) AS paren_select LIMIT 100",
+		},
+		{
+			"outer order by applies after inner limit",
+			"(SELECT a FROM t ORDER BY a LIMIT 5) ORDER BY b",
+			"SELECT * FROM (SELECT a FROM t ORDER BY a LIMIT 5) AS paren_select ORDER BY b",
+		},
+		{
+			"outer with over inner with",
+			"WITH x AS (SELECT 1) (WITH y AS (SELECT 2) SELECT * FROM y)",
+			"WITH x AS (SELECT 1) SELECT * FROM (WITH y AS (SELECT 2) SELECT * FROM y) AS paren_select",
+		},
+		{
+			"inner with kept when there is no outer with",
+			"(WITH y AS (SELECT 2) SELECT * FROM y)",
+			"WITH y AS (SELECT 2) SELECT * FROM y",
+		},
+		{
+			"non-conflicting outer limit merges",
+			"(SELECT a FROM t ORDER BY a) LIMIT 5",
+			"SELECT a FROM t ORDER BY a LIMIT 5",
+		},
+		{
+			"non-conflicting outer with merges",
+			"WITH x AS (SELECT 1) (SELECT * FROM x LIMIT 3)",
+			"WITH x AS (SELECT 1) SELECT * FROM x LIMIT 3",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stmt, err := ParseString(c.sql)
+			require.NoError(t, err)
+			got := String(stmt)
+			require.Equal(t, c.want, got)
+
+			stmt2, err := ParseString(got)
+			require.NoError(t, err)
+			require.Equal(t, got, String(stmt2))
+		})
+	}
+}
