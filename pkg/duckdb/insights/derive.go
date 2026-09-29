@@ -18,29 +18,55 @@ import "github.com/inngest/inngest/pkg/duckdb/parser"
 // explicitCols, if non-empty, is a WITH x(a, b, ...) explicit column list
 // overriding inferred names positionally. diags is validateWithCTEs' own
 // diagnostics accumulator, passed straight through to stmt's own
-// validation -- the second resolveScope call below (for leafScope) always
-// passes nil instead, since it re-resolves the very same FROM clause
-// validateWithCTEs just validated, and reusing diags there would collect
-// (and so surface) every one of that FROM clause's function-call
-// diagnostics a second time.
+// validation.
+//
+// The scope output columns are inferred against is the one validation
+// itself resolved (validatedLeafScope), never a second resolveScope of the
+// same FROM clause: re-resolving re-derives every nested FROM-clause
+// subquery, so a subquery nested k deep was derived 2^k times — Transpile
+// was exponential in nesting depth (depth 16 took ~0.7s).
 func deriveTable(stmt *parser.SelectStatement, name string, explicitCols []string, ctes map[string]logicalTable, outerScope *tableScope, diags *[]Diagnostic) (logicalTable, error) {
-	_, _, err := validateWithCTEs(stmt, ctes, outerScope, diags)
+	leafScope, err := validatedLeafScope(stmt, ctes, outerScope, diags)
 	if err != nil {
 		return logicalTable{}, err
 	}
 
-	leaf := leftmostOperand(stmt)
-	leafScope, err := resolveScope(leaf.From, ctes, nil)
-	if err != nil {
-		return logicalTable{}, err
-	}
-	leafScope.outer = outerScope
-
-	order, cols, err := inferOutputColumns(leaf, leafScope, explicitCols)
+	order, cols, err := inferOutputColumns(leftmostOperand(stmt), leafScope, explicitCols)
 	if err != nil {
 		return logicalTable{}, err
 	}
 	return logicalTable{name: name, columnOrder: order, columns: cols}, nil
+}
+
+// validatedLeafScope validates stmt exactly as validateWithCTEs does and
+// returns the scope of its leftmost operand (stmt itself unless it is a
+// set operation) — the scope its output columns come from. validateWithCTEs
+// discards its operands' scopes for a set operation, so that case repeats
+// its two steps here (a WITH clause first, then each operand with the
+// merged CTEs) to keep the left operand's.
+func validatedLeafScope(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope, diags *[]Diagnostic) (*tableScope, error) {
+	if stmt.SetOp == parser.SetOpNone {
+		scope, _, err := validateWithCTEs(stmt, ctes, outerScope, diags)
+		return scope, err
+	}
+	if stmt.With != nil {
+		// A statement holding only the WITH clause: validateWithCTEs
+		// derives its CTEs and returns them merged, with nothing else to
+		// validate.
+		_, merged, err := validateWithCTEs(&parser.SelectStatement{With: stmt.With}, ctes, nil, diags)
+		if err != nil {
+			return nil, err
+		}
+		ctes = merged
+	}
+	left, err := validatedLeafScope(stmt.SetLeft, ctes, outerScope, diags)
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := validateWithCTEs(stmt.SetRight, ctes, outerScope, diags); err != nil {
+		return nil, err
+	}
+	return left, nil
 }
 
 // leftmostOperand returns stmt itself, or (for a UNION/INTERSECT/EXCEPT
