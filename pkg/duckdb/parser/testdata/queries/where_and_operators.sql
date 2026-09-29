@@ -17,3 +17,5 @@ SELECT (1 + 2) * 3 - 4 / 2 AS calc FROM t;
 SELECT a FROM t WHERE a = NOT b;
 
 SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
+
+SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1;
