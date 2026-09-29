@@ -8,7 +8,7 @@ EVENT ARGS
 []
 
 OUTPUT SQL
-(CAST((output::JSON->>?) AS DOUBLE) >= ?)
+(TRY_CAST((output::JSON->>?) AS DOUBLE) >= ?)
 
 OUTPUT ARGS
 [$.data.count 3]
