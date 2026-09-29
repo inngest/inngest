@@ -14,28 +14,49 @@ var (
 	pegParser     *peg.Parser
 	pegParserOnce sync.Once
 	pegParserErr  error
+
+	// keywordSets is the vendored grammar's keyword lists. Every keyword that
+	// isn't purely unreserved — reserved, column-name, func-name and
+	// type-name — is rejected as a bare identifier in at least one position
+	// (see ColId/TableName in base.gram/common.gram), so Write must quote them.
+	keywordSets *KeywordSets
 )
 
 func loadPegParser() (*peg.Parser, error) {
 	pegParserOnce.Do(func() {
-		pegParser, pegParserErr = newPegParser()
+		pegParser, keywordSets, pegParserErr = newPegParser()
 	})
 	return pegParser, pegParserErr
 }
 
 // newPegParser builds a fresh peg.Parser over the vendored grammar. Most
 // callers want the shared loadPegParser instead.
-func newPegParser() (*peg.Parser, error) {
+func newPegParser() (*peg.Parser, *KeywordSets, error) {
 	g, kl, err := grammar.Load()
 	if err != nil {
-		return nil, fmt.Errorf("duckdb/parser: loading vendored grammar: %w", err)
+		return nil, nil, fmt.Errorf("duckdb/parser: loading vendored grammar: %w", err)
 	}
 	tokens, err := symbolTokens(g)
 	if err != nil {
-		return nil, fmt.Errorf("duckdb/parser: %w", err)
+		return nil, nil, fmt.Errorf("duckdb/parser: %w", err)
 	}
 	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens}, nil
+	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens}, ks, nil
+}
+
+// isNonIdentKeyword reports whether s, spelled bare, would lex as a keyword
+// that can't stand in for an identifier everywhere one is allowed.
+func isNonIdentKeyword(s string) bool {
+	if _, err := loadPegParser(); err != nil {
+		return false
+	}
+	up := strings.ToUpper(s)
+	for _, set := range []map[string]struct{}{keywordSets.Reserved, keywordSets.ColumnName, keywordSets.FuncName, keywordSets.TypeName} {
+		if _, ok := set[up]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseString parses a single DuckDB SELECT statement into a typed AST. A
