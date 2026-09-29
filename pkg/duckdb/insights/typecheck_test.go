@@ -59,6 +59,10 @@ func TestInferTypeComparisonAndLogical(t *testing.T) {
 	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT run_id IS NULL FROM runs"))
 	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT step_index BETWEEN 1 AND 5 FROM metadata"))
 	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT status LIKE 'Comp%' FROM runs"))
+	// Symbol spellings are LikeExpr too; binary '~' is regex match, not a
+	// bitwise operator.
+	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT status ~~ 'Comp%' FROM runs"))
+	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT status ~ '^Comp' FROM runs"))
 	require.Equal(t, ColumnTypeBoolean, typeOfFirstColumn(t, "SELECT status = ANY (SELECT status FROM runs) FROM runs"))
 }
 

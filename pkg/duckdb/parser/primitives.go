@@ -267,6 +267,8 @@ const operatorChars = "+-*/%^<>=~!@#&|?"
 //
 //   - '->' belongs to LambdaArrowExpression.
 //   - The comparison spellings belong to ComparisonExpressionTail.
+//   - The LIKE/ILIKE/GLOB/regex symbol spellings belong to LikeClause's
+//     LikeVariations.
 //
 // Arithmetic/bitwise operators ('+', '&', ...) need no entry: their rules
 // sit *below* OtherOperatorExpression, so they always match first.
@@ -274,6 +276,8 @@ var operatorLiteralReserved = map[string]struct{}{
 	"->": {},
 	"=":  {}, "==": {}, "!=": {}, "<>": {},
 	"<": {}, ">": {}, "<=": {}, ">=": {},
+	"~~": {}, "!~~": {}, "~~*": {}, "!~~*": {}, "~~~": {},
+	"~": {}, "!~": {}, "~*": {}, "!~*": {},
 }
 
 // operatorTrailingSignExempt: a multi-character operator may end in '+' or

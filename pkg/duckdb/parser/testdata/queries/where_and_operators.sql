@@ -19,3 +19,5 @@ SELECT a FROM t WHERE a = NOT b;
 SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
 
 SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1;
+
+SELECT a FROM t WHERE 'x' ~~ data ->> 'name' AND b !~* 'y' AND c NOT ~~~ 'z*' AND d ~ 'r' || s;
