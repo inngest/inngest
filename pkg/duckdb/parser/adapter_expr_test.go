@@ -5,17 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/inngest/inngest/pkg/duckdb/parser/grammar"
-	"github.com/inngest/inngest/pkg/duckdb/parser/peg"
 )
 
 func parseExprForTest(t *testing.T, sql string) Expr {
 	t.Helper()
-	g, kl, err := grammar.Load()
+	p, err := newPegParser()
 	require.NoError(t, err)
-	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	p := &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia}
 	n, err := p.Parse(sql, "Expression")
 	require.NoErrorf(t, err, "parsing %q", sql)
 	a := newAdapter(sql)
@@ -124,6 +119,55 @@ func TestAdaptComparisonNegatedRightOperand(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "NOT", inner.Op)
 	require.Equal(t, []string{"b"}, inner.X.(*Ident).Parts)
+}
+
+func TestAdaptComparisonOperatorsBindBelowOtherOperators(t *testing.T) {
+	// Every ComparisonOperator spelling must reach ComparisonExpressionTail
+	// (not OperatorLiteral at OtherOperator level), so it binds looser than
+	// ->>, || and friends, and multi-char spellings aren't split.
+	cases := []struct{ sql, op, left, right string }{
+		{"'x' = data ->> 'name'", "=", "Literal(0,x)", "BinaryExpr(->>)"},
+		{"'x' <> data ->> 'name'", "<>", "Literal(0,x)", "BinaryExpr(->>)"},
+		{"name = 'a' || 'b'", "=", "Ident(name)", "BinaryExpr(||)"},
+		{"a || b = c", "=", "BinaryExpr(||)", "Ident(c)"},
+		{"a == b", "==", "Ident(a)", "Ident(b)"},
+		{"a != b", "!=", "Ident(a)", "Ident(b)"},
+		{"a!=b", "!=", "Ident(a)", "Ident(b)"},
+		{"a <> b", "<>", "Ident(a)", "Ident(b)"},
+		{"a < b", "<", "Ident(a)", "Ident(b)"},
+		{"a > b", ">", "Ident(a)", "Ident(b)"},
+		{"a <= b", "<=", "Ident(a)", "Ident(b)"},
+		{"a >= b", ">=", "Ident(a)", "Ident(b)"},
+		{"a <= b @> c", "<=", "Ident(a)", "BinaryExpr(@>)"},
+		{"a=-1", "=", "Ident(a)", "UnaryExpr(-)"},
+		{"a<-1", "<", "Ident(a)", "UnaryExpr(-)"},
+		{"a>=-1", ">=", "Ident(a)", "UnaryExpr(-)"},
+	}
+	for _, c := range cases {
+		t.Run(c.sql, func(t *testing.T) {
+			e := parseExprForTest(t, c.sql)
+			bin, ok := e.(*BinaryExpr)
+			require.Truef(t, ok, "got %s", Dump(e))
+			require.Equal(t, c.op, bin.Op)
+			require.Equal(t, c.left, bin.Left.String())
+			require.Equal(t, c.right, bin.Right.String())
+		})
+	}
+}
+
+func TestAdaptOperatorsSharingComparisonPrefixes(t *testing.T) {
+	// Operators that start with a comparison character keep their own
+	// identity (and '->' stays a lambda).
+	for _, op := range []string{"<@", "<<", ">>", "->>", "<=>", "<->", "<<=", ">>=", "!~~"} {
+		t.Run(op, func(t *testing.T) {
+			e := parseExprForTest(t, "a "+op+" b")
+			bin, ok := e.(*BinaryExpr)
+			require.Truef(t, ok, "got %s", Dump(e))
+			require.Equal(t, op, bin.Op)
+		})
+	}
+	_, ok := parseExprForTest(t, "x -> x = 1").(*LambdaExpr)
+	require.True(t, ok)
 }
 
 func TestAdaptBetween(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/inngest/inngest/pkg/duckdb/parser/grammar"
 	"github.com/inngest/inngest/pkg/duckdb/parser/peg"
 )
 
@@ -100,6 +101,39 @@ func TestOperatorLiteralPrimitive(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "<=>", n.Text)
 	require.Equal(t, 3, next)
+
+	// Comparison spellings belong to ComparisonExpressionTail, including
+	// once a trailing sign is split off (`a=-1` is `a = -1`).
+	for _, in := range []string{"= b", "== b", "!= b", "<> b", "< b", "> b", "<= b", ">= b", "-> b", "=-1", "<-1", ">=+1"} {
+		_, _, ok := op(testAlloc, in, 0)
+		require.Falsef(t, ok, "OperatorLiteral must not claim %q", in)
+	}
+
+	// Trailing '+'/'-' stays part of the operator only when it contains
+	// one of ~!@#%^&|`? (the Postgres lexer rule).
+	for _, tc := range []struct{ in, want string }{
+		{"<=>-1", "<=>"},
+		{"@-1", "@-"},
+		{"=~-1", "=~-"},
+		{"<->b", "<->"},
+	} {
+		n, _, ok := op(testAlloc, tc.in, 0)
+		require.Truef(t, ok, "expected %q to match", tc.in)
+		require.Equal(t, tc.want, n.Text)
+	}
+}
+
+func TestSymbolTokensFromAnyOp(t *testing.T) {
+	g, _, err := grammar.Load()
+	require.NoError(t, err)
+	tokens, err := symbolTokens(g)
+	require.NoError(t, err)
+	for _, want := range []string{"<=", ">=", "<>", "!=", "==", "->>", "<@", "<<", "->"} {
+		require.Contains(t, tokens, want)
+	}
+	for _, tok := range tokens {
+		require.Greater(t, len(tok), 1, "single-char operators can't be split")
+	}
 }
 
 func TestEndOfInputPrimitive(t *testing.T) {
