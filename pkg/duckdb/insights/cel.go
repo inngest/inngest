@@ -3,9 +3,11 @@ package insights
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	sq "github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exp"
 	"github.com/google/cel-go/common/operators"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -166,31 +168,86 @@ func celFieldConverter(n *expr.Node, scope *celFieldScope) ([]sq.Expression, err
 // that as JSON and fails with a "Malformed JSON at byte 1" error — see
 // pkg/execution/dualwrite/tracing.go's materializeRuns for the same
 // underlying VARIANT/JSON distinction on the write side.
+//
+// The JSONPath is bound as a query parameter rather than spliced into the
+// SQL text: a CEL string index (e.g. event.data.foo["a'b"]) carries an
+// arbitrary user string into fieldPath, so it must never reach the SQL as
+// a literal.
 func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expression, error) {
 	expr = fmt.Sprintf("%s::JSON", expr)
-	jsonPath := fmt.Sprintf("$.%s", fieldPath)
-	jsonExpr := fmt.Sprintf("(%s->'%s')", expr, jsonPath)
-	textExpr := fmt.Sprintf("(%s->>'%s')", expr, jsonPath)
+	jsonPath := celJSONPath(fieldPath)
+	textExpr := fmt.Sprintf("(%s->>?)", expr)
 
 	switch v := literal.(type) {
 	case string:
-		return handleStringOp(textExpr, v, op)
+		return handleStringOp(sq.L(textExpr, jsonPath), v, op)
 	case int64, float64:
-		numExpr := fmt.Sprintf("CAST(%s AS DOUBLE)", textExpr)
-		return handleNumericOp(numExpr, v, op)
+		return handleNumericOp(sq.L(fmt.Sprintf("CAST(%s AS DOUBLE)", textExpr), jsonPath), v, op)
 	case bool:
 		// DuckDB's ->> extracts a JSON boolean as the text "true"/"false".
 		boolStr := "false"
 		if v {
 			boolStr = "true"
 		}
-		return handleStringOp(textExpr, boolStr, op)
+		return handleStringOp(sq.L(textExpr, jsonPath), boolStr, op)
 	case nil:
-		return handleNullOp(jsonExpr, op)
+		return handleNullOp(fmt.Sprintf("(%s->?)", expr), jsonPath, op)
 	default:
 		return nil, fmt.Errorf("unsupported literal type: %T", literal)
 	}
 }
+
+// celJSONPath converts fieldPath — a CEL field path as expr's parser
+// renders it: dot-separated names, each optionally followed by [key]
+// index accesses — into a DuckDB JSONPath. An integer index stays [n];
+// any other name or key that isn't a plain identifier (e.g. a CEL string
+// index like foo["a.b"]) becomes a double-quoted member, so JSONPath-
+// special characters in it can't change the path's structure.
+func celJSONPath(fieldPath string) string {
+	var b strings.Builder
+	b.WriteString("$")
+	var name strings.Builder
+	flush := func() {
+		if name.Len() > 0 {
+			writeJSONPathMember(&b, name.String())
+			name.Reset()
+		}
+	}
+	for i := 0; i < len(fieldPath); i++ {
+		switch c := fieldPath[i]; c {
+		case '.':
+			flush()
+		case '[':
+			flush()
+			key := fieldPath[i+1:]
+			if end := strings.IndexByte(key, ']'); end >= 0 {
+				key = key[:end]
+			}
+			i += len(key) + 1
+			if isDecimalDigits(key) {
+				b.WriteString("[" + key + "]")
+			} else {
+				writeJSONPathMember(&b, key)
+			}
+		default:
+			name.WriteByte(c)
+		}
+	}
+	flush()
+	return b.String()
+}
+
+func writeJSONPathMember(b *strings.Builder, name string) {
+	if jsonPathIdentRegex.MatchString(name) {
+		b.WriteString("." + name)
+		return
+	}
+	b.WriteString(`."`)
+	b.WriteString(strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(name))
+	b.WriteString(`"`)
+}
+
+var jsonPathIdentRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // handleNullOp creates SQL filters for JSON null comparison in DuckDB.
 // json_type() returns SQL NULL both for a missing key and for an explicit
@@ -200,40 +257,40 @@ func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expr
 // works instead, and keeps "missing key matches neither == null nor !=
 // null" via SQL's three-valued logic (NULL = 'null'::JSON is NULL either
 // way).
-func handleNullOp(jsonExpr string, op string) ([]sq.Expression, error) {
+func handleNullOp(jsonExpr string, jsonPath string, op string) ([]sq.Expression, error) {
 	switch op {
 	case operators.Equals:
-		return []sq.Expression{sq.L(fmt.Sprintf("%s = 'null'::JSON", jsonExpr))}, nil
+		return []sq.Expression{sq.L(fmt.Sprintf("%s = 'null'::JSON", jsonExpr), jsonPath)}, nil
 	case operators.NotEquals:
-		return []sq.Expression{sq.L(fmt.Sprintf("%s != 'null'::JSON", jsonExpr))}, nil
+		return []sq.Expression{sq.L(fmt.Sprintf("%s != 'null'::JSON", jsonExpr), jsonPath)}, nil
 	}
 	return nil, fmt.Errorf("unsupported null operator: %s (only == and != are supported for null)", op)
 }
 
-func handleStringOp(expr string, value string, op string) ([]sq.Expression, error) {
+func handleStringOp(expr exp.LiteralExpression, value string, op string) ([]sq.Expression, error) {
 	switch op {
 	case operators.Equals:
-		return []sq.Expression{sq.L(expr).Eq(value)}, nil
+		return []sq.Expression{expr.Eq(value)}, nil
 	case operators.NotEquals:
-		return []sq.Expression{sq.L(expr).Neq(value)}, nil
+		return []sq.Expression{expr.Neq(value)}, nil
 	}
 	return nil, fmt.Errorf("unsupported string operator: %s", op)
 }
 
-func handleNumericOp(expr string, value any, op string) ([]sq.Expression, error) {
+func handleNumericOp(expr exp.LiteralExpression, value any, op string) ([]sq.Expression, error) {
 	switch op {
 	case operators.Equals:
-		return []sq.Expression{sq.L(expr).Eq(value)}, nil
+		return []sq.Expression{expr.Eq(value)}, nil
 	case operators.NotEquals:
-		return []sq.Expression{sq.L(expr).Neq(value)}, nil
+		return []sq.Expression{expr.Neq(value)}, nil
 	case operators.Greater:
-		return []sq.Expression{sq.L(expr).Gt(value)}, nil
+		return []sq.Expression{expr.Gt(value)}, nil
 	case operators.GreaterEquals:
-		return []sq.Expression{sq.L(expr).Gte(value)}, nil
+		return []sq.Expression{expr.Gte(value)}, nil
 	case operators.Less:
-		return []sq.Expression{sq.L(expr).Lt(value)}, nil
+		return []sq.Expression{expr.Lt(value)}, nil
 	case operators.LessEquals:
-		return []sq.Expression{sq.L(expr).Lte(value)}, nil
+		return []sq.Expression{expr.Lte(value)}, nil
 	}
 	return nil, fmt.Errorf("unsupported numeric operator: %s", op)
 }
