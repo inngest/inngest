@@ -67,7 +67,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 		}
 	}
 
-	r := &arrayOfStructRewriter{scope: scope}
+	r := &arrayOfStructRewriter{scope: scope, ctes: mergedCTEs}
 	for _, item := range stmt.Columns {
 		orig := item.Expr
 		item.Expr = r.rewrite(item.Expr)
@@ -137,7 +137,7 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 			if err != nil {
 				return diagnostics, err
 			}
-			rw := &arrayOfStructRewriter{scope: scope}
+			rw := &arrayOfStructRewriter{scope: scope, ctes: ctes}
 			r.On = rw.rewrite(r.On)
 			diagnostics = append(diagnostics, rw.diagnostics...)
 			if rw.err != nil {
@@ -159,7 +159,10 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 // scope — mirroring exprValidator's and subqueryRemapper's treatment of
 // the same node shape.
 type arrayOfStructRewriter struct {
-	scope       *tableScope
+	scope *tableScope
+	// ctes is the CTE set visible at scope, handed to every nested
+	// subquery so it can still reference an enclosing WITH's names.
+	ctes        map[string]logicalTable
 	diagnostics []Diagnostic
 	err         error
 }
@@ -195,7 +198,7 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 			e.List[i] = r.rewrite(item)
 		}
 		if e.Subquery != nil {
-			diags, err := rewriteArrayOfStructAccess(e.Subquery, nil, r.scope)
+			diags, err := rewriteArrayOfStructAccess(e.Subquery, r.ctes, r.scope)
 			r.diagnostics = append(r.diagnostics, diags...)
 			if err != nil {
 				r.err = err
@@ -212,7 +215,7 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 		}
 		e.Else = r.rewrite(e.Else)
 	case *parser.SubqueryExpr:
-		diags, err := rewriteArrayOfStructAccess(e.Select, nil, r.scope)
+		diags, err := rewriteArrayOfStructAccess(e.Select, r.ctes, r.scope)
 		r.diagnostics = append(r.diagnostics, diags...)
 		if err != nil {
 			r.err = err
