@@ -9,3 +9,7 @@ SELEC * FROM t;
 SELECT * FROM t WHERE a = ;
 
 SELECT * FROM t GROUP BY;
+
+SELECT * REPLACE (a + 1 AS a) FROM t;
+
+SELECT * RENAME (a AS b) FROM t;
