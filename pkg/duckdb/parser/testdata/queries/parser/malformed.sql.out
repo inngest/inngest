@@ -13,6 +13,12 @@ ERROR: 1:1: failed to parse SelectStatement
 -- SELECT * FROM t WHERE a =
 ERROR: 1:26: unexpected trailing input
 
--- SELECT * FROM t GROUP BY;
+-- SELECT * FROM t GROUP BY
 ERROR: 1:25: unexpected trailing input
+
+-- SELECT * REPLACE (a + 1 AS a) FROM t
+ERROR: duckdb/parser: duckdb/parser: * REPLACE (...) is not yet supported
+
+-- SELECT * RENAME (a AS b) FROM t;
+ERROR: duckdb/parser: duckdb/parser: * RENAME (...) is not yet supported
 
