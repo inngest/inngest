@@ -98,6 +98,21 @@ type BinaryExpr struct {
 func (b *BinaryExpr) Children() []Node { return []Node{b.Left, b.Right} }
 func (b *BinaryExpr) String() string   { return "BinaryExpr(" + b.Op + ")" }
 
+// QuantifiedExpr is `Left Op ANY|ALL Right` — a comparison against every
+// element of a subquery (Right is a *SubqueryExpr) or list-valued
+// expression. Quantifier is "ANY" or "ALL".
+type QuantifiedExpr struct {
+	baseExpr
+	Op          string
+	Quantifier  string
+	Left, Right Expr
+}
+
+func (q *QuantifiedExpr) Children() []Node { return []Node{q.Left, q.Right} }
+func (q *QuantifiedExpr) String() string {
+	return "QuantifiedExpr(" + q.Op + " " + q.Quantifier + ")"
+}
+
 type UnaryExpr struct {
 	baseExpr
 	Op      string

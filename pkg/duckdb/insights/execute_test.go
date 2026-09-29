@@ -137,3 +137,21 @@ func TestExecuteComparesNowAgainstTimestampColumn(t *testing.T) {
 	require.Len(t, result.Rows, 1)
 	require.Equal(t, runID, result.Rows[0][0])
 }
+
+// TestExecuteQuantifiedSubquery proves `= ANY (SELECT ...)` survives
+// transpilation (operator, quantifier and parens kept; the inner table
+// tenant-scoped) and runs in DuckDB.
+func TestExecuteQuantifiedSubquery(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	accountID, envID, runID := seedOneCompletedRun(t, db)
+
+	tr, err := insights.Transpile("SELECT run_id FROM runs WHERE run_id = ANY (SELECT run_id FROM runs)", accountID, envID)
+	require.NoError(t, err)
+
+	result, err := insights.Execute(ctx, db, tr)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+	require.Equal(t, runID, result.Rows[0][0])
+}
