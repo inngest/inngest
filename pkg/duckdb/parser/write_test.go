@@ -76,6 +76,7 @@ func TestWritePrecedencePreservesGrouping(t *testing.T) {
 		{"exponent right of additive needs parens", "(a + b) ^ 2", "(a + b) ^ 2"},
 		{"unary minus operand", "-(a + b)", "-(a + b)"},
 		{"unary minus tight operand no parens", "-a + b", "-a + b"},
+		{"not in comparison right operand keeps parens", "a = NOT b", "a = (NOT b)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
