@@ -21,3 +21,5 @@ SELECT a FROM t GROUP BY CUBE (a, b);
 SELECT a FROM t ORDER BY a DESC, b;
 
 SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5;
+
+SELECT "group", t."order" AS "select" FROM "table" AS t;
