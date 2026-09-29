@@ -67,6 +67,21 @@ func TestNormalizeAppURL(t *testing.T) {
 			forceHTTPS:  true,
 		},
 		{
+			name:        "IPv6 host with explicit port 80 should keep its brackets",
+			inputURL:    "http://[2001:db8::1]:80/api/inngest",
+			expectedURL: "http://[2001:db8::1]/api/inngest",
+		},
+		{
+			name:        "IPv6 host with explicit port 443 should keep its brackets",
+			inputURL:    "https://[2001:db8::1]:443/api/inngest",
+			expectedURL: "https://[2001:db8::1]/api/inngest",
+		},
+		{
+			name:        "IPv6 host with non-default port should be preserved",
+			inputURL:    "http://[2001:db8::1]:8080/api/inngest",
+			expectedURL: "http://[2001:db8::1]:8080/api/inngest",
+		},
+		{
 			name:        "insecure WebSocket URL should stay the same without force",
 			inputURL:    "ws://api.example.com/api/inngest",
 			expectedURL: "ws://api.example.com/api/inngest",
