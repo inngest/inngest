@@ -442,6 +442,26 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		}
 	}
 
+	// Archived Connect apps have no worker capacity, so their app semaphore can
+	// otherwise prevent queue items from ever reaching the executor's archived
+	// workspace check and being dequeued. This bypass is deliberately limited to
+	// the app semaphore; every other constraint remains enforced.
+	bypassAppSemaphore := q.bypassArchivedWorkspaceAppSemaphore(
+		ctx,
+		*shadowPart.AccountID,
+		*shadowPart.EnvID,
+		item.Data.Semaphores,
+	)
+	if bypassAppSemaphore {
+		span.SetAttributes(attribute.Bool("archived_workspace_app_semaphore_bypass", true))
+		metrics.IncrQueueArchivedWorkspaceAppSemaphoreBypassCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.Shard().Name(),
+			},
+		})
+	}
+
 	switch q.hasReusableCapacityLease(item, now) {
 	case true:
 		// in this case, key queues claimed a bunch of constraints up front and we already have some
@@ -456,7 +476,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			},
 		})
 
-		if len(item.Data.Semaphores) == 0 || q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) {
+		if len(item.Data.Semaphores) == 0 ||
+			q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) ||
+			(bypassAppSemaphore && !hasNonAppSemaphore(item.Data.Semaphores)) {
 			// backlog lease covers everything, no semaphores — skip Acquire entirely.
 			span.SetAttributes(attribute.Bool("valid_lease", true))
 			return ItemLeaseConstraintCheckResult{
@@ -500,6 +522,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	// always add semaphores to each check, as this must be done per queue item.
 	for _, sem := range item.Data.Semaphores {
+		if bypassAppSemaphore && sem.Kind() == constraintapi.SemaphoreKindApp {
+			continue
+		}
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
 			Semaphore: &constraintapi.SemaphoreConstraint{
@@ -636,6 +661,37 @@ func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, 
 	}
 
 	return q.DisableSemaphoreConstraintChecks(ctx, accountID)
+}
+
+func (q *queueProcessor) bypassArchivedWorkspaceAppSemaphore(
+	ctx context.Context,
+	accountID,
+	workspaceID uuid.UUID,
+	semaphores []constraintapi.Semaphore,
+) bool {
+	if q.BypassArchivedWorkspaceAppSemaphore == nil || !hasAppSemaphoreConfig(semaphores) {
+		return false
+	}
+
+	return q.BypassArchivedWorkspaceAppSemaphore(ctx, accountID, workspaceID)
+}
+
+func hasAppSemaphoreConfig(semaphores []constraintapi.Semaphore) bool {
+	for _, semaphore := range semaphores {
+		if semaphore.Kind() == constraintapi.SemaphoreKindApp {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNonAppSemaphore(semaphores []constraintapi.Semaphore) bool {
+	for _, semaphore := range semaphores {
+		if semaphore.Kind() != constraintapi.SemaphoreKindApp {
+			return true
+		}
+	}
+	return false
 }
 
 func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {

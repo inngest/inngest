@@ -45,6 +45,10 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// BypassArchivedWorkspaceAppSemaphore reports whether the app semaphore may be
+// omitted so an item for an archived workspace can reach executor cleanup.
+type BypassArchivedWorkspaceAppSemaphore func(ctx context.Context, accountID, workspaceID uuid.UUID) bool
+
 // PermanentConstraintErrorHandler cleans up application state associated with
 // a queue item that cannot be routed to its configured constraint shard. The
 // queue only dequeues the item after this handler succeeds.
@@ -592,6 +596,7 @@ type QueueOptions struct {
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
 	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
+	BypassArchivedWorkspaceAppSemaphore BypassArchivedWorkspaceAppSemaphore
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -776,6 +781,12 @@ func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
 func WithDisableSemaphoreConstraintChecks(f DisableSemaphoreConstraintChecks) QueueOpt {
 	return func(q *QueueOptions) {
 		q.DisableSemaphoreConstraintChecks = f
+	}
+}
+
+func WithBypassArchivedWorkspaceAppSemaphore(f BypassArchivedWorkspaceAppSemaphore) QueueOpt {
+	return func(q *QueueOptions) {
+		q.BypassArchivedWorkspaceAppSemaphore = f
 	}
 }
 
