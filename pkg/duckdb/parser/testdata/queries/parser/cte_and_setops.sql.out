@@ -182,7 +182,7 @@ SelectStatement
         FromClause
           BaseTableRef(y,alias=)
 
--- (WITH y AS (SELECT 2) SELECT * FROM y);
+-- (WITH y AS (SELECT 2) SELECT * FROM y)
 SelectStatement
   SelectItem()
     StarExpr(,exclude=[])
@@ -193,4 +193,44 @@ SelectStatement
           Literal(1,2)
   FromClause
     BaseTableRef(y,alias=)
+
+-- SELECT a FROM t1 EXCEPT (SELECT a FROM t2 EXCEPT SELECT a FROM t3)
+SelectStatement(EXCEPT,all=false,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t1,alias=)
+  SelectStatement(EXCEPT,all=false,byName=false)
+    SelectStatement
+      SelectItem()
+        Ident(a)
+      FromClause
+        BaseTableRef(t2,alias=)
+    SelectStatement
+      SelectItem()
+        Ident(a)
+      FromClause
+        BaseTableRef(t3,alias=)
+
+-- SELECT 1 UNION ALL (SELECT 1 UNION SELECT 1) UNION (SELECT 2 INTERSECT SELECT 2);
+SelectStatement(UNION,all=false,byName=false)
+  SelectStatement(UNION,all=true,byName=false)
+    SelectStatement
+      SelectItem()
+        Literal(1,1)
+    SelectStatement(UNION,all=false,byName=false)
+      SelectStatement
+        SelectItem()
+          Literal(1,1)
+      SelectStatement
+        SelectItem()
+          Literal(1,1)
+  SelectStatement(INTERSECT,all=false,byName=false)
+    SelectStatement
+      SelectItem()
+        Literal(1,2)
+    SelectStatement
+      SelectItem()
+        Literal(1,2)
 
