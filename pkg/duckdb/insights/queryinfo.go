@@ -38,7 +38,8 @@ func collectQueryInfo(stmt *parser.SelectStatement, info *QueryInfo, seen, cteNa
 	if stmt.SetOp != parser.SetOpNone {
 		collectQueryInfo(stmt.SetLeft, info, seen, cteNames)
 		collectQueryInfo(stmt.SetRight, info, seen, cteNames)
-		return
+		// No return: the set-op node's own ORDER BY/LIMIT/OFFSET, walked
+		// below, can hold subqueries too.
 	}
 	if stmt.From != nil {
 		for _, ref := range stmt.From.Refs {

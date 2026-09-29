@@ -81,6 +81,9 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 		if _, _, err := validateWithCTEs(stmt.SetRight, ctes, outerScope, diags); err != nil {
 			return nil, nil, err
 		}
+		if err := validateSetOpModifiers(stmt, ctes, outerScope, diags); err != nil {
+			return nil, nil, err
+		}
 		return nil, ctes, nil
 	}
 	if stmt.Values != nil {
@@ -113,6 +116,40 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 		}
 	}
 	return scope, ctes, nil
+}
+
+// validateSetOpModifiers checks a set operation's own ORDER BY/LIMIT/OFFSET
+// — they hang off the set-op node itself, not either operand, so the
+// operands' validation never sees them. DuckDB binds a set operation's
+// ORDER BY by matching it against its leftmost operand's SELECT list, so
+// that operand's FROM scope (plus its SELECT-list aliases, skipped the
+// same way groupByOrderByAliasExprs does) is the scope checked against.
+func validateSetOpModifiers(stmt *parser.SelectStatement, ctes map[string]logicalTable, outerScope *tableScope, diags *[]Diagnostic) error {
+	nodes := collectExprs(stmt)
+	if len(nodes) == 0 {
+		return nil
+	}
+	leaf := leftmostOperand(stmt)
+	// nil diags: this FROM clause was already validated, diagnostics and
+	// all, as the leftmost operand.
+	scope, err := resolveScope(leaf.From, ctes, nil)
+	if err != nil {
+		return err
+	}
+	scope.outer = outerScope
+	aliases := selectAliases(leaf)
+
+	v := &exprValidator{scope: scope, ctes: ctes, diags: diags}
+	for _, n := range nodes {
+		if e, ok := n.(parser.Expr); ok && isAliasOnlyReference(e, aliases, scope) {
+			continue
+		}
+		parser.Walk(v, n)
+		if v.err != nil {
+			return v.err
+		}
+	}
+	return nil
 }
 
 // groupByOrderByAliasExprs returns the set of GROUP BY/ORDER BY top-level
