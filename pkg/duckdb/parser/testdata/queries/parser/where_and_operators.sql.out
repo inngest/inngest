@@ -108,7 +108,7 @@ SelectStatement
     UnaryExpr(NOT)
       Ident(b)
 
--- SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
+-- SELECT a FROM t WHERE a IN tags AND b NOT IN (tags)
 SelectStatement
   SelectItem()
     Ident(a)
@@ -121,4 +121,29 @@ SelectStatement
     InExpr(not=true)
       Ident(b)
       Ident(tags)
+
+-- SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1;
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(AND)
+    BinaryExpr(AND)
+      BinaryExpr(AND)
+        BinaryExpr(=)
+          Literal(0,x)
+          BinaryExpr(->>)
+            Ident(data)
+            Literal(0,name)
+        BinaryExpr(<=)
+          Ident(b)
+          Literal(1,1)
+      BinaryExpr(!=)
+        Ident(c)
+        Literal(1,2)
+    BinaryExpr(=)
+      Ident(d)
+      UnaryExpr(-)
+        Literal(1,1)
 
