@@ -48,6 +48,14 @@ var runsInputsCELScope = trie.New[[]string, string, celFieldHandler]().
 	AddWild([]string{"output"}, celWildJSONFieldHandler("output", "output", "data")).
 	AddWild([]string{"error"}, celWildJSONFieldHandler("output", "error", "error"))
 
+// runsInputsMatchSQL is the inputs-array match CELOutputFilters wraps an
+// event.* fragment in itself, for an event.* part of a conjunct that also
+// references output.*/error.* and so can't be handed to CELEventFilters'
+// caller (see celExprsToSQL). It must stay equivalent to pkg/duckdb/
+// query's eventCELArrayMatchClause, which applies the same match to
+// CELEventFilters' result.
+const runsInputsMatchSQL = `len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ?)) > 0`
+
 // eventsTableCELScope backs CELEventTableFilters (used by
 // pkg/cqrs/duckdbquery.GetEventsByExpressions to search inngest.events
 // directly — one row per event, not an array of them). Unlike

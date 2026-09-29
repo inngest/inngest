@@ -264,6 +264,45 @@ func TestCELEventAndOutputFiltersSplitAMixedExpression(t *testing.T) {
 	assert.Equal(t, []sq.Expression{sq.L("(output::JSON->>?)", "$.data.ok").Eq("true")}, outputFilters)
 }
 
+func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
+	// An || across event.* and output.* can't be split into two ANDed
+	// halves: nothing is pushed down pre-collapse, and the output half
+	// evaluates the whole OR, matching event.* against inputs itself.
+	ctx := context.Background()
+	cel := []string{`event.name == "x" || output.ok == true`}
+
+	eventFilters, err := CELEventFilters(ctx, cel)
+	require.NoError(t, err)
+	assert.Empty(t, eventFilters)
+
+	outputFilters, err := CELOutputFilters(ctx, cel)
+	require.NoError(t, err)
+	sqlText, args, err := RenderWhereSQL(outputFilters)
+	require.NoError(t, err)
+	assert.Equal(t, `(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
+	assert.Equal(t, []any{"$.name", "x", "$.data.ok", "true"}, args)
+}
+
+func TestCELEventTableFiltersNestedOrGroup(t *testing.T) {
+	// The (a && (b || c)) branch must stay one ANDed unit inside the
+	// outer OR, not be flattened into it as a || (b || c).
+	ctx := context.Background()
+	filters, err := CELEventTableFilters(ctx, []string{`(event.name == "x" && (event.data.a == 1 || event.data.a == 3)) || event.name == "z"`})
+	require.NoError(t, err)
+	sqlText, args, err := RenderWhereSQL(filters)
+	require.NoError(t, err)
+	assert.Equal(t, "(((event_name = ?) AND ((CAST((event_data::JSON->>?) AS DOUBLE) = ?) OR (CAST((event_data::JSON->>?) AS DOUBLE) = ?))) OR (event_name = ?))", sqlText)
+	assert.Equal(t, []any{"x", "$.a", int64(1), "$.a", int64(3), "z"}, args)
+}
+
+func TestCELEventTableFiltersOrWithUnconvertibleBranchIsUnconstrained(t *testing.T) {
+	// output.* has no meaning for an events-table search; dropping just
+	// that branch would narrow the OR to event.name == "x".
+	filters, err := CELEventTableFilters(context.Background(), []string{`event.name == "x" || output.ok == true`})
+	require.NoError(t, err)
+	assert.Empty(t, filters)
+}
+
 func TestCELJSONPathKeysAreBoundNotSpliced(t *testing.T) {
 	// expr lifts string literals (a bracketed key included) out of an
 	// expression unless it already mentions "vars.", so the second
