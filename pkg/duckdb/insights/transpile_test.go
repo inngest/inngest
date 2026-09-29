@@ -112,3 +112,35 @@ func TestTranspileRejectsQualifiedOperator(t *testing.T) {
 		})
 	}
 }
+
+// An OFFSET with no LIMIT anywhere but the root used to panic in Write.
+func TestTranspileOffsetOnlyInNestedQueries(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT * FROM (SELECT run_id FROM runs OFFSET 5) s",
+		"SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM runs OFFSET 5)",
+		"WITH c AS (SELECT run_id FROM runs OFFSET 5) SELECT run_id FROM c",
+		"(SELECT run_id FROM runs OFFSET 5) UNION ALL SELECT run_id FROM runs",
+	} {
+		t.Run(sql, func(t *testing.T) {
+			tr, err := Transpile(sql, testAccountID, testEnvID)
+			require.NoError(t, err)
+			require.Contains(t, tr.SQL, "FROM inngest.insights_runs(?, ?) AS runs OFFSET 5)")
+		})
+	}
+}
+
+// Transpile must hand any stage's panic back as an error, not crash the
+// caller.
+func TestTranspileRecoversStagePanic(t *testing.T) {
+	orig := pipeline
+	t.Cleanup(func() { pipeline = orig })
+	pipeline = append(append([]stage{}, orig...), func(*pipelineState) error { panic("boom") })
+
+	var (
+		tr  *TranspileResult
+		err error
+	)
+	require.NotPanics(t, func() { tr, err = Transpile("SELECT run_id FROM runs", testAccountID, testEnvID) })
+	require.Nil(t, tr)
+	require.ErrorContains(t, err, "boom")
+}

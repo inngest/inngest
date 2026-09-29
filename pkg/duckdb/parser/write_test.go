@@ -169,7 +169,7 @@ func TestWriteRejectsEmptyOperator(t *testing.T) {
 		&BinaryExpr{Left: &Ident{Parts: []string{"f"}}, Right: &Ident{Parts: []string{"x"}}},
 		&UnaryExpr{X: &Ident{Parts: []string{"x"}}},
 	} {
-		require.PanicsWithValue(t, "duckdb/parser: Write: empty operator", func() { _ = Write(&strings.Builder{}, n) })
+		require.EqualError(t, Write(&strings.Builder{}, n), "duckdb/parser: Write: empty operator")
 	}
 }
 
@@ -374,4 +374,32 @@ func TestWritePivotEnumTargetKeepsQuoting(t *testing.T) {
 	stmt, err := ParseString(`SELECT * FROM t PIVOT (sum(x) FOR y IN "a b")`)
 	require.NoError(t, err)
 	require.Contains(t, String(stmt), `IN ("a b")`)
+}
+
+// TestWriteOffsetOnly checks an OFFSET with no LIMIT (a LimitClause with a
+// nil Limit) prints as a bare OFFSET wherever it appears, not just at the
+// root, where it used to be the only place it didn't panic.
+func TestWriteOffsetOnly(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"root", "SELECT a FROM t OFFSET 5", "SELECT a FROM t OFFSET 5"},
+		{"from subquery", "SELECT * FROM (SELECT a FROM t OFFSET 5) s", "SELECT * FROM (SELECT a FROM t OFFSET 5) AS s"},
+		{"in subquery", "SELECT a FROM t WHERE a IN (SELECT b FROM u OFFSET 1)", "SELECT a FROM t WHERE a IN (SELECT b FROM u OFFSET 1)"},
+		{"cte body", "WITH c AS (SELECT a FROM t OFFSET 2) SELECT a FROM c", "WITH c AS (SELECT a FROM t OFFSET 2) SELECT a FROM c"},
+		{"set-op operand", "(SELECT a FROM t OFFSET 1) UNION ALL SELECT a FROM u", "(SELECT a FROM t OFFSET 1) UNION ALL SELECT a FROM u"},
+		{"order by then offset", "SELECT a FROM t ORDER BY a OFFSET 1", "SELECT a FROM t ORDER BY a OFFSET 1"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteReturnsErrorForUnwritableAST checks Write reports an AST it
+// can't render as an error rather than panicking out to its caller.
+func TestWriteReturnsErrorForUnwritableAST(t *testing.T) {
+	stmt := &SelectStatement{Columns: []*SelectItem{{Expr: nil}}}
+	var sb strings.Builder
+	err := Write(&sb, stmt)
+	require.ErrorContains(t, err, "duckdb/parser: Write: unhandled Expr <nil>")
 }
