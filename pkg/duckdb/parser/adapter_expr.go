@@ -610,6 +610,14 @@ func (a *adapter) adaptStarExpression(n *peg.Node) Expr {
 		// ExcludeList <- ExcludeOrExcept ExcludeNames
 		s.Exclude = a.adaptExcludeNames(body(ex).Children[1])
 	}
+	// Not modeled on StarExpr; silently dropping them would change which
+	// columns (or column names) the query returns.
+	if _, ok := present(seq.Children[3]); ok {
+		panic("duckdb/parser: * REPLACE (...) is not yet supported")
+	}
+	if _, ok := present(seq.Children[4]); ok {
+		panic("duckdb/parser: * RENAME (...) is not yet supported")
+	}
 	return s
 }
 
