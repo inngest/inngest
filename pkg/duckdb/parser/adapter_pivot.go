@@ -44,7 +44,10 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 	// degenerate unparenthesized "FOR col IN a" spelling.
 	target := choice(body(seq.Children[2]))
 	if target.Name == "PivotEnumTarget" {
-		pc.In = []string{literalText(body(target))} // PivotEnumTarget <- Identifier
+		// PivotEnumTarget <- Identifier. Kept as source text like the list
+		// form below, since Write emits In verbatim: a decoded quoted
+		// identifier would lose its quotes.
+		pc.In = []string{a.rawText(body(target))}
 		return pc
 	}
 	// PivotListTarget <- PivotTargetList ; PivotTargetList <- Parens(TargetList)
