@@ -1,6 +1,7 @@
 package peg
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -70,6 +71,13 @@ type Parser struct {
 	// '<' / '<=' commits to '<' and fails on the leftover '='. Word literals
 	// are unaffected (they already require an identifier boundary).
 	SymbolTokens []string
+	// MaxDepth, if positive, caps how many rule invocations may be nested
+	// at once. Recursion depth tracks the input's nesting, and Go can't
+	// recover from a goroutine stack overflow, so a parser exposed to
+	// untrusted input needs this to fail deeply-nested input cleanly
+	// (ErrTooDeep) instead of crashing the process. Like Grammar and
+	// Primitives, it must not change once the Parser has been used.
+	MaxDepth int
 
 	dispatchOnce sync.Once
 	dispatch     map[string]dispatchEntry
@@ -202,9 +210,22 @@ func mentionsRef(expr Expr, name string) bool {
 type ParseError struct {
 	Pos     int
 	Message string
+
+	tooDeep bool
 }
 
 func (e *ParseError) Error() string { return fmt.Sprintf("offset %d: %s", e.Pos, e.Message) }
+
+// ErrTooDeep is wrapped by the *ParseError a parse returns when it exceeds
+// Parser.MaxDepth.
+var ErrTooDeep = errors.New("input is nested too deeply")
+
+func (e *ParseError) Unwrap() error {
+	if e.tooDeep {
+		return ErrTooDeep
+	}
+	return nil
+}
 
 // Parse builds a fresh evaluator for this one call, so the returned *Node
 // is valid indefinitely. A caller that parses many inputs back-to-back and
@@ -241,7 +262,7 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 	// either is read.
 	dispatch := p.getDispatch()
 	e := &evaluator{
-		dispatch: dispatch, munch: p.munch, callSigs: p.callSigs, skip: skip, input: input,
+		dispatch: dispatch, munch: p.munch, callSigs: p.callSigs, skip: skip, input: input, maxDepth: p.MaxDepth,
 		refMemo:   make(map[refMemoKey]memoEntry, len(input)*12),
 		callMemo:  make(map[callMemoKey]memoEntry, len(input)/2+1),
 		skipCache: skipCache,
@@ -262,6 +283,7 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 func (e *evaluator) reset(input string) {
 	e.input = input
 	e.furthestFail = 0
+	e.depth, e.tooDeep, e.tooDeepPos = 0, false, 0
 	if cap(e.skipCache) >= len(input)+1 {
 		e.skipCache = e.skipCache[:len(input)+1]
 	} else {
@@ -281,6 +303,9 @@ func (e *evaluator) reset(input string) {
 func (e *evaluator) run(root string) (*Node, error) {
 	start := e.skipPos(0)
 	node, next, ok := e.evalRef(root, nil, false, start)
+	if e.tooDeep {
+		return nil, &ParseError{Pos: e.tooDeepPos, Message: ErrTooDeep.Error(), tooDeep: true}
+	}
 	if !ok {
 		return nil, &ParseError{Pos: e.furthestFail, Message: fmt.Sprintf("failed to parse %s", root)}
 	}
@@ -392,6 +417,13 @@ type evaluator struct {
 	callMemo     map[callMemoKey]memoEntry
 	furthestFail int
 
+	// depth counts the rule invocations currently being evaluated; once it
+	// would exceed maxDepth, tooDeep is set and every further invocation
+	// fails immediately so the parse unwinds without more work.
+	depth, maxDepth int
+	tooDeep         bool
+	tooDeepPos      int
+
 	// skipCache memoizes skipPos by input offset (-1 = uncomputed). Every
 	// layer of a pure rule-reference chain re-skips trivia at the same
 	// already-skipped position (see evalRef's comment on why that's
@@ -420,6 +452,21 @@ type evaluator struct {
 	// primitives tried speculatively as often as they are, re-evaluating
 	// it per call would cost as much as the heap allocation it replaces.
 	newNodeFn func(Node) *Node
+}
+
+// enter records one more nested rule invocation at pos, reporting false
+// (without recording it) once that would exceed maxDepth. Every true
+// return must be paired with a depth-- once the invocation's body returns.
+func (e *evaluator) enter(pos int) bool {
+	if e.tooDeep {
+		return false
+	}
+	if e.maxDepth > 0 && e.depth >= e.maxDepth {
+		e.tooDeep, e.tooDeepPos = true, pos
+		return false
+	}
+	e.depth++
+	return true
 }
 
 func (e *evaluator) fail(pos int) {
@@ -601,7 +648,11 @@ func (e *evaluator) evalRef(name string, env *env, noSkip bool, pos int) (*Node,
 	if m, ok := e.refMemo[key]; ok {
 		return m.node, m.next, m.ok
 	}
+	if !e.enter(p) {
+		return nil, 0, false
+	}
 	body, next, ok := e.evalExpr(rule.Expr, nil, noSkip, p)
+	e.depth--
 	var result *Node
 	if ok {
 		result = e.newNode(Node{Kind: KindRule, Name: name, Start: p, End: next, Children: e.oneChild(body)})
@@ -630,8 +681,12 @@ func (e *evaluator) evalCall(name string, arg *Expr, callerEnv *env, noSkip bool
 	if m, ok := e.callMemo[key]; ok {
 		return m.node, m.next, m.ok
 	}
+	if !e.enter(p) {
+		return nil, 0, false
+	}
 	calleeEnv := e.newEnv(env{name: rule.Param, bind: binding{expr: *arg, env: callerEnv}})
 	body, next, ok := e.evalExpr(rule.Expr, calleeEnv, noSkip, p)
+	e.depth--
 	var result *Node
 	if ok {
 		result = e.newNode(Node{Kind: KindRule, Name: name, Start: p, End: next, Children: e.oneChild(body)})
