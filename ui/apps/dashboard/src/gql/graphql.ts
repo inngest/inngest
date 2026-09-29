@@ -126,8 +126,6 @@ export type Account = {
   datadogConnections: Array<DatadogConnectionStatus>;
   datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
-  /** @deprecated Use ents instead. */
-  entitlements: Entitlements;
   ents: AccountEntitlements;
   /** Monthly execution cap. Null when the account is uncapped or the feature is off for it. */
   executionCap: Maybe<AccountExecutionCap>;
@@ -452,8 +450,6 @@ export type BillingPlan = {
   amount: Scalars['Int']['output'];
   availableAddons: AvailableAddons;
   billingPeriod: Scalars['BillingPeriod']['output'];
-  /** @deprecated Use ents instead. */
-  entitlements: Entitlements;
   ents: PlanEntitlements;
   features: Scalars['Map']['output'];
   id: Scalars['ID']['output'];
@@ -815,13 +811,6 @@ export type EntitlementBool = {
   enabled: Scalars['Boolean']['output'];
 };
 
-export type EntitlementConcurrency = {
-  __typename?: 'EntitlementConcurrency';
-  burstMode: BurstConcurrencyMode;
-  limit: Scalars['Int']['output'];
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementConcurrencyValue = {
   __typename?: 'EntitlementConcurrencyValue';
   burstMode: BurstConcurrencyMode;
@@ -838,19 +827,6 @@ export type EntitlementConnectWorkerConnections = {
   limit: Maybe<Scalars['Int']['output']>;
 };
 
-export type EntitlementEvents = {
-  __typename?: 'EntitlementEvents';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-};
-
-export type EntitlementExecutions = {
-  __typename?: 'EntitlementExecutions';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementInt = {
   __typename?: 'EntitlementInt';
   limit: Scalars['Int']['output'];
@@ -859,20 +835,6 @@ export type EntitlementInt = {
 export type EntitlementNullableInt = {
   __typename?: 'EntitlementNullableInt';
   limit: Maybe<Scalars['Int']['output']>;
-};
-
-export type EntitlementRunCount = {
-  __typename?: 'EntitlementRunCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
-};
-
-export type EntitlementStepCount = {
-  __typename?: 'EntitlementStepCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
 };
 
 export type EntitlementUsage = {
@@ -896,46 +858,10 @@ export type EntitlementUsageStepCount = {
   overageAllowed: Scalars['Boolean']['output'];
 };
 
-export type EntitlementUserCount = {
-  __typename?: 'EntitlementUserCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementWithOverage = {
   __typename?: 'EntitlementWithOverage';
   limit: Maybe<Scalars['Int']['output']>;
   overageAllowed: Scalars['Boolean']['output'];
-};
-
-export type Entitlements = {
-  __typename?: 'Entitlements';
-  accountID: Maybe<Scalars['UUID']['output']>;
-  concurrency: EntitlementConcurrency;
-  connect: EntitlementBool;
-  connectAppsPerConnection: EntitlementConnectAppsPerConnection;
-  connectWorkerConnections: EntitlementConnectWorkerConnections;
-  eventBatchCount: EntitlementInt;
-  eventBatchTimeout: EntitlementInt;
-  eventSize: EntitlementInt;
-  events: EntitlementEvents;
-  executions: EntitlementExecutions;
-  functionBacklogSize: EntitlementNullableInt;
-  hipaa: EntitlementBool;
-  history: EntitlementInt;
-  metricsExport: EntitlementBool;
-  metricsExportFreshness: EntitlementInt;
-  metricsExportGranularity: EntitlementInt;
-  otelTraces: EntitlementBool;
-  planID: Maybe<Scalars['UUID']['output']>;
-  realtimeConnections: EntitlementInt;
-  realtimeMessages: EntitlementInt;
-  runCount: EntitlementRunCount;
-  runDuration: EntitlementInt;
-  slackChannel: EntitlementBool;
-  stepCount: EntitlementStepCount;
-  tracingCustomSpans: EntitlementInt;
-  userCount: EntitlementUserCount;
 };
 
 export type EnvEdge = {
@@ -1294,12 +1220,6 @@ export type FunctionRunV2 = {
 
 export type FunctionRunV2TraceArgs = {
   preview: InputMaybe<Scalars['Boolean']['input']>;
-};
-
-export type FunctionRunV2Edge = {
-  __typename?: 'FunctionRunV2Edge';
-  cursor: Scalars['String']['output'];
-  node: FunctionRunV2;
 };
 
 export type FunctionTrigger = {
@@ -2467,8 +2387,6 @@ export type RunTraceTrigger = {
 
 export type RunsConnection = {
   __typename?: 'RunsConnection';
-  edges: Array<FunctionRunV2Edge>;
-  pageInfo: PageInfo;
   totalCount: Scalars['Int']['output'];
 };
 
@@ -3264,11 +3182,8 @@ export type WorkspaceRunTriggerArgs = {
 
 
 export type WorkspaceRunsArgs = {
-  after: InputMaybe<Scalars['String']['input']>;
   filter: RunsFilterV2;
-  first?: Scalars['Int']['input'];
   orderBy: Array<RunsOrderBy>;
-  preview: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
