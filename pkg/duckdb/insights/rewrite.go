@@ -69,7 +69,15 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 
 	r := &arrayOfStructRewriter{scope: scope}
 	for _, item := range stmt.Columns {
+		orig := item.Expr
 		item.Expr = r.rewrite(item.Expr)
+		// An unaliased bare col.field item is named by its last part (see
+		// outputColumnName); its computed replacement would lose that name,
+		// both as a result column and when deriveTable re-derives a CTE or
+		// subquery from this rewritten body, so pin it as an explicit alias.
+		if id, ok := orig.(*parser.Ident); ok && item.Alias == "" && item.Expr != orig {
+			item.Alias = id.Parts[len(id.Parts)-1]
+		}
 	}
 	if stmt.Where != nil {
 		stmt.Where = r.rewrite(stmt.Where)
