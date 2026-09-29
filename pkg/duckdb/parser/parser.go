@@ -41,7 +41,7 @@ func newPegParser() (*peg.Parser, *KeywordSets, error) {
 		return nil, nil, fmt.Errorf("duckdb/parser: %w", err)
 	}
 	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens}, ks, nil
+	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens, MaxDepth: maxRuleDepth}, ks, nil
 }
 
 // isNonIdentKeyword reports whether s, spelled bare, would lex as a keyword
@@ -59,10 +59,28 @@ func isNonIdentKeyword(s string) bool {
 	return false
 }
 
+// MaxSQLBytes is the longest input ParseString accepts. Parse cost (time,
+// and memo/slab memory preallocated in proportion to input length) grows
+// with input size — a 64KiB query already takes a few hundred MB of
+// allocations — so larger input is rejected up front rather than parsed.
+const MaxSQLBytes = 64 << 10
+
+// maxRuleDepth caps nested grammar-rule invocations (peg.Parser.MaxDepth).
+// Each level of parenthesized nesting costs about 20 rules and each rule a
+// few KB of goroutine stack, so this allows roughly 200 levels of nesting —
+// far beyond any realistic query — while keeping the stack in the low tens
+// of MB instead of overflowing it, which Go can't recover from.
+const maxRuleDepth = 4096
+
 // ParseString parses a single DuckDB SELECT statement into a typed AST. A
 // trailing ';' and surrounding whitespace are tolerated; anything else
-// after the statement is a parse error.
+// after the statement is a parse error, as is input longer than
+// MaxSQLBytes or nested too deeply to parse safely.
 func ParseString(sql string) (stmt *SelectStatement, err error) {
+	if len(sql) > MaxSQLBytes {
+		return nil, &ParseError{Pos: positionAt(sql, 0), Message: fmt.Sprintf("query is %d bytes, exceeding the %d-byte limit", len(sql), MaxSQLBytes)}
+	}
+
 	p, loadErr := loadPegParser()
 	if loadErr != nil {
 		return nil, loadErr
@@ -78,6 +96,14 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 	sess := p.AcquireSession()
 	defer sess.Release()
 
+	// Registered before sess.Parse, not just before adapting, so a panic
+	// from the peg engine or a primitive is also returned as an error.
+	defer func() {
+		if r := recover(); r != nil {
+			stmt, err = nil, fmt.Errorf("duckdb/parser: %v", r)
+		}
+	}()
+
 	cst, parseErr := sess.Parse(trimmed, "SelectStatement")
 	if parseErr != nil {
 		pos := Position{}
@@ -87,14 +113,12 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 			pos = positionAt(trimmed, perr.Pos)
 			msg = perr.Message
 		}
+		if errors.Is(parseErr, peg.ErrTooDeep) {
+			msg = "query is nested too deeply"
+		}
 		return nil, &ParseError{Pos: pos, Message: msg}
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			stmt, err = nil, fmt.Errorf("duckdb/parser: %v", r)
-		}
-	}()
 	a := newAdapter(trimmed)
 	// SelectStatement <- SelectStatementInternal
 	return a.adaptSelectStatementInternal(body(cst)), nil

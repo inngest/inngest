@@ -1,6 +1,7 @@
 package peg
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -113,6 +114,41 @@ Y <- 'y'
 	require.NoError(t, err)
 	_, err = p.Parse("(y) b", "Forwarded")
 	require.NoError(t, err)
+}
+
+func TestParseMaxDepth(t *testing.T) {
+	g, err := ParseGrammar(`
+Nested <- Parens(Nested) / 'x'
+Parens(D) <- '(' D ')'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, MaxDepth: 20}
+	nested := func(depth int) string {
+		return strings.Repeat("(", depth) + "x" + strings.Repeat(")", depth)
+	}
+
+	// Each level is one Nested + one Parens invocation.
+	_, err = p.Parse(nested(9), "Nested")
+	require.NoError(t, err)
+
+	_, err = p.Parse(nested(10), "Nested")
+	require.ErrorIs(t, err, ErrTooDeep)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Equal(t, 10, perr.Pos)
+
+	// A pooled session that hit the limit starts the next parse clean.
+	s := p.AcquireSession()
+	defer s.Release()
+	_, err = s.Parse(nested(10), "Nested")
+	require.ErrorIs(t, err, ErrTooDeep)
+	_, err = s.Parse(nested(9), "Nested")
+	require.NoError(t, err)
+
+	// Malformed input under the limit is still an ordinary parse error.
+	_, err = p.Parse("((x)", "Nested")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrTooDeep)
 }
 
 func TestParseMemoizesRepeatedRuleAtSamePosition(t *testing.T) {
