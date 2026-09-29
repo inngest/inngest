@@ -122,7 +122,7 @@ SelectStatement
       Ident(b)
       Ident(tags)
 
--- SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1;
+-- SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1
 SelectStatement
   SelectItem()
     Ident(a)
@@ -146,4 +146,30 @@ SelectStatement
       Ident(d)
       UnaryExpr(-)
         Literal(1,1)
+
+-- SELECT a FROM t WHERE 'x' ~~ data ->> 'name' AND b !~* 'y' AND c NOT ~~~ 'z*' AND d ~ 'r' || s;
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(AND)
+    BinaryExpr(AND)
+      BinaryExpr(AND)
+        LikeExpr(~~,not=false)
+          Literal(0,x)
+          BinaryExpr(->>)
+            Ident(data)
+            Literal(0,name)
+        LikeExpr(!~*,not=false)
+          Ident(b)
+          Literal(0,y)
+      LikeExpr(~~~,not=true)
+        Ident(c)
+        Literal(0,z*)
+    LikeExpr(~,not=false)
+      Ident(d)
+      BinaryExpr(||)
+        Literal(0,r)
+        Ident(s)
 
