@@ -290,6 +290,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *Parameter:
 		sw.parameter(v)
 	case *BinaryExpr:
+		requireOp(v.Op)
 		p := binaryPrec(v.Op)
 		sw.exprAtLeast(v.Left, p)
 		sw.str(" ")
@@ -297,6 +298,8 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(" ")
 		sw.exprAtLeast(v.Right, p+1)
 	case *QuantifiedExpr:
+		requireOp(v.Op)
+		requireOp(v.Quantifier)
 		sw.exprAtLeast(v.Left, precOther)
 		sw.str(" ")
 		sw.str(v.Op)
@@ -523,10 +526,20 @@ func (sw *sqlWriter) parameter(p *Parameter) {
 	}
 }
 
+// requireOp refuses an empty operator: printing one would put its operands
+// (or operand and neighbor) side by side, e.g. `f  (x)`, which DuckDB
+// reparses as a function call rather than the expression the AST holds.
+func requireOp(op string) {
+	if op == "" {
+		panic("duckdb/parser: Write: empty operator")
+	}
+}
+
 func (sw *sqlWriter) unaryExpr(u *UnaryExpr) {
 	// A space between two adjacent operator tokens keeps them from lexing
 	// as one: "--" starts a line comment, "~~" is LIKE, and "!!" doesn't
 	// parse at all.
+	requireOp(u.Op)
 	inner, nested := u.X.(*UnaryExpr)
 	if u.Postfix {
 		sw.exprAtLeast(u.X, precAtom)

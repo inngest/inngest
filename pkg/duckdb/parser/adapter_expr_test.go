@@ -325,6 +325,23 @@ func TestAdaptStarReplaceAndRenameRejected(t *testing.T) {
 	}
 }
 
+func TestAdaptQualifiedOperatorRejected(t *testing.T) {
+	// OPERATOR(op) is a multi-token rule literalText can't read: infix it
+	// used to adapt to an empty-Op BinaryExpr (`a  b`, which DuckDB
+	// reparses as a function call), prefix it silently vanished.
+	for _, sql := range []string{
+		"SELECT a OPERATOR(+) b FROM t",
+		"SELECT a OPERATOR(pg_catalog.||) b FROM t",
+		"SELECT OPERATOR(-) 1",
+		"SELECT - OPERATOR(-) 1",
+	} {
+		t.Run(sql, func(t *testing.T) {
+			_, err := ParseString(sql)
+			require.ErrorContains(t, err, "OPERATOR(...) is not supported")
+		})
+	}
+}
+
 func TestAdaptFunctionCallShape(t *testing.T) {
 	e := parseExprForTest(t, "count(DISTINCT a ORDER BY a) FILTER (WHERE a > 0)")
 	f, ok := e.(*FunctionExpr)
