@@ -50,3 +50,16 @@ func TestRemapTablesUnion(t *testing.T) {
 	args := remapTables(stmt, testAccountID, testEnvID)
 	require.Equal(t, []any{testAccountID.String(), testEnvID.String(), testAccountID.String(), testEnvID.String()}, args)
 }
+
+func TestRemapTablesInQuantifiedSubquery(t *testing.T) {
+	// Tenant scoping must reach a subquery under = ANY exactly as it
+	// reaches one under IN.
+	stmt := mustParse(t, "SELECT run_id FROM runs WHERE run_id = ANY (SELECT id FROM events)")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Equal(t, []any{testAccountID.String(), testEnvID.String(), testAccountID.String(), testEnvID.String()}, args)
+	require.Equal(t,
+		"SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE run_id = ANY (SELECT id FROM inngest.insights_events(?, ?) AS events)",
+		parser.String(stmt),
+	)
+}
