@@ -60,6 +60,47 @@ func TestParseStringRecoversPanicAsError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseStringRejectsOversizedInput(t *testing.T) {
+	// Padding stays within the limit and parses normally.
+	atLimit := "SELECT 1" + strings.Repeat(" ", MaxSQLBytes-len("SELECT 1"))
+	_, err := ParseString(atLimit)
+	require.NoError(t, err)
+
+	_, err = ParseString(atLimit + " ")
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Contains(t, perr.Message, "exceeding the 65536-byte limit")
+}
+
+func TestParseStringRejectsDeepNesting(t *testing.T) {
+	nestedParens := func(depth int) string {
+		return "SELECT " + strings.Repeat("(", depth) + "1" + strings.Repeat(")", depth)
+	}
+	nestedSubqueries := func(depth int) string {
+		return strings.Repeat("SELECT * FROM (", depth) + "SELECT 1" + strings.Repeat(") AS s", depth)
+	}
+
+	// Realistic nesting is unaffected.
+	_, err := ParseString(nestedParens(100))
+	require.NoError(t, err)
+	_, err = ParseString(nestedSubqueries(100))
+	require.NoError(t, err)
+
+	// 20k levels fits in MaxSQLBytes but, unguarded, overflows the
+	// goroutine stack — a fatal, unrecoverable crash rather than a panic.
+	for _, sql := range []string{nestedParens(20000), nestedSubqueries(3000)} {
+		require.Less(t, len(sql), MaxSQLBytes)
+		_, err = ParseString(sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr)
+		require.Equal(t, "query is nested too deeply", perr.Message)
+	}
+
+	// The pooled session that hit the limit is reusable afterwards.
+	_, err = ParseString("SELECT a FROM t")
+	require.NoError(t, err)
+}
+
 func TestParseStringRejectsMalformedSQL(t *testing.T) {
 	_, err := ParseString("SELEC * FROM")
 	require.Error(t, err)
