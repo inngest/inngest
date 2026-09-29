@@ -57,3 +57,18 @@ func TestTranspileRespectsExistingLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, tr.Limited)
 }
+
+// OPERATOR(op) used to adapt to an empty-Op BinaryExpr, which Write
+// rendered as `getenv  (...)` -- DuckDB reparses that as a call to a
+// function the allowlist never saw.
+func TestTranspileRejectsQualifiedOperator(t *testing.T) {
+	for _, sql := range []string{
+		`WITH c AS (SELECT run_id AS getenv FROM runs) SELECT getenv OPERATOR(+) ('HOME' || '') AS leaked FROM c`,
+		`SELECT OPERATOR(-) 1 AS x FROM runs`,
+	} {
+		t.Run(sql, func(t *testing.T) {
+			_, err := Transpile(sql, testAccountID, testEnvID)
+			require.ErrorContains(t, err, "OPERATOR(...) is not supported")
+		})
+	}
+}
