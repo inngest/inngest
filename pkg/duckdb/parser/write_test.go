@@ -253,3 +253,24 @@ func TestWriteSliceBounds(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteBetweenInLikeOperandParens checks the left operand of
+// BETWEEN/IN/LIKE is parenthesized when it is itself one of them: the
+// grammar's BetweenInLikeExpression takes a single, non-repeating
+// BetweenInLikeOp, so a flat `a LIKE 'x' IN (TRUE)` doesn't parse.
+func TestWriteBetweenInLikeOperandParens(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"like under in", "SELECT (a LIKE 'x') IN (TRUE)", "SELECT (a LIKE 'x') IN (TRUE)"},
+		{"between under between", "SELECT (a BETWEEN 1 AND 2) BETWEEN FALSE AND TRUE", "SELECT (a BETWEEN 1 AND 2) BETWEEN FALSE AND TRUE"},
+		{"in under like", "SELECT (a IN (1, 2)) NOT LIKE 'x'", "SELECT (a IN (1, 2)) NOT LIKE 'x'"},
+		{"in containment under in", "SELECT (a IN xs) IN (TRUE)", "SELECT (a IN xs) IN (TRUE)"},
+		{"other operator needs no parens", "SELECT a || b LIKE 'x'", "SELECT a || b LIKE 'x'"},
+		{"escape binds a comparison", "SELECT a LIKE 'x' ESCAPE b = c", "SELECT a LIKE 'x' ESCAPE b = c"},
+		{"escape keeps parens around or", "SELECT a LIKE 'x' ESCAPE (b OR c)", "SELECT a LIKE 'x' ESCAPE (b OR c)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}

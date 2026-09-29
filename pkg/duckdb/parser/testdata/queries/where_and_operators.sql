@@ -21,3 +21,5 @@ SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
 SELECT a FROM t WHERE 'x' = data ->> 'name' AND b <= 1 AND c != 2 AND d=-1;
 
 SELECT a FROM t WHERE 'x' ~~ data ->> 'name' AND b !~* 'y' AND c NOT ~~~ 'z*' AND d ~ 'r' || s;
+
+SELECT a FROM t WHERE (a LIKE 'x') IN (TRUE) AND (b BETWEEN 1 AND 2) NOT BETWEEN FALSE AND TRUE AND c LIKE 'y' ESCAPE (d OR e);
