@@ -1172,7 +1172,7 @@ func (sw *sqlWriter) selectStatement(s *SelectStatement) {
 
 	switch {
 	case s.SetOp != SetOpNone:
-		sw.setOperand(s.SetLeft, s.SetOp)
+		sw.setOperand(s.SetLeft, s.SetOp, false)
 		sw.str(" ")
 		sw.str(s.SetOp.String())
 		if s.SetAll {
@@ -1182,7 +1182,7 @@ func (sw *sqlWriter) selectStatement(s *SelectStatement) {
 			sw.str(" BY NAME")
 		}
 		sw.str(" ")
-		sw.setOperand(s.SetRight, s.SetOp)
+		sw.setOperand(s.SetRight, s.SetOp, true)
 	case s.Values != nil:
 		sw.str("VALUES ")
 		for i, row := range s.Values {
@@ -1274,10 +1274,15 @@ func (sw *sqlWriter) simpleSelectCore(s *SelectStatement) {
 // operand in the source if it was itself parenthesized — see
 // adaptSelectAtom's SelectParens case), or when parentOp is the
 // tighter-binding INTERSECT and child is the looser UNION/EXCEPT (see
-// adaptSelectSetOpChain / adaptIntersectChain's two-tier precedence).
-func (sw *sqlWriter) setOperand(child *SelectStatement, parentOp SetOp) {
+// adaptSelectSetOpChain / adaptIntersectChain's two-tier precedence), or
+// when child is a right operand set operation that doesn't bind tighter
+// than parentOp — both tiers are left-associative, so a flat
+// `a EXCEPT b EXCEPT c` means `(a EXCEPT b) EXCEPT c`.
+func (sw *sqlWriter) setOperand(child *SelectStatement, parentOp SetOp, right bool) {
+	looser := child.SetOp == SetOpUnion || child.SetOp == SetOpExcept
 	needsParens := child.With != nil || child.OrderBy != nil || child.Limit != nil ||
-		(parentOp == SetOpIntersect && (child.SetOp == SetOpUnion || child.SetOp == SetOpExcept))
+		(parentOp == SetOpIntersect && looser) ||
+		(right && child.SetOp != SetOpNone && (parentOp == SetOpIntersect || looser))
 	if needsParens {
 		sw.str("(")
 		sw.selectStatement(child)
