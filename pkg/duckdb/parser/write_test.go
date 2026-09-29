@@ -294,3 +294,25 @@ func TestWriteIntervalValueParens(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteSeparatesAdjacentOperators checks Write never glues two
+// operator tokens into a different one: "--" starts a line comment, "~~"
+// is LIKE, and DuckDB rejects "!!".
+func TestWriteSeparatesAdjacentOperators(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"double minus", "SELECT - -1", "SELECT - -1"},
+		{"parenthesized double minus", "SELECT -(-a), b", "SELECT - -a, b"},
+		{"double tilde", "SELECT ~ ~a", "SELECT ~ ~a"},
+		{"minus tilde", "SELECT -~a", "SELECT - ~a"},
+		{"plus minus", "SELECT +-a", "SELECT + -a"},
+		{"binary minus then unary minus", "SELECT a - -1", "SELECT a - -1"},
+		{"divide by unary minus", "SELECT a / -1", "SELECT a / -1"},
+		{"single prefix stays tight", "SELECT -a", "SELECT -a"},
+		{"double factorial", "SELECT (a!)!", "SELECT a! !"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
