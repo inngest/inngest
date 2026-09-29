@@ -485,9 +485,14 @@ func (q *queue) BacklogsByPartition(ctx context.Context, partitionID string, fro
 				iterated++
 			}
 
+			cursorAdvanced := ptFrom.IsZero() || res.Cursor > ptFrom.UnixMilli()
 			ptFrom = time.UnixMilli(res.Cursor)
 
 			l.Trace("iterated backlogs in partition", "count", iterated)
+
+			if !opt.EnableMillisecondIncrease && !cursorAdvanced {
+				break
+			}
 
 			if opt.EnableMillisecondIncrease {
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
