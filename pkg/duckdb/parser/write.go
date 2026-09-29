@@ -524,13 +524,20 @@ func (sw *sqlWriter) parameter(p *Parameter) {
 }
 
 func (sw *sqlWriter) unaryExpr(u *UnaryExpr) {
+	// A space between two adjacent operator tokens keeps them from lexing
+	// as one: "--" starts a line comment, "~~" is LIKE, and "!!" doesn't
+	// parse at all.
+	inner, nested := u.X.(*UnaryExpr)
 	if u.Postfix {
 		sw.exprAtLeast(u.X, precAtom)
+		if nested && inner.Postfix {
+			sw.str(" ")
+		}
 		sw.str(u.Op)
 		return
 	}
 	sw.str(u.Op)
-	if startsWithLetter(u.Op) {
+	if startsWithLetter(u.Op) || nested && !inner.Postfix && !startsWithLetter(inner.Op) {
 		sw.str(" ")
 	}
 	sw.exprAtLeast(u.X, prec(u))
