@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
+import { InsightsColumnRole } from '@/gql/graphql';
 import { convertToCSV, convertToJSON } from './useDownloadInsightsResults';
 
 const data: InsightsFetchResult = {
-  columns: [{ name: 'created_at', type: 'date' }],
+  columns: [
+    {
+      name: 'created_at',
+      type: 'date',
+      role: InsightsColumnRole.Unspecified,
+    },
+  ],
   rows: [
     {
       id: 'row-0',

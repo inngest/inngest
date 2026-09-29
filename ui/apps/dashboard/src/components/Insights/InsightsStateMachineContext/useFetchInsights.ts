@@ -21,6 +21,7 @@ const insightResultsQuery = graphql(`
       columns {
         name
         columnType
+        role
       }
       rows {
         values
@@ -124,6 +125,7 @@ function transformInsightsResponse(
     columns: insights.columns.map((col) => ({
       name: col.name,
       type: mapColumnType(col.columnType),
+      role: col.role,
     })),
     rows: insights.rows.map((row, index) => ({
       id: `row-${index}`,
