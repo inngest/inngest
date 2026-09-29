@@ -80,6 +80,11 @@ func TestWritePrecedencePreservesGrouping(t *testing.T) {
 		{"in list containment stays unparenthesized", "x IN list_col", "x IN list_col"},
 		{"not in list containment", "x NOT IN [1, 2]", "x NOT IN [1, 2]"},
 		{"in parenthesized single element stays a list", "x IN (list_col)", "x IN (list_col)"},
+		{"comparison binds looser than json arrow", "'x' = data ->> 'name'", "'x' = data ->> 'name'"},
+		{"comparison binds looser than concat", "name = 'a' || 'b'", "name = 'a' || 'b'"},
+		{"explicit parens around comparison under concat", "(name = 'a') || 'b'", "(name = 'a') || 'b'"},
+		{"not-equal is not factorial", "a!=b", "a != b"},
+		{"comparison against unspaced negative", "a<=-1", "a <= -1"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -62,9 +62,17 @@ type Parser struct {
 	// to skipping nothing if nil — this package has no notion of "SQL";
 	// the root package (Task 4) supplies a real SQL trivia-skipper.
 	SkipTrivia func(input string, pos int) int
+	// SymbolTokens lists multi-character symbol tokens (e.g. "<=") that a
+	// shorter symbol literal must never split: '<' does not match where the
+	// input continues as "<=". This is a tokenizer's maximal munch, which
+	// a scannerless PEG otherwise lacks — without it, an ordered choice like
+	// '<' / '<=' commits to '<' and fails on the leftover '='. Word literals
+	// are unaffected (they already require an identifier boundary).
+	SymbolTokens []string
 
 	dispatchOnce sync.Once
 	dispatch     map[string]dispatchEntry
+	munch        *munchTable
 
 	// sessionPool recycles evaluators (and their node/child/env slabs, memo
 	// maps, and skip cache) across Session.Parse calls — see Session's doc
@@ -109,8 +117,47 @@ func (p *Parser) getDispatch() map[string]dispatchEntry {
 			nextID++
 		}
 		p.dispatch = d
+		p.munch = newMunchTable(p.SymbolTokens)
 	})
 	return p.dispatch
+}
+
+// munchTable indexes SymbolTokens by each of their proper prefixes, so
+// matchLiteral can ask "does a longer token start here?" for a literal.
+// cont is a cheap pre-filter: only a byte that appears past the first
+// position of some token can extend a literal, so every other following
+// byte skips the map lookup entirely.
+type munchTable struct {
+	longer map[string][]string
+	cont   [256]bool
+}
+
+func newMunchTable(tokens []string) *munchTable {
+	if len(tokens) == 0 {
+		return nil
+	}
+	m := &munchTable{longer: make(map[string][]string)}
+	for _, tok := range tokens {
+		for i := 1; i < len(tok); i++ {
+			m.longer[tok[:i]] = append(m.longer[tok[:i]], tok)
+			m.cont[tok[i]] = true
+		}
+	}
+	return m
+}
+
+// splits reports whether matching lit at [p, end) would split a longer
+// token that also starts at p.
+func (m *munchTable) splits(input, lit string, p, end int) bool {
+	if m == nil || end >= len(input) || !m.cont[input[end]] {
+		return false
+	}
+	for _, tok := range m.longer[lit] {
+		if strings.HasPrefix(input[p:], tok) {
+			return true
+		}
+	}
+	return false
 }
 
 type ParseError struct {
@@ -151,8 +198,10 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 	for i := range skipCache {
 		skipCache[i] = -1
 	}
+	// getDispatch also builds p.munch, so it must run before p.munch is read.
+	dispatch := p.getDispatch()
 	e := &evaluator{
-		dispatch: p.getDispatch(), skip: skip, input: input,
+		dispatch: dispatch, munch: p.munch, skip: skip, input: input,
 		refMemo:   make(map[refMemoKey]memoEntry, len(input)*12),
 		callMemo:  make(map[callMemoKey]memoEntry, len(input)/2+1),
 		skipCache: skipCache,
@@ -295,6 +344,7 @@ type memoEntry struct {
 
 type evaluator struct {
 	dispatch     map[string]dispatchEntry
+	munch        *munchTable
 	skip         func(input string, pos int) int
 	input        string
 	refMemo      map[refMemoKey]memoEntry
@@ -611,7 +661,12 @@ func (e *evaluator) matchLiteral(lit string, noSkip bool, pos int) (int, bool) {
 		return 0, false
 	}
 	end := p + len(lit)
-	if isWordLiteral(lit) && end < len(e.input) && identCont(e.input[end]) {
+	if isWordLiteral(lit) {
+		if end < len(e.input) && identCont(e.input[end]) {
+			e.fail(p)
+			return 0, false
+		}
+	} else if e.munch.splits(e.input, lit, p, end) {
 		e.fail(p)
 		return 0, false
 	}
