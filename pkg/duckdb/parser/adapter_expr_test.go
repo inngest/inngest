@@ -102,6 +102,30 @@ func TestAdaptIsDistinctFrom(t *testing.T) {
 	require.True(t, d.Not)
 }
 
+func TestAdaptComparisonNegatedRightOperand(t *testing.T) {
+	// ComparisonExpressionTail's optional NOT negates only the right
+	// operand: `a = NOT b` is `a = (NOT b)`, never `a = b`.
+	e := parseExprForTest(t, "a = NOT b")
+	eq, ok := e.(*BinaryExpr)
+	require.True(t, ok)
+	require.Equal(t, "=", eq.Op)
+	require.Equal(t, []string{"a"}, eq.Left.(*Ident).Parts)
+	not, ok := eq.Right.(*UnaryExpr)
+	require.True(t, ok)
+	require.Equal(t, "NOT", not.Op)
+	require.Equal(t, []string{"b"}, not.X.(*Ident).Parts)
+
+	e = parseExprForTest(t, "a <> NOT NOT b")
+	ne, ok := e.(*BinaryExpr)
+	require.True(t, ok)
+	outer, ok := ne.Right.(*UnaryExpr)
+	require.True(t, ok)
+	inner, ok := outer.X.(*UnaryExpr)
+	require.True(t, ok)
+	require.Equal(t, "NOT", inner.Op)
+	require.Equal(t, []string{"b"}, inner.X.(*Ident).Parts)
+}
+
 func TestAdaptBetween(t *testing.T) {
 	e := parseExprForTest(t, "a NOT BETWEEN 1 AND 10")
 	b, ok := e.(*BetweenExpr)
