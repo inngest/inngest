@@ -59,7 +59,7 @@ const pausedContent = {
 const enhancedContent: Partial<Record<UsageBand, CardContent>> = {
   '50': { kind: 'caution', ...pausedContent },
   '75': { kind: 'warning', ...pausedContent },
-  '90': { kind: 'error', ...pausedContent },
+  '90': { kind: 'error', ...pausedContent, dismissable: false },
   capped: {
     kind: 'error',
     title: 'New runs are paused',
