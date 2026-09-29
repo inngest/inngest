@@ -316,3 +316,24 @@ func TestWriteSeparatesAdjacentOperators(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteSetOpRightOperandParens checks a set operation's right operand
+// keeps its parens when it is itself a set operation: set operations are
+// left-associative, so only a tighter-binding INTERSECT under UNION/EXCEPT
+// can be printed flat on the right.
+func TestWriteSetOpRightOperandParens(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"except under except", "SELECT a FROM t1 EXCEPT (SELECT a FROM t2 EXCEPT SELECT a FROM t3)", "SELECT a FROM t1 EXCEPT (SELECT a FROM t2 EXCEPT SELECT a FROM t3)"},
+		{"union under union all", "SELECT 1 UNION ALL (SELECT 1 UNION SELECT 1)", "SELECT 1 UNION ALL (SELECT 1 UNION SELECT 1)"},
+		{"union under except", "SELECT 1 EXCEPT (SELECT 1 UNION SELECT 2)", "SELECT 1 EXCEPT (SELECT 1 UNION SELECT 2)"},
+		{"intersect under intersect", "SELECT 1 INTERSECT (SELECT 1 INTERSECT SELECT 2)", "SELECT 1 INTERSECT (SELECT 1 INTERSECT SELECT 2)"},
+		{"intersect under union stays flat", "SELECT 1 UNION (SELECT 1 INTERSECT SELECT 2)", "SELECT 1 UNION SELECT 1 INTERSECT SELECT 2"},
+		{"intersect under except stays flat", "SELECT 1 EXCEPT (SELECT 1 INTERSECT SELECT 2)", "SELECT 1 EXCEPT SELECT 1 INTERSECT SELECT 2"},
+		{"left-nested stays flat", "(SELECT 1 EXCEPT SELECT 2) EXCEPT SELECT 3", "SELECT 1 EXCEPT SELECT 2 EXCEPT SELECT 3"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
