@@ -128,7 +128,7 @@ func TestCELEventFilters(t *testing.T) {
 			name: "event.ts greater than",
 			cel:  []string{`event.ts > 1727291508963`},
 			expected: []sq.Expression{
-				sq.L("CAST((x::JSON->>?) AS DOUBLE)", "$.ts").Gt(int64(1727291508963)),
+				sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.ts").Gt(int64(1727291508963)),
 			},
 		},
 		{
@@ -218,7 +218,7 @@ func TestCELOutputFilters(t *testing.T) {
 			name: "output numeric comparison",
 			cel:  []string{`output.count >= 3`},
 			expected: []sq.Expression{
-				sq.L("CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(3)),
+				sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(3)),
 			},
 		},
 		{
@@ -291,7 +291,7 @@ func TestCELEventTableFiltersNestedOrGroup(t *testing.T) {
 	require.NoError(t, err)
 	sqlText, args, err := RenderWhereSQL(filters)
 	require.NoError(t, err)
-	assert.Equal(t, "(((event_name = ?) AND ((CAST((event_data::JSON->>?) AS DOUBLE) = ?) OR (CAST((event_data::JSON->>?) AS DOUBLE) = ?))) OR (event_name = ?))", sqlText)
+	assert.Equal(t, "(((event_name = ?) AND ((TRY_CAST((event_data::JSON->>?) AS DOUBLE) = ?) OR (TRY_CAST((event_data::JSON->>?) AS DOUBLE) = ?))) OR (event_name = ?))", sqlText)
 	assert.Equal(t, []any{"x", "$.a", int64(1), "$.a", int64(3), "z"}, args)
 }
 
@@ -362,9 +362,9 @@ func TestRenderWhereSQL(t *testing.T) {
 			name: "multiple filters AND together with positional args in order",
 			filters: []sq.Expression{
 				sq.L("(x::JSON->>'$.name')").Eq("test/hello"),
-				sq.L("CAST((x::JSON->>'$.ts') AS DOUBLE)").Gt(int64(123)),
+				sq.L("TRY_CAST((x::JSON->>'$.ts') AS DOUBLE)").Gt(int64(123)),
 			},
-			wantSQL:  "(((x::JSON->>'$.name') = ?) AND (CAST((x::JSON->>'$.ts') AS DOUBLE) > ?))",
+			wantSQL:  "(((x::JSON->>'$.name') = ?) AND (TRY_CAST((x::JSON->>'$.ts') AS DOUBLE) > ?))",
 			wantArgs: []any{"test/hello", int64(123)},
 		},
 	}
