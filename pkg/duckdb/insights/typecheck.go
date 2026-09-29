@@ -158,7 +158,7 @@ func binaryExprType(b *parser.BinaryExpr, scope *tableScope) ColumnType {
 			return ColumnTypeDatetime
 		}
 		return ColumnTypeNumber
-	case "&", "|", "~", "<<", ">>":
+	case "&", "|", "<<", ">>":
 		return ColumnTypeNumber
 	default:
 		return ColumnTypeUnknown
