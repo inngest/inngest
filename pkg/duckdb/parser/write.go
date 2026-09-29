@@ -575,23 +575,22 @@ func (sw *sqlWriter) listExpr(l *ListExpr) {
 	sw.str("]")
 }
 
-// sliceExpr can't always distinguish a bare index x[i] from an open-ended
-// slice x[i:] — both adapt to Start=i, Stop=nil, HasStep=false, since
-// SliceExpr has no separate "a colon was written" flag (see
-// adaptSliceExpression). This always emits the bare-index form for that
-// shape; HasStep alone is unambiguous (the grammar can't match a step
-// colon without first matching a stop colon), so the ":" before a step is
-// always printed correctly.
+// sliceExpr prints the stop colon whenever the source had one, so an
+// open-ended slice x[i:] (a list) never collapses into a bare index x[i]
+// (an element). A step implies a stop colon in the grammar; checking the
+// other fields too keeps a hand-built AST printing a valid slice.
 func (sw *sqlWriter) sliceExpr(s *SliceExpr) {
 	sw.exprAtLeast(s.X, precAtom)
 	sw.str("[")
 	if s.Start != nil {
 		sw.exprTop(s.Start)
 	}
-	if s.Stop != nil || s.HasStep {
+	if s.HasStop || s.Stop != nil || s.StopMinus || s.HasStep {
 		sw.str(":")
 		if s.Stop != nil {
 			sw.exprTop(s.Stop)
+		} else if s.StopMinus {
+			sw.str("-")
 		}
 	}
 	if s.HasStep {
