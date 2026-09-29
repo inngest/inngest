@@ -51,7 +51,7 @@ SelectStatement
       PivotColumn(in=[])
         Ident(quarter)
 
--- UNPIVOT wide ON q1, q2, q3, q4;
+-- UNPIVOT wide ON q1, q2, q3, q4
 SelectStatement
   FromClause
     UnpivotRef(header=[],names=[],alias=)
@@ -64,4 +64,17 @@ SelectStatement
         Ident(q3)
       SelectItem()
         Ident(q4)
+
+-- SELECT * FROM t PIVOT (sum(x) FOR y IN "a b");
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    PivotRef(groupBy=[],alias=)
+      BaseTableRef(t,alias=)
+      SelectItem()
+        FunctionExpr(sum,distinct=false)
+          Ident(x)
+      PivotColumn(in=["a b"])
+        Ident(y)
 

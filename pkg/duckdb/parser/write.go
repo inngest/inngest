@@ -465,7 +465,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(strings.ReplaceAll(v.Value, "'", "''"))
 		sw.str("'")
 	case *NamedArg:
-		sw.str(v.Name)
+		writeIdentPart(sw, v.Name)
 		sw.str(" := ")
 		sw.exprTop(v.Value)
 	case *FunctionExpr:
@@ -633,12 +633,12 @@ func (sw *sqlWriter) sliceExpr(s *SliceExpr) {
 
 func (sw *sqlWriter) lambdaExpr(l *LambdaExpr) {
 	if len(l.Params) == 1 {
-		sw.str(l.Params[0])
+		writeIdentPart(sw, l.Params[0])
 	} else {
 		sw.str("(")
 		for i, p := range l.Params {
 			sw.sep(i, ", ")
-			sw.str(p)
+			writeIdentPart(sw, p)
 		}
 		sw.str(")")
 	}
@@ -652,7 +652,7 @@ func (sw *sqlWriter) listComprehensionExpr(l *ListComprehensionExpr) {
 	sw.str(" FOR ")
 	for i, v := range l.Vars {
 		sw.sep(i, ", ")
-		sw.str(v)
+		writeIdentPart(sw, v)
 	}
 	sw.str(" IN ")
 	sw.exprTop(l.Source)
