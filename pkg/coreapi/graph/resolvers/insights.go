@@ -4,13 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+)
+
+// errInsightsInternal is what Insights returns in place of a recovered panic.
+var errInsightsInternal = errors.New("insights: internal error running query")
+
+// transpileInsights and executeInsights are seams for tests to inject a
+// panic; production always uses the insights package's own functions.
+var (
+	transpileInsights = insights.Transpile
+	executeInsights   = insights.Execute
 )
 
 // Insights backs Query.insights — see
@@ -19,12 +31,24 @@ import (
 // (Runs/RunTrace/etc.), there's no non-DuckDB fallback to fall through to,
 // so a nil DuckDB errors clearly rather than resolving empty — matching
 // 007/008's precedent of a clear GQL error over a silent empty result.
-func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.InsightsQueryResult, error) {
+func (qr *queryResolver) Insights(ctx context.Context, sql string) (res *models.InsightsQueryResult, err error) {
 	if qr.DuckDB == nil {
 		return nil, fmt.Errorf("insights requires dual-write (--duckdb) to be enabled")
 	}
 
 	start := time.Now()
+
+	// The insights pipeline walks arbitrary user-shaped ASTs; a bug there
+	// must fail this one query, not the request (or, off the GQL path, the
+	// process). The query text isn't logged: it's user data.
+	defer func() {
+		if r := recover(); r != nil {
+			logger.StdlibLogger(ctx).Error("insights: recovered panic running query",
+				"panic", r, "stack", string(debug.Stack()))
+			recordInsightsQueryMetrics(ctx, start, "internal_error", "", 0)
+			res, err = nil, errInsightsInternal
+		}
+	}()
 
 	// SHOW TABLES / DESCRIBE <table> answer entirely from this package's
 	// own static schema registry (tables.go) -- no SQL parsing, no
@@ -48,7 +72,7 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.Insi
 	// has no per-request, auth-derived account/env ID to draw from today.
 	// See docs/plans/012-duckdb-insights-query-layer-plan.md's Global
 	// Constraints on env scoping.
-	tr, err := insights.Transpile(sql, consts.DevServerAccountID, consts.DevServerEnvID)
+	tr, err := transpileInsights(sql, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		// A rejected query (bad SQL, unknown table/column, disallowed
 		// function, ...) still resolves as a normal (empty) result with a
@@ -65,7 +89,7 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (*models.Insi
 		return nil, err
 	}
 
-	result, err := insights.Execute(ctx, qr.DuckDB, tr)
+	result, err := executeInsights(ctx, qr.DuckDB, tr)
 	if err != nil {
 		// A query that parsed and validated can still fail once it
 		// actually runs (a stale allowlist entry a macro doesn't project,

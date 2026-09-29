@@ -6,13 +6,22 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime/debug"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
+	"github.com/inngest/inngest/pkg/logger"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+// transpileInsights and executeInsights are seams for tests to inject a
+// panic; production always uses the insights package's own functions.
+var (
+	transpileInsights = insights.Transpile
+	executeInsights   = insights.Execute
 )
 
 // QueryInsights backs POST /v2/insights/query -- the REST counterpart of
@@ -25,7 +34,19 @@ import (
 // own diagnostics field exists for exactly this, matching the resolver's
 // precedent that this is a query problem a client can point back at, not
 // an API failure.
-func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
+func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (resp *apiv2.QueryInsightsResponse, err error) {
+	// The insights pipeline walks arbitrary user-shaped ASTs; a bug there
+	// must fail this one request with a 500, not crash the gRPC server. The
+	// query text isn't logged: it's user data.
+	defer func() {
+		if r := recover(); r != nil {
+			logger.StdlibLogger(ctx).Error("insights: recovered panic running query",
+				"panic", r, "stack", string(debug.Stack()))
+			resp, err = nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError,
+				"Internal error running the Insights query.")
+		}
+	}()
+
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_QueryInsights_FullMethodName); result.Limited {
 		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
 			"API rate limit exceeded. The request was rejected and no query was executed.")
@@ -47,7 +68,7 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 	// consts.DevServerAccountID/EnvID, matching every other apiv2 endpoint
 	// (endpoints.go's FetchAccount/FetchEnv) and the GQL resolver -- this
 	// service has no per-request, auth-derived account/env ID today.
-	tr, err := insights.Transpile(req.Query, consts.DevServerAccountID, consts.DevServerEnvID)
+	tr, err := transpileInsights(req.Query, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
 			return queryInsightsDiagnosticResponse(verr.Diagnostic(), req.Query), nil
@@ -55,7 +76,7 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorValidationError, err.Error())
 	}
 
-	result, err := insights.Execute(ctx, s.duckDB, tr)
+	result, err := executeInsights(ctx, s.duckDB, tr)
 	if err != nil {
 		if eerr, ok := errors.AsType[*insights.ExecutionError](err); ok {
 			return queryInsightsDiagnosticResponse(eerr.Diagnostic(), req.Query), nil
