@@ -338,6 +338,15 @@ func (a *adapter) adaptLikeVariations(n *peg.Node) string {
 	return literalText(alt)
 }
 
+// rejectQualifiedOperator refuses OPERATOR([schema.]op), infix or prefix.
+// Its multi-token Seq isn't readable by literalText, so adapting it would
+// yield an empty operator: infix that renders its operands adjacent
+// (`f  (x)`, which DuckDB reparses as a function call), prefix it silently
+// drops the operator.
+func rejectQualifiedOperator() {
+	panic("duckdb/parser: OPERATOR(...) is not supported")
+}
+
 func (a *adapter) adaptOtherOperatorExpression(n *peg.Node) Expr {
 	// OtherOperatorTail <- OtherOperator BitwiseExpression ;
 	// OtherOperator <- AnyAllParsedOperator / NamedOtherOperator.
@@ -358,6 +367,8 @@ func (a *adapter) adaptOtherOperatorExpression(n *peg.Node) Expr {
 				Left:       left,
 				Right:      right,
 			}
+		} else if choice(body(alt)).Name == "QualifiedOperator" {
+			rejectQualifiedOperator()
 		}
 		return &BinaryExpr{baseExpr: a.at(tail), Op: literalText(tseq.Children[0]), Left: left, Right: right}
 	})
@@ -398,7 +409,10 @@ func (a *adapter) adaptPrefixExpression(n *peg.Node) Expr {
 	prefixes := body(seq.Children[0]).Children
 	result := a.adaptBaseExpression(seq.Children[1])
 	for i := len(prefixes) - 1; i >= 0; i-- {
-		result = &UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
+		if choice(body(prefixes[i])).Name == "QualifiedOperator" {
+			rejectQualifiedOperator()
+		}
+		result =&UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
 	}
 	return result
 }
