@@ -111,7 +111,7 @@ SelectStatement
     OrderByItem(desc=false,nulls=false/false)
       Ident(b)
 
--- SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5;
+-- SELECT a FROM t ORDER BY ALL LIMIT 10 OFFSET 5
 SelectStatement
   SelectItem()
     Ident(a)
@@ -122,4 +122,13 @@ SelectStatement
   LimitClause(all=false,percent=false)
     Literal(1,10)
     Literal(1,5)
+
+-- SELECT "group", t."order" AS "select" FROM "table" AS t;
+SelectStatement
+  SelectItem()
+    Ident(group)
+  SelectItem(select)
+    Ident(t.order)
+  FromClause
+    BaseTableRef(table,alias=t)
 
