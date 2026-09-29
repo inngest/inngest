@@ -87,6 +87,11 @@ func TestWritePrecedencePreservesGrouping(t *testing.T) {
 		{"explicit parens around comparison under concat", "(name = 'a') || 'b'", "(name = 'a') || 'b'"},
 		{"not-equal is not factorial", "a!=b", "a != b"},
 		{"comparison against unspaced negative", "a<=-1", "a <= -1"},
+		{"any subquery", "a = ANY (SELECT 1)", "a = ANY (SELECT 1)"},
+		{"all list keeps its parens", "a >= ALL ([1, 2])", "a >= ALL ([1, 2])"},
+		{"any over a column keeps its parens", "a <> ANY (xs)", "a <> ANY (xs)"},
+		{"any operand binds looser than concat", "a || b = ANY (xs)", "a || b = ANY (xs)"},
+		{"any under comparison", "(a = ANY (xs)) = TRUE", "a = ANY (xs) = TRUE"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

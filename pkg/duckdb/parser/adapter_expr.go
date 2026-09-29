@@ -170,10 +170,11 @@ func foldLeftAssoc(head Expr, tails *peg.Node, combine func(left Expr, tail *peg
 	return result
 }
 
-// foldBinaryLevel handles the 9 precedence levels whose grammar shape is
-// exactly "Operand TailRule*" with Tail exactly "OpRule Operand" — LogicalOr,
-// LogicalAnd, OtherOperator, Bitwise, Additive, Multiplicative,
-// Exponentiation, Collate, AtTimeZone. adaptOperand adapts one operand at
+// foldBinaryLevel handles the precedence levels whose grammar shape is
+// exactly "Operand TailRule*" with Tail exactly "OpRule Operand" and OpRule
+// a single token — LogicalOr, LogicalAnd, Bitwise, Additive, Multiplicative,
+// Exponentiation, Collate. (OtherOperator and AtTimeZone have multi-token
+// operators and fold themselves.) adaptOperand adapts one operand at
 // this level (i.e. the next-higher-precedence level's adapter).
 func (a *adapter) foldBinaryLevel(n *peg.Node, adaptOperand func(*peg.Node) Expr) Expr {
 	seq := body(n)
@@ -338,7 +339,28 @@ func (a *adapter) adaptLikeVariations(n *peg.Node) string {
 }
 
 func (a *adapter) adaptOtherOperatorExpression(n *peg.Node) Expr {
-	return a.foldBinaryLevel(n, a.adaptBitwiseExpression)
+	// OtherOperatorTail <- OtherOperator BitwiseExpression ;
+	// OtherOperator <- AnyAllParsedOperator / NamedOtherOperator.
+	// AnyAllOperator <- AnyOp AnyOrAll is a two-token Seq that
+	// literalText can't read, so it gets its own node.
+	seq := body(n)
+	head := a.adaptBitwiseExpression(seq.Children[0])
+	return foldLeftAssoc(head, seq.Children[1], func(left Expr, tail *peg.Node) Expr {
+		tseq := body(tail)
+		right := a.adaptBitwiseExpression(tseq.Children[1])
+		if alt := choice(body(tseq.Children[0])); alt.Name == "AnyAllParsedOperator" {
+			// AnyAllParsedOperator <- AnyAllOperator
+			aseq := body(body(alt))
+			return &QuantifiedExpr{
+				baseExpr:   a.at(tail),
+				Op:         literalText(aseq.Children[0]),
+				Quantifier: literalText(aseq.Children[1]),
+				Left:       left,
+				Right:      right,
+			}
+		}
+		return &BinaryExpr{baseExpr: a.at(tail), Op: literalText(tseq.Children[0]), Left: left, Right: right}
+	})
 }
 func (a *adapter) adaptBitwiseExpression(n *peg.Node) Expr {
 	return a.foldBinaryLevel(n, a.adaptAdditiveExpression)
