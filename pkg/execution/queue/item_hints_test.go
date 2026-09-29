@@ -1,7 +1,9 @@
 package queue
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -25,7 +28,7 @@ type hintTestShard struct {
 	migrationCalls atomic.Int32
 	locked         *time.Time
 	migrationErr   error
-	beforeLease    func()
+	beforeLease    func(context.Context)
 	leaseNow       time.Time
 	kind           enums.QueueShardKind
 }
@@ -40,7 +43,10 @@ func (s *hintTestShard) Kind() enums.QueueShardKind {
 func (s *hintTestShard) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, opts ...LeaseOptionFn) (*ulid.ULID, error) {
 	s.leaseCalls.Add(1)
 	if s.beforeLease != nil {
-		s.beforeLease()
+		s.beforeLease(ctx)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	s.leaseNow = now
 	if s.leaseErr != nil {
@@ -73,6 +79,89 @@ func hintTestQueue(t *testing.T, source ItemHintSource, extra ...QueueOpt) (*que
 	q, err := New(t.Context(), "hint-test", registry, append(opts, extra...)...)
 	require.NoError(t, err)
 	return q, shard, clock
+}
+
+func TestItemHintRecoversAfterShardLeaseExpiry(t *testing.T) {
+	for _, backend := range []enums.QueueShardKind{enums.QueueShardKindRedis, "fdb"} {
+		for _, expiredAtStartup := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/expired-at-startup=%t", backend, expiredAtStartup), func(t *testing.T) {
+				ready := make(chan context.Context, 1)
+				var offer func(QueueItem) bool
+				var starts atomic.Int32
+				q, shard, clock := hintTestQueue(t, func(ctx context.Context, owned QueueShard, admit func(QueueItem) bool) error {
+					starts.Add(1)
+					offer = admit
+					ready <- ctx
+					<-ctx.Done()
+					return ctx.Err()
+				})
+				shard.kind = backend
+				q.runMode.ShardGroup = "self-serve"
+				setLease := func(until time.Time) {
+					lease := ulid.MustNew(ulid.Timestamp(until), nil)
+					q.shardLeaseLock.Lock()
+					q.shardLeaseID = &lease
+					q.shardLeaseLock.Unlock()
+				}
+				setLease(clock.Now().Add(ShardLeaseDuration))
+				if expiredAtStartup {
+					// Ownership was acquired, but renewal is delayed before hints start.
+					setLease(clock.Now().Add(-time.Millisecond))
+				}
+				dispatched := make(chan string, 3)
+				stop := q.startItemHints(t.Context(), func(_ context.Context, work ProcessItem) (DispatchedItem, error) {
+					dispatched <- work.I.ID
+					q.Semaphore().Release(1)
+					return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+				})
+				t.Cleanup(stop)
+				var sourceCtx context.Context
+				select {
+				case sourceCtx = <-ready:
+				case <-time.After(time.Second):
+					t.Fatal("temporary expiry prevented the receiver from starting")
+				}
+				clock.BlockUntil(1)
+				if !expiredAtStartup {
+					_, _, before := hintMetrics(t)
+					require.True(t, offer(hintItem(shard.item, "pending-1")))
+					require.True(t, offer(hintItem(shard.item, "pending-2")))
+					clock.Advance(ShardLeaseDuration + time.Millisecond)
+					require.Eventually(t, func() bool {
+						_, _, after := hintMetrics(t)
+						return after["inactive"]-before["inactive"] == 2
+					}, time.Second, time.Millisecond, "inactive hints must be discarded without a lease attempt")
+				}
+				require.False(t, offer(hintItem(shard.item, "while-expired")))
+				require.Zero(t, shard.leaseCalls.Load())
+				require.NoError(t, sourceCtx.Err(), "temporary expiry must preserve the receiver and boot identity")
+
+				setLease(clock.Now().Add(ShardLeaseDuration))
+				require.True(t, offer(hintItem(shard.item, "after-renewal")))
+				clock.Advance(time.Millisecond)
+				select {
+				case id := <-dispatched:
+					require.Equal(t, "after-renewal", id, "discarded hints must not be replayed")
+				case <-time.After(time.Second):
+					t.Fatal("hint did not dispatch after renewal recovered")
+				}
+				require.EqualValues(t, 1, shard.leaseCalls.Load())
+				require.EqualValues(t, 1, starts.Load(), "recovery reuses the existing source")
+
+				// Actual renewal-loop termination still shuts down registration.
+				q.hintsStopped.Store(true)
+				clock.Advance(time.Millisecond)
+				select {
+				case <-sourceCtx.Done():
+				case <-time.After(time.Second):
+					t.Fatal("receiver stayed alive after ownership renewal stopped")
+				}
+				require.False(t, offer(hintItem(shard.item, "after-ownership-loss")))
+				stop()
+				require.Empty(t, dispatched)
+			})
+		}
+	}
 }
 
 type observedHintCompletion struct {
@@ -157,7 +246,7 @@ func TestItemHintDrainsSnapshotSerially(t *testing.T) {
 	entered := make(chan struct{}, 3)
 	releaseLease := make(chan struct{})
 	release := sync.OnceFunc(func() { close(releaseLease) })
-	shard.beforeLease = func() { entered <- struct{}{}; <-releaseLease }
+	shard.beforeLease = func(context.Context) { entered <- struct{}{}; <-releaseLease }
 	dispatched := make(chan string, 3)
 	stop := q.startItemHints(t.Context(), func(_ context.Context, work ProcessItem) (DispatchedItem, error) {
 		dispatched <- work.I.ID
@@ -373,3 +462,151 @@ func TestItemHintLeasesEarlyButWorkerWaits(t *testing.T) {
 }
 
 func hintItem(item QueueItem, id string) QueueItem { item.ID = id; return item }
+
+// Only read-only eligibility uses the hint budget. Lease/dispatch must preserve
+// the normal processor context, including its cancellation and deadline.
+func TestItemHintLeaseContext(t *testing.T) {
+	for _, backend := range []enums.QueueShardKind{enums.QueueShardKindRedis, "fdb"} {
+		for _, shutdown := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/shutdown=%t", backend, shutdown), func(t *testing.T) {
+				q, shard, _ := hintTestQueue(t, nil)
+				shard.kind = backend
+				q.itemHints.AttemptTimeout = 20 * time.Millisecond
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+				defer cancel()
+				var eligibilityCtx context.Context
+				q.PartitionPausedGetter = func(ctx context.Context, _ uuid.UUID) PartitionPausedInfo {
+					eligibilityCtx = ctx
+					return PartitionPausedInfo{}
+				}
+				shard.beforeLease = func(leaseCtx context.Context) {
+					want, _ := ctx.Deadline()
+					got, _ := leaseCtx.Deadline()
+					require.Equal(t, want, got, "do not pass the hint deadline into a mutating lease")
+					<-eligibilityCtx.Done()
+					require.NoError(t, leaseCtx.Err())
+					if shutdown {
+						cancel()
+						require.ErrorIs(t, leaseCtx.Err(), context.Canceled, "processor shutdown still cancels leasing")
+					}
+				}
+				dispatches := 0
+				dispatched := q.processItemHint(ctx, hintItem(shard.item, "deadline"), func(dispatchCtx context.Context, _ ProcessItem) (DispatchedItem, error) {
+					dispatches++
+					require.NoError(t, dispatchCtx.Err(), "canceling the eligibility timer must not cancel handoff")
+					want, _ := ctx.Deadline()
+					got, _ := dispatchCtx.Deadline()
+					require.Equal(t, want, got)
+					q.Semaphore().Release(1)
+					return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+				})
+				require.EqualValues(t, 1, shard.leaseCalls.Load())
+				require.EqualValues(t, 2, q.Semaphore().Available())
+				if shutdown {
+					require.Nil(t, dispatched)
+					require.Zero(t, dispatches)
+				} else {
+					require.NotNil(t, dispatched)
+					require.Equal(t, 1, dispatches)
+				}
+			})
+		}
+	}
+}
+
+func TestItemHintEligibilityTimeoutPreventsLease(t *testing.T) {
+	for _, stage := range []string{"pause", "account", "priority"} {
+		t.Run(stage, func(t *testing.T) {
+			q, shard, _ := hintTestQueue(t, nil)
+			q.itemHints.AttemptTimeout = time.Millisecond
+			switch stage {
+			case "pause":
+				q.PartitionPausedGetter = func(ctx context.Context, _ uuid.UUID) PartitionPausedInfo {
+					<-ctx.Done()
+					return PartitionPausedInfo{}
+				}
+			case "account":
+				q.AccountExists = func(ctx context.Context, _ uuid.UUID) (bool, error) {
+					<-ctx.Done()
+					return true, nil
+				}
+			case "priority":
+				q.PartitionPriorityFinder = func(ctx context.Context, _ QueuePartition) uint {
+					<-ctx.Done()
+					return 0
+				}
+			}
+			dispatched := q.processItemHint(t.Context(), hintItem(shard.item, "expired"), func(context.Context, ProcessItem) (DispatchedItem, error) {
+				t.Error("expired eligibility must not dispatch")
+				return nil, nil
+			})
+			require.Nil(t, dispatched)
+			require.Zero(t, shard.leaseCalls.Load(), "do not begin a lease after eligibility expires")
+			require.EqualValues(t, 2, q.Semaphore().Available())
+		})
+	}
+}
+
+func TestItemHintLeaseFailureLogs(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		leaseErr    error
+		dispatchErr error
+		noCapacity  bool
+		wantStage   string
+	}{
+		{name: "backend timeout", leaseErr: context.DeadlineExceeded, wantStage: "lease"},
+		{name: "backend connection failure", leaseErr: errors.New("connection reset"), wantStage: "lease"},
+		{name: "dispatch canceled", dispatchErr: context.Canceled, wantStage: "dispatch"},
+		{name: "missing", leaseErr: ErrQueueItemNotFound},
+		{name: "already leased", leaseErr: ErrQueueItemAlreadyLeased},
+		{name: "throttled", leaseErr: ErrQueueItemThrottled},
+		{name: "concurrency limited", leaseErr: ErrPartitionConcurrencyLimit},
+		{name: "worker limit", noCapacity: true},
+		{name: "success"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			ctx := logger.WithStdlib(t.Context(), logger.From(context.Background(), logger.WithLoggerWriter(&logs), logger.WithHandler(logger.JSONHandler), logger.WithLoggerLevel(logger.LevelWarning)))
+			q, shard, _ := hintTestQueue(t, nil)
+			shard.leaseErr = tc.leaseErr
+			item := hintItem(shard.item, "logged-item")
+			item.Data.Identifier.RunID = ulid.Make()
+			item.Data.Payload = "private-payload"
+			if tc.noCapacity {
+				require.True(t, q.Semaphore().TryAcquire(2))
+				defer q.Semaphore().Release(2)
+			}
+			q.processItemHint(ctx, item, func(context.Context, ProcessItem) (DispatchedItem, error) {
+				if tc.dispatchErr != nil {
+					return nil, tc.dispatchErr
+				}
+				q.Semaphore().Release(1)
+				return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+			})
+			if tc.wantStage == "" {
+				require.Empty(t, logs.String(), "expected outcomes must not emit warnings")
+				return
+			}
+			var entry map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &entry))
+			require.Equal(t, "item hint lease/dispatch failed; scanning continues", entry["msg"])
+			require.Equal(t, tc.wantStage, entry["stage"])
+			require.Equal(t, item.ID, entry["item_id"])
+			require.Equal(t, item.Data.Identifier.RunID.String(), entry["run_id"])
+			require.Equal(t, "ss3", entry["queue_shard"])
+			require.Equal(t, "redis", entry["queue_backend"])
+			wantErr := tc.leaseErr
+			if wantErr == nil {
+				wantErr = tc.dispatchErr
+			}
+			require.Contains(t, entry["error"], wantErr.Error())
+			require.Contains(t, entry, "context_error")
+			require.Contains(t, entry, "elapsed_ms")
+			require.NotContains(t, logs.String(), "private-payload")
+			if tc.wantStage == "dispatch" {
+				require.NotEmpty(t, entry["lease_id"], "record a known successful lease before failed handoff")
+			}
+		})
+	}
+}
