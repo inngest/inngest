@@ -73,7 +73,8 @@ type Result struct {
 	Rows    [][]any
 }
 
-// Execute runs tr's rewritten SQL against db. Column metadata comes from
+// Execute runs tr's rewritten SQL against db, after checkRenderedSQL confirms
+// DuckDB reads it as referencing only what Transpile allows. Column metadata comes from
 // rows.ColumnTypes(), not a separate DESCRIBE call — the driver derives it
 // unconditionally rather than by sniffing the first returned row, so this
 // reports every column correctly even when the query matches zero rows.
@@ -82,6 +83,10 @@ type Result struct {
 // past its reconciled column count) gets no hint at all rather than a
 // panic or guess.
 func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, error) {
+	if err := checkRenderedSQL(ctx, db, tr.SQL); err != nil {
+		return nil, &ExecutionError{Err: err, Start: tr.Start, End: tr.End}
+	}
+
 	rows, err := db.QueryContext(ctx, tr.SQL, tr.Args...)
 	if err != nil {
 		return nil, &ExecutionError{Err: fmt.Errorf("executing query: %w", err), Start: tr.Start, End: tr.End}

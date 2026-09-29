@@ -197,6 +197,28 @@ func TestSetupDualWriteReturnsDBHandleOnSuccess(t *testing.T) {
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 }
 
+// TestSetupDualWriteSandboxesExternalAccess pins that the handle Insights
+// runs user SQL on can't read the environment or arbitrary files, in both
+// the persisted (DuckLake) and in-memory modes, while migrations (run after
+// the sandbox is applied) still succeed.
+func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	for _, persist := range []bool{true, false} {
+		l, db := setupDualWrite(context.Background(), true, persist, binPath, t.TempDir(), "")
+		require.NotNil(t, l, "persist=%v", persist)
+		require.NotNil(t, db, "persist=%v", persist)
+		t.Cleanup(func() { stopDualWrite(context.Background(), l) })
+
+		_, err := db.ExecContext(t.Context(), "SELECT getenv('HOME') AS v;")
+		require.ErrorContains(t, err, "getenv is disabled", "persist=%v", persist)
+		_, err = db.ExecContext(t.Context(), "SELECT content FROM read_text('/etc/hosts');")
+		require.ErrorContains(t, err, "disabled by configuration", "persist=%v", persist)
+	}
+}
+
 func TestStopDualWriteIsSafeWithNilListener(t *testing.T) {
 	require.NotPanics(t, func() {
 		stopDualWrite(context.Background(), nil)
