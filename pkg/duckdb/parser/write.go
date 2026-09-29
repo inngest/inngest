@@ -337,6 +337,16 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.exprAtLeast(v.High, precOther)
 	case *InExpr:
 		sw.exprAtLeast(v.X, precBetweenInLike)
+		if v.Contains && len(v.List) == 1 {
+			// No parens: `x IN (y)` would reparse as equality, not containment.
+			if v.Not {
+				sw.str(" NOT IN ")
+			} else {
+				sw.str(" IN ")
+			}
+			sw.exprAtLeast(v.List[0], precOther)
+			return
+		}
 		if v.Not {
 			sw.str(" NOT IN (")
 		} else {

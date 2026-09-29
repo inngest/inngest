@@ -15,3 +15,5 @@ SELECT a FROM t WHERE a IS DISTINCT FROM b;
 SELECT (1 + 2) * 3 - 4 / 2 AS calc FROM t;
 
 SELECT a FROM t WHERE a = NOT b;
+
+SELECT a FROM t WHERE a IN tags AND b NOT IN (tags);
