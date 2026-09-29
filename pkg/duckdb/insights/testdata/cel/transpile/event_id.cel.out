@@ -2,10 +2,10 @@ INPUT
 event.id == "abc"
 
 EVENT SQL
-((x::JSON->>'$.id') = ?)
+((x::JSON->>?) = ?)
 
 EVENT ARGS
-[abc]
+[$.id abc]
 
 OUTPUT SQL
 

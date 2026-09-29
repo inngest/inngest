@@ -2,13 +2,13 @@ INPUT
 event.name == "x" && output.ok == true
 
 EVENT SQL
-((x::JSON->>'$.name') = ?)
+((x::JSON->>?) = ?)
 
 EVENT ARGS
-[x]
+[$.name x]
 
 OUTPUT SQL
-((output::JSON->>'$.data.ok') = ?)
+((output::JSON->>?) = ?)
 
 OUTPUT ARGS
-[true]
+[$.data.ok true]

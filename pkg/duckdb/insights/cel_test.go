@@ -49,21 +49,21 @@ func TestCELEventTableFilters(t *testing.T) {
 			name: "event.data targets the event_data JSON column directly",
 			cel:  []string{`event.data.foo == "bar"`},
 			expected: []sq.Expression{
-				sq.L("(event_data::JSON->>'$.foo')").Eq("bar"),
+				sq.L("(event_data::JSON->>?)", "$.foo").Eq("bar"),
 			},
 		},
 		{
 			name: "event.data nested path",
 			cel:  []string{`event.data.nested.value == "x"`},
 			expected: []sq.Expression{
-				sq.L("(event_data::JSON->>'$.nested.value')").Eq("x"),
+				sq.L("(event_data::JSON->>?)", "$.nested.value").Eq("x"),
 			},
 		},
 		{
 			name: "event.data null",
 			cel:  []string{`event.data.n == null`},
 			expected: []sq.Expression{
-				sq.L("(event_data::JSON->'$.n') = 'null'::JSON"),
+				sq.L("(event_data::JSON->?) = 'null'::JSON", "$.n"),
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestCELEventTableFilters(t *testing.T) {
 			expected: []sq.Expression{
 				sq.And(
 					sq.L("event_name").Eq("x"),
-					sq.L("(event_data::JSON->>'$.foo')").Eq("bar"),
+					sq.L("(event_data::JSON->>?)", "$.foo").Eq("bar"),
 				),
 			},
 		},
@@ -107,63 +107,63 @@ func TestCELEventFilters(t *testing.T) {
 			name: "event.id equals",
 			cel:  []string{`event.id == "abc"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.id')").Eq("abc"),
+				sq.L("(x::JSON->>?)", "$.id").Eq("abc"),
 			},
 		},
 		{
 			name: "event.name not equals",
 			cel:  []string{`event.name != "test/hello"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.name')").Neq("test/hello"),
+				sq.L("(x::JSON->>?)", "$.name").Neq("test/hello"),
 			},
 		},
 		{
 			name: "event.v equals",
 			cel:  []string{`event.v == "2024-01-01"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.v')").Eq("2024-01-01"),
+				sq.L("(x::JSON->>?)", "$.v").Eq("2024-01-01"),
 			},
 		},
 		{
 			name: "event.ts greater than",
 			cel:  []string{`event.ts > 1727291508963`},
 			expected: []sq.Expression{
-				sq.L("CAST((x::JSON->>'$.ts') AS DOUBLE)").Gt(int64(1727291508963)),
+				sq.L("CAST((x::JSON->>?) AS DOUBLE)", "$.ts").Gt(int64(1727291508963)),
 			},
 		},
 		{
 			name: "event.data string field",
 			cel:  []string{`event.data.foo == "bar"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.data.foo')").Eq("bar"),
+				sq.L("(x::JSON->>?)", "$.data.foo").Eq("bar"),
 			},
 		},
 		{
 			name: "event.data boolean true",
 			cel:  []string{`event.data.b == true`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.data.b')").Eq("true"),
+				sq.L("(x::JSON->>?)", "$.data.b").Eq("true"),
 			},
 		},
 		{
 			name: "event.data null",
 			cel:  []string{`event.data.n == null`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->'$.data.n') = 'null'::JSON"),
+				sq.L("(x::JSON->?) = 'null'::JSON", "$.data.n"),
 			},
 		},
 		{
 			name: "event.data not null",
 			cel:  []string{`event.data.n != null`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->'$.data.n') != 'null'::JSON"),
+				sq.L("(x::JSON->?) != 'null'::JSON", "$.data.n"),
 			},
 		},
 		{
 			name: "event.data nested path",
 			cel:  []string{`event.data.nested.value == "x"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>'$.data.nested.value')").Eq("x"),
+				sq.L("(x::JSON->>?)", "$.data.nested.value").Eq("x"),
 			},
 		},
 		{
@@ -171,8 +171,8 @@ func TestCELEventFilters(t *testing.T) {
 			cel:  []string{`event.name == "x" && event.data.foo == "bar"`},
 			expected: []sq.Expression{
 				sq.And(
-					sq.L("(x::JSON->>'$.name')").Eq("x"),
-					sq.L("(x::JSON->>'$.data.foo')").Eq("bar"),
+					sq.L("(x::JSON->>?)", "$.name").Eq("x"),
+					sq.L("(x::JSON->>?)", "$.data.foo").Eq("bar"),
 				),
 			},
 		},
@@ -204,35 +204,35 @@ func TestCELOutputFilters(t *testing.T) {
 			name: "output boolean true targets the data envelope",
 			cel:  []string{`output.success == true`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>'$.data.success')").Eq("true"),
+				sq.L("(output::JSON->>?)", "$.data.success").Eq("true"),
 			},
 		},
 		{
 			name: "output null",
 			cel:  []string{`output.result == null`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->'$.data.result') = 'null'::JSON"),
+				sq.L("(output::JSON->?) = 'null'::JSON", "$.data.result"),
 			},
 		},
 		{
 			name: "output numeric comparison",
 			cel:  []string{`output.count >= 3`},
 			expected: []sq.Expression{
-				sq.L("CAST((output::JSON->>'$.data.count') AS DOUBLE)").Gte(int64(3)),
+				sq.L("CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(3)),
 			},
 		},
 		{
 			name: "output nested path",
 			cel:  []string{`output.nested.value == "x"`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>'$.data.nested.value')").Eq("x"),
+				sq.L("(output::JSON->>?)", "$.data.nested.value").Eq("x"),
 			},
 		},
 		{
 			name: "error targets the error envelope",
 			cel:  []string{`error.message == "boom"`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->>'$.error.message')").Eq("boom"),
+				sq.L("(output::JSON->>?)", "$.error.message").Eq("boom"),
 			},
 		},
 		{
@@ -257,11 +257,45 @@ func TestCELEventAndOutputFiltersSplitAMixedExpression(t *testing.T) {
 
 	eventFilters, err := CELEventFilters(ctx, cel)
 	require.NoError(t, err)
-	assert.Equal(t, []sq.Expression{sq.L("(x::JSON->>'$.name')").Eq("x")}, eventFilters)
+	assert.Equal(t, []sq.Expression{sq.L("(x::JSON->>?)", "$.name").Eq("x")}, eventFilters)
 
 	outputFilters, err := CELOutputFilters(ctx, cel)
 	require.NoError(t, err)
-	assert.Equal(t, []sq.Expression{sq.L("(output::JSON->>'$.data.ok')").Eq("true")}, outputFilters)
+	assert.Equal(t, []sq.Expression{sq.L("(output::JSON->>?)", "$.data.ok").Eq("true")}, outputFilters)
+}
+
+func TestCELJSONPathKeysAreBoundNotSpliced(t *testing.T) {
+	// expr lifts string literals (a bracketed key included) out of an
+	// expression unless it already mentions "vars.", so the second
+	// predicate here is what lets the raw key reach handleJSONFilter.
+	ctx := context.Background()
+	cel := []string{`event.data.foo["x') OR 1=1 OR ('"] == "y" && event.data.vars.q == "z"`}
+
+	filters, err := CELEventTableFilters(ctx, cel)
+	require.NoError(t, err)
+	sqlText, args, err := RenderWhereSQL(filters)
+	require.NoError(t, err)
+	assert.Equal(t, "(((event_data::JSON->>?) = ?) AND ((event_data::JSON->>?) = ?))", sqlText)
+	assert.Equal(t, []any{`$.foo."x') OR 1=1 OR ('"`, "y", "$.vars.q", "z"}, args)
+}
+
+func TestCELJSONPath(t *testing.T) {
+	tests := map[string]string{
+		"":                "$",
+		"id":              "$.id",
+		"data.foo.bar":    "$.data.foo.bar",
+		"data.items[0]":   "$.data.items[0]",
+		"data.items[0].x": "$.data.items[0].x",
+		"data.foo[a'b]":   `$.data.foo."a'b"`,
+		"data.foo[a.b]":   `$.data.foo."a.b"`,
+		`data.foo[a"b\c]`: `$.data.foo."a\"b\\c"`,
+		"data.foo[a b]":   `$.data.foo."a b"`,
+	}
+	for in, want := range tests {
+		t.Run(in, func(t *testing.T) {
+			assert.Equal(t, want, celJSONPath(in))
+		})
+	}
 }
 
 func TestRenderWhereSQL(t *testing.T) {

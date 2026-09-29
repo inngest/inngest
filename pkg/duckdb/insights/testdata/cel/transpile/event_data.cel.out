@@ -2,10 +2,10 @@ INPUT
 event.data.foo == "bar"
 
 EVENT SQL
-((x::JSON->>'$.data.foo') = ?)
+((x::JSON->>?) = ?)
 
 EVENT ARGS
-[bar]
+[$.data.foo bar]
 
 OUTPUT SQL
 
