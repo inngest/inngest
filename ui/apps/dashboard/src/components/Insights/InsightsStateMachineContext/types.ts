@@ -1,7 +1,10 @@
+export type InsightsColumnRole = 'EVENT_ID' | 'RUN_ID' | 'UNSPECIFIED';
+
 export interface InsightsFetchResult {
   columns: Array<{
     name: string;
     type: 'date' | 'string' | 'number';
+    role: InsightsColumnRole;
   }>;
   rows: Array<{
     id: string;

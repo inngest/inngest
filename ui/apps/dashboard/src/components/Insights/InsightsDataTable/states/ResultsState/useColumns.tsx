@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
-import { TextCell, TimeCell } from '@inngest/components/Table';
+import { LinkCell, TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
+import { InsightsColumnRole } from '@/gql/graphql';
+import { usePathCreator } from '@/utils/usePathCreator';
 
 type InsightsEntry = InsightsFetchResult['rows'][number];
 type InsightsColumnValue = InsightsEntry['values'][string];
@@ -18,6 +20,7 @@ const DEFAULT_COLUMN_SIZE = 340;
 
 // TODO: Support 'json' column type when BE supports it.
 export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
+  const pathCreator = usePathCreator();
   const columns = useMemo(() => {
     const cols = data?.columns ?? [];
     if (cols.length === 0) return [];
@@ -33,8 +36,25 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
           switch (col.type) {
             case 'date':
               return <TimeCell date={new Date(value)} />;
-            case 'string':
-              return <TextCell>{String(value)}</TextCell>;
+            case 'string': {
+              const id = String(value);
+              switch (col.role) {
+                case InsightsColumnRole.RunId:
+                  return (
+                    <LinkCell href={pathCreator.runPopout({ runID: id })}>
+                      {id}
+                    </LinkCell>
+                  );
+                case InsightsColumnRole.EventId:
+                  return (
+                    <LinkCell href={pathCreator.eventPopout({ eventID: id })}>
+                      {id}
+                    </LinkCell>
+                  );
+              }
+
+              return <TextCell>{id}</TextCell>;
+            }
             case 'number':
             default:
               return <TextCell>{String(value)}</TextCell>;
@@ -45,7 +65,7 @@ export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
         minSize: COLUMN_SIZE_BY_TYPE[col.type] ?? DEFAULT_COLUMN_SIZE,
       }),
     );
-  }, [data?.columns]);
+  }, [data?.columns, pathCreator]);
 
   return { columns };
 }

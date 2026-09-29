@@ -24,9 +24,21 @@ export function TextCell({ children, className }: React.PropsWithChildren<{ clas
   return <p className={cn(cellStyles, 'truncate font-medium', className)}>{children}</p>;
 }
 
-export function LinkCell({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
+export function LinkCell({
+  children,
+  href,
+  onClick,
+  ...props
+}: React.PropsWithChildren<LinkProps>) {
   return (
-    <Link href={href} {...props}>
+    <Link
+      href={href}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick?.(event);
+      }}
+      {...props}
+    >
       {children}
     </Link>
   );
