@@ -43,7 +43,9 @@ func remapTablesWithCTEs(stmt *parser.SelectStatement, accountID, envID uuid.UUI
 	if stmt.SetOp != parser.SetOpNone {
 		args = append(args, remapTablesWithCTEs(stmt.SetLeft, accountID, envID, ctes)...)
 		args = append(args, remapTablesWithCTEs(stmt.SetRight, accountID, envID, ctes)...)
-		return args
+		// No return: a set-op node has no FROM of its own, but its own
+		// ORDER BY/LIMIT/OFFSET can still hold subqueries, which
+		// remapSubqueriesIn below must reach.
 	}
 	if stmt.From != nil {
 		for i, ref := range stmt.From.Refs {

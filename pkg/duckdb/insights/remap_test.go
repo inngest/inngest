@@ -63,3 +63,14 @@ func TestRemapTablesInQuantifiedSubquery(t *testing.T) {
 		parser.String(stmt),
 	)
 }
+
+func TestRemapTablesRewritesSetOpModifierSubqueries(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY (SELECT max(id) FROM events) LIMIT 5 OFFSET (SELECT count(*) FROM runs)")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Len(t, args, 8)
+	require.Equal(t,
+		"SELECT run_id FROM inngest.insights_runs(?, ?) AS runs UNION ALL SELECT run_id FROM inngest.insights_runs(?, ?) AS runs ORDER BY (SELECT max(id) FROM inngest.insights_events(?, ?) AS events) LIMIT 5 OFFSET (SELECT count(*) FROM inngest.insights_runs(?, ?) AS runs)",
+		parser.String(stmt),
+	)
+}
