@@ -1,5 +1,5 @@
 {
-  "sql": "SELECT run_id, sessions -\u003e\u003e '$[*].key' AS key, sessions -\u003e\u003e '$[*].id' AS id FROM inngest.insights_runs(?, ?) AS runs LIMIT 1000",
+  "sql": "WITH x AS (SELECT sessions -\u003e\u003e '$[*].key' AS key FROM inngest.insights_runs(?, ?) AS runs) SELECT key FROM x LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"
@@ -10,28 +10,19 @@
   ],
   "limited": true,
   "columnHints": [
-    3,
-    0,
     0
   ],
   "diagnostics": [
     {
-      "start": "1:16",
-      "end": "1:28",
+      "start": "1:19",
+      "end": "1:31",
       "severity": 0,
       "code": "array-of-struct-access-rewritten",
       "message": "sessions is an array of structs, not JSON -- rewrote sessions.key to sessions -\u003e\u003e '$[*].key'."
     },
     {
-      "start": "1:30",
-      "end": "1:41",
-      "severity": 0,
-      "code": "array-of-struct-access-rewritten",
-      "message": "sessions is an array of structs, not JSON -- rewrote sessions.id to sessions -\u003e\u003e '$[*].id'."
-    },
-    {
-      "start": "1:1",
-      "end": "1:51",
+      "start": "1:43",
+      "end": "1:60",
       "severity": 0,
       "code": "default-limit-applied",
       "message": "No LIMIT was specified; results were capped at 1000 rows."

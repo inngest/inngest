@@ -19,7 +19,7 @@ func mustRewriteArrayOfStructAccess(t *testing.T, sql string) (*parser.SelectSta
 
 func TestRewriteArrayOfStructAccessBareColumn(t *testing.T) {
 	stmt, diags := mustRewriteArrayOfStructAccess(t, "SELECT sessions.key FROM runs")
-	require.Equal(t, "SELECT sessions ->> '$[*].key' FROM runs", parser.String(stmt))
+	require.Equal(t, "SELECT sessions ->> '$[*].key' AS key FROM runs", parser.String(stmt))
 	require.Len(t, diags, 1)
 	require.Equal(t, "array-of-struct-access-rewritten", diags[0].Code)
 	require.Equal(t, DiagnosticInfo, diags[0].Severity)
@@ -29,7 +29,7 @@ func TestRewriteArrayOfStructAccessBareColumn(t *testing.T) {
 
 func TestRewriteArrayOfStructAccessQualifiedColumn(t *testing.T) {
 	stmt, diags := mustRewriteArrayOfStructAccess(t, "SELECT r.sessions.key FROM runs r")
-	require.Equal(t, "SELECT r.sessions ->> '$[*].key' FROM runs AS r", parser.String(stmt))
+	require.Equal(t, "SELECT r.sessions ->> '$[*].key' AS key FROM runs AS r", parser.String(stmt))
 	require.Len(t, diags, 1)
 }
 
@@ -37,7 +37,7 @@ func TestRewriteArrayOfStructAccessInWhereGroupByOrderBy(t *testing.T) {
 	stmt, diags := mustRewriteArrayOfStructAccess(t,
 		"SELECT sessions.key FROM runs WHERE sessions.id = 'x' GROUP BY sessions.key ORDER BY sessions.key")
 	require.Equal(t,
-		"SELECT sessions ->> '$[*].key' FROM runs WHERE sessions ->> '$[*].id' = 'x' GROUP BY sessions ->> '$[*].key' ORDER BY sessions ->> '$[*].key'",
+		"SELECT sessions ->> '$[*].key' AS key FROM runs WHERE sessions ->> '$[*].id' = 'x' GROUP BY sessions ->> '$[*].key' ORDER BY sessions ->> '$[*].key'",
 		parser.String(stmt),
 	)
 	// One diagnostic per rewritten occurrence, not deduplicated by column
@@ -86,6 +86,19 @@ func TestRewriteArrayOfStructAccessInCTE(t *testing.T) {
 		"WITH x AS (SELECT sessions.key AS k FROM runs) SELECT k FROM x")
 	require.Equal(t,
 		"WITH x AS (SELECT sessions ->> '$[*].key' AS k FROM runs) SELECT k FROM x",
+		parser.String(stmt),
+	)
+	require.Len(t, diags, 1)
+}
+
+func TestRewriteArrayOfStructAccessKeepsUnaliasedNameInCTE(t *testing.T) {
+	// Unaliased, sessions.key is named "key" by validate; the rewrite
+	// must keep that name or the CTE's re-derivation rejects the now-
+	// computed column.
+	stmt, diags := mustRewriteArrayOfStructAccess(t,
+		"WITH x AS (SELECT sessions.key FROM runs) SELECT key FROM x")
+	require.Equal(t,
+		"WITH x AS (SELECT sessions ->> '$[*].key' AS key FROM runs) SELECT key FROM x",
 		parser.String(stmt),
 	)
 	require.Len(t, diags, 1)
