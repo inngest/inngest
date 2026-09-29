@@ -17,10 +17,13 @@ ERROR: 1:26: unexpected trailing input
 ERROR: 1:25: unexpected trailing input
 
 -- SELECT * REPLACE (a + 1 AS a) FROM t
-ERROR: duckdb/parser: duckdb/parser: * REPLACE (...) is not yet supported
+ERROR: duckdb/parser: * REPLACE (...) is not yet supported
 
 -- SELECT * RENAME (a AS b) FROM t
-ERROR: duckdb/parser: duckdb/parser: * RENAME (...) is not yet supported
+ERROR: duckdb/parser: * RENAME (...) is not yet supported
+
+-- SELECT * FROM t TABLESAMPLE 10%
+ERROR: duckdb/parser: TABLESAMPLE is not yet supported (see Task 10)
 
 -- SELECT ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
 ERROR: 1:202: query is nested too deeply
