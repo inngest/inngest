@@ -173,7 +173,7 @@ SelectStatement
         Literal(0,r)
         Ident(s)
 
--- SELECT a FROM t WHERE (a LIKE 'x') IN (TRUE) AND (b BETWEEN 1 AND 2) NOT BETWEEN FALSE AND TRUE AND c LIKE 'y' ESCAPE (d OR e);
+-- SELECT a FROM t WHERE (a LIKE 'x') IN (TRUE) AND (b BETWEEN 1 AND 2) NOT BETWEEN FALSE AND TRUE AND c LIKE 'y' ESCAPE (d OR e)
 SelectStatement
   SelectItem()
     Ident(a)
@@ -199,4 +199,30 @@ SelectStatement
       BinaryExpr(OR)
         Ident(d)
         Ident(e)
+
+-- SELECT - -1, -(-a), ~ ~b, a - -1, (c!)! FROM t;
+SelectStatement
+  SelectItem()
+    UnaryExpr(-)
+      UnaryExpr(-)
+        Literal(1,1)
+  SelectItem()
+    UnaryExpr(-)
+      UnaryExpr(-)
+        Ident(a)
+  SelectItem()
+    UnaryExpr(~)
+      UnaryExpr(~)
+        Ident(b)
+  SelectItem()
+    BinaryExpr(-)
+      Ident(a)
+      UnaryExpr(-)
+        Literal(1,1)
+  SelectItem()
+    UnaryExpr(!)
+      UnaryExpr(!)
+        Ident(c)
+  FromClause
+    BaseTableRef(t,alias=)
 
