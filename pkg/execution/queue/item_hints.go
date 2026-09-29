@@ -39,7 +39,7 @@ func (q *queueProcessor) hintsAllowed() bool {
 
 func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFunc) func() {
 	opts := q.itemHints
-	if opts == nil || opts.Source == nil || !q.hintsAllowed() {
+	if opts == nil || opts.Source == nil || q.hintsStopped.Load() || (!q.runMode.Partition && !q.runMode.Account) {
 		return func() {}
 	}
 	if opts.BufferSize <= 0 || opts.AttemptTimeout <= 0 {
@@ -78,7 +78,11 @@ func (q *queueProcessor) startItemHints(ctx context.Context, dispatch DispatchFu
 			case <-ctx.Done():
 				return
 			case <-tick.Chan():
-				if !q.hintsAllowed() {
+				// A delayed renewal can temporarily expire the local shard lease.
+				// Keep the source alive; admission rejects and the drain drops
+				// inactive hints until renewal recovers. Only actual shutdown of
+				// the ownership-renewal loop permanently stops the source.
+				if q.hintsStopped.Load() {
 					return
 				}
 				// Snapshot the pending count so arrivals cannot extend this pass.

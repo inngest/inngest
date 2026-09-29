@@ -75,6 +75,89 @@ func hintTestQueue(t *testing.T, source ItemHintSource, extra ...QueueOpt) (*que
 	return q, shard, clock
 }
 
+func TestItemHintRecoversAfterShardLeaseExpiry(t *testing.T) {
+	for _, backend := range []enums.QueueShardKind{enums.QueueShardKindRedis, "fdb"} {
+		for _, expiredAtStartup := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/expired-at-startup=%t", backend, expiredAtStartup), func(t *testing.T) {
+				ready := make(chan context.Context, 1)
+				var offer func(QueueItem) bool
+				var starts atomic.Int32
+				q, shard, clock := hintTestQueue(t, func(ctx context.Context, owned QueueShard, admit func(QueueItem) bool) error {
+					starts.Add(1)
+					offer = admit
+					ready <- ctx
+					<-ctx.Done()
+					return ctx.Err()
+				})
+				shard.kind = backend
+				q.runMode.ShardGroup = "self-serve"
+				setLease := func(until time.Time) {
+					lease := ulid.MustNew(ulid.Timestamp(until), nil)
+					q.shardLeaseLock.Lock()
+					q.shardLeaseID = &lease
+					q.shardLeaseLock.Unlock()
+				}
+				setLease(clock.Now().Add(ShardLeaseDuration))
+				if expiredAtStartup {
+					// Ownership was acquired, but renewal is delayed before hints start.
+					setLease(clock.Now().Add(-time.Millisecond))
+				}
+				dispatched := make(chan string, 3)
+				stop := q.startItemHints(t.Context(), func(_ context.Context, work ProcessItem) (DispatchedItem, error) {
+					dispatched <- work.I.ID
+					q.Semaphore().Release(1)
+					return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
+				})
+				t.Cleanup(stop)
+				var sourceCtx context.Context
+				select {
+				case sourceCtx = <-ready:
+				case <-time.After(time.Second):
+					t.Fatal("temporary expiry prevented the receiver from starting")
+				}
+				clock.BlockUntil(1)
+				if !expiredAtStartup {
+					_, _, before := hintMetrics(t)
+					require.True(t, offer(hintItem(shard.item, "pending-1")))
+					require.True(t, offer(hintItem(shard.item, "pending-2")))
+					clock.Advance(ShardLeaseDuration + time.Millisecond)
+					require.Eventually(t, func() bool {
+						_, _, after := hintMetrics(t)
+						return after["inactive"]-before["inactive"] == 2
+					}, time.Second, time.Millisecond, "inactive hints must be discarded without a lease attempt")
+				}
+				require.False(t, offer(hintItem(shard.item, "while-expired")))
+				require.Zero(t, shard.leaseCalls.Load())
+				require.NoError(t, sourceCtx.Err(), "temporary expiry must preserve the receiver and boot identity")
+
+				setLease(clock.Now().Add(ShardLeaseDuration))
+				require.True(t, offer(hintItem(shard.item, "after-renewal")))
+				clock.Advance(time.Millisecond)
+				select {
+				case id := <-dispatched:
+					require.Equal(t, "after-renewal", id, "discarded hints must not be replayed")
+				case <-time.After(time.Second):
+					t.Fatal("hint did not dispatch after renewal recovered")
+				}
+				require.EqualValues(t, 1, shard.leaseCalls.Load())
+				require.EqualValues(t, 1, starts.Load(), "recovery reuses the existing source")
+
+				// Actual renewal-loop termination still shuts down registration.
+				q.hintsStopped.Store(true)
+				clock.Advance(time.Millisecond)
+				select {
+				case <-sourceCtx.Done():
+				case <-time.After(time.Second):
+					t.Fatal("receiver stayed alive after ownership renewal stopped")
+				}
+				require.False(t, offer(hintItem(shard.item, "after-ownership-loss")))
+				stop()
+				require.Empty(t, dispatched)
+			})
+		}
+	}
+}
+
 type observedHintCompletion struct {
 	*dispatchedItemHandle
 	observing chan struct{}
