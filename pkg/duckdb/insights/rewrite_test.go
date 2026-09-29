@@ -104,6 +104,29 @@ func TestRewriteArrayOfStructAccessKeepsUnaliasedNameInCTE(t *testing.T) {
 	require.Len(t, diags, 1)
 }
 
+func TestRewriteArrayOfStructAccessSubqueriesSeeEnclosingCTEs(t *testing.T) {
+	for _, sql := range []string{
+		"WITH x AS (SELECT run_id FROM runs) SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM x)",
+		"WITH x AS (SELECT run_id FROM runs) SELECT run_id FROM runs WHERE EXISTS (SELECT run_id FROM x)",
+		"WITH x AS (SELECT run_id FROM runs) SELECT (SELECT max(run_id) AS m FROM x) AS m FROM runs",
+		"WITH x AS (SELECT run_id FROM runs) SELECT runs.run_id FROM runs INNER JOIN events ON runs.run_id IN (SELECT run_id FROM x)",
+	} {
+		t.Run(sql, func(t *testing.T) {
+			stmt, diags := mustRewriteArrayOfStructAccess(t, sql)
+			require.Equal(t, sql, parser.String(stmt))
+			require.Empty(t, diags)
+		})
+	}
+
+	stmt, diags := mustRewriteArrayOfStructAccess(t,
+		"WITH x AS (SELECT run_id FROM runs) SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM x WHERE sessions.key = 'k')")
+	require.Equal(t,
+		"WITH x AS (SELECT run_id FROM runs) SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM x WHERE sessions ->> '$[*].key' = 'k')",
+		parser.String(stmt),
+	)
+	require.Len(t, diags, 1)
+}
+
 func TestRewriteArrayOfStructAccessLeavesGenuineJSONColumnsAlone(t *testing.T) {
 	// data.function_id (events) and inngest.score (runs) are genuine JSON
 	// columns -- DuckDB's dot operator already works on those natively
