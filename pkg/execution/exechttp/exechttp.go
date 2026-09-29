@@ -120,7 +120,7 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	}
 
 	tracking := &httpstat.Result{}
-	req = req.WithContext(httpstat.WithHTTPStat(req.Context(), tracking))
+	req = req.WithContext(httpstat.WithHTTPStat(ctx, tracking))
 	resp, err := e.Do(req)
 	tracking.End(time.Now())
 
@@ -200,6 +200,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// Read 1 extra byte above the max so that we can check if the response is too large
 	byt, err := io.ReadAll(body)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if bodyEncoding != "" {
 			return nil, fmt.Errorf("error decoding %s response body: %w", bodyEncoding, err)
 		}
