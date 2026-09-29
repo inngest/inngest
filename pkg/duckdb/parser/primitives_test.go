@@ -123,6 +123,45 @@ func TestOperatorLiteralPrimitive(t *testing.T) {
 	}
 }
 
+// TestOperatorLiteralReservesLowerPrecedenceSymbols guards re-vendors: every
+// symbol spelling of ComparisonOperator and LikeVariations must stay out of
+// OperatorLiteral's reach, or it silently binds at OtherOperator level.
+func TestOperatorLiteralReservesLowerPrecedenceSymbols(t *testing.T) {
+	g, _, err := grammar.Load()
+	require.NoError(t, err)
+
+	var symbols []string
+	seen := map[string]bool{}
+	var collect func(e peg.Expr)
+	collect = func(e peg.Expr) {
+		switch e.Kind {
+		case peg.ExprLiteral:
+			if !isWordLiteral(e.Literal) {
+				symbols = append(symbols, e.Literal)
+			}
+		case peg.ExprRef:
+			if rule, ok := g.Rules[e.Ref]; ok && !seen[e.Ref] {
+				seen[e.Ref] = true
+				collect(rule.Expr)
+			}
+		}
+		for _, c := range e.Children {
+			collect(c)
+		}
+	}
+	collect(g.Rules["ComparisonOperator"].Expr)
+	collect(g.Rules["LikeVariations"].Expr)
+	require.Contains(t, symbols, "~~~")
+	require.Contains(t, symbols, "<>")
+
+	op := Primitives(testKeywordSets())["OperatorLiteral"]
+	for _, sym := range symbols {
+		require.Contains(t, operatorLiteralReserved, sym)
+		_, _, ok := op(testAlloc, sym+" b", 0)
+		require.Falsef(t, ok, "OperatorLiteral must not claim %q", sym)
+	}
+}
+
 func TestSymbolTokensFromAnyOp(t *testing.T) {
 	g, _, err := grammar.Load()
 	require.NoError(t, err)
