@@ -442,7 +442,16 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str("}")
 	case *IntervalExpr:
 		sw.str("INTERVAL ")
-		sw.exprTop(v.Value)
+		// IntervalParameter accepts only a string, an unsigned number, or a
+		// ParensExpression, so anything else (a column, a sum, a negated
+		// number) needs its parens back.
+		if lit, ok := v.Value.(*Literal); ok && (lit.Kind == LitString || lit.Kind == LitNumber && !strings.HasPrefix(lit.Text, "-")) {
+			sw.exprTop(v.Value)
+		} else {
+			sw.str("(")
+			sw.exprTop(v.Value)
+			sw.str(")")
+		}
 		if v.Unit != "" {
 			sw.str(" ")
 			sw.str(v.Unit)
