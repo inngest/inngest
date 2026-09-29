@@ -18,15 +18,24 @@ var (
 
 func loadPegParser() (*peg.Parser, error) {
 	pegParserOnce.Do(func() {
-		g, kl, err := grammar.Load()
-		if err != nil {
-			pegParserErr = fmt.Errorf("duckdb/parser: loading vendored grammar: %w", err)
-			return
-		}
-		ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-		pegParser = &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia}
+		pegParser, pegParserErr = newPegParser()
 	})
 	return pegParser, pegParserErr
+}
+
+// newPegParser builds a fresh peg.Parser over the vendored grammar. Most
+// callers want the shared loadPegParser instead.
+func newPegParser() (*peg.Parser, error) {
+	g, kl, err := grammar.Load()
+	if err != nil {
+		return nil, fmt.Errorf("duckdb/parser: loading vendored grammar: %w", err)
+	}
+	tokens, err := symbolTokens(g)
+	if err != nil {
+		return nil, fmt.Errorf("duckdb/parser: %w", err)
+	}
+	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
+	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens}, nil
 }
 
 // ParseString parses a single DuckDB SELECT statement into a typed AST. A
