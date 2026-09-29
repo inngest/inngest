@@ -48,7 +48,21 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 		}
 		diags, err = rewriteArrayOfStructAccess(stmt.SetRight, mergedCTEs, outerScope)
 		diagnostics = append(diagnostics, diags...)
-		return diagnostics, err
+		if err != nil {
+			return diagnostics, err
+		}
+		// The set-op node's own ORDER BY/LIMIT/OFFSET resolve against its
+		// leftmost operand's scope -- see validateSetOpModifiers.
+		leaf := leftmostOperand(stmt)
+		scope, err := resolveScope(leaf.From, mergedCTEs, nil)
+		if err != nil {
+			return diagnostics, err
+		}
+		scope.outer = outerScope
+		r := &arrayOfStructRewriter{scope: scope, ctes: mergedCTEs}
+		r.rewriteModifiers(stmt)
+		diagnostics = append(diagnostics, r.diagnostics...)
+		return diagnostics, r.err
 	}
 
 	scope, err := resolveScope(stmt.From, mergedCTEs, nil)
@@ -98,11 +112,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 			r.rewriteGroupByItem(item)
 		}
 	}
-	if stmt.OrderBy != nil {
-		for _, item := range stmt.OrderBy.Items {
-			item.X = r.rewrite(item.X)
-		}
-	}
+	r.rewriteModifiers(stmt)
 	for _, w := range stmt.Windows {
 		r.rewriteWindowSpec(w.Spec)
 	}
@@ -254,6 +264,20 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 		e.Body = r.rewrite(e.Body)
 	}
 	return expr
+}
+
+// rewriteModifiers rewrites stmt's ORDER BY/LIMIT/OFFSET -- the clauses a
+// set-op node carries too, alongside its operands.
+func (r *arrayOfStructRewriter) rewriteModifiers(stmt *parser.SelectStatement) {
+	if stmt.OrderBy != nil {
+		for _, item := range stmt.OrderBy.Items {
+			item.X = r.rewrite(item.X)
+		}
+	}
+	if stmt.Limit != nil {
+		stmt.Limit.Limit = r.rewrite(stmt.Limit.Limit)
+		stmt.Limit.Offset = r.rewrite(stmt.Limit.Offset)
+	}
 }
 
 func (r *arrayOfStructRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
