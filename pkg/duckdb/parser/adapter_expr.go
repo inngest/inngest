@@ -451,9 +451,12 @@ func (a *adapter) adaptSliceExpression(x Expr, n *peg.Node) *SliceExpr {
 	}
 	if e, ok := present(bseq.Children[1]); ok {
 		// EndSliceBound <- ':' EndSliceValue? ; EndSliceValue <- Expression / EndSliceMinus
+		s.HasStop = true
 		if v, ok := present(body(e).Children[1]); ok {
 			inner := choice(body(v))
-			if inner.Name != "EndSliceMinus" {
+			if inner.Name == "EndSliceMinus" {
+				s.StopMinus = true
+			} else {
 				s.Stop = a.adaptExpression(inner)
 			}
 		}
