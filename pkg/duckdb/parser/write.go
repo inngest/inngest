@@ -2,6 +2,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -15,17 +16,33 @@ import (
 // FETCH, a PIVOT statement vs. its table-suffix form — but it is always a
 // semantically equivalent DuckDB SELECT statement for any AST this
 // package's own parser produced. It returns the first error w returned, if
-// any; every other write is skipped once one occurs.
-func Write(w io.Writer, n Node) error {
+// any; every other write is skipped once one occurs. An AST it can't render
+// (a hand-built or mutated one with a nil or unknown node, an empty
+// operator, ...) is also returned as an error, never a panic — w may
+// then hold partial output, which must not be used.
+func Write(w io.Writer, n Node) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			msg := fmt.Sprint(r)
+			if !strings.HasPrefix(msg, errPrefix) {
+				msg = errPrefix + "Write: " + msg
+			}
+			err = errors.New(msg)
+		}
+	}()
 	sw := &sqlWriter{w: w}
 	sw.node(n)
 	return sw.err
 }
 
-// String renders n back into DuckDB SQL text and returns it directly.
+// String renders n back into DuckDB SQL text and returns it directly. It
+// panics if n can't be rendered (see Write) rather than return partial SQL;
+// use Write to get that as an error instead.
 func String(n Node) string {
 	var sb strings.Builder
-	_ = Write(&sb, n) // strings.Builder's Write never returns an error
+	if err := Write(&sb, n); err != nil { // strings.Builder itself never fails
+		panic(err.Error())
+	}
 	return sb.String()
 }
 
@@ -883,17 +900,23 @@ func (sw *sqlWriter) distinctClause(d *DistinctClause) {
 // discarding which spelling was used) — semantically identical, and this
 // is the simpler, more universally-recognized DuckDB form.
 func (sw *sqlWriter) limitClause(l *LimitClause) {
-	sw.str("LIMIT ")
-	if l.All {
-		sw.str("ALL")
-	} else {
-		sw.exprTop(l.Limit)
-	}
-	if l.Percent {
-		sw.str(" PERCENT")
+	// A nil Limit (and not ALL) is a bare "OFFSET n": no LIMIT to print.
+	if l.All || l.Limit != nil {
+		sw.str("LIMIT ")
+		if l.All {
+			sw.str("ALL")
+		} else {
+			sw.exprTop(l.Limit)
+		}
+		if l.Percent {
+			sw.str(" PERCENT")
+		}
+		if l.Offset != nil {
+			sw.str(" ")
+		}
 	}
 	if l.Offset != nil {
-		sw.str(" OFFSET ")
+		sw.str("OFFSET ")
 		sw.exprTop(l.Offset)
 	}
 }
