@@ -2,6 +2,7 @@ package insights
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -138,8 +139,16 @@ func stageAddDefaultLimit(ps *pipelineState) error {
 }
 
 // Transpile parses sql, then runs every stage in pipeline, in order. Never
-// touches the database.
-func Transpile(sql string, accountID, envID uuid.UUID) (*TranspileResult, error) {
+// touches the database. A panic in any stage (an AST shape a stage or
+// parser.Write doesn't handle) is returned as an error, never propagated:
+// sql is user-controlled, so it must not be able to crash the caller.
+func Transpile(sql string, accountID, envID uuid.UUID) (res *TranspileResult, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			res, err = nil, fmt.Errorf("insights: transpiling query: %v", r)
+		}
+	}()
+
 	stmt, err := parser.ParseString(sql)
 	if err != nil {
 		return nil, fmt.Errorf("insights: parsing query: %w", err)
@@ -152,8 +161,13 @@ func Transpile(sql string, accountID, envID uuid.UUID) (*TranspileResult, error)
 		}
 	}
 
+	var out strings.Builder
+	if err := parser.Write(&out, ps.stmt); err != nil {
+		return nil, fmt.Errorf("insights: rendering query: %w", err)
+	}
+
 	return &TranspileResult{
-		SQL:             parser.String(ps.stmt),
+		SQL:             out.String(),
 		Args:            ps.args,
 		Start:           stmt.Pos(),
 		End:             stmt.End(),
