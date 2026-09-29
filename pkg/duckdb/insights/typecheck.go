@@ -63,7 +63,7 @@ func inferType(expr parser.Expr, scope *tableScope) ColumnType {
 		// bucket DuckDBToColumnType gives any composite type.
 		return ColumnTypeJSON
 	case *parser.NullTest, *parser.IsExpr, *parser.BetweenExpr, *parser.LikeExpr,
-		*parser.InExpr, *parser.DistinctFromExpr:
+		*parser.InExpr, *parser.DistinctFromExpr, *parser.QuantifiedExpr:
 		return ColumnTypeBoolean
 	case *parser.ListExpr, *parser.StructExpr, *parser.MapExpr:
 		return ColumnTypeJSON
