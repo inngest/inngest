@@ -2,6 +2,7 @@ package peg
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -73,6 +74,10 @@ type Parser struct {
 	dispatchOnce sync.Once
 	dispatch     map[string]dispatchEntry
 	munch        *munchTable
+	// callSigs holds the precomputed memo signature of every composite
+	// call argument that doesn't mention its enclosing rule's parameter,
+	// keyed by the argument's address in Grammar — see argSig.
+	callSigs map[*Expr]string
 
 	// sessionPool recycles evaluators (and their node/child/env slabs, memo
 	// maps, and skip cache) across Session.Parse calls — see Session's doc
@@ -118,6 +123,10 @@ func (p *Parser) getDispatch() map[string]dispatchEntry {
 		}
 		p.dispatch = d
 		p.munch = newMunchTable(p.SymbolTokens)
+		p.callSigs = map[*Expr]string{}
+		for _, rule := range p.Grammar.Rules {
+			collectCallSigs(p.callSigs, &rule.Expr, rule.Param)
+		}
 	})
 	return p.dispatch
 }
@@ -154,6 +163,36 @@ func (m *munchTable) splits(input, lit string, p, end int) bool {
 	}
 	for _, tok := range m.longer[lit] {
 		if strings.HasPrefix(input[p:], tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// collectCallSigs records the signature of every composite call argument
+// under expr that doesn't reference param — such an argument's signature
+// can't depend on the env it's evaluated in, so it's computed once here
+// instead of rebuilt (and allocated) on every evalCall.
+func collectCallSigs(sigs map[*Expr]string, expr *Expr, param string) {
+	if expr.Kind == ExprCall {
+		arg := &expr.Children[0]
+		if arg.Kind != ExprRef && arg.Kind != ExprLiteral && (param == "" || !mentionsRef(*arg, param)) {
+			var b strings.Builder
+			writeArgSig(&b, *arg, nil)
+			sigs[arg] = b.String()
+		}
+	}
+	for i := range expr.Children {
+		collectCallSigs(sigs, &expr.Children[i], param)
+	}
+}
+
+func mentionsRef(expr Expr, name string) bool {
+	if (expr.Kind == ExprRef || expr.Kind == ExprCall) && expr.Ref == name {
+		return true
+	}
+	for _, c := range expr.Children {
+		if mentionsRef(c, name) {
 			return true
 		}
 	}
@@ -198,10 +237,11 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 	for i := range skipCache {
 		skipCache[i] = -1
 	}
-	// getDispatch also builds p.munch, so it must run before p.munch is read.
+	// getDispatch also builds p.munch and p.callSigs, so it must run before
+	// either is read.
 	dispatch := p.getDispatch()
 	e := &evaluator{
-		dispatch: dispatch, munch: p.munch, skip: skip, input: input,
+		dispatch: dispatch, munch: p.munch, callSigs: p.callSigs, skip: skip, input: input,
 		refMemo:   make(map[refMemoKey]memoEntry, len(input)*12),
 		callMemo:  make(map[callMemoKey]memoEntry, len(input)/2+1),
 		skipCache: skipCache,
@@ -345,6 +385,7 @@ type memoEntry struct {
 type evaluator struct {
 	dispatch     map[string]dispatchEntry
 	munch        *munchTable
+	callSigs     map[*Expr]string
 	skip         func(input string, pos int) int
 	input        string
 	refMemo      map[refMemoKey]memoEntry
@@ -445,30 +486,75 @@ func (e *evaluator) newChildren(nodes []*Node) []*Node {
 // catch-all default below). The ExprRef/ExprLiteral cases — overwhelmingly
 // the common ones, since this grammar only ever binds List/Parens'
 // parameter to a bare rule reference — return the existing field directly
-// with no allocation; only the rare nested-ExprCall argument falls back to
-// building a string.
-func argSig(expr Expr) (ExprKind, string) {
+// with no allocation; every composite argument (a nested call, `X?`,
+// `'a' X`, ...) falls back to serializing its whole expression tree, so two
+// different arguments never share a memo entry. A reference to a parameter
+// bound in env is resolved to its binding first: the same parameter name
+// forwarded from two different enclosing calls denotes two different
+// arguments. expr must point into the Grammar (as evalExpr's
+// &expr.Children[0] does) so the composite case can hit callSigs, which
+// covers every such argument in practice; the fallback only runs for one
+// that forwards its enclosing rule's parameter.
+func (e *evaluator) argSig(expr *Expr, env *env) (ExprKind, string) {
 	switch expr.Kind {
 	case ExprRef:
-		return ExprRef, expr.Ref
-	case ExprCall:
-		var b strings.Builder
-		b.WriteString(expr.Ref)
-		b.WriteByte('(')
-		for i, c := range expr.Children {
-			if i > 0 {
-				b.WriteByte(',')
-			}
-			_, s := argSig(c)
-			b.WriteString(s)
+		if b, ok := env.lookup(expr.Ref); ok {
+			return e.argSig(&b.expr, b.env)
 		}
-		b.WriteByte(')')
-		return ExprCall, b.String()
+		return ExprRef, expr.Ref
 	case ExprLiteral:
 		return ExprLiteral, expr.Literal
 	default:
-		return expr.Kind, ""
+		if s, ok := e.callSigs[expr]; ok {
+			return expr.Kind, s
+		}
+		var b strings.Builder
+		writeArgSig(&b, *expr, env)
+		return expr.Kind, b.String()
 	}
+}
+
+// writeArgSig writes an unambiguous encoding of expr: a kind byte, then a
+// length-prefixed string, a class's ranges, or a bracketed child list.
+func writeArgSig(b *strings.Builder, expr Expr, env *env) {
+	if expr.Kind == ExprRef {
+		if bnd, ok := env.lookup(expr.Ref); ok {
+			writeArgSig(b, bnd.expr, bnd.env)
+			return
+		}
+	}
+	b.WriteByte(byte('A' + expr.Kind))
+	switch expr.Kind {
+	case ExprRef, ExprLiteral:
+		s := expr.Ref
+		if expr.Kind == ExprLiteral {
+			s = expr.Literal
+		}
+		b.WriteString(strconv.Itoa(len(s)))
+		b.WriteByte(':')
+		b.WriteString(s)
+		return
+	case ExprClass:
+		if expr.Class.Negated {
+			b.WriteByte('^')
+		}
+		for _, r := range expr.Class.Ranges {
+			b.WriteString(strconv.Itoa(int(r.Lo)))
+			b.WriteByte('-')
+			b.WriteString(strconv.Itoa(int(r.Hi)))
+			b.WriteByte(',')
+		}
+		return
+	case ExprCall:
+		b.WriteString(strconv.Itoa(len(expr.Ref)))
+		b.WriteByte(':')
+		b.WriteString(expr.Ref)
+	}
+	b.WriteByte('(')
+	for _, c := range expr.Children {
+		writeArgSig(b, c, env)
+	}
+	b.WriteByte(')')
 }
 
 // evalRef resolves a bare rule/parameter reference: parameter bindings in
@@ -528,7 +614,7 @@ func (e *evaluator) evalRef(name string, env *env, noSkip bool, pos int) (*Node,
 // the callee's single parameter to Arg *closed over the caller's env*, then
 // evaluates the callee's body in a fresh environment containing only that
 // one binding.
-func (e *evaluator) evalCall(name string, arg Expr, callerEnv *env, noSkip bool, pos int) (*Node, int, bool) {
+func (e *evaluator) evalCall(name string, arg *Expr, callerEnv *env, noSkip bool, pos int) (*Node, int, bool) {
 	d, ok := e.dispatch[name]
 	rule := d.rule
 	if !ok || rule == nil || rule.Param == "" {
@@ -539,12 +625,12 @@ func (e *evaluator) evalCall(name string, arg Expr, callerEnv *env, noSkip bool,
 	if !noSkip {
 		p = e.skipPos(p)
 	}
-	argKind, argSigStr := argSig(arg)
+	argKind, argSigStr := e.argSig(arg, callerEnv)
 	key := callMemoKey{ruleID: d.id, argKind: argKind, sig: argSigStr, pos: p, noSkip: noSkip}
 	if m, ok := e.callMemo[key]; ok {
 		return m.node, m.next, m.ok
 	}
-	calleeEnv := e.newEnv(env{name: rule.Param, bind: binding{expr: arg, env: callerEnv}})
+	calleeEnv := e.newEnv(env{name: rule.Param, bind: binding{expr: *arg, env: callerEnv}})
 	body, next, ok := e.evalExpr(rule.Expr, calleeEnv, noSkip, p)
 	var result *Node
 	if ok {
@@ -580,7 +666,7 @@ func (e *evaluator) evalExpr(expr Expr, env *env, noSkip bool, pos int) (*Node, 
 	case ExprRef:
 		return e.evalRef(expr.Ref, env, noSkip, pos)
 	case ExprCall:
-		return e.evalCall(expr.Ref, expr.Children[0], env, noSkip, pos)
+		return e.evalCall(expr.Ref, &expr.Children[0], env, noSkip, pos)
 	case ExprSeq:
 		// Evaluate every element into local (often stack-allocated) storage
 		// first, then bump-copy the finished pointers into childSlab in one
