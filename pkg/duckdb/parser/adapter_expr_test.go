@@ -207,6 +207,22 @@ func TestAdaptStarWithExclude(t *testing.T) {
 	require.Equal(t, []string{"a", "b"}, s.Exclude)
 }
 
+func TestAdaptStarReplaceAndRenameRejected(t *testing.T) {
+	// StarExpr doesn't model REPLACE/RENAME; they must error, not vanish.
+	cases := []struct{ sql, want string }{
+		{"SELECT * REPLACE (a + 1 AS a) FROM t", "REPLACE"},
+		{"SELECT t.* EXCLUDE (b) REPLACE (a + 1 AS a) FROM t", "REPLACE"},
+		{"SELECT * RENAME (a AS b) FROM t", "RENAME"},
+		{"SELECT * RENAME a AS b FROM t", "RENAME"},
+	}
+	for _, c := range cases {
+		t.Run(c.sql, func(t *testing.T) {
+			_, err := ParseString(c.sql)
+			require.ErrorContains(t, err, c.want)
+		})
+	}
+}
+
 func TestAdaptFunctionCallShape(t *testing.T) {
 	e := parseExprForTest(t, "count(DISTINCT a ORDER BY a) FILTER (WHERE a > 0)")
 	f, ok := e.(*FunctionExpr)
