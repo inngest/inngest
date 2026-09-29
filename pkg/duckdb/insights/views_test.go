@@ -37,6 +37,9 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
 			DataPath:    filepath.Join(dir, "data"),
 		},
+		// Mirror devserver's setupDualWrite, which sandboxes the handle
+		// Execute runs on.
+		RestrictExternalAccess: true,
 	})
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)

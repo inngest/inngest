@@ -36,6 +36,7 @@ remap.go         the remapTables stage — rewrites logical table refs (FROM tre
 limit.go         the addDefaultLimit stage
 transpile.go     Transpile: the ordered []stage pipeline + TranspileResult
 execute.go       Execute: runs the rewritten SQL, decodes rows/columns
+guard.go         checkRenderedSQL — Execute's post-render check of DuckDB's own parse (json_serialize_sql) against the allowlist
 columntype.go    ColumnType enum + DuckDBToColumnType
 hint.go          ColumnHint enum
 testdata/queries/*.sql            golden fixture inputs, one query per file
