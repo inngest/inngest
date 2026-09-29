@@ -10,7 +10,7 @@ import (
 
 func newSmokeParser(t *testing.T) *peg.Parser {
 	t.Helper()
-	p, err := newPegParser()
+	p, _, err := newPegParser()
 	require.NoError(t, err)
 	return p
 }

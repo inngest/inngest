@@ -3,11 +3,13 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/duckdb/parser/grammar"
 	"github.com/stretchr/testify/require"
 )
 
@@ -149,6 +151,56 @@ func TestWriteReturnsWriterError(t *testing.T) {
 	require.NoError(t, err)
 	err = Write(errWriter{}, stmt)
 	require.ErrorIs(t, err, errBoom)
+}
+
+func TestWriteQuotesKeywordIdentifiers(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"reserved column", `SELECT "group" FROM t`, `SELECT "group" FROM t`},
+		{
+			"reserved aliases and table",
+			`SELECT a AS "select" FROM "table" AS "order"`,
+			`SELECT a AS "select" FROM "table" AS "order"`,
+		},
+		{
+			"reserved dotted parts",
+			`SELECT "select"."from", t."group".x FROM t GROUP BY "order"`,
+			`SELECT "select"."from", t."group".x FROM t GROUP BY "order"`,
+		},
+		{"reserved cte name", `WITH "select" AS (SELECT 1) SELECT * FROM "select"`, `WITH "select" AS (SELECT 1) SELECT * FROM "select"`},
+		{"embedded quote still escaped", `SELECT "a""b" FROM t`, `SELECT "a""b" FROM t`},
+		{"unreserved keywords stay bare", `SELECT a AS year, name, value FROM t`, `SELECT a AS year, name, value FROM t`},
+		{"keyword-named functions stay bare", `SELECT left(s, 2), right(s, 1) FROM t`, `SELECT left(s, 2), right(s, 1) FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stmt, err := ParseString(c.sql)
+			require.NoError(t, err)
+			got := String(stmt)
+			require.Equal(t, c.want, got)
+			_, err = ParseString(got)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestWriteRoundTripsEveryKeywordAsIdentifier checks every vendored keyword,
+// used as a quoted column, alias, table name and table alias, survives
+// Write -> reparse with the same AST.
+func TestWriteRoundTripsEveryKeywordAsIdentifier(t *testing.T) {
+	_, kl, err := grammar.Load()
+	require.NoError(t, err)
+	for _, list := range [][]string{kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName} {
+		for _, kw := range list {
+			kw := strings.ToLower(kw)
+			src := fmt.Sprintf(`SELECT "%[1]s", x."%[1]s" AS "%[1]s" FROM "%[1]s" AS x, y AS "%[1]s"`, kw)
+			stmt, err := ParseString(src)
+			require.NoError(t, err, src)
+			out := String(stmt)
+			reparsed, err := ParseString(out)
+			require.NoError(t, err, "keyword %q: reparsing %q", kw, out)
+			require.Equal(t, Dump(stmt), Dump(reparsed), "keyword %q: %q", kw, out)
+		}
+	}
 }
 
 func TestStringNeverPanicsOnCoreNodeKinds(t *testing.T) {
