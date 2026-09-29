@@ -27,7 +27,7 @@ SelectStatement
   FromClause
     BaseTableRef(other,alias=)
 
--- SELECT a FROM t WHERE a = ANY (SELECT id FROM other) AND b >= ALL ([1, 2]) AND c <> ANY (tags);
+-- SELECT a FROM t WHERE a = ANY (SELECT id FROM other) AND b >= ALL ([1, 2]) AND c <> ANY (tags)
 SelectStatement
   SelectItem()
     Ident(a)
@@ -51,4 +51,65 @@ SelectStatement
     QuantifiedExpr(<> ANY)
       Ident(c)
       Ident(tags)
+
+-- SELECT * FROM (SELECT a FROM t OFFSET 5) AS s
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableSubqueryRef(alias=s)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        LimitClause(all=false,percent=false)
+          Literal(1,5)
+
+-- SELECT a FROM t WHERE a IN (SELECT b FROM u OFFSET 1)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  InExpr(not=false)
+    Ident(a)
+    SelectStatement
+      SelectItem()
+        Ident(b)
+      FromClause
+        BaseTableRef(u,alias=)
+      LimitClause(all=false,percent=false)
+        Literal(1,1)
+
+-- WITH c AS (SELECT a FROM t OFFSET 2) SELECT a FROM c
+SelectStatement
+  SelectItem()
+    Ident(a)
+  WithClause(recursive=false)
+    CTE(c)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        LimitClause(all=false,percent=false)
+          Literal(1,2)
+  FromClause
+    BaseTableRef(c,alias=)
+
+-- (SELECT a FROM t OFFSET 1) UNION ALL SELECT a FROM u;
+SelectStatement(UNION,all=true,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t,alias=)
+    LimitClause(all=false,percent=false)
+      Literal(1,1)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(u,alias=)
 
