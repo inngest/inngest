@@ -17,8 +17,11 @@ import (
 type ItemHintSource func(ctx context.Context, shard QueueShard, offer func(QueueItem) bool) error
 
 type ItemHintOptions struct {
-	Source         ItemHintSource
-	BufferSize     int
+	Source     ItemHintSource
+	BufferSize int
+	// AttemptTimeout bounds read-only eligibility checks, not lease/dispatch.
+	// Mutating operations use the normal processor context: a timeout cannot
+	// roll back a lease that committed before its reply arrived.
 	AttemptTimeout time.Duration
 }
 
@@ -131,15 +134,15 @@ func (q *queueProcessor) processItemHint(ctx context.Context, item QueueItem, di
 		q.recordItemHint(ctx, "ineligible")
 		return nil
 	}
-	attemptCtx, cancel := context.WithTimeout(ctx, q.itemHints.AttemptTimeout)
+	eligibilityCtx, cancel := context.WithTimeout(ctx, q.itemHints.AttemptTimeout)
 	defer cancel()
 	// Direct hints bypass scanner eligibility, not pause/migration policy. Use
 	// the same callbacks/operation without scanner pointer requeues or refills.
-	if q.PartitionPausedGetter(attemptCtx, item.FunctionID).Paused || attemptCtx.Err() != nil {
+	if q.PartitionPausedGetter(eligibilityCtx, item.FunctionID).Paused || eligibilityCtx.Err() != nil {
 		q.recordItemHint(ctx, "ineligible")
 		return nil
 	}
-	locked, err := q.Shard().IsMigrationLocked(attemptCtx, Scope{AccountID: account, EnvID: item.WorkspaceID, FunctionID: item.FunctionID})
+	locked, err := q.Shard().IsMigrationLocked(eligibilityCtx, Scope{AccountID: account, EnvID: item.WorkspaceID, FunctionID: item.FunctionID})
 	if err != nil {
 		q.recordItemHint(ctx, "read_error")
 		return nil
@@ -148,27 +151,50 @@ func (q *queueProcessor) processItemHint(ctx context.Context, item QueueItem, di
 		q.recordItemHint(ctx, "ineligible")
 		return nil
 	}
-	if exists, err := q.accountExists(attemptCtx, account); err != nil || !exists {
+	if exists, err := q.accountExists(eligibilityCtx, account); err != nil || !exists {
 		q.recordItemHint(ctx, "ineligible")
 		return nil
 	}
+	priority := q.PartitionPriorityFinder(eligibilityCtx, partition)
+	if eligibilityCtx.Err() != nil || !q.hintsAllowed() {
+		q.recordItemHint(ctx, "ineligible")
+		return nil
+	}
+	cancel()
 	// Scanners attach the stored queue ID to the worker-facing Item. Enqueue's
 	// returned envelope may still carry the original (unhashed) producer JobID.
 	item.Data.JobID = &item.ID
 	// The buffered copy may be stale. Scanning may already run the item, so a
 	// limited hint is dropped rather than requeued over the stored item.
+	// Use the same lifetime as ordinary leasing, including capacity acquisition
+	// and worker handoff. An extra hint deadline can abandon a committed lease
+	// until expiry/scavenging. Processor shutdown still cancels the operation.
 	var dispatched DispatchedItem
-	result, err := q.LeaseItem(attemptCtx, LeaseItemRequest{
+	leaseStarted := time.Now()
+	result, err := q.LeaseItem(ctx, LeaseItemRequest{
 		Item: &item, StaticTime: q.Clock().Now(), SkipRequeueOnLimit: true,
-		Priority: q.PartitionPriorityFinder(attemptCtx, partition),
+		Priority: priority,
 	}, func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
 		item.fromHint = true
 		var err error
 		dispatched, err = dispatch(ctx, item)
 		return dispatched, err
 	})
-	cancel()
 	if err != nil || dispatched == nil || result.Status != LeaseItemStatusDispatched {
+		if err != nil && (result.Status == LeaseItemStatusLeaseError || result.Status == LeaseItemStatusDispatched) {
+			stage := "lease"
+			if result.Status == LeaseItemStatusDispatched {
+				stage = "dispatch"
+			}
+			// Transport failures can still leave an uncertain lease. Preserve the
+			// error and identity without logging payloads or retrying the hint.
+			logger.StdlibLogger(ctx).Warn("item hint lease/dispatch failed; scanning continues",
+				"stage", stage, "error", err, "context_error", ctx.Err(),
+				"account_id", account, "env_id", item.WorkspaceID, "fn_id", item.FunctionID,
+				"run_id", item.Data.Identifier.RunID, "item_id", item.ID, "lease_id", item.LeaseID,
+				"queue_shard", q.Shard().Name(), "queue_backend", q.Shard().Kind(),
+				"elapsed_ms", time.Since(leaseStarted).Milliseconds())
+		}
 		q.recordItemHint(ctx, itemHintLeaseOutcome(result.Status))
 		return nil
 	}
