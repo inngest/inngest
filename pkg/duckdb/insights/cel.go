@@ -331,7 +331,10 @@ func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expr
 	case string:
 		return handleStringOp(sq.L(textExpr, jsonPath), v, op)
 	case int64, float64:
-		return handleNumericOp(sq.L(fmt.Sprintf("CAST(%s AS DOUBLE)", textExpr), jsonPath), v, op)
+		// TRY_CAST: a non-numeric value (a string, object, or array) becomes
+		// NULL and matches nothing, like a missing key, instead of a
+		// conversion error failing the whole query.
+		return handleNumericOp(sq.L(fmt.Sprintf("TRY_CAST(%s AS DOUBLE)", textExpr), jsonPath), v, op)
 	case bool:
 		// DuckDB's ->> extracts a JSON boolean as the text "true"/"false".
 		boolStr := "false"

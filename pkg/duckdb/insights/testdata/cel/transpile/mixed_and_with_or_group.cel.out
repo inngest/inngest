@@ -8,7 +8,7 @@ EVENT ARGS
 [$.name y]
 
 OUTPUT SQL
-(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: (CAST((x::JSON->>?) AS DOUBLE) = ?))) > 0 OR ((output::JSON->>?) = ?))
+(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: (TRY_CAST((x::JSON->>?) AS DOUBLE) = ?))) > 0 OR ((output::JSON->>?) = ?))
 
 OUTPUT ARGS
 [$.data.a 1 $.data.ok true]
