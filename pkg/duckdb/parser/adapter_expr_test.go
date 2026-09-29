@@ -170,6 +170,28 @@ func TestAdaptOperatorsSharingComparisonPrefixes(t *testing.T) {
 	require.True(t, ok)
 }
 
+func TestAdaptQuantifiedComparison(t *testing.T) {
+	// AnyAllOperator <- AnyOp AnyOrAll is a two-token operator; it must
+	// keep both its operator and its ANY/ALL quantifier.
+	cases := []struct{ sql, op, quantifier, right string }{
+		{"a = ANY (SELECT 1)", "=", "ANY", "SubqueryExpr(exists=false,not=false)"},
+		{"a >= ALL (SELECT b FROM t)", ">=", "ALL", "SubqueryExpr(exists=false,not=false)"},
+		{"a <> any ([1, 2])", "<>", "ANY", "ListExpr(paren=false)"},
+		{"a ~~ ALL (patterns)", "~~", "ALL", "Ident(patterns)"},
+	}
+	for _, c := range cases {
+		t.Run(c.sql, func(t *testing.T) {
+			e := parseExprForTest(t, c.sql)
+			q, ok := e.(*QuantifiedExpr)
+			require.Truef(t, ok, "got %s", Dump(e))
+			require.Equal(t, c.op, q.Op)
+			require.Equal(t, c.quantifier, q.Quantifier)
+			require.Equal(t, "Ident(a)", q.Left.String())
+			require.Equal(t, c.right, q.Right.String())
+		})
+	}
+}
+
 func TestAdaptBetween(t *testing.T) {
 	e := parseExprForTest(t, "a NOT BETWEEN 1 AND 10")
 	b, ok := e.(*BetweenExpr)

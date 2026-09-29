@@ -83,6 +83,8 @@ func prec(e Expr) int {
 		return precLambdaArrow
 	case *BinaryExpr:
 		return binaryPrec(v.Op)
+	case *QuantifiedExpr:
+		return precOther
 	case *UnaryExpr:
 		switch {
 		case v.Postfix:
@@ -107,8 +109,8 @@ func prec(e Expr) int {
 // and the AT TIME ZONE operator are BinaryExpr too (foldBinaryLevel builds
 // every one of these 9 levels the same way — see adapter_expr.go) even
 // though they read like keywords, not symbols. Any operator text this
-// switch doesn't recognize (a custom NamedOtherOperator, OPERATOR(...), an
-// ANY/ALL-suffixed comparison, ...) falls through to precOther, which
+// switch doesn't recognize (a custom NamedOtherOperator, OPERATOR(...),
+// ...) falls through to precOther, which
 // matches where OtherOperatorExpression sits in the grammar regardless of
 // the specific operator spelling.
 func binaryPrec(op string) int {
@@ -294,6 +296,22 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(v.Op)
 		sw.str(" ")
 		sw.exprAtLeast(v.Right, p+1)
+	case *QuantifiedExpr:
+		sw.exprAtLeast(v.Left, precOther)
+		sw.str(" ")
+		sw.str(v.Op)
+		sw.str(" ")
+		sw.str(v.Quantifier)
+		sw.str(" ")
+		// The grammar accepts any BitwiseExpression here, but DuckDB's
+		// executing parser requires `ANY (...)`, so always parenthesize.
+		if sub, ok := v.Right.(*SubqueryExpr); ok && !sub.Exists {
+			sw.exprTop(sub)
+		} else {
+			sw.str("(")
+			sw.exprTop(v.Right)
+			sw.str(")")
+		}
 	case *UnaryExpr:
 		sw.unaryExpr(v)
 	case *NullTest:
