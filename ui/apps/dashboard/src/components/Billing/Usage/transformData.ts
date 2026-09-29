@@ -160,6 +160,10 @@ export function createChartOptions(
       },
     },
     yAxis: {
+      // Mark lines do not contribute to the automatic axis range.
+      max: hasLimit
+        ? ({ max }) => Math.ceil((Math.max(max, includedCountLimit) * 11) / 10)
+        : undefined,
       axisLabel: {
         fontSize: 10,
         fontWeight: 400,
