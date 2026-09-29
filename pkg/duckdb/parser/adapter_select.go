@@ -16,18 +16,57 @@ func (a *adapter) adaptSelectStatementInternal(n *peg.Node) *SelectStatement {
 	if w, ok := present(seq.Children[0]); ok {
 		with = a.adaptWithClause(w)
 	}
-	stmt := a.adaptSelectSetOpChain(seq.Children[1])
-	stmt.With = with
+	var orderBy *OrderByClause
+	var limit *LimitClause
 	if mods, ok := present(seq.Children[2]); ok {
 		mseq := body(mods)
 		if o, ok := present(mseq.Children[0]); ok {
-			stmt.OrderBy = a.adaptOrderByClause(o)
+			orderBy = a.adaptOrderByClause(o)
 		}
 		if l, ok := present(mseq.Children[1]); ok {
-			stmt.Limit = a.adaptLimitOffset(l)
+			limit = a.adaptLimitOffset(l)
 		}
 	}
+	chain := seq.Children[1]
+	stmt := a.adaptSelectSetOpChain(chain)
+	// A lone SelectParens atom hands back its inner statement, which may
+	// already carry its own WITH/ORDER BY/LIMIT. Merging the outer clauses
+	// into it is only safe when that can't change meaning — `(... LIMIT 10)
+	// LIMIT 100` must still return at most 10 rows, and an outer ORDER BY
+	// must apply after an inner LIMIT, not before it — so otherwise the
+	// inner statement is kept intact as a FROM-clause subquery.
+	if (with != nil && stmt.With != nil) ||
+		(orderBy != nil && (stmt.OrderBy != nil || stmt.Limit != nil)) ||
+		(limit != nil && stmt.Limit != nil) {
+		stmt = a.wrapSelectAsSubquery(n, chain, stmt)
+	}
+	if with != nil {
+		stmt.With = with
+	}
+	if orderBy != nil {
+		stmt.OrderBy = orderBy
+	}
+	if limit != nil {
+		stmt.Limit = limit
+	}
 	return stmt
+}
+
+// parenSelectAlias names the FROM-clause subquery wrapSelectAsSubquery
+// synthesizes. It's the wrapper's only FROM item and the wrapper selects
+// `*`, so the name is never referenced — it exists because consumers (and
+// older DuckDB versions) expect every FROM-clause subquery to be aliased.
+const parenSelectAlias = "paren_select"
+
+// wrapSelectAsSubquery returns `SELECT * FROM (inner) AS paren_select`,
+// positioned over n (the whole statement) with the subquery spanning chain.
+func (a *adapter) wrapSelectAsSubquery(n, chain *peg.Node, inner *SelectStatement) *SelectStatement {
+	ref := &TableSubqueryRef{baseTableRefNode: baseTableRefNode{a.at(chain)}, Select: inner, Alias: parenSelectAlias}
+	return &SelectStatement{
+		baseExpr: a.at(n),
+		Columns:  []*SelectItem{{baseExpr: a.at(n), Expr: &StarExpr{baseExpr: a.at(n)}}},
+		From:     &FromClause{baseExpr: a.at(chain), Refs: []TableRef{ref}},
+	}
 }
 
 func (a *adapter) adaptSelectAtom(n *peg.Node) *SelectStatement {
