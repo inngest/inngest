@@ -263,6 +263,31 @@ func TestValidateRejectsCorrelatedSubqueryToGenuinelyUnknownColumn(t *testing.T)
 	require.Contains(t, err.Error(), "unknown column")
 }
 
+func TestValidateScopesQuantifiedSubqueryLikeInSubquery(t *testing.T) {
+	// A subquery under = ANY / ALL is an expression-position subquery just
+	// like IN (SELECT ...): its tables and columns are validated, and it
+	// may correlate to the enclosing scope.
+	for _, sql := range []string{
+		"SELECT run_id FROM runs WHERE run_id = ANY (SELECT run_id FROM runs)",
+		"SELECT run_id FROM runs WHERE run_id <> ALL (SELECT id FROM events WHERE status = runs.status)",
+	} {
+		_, _, _, err := validate(mustParse(t, sql))
+		require.NoError(t, err, sql)
+	}
+
+	_, _, _, err := validate(mustParse(t, "SELECT run_id FROM runs WHERE run_id = ANY (SELECT id FROM events WHERE bogus_evil_column = 1)"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown column")
+
+	_, _, _, err = validate(mustParse(t, "SELECT run_id FROM runs WHERE run_id = ANY (SELECT * FROM nonexistent_table)"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown table")
+
+	_, _, _, err = validate(mustParse(t, "SELECT run_id FROM runs WHERE run_id >= ALL (SELECT read_csv('/etc/passwd') FROM runs)"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not allowed")
+}
+
 func TestValidateAcceptsMultiLevelCorrelatedSubquery(t *testing.T) {
 	// Correlation chains transitively: a subquery nested two levels deep
 	// can still reach the outermost query's own scope, not just its

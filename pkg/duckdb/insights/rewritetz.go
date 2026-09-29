@@ -147,6 +147,9 @@ func (r *tzFunctionRewriter) rewrite(expr parser.Expr) parser.Expr {
 	switch e := expr.(type) {
 	case *parser.BinaryExpr:
 		e.Left, e.Right = r.rewrite(e.Left), r.rewrite(e.Right)
+	case *parser.QuantifiedExpr:
+		// A *SubqueryExpr Right recurses via the SubqueryExpr case.
+		e.Left, e.Right = r.rewrite(e.Left), r.rewrite(e.Right)
 	case *parser.UnaryExpr:
 		e.X = r.rewrite(e.X)
 	case *parser.NullTest:
