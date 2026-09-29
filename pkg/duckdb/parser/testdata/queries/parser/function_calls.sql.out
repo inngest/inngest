@@ -37,11 +37,50 @@ SelectStatement
   FromClause
     BaseTableRef(t,alias=)
 
--- SELECT row_number() OVER win FROM t;
+-- SELECT row_number() OVER win FROM t
 SelectStatement
   SelectItem()
     FunctionExpr(row_number,distinct=false)
       WindowSpec(win)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT struct_pack("a b" := 1, "select" := 2, c := 3)
+SelectStatement
+  SelectItem()
+    FunctionExpr(struct_pack,distinct=false)
+      NamedArg(a b)
+        Literal(1,1)
+      NamedArg(select)
+        Literal(1,2)
+      NamedArg(c)
+        Literal(1,3)
+
+-- SELECT list_transform(l, "a b" -> 1), list_reduce(l, ("a b", c) -> 1) FROM t
+SelectStatement
+  SelectItem()
+    FunctionExpr(list_transform,distinct=false)
+      Ident(l)
+      LambdaExpr(a b)
+        Literal(1,1)
+  SelectItem()
+    FunctionExpr(list_reduce,distinct=false)
+      Ident(l)
+      BinaryExpr(->)
+        ListExpr(paren=true)
+          Ident(a b)
+          Ident(c)
+        Literal(1,1)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT [1 FOR "x IN [1]] a, (SELECT 1 FROM u) n, [1 FOR y" IN [1]] c FROM t;
+SelectStatement
+  SelectItem(c)
+    ListComprehensionExpr(x IN [1]] a, (SELECT 1 FROM u) n, [1 FOR y)
+      Literal(1,1)
+      ListExpr(paren=false)
+        Literal(1,1)
   FromClause
     BaseTableRef(t,alias=)
 
