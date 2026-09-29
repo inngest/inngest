@@ -1,0 +1,3 @@
+{
+  "error": "insights: LIMIT must be a literal, non-negative integer (at 1:25)"
+}

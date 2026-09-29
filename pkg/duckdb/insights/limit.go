@@ -62,18 +62,34 @@ func addDefaultLimit(stmt *parser.SelectStatement) (limitOutcome, error) {
 	}
 
 	lit, ok := stmt.Limit.Limit.(*parser.Literal)
-	if !ok || lit.Kind != parser.LitNumber {
-		// A computed expression (a parameter, arithmetic, a subquery, ...)
-		// -- this package has no static way to bound its runtime value, so
-		// it's rejected rather than reaching DuckDB uncapped.
+	// A computed expression (a parameter, arithmetic, a subquery, ...) --
+	// this package has no static way to bound its runtime value, so it's
+	// rejected rather than reaching DuckDB uncapped. So is a non-integer
+	// number literal ("1e9", "10.5"), which DuckDB accepts but a plain
+	// integer parse can't bound.
+	if !ok || lit.Kind != parser.LitNumber || !isDecimalDigits(lit.Text) {
 		return limitUnchanged, &ValidationError{Pos: stmt.Limit.Pos(), End: stmt.Limit.End(), Message: "LIMIT must be a literal, non-negative integer"}
 	}
 
-	n, err := strconv.Atoi(lit.Text)
-	if err != nil || n <= defaultInsightsLimit {
+	// A digit string too large for uint64 (ErrRange) is still an integer
+	// above the ceiling, so it's capped like any other.
+	n, err := strconv.ParseUint(lit.Text, 10, 64)
+	if err == nil && n <= defaultInsightsLimit {
 		return limitUnchanged, nil
 	}
 
 	lit.Text = strconv.Itoa(defaultInsightsLimit)
 	return limitCapped, nil
+}
+
+func isDecimalDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
