@@ -24,11 +24,34 @@ SelectStatement
   FromClause
     BaseTableRef(t,alias=)
 
--- SELECT a::VARCHAR FROM t;
+-- SELECT a::VARCHAR FROM t
 SelectStatement
   SelectItem()
     CastExpr(VARCHAR,try=false)
       Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT INTERVAL '1' DAY, INTERVAL 2 HOUR, INTERVAL (n) DAY, INTERVAL (1 + 2) DAY, INTERVAL (-1) DAY FROM t;
+SelectStatement
+  SelectItem()
+    IntervalExpr(DAY)
+      Literal(0,1)
+  SelectItem()
+    IntervalExpr(HOUR)
+      Literal(1,2)
+  SelectItem()
+    IntervalExpr(DAY)
+      Ident(n)
+  SelectItem()
+    IntervalExpr(DAY)
+      BinaryExpr(+)
+        Literal(1,1)
+        Literal(1,2)
+  SelectItem()
+    IntervalExpr(DAY)
+      UnaryExpr(-)
+        Literal(1,1)
   FromClause
     BaseTableRef(t,alias=)
 
