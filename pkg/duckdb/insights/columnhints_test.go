@@ -350,6 +350,15 @@ func TestBuildColumnHintsRangeSliceOfHintedArrayGetsNoHint(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintNone}, hints)
 }
 
+func TestBuildColumnHintsOpenEndedSliceOfHintedArrayGetsNoHint(t *testing.T) {
+	// "[2:]" and "[1:-]" have no stop expression but are still range
+	// slices (lists), not single elements.
+	for _, slice := range []string{"[2:]", "[1:-]"} {
+		hints := hintsFor(t, "SELECT (attributes -> '_inngest.defer.parent_run_ids')"+slice+" FROM extended_trace_spans")
+		require.Equal(t, []ColumnHint{HintNone}, hints, slice)
+	}
+}
+
 func TestBuildColumnHintsUnnestInFromClauseInheritsArgHint(t *testing.T) {
 	// The FROM-clause table-function form (scope.go's addTableFunction)
 	// resolves the same hint for its synthetic "unnest" column.

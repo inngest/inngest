@@ -222,3 +222,34 @@ func TestStringNeverPanicsOnCoreNodeKinds(t *testing.T) {
 	require.NotEmpty(t, String(stmt.Limit))
 	require.NotEmpty(t, String(stmt.Columns[0]))
 }
+
+// requireWriteRoundTrip checks sql (a full statement) writes as want, and
+// that want reparses to the same AST as sql — the property a paren or
+// separator bug breaks, even when the printed text is stable.
+func requireWriteRoundTrip(t *testing.T, sql, want string) {
+	t.Helper()
+	stmt, err := ParseString(sql)
+	require.NoError(t, err)
+	got := String(stmt)
+	require.Equal(t, want, got)
+	reparsed, err := ParseString(got)
+	require.NoError(t, err, "reparsing Write output %q", got)
+	require.Equal(t, Dump(stmt), Dump(reparsed), "Write output %q reparses differently", got)
+}
+
+func TestWriteSliceBounds(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"single index", "SELECT x[2]", "SELECT x[2]"},
+		{"open-ended slice keeps its colon", "SELECT x[2:]", "SELECT x[2:]"},
+		{"empty slice", "SELECT x[:]", "SELECT x[:]"},
+		{"minus stop", "SELECT x[1:-]", "SELECT x[1:-]"},
+		{"minus stop with step", "SELECT x[1:-:2]", "SELECT x[1:-:2]"},
+		{"full slice", "SELECT x[1:2:3]", "SELECT x[1:2:3]"},
+		{"step only", "SELECT x[::2]", "SELECT x[::2]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
