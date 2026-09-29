@@ -32,3 +32,9 @@ func TestExtractQueryInfoUnion(t *testing.T) {
 	require.Equal(t, "runs", info.PrimaryTable)
 	require.Equal(t, []string{"runs", "extended_trace_spans"}, info.Tables)
 }
+
+func TestExtractQueryInfoSetOpModifierSubquery(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs UNION SELECT run_id FROM runs ORDER BY (SELECT max(id) FROM events)")
+	info := extractQueryInfo(stmt)
+	require.Equal(t, []string{"runs", "events"}, info.Tables)
+}
