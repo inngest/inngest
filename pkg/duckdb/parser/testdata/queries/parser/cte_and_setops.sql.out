@@ -105,10 +105,92 @@ SelectStatement(UNION,all=false,byName=false)
     FromClause
       BaseTableRef(t2,alias=)
 
--- VALUES (1, 'a'), (2, 'b');
+-- VALUES (1, 'a'), (2, 'b')
 SelectStatement(VALUES,rows=2)
   Literal(1,1)
   Literal(0,a)
   Literal(1,2)
   Literal(0,b)
+
+-- (SELECT a FROM t LIMIT 10) LIMIT 100
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableSubqueryRef(alias=paren_select)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        LimitClause(all=false,percent=false)
+          Literal(1,10)
+  LimitClause(all=false,percent=false)
+    Literal(1,100)
+
+-- (SELECT a FROM t ORDER BY a LIMIT 5) ORDER BY b
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableSubqueryRef(alias=paren_select)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        OrderByClause
+          OrderByItem(desc=false,nulls=false/false)
+            Ident(a)
+        LimitClause(all=false,percent=false)
+          Literal(1,5)
+  OrderByClause
+    OrderByItem(desc=false,nulls=false/false)
+      Ident(b)
+
+-- (SELECT a FROM t ORDER BY a) LIMIT 5
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  OrderByClause
+    OrderByItem(desc=false,nulls=false/false)
+      Ident(a)
+  LimitClause(all=false,percent=false)
+    Literal(1,5)
+
+-- WITH x AS (SELECT 1) (WITH y AS (SELECT 2) SELECT * FROM y)
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  WithClause(recursive=false)
+    CTE(x)
+      SelectStatement
+        SelectItem()
+          Literal(1,1)
+  FromClause
+    TableSubqueryRef(alias=paren_select)
+      SelectStatement
+        SelectItem()
+          StarExpr(,exclude=[])
+        WithClause(recursive=false)
+          CTE(y)
+            SelectStatement
+              SelectItem()
+                Literal(1,2)
+        FromClause
+          BaseTableRef(y,alias=)
+
+-- (WITH y AS (SELECT 2) SELECT * FROM y);
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  WithClause(recursive=false)
+    CTE(y)
+      SelectStatement
+        SelectItem()
+          Literal(1,2)
+  FromClause
+    BaseTableRef(y,alias=)
 
