@@ -152,19 +152,6 @@ describe('ensureFirstTouch', () => {
     });
   });
 
-  it('writes the first-touch cookie from a ref parameter', () => {
-    const written = stubBrowser({
-      href: 'https://app.inngest.com/sign-up?ref=homepage-hero',
-    });
-
-    ensureFirstTouch();
-
-    expect(written).toHaveLength(1);
-    expect(decodeFirstTouch(written[0] ?? '')).toMatchObject({
-      first_ref: 'homepage-hero',
-    });
-  });
-
   it('never overwrites an existing first-touch cookie', () => {
     const existing = encodeURIComponent(
       JSON.stringify({ first_utm_campaign: 'earlier' }),
@@ -180,9 +167,9 @@ describe('ensureFirstTouch', () => {
     expect(getSignupAttribution()).toEqual({ utmCampaign: 'earlier' });
   });
 
-  it('does nothing when the url carries no attribution', () => {
+  it('does nothing when the url carries no utm parameters', () => {
     const written = stubBrowser({
-      href: 'https://app.inngest.com/sign-up?redirect_url=%2Fenv',
+      href: 'https://app.inngest.com/sign-up?ref=homepage-hero&redirect_url=%2Fenv',
     });
 
     ensureFirstTouch();

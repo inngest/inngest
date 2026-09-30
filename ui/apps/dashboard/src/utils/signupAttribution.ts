@@ -33,7 +33,7 @@ const readCookie = (name: string): string | undefined => {
  *
  * The website writes the same cookie on www.inngest.com. Campaign links that
  * redirect straight to app.inngest.com skip the website, so without this the
- * campaign never reaches sign-up. Only runs when the URL carries utm or ref
+ * campaign never reaches sign-up. Only runs when the URL carries utm
  * parameters, so a plain visit does not claim first touch ahead of a later
  * campaign visit. Never overwrites an existing cookie.
  */
@@ -49,8 +49,6 @@ export const ensureFirstTouch = (): void => {
       const value = params.get(key);
       if (value) payload[`first_${key}`] = value;
     }
-    const ref = params.get('ref');
-    if (ref) payload.first_ref = ref;
     if (Object.keys(payload).length === 0) return;
 
     payload.first_landing_url = window.location.href;
