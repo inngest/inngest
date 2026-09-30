@@ -20,40 +20,72 @@ support the opcode; SDKs fall back to today's `step.run` implementation.
 
 ## Problem
 
-References are to inngest-js `main` (`packages/inngest/src/components/sandbox/`)
-unless noted.
+References are to inngest-js `main` 269efeaf
+(`packages/inngest/src/components/sandbox/`), inngest `main` dd1e28f9 and
+monorepo `develop` unless noted.
 
 1. **Long executor-to-app requests.** `SandboxMiddleware` wraps every
-   operation in `step.run` (`middleware.ts` ~77). The app then calls Cloud
-   and blocks:
-   - `exec`: up to 5 min (`validation.ts` `maxSandboxProcessTimeoutMs`);
-     Cloud `exec` is itself a held-open stream (monorepo
-     `api/rest/v2/api_sandbox_exec.go`).
-   - create + wait running: default 120 s, max 5 min (`validation.ts`).
-   - pause/resume: `pollSandboxStatus` (`client.ts` ~747), 5 min default
-     (`lifecycleTimeout`, `client.ts` ~564).
+   operation in `step.run` (`middleware.ts` ~85). The app then calls Cloud
+   and blocks (limits in `validation.ts` ~28-32):
+   - `exec`: default 30 s, max 5 min. Cloud `exec` itself holds its request
+     open until the command exits (monorepo `api_sandbox_exec.go` ~23-80).
+   - create + wait running: default 120 s, max 5 min (`client.ts` ~1438).
+   - pause/resume: `pollSandboxStatus` (`client.ts` ~748) polls every 1 s,
+     5 min default (`lifecycleTimeout`, `client.ts` ~565).
    - snapshot ready: up to 5 min.
 
-   This exceeds typical serverless limits, bills the user's compute while
-   idle, and drops connections (observed: a pause held the request ~3m43s
-   until it dropped).
-2. **Retries double-execute.** No idempotency key is sent. Only sandbox
-   create is name-idempotent in Cloud (monorepo `api_sandboxes.go` ~93);
-   process start and snapshot create are not. A dropped request is retried
-   while the first attempt may still be running in both the app and the
-   sandbox. The dev bridge already has to answer `operation_ambiguous`
-   (`cmd/internal/cloudsandboxes/cloudsandboxes.go` ~239).
-3. **Messy traces.** One logical action becomes several steps (snapshot =
-   create + `:wait-until-ready` step, `durable.ts` ~447; process = start +
-   wait + output). Spans are generic `step.run` spans containing wire JSON.
-4. **Output ceiling.** Step output is capped at 4 MiB, so exec output is
-   tail-truncated in the SDK (`durable.ts` ~88).
-5. **No cleanup.** Sandbox lifetime is not tied to the run. Failed or
-   cancelled runs leave sandboxes running until Cloud's runtime timeout
-   pauses them (monorepo `api/fns/sandbox_timeout.go`); paused sandboxes and
-   snapshots still hold storage. Only the dev bridge keeps a journal.
+   Consecutive steps also run in the same request, so one held request can
+   span several operations. Measured on the dev server (inngest-js main,
+   `create` then `commands.run("sleep 45 && echo done")` then `destroy`):
+
+   | App request | Duration | Work |
+   | --- | --- | --- |
+   | 1 | 46.86 s | create (1.58 s) + exec (45.26 s), then plans destroy |
+   | 2 | 0.46 s | destroy |
+   | 3 | 0.00 s | run complete |
+
+   Inferred (not measured): this exceeds typical serverless limits and
+   bills the user's compute while idle. Anecdotally, a pause once held the
+   request ~3m43s until the connection dropped.
+2. **Retries double-execute.** No idempotency key is sent; `x-request-id`
+   is only read back into errors (`client.ts` ~374, ~513). Create is safe:
+   the name is required, and Cloud returns the existing sandbox (HTTP 200)
+   when the spec matches and it is STARTING or RUNNING, else 409
+   (monorepo `pkg/compute/sandbox.go` `recoverExistingSandboxCreate` ~343,
+   `api_sandboxes.go` ~105). Exec, process start and snapshot create have
+   no idempotency: a dropped request is retried while the first attempt
+   may still be running in the sandbox. The dev bridge already has to
+   answer `operation_ambiguous` (`cmd/internal/cloudsandboxes/cloudsandboxes.go` ~239).
+3. **Messy traces.** Snapshot splits one call into two steps (create +
+   `:wait-until-ready`, `durable.ts` ~457-470, ~630-648). Create and
+   `commands.run` are one step each; process start/wait/output are separate
+   user calls. All spans are generic `step.run` spans containing wire JSON.
+4. **Output ceiling.** Three limits stack:
+   - the SDK tail-truncates exec output to 2 MiB raw
+     (`maxDurableSandboxExecOutputBytes`, `protocol.ts` ~153;
+     `durable.ts` ~70-126) so base64 fits the step limit;
+   - the executor rejects (does not truncate) step output over 4 MiB
+     (`consts.MaxStepOutputSize`, `pkg/consts/consts.go` ~34; enforced by
+     `GeneratorOpcode.Validate`, `pkg/execution/state/opcode.go` ~69);
+   - Cloud cancels an exec whose combined output exceeds 4 MiB and returns
+     413 `sandbox_exec_output_too_large` with no output (monorepo
+     `api_sandbox.go` ~37, `api_sandbox_exec.go` ~64-72). An opcode does not
+     remove this one.
+   Process output is capped at a 512 KiB tail (`maxSandboxProcessTailBytes`,
+   `validation.ts` ~33; monorepo `api_sandbox_processes.go` ~176).
+5. **No cleanup.** Sandbox lifetime is not tied to the run; the executor has
+   no sandbox code. Failed or cancelled runs leave sandboxes running until
+   Cloud's runtime timeout, which pauses and never destroys (monorepo
+   `api/fns/sandbox_timeout.go`). The timeout is a per-runtime default
+   entitlement of 1 h (up to 24 h, 0 disables; monorepo
+   `pkg/consts/consts.go` ~126), not a hard lifetime. Nothing reaps paused
+   sandboxes; they and snapshots keep holding storage. The dev bridge only
+   journals IDs for manual recovery (`remember`, `cloudsandboxes.go` ~245).
 6. **Per-SDK cost.** Each SDK must port the REST client, polling and error
-   mapping (`client.ts` is ~1.4k lines).
+   mapping: `client.ts` 1,551 lines, plus `durable.ts` 877 and
+   `protocol.ts` 811. The Go and Python SDKs have no sandbox support yet.
+   Cloud already waits out `exec` server-side; all other waits are SDK
+   polling.
 
 ## Proposal
 
@@ -78,26 +110,33 @@ emitted like `Gateway` (inngest-js `InngestStepTools.ts` ~1053):
 `action`/`target`/`input` reuse today's wire schema (`protocol.ts`), and the
 step result is today's wire result. The durable facade in `durable.ts` stays;
 only `rawTool` changes from `step.run` to emitting the opcode. Composite
-actions become one opcode: `snapshot` (create + ready), `exec` (start + wait
-+ output), `create` (create + running).
+actions become one opcode: `snapshot` (create + ready), `create` (create +
+running).
 
 ### Executor
 
 `handleGeneratorSandbox` is dispatched alongside `OpcodeGateway`
-(`pkg/execution/executor/executor.go` ~4114). Two classes of action:
+(`pkg/execution/executor/executor.go` ~4116). Three classes of action:
 
 - **Short** (get, list, signal, destroy, snapshot get/list/delete): a single
   Cloud call inside the handler, then `SaveStep`, as
   `handleGeneratorGateway` does (~4953).
-- **Long** (create, exec, pause, resume, snapshot): the handler issues the
-  start call with an idempotency key, records a pending-op entry, creates a
-  pause with the user's timeout (as `handleGeneratorWaitForSignal` does,
-  ~5259), and returns. Completion is detected asynchronously (below) and
-  resumes the run with the step result. No queue worker or app connection is
-  held, so timeouts can be hours instead of 5 min.
+- **Long** (create, pause, resume, snapshot, process wait): the handler
+  issues the start call with an idempotency key, records a pending-op entry,
+  creates a pause with the user's timeout (as `handleGeneratorWaitForSignal`
+  does, ~5259), and returns. Completion is detected asynchronously (below)
+  and resumes the run with the step result. No queue worker or app
+  connection is held, so timeouts can be hours instead of 5 min.
+- **Exec**: the executor calls Cloud's held-open `exec` itself, off the
+  app's connection. This keeps today's output capture (4 MiB in Cloud,
+  2 MiB tail in the step) and Cloud's 5 min limit, at the cost of holding
+  one executor worker per exec.
 
-`exec` is implemented as process start + completion wait + output fetch, not
-the held-open Cloud `exec` stream.
+`exec` is not rebuilt as process start + wait + output: process output is
+capped at a 512 KiB tail, which would be worse than today. Commands longer
+than 5 min use `processes.start` + `wait` (async); their output stays
+512 KiB until Cloud raises the process tail or offers streamed output (open
+question).
 
 ### Async wait
 
@@ -117,9 +156,9 @@ Phase 1 is polling; callbacks come later.
 
 ### State
 
-- Step output: the same wire result as today. Output larger than the step
-  limit is truncated as today in phase 2. Offloading to blob storage is a
-  follow-up.
+- Step output: the same wire result as today, with exec output
+  tail-truncated to 2 MiB as today. Offloading to blob storage is a
+  follow-up; it does not lift Cloud's 4 MiB exec cap.
 - A per-run sandbox ledger in run state:
   `handle -> {sandboxID, createdByRun, keepAlive, durable, snapshots: [{stepID, snapshotID}]}`.
   It drives idempotency, cleanup and rewind.
@@ -127,8 +166,8 @@ Phase 1 is polling; callbacks come later.
 ### Idempotency
 
 The key is `hash(runID, stepID, attempt)` for mutating calls, and
-`hash(runID, stepID)` for create, which is already name-idempotent: the
-name is derived from the key when the user gives none. On retry, the
+`hash(runID, stepID)` for create, which is already name-idempotent (name
+is required today; it could be derived from the key if made optional). On retry, the
 executor first consults the ledger and the pending-op entry. If the prior
 attempt's process or snapshot exists, it adopts it instead of starting
 another. This needs idempotency-key support on Cloud process start and
@@ -185,7 +224,7 @@ On retry of step N, or a "rerun from step", the executor:
 
 Restore should be in place so the sandbox ID stays stable and earlier
 memoized refs remain valid. Cloud resume already restores a snapshot into
-the same workload ID (monorepo `pkg/compute/sandbox_lifecycle.go` ~146,
+the same workload ID (monorepo `pkg/compute/sandbox_lifecycle.go` ~188,
 `CloneSnapshot` into the existing workload), so "restore workload to
 snapshot X" looks like a generalisation of that path. If Cloud cannot do
 this, the ledger maps the logical handle to a new physical ID.
@@ -234,3 +273,5 @@ status events, in-place restore, cheap snapshots.
    API key?
 6. Rate limits for executor polling: is one GET per second per active op
    acceptable?
+7. Can the process output tail (512 KiB) be raised to at least exec's
+   4 MiB, or output be streamed, so long commands keep full output?
