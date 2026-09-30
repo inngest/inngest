@@ -24,6 +24,7 @@ export function legacyExecutionCap({
   overageAllowed,
 }: LegacyExecutions): ExecutionCap | null {
   if (limit === null || overageAllowed) return null;
+  // Legacy has no enforcement signal; treat the limit as a hard cap like the pre-flag UI.
   return { usage, limit, enforced: true, exceeded: usage >= limit };
 }
 

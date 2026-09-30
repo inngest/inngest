@@ -10,7 +10,7 @@ import {
 } from '@remixicon/react';
 
 import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
-import type { UsageBand } from './executionLimit';
+import { usageKind, type UsageBand } from './executionLimit';
 import { useDismissal } from './useDismissal';
 import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
 
@@ -56,18 +56,19 @@ const pausedContent = {
   dismissable: true,
 };
 
-const enhancedContent: Partial<Record<UsageBand, CardContent>> = {
-  '50': { kind: 'caution', ...pausedContent },
-  '75': { kind: 'warning', ...pausedContent },
-  '90': { kind: 'error', ...pausedContent, dismissable: false },
-  limitReached: {
-    kind: 'error',
-    title: 'New runs are paused',
-    body: (usage) =>
-      `You've used ${usage} executions this month and reached the Hobby limit. New runs and scheduled functions won't start and aren't queued. Upgrade to Pro to resume now.`,
-    dismissable: false,
-  },
+const limitReachedContent = {
+  title: 'New runs are paused',
+  body: (usage: string) =>
+    `You've used ${usage} executions this month and reached the Hobby limit. New runs and scheduled functions won't start and aren't queued. Upgrade to Pro to resume now.`,
+  dismissable: false,
 };
+
+function enhancedContent(band: UsageBand): CardContent | undefined {
+  const kind = usageKind(band);
+  if (kind === 'default') return undefined;
+  if (band === 'limitReached') return { kind, ...limitReachedContent };
+  return { kind, ...pausedContent, dismissable: band !== '90' };
+}
 
 export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   const data = useExecutionLimit();
@@ -79,7 +80,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
 
   let content: CardContent | undefined;
   if (data.enhanced) {
-    content = enhancedContent[data.band];
+    content = enhancedContent(data.band);
   } else if (data.isCapHit) {
     content = legacyContent;
   }
