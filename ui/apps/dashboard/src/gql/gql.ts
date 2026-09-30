@@ -187,7 +187,7 @@ type Documents = {
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": typeof types.CompleteAwsMarketplaceSetupDocument,
     "\n  query SecurityEmailSettings {\n    account {\n      securityEmail\n    }\n  }\n": typeof types.SecurityEmailSettingsDocument,
     "\n  mutation UpdateSecurityEmail($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      securityEmail\n    }\n  }\n": typeof types.UpdateSecurityEmailDocument,
-    "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": typeof types.GetAccountSupportInfoDocument,
+    "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n      }\n    }\n  }\n": typeof types.GetAccountSupportInfoDocument,
 };
 const documents: Documents = {
     "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.AiOverviewFunctionLookupDocument,
@@ -363,7 +363,7 @@ const documents: Documents = {
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
     "\n  query SecurityEmailSettings {\n    account {\n      securityEmail\n    }\n  }\n": types.SecurityEmailSettingsDocument,
     "\n  mutation UpdateSecurityEmail($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      securityEmail\n    }\n  }\n": types.UpdateSecurityEmailDocument,
-    "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
+    "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
 };
 
 /**
@@ -1075,7 +1075,7 @@ export function graphql(source: "\n  mutation UpdateSecurityEmail($input: Update
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n      }\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
