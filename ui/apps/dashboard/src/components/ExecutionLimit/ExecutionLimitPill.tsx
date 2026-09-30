@@ -16,7 +16,7 @@ export function ExecutionLimitPill() {
   );
 
   if (!data.enhanced) {
-    if (!data.isCapped) return null;
+    if (!data.isCapHit) return null;
 
     return (
       <Pill

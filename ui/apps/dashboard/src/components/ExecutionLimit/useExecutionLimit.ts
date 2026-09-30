@@ -5,7 +5,7 @@ import { pathCreator } from '@/utils/urls';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 import {
-  isExecutionCapped,
+  isCapHit,
   legacyExecutionCap,
   usageBand,
   type UsageBand,
@@ -52,9 +52,9 @@ const executionCapQuery = graphql(`
 type ExecutionLimitData = {
   accountID: string;
   band: UsageBand;
-  isCapped: boolean;
-  usedExecutions: number;
-  executionLimit: number;
+  isCapHit: boolean;
+  usage: number;
+  limit: number;
   isVercel: boolean;
   marketplaceBillingURL: string | null;
   enhanced: boolean;
@@ -96,14 +96,14 @@ export function useExecutionLimit(): ExecutionLimitData | null {
   const isEnterprise =
     'plan' in account &&
     (account.plan?.name ?? '').toLowerCase().includes('enterprise');
-  const isCapped = !isEnterprise && isExecutionCapped(cap);
+  const capHit = !isEnterprise && isCapHit(cap);
 
   return {
     accountID: account.id,
-    band: usageBand({ usage: cap.usage, limit: cap.limit, isCapped }),
-    isCapped,
-    usedExecutions: cap.usage,
-    executionLimit: cap.limit,
+    band: usageBand({ usage: cap.usage, limit: cap.limit, capHit }),
+    isCapHit: capHit,
+    usage: cap.usage,
+    limit: cap.limit,
     isVercel:
       'marketplace' in account && account.marketplace === Marketplace.Vercel,
     marketplaceBillingURL: account.marketplaceBillingURL ?? null,

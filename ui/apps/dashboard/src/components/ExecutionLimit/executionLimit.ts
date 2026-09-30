@@ -14,10 +14,7 @@ export type ExecutionCap = {
   exceeded: boolean;
 };
 
-export function isExecutionCapped({
-  enforced,
-  exceeded,
-}: ExecutionCap): boolean {
+export function isCapHit({ enforced, exceeded }: ExecutionCap): boolean {
   return enforced && exceeded;
 }
 
@@ -30,18 +27,18 @@ export function legacyExecutionCap({
   return { usage, limit, enforced: true, exceeded: usage >= limit };
 }
 
-export type UsageBand = 'under50' | '50' | '75' | '90' | 'capped';
+export type UsageBand = 'under50' | '50' | '75' | '90' | 'limitReached';
 
 export function usageBand({
   usage,
   limit,
-  isCapped,
+  capHit,
 }: {
   usage: number;
   limit: number;
-  isCapped: boolean;
+  capHit: boolean;
 }): UsageBand {
-  if (isCapped) return 'capped';
+  if (capHit) return 'limitReached';
   if (limit <= 0) return 'under50';
 
   const ratio = usage / limit;
@@ -54,7 +51,7 @@ export function usageBand({
 export type UsageKind = 'default' | 'caution' | 'warning' | 'error';
 
 export function usageKind(band: UsageBand): UsageKind {
-  if (band === 'capped') return 'error';
+  if (band === 'limitReached') return 'error';
   if (band === 'under50') return 'default';
   if (band === '50') return 'caution';
   if (band === '75') return 'warning';
@@ -68,7 +65,7 @@ export function pillContent(
   const kind = usageKind(band);
   if (kind === 'default') return null;
 
-  if (band === 'capped') {
+  if (band === 'limitReached') {
     return {
       kind,
       text: isVercel

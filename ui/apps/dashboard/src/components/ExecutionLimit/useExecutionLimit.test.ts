@@ -95,10 +95,10 @@ describe('useExecutionLimit', () => {
     expect(useExecutionLimit()).toMatchObject({
       accountID: 'legacy-account',
       enhanced: false,
-      isCapped: true,
-      band: 'capped',
-      usedExecutions: 50_000,
-      executionLimit: 50_000,
+      isCapHit: true,
+      band: 'limitReached',
+      usage: 50_000,
+      limit: 50_000,
     });
     expect(
       mocks.useSkippableGraphQLQuery.mock.calls.map(([args]) => args.skip),
@@ -123,7 +123,7 @@ describe('useExecutionLimit', () => {
     expect(useExecutionLimit()).toMatchObject({
       accountID: 'enhanced-account',
       enhanced: true,
-      isCapped: false,
+      isCapHit: false,
       band: '90',
       isVercel: true,
       marketplaceBillingURL: 'https://vercel.com/billing',

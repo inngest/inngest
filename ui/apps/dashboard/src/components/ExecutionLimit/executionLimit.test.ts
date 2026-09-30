@@ -4,7 +4,7 @@ import {
   dismissalStorageKey,
   DISMISSAL_LIFETIME_MS,
   isDismissalActive,
-  isExecutionCapped,
+  isCapHit,
   legacyExecutionCap,
   pillContent,
   usageBand,
@@ -18,31 +18,31 @@ const atLimit = {
   exceeded: true,
 };
 
-describe('isExecutionCapped', () => {
-  it('caps once the backend reports the cap exceeded', () => {
-    expect(isExecutionCapped(atLimit)).toBe(true);
-    expect(isExecutionCapped({ ...atLimit, exceeded: false })).toBe(false);
+describe('isCapHit', () => {
+  it('hits the cap once the backend reports it exceeded', () => {
+    expect(isCapHit(atLimit)).toBe(true);
+    expect(isCapHit({ ...atLimit, exceeded: false })).toBe(false);
   });
 
-  it('never caps while enforcement is off', () => {
-    expect(isExecutionCapped({ ...atLimit, enforced: false })).toBe(false);
+  it('never hits the cap while enforcement is off', () => {
+    expect(isCapHit({ ...atLimit, enforced: false })).toBe(false);
   });
 });
 
 describe('legacyExecutionCap', () => {
   const legacyAtLimit = { usage: 50_000, limit: 50_000, overageAllowed: false };
-  const cappedBy = (executions: typeof legacyAtLimit) => {
+  const capHitBy = (executions: typeof legacyAtLimit) => {
     const cap = legacyExecutionCap(executions);
-    return cap && isExecutionCapped(cap);
+    return cap && isCapHit(cap);
   };
 
   it('treats unlimited plans as having no cap', () => {
     expect(legacyExecutionCap({ ...legacyAtLimit, limit: null })).toBeNull();
   });
 
-  it('caps at the limit as if enforced', () => {
-    expect(cappedBy(legacyAtLimit)).toBe(true);
-    expect(cappedBy({ ...legacyAtLimit, usage: 49_999 })).toBe(false);
+  it('hits the cap at the limit as if enforced', () => {
+    expect(capHitBy(legacyAtLimit)).toBe(true);
+    expect(capHitBy({ ...legacyAtLimit, usage: 49_999 })).toBe(false);
   });
 
   it('treats accounts billed for overage as having no cap', () => {
@@ -53,8 +53,8 @@ describe('legacyExecutionCap', () => {
 });
 
 describe('usageBand', () => {
-  const band = (usage: number, isCapped = false) =>
-    usageBand({ usage, limit: 50_000, isCapped });
+  const band = (usage: number, capHit = false) =>
+    usageBand({ usage, limit: 50_000, capHit });
 
   it('stays quiet below half the limit', () => {
     expect(band(0)).toBe('under50');
@@ -69,18 +69,18 @@ describe('usageBand', () => {
     expect(band(45_000)).toBe('90');
   });
 
-  it('reports 90 rather than capped at the limit while enforcement is off', () => {
+  it('reports 90 rather than limitReached at the limit while enforcement is off', () => {
     expect(band(50_000)).toBe('90');
     expect(band(60_000)).toBe('90');
   });
 
-  it('reports capped whenever the cap is enforced, whatever the ratio', () => {
-    expect(band(50_000, true)).toBe('capped');
-    expect(band(47_500, true)).toBe('capped');
+  it('reports limitReached whenever the cap is hit, whatever the ratio', () => {
+    expect(band(50_000, true)).toBe('limitReached');
+    expect(band(47_500, true)).toBe('limitReached');
   });
 
   it('treats a non-positive limit as no usage', () => {
-    expect(usageBand({ usage: 10, limit: 0, isCapped: false })).toBe('under50');
+    expect(usageBand({ usage: 10, limit: 0, capHit: false })).toBe('under50');
   });
 });
 
@@ -90,7 +90,7 @@ describe('usageKind', () => {
     expect(usageKind('50')).toBe('caution');
     expect(usageKind('75')).toBe('warning');
     expect(usageKind('90')).toBe('error');
-    expect(usageKind('capped')).toBe('error');
+    expect(usageKind('limitReached')).toBe('error');
   });
 });
 
@@ -154,14 +154,14 @@ describe('pillContent', () => {
     expect(pillContent('75', false)?.text).toContain('almost reached');
   });
 
-  it('errors at 90% of the limit, with the same almost-reached copy as capped', () => {
+  it('errors at 90% of the limit, keeping the almost-reached copy', () => {
     expect(pillContent('90', false)).toMatchObject({ kind: 'error' });
     expect(pillContent('90', false)?.text).toContain('almost reached');
   });
 
-  it('escalates to an error once capped, dropping the almost-reached copy', () => {
-    expect(pillContent('capped', false)).toMatchObject({ kind: 'error' });
-    expect(pillContent('capped', false)?.text).not.toContain('almost');
+  it('escalates to an error once the limit is reached, dropping the almost-reached copy', () => {
+    expect(pillContent('limitReached', false)).toMatchObject({ kind: 'error' });
+    expect(pillContent('limitReached', false)?.text).not.toContain('almost');
   });
 
   it('points Vercel accounts at the integration settings', () => {

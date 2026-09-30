@@ -146,13 +146,13 @@ export function InfraDashboard({
         {executionLimit?.enhanced ? (
           <KpiCard
             cap={{
-              value: executionLimit.usedExecutions,
-              limit: executionLimit.executionLimit,
+              value: executionLimit.usage,
+              limit: executionLimit.limit,
               kind: usageKind(executionLimit.band),
             }}
             fetching={false}
             label="Executions ran (runs + steps)"
-            value={formatCompactNumber(executionLimit.usedExecutions)}
+            value={formatCompactNumber(executionLimit.usage)}
           />
         ) : (
           <KpiCard

@@ -60,7 +60,7 @@ const enhancedContent: Partial<Record<UsageBand, CardContent>> = {
   '50': { kind: 'caution', ...pausedContent },
   '75': { kind: 'warning', ...pausedContent },
   '90': { kind: 'error', ...pausedContent, dismissable: false },
-  capped: {
+  limitReached: {
     kind: 'error',
     title: 'New runs are paused',
     body: (usage) =>
@@ -80,7 +80,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   let content: CardContent | undefined;
   if (data.enhanced) {
     content = enhancedContent[data.band];
-  } else if (data.isCapped) {
+  } else if (data.isCapHit) {
     content = legacyContent;
   }
   if (!content) return null;
@@ -107,8 +107,8 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
     );
   }
 
-  const formattedLimit = numberFormatter.format(data.executionLimit);
-  const formattedUsage = numberFormatter.format(data.usedExecutions);
+  const formattedLimit = numberFormatter.format(data.limit);
+  const formattedUsage = numberFormatter.format(data.usage);
 
   return (
     <SidebarAlertCard
@@ -150,9 +150,9 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       <div className="mt-2 pt-1">
         <ProgressBar
           kind={content.kind}
-          limit={data.executionLimit}
+          limit={data.limit}
           size="small"
-          value={data.usedExecutions}
+          value={data.usage}
         />
         <p className="mt-[3px] text-xs font-bold leading-4">
           {formattedUsage}/{formattedLimit} Executions

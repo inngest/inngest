@@ -7,9 +7,9 @@ const numberFormatter = new Intl.NumberFormat('en-US');
 export function ExecutionLimitBanner() {
   const data = useExecutionLimit();
 
-  if (!data?.enhanced || data.band !== 'capped') return null;
+  if (!data?.enhanced || data.band !== 'limitReached') return null;
 
-  const formattedUsage = numberFormatter.format(data.usedExecutions);
+  const formattedUsage = numberFormatter.format(data.usage);
 
   return (
     <Banner
