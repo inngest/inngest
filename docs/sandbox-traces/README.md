@@ -169,10 +169,14 @@ on its first row. Cheapest option; no interaction.
 
 ### B. Machine highlight
 
-Hovering or clicking a machine chip gives every row with that `sandbox_id` the
+Selecting a machine gives every row with that `sandbox_id` the
 experiment-style dotted background (in the machine's colour) and dims the rest.
 Works across parallel work because it's a per-row flag, exactly like
 `hasExperiment` in `RunDetailsV4/TimelineBar.tsx`.
+
+Decided interaction: **clicking a machine chip pins the highlight** (click it
+again, or press Escape, to clear), and **hovering a chip previews it** while no
+machine is pinned. The mock shows `ci-build` pinned.
 
 ![B. Machine highlight](./highlight.png)
 
@@ -256,13 +260,49 @@ there are no internal steps and `statement_id` is always the step's own ID; the
 grouping in option C then simply never triggers for those rows. Nothing in the
 UI needs to be undone.
 
+## Rollout to Cloud
+
+Cloud (`inngest/monorepo`) doesn't have its own metadata allowlist. It imports
+this repo as a Go module and vendors it: `go.mod` requires
+`github.com/inngest/inngest` at a pseudo-version (on `develop` on 2026-09-30:
+`v1.45.2-0.20260929202128-3c3c7666fd48`, i.e. inngest `3c3c7666`), and
+`vendor/github.com/inngest/inngest/pkg/tracing/metadata/kind.go` is the
+allowlist Cloud enforces. Its executor is the vendored
+`pkg/execution/executor` too.
+
+Bumps are automated:
+
+1. Merge the inngest PR to `main`. `.github/workflows/dispatch_upstream.yml`
+   fires a `repository_dispatch` (`upstream-inngest`) at `inngest/monorepo`.
+2. The monorepo's `.github/workflows/upstream-inngest.yml` runs
+   `go get github.com/inngest/inngest@<new main sha>` and `make mod` (`GOWORK=off
+   go mod tidy && go mod vendor`) on the `automated/upstream-inngest` branch,
+   and opens or updates a PR titled `chore(deps): upstream inngest/inngest@main
+   (N commits behind)` against `develop`.
+3. A human reviews and merges that PR (#8937 on 2026-09-29 merged two
+   minutes after it opened). Cloud's normal deploy from `develop` then picks it
+   up. I haven't checked the deploy pipeline itself.
+
+So the steps for this change are:
+
+1. Merge the inngest PR (allowlist + `SandboxMetadata`).
+2. Merge the next automated upstream PR in `inngest/monorepo`, checking that
+   `vendor/github.com/inngest/inngest/pkg/tracing/metadata/sandbox.go` and the
+   `kind.go` allowlist line are in its diff.
+3. Only then release the SDK change. Releasing earlier is harmless: Cloud
+   logs `invalid metadata in checkpoint step` and drops the entry, and the step
+   is unaffected.
+4. The trace UI changes (in this repo's `ui/`) can ship any time after step 2.
+   Runs from before then render as they do today.
+
+To test Cloud against an unmerged inngest branch, the monorepo has `make
+oss-vendor OSSHASH=<sha>` (`go get github.com/inngest/inngest@<sha>` plus
+`make mod`) for a monorepo branch.
+
 ## Open questions
 
-1. **Cloud rollout.** The allowlist change must reach the Cloud API before
-   Cloud runs show this metadata. Until then, Cloud drops the entries with a
-   warning. Does the Cloud executor vendor this package, and how is it bumped?
-2. **Secrets in commands.** `command` is already visible in the step input, so
-   this adds no new exposure, but a trace makes it more prominent. Should the
-   UI mask values that match the run's sandbox secrets?
-3. **Highlight trigger for B.** Hover only, click only (sticky), or both? The
-   mock assumes click-to-pin plus hover preview.
+1. **Secrets in commands.** Command argv, `environment` values and stdout are
+   already stored in plain text in step input and output (see the separate
+   secrets audit). This metadata copies up to 1 KiB of argv, which adds another
+   place to look but no new category of data. Fix the underlying exposure
+   before the UI makes commands more prominent.
