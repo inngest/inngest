@@ -69,9 +69,10 @@ describe('usageBand', () => {
     expect(band(45_000)).toBe('90');
   });
 
-  it('reports 90 rather than limitReached at the limit while enforcement is off', () => {
-    expect(band(50_000)).toBe('90');
-    expect(band(60_000)).toBe('90');
+  it('reports limitReached at the limit even while enforcement is off', () => {
+    expect(band(49_999)).toBe('90');
+    expect(band(50_000)).toBe('limitReached');
+    expect(band(60_000)).toBe('limitReached');
   });
 
   it('reports limitReached whenever the cap is hit, whatever the ratio', () => {

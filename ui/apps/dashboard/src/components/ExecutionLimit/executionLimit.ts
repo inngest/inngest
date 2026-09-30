@@ -42,6 +42,7 @@ export function usageBand({
   if (limit <= 0) return 'under50';
 
   const ratio = usage / limit;
+  if (ratio >= 1) return 'limitReached';
   if (ratio >= 0.9) return '90';
   if (ratio >= 0.75) return '75';
   if (ratio >= 0.5) return '50';

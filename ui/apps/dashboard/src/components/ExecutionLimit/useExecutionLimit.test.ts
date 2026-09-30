@@ -124,7 +124,7 @@ describe('useExecutionLimit', () => {
       accountID: 'enhanced-account',
       enhanced: true,
       isCapHit: false,
-      band: '90',
+      band: 'limitReached',
       isVercel: true,
       marketplaceBillingURL: 'https://vercel.com/billing',
     });
