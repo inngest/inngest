@@ -52,7 +52,11 @@ type SandboxMetadata struct {
 	Role SandboxRole `json:"role"`
 
 	// SandboxID and SandboxName identify the machine this step acted on, or
-	// created. Every step on the same machine shares the ID.
+	// created. Every step on the same machine shares the ID, and it's the key
+	// to group by: a machine may have been created, and may be destroyed,
+	// outside this run. Both come from the reference the operation targets,
+	// so they're present even when the step fails. A failed create has only
+	// the name.
 	SandboxID   string `json:"sandbox_id,omitempty"`
 	SandboxName string `json:"sandbox_name,omitempty"`
 

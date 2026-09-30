@@ -44,7 +44,11 @@ type SandboxMetadata struct {
 	Role SandboxRole `json:"role"`
 
 	// SandboxID and SandboxName identify the machine this step acted on, or
-	// created. Every step on the same machine shares the ID.
+	// created. Every step on the same machine shares the ID, and it's the key
+	// to group by: a machine may have been created, and may be destroyed,
+	// outside this run. Both come from the reference the operation targets,
+	// so they're present even when the step fails. A failed create has only
+	// the name.
 	SandboxID   string `json:"sandbox_id,omitempty"`
 	SandboxName string `json:"sandbox_name,omitempty"`
 
@@ -53,14 +57,17 @@ type SandboxMetadata struct {
 
 	// Command is the argv a command or process ran. CommandDisplay is the
 	// command as the user wrote it, when they passed a shell string.
-	Command        []string `json:"command,omitempty"`
-	CommandDisplay string   `json:"command_display,omitempty"`
-	Cwd            string   `json:"cwd,omitempty"`
+	// CommandTruncated is true when either was cut short to keep metadata
+	// small.
+	Command          []string `json:"command,omitempty"`
+	CommandDisplay   string   `json:"command_display,omitempty"`
+	CommandTruncated bool     `json:"command_truncated,omitempty"`
+	Cwd              string   `json:"cwd,omitempty"`
 
 	ProcessID         string `json:"process_id,omitempty"`
 	ProcessState      string `json:"process_state,omitempty"`
 	ExitCode          *int   `json:"exit_code,omitempty"`
-	TerminationSignal string `json:"termination_signal,omitempty"`
+	TerminationSignal *int   `json:"termination_signal,omitempty"`
 
 	// OutputTruncated is true when a captured command's stdout/stderr was cut
 	// to fit in the step's output.

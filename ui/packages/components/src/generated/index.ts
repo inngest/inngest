@@ -68,7 +68,11 @@ export interface SandboxMetadata {
   role: SandboxRole;
   /**
    * SandboxID and SandboxName identify the machine this step acted on, or
-   * created. Every step on the same machine shares the ID.
+   * created. Every step on the same machine shares the ID, and it's the key
+   * to group by: a machine may have been created, and may be destroyed,
+   * outside this run. Both come from the reference the operation targets,
+   * so they're present even when the step fails. A failed create has only
+   * the name.
    */
   sandbox_id?: string;
   sandbox_name?: string;
@@ -79,14 +83,17 @@ export interface SandboxMetadata {
   /**
    * Command is the argv a command or process ran. CommandDisplay is the
    * command as the user wrote it, when they passed a shell string.
+   * CommandTruncated is true when either was cut short to keep metadata
+   * small.
    */
   command?: string[];
   command_display?: string;
+  command_truncated?: boolean;
   cwd?: string;
   process_id?: string;
   process_state?: string;
   exit_code?: number /* int */;
-  termination_signal?: string;
+  termination_signal?: number /* int */;
   /**
    * OutputTruncated is true when a captured command's stdout/stderr was cut
    * to fit in the step's output.
