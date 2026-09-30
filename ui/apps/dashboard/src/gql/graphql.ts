@@ -119,23 +119,22 @@ export type Account = {
   activeBanners: Array<Banner>;
   addons: Addons;
   apiKeys: Array<ApiKey>;
+  /** @deprecated Field no longer supported */
   appliedAddons: AppliedAddons;
   billingEmail: Scalars['String']['output'];
   constraintAPIEnrolled: Scalars['Boolean']['output'];
   createdAt: Scalars['Time']['output'];
   datadogConnections: Array<DatadogConnectionStatus>;
   datadogOrganizations: Array<DatadogOrganization>;
+  /** @deprecated Field no longer supported */
   entitlementUsage: EntitlementUsage;
-  /** @deprecated Use ents instead. */
-  entitlements: Entitlements;
   ents: AccountEntitlements;
   id: Scalars['ID']['output'];
   insightsQueries: Array<InsightsQueryStatement>;
   marketplace: Maybe<Marketplace>;
   /**
-   * marketplaceBillingURL is a provider-hosted page where an account billed by a
-   * marketplace manages its plan. Null for accounts we bill ourselves, and for
-   * marketplaces with no deep link (DigitalOcean, AWS).
+   * Provider-hosted page where a marketplace-billed account manages its plan.
+   * Null when we bill the account, or the marketplace has no deep link.
    */
   marketplaceBillingURL: Maybe<Scalars['String']['output']>;
   name: Maybe<Scalars['NullString']['output']>;
@@ -435,10 +434,9 @@ export type BillingPlan = {
   __typename?: 'BillingPlan';
   addons: Addons;
   amount: Scalars['Int']['output'];
+  /** @deprecated Field no longer supported */
   availableAddons: AvailableAddons;
   billingPeriod: Scalars['BillingPeriod']['output'];
-  /** @deprecated Use ents instead. */
-  entitlements: Entitlements;
   ents: PlanEntitlements;
   features: Scalars['Map']['output'];
   id: Scalars['ID']['output'];
@@ -800,12 +798,6 @@ export type EntitlementBool = {
   enabled: Scalars['Boolean']['output'];
 };
 
-export type EntitlementConcurrency = {
-  __typename?: 'EntitlementConcurrency';
-  limit: Scalars['Int']['output'];
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementConcurrencyValue = {
   __typename?: 'EntitlementConcurrencyValue';
   burstMode: BurstConcurrencyMode;
@@ -822,19 +814,6 @@ export type EntitlementConnectWorkerConnections = {
   limit: Maybe<Scalars['Int']['output']>;
 };
 
-export type EntitlementEvents = {
-  __typename?: 'EntitlementEvents';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-};
-
-export type EntitlementExecutions = {
-  __typename?: 'EntitlementExecutions';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementInt = {
   __typename?: 'EntitlementInt';
   limit: Scalars['Int']['output'];
@@ -843,20 +822,6 @@ export type EntitlementInt = {
 export type EntitlementNullableInt = {
   __typename?: 'EntitlementNullableInt';
   limit: Maybe<Scalars['Int']['output']>;
-};
-
-export type EntitlementRunCount = {
-  __typename?: 'EntitlementRunCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
-};
-
-export type EntitlementStepCount = {
-  __typename?: 'EntitlementStepCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  overageAllowed: Scalars['Boolean']['output'];
-  usage: Scalars['Int']['output'];
 };
 
 export type EntitlementUsage = {
@@ -880,46 +845,10 @@ export type EntitlementUsageStepCount = {
   overageAllowed: Scalars['Boolean']['output'];
 };
 
-export type EntitlementUserCount = {
-  __typename?: 'EntitlementUserCount';
-  limit: Maybe<Scalars['Int']['output']>;
-  usage: Scalars['Int']['output'];
-};
-
 export type EntitlementWithOverage = {
   __typename?: 'EntitlementWithOverage';
   limit: Maybe<Scalars['Int']['output']>;
   overageAllowed: Scalars['Boolean']['output'];
-};
-
-export type Entitlements = {
-  __typename?: 'Entitlements';
-  accountID: Maybe<Scalars['UUID']['output']>;
-  concurrency: EntitlementConcurrency;
-  connect: EntitlementBool;
-  connectAppsPerConnection: EntitlementConnectAppsPerConnection;
-  connectWorkerConnections: EntitlementConnectWorkerConnections;
-  eventBatchCount: EntitlementInt;
-  eventBatchTimeout: EntitlementInt;
-  eventSize: EntitlementInt;
-  events: EntitlementEvents;
-  executions: EntitlementExecutions;
-  functionBacklogSize: EntitlementNullableInt;
-  hipaa: EntitlementBool;
-  history: EntitlementInt;
-  metricsExport: EntitlementBool;
-  metricsExportFreshness: EntitlementInt;
-  metricsExportGranularity: EntitlementInt;
-  otelTraces: EntitlementBool;
-  planID: Maybe<Scalars['UUID']['output']>;
-  realtimeConnections: EntitlementInt;
-  realtimeMessages: EntitlementInt;
-  runCount: EntitlementRunCount;
-  runDuration: EntitlementInt;
-  slackChannel: EntitlementBool;
-  stepCount: EntitlementStepCount;
-  tracingCustomSpans: EntitlementInt;
-  userCount: EntitlementUserCount;
 };
 
 export type EnvEdge = {
@@ -1218,6 +1147,7 @@ export type FunctionRun = {
   status: FunctionRunStatus;
   workflowID: Scalars['UUID']['output'];
   workflowVersion: Maybe<WorkflowVersion>;
+  /** @deprecated Field no longer supported */
   workflowVersionInt: Scalars['Int']['output'];
   workspaceID: Scalars['UUID']['output'];
 };
@@ -1242,6 +1172,7 @@ export enum FunctionRunStatus {
 
 export enum FunctionRunTimeField {
   EndedAt = 'ENDED_AT',
+  /** @deprecated Field no longer supported */
   Mixed = 'MIXED',
   StartedAt = 'STARTED_AT'
 }
@@ -1278,12 +1209,6 @@ export type FunctionRunV2 = {
 
 export type FunctionRunV2TraceArgs = {
   preview: InputMaybe<Scalars['Boolean']['input']>;
-};
-
-export type FunctionRunV2Edge = {
-  __typename?: 'FunctionRunV2Edge';
-  cursor: Scalars['String']['output'];
-  node: FunctionRunV2;
 };
 
 export type FunctionTrigger = {
@@ -2451,8 +2376,6 @@ export type RunTraceTrigger = {
 
 export type RunsConnection = {
   __typename?: 'RunsConnection';
-  edges: Array<FunctionRunV2Edge>;
-  pageInfo: PageInfo;
   totalCount: Scalars['Int']['output'];
 };
 
@@ -2816,6 +2739,7 @@ export type StripeSubscriptionInput = {
 
 export type StripeSubscriptionItemsInput = {
   amount: Scalars['Int']['input'];
+  /** @deprecated Use planSlug instead */
   planID?: InputMaybe<Scalars['ID']['input']>;
   planSlug?: InputMaybe<Scalars['String']['input']>;
   quantity: Scalars['Int']['input'];
@@ -2919,6 +2843,7 @@ export type Usage = {
 export type UsageInput = {
   from?: InputMaybe<Scalars['Time']['input']>;
   period?: InputMaybe<Scalars['Period']['input']>;
+  /** @deprecated Field no longer supported */
   range?: InputMaybe<Scalars['Timerange']['input']>;
   to?: InputMaybe<Scalars['Time']['input']>;
 };
@@ -3046,6 +2971,7 @@ export type Workflow = {
   slug: Scalars['String']['output'];
   triggers: Array<FunctionTrigger>;
   url: Scalars['String']['output'];
+  /** @deprecated Field no longer supported */
   usage: Usage;
 };
 
@@ -3115,12 +3041,14 @@ export type Workspace = {
   connectWorkerMetrics: ScopedMetricsResponse;
   createdAt: Scalars['Time']['output'];
   envSecrets: Array<EnvSecret>;
+  /** @deprecated Field no longer supported */
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventType: EventTypeV2;
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
   eventV2: EventV2;
+  /** @deprecated Field no longer supported */
   events: PaginatedEvents;
   eventsV2: EventsConnection;
   functionCount: Scalars['Int']['output'];
@@ -3248,11 +3176,8 @@ export type WorkspaceRunTriggerArgs = {
 
 
 export type WorkspaceRunsArgs = {
-  after: InputMaybe<Scalars['String']['input']>;
   filter: RunsFilterV2;
-  first?: Scalars['Int']['input'];
   orderBy: Array<RunsOrderBy>;
-  preview: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
