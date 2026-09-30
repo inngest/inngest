@@ -66,10 +66,6 @@ export function useExecutionLimit(): ExecutionLimitData | null {
   );
   const enhanced = isReady && enhancedEnabled;
 
-  // Gates both queries so a flagged account never renders the legacy card
-  // first. isReady also turns true when identification fails or never comes,
-  // so no account is stranded.
-
   const legacyRes = useSkippableGraphQLQuery({
     query: executionLimitQuery,
     variables: {},
@@ -91,7 +87,7 @@ export function useExecutionLimit(): ExecutionLimitData | null {
           ...account.entitlements.executions,
           usage: account.entitlements.usage.executions,
         });
-  if (!cap || cap.usage === null) return null;
+  if (!cap) return null;
 
   const isEnterprise =
     'plan' in account &&

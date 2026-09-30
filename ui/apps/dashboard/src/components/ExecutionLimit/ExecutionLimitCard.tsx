@@ -75,6 +75,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   const { isReady, isDismissed, dismiss } = useDismissal(
     'card',
     data?.accountID,
+    data?.band,
   );
   if (!data) return null;
 

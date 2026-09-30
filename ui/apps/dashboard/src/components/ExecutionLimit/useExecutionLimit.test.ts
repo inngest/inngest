@@ -39,10 +39,10 @@ describe('useExecutionLimit', () => {
     marketplace: Marketplace;
     marketplaceBillingURL: string | null;
     executionCap: {
-      usage: number | null;
+      usage: number;
       limit: number;
       enforced: boolean;
-      exceeded: boolean | null;
+      exceeded: boolean;
     } | null;
   };
 
@@ -86,11 +86,8 @@ describe('useExecutionLimit', () => {
     );
   });
 
-  it.each([
-    // A flag that fails to load or identify comes back ready with its default.
-    { name: 'off', value: false, isReady: true },
-  ])('uses legacy limits when the flag is $name', ({ value, isReady }) => {
-    flag = { value, isReady };
+  it('uses legacy limits when the flag is off', () => {
+    flag = { value: false, isReady: true };
 
     expect(useExecutionLimit()).toMatchObject({
       accountID: 'legacy-account',
@@ -154,18 +151,6 @@ describe('useExecutionLimit', () => {
   it('does not fall back to legacy limits when the enhanced cap is null', () => {
     flag = { value: true, isReady: true };
     enhancedAccount.executionCap = null;
-
-    expect(useExecutionLimit()).toBeNull();
-  });
-
-  it('hides when usage is unknown', () => {
-    flag = { value: true, isReady: true };
-    enhancedAccount.executionCap = {
-      usage: null,
-      limit: 50_000,
-      enforced: true,
-      exceeded: null,
-    };
 
     expect(useExecutionLimit()).toBeNull();
   });

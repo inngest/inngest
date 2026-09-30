@@ -129,11 +129,7 @@ export type Account = {
   /** @deprecated Use ents instead. */
   entitlements: Entitlements;
   ents: AccountEntitlements;
-  /**
-   * Monthly execution cap for the account. Null when the account is not capped:
-   * its executions_overage_limit entitlement is -1, or its executions allowance
-   * is unlimited. The usage card and the capped banner read only this field.
-   */
+  /** Monthly execution cap. Null when the account is uncapped or the feature is off for it. */
   executionCap: Maybe<AccountExecutionCap>;
   id: Scalars['ID']['output'];
   insightsQueries: Array<InsightsQueryStatement>;
@@ -226,14 +222,14 @@ export type AccountExecutionCap = {
   __typename?: 'AccountExecutionCap';
   /** Whether the cap is being enforced for this account. Usage is counted and shown either way. */
   enforced: Scalars['Boolean']['output'];
-  /** Whether usage has reached limit + overageLimit. New runs are refused only when enforced is also true. Null when usage is unknown. */
-  exceeded: Maybe<Scalars['Boolean']['output']>;
+  /** Whether usage has reached limit + overageLimit. New runs are refused only when enforced is also true. */
+  exceeded: Scalars['Boolean']['output'];
   /** Monthly execution allowance: the executions entitlement, overrides and addons included. */
   limit: Scalars['Int']['output'];
-  /** Executions past limit before new runs are refused. Hobby is 0. */
+  /** Executions past limit before new runs are refused. */
   overageLimit: Scalars['Int']['output'];
-  /** Month-to-date executions, read from the usage counter. Lags real usage by seconds. Null when the read failed. */
-  usage: Maybe<Scalars['Int']['output']>;
+  /** Month-to-date executions, read from the metrics service. Usually under a minute behind, hours in the worst case. */
+  usage: Scalars['Int']['output'];
 };
 
 export type AccountPaymentStatus = {
@@ -3768,7 +3764,7 @@ export type ExecutionLimitCheckQuery = { __typename?: 'Query', account: { __type
 export type ExecutionCapCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ExecutionCapCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, marketplace: Marketplace | null, marketplaceBillingURL: string | null, executionCap: { __typename?: 'AccountExecutionCap', usage: number | null, limit: number, enforced: boolean, exceeded: boolean | null } | null } };
+export type ExecutionCapCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, marketplace: Marketplace | null, marketplaceBillingURL: string | null, executionCap: { __typename?: 'AccountExecutionCap', usage: number, limit: number, enforced: boolean, exceeded: boolean } | null } };
 
 export type GetExperimentsQueryVariables = Exact<{
   workspaceID: Scalars['ID']['input'];

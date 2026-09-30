@@ -254,7 +254,7 @@ function BillingComponent() {
                     data={executions}
                     className="mb-6"
                     kind={
-                      executionLimit
+                      executionLimit?.enhanced
                         ? usageKind(executionLimit.band)
                         : undefined
                     }

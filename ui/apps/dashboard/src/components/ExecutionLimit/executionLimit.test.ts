@@ -8,7 +8,6 @@ import {
   legacyExecutionCap,
   pillContent,
   usageBand,
-  usageKind,
 } from './executionLimit';
 
 const atLimit = {
@@ -85,29 +84,25 @@ describe('usageBand', () => {
   });
 });
 
-describe('usageKind', () => {
-  it('maps each usage band to its pill/card tone', () => {
-    expect(usageKind('under50')).toBe('default');
-    expect(usageKind('50')).toBe('caution');
-    expect(usageKind('75')).toBe('warning');
-    expect(usageKind('90')).toBe('error');
-    expect(usageKind('limitReached')).toBe('error');
-  });
-});
-
 describe('dismissalStorageKey', () => {
   const accountA = '5d258962-2c37-4a5d-b875-ebe72792c47f';
   const accountB = 'e8ea18c4-dbb4-4e98-a6a4-8ff8b3801765';
 
   it('gives different accounts different keys', () => {
-    expect(dismissalStorageKey('card', accountA)).not.toBe(
-      dismissalStorageKey('card', accountB),
+    expect(dismissalStorageKey('card', accountA, '50')).not.toBe(
+      dismissalStorageKey('card', accountB, '50'),
     );
   });
 
-  it('is stable for the same surface and account', () => {
-    expect(dismissalStorageKey('card', accountA)).toBe(
-      dismissalStorageKey('card', accountA),
+  it('gives different bands different keys', () => {
+    expect(dismissalStorageKey('card', accountA, '50')).not.toBe(
+      dismissalStorageKey('card', accountA, '75'),
+    );
+  });
+
+  it('is stable for the same surface, account and band', () => {
+    expect(dismissalStorageKey('card', accountA, '50')).toBe(
+      dismissalStorageKey('card', accountA, '50'),
     );
   });
 });

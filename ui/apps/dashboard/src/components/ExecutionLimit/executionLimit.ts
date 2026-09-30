@@ -2,20 +2,19 @@ import type { ExecutionLimitCheckQuery } from '@/gql/graphql';
 
 type LegacyEntitlements = ExecutionLimitCheckQuery['account']['entitlements'];
 
-// The legacy query reads usage separately from the executions entitlement.
 export type LegacyExecutions = LegacyEntitlements['executions'] & {
   usage: LegacyEntitlements['usage']['executions'];
 };
 
 export type ExecutionCap = {
-  usage: number | null;
+  usage: number;
   limit: number;
   enforced: boolean;
-  exceeded: boolean | null;
+  exceeded: boolean;
 };
 
 export function isCapHit({ enforced, exceeded }: ExecutionCap): boolean {
-  return enforced && exceeded === true;
+  return enforced && exceeded;
 }
 
 export function legacyExecutionCap({
@@ -93,8 +92,9 @@ const DISMISSAL_STORAGE_KEY_PREFIX: Record<DismissalSurface, string> = {
 export function dismissalStorageKey(
   surface: DismissalSurface,
   accountID: string,
+  band: UsageBand,
 ): string {
-  return `${DISMISSAL_STORAGE_KEY_PREFIX[surface]}:${accountID}`;
+  return `${DISMISSAL_STORAGE_KEY_PREFIX[surface]}:${accountID}:${band}`;
 }
 
 export const DISMISSAL_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -112,8 +112,9 @@ export function isDismissalActive(
 export function readDismissedAt(
   surface: DismissalSurface,
   accountID: string,
+  band: UsageBand,
 ): number | null {
-  const key = dismissalStorageKey(surface, accountID);
+  const key = dismissalStorageKey(surface, accountID, band);
 
   try {
     const raw = window.localStorage.getItem(key);
@@ -130,9 +131,10 @@ export function readDismissedAt(
 export function writeDismissedAt(
   surface: DismissalSurface,
   accountID: string,
+  band: UsageBand,
   now: number,
 ): void {
-  const key = dismissalStorageKey(surface, accountID);
+  const key = dismissalStorageKey(surface, accountID, band);
 
   try {
     window.localStorage.setItem(key, String(now));
