@@ -91,7 +91,7 @@ export function useExecutionLimit(): ExecutionLimitData | null {
           ...account.entitlements.executions,
           usage: account.entitlements.usage.executions,
         });
-  if (!cap) return null;
+  if (!cap || cap.usage === null) return null;
 
   const isEnterprise =
     'plan' in account &&

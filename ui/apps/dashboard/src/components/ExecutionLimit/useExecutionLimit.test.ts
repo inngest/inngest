@@ -39,10 +39,10 @@ describe('useExecutionLimit', () => {
     marketplace: Marketplace;
     marketplaceBillingURL: string | null;
     executionCap: {
-      usage: number;
+      usage: number | null;
       limit: number;
       enforced: boolean;
-      exceeded: boolean;
+      exceeded: boolean | null;
     } | null;
   };
 
@@ -154,6 +154,18 @@ describe('useExecutionLimit', () => {
   it('does not fall back to legacy limits when the enhanced cap is null', () => {
     flag = { value: true, isReady: true };
     enhancedAccount.executionCap = null;
+
+    expect(useExecutionLimit()).toBeNull();
+  });
+
+  it('hides when usage is unknown', () => {
+    flag = { value: true, isReady: true };
+    enhancedAccount.executionCap = {
+      usage: null,
+      limit: 50_000,
+      enforced: true,
+      exceeded: null,
+    };
 
     expect(useExecutionLimit()).toBeNull();
   });

@@ -8,14 +8,14 @@ export type LegacyExecutions = LegacyEntitlements['executions'] & {
 };
 
 export type ExecutionCap = {
-  usage: number;
+  usage: number | null;
   limit: number;
   enforced: boolean;
-  exceeded: boolean;
+  exceeded: boolean | null;
 };
 
 export function isCapHit({ enforced, exceeded }: ExecutionCap): boolean {
-  return enforced && exceeded;
+  return enforced && exceeded === true;
 }
 
 export function legacyExecutionCap({
