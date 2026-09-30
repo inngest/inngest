@@ -48,6 +48,54 @@ func TestSandboxMetadataSerialize(t *testing.T) {
 	assert.Equal(t, md, roundTrip)
 }
 
+// Values must stay flat (scalars and arrays of scalars) so they round-trip
+// through ClickHouse JSON and DuckDB VARIANT storage unchanged.
+func TestSandboxMetadataValuesAreFlat(t *testing.T) {
+	t.Parallel()
+
+	exitCode := 1
+	signal := 9
+	values, err := SandboxMetadata{
+		Version:           1,
+		Action:            "process.wait",
+		Statement:         "process.wait",
+		StatementID:       "abc123",
+		Role:              SandboxRoleInternal,
+		SandboxID:         "9ecbb10f-de90-47c3-94ef-9685bb5c5b61",
+		SandboxName:       "box",
+		SourceSnapshotID:  "snap",
+		Command:           []string{"sleep", "10"},
+		CommandDisplay:    "sleep 10",
+		CommandTruncated:  true,
+		Cwd:               "/work",
+		ProcessID:         "proc",
+		ProcessState:      "EXITED",
+		ExitCode:          &exitCode,
+		TerminationSignal: &signal,
+		OutputTruncated:   true,
+		SnapshotID:        "snap",
+		SnapshotStatus:    "READY",
+		ErrorCode:         "sandbox_error",
+	}.Serialize()
+	require.NoError(t, err)
+
+	for key, raw := range values {
+		var value any
+		require.NoError(t, json.Unmarshal(raw, &value), key)
+
+		items, isArray := value.([]any)
+		if !isArray {
+			items = []any{value}
+		}
+		for _, item := range items {
+			switch item.(type) {
+			case map[string]any, []any:
+				t.Errorf("value %q is nested: %s", key, raw)
+			}
+		}
+	}
+}
+
 func TestSandboxMetadataUpdateAllowed(t *testing.T) {
 	t.Parallel()
 

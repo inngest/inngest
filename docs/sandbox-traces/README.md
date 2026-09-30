@@ -43,7 +43,7 @@ step IDs or the step input shape.
 | `version` | `1` | Shape version. |
 | `action` | string | Sandbox API operation this step performed: `create`, `exec`, `process.start`, `process.wait`, `snapshot.create`, `snapshot.waitUntilReady`, `destroy`, ... |
 | `statement` | string | SDK method the user called: `create`, `commands.run`, `processes.start`, `process.wait`, `snapshot`, `snapshot.clone`, `destroy`, ... Internal steps carry their statement's method. |
-| `statement_id` | string | Step ID (the trace's `stepID`) of the statement step this step belongs to. Equal to the step's own ID for a statement step. **This is the grouping key for rule 2.** |
+| `statement_id` | string | Hashed step ID (the trace's `stepID`, and `run_metadata.step_id`) of the statement step this step belongs to. Never the user's step ID. Equal to the step's own ID for a statement step. **This is the grouping key for rule 2.** |
 | `role` | `statement` \| `internal` | Whether this step is the row the user wrote, or work serving another row. |
 | `sandbox_id`, `sandbox_name` | string | The machine this step acted on or created. **This is the linking key for rule 3.** Taken from the reference the operation targets, so it's present before any result and on failure. A failed `create` has only the name. See [Machines from outside the run](#machines-from-outside-the-run). |
 | `source_snapshot_id` | string | For `create`/`snapshot.clone`, the snapshot the machine was cloned from. Links a clone to the `snapshot` row that made it. |
@@ -57,6 +57,18 @@ step IDs or the step input shape.
 | `output_truncated` | bool | Captured stdout/stderr was tail-truncated to fit the step output. |
 | `snapshot_id`, `snapshot_status` | string | For snapshot actions. |
 | `error_code` | string | The sandbox API's error code when the step failed, like `sandbox_snapshot_limit_exceeded`. |
+
+Two rules keep the entries safe to store and fold:
+
+- **One whole entry per step attempt.** Entries for the same span and kind are
+  folded as merge patches, which never clear a key that a later entry omits.
+  So each attempt sends exactly one entry with its full value set, and never
+  a partial update that relies on an earlier one. A retry that succeeds
+  carries no `error_code`, because it's a separate attempt span with its own
+  entry (`trace.test.ts` covers this).
+- **Flat values.** Only scalars and short string arrays (`command`), no nested
+  objects, so values round-trip through ClickHouse `JSON` and DuckDB `VARIANT`
+  (`sandbox_test.go` checks this).
 
 Where it comes from:
 
@@ -231,6 +243,31 @@ machines.
 Runs without the metadata (older SDKs, other languages) render exactly as
 today.
 
+### DuckDB and flat spans
+
+Riley's DuckDB work replaces dynamic spans with flat spans and stores metadata
+in a `run_metadata` table, keyed by run, parent span, kind and step
+(`step_id` is the hashed step ID). See the spec,
+[DuckDB Cloud Dual-Write with CH Buffer](https://app.notion.com/p/inngest/DuckDB-Cloud-Dual-Write-with-CH-Buffer-3e4b64753bbd806ab2e7db88e7d5d0c0),
+[#4879](https://github.com/inngest/inngest/pull/4879) (merged; routes every
+metadata span, including SDK `addMetadata`, to `OnMetadataEntry`) and
+[#4880](https://github.com/inngest/inngest/pull/4880) (DuckDB dual-write and
+the flat trace loader).
+
+This design already fits:
+
+- The UI depends only on `RunTraceSpan.metadata` entries of kind
+  `inngest.sandbox`. Grouping by `statement_id` and linking by `sandbox_id`
+  happen in `traceConversion.ts`, not in the Go trace loader, so nothing relies
+  on the dynamic-span rollups the flat model removes.
+- `inngest.sandbox` entries reach `run_metadata` with no extra work, and
+  `sandbox_id` is queryable in Insights from `values`.
+
+What it needs from that work: the flat loader
+(`pkg/coreapi/graph/loaders/trace_flat.go`) doesn't fill
+`RunTraceSpan.metadata` yet ("no metadata-span rollup"). It must, from
+`run_metadata`, for every kind. Experiments need the same thing.
+
 ## CI layer (`inngest/ci`, branch `jack/ci`)
 
 Not done in this slice. CI builds each command from several `step.sandbox`
@@ -306,3 +343,16 @@ oss-vendor OSSHASH=<sha>` (`go get github.com/inngest/inngest@<sha>` plus
    secrets audit). This metadata copies up to 1 KiB of argv, which adds another
    place to look but no new category of data. Fix the underlying exposure
    before the UI makes commands more prominent.
+2. **Flat loader metadata (for Riley).** Will the flat/DuckDB trace loader
+   fill `RunTraceSpan.metadata` from `run_metadata`, generically for every
+   kind, and when?
+3. **Hashed or userland `step_id` (for Riley).** #4879's
+   `MetadataEntry.StepID` prefers the userland ID, while the `run_metadata`
+   migration comment says `step_id` is hashed. Which is it? `statement_id` is
+   pinned to the hashed ID either way.
+4. **Fold key (for Riley).** Will metadata keep folding per span and kind, or
+   move to per step across attempts? Per step, a failed attempt's
+   `error_code` would leak into a later successful attempt.
+5. **Indexing (for Riley).** Will `inngest.*` kinds get per-kind indexes or
+   promoted columns (for example `sandbox_id`), or is `VARIANT` shredding
+   enough for cross-run lookups?

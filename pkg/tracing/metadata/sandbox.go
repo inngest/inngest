@@ -31,6 +31,14 @@ const (
 // `step.sandbox`; an executor that runs sandbox operations natively can emit
 // the same shape.
 //
+// Each step attempt emits exactly one entry, carrying the attempt's full value
+// set. Entries for the same span and kind are folded as merge patches (see
+// Op), which never clear a key a later entry omits, so an entry must never be
+// a partial update that relies on an earlier one.
+//
+// Values stay flat: scalars and short string arrays only, no nested objects,
+// so they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
+//
 //tygo:generate
 type SandboxMetadata struct {
 	// Version of this shape. Currently 1.
@@ -45,8 +53,10 @@ type SandboxMetadata struct {
 	// method, not their own action.
 	Statement string `json:"statement"`
 
-	// StatementID is the step ID of the statement step this step belongs to.
-	// For a statement step it's the step's own ID.
+	// StatementID is the hashed step ID of the statement step this step
+	// belongs to, never the SDK-facing userland step ID. It's the span's
+	// stepID and the same ID the run metadata table stores as step_id. For a
+	// statement step it's the step's own ID.
 	StatementID string `json:"statement_id"`
 
 	Role SandboxRole `json:"role"`
