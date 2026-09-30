@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/inngest/inngest/cmd/internal/cloudsandboxes"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
@@ -126,6 +127,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 			"to", change.To,
 		)
 	}
+
+	bridge, err := cloudsandboxes.New(ctx, opts.Config.EventAPI.Port)
+	if err != nil {
+		return err
+	}
+	opts.CloudSandboxes = bridge
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
