@@ -33,7 +33,6 @@ const GetAccountSupportInfoDocument = graphql(`
         id
         name
         amount
-        features
       }
     }
   }
