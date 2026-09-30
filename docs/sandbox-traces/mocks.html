@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sandbox trace mocks</title>
+<!--
+  Static mocks for docs/sandbox-traces/README.md. Pick a variant with
+  ?v=annotated|highlight|expanded|rail|detail and screenshot at 1400x760:
+
+  chromium --headless --no-sandbox --hide-scrollbars --window-size=1400,760 \
+    --screenshot=annotated.png "file://$PWD/mocks.html?v=annotated"
+
+  Every row is derived only from the `inngest.sandbox` metadata the SDK
+  emits today (see README.md), plus ordinary span timing.
+-->
+<style>
+  :root {
+    --bg: #ffffff; --canvas: #f6f6f6; --line: #e5e5e5; --text: #1c1c1c;
+    --muted: #7b7b7b; --faint: #a3a3a3; --green: #2c9b63; --red: #e2574c;
+    --m1: #6d5bd0; --m1-bg: rgba(109, 91, 208, .10);
+    --m2: #d9822b; --m2-bg: rgba(217, 130, 43, .12);
+    --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+  .frame { display: grid; grid-template-columns: 1fr 470px; height: 760px; border-top: 1px solid var(--line); }
+  .frame.full { grid-template-columns: 1fr; }
+  .trace { border-right: 1px solid var(--line); overflow: hidden; }
+  .caption { padding: 14px 18px 10px; border-bottom: 1px solid var(--line); }
+  .caption b { font-size: 15px; }
+  .caption span { color: var(--muted); margin-left: 8px; }
+  .head, .row { display: grid; grid-template-columns: var(--rail, 0px) 330px 64px 1fr; align-items: center; }
+  .head { height: 34px; color: var(--muted); font: 11px var(--mono); border-bottom: 1px solid var(--line); }
+  .ticks { display: flex; justify-content: space-between; padding: 0 14px; }
+  .row { position: relative; min-height: 46px; padding: 3px 0; font-family: var(--mono); }
+  .row.sub { min-height: 26px; font-size: 12px; color: var(--muted); }
+  .row.dim { opacity: .38; }
+  .row.hl::before { content: ""; position: absolute; inset: 0; z-index: -1;
+    background-color: var(--hl-bg); background-image: radial-gradient(var(--hl) .9px, transparent 1px); background-size: 7px 7px; }
+  .row.m1 { --hl: var(--m1); --hl-bg: var(--m1-bg); }
+  .row.m2 { --hl: var(--m2); --hl-bg: var(--m2-bg); }
+  .row.selected { box-shadow: inset 3px 0 0 var(--text); background: rgba(0,0,0,.035); }
+  .name { display: flex; align-items: center; gap: 6px; padding-left: 12px; min-width: 0; }
+  .row.sub .name { padding-left: 40px; }
+  .caret { width: 10px; color: var(--faint); font-size: 10px; flex: none; }
+  .title { white-space: nowrap; }
+  .desc { color: var(--muted); font: 12px system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .desc code { font: 11.5px var(--mono); color: var(--text); background: var(--canvas); padding: 0 3px; border-radius: 3px; }
+  .stack { display: flex; flex-direction: column; min-width: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font: 11px var(--mono); padding: 0 6px; height: 18px; border-radius: 9px; border: 1px solid; flex: none; }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .chip.m1 { color: var(--m1); border-color: rgba(109,91,208,.4); background: var(--m1-bg); }
+  .chip.m2 { color: var(--m2); border-color: rgba(217,130,43,.45); background: var(--m2-bg); }
+  .chip.on { box-shadow: 0 0 0 2px currentColor; }
+  .exit { font: 10.5px var(--mono); padding: 0 5px; border-radius: 3px; flex: none; }
+  .exit.ok { color: var(--green); background: rgba(44,155,99,.1); }
+  .exit.bad { color: var(--red); background: rgba(226,87,76,.12); }
+  .dur { color: var(--muted); font-size: 12px; text-align: right; padding-right: 10px; }
+  .lane { position: relative; height: 100%; margin: 0 14px; }
+  .bar { position: absolute; top: 50%; height: 12px; margin-top: -6px; border-radius: 2px;
+    background: repeating-linear-gradient(-45deg, #3fb57c 0 4px, #57c68f 4px 8px); }
+  .bar.plain { background: #b9b9b9; }
+  .bar.fail { background: var(--red); }
+  .bar.wait { background: repeating-linear-gradient(90deg, rgba(63,181,124,.35) 0 3px, transparent 3px 6px); border: 1px solid #57c68f; }
+  .seg { position: absolute; top: 50%; height: 12px; margin-top: -6px; }
+  .band { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; }
+  .band.m1 { background: var(--m1-bg); border: 1px dashed rgba(109,91,208,.35); }
+  .band.m2 { background: var(--m2-bg); border: 1px dashed rgba(217,130,43,.4); }
+  .railcell { position: relative; height: 100%; }
+  .rl { position: absolute; top: 0; bottom: 0; width: 2px; }
+  .rl.top { top: 50%; } .rl.bottom { bottom: 50%; }
+  .rl.m1 { background: var(--m1); } .rl.m2 { background: var(--m2); }
+  .dot { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -4px; border-radius: 50%; border: 2px solid; background: #fff; }
+  .dot.m1 { border-color: var(--m1); } .dot.m2 { border-color: var(--m2); }
+  .dot.start { background: currentColor; }
+  .dot.m1.start { background: var(--m1); } .dot.m2.start { background: var(--m2); }
+  .legend { position: absolute; right: 16px; top: 12px; display: flex; gap: 8px; }
+
+  .panel { padding: 16px 18px; overflow: hidden; }
+  .panel h3 { margin: 0 0 2px; font: 600 15px var(--mono); }
+  .panel .sub { color: var(--muted); margin-bottom: 14px; }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; margin-bottom: 14px; font-size: 12.5px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-family: var(--mono); }
+  .term { background: #16161a; color: #d8d8d8; border-radius: 6px; padding: 10px 12px; font: 11.5px/1.55 var(--mono); white-space: pre; overflow: hidden; }
+  .term .prompt { color: #8f8fa3; } .term .err { color: #ff8f86; }
+  .tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--line); margin: 6px 0 10px; }
+  .tabs span { padding: 6px 0; color: var(--muted); } .tabs span.on { color: var(--text); border-bottom: 2px solid var(--text); }
+  .steps { font: 12px var(--mono); color: var(--muted); }
+  .steps div { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  .machine-card { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .machine-card a { color: var(--m2); text-decoration: none; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+  const T = 150; // seconds shown on the timeline
+  const M = {
+    m1: { name: "ci-build", cls: "m1" },
+    m2: { name: "ci-e2e", cls: "m2", existing: true, alive: true },
+  };
+  // One entry per statement the user wrote. `m` is sandbox_id, `desc`
+  // is derived from action/statement/command_display/exit_code, and
+  // `internal` lists the role:"internal" steps sharing its statement_id.
+  const rows = [
+    { id: "build-machine", m: "m1", verb: "Create", desc: ["Create sandbox", null], s: 0, e: 5.1 },
+    { id: "get-e2e", m: "m2", desc: ["Get existing sandbox", null], s: 0.2, e: 0.6, first: true },
+    { id: "install", m: "m1", desc: ["Run", "pnpm install"], exit: 0, s: 5.3, e: 34 },
+    { id: "e2e-install", m: "m2", desc: ["Run", "pnpm install"], exit: 0, s: 5.8, e: 37 },
+    { id: "notify-start", plain: true, desc: ["step.run", null], s: 34.5, e: 35.4 },
+    { id: "test", m: "m1", desc: ["Run", "pnpm test"], exit: 0, s: 34.2, e: 118, long: true,
+      internal: [
+        { id: "test › start", a: "process.start", s: 34.2, e: 34.7 },
+        { id: "test › wait #1", a: "sleep 15s", s: 34.7, e: 49.7, wait: true },
+        { id: "test › check #1", a: "process.get · RUNNING", s: 49.7, e: 50.1 },
+        { id: "test › wait #2", a: "sleep 30s", s: 50.1, e: 80.1, wait: true },
+        { id: "test › check #2", a: "process.get · RUNNING", s: 80.1, e: 80.5 },
+        { id: "test › wait #3", a: "sleep 30s", s: 80.5, e: 110.5, wait: true },
+        { id: "test › check #3", a: "process.get · EXITED 0", s: 110.5, e: 111 },
+        { id: "test › output", a: "process.output", s: 111, e: 118 },
+      ] },
+    { id: "e2e", m: "m2", desc: ["Run", "pnpm e2e --shard 1/2"], exit: 1, s: 37.3, e: 96, fail: true },
+    { id: "e2e-release", m: "m2", desc: ["Run", "rm -rf /work"], exit: 0, s: 96.3, e: 97 },
+    { id: "snapshot-build", m: "m1", desc: ["Snapshot", null], s: 118.2, e: 139,
+      internal: [
+        { id: "snapshot-build", a: "snapshot.create · CREATING", s: 118.2, e: 119 },
+        { id: "snapshot-build:wait-until-ready", a: "snapshot.waitUntilReady · READY", s: 119, e: 139 },
+      ] },
+    { id: "destroy-build", m: "m1", desc: ["Destroy", null], s: 139.3, e: 140.1 },
+  ];
+
+  const v = new URLSearchParams(location.search).get("v") || "annotated";
+  const pct = (t) => (t / T) * 100;
+  const chip = (m, on, first) => `<span class="chip ${M[m].cls}${on ? " on" : ""}"><i></i>${M[m].name}${first && M[m].existing ? " · existing" : ""}</span>`;
+
+  const descHtml = (r) => {
+    if (r.plain) return `<span class="desc">ordinary step</span>`;
+    const [verb, cmd] = r.desc;
+    const what = cmd ? `${verb} <code>${cmd}</code> on` : `${verb}`;
+    return `<span class="desc">${what}</span>`;
+  };
+
+  const barHtml = (r) => {
+    if (r.internal && (v === "expanded" || v === "detail" || v === "annotated" || v === "highlight" || v === "rail")) {
+      // A statement's bar is its internal steps' bars joined up.
+      return r.internal.map((s) =>
+        `<div class="bar ${s.wait ? "wait" : ""}" style="left:${pct(s.s)}%;width:${Math.max(pct(s.e - s.s), .4)}%"></div>`
+      ).join("");
+    }
+    const cls = r.plain ? "plain" : r.fail ? "fail" : "";
+    return `<div class="bar ${cls}" style="left:${pct(r.s)}%;width:${Math.max(pct(r.e - r.s), .4)}%"></div>`;
+  };
+
+  // Machine rails: which machines are alive on each row, for the "rail" variant.
+  const railFor = (idx) => {
+    const cells = [];
+    const order = ["m1", "m2"];
+    order.forEach((m, lane) => {
+      const mine = rows.map((r, i) => (r.m === m ? i : -1)).filter((i) => i >= 0);
+      const first = mine[0], last = mine[mine.length - 1];
+      if ((idx < first && !M[m].existing) || (idx > last && !M[m].alive)) return;
+      if (idx < first || idx > last) { cells.push(`<div class="rl ${M[m].cls}" style="left:${12 + lane * 14}px;opacity:.35"></div>`); return; }
+      const x = 12 + lane * 14;
+      const isFirst = idx === first, isLast = idx === last;
+      const cls = (isFirst && !M[m].existing) ? "top" : (isLast && !M[m].alive) ? "bottom" : "";
+      cells.push(`<div class="rl ${M[m].cls} ${cls}" style="left:${x}px"></div>`);
+      if (rows[idx].m === m) {
+        cells.push(`<div class="dot ${M[m].cls}${isFirst && !M[m].existing ? " start" : ""}" style="left:${x}px"></div>`);
+      }
+    });
+    return `<div class="railcell">${cells.join("")}</div>`;
+  };
+
+  const selectedMachine = v === "highlight" ? "m1" : null;
+  const expanded = v === "expanded" ? new Set(["test", "snapshot-build"]) : new Set();
+  const selectedRow = v === "detail" ? "e2e" : null;
+
+  const rowHtml = (r, idx) => {
+    const cls = ["row"];
+    if (selectedMachine) {
+      if (r.m === selectedMachine) cls.push("hl", M[r.m].cls);
+      else cls.push("dim");
+    }
+    if (r.id === selectedRow) cls.push("selected");
+    const exit = r.exit === undefined ? "" :
+      `<span class="exit ${r.exit === 0 ? "ok" : "bad"}">exit ${r.exit}</span>`;
+    const caret = r.internal ? (expanded.has(r.id) ? "▼" : "▶") : "";
+    const extra = r.internal && !expanded.has(r.id) && v !== "rail"
+      ? `<span class="desc">· ${r.internal.length} steps</span>` : "";
+    const band = v === "rail" && r.m && rows.findIndex((x) => x.m === r.m) === idx
+      ? (() => {
+          const mine = rows.filter((x) => x.m === r.m);
+          const s = M[r.m].existing ? 0 : Math.min(...mine.map((x) => x.s)), e = M[r.m].alive ? T : Math.max(...mine.map((x) => x.e));
+          return `<div class="band ${M[r.m].cls}" style="left:${pct(s)}%;width:${pct(e - s)}%"></div>`;
+        })() : "";
+    let html = `<div class="${cls.join(" ")}">
+      ${v === "rail" ? railFor(idx) : "<div></div>"}
+      <div class="name"><span class="caret">${caret}</span>
+        <div class="stack"><span class="title">${r.id}</span>
+          <span style="display:flex;gap:6px;align-items:center;min-width:0">${descHtml(r)}${r.m ? chip(r.m, selectedMachine === r.m, r.first) : ""}${exit}${extra}</span>
+        </div></div>
+      <div class="dur">${fmt(r.e - r.s)}</div>
+      <div class="lane">${band}${barHtml(r)}</div></div>`;
+    if (expanded.has(r.id)) {
+      html += r.internal.map((s) => `<div class="row sub">
+        <div></div>
+        <div class="name"><span class="title">${s.id}</span>&nbsp;<span class="desc">${s.a}</span></div>
+        <div class="dur">${fmt(s.e - s.s)}</div>
+        <div class="lane"><div class="bar ${s.wait ? "wait" : ""}" style="left:${pct(s.s)}%;width:${Math.max(pct(s.e - s.s), .4)}%"></div></div>
+      </div>`).join("");
+    }
+    return html;
+  };
+
+  function fmt(sec) { return sec < 1 ? `${Math.round(sec * 1000)}ms` : sec < 60 ? `${sec.toFixed(1)}s` : `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`; }
+
+  const captions = {
+    annotated: ["A. Annotated rows", "step ID stays the title; the machine chip, command, and exit code come from metadata"],
+    highlight: ["B. Machine highlight", "clicking ci-build highlights all its rows, even with ci-e2e running in parallel"],
+    expanded: ["C. Statement rows own their internal steps", "`test` and `snapshot-build` are one row each; expanding shows the steps behind them"],
+    rail: ["D. Machine rails", "a lane per machine links every action on it; ci-e2e existed before this run and outlives it"],
+    detail: ["E. Command detail panel", "clicking a command row shows the decoded command view instead of raw step JSON"],
+  };
+  const [title, sub] = captions[v];
+
+  const trace = `<div class="trace" style="--rail:${v === "rail" ? "44px" : "0px"}">
+    <div class="caption"><b>${title}</b><span>${sub}</span></div>
+    <div class="head"><div></div><div style="padding-left:12px">Run · ci/pull-request</div><div class="dur">2m 20s</div>
+      <div class="ticks"><span>0s</span><span>30s</span><span>1m</span><span>1m 30s</span><span>2m</span><span>2m 30s</span></div></div>
+    ${rows.map(rowHtml).join("")}
+  </div>`;
+
+  const panel = v === "detail" ? `<div class="panel">
+    <h3>e2e</h3>
+    <div class="sub">Run <code style="font-family:var(--mono)">pnpm e2e --shard 1/2</code> on ${chip("m2")}</div>
+    <div class="machine-card"><span>${chip("m2")}&nbsp; 2 vCPU · 2 GB · created outside this run</span><a href="#">Open sandbox →</a></div>
+    <dl class="kv">
+      <dt>Exit code</dt><dd style="color:var(--red)">1</dd>
+      <dt>Working dir</dt><dd>/work</dd>
+      <dt>Duration</dt><dd>58.7s</dd>
+    </dl>
+    <div class="tabs"><span class="on">Output</span><span>Steps (1)</span><span>Raw</span></div>
+    <div class="term"><span class="prompt">$ pnpm e2e --shard 1/2</span>
+  ✓ checkout.spec.ts (12)
+  ✓ cart.spec.ts (8)
+<span class="err">  ✗ payments.spec.ts › refunds a partial order
+    Expected: 200
+    Received: 502</span>
+  Tests  1 failed | 20 passed (21)
+<span class="err">ELIFECYCLE  Command failed with exit code 1.</span></div>
+  </div>` : "";
+
+  document.getElementById("app").innerHTML =
+    `<div class="frame ${v === "detail" ? "" : "full"}">${trace}${panel}</div>`;
+</script>
+</body>
+</html>
