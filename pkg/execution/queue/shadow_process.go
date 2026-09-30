@@ -608,15 +608,9 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 				if shadowPart.FunctionID != nil {
 					q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.FunctionID)
 				}
-				if len(backlog.ConcurrencyKeys) > 0 {
-					q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), backlog.ConcurrencyKeys[0].CanonicalKeyID)
-				}
 			case enums.QueueConstraintCustomConcurrencyKey2:
 				if shadowPart.FunctionID != nil {
 					q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.FunctionID)
-				}
-				if len(backlog.ConcurrencyKeys) > 1 {
-					q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), backlog.ConcurrencyKeys[1].CanonicalKeyID)
 				}
 			default:
 			}

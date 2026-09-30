@@ -12,10 +12,6 @@ type QueueLifecycleListener interface {
 	// its function concurrency limit.
 	OnFnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID)
 
-	// OnCustomKeyConcurrencyLimitReached is called when a queue item cannot be processed due to
-	// a custom key concurrency limit.
-	OnCustomKeyConcurrencyLimitReached(ctx context.Context, key string)
-
 	// OnAccountConcurrencyLimitReached is called when a queue item cannot be processed due to
 	// its account's concurrency limit.
 	OnAccountConcurrencyLimitReached(
@@ -48,11 +44,5 @@ func (l QueueLifecycleListeners) OnAccountConcurrencyLimitReached(
 ) {
 	l.GoEach(func(listener QueueLifecycleListener) {
 		listener.OnAccountConcurrencyLimitReached(ctx, acctID, workspaceID)
-	})
-}
-
-func (l QueueLifecycleListeners) OnCustomKeyConcurrencyLimitReached(ctx context.Context, key string) {
-	l.GoEach(func(listener QueueLifecycleListener) {
-		listener.OnCustomKeyConcurrencyLimitReached(ctx, key)
 	})
 }

@@ -350,9 +350,6 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), fnID)
 		}
 
-		// TODO: Report on key that was hit (this must have been empty previously)
-		// p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.EvaluatedConcurrencyKey)
-
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},

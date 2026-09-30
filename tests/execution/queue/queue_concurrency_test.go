@@ -383,7 +383,6 @@ type testLifecycleListener struct {
 	lock            *sync.Mutex
 	fnConcurrency   map[uuid.UUID]int
 	acctConcurrency map[uuid.UUID]int
-	ckConcurrency   map[string]int
 }
 
 func newTestLifecycleListener() testLifecycleListener {
@@ -391,7 +390,6 @@ func newTestLifecycleListener() testLifecycleListener {
 		lock:            &sync.Mutex{},
 		fnConcurrency:   map[uuid.UUID]int{},
 		acctConcurrency: map[uuid.UUID]int{},
-		ckConcurrency:   map[string]int{},
 	}
 }
 
@@ -414,15 +412,6 @@ func (t testLifecycleListener) OnAccountConcurrencyLimitReached(
 	i := t.acctConcurrency[acctID]
 	t.acctConcurrency[acctID] = i + 1
 }
-
-func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Context, key string) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	i := t.ckConcurrency[key]
-	t.ckConcurrency[key] = i + 1
-}
-
 func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *osqueue.QueueShadowPartition, b *osqueue.QueueBacklog, res *osqueue.BacklogRefillResult) {
 	// no-op
 }
