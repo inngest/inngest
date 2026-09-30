@@ -191,6 +191,24 @@ func TestSavedLoginAndRecovery(t *testing.T) {
 	require.Equal(t, int32(3), mutations.Load())
 }
 
+func TestAcceptedDeleteForgetsSandbox(t *testing.T) {
+	b, _ := testBridge(t, func(w http.ResponseWriter, r *http.Request) {
+		// Cloud answers 202 with the TERMINATING resource while termination is in progress.
+		if r.Method == "DELETE" {
+			w.WriteHeader(202)
+			fmt.Fprintf(w, `{"data":{"id":%q,"status":"TERMINATING"}}`, sandboxID)
+			return
+		}
+		w.WriteHeader(201)
+		fmt.Fprintf(w, `{"data":{"id":%q,"status":"RUNNING"}}`, sandboxID)
+	})
+	require.Equal(t, 201, request(b, "POST", "/v2/sandboxes").Code)
+	require.Contains(t, request(b, "GET", "/dev/cloud/status").Body.String(), sandboxID)
+
+	require.Equal(t, 202, request(b, "DELETE", "/v2/sandboxes/"+sandboxID).Code)
+	require.NotContains(t, request(b, "GET", "/dev/cloud/status").Body.String(), sandboxID)
+}
+
 func TestInvalidSavedLogin(t *testing.T) {
 	var calls atomic.Int32
 	b, metadata := testBridge(t, func(w http.ResponseWriter, r *http.Request) {
