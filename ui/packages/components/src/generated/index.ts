@@ -15,6 +15,7 @@ export type SpanMetadataKind =
   | typeof KindInngestResponseHeaders
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
+  | typeof KindInngestSandbox
   | typeof KindInngestWarnings
   | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
@@ -22,6 +23,82 @@ export type SpanMetadataKind =
 //////////
 // source: types_gen.go
 
+/**
+ * From sandbox.go
+ */
+export const KindInngestSandbox = 'inngest.sandbox';
+/**
+ * From sandbox.go
+ * SandboxRole says how a step relates to the user's code.
+ * A "statement" step is the one the user wrote, like `box.snapshot("snap")`,
+ * and is the row a trace shows. An "internal" step is extra work the SDK did to
+ * serve that statement, like waiting for the snapshot to be ready, and belongs
+ * to the statement's row rather than being a row of its own.
+ */
+export type SandboxRole = string;
+/**
+ * From sandbox.go
+ * SandboxMetadata describes a step that acted on an Inngest sandbox, so trace
+ * UIs and APIs can present it as a sandbox action instead of a plain step.
+ * It is step scoped. Today the SDK attaches it to the steps behind
+ * `step.sandbox`; an executor that runs sandbox operations natively can emit
+ * the same shape.
+ */
+export interface SandboxMetadata {
+  /**
+   * Version of this shape. Currently 1.
+   */
+  version: number /* int */;
+  /**
+   * Action is the sandbox API operation this step performed, like "create",
+   * "exec", "snapshot.create" or "snapshot.waitUntilReady".
+   */
+  action: string;
+  /**
+   * Statement is the SDK method the user called, like "create",
+   * "commands.run" or "snapshot". Internal steps carry their statement's
+   * method, not their own action.
+   */
+  statement: string;
+  /**
+   * StatementID is the step ID of the statement step this step belongs to.
+   * For a statement step it's the step's own ID.
+   */
+  statement_id: string;
+  role: SandboxRole;
+  /**
+   * SandboxID and SandboxName identify the machine this step acted on, or
+   * created. Every step on the same machine shares the ID.
+   */
+  sandbox_id?: string;
+  sandbox_name?: string;
+  /**
+   * SourceSnapshotID is the snapshot a created sandbox was cloned from.
+   */
+  source_snapshot_id?: string;
+  /**
+   * Command is the argv a command or process ran. CommandDisplay is the
+   * command as the user wrote it, when they passed a shell string.
+   */
+  command?: string[];
+  command_display?: string;
+  cwd?: string;
+  process_id?: string;
+  process_state?: string;
+  exit_code?: number /* int */;
+  termination_signal?: string;
+  /**
+   * OutputTruncated is true when a captured command's stdout/stderr was cut
+   * to fit in the step's output.
+   */
+  output_truncated?: boolean;
+  snapshot_id?: string;
+  snapshot_status?: string;
+  /**
+   * ErrorCode is the sandbox API's error code when the step failed.
+   */
+  error_code?: string;
+}
 /**
  * From score.go
  */

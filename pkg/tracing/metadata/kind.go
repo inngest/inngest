@@ -72,6 +72,7 @@ var allowedInngestKinds = map[Kind]bool{
 	"inngest.warnings":         true,
 	KindInngestExperiment:      true,
 	KindInngestScore:           true,
+	KindInngestSandbox:         true,
 }
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
