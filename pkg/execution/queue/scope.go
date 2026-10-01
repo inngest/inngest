@@ -41,9 +41,13 @@ func (s Scope) ValidateIDs() error {
 }
 
 func ScopeFromQueueItem(i QueueItem) Scope {
+	wsID := i.Data.Identifier.WorkspaceID
+	if wsID == uuid.Nil {
+		wsID = i.WorkspaceID
+	}
 	scope := Scope{
 		AccountID:  i.Data.Identifier.AccountID,
-		EnvID:      i.Data.Identifier.WorkspaceID,
+		EnvID:      wsID,
 		FunctionID: i.FunctionID,
 	}
 	if i.QueueName != nil {

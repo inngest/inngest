@@ -228,6 +228,7 @@ func (c *manager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 		JobID:       &jobID,
 		GroupID:     uuid.New().String(),
 		Kind:        kind,
+		WorkspaceID: ci.WorkspaceID,
 		MaxAttempts: &maxAttempts,
 		Payload:     ci,
 		QueueName:   &kind,

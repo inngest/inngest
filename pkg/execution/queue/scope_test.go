@@ -126,3 +126,58 @@ func TestScopeValidateIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestScopeFromQueueItem(t *testing.T) {
+	accountID, functionID := uuid.New(), uuid.New()
+	identifierWorkspaceID, itemWorkspaceID := uuid.New(), uuid.New()
+	tests := []struct {
+		name                  string
+		identifierWorkspaceID uuid.UUID
+		itemWorkspaceID       uuid.UUID
+		wantEnvID             uuid.UUID
+	}{
+		{
+			name:                  "identifier workspace only",
+			identifierWorkspaceID: identifierWorkspaceID,
+			wantEnvID:             identifierWorkspaceID,
+		},
+		{
+			name:            "falls back to item workspace",
+			itemWorkspaceID: itemWorkspaceID,
+			wantEnvID:       itemWorkspaceID,
+		},
+		{
+			name:                  "identifier workspace takes precedence",
+			identifierWorkspaceID: identifierWorkspaceID,
+			itemWorkspaceID:       itemWorkspaceID,
+			wantEnvID:             identifierWorkspaceID,
+		},
+		{
+			name: "both workspaces missing",
+		},
+	}
+
+	for _, tt := range tests {
+		for _, isSystem := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/system=%t", tt.name, isSystem), func(t *testing.T) {
+				item := QueueItem{
+					WorkspaceID: tt.itemWorkspaceID,
+					FunctionID:  functionID,
+				}
+				item.Data.Identifier.AccountID = accountID
+				item.Data.Identifier.WorkspaceID = tt.identifierWorkspaceID
+				if isSystem {
+					queueName := KindCronHealthCheck
+					item.QueueName = &queueName
+				}
+
+				require.Equal(t, Scope{
+					IsSystem:   isSystem,
+					AccountID:  accountID,
+					EnvID:      tt.wantEnvID,
+					FunctionID: functionID,
+				}, ScopeFromQueueItem(item))
+			})
+		}
+	}
+}
