@@ -1,0 +1,144 @@
+import type { ExecutionLimitCheckQuery } from '@/gql/graphql';
+
+type LegacyEntitlements = ExecutionLimitCheckQuery['account']['entitlements'];
+
+export type LegacyExecutions = LegacyEntitlements['executions'] & {
+  usage: LegacyEntitlements['usage']['executions'];
+};
+
+export type ExecutionCap = {
+  usage: number;
+  limit: number;
+  enforced: boolean;
+  exceeded: boolean;
+};
+
+export function isCapHit({ enforced, exceeded }: ExecutionCap): boolean {
+  return enforced && exceeded;
+}
+
+export function legacyExecutionCap({
+  usage,
+  limit,
+  overageAllowed,
+}: LegacyExecutions): ExecutionCap | null {
+  if (limit === null || overageAllowed) return null;
+  // Legacy has no enforcement signal; treat the limit as a hard cap like the pre-flag UI.
+  return { usage, limit, enforced: true, exceeded: usage >= limit };
+}
+
+export type UsageBand = 'under50' | '50' | '75' | '90' | 'limitReached';
+
+export function usageBand({
+  usage,
+  limit,
+  capHit,
+}: {
+  usage: number;
+  limit: number;
+  capHit: boolean;
+}): UsageBand {
+  if (capHit) return 'limitReached';
+  if (limit <= 0) return 'under50';
+
+  const ratio = usage / limit;
+  if (ratio >= 1) return 'limitReached';
+  if (ratio >= 0.9) return '90';
+  if (ratio >= 0.75) return '75';
+  if (ratio >= 0.5) return '50';
+  return 'under50';
+}
+
+export type UsageKind = 'default' | 'caution' | 'warning' | 'error';
+
+export function usageKind(band: UsageBand): UsageKind {
+  if (band === 'limitReached') return 'error';
+  if (band === 'under50') return 'default';
+  if (band === '50') return 'caution';
+  if (band === '75') return 'warning';
+  return 'error';
+}
+
+export function pillContent(
+  band: UsageBand,
+  isVercel: boolean,
+): { kind: 'caution' | 'warning' | 'error'; text: string } | null {
+  const kind = usageKind(band);
+  if (kind === 'default') return null;
+
+  if (band === 'limitReached') {
+    return {
+      kind,
+      text: isVercel
+        ? 'Hobby account executions limit reached. Change configurations on the Vercel Integrations Settings page to upgrade and resume using Inngest.'
+        : 'Hobby account executions limit reached. Upgrade your plan to continue using Inngest.',
+    };
+  }
+
+  return {
+    kind,
+    text: isVercel
+      ? 'Hobby account executions limit almost reached. Change configurations on the Vercel Integrations Settings page to upgrade and avoid disruption.'
+      : 'Hobby account executions limit almost reached. Upgrade your plan to continue using Inngest.',
+  };
+}
+
+export type DismissalSurface = 'card';
+
+const DISMISSAL_STORAGE_KEY_PREFIX: Record<DismissalSurface, string> = {
+  card: 'dismissedExecutionLimitCard',
+};
+
+export function dismissalStorageKey(
+  surface: DismissalSurface,
+  accountID: string,
+  band: UsageBand,
+): string {
+  return `${DISMISSAL_STORAGE_KEY_PREFIX[surface]}:${accountID}:${band}`;
+}
+
+export const DISMISSAL_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+export function isDismissalActive(
+  dismissedAt: number | null,
+  now: number,
+): boolean {
+  if (dismissedAt === null || !Number.isFinite(dismissedAt)) return false;
+  if (dismissedAt > now) return false;
+
+  return now - dismissedAt < DISMISSAL_LIFETIME_MS;
+}
+
+export function readDismissedAt(
+  surface: DismissalSurface,
+  accountID: string,
+  band: UsageBand,
+): number | null {
+  const key = dismissalStorageKey(surface, accountID, band);
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch (error) {
+    console.warn(`error reading localStorage key "${key}":`, error);
+    return null;
+  }
+}
+
+export function writeDismissedAt(
+  surface: DismissalSurface,
+  accountID: string,
+  band: UsageBand,
+  now: number,
+): void {
+  const key = dismissalStorageKey(surface, accountID, band);
+
+  try {
+    window.localStorage.setItem(key, String(now));
+  } catch (error) {
+    console.warn(`error writing localStorage key "${key}":`, error);
+  }
+}

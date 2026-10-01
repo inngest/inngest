@@ -34,7 +34,7 @@ export const WithAction: Story = {
     iconSide: 'left',
     children: 'Hobby account execution limit reached. Upgrade your plan to continue using Inngest.',
     action: (
-      <button className="flex items-center gap-0.5 underline underline-offset-2">
+      <button className="ml-4 flex items-center gap-0.5 underline underline-offset-2">
         Upgrade
         <RiArrowRightLine className="h-3.5 w-3.5" />
       </button>
