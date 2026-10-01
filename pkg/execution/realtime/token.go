@@ -8,12 +8,17 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
 
 const (
 	Issuer        = "rt.inngest.com"
 	DefaultExpiry = time.Minute
+	// Publishing starts only after the outbound request returns headers. Cover
+	// the maximum execution duration plus a small authentication grace period.
+	// Subscription tokens retain their short DefaultExpiry.
+	PublishExpiry = consts.MaxFunctionTimeout + time.Minute
 )
 
 type JWTClaims struct {
@@ -121,6 +126,10 @@ func NewJWT(
 // publish endpoint.
 func NewPublishJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID) (string, error) {
 	now := time.Now()
+	expiresAt := now.Add(PublishExpiry)
+	if deadline, ok := ctx.Deadline(); ok && deadline.Add(time.Minute).Before(expiresAt) {
+		expiresAt = deadline.Add(time.Minute)
+	}
 
 	id, err := ulid.New(ulid.Now(), rand.Reader)
 	if err != nil {
@@ -130,7 +139,7 @@ func NewPublishJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUI
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    Issuer,
 			Subject:   accountID.String(),
-			ExpiresAt: jwt.NewNumericDate(now.Add(DefaultExpiry)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ID:        id.String(),
 		},
