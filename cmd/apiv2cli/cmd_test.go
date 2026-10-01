@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,13 +14,102 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
+	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestCommandLoginGuidance(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		args      []string
+		status    int
+		wantLogin bool
+	}{
+		{"cloud without credentials", []string{"--prod"}, 401, true},
+		{"explicit cloud host", []string{"--api-host", "https://api.inngest.com"}, 401, true},
+		{"API key rejected", []string{"--prod", "--api-key", "test-key"}, 401, false},
+		{"signing key rejected", []string{"--prod", "--signing-key", "test-key"}, 401, false},
+		{"forbidden", []string{"--prod"}, 403, false},
+		{"server error", []string{"--prod"}, 500, false},
+		{"local server", nil, 401, true},
+		{"custom server", []string{"--api-host", "https://example.com"}, 401, true},
+		{"public endpoint", []string{"--prod"}, 200, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+			t.Setenv("INNGEST_API_KEY", "")
+			t.Setenv("INNGEST_SIGNING_KEY", "")
+			const body = `{"errors":[{"code":"authorization_header_missing","message":"authorization header missing or invalid"}]}`
+			transport := http.DefaultTransport
+			t.Cleanup(func() { http.DefaultTransport = transport })
+			http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: test.status,
+					Status:     fmt.Sprintf("%d %s", test.status, http.StatusText(test.status)),
+					Body:       io.NopCloser(strings.NewReader(body)),
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			})
+			cmd := Command()
+			cmd.Writer = &bytes.Buffer{}
+			err := cmd.Run(context.Background(), append([]string{"api", "get-apps"}, test.args...))
+			if test.status == http.StatusOK {
+				require.NoError(t, err)
+			} else if test.wantLogin {
+				require.ErrorContains(t, err, "Authentication required. Log into Inngest Cloud with:")
+				lines := strings.Split(err.Error(), "\n")
+				require.Contains(t, lines, "inngest login")
+				require.Contains(t, lines, "npx inngest-cli@latest login")
+				require.ErrorContains(t, err, "or provide an API key")
+				require.True(t, strings.HasSuffix(err.Error(), "or provide an API key\n"))
+			} else {
+				require.EqualError(t, err, fmt.Sprintf("%d %s: %s", test.status, http.StatusText(test.status), body))
+			}
+		})
+	}
+}
+
+func TestAPIRedirectCredentialSafety(t *testing.T) {
+	for _, test := range []struct {
+		name, target string
+		auth         bool
+		hops         int
+		wantError    bool
+	}{
+		{"https", "https://api.inngest.com/v2/apps", true, 1, false},
+		{"http downgrade", "http://api.inngest.com/v2/apps", true, 1, true},
+		{"loopback", "http://127.0.0.1:8090/v2/apps", true, 1, false},
+		{"no credentials", "http://example.com/v2/apps", false, 1, false},
+		{"redirect limit", "https://api.inngest.com/v2/apps", true, 10, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, test.target, nil)
+			if test.auth {
+				req.Header.Set("Authorization", "Bearer test-token")
+			}
+			err := checkAPIRedirect(req, make([]*http.Request, test.hops))
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
 
 func TestDiscoverEndpointsFromProto(t *testing.T) {
 	endpoints := discoverEndpoints()
@@ -862,6 +952,92 @@ func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "Bearer sk-inn-api-test", gotAuth)
+}
+
+func TestCommandUsesStoredOAuthForMatchingResource(t *testing.T) {
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "signkey-legacy")
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+
+	var gotAuth string
+	var gotEnv string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotEnv = r.Header.Get("X-Inngest-Env")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer server.Close()
+
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:               server.URL,
+		Resource:             server.URL + "/v2",
+		ClientID:             cliauth.ClientID,
+		SessionID:            "session-id",
+		SessionExpiresAt:     time.Now().Add(time.Hour),
+		AccountID:            "account-id",
+		ResourceBoundaryMode: "all_envs",
+	}, cliauth.Credential{
+		AccessToken:  "inngest_at_stored",
+		RefreshToken: "inngest_rt_stored",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}, true))
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"health",
+		"--api-host", server.URL,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "Bearer inngest_at_stored", gotAuth)
+	require.Empty(t, gotEnv)
+}
+
+func TestCommandIgnoresStoredOAuthForDifferentResource(t *testing.T) {
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "")
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer server.Close()
+
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:           "https://api.inngest.com",
+		Resource:         "https://api.inngest.com/v2",
+		ClientID:         cliauth.ClientID,
+		SessionID:        "session-id",
+		SessionExpiresAt: time.Now().Add(time.Hour),
+		AccountID:        "account-id",
+	}, cliauth.Credential{
+		AccessToken:  "inngest_at_stored",
+		RefreshToken: "inngest_rt_stored",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}, true))
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"health",
+		"--api-host", server.URL,
+	})
+
+	require.NoError(t, err)
+	require.Empty(t, gotAuth)
 }
 
 func TestNormalizeAPIURL(t *testing.T) {

@@ -1,19 +1,78 @@
 package apiv1
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
+	"github.com/inngest/inngest/pkg/execution/checkpoint"
+	"github.com/inngest/inngest/pkg/execution/executor"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+type asyncCheckpointRecorder struct{ called bool }
+
+func (m *asyncCheckpointRecorder) CheckpointAsyncSteps(context.Context, checkpoint.AsyncCheckpoint) error {
+	m.called = true
+	return nil
+}
+func (*asyncCheckpointRecorder) CheckpointSyncSteps(context.Context, checkpoint.SyncCheckpoint) error {
+	return nil
+}
+func (*asyncCheckpointRecorder) Metrics() checkpoint.MetricsProvider { return nil }
+
+func TestCheckpointAsyncStepsRouteAfterDecode(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		handled    bool
+		status     int
+	}{
+		{"routed", `{"qi_id":"old-job","steps":[]}`, true, http.StatusAccepted},
+		{"local", `{"qi_id":"new-job","steps":[]}`, false, http.StatusOK},
+		{"malformed body", `{"qi_id":`, true, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkpointer := &asyncCheckpointRecorder{}
+			called := false
+			api := &checkpointAPI{
+				Opts:         Opts{AuthFinder: apiv1auth.NilAuthFinder},
+				checkpointer: checkpointer,
+				routeAsyncCheckpoint: func(w http.ResponseWriter, _ *http.Request, accountID uuid.UUID, input CheckpointAsyncStepsRequest) bool {
+					called = true
+					require.Equal(t, consts.DevServerAccountID, accountID)
+					require.NotEmpty(t, input.QueueItemRef)
+					if tc.handled {
+						w.WriteHeader(http.StatusAccepted)
+					}
+					return tc.handled
+				},
+			}
+			rec := httptest.NewRecorder()
+			api.CheckpointAsyncSteps(rec, httptest.NewRequest(http.MethodPost, "/v1/checkpoint/run/async", bytes.NewBufferString(tc.body)))
+			require.Equal(t, tc.status, rec.Code)
+			require.Equal(t, tc.status != http.StatusBadRequest, called)
+			require.Equal(t, !tc.handled && tc.status == http.StatusOK, checkpointer.called)
+		})
+	}
+}
 
 // mockOutputReader implements RunOutputReader for testing
 type mockOutputReader struct {
@@ -169,4 +228,112 @@ func TestCheckpointAPI_Output(t *testing.T) {
 
 		require.Equal(t, 401, rec.Code)
 	})
+}
+
+type scheduleErrExecutor struct {
+	execution.Executor
+	err error
+}
+
+func (e scheduleErrExecutor) Schedule(ctx context.Context, r execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	return nil, nil, e.err
+}
+
+type noopPublisher struct {
+	wg *sync.WaitGroup
+}
+
+func (p noopPublisher) Publish(ctx context.Context, evt event.TrackedEvent) error {
+	p.wg.Done()
+	return nil
+}
+
+type noopAppCreator struct {
+	cqrs.AppCreator
+}
+
+func (noopAppCreator) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
+	return &cqrs.App{ID: arg.ID}, nil
+}
+
+type noopFunctionCreator struct {
+	cqrs.FunctionCreator
+	wg *sync.WaitGroup
+}
+
+func (f noopFunctionCreator) UpsertFunction(ctx context.Context, params cqrs.UpsertFunctionParams) (*cqrs.Function, error) {
+	f.wg.Done()
+	return &cqrs.Function{ID: params.ID}, nil
+}
+
+func TestCheckpointAPI_CheckpointNewRun_ScheduleErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus int
+		wantMsg    string
+	}{
+		{
+			name:       "skipped run returns 403 with reason",
+			err:        executor.SkippedError{Reason: enums.SkipReasonAccountExecutionCapHit},
+			wantStatus: http.StatusForbidden,
+			wantMsg:    "AccountExecutionCapHit",
+		},
+		{
+			name:       "rate limited returns 429",
+			err:        executor.ErrFunctionRateLimited,
+			wantStatus: http.StatusTooManyRequests,
+			wantMsg:    "Rate limits exceeded",
+		},
+		{
+			name:       "unknown error returns 500",
+			err:        errors.New("boom"),
+			wantStatus: http.StatusInternalServerError,
+			wantMsg:    "Failed to schedule run",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			wg := &sync.WaitGroup{}
+			wg.Add(2)
+
+			api := NewCheckpointAPI(Opts{
+				AuthFinder:      apiv1auth.NilAuthFinder,
+				Executor:        scheduleErrExecutor{err: tc.err},
+				EventPublisher:  noopPublisher{wg: wg},
+				AppCreator:      noopAppCreator{},
+				FunctionCreator: noopFunctionCreator{wg: wg},
+			})
+
+			body, err := json.Marshal(CheckpointNewRunRequest{
+				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+				Event: inngestgo.GenericEvent[NewAPIRunData]{
+					Name: "http/request",
+					Data: NewAPIRunData{
+						Domain: "https://example.com",
+						Method: http.MethodPost,
+						Path:   "/api/test",
+					},
+				},
+			})
+			require.NoError(t, err)
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+
+			api.CheckpointNewRun(rec, req)
+			wg.Wait()
+
+			require.Equal(t, tc.wantStatus, rec.Code)
+
+			resp := struct {
+				Error  string `json:"error"`
+				Status int    `json:"status"`
+			}{}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+			require.Equal(t, tc.wantStatus, resp.Status)
+			require.Contains(t, resp.Error, tc.wantMsg)
+		})
+	}
 }

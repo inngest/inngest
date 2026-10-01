@@ -927,6 +927,7 @@ func (q *queue) Lease(
 		now.UnixMilli(),
 		setEarliestPeekTime,
 		item.EarliestPeekTime,
+		item.GenerationID,
 	})
 	if err != nil {
 		return nil, err
@@ -1334,12 +1335,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.kg
 
-	if limit > osqueue.PartitionPeekMax {
-		return nil, osqueue.ErrPartitionPeekMaxExceedsLimits
-	}
+	// The scanner already resolves the dynamic limit and divides it across accounts.
+	// Honor that budget without re-evaluating the getter or applying its floor;
+	// direct callers still get a default for non-positive limits and an absolute cap.
 	if limit <= 0 {
 		limit = osqueue.PartitionPeekMax
 	}
+	limit = min(limit, osqueue.AbsolutePartitionPeekMax)
 
 	// TODO(tony): If this is an allowlist, only peek the given partitions.  Use ZMSCORE
 	// to fetch the scores for all allowed partitions, then filter where score <= until.
@@ -1615,7 +1617,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
 	if sequential {
-		n := int(math.Min(float64(len(items)), float64(osqueue.PartitionSelectionMax)))
+		n := min(len(items), int(osqueue.PartitionSelectionMax))
 		return items[0:n], nil
 	}
 

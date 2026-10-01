@@ -169,6 +169,9 @@ type ItemLeaseConstraintCheckResult struct {
 	// while processing the item.
 	CapacityLease *CapacityLease
 
+	// ArchivedWorkspaceAppSemaphoreBypassed marks this lease as cleanup-only.
+	ArchivedWorkspaceAppSemaphoreBypassed bool
+
 	// limitingConstraint returns the most limiting constraint in case
 	// no capacity was available.
 	LimitingConstraint enums.QueueConstraint
@@ -442,6 +445,29 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		}
 	}
 
+	// Archived Connect apps have no worker capacity, so their app semaphore can
+	// otherwise prevent queue items from ever reaching the executor's archived
+	// workspace check and being dequeued. This bypass is deliberately limited to
+	// the app semaphore; every other constraint remains enforced.
+	bypassAppSemaphore := q.bypassArchivedWorkspaceAppSemaphore(
+		ctx,
+		*shadowPart.AccountID,
+		*shadowPart.EnvID,
+		item.Data.Semaphores,
+	)
+	if bypassAppSemaphore {
+		span.SetAttributes(attribute.Bool("archived_workspace_app_semaphore_bypass", true))
+		metrics.IncrQueueArchivedWorkspaceAppSemaphoreBypassCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": q.Shard().Name(),
+			},
+		})
+	}
+	result := ItemLeaseConstraintCheckResult{
+		ArchivedWorkspaceAppSemaphoreBypassed: bypassAppSemaphore,
+	}
+
 	switch q.hasReusableCapacityLease(item, now) {
 	case true:
 		// in this case, key queues claimed a bunch of constraints up front and we already have some
@@ -456,12 +482,13 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			},
 		})
 
-		if len(item.Data.Semaphores) == 0 || q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) {
+		if len(item.Data.Semaphores) == 0 ||
+			q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) ||
+			(bypassAppSemaphore && !hasNonAppSemaphore(item.Data.Semaphores)) {
 			// backlog lease covers everything, no semaphores — skip Acquire entirely.
 			span.SetAttributes(attribute.Bool("valid_lease", true))
-			return ItemLeaseConstraintCheckResult{
-				CapacityLease: item.CapacityLease,
-			}, nil
+			result.CapacityLease = item.CapacityLease
+			return result, nil
 		}
 	case false:
 		// release expired/near-expiring lease in the background so that capacity
@@ -500,6 +527,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 	// always add semaphores to each check, as this must be done per queue item.
 	for _, sem := range item.Data.Semaphores {
+		if bypassAppSemaphore && sem.Kind() == constraintapi.SemaphoreKindApp {
+			continue
+		}
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
 			Semaphore: &constraintapi.SemaphoreConstraint{
@@ -513,7 +543,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}
 
 	if len(constraintItems) == 0 {
-		return ItemLeaseConstraintCheckResult{}, nil
+		return result, nil
 	}
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
@@ -548,7 +578,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonAccountMissing.String(), metrics.CounterOpt{
 				PkgName: pkgName,
 			})
-			return ItemLeaseConstraintCheckResult{}, nil
+			return result, nil
 		}
 
 		span.RecordError(err)
@@ -575,23 +605,21 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	if len(res.Leases) == 0 {
 		span.SetAttributes(attribute.Bool("constrained", true))
 
-		return ItemLeaseConstraintCheckResult{
-			LimitingConstraint:  constraint,
-			RetryAfter:          res.RetryAfter,
-			ExhaustedSemaphores: exhaustedSemaphores(res.ExhaustedConstraints),
-		}, nil
+		result.LimitingConstraint = constraint
+		result.RetryAfter = res.RetryAfter
+		result.ExhaustedSemaphores = exhaustedSemaphores(res.ExhaustedConstraints)
+		return result, nil
 	}
 
 	capacityLeaseID := res.Leases[0].LeaseID
 
 	span.SetAttributes(attribute.String("capacity_lease_id", capacityLeaseID.String()))
 
-	return ItemLeaseConstraintCheckResult{
-		CapacityLease: &CapacityLease{
-			LeaseID:    capacityLeaseID,
-			IssuedAtMS: now.UnixMilli(),
-		},
-	}, nil
+	result.CapacityLease = &CapacityLease{
+		LeaseID:    capacityLeaseID,
+		IssuedAtMS: now.UnixMilli(),
+	}
+	return result, nil
 }
 
 // exhaustedSemaphores returns the semaphore constraints in the given exhausted
@@ -636,6 +664,37 @@ func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, 
 	}
 
 	return q.DisableSemaphoreConstraintChecks(ctx, accountID)
+}
+
+func (q *queueProcessor) bypassArchivedWorkspaceAppSemaphore(
+	ctx context.Context,
+	accountID,
+	workspaceID uuid.UUID,
+	semaphores []constraintapi.Semaphore,
+) bool {
+	if q.BypassArchivedWorkspaceAppSemaphore == nil || !hasAppSemaphoreConfig(semaphores) {
+		return false
+	}
+
+	return q.BypassArchivedWorkspaceAppSemaphore(ctx, accountID, workspaceID)
+}
+
+func hasAppSemaphoreConfig(semaphores []constraintapi.Semaphore) bool {
+	for _, semaphore := range semaphores {
+		if semaphore.Kind() == constraintapi.SemaphoreKindApp {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNonAppSemaphore(semaphores []constraintapi.Semaphore) bool {
+	for _, semaphore := range semaphores {
+		if semaphore.Kind() != constraintapi.SemaphoreKindApp {
+			return true
+		}
+	}
+	return false
 }
 
 func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {

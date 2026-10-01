@@ -1116,6 +1116,22 @@ func TestCQRSGetFunctions(t *testing.T) {
 			assert.True(t, foundFnIDs[expectedID], "Expected function ID %s to be found", expectedID)
 		}
 	})
+
+	t.Run("get functions by slugs", func(t *testing.T) {
+		err := cm.DeleteFunctionsByIDs(ctx, []uuid.UUID{fnIDs[1]})
+		require.NoError(t, err)
+
+		functions, err := cm.GetFunctionsBySlugs(ctx, []string{"test-function-1", "test-function-2", "test-function-3", "missing-function"})
+		require.NoError(t, err)
+		require.Len(t, functions, 2)
+
+		functionsBySlug := make(map[string]*cqrs.Function, len(functions))
+		for _, fn := range functions {
+			functionsBySlug[fn.Slug] = fn
+		}
+		assert.Equal(t, fnIDs[0], functionsBySlug["test-function-1"].ID)
+		assert.Equal(t, fnIDs[2], functionsBySlug["test-function-3"].ID)
+	})
 }
 
 func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
@@ -2688,8 +2704,9 @@ func TestCQRSGetRunsUsesModernSpanData(t *testing.T) {
 	deferred := true
 
 	attrs, err := json.Marshal(map[string]any{
-		meta.Attrs.BatchID.Key():      batchID.String(),
-		meta.Attrs.CronSchedule.Key(): "*/5 * * * *",
+		meta.Attrs.BatchID.Key():           batchID.String(),
+		meta.Attrs.CronSchedule.Key():      "*/5 * * * *",
+		meta.Attrs.DeferParentFnSlug.Key(): "parent-function",
 	})
 	require.NoError(t, err)
 	eventIDs, err := json.Marshal([]string{firstEventID.String(), eventID.String(), thirdEventID.String()})
@@ -2777,6 +2794,7 @@ func TestCQRSGetRunsUsesModernSpanData(t *testing.T) {
 	assert.Equal(t, batchID, *runs[0].BatchID)
 	require.NotNil(t, runs[0].CronSchedule)
 	assert.Equal(t, "*/5 * * * *", *runs[0].CronSchedule)
+	assert.Equal(t, "parent-function", runs[0].DeferParentFunctionSlug)
 	assert.JSONEq(t, `{"data":{"source":"function"}}`, string(runs[0].Output))
 	assert.NotEmpty(t, runs[0].Cursor)
 }
@@ -2871,6 +2889,10 @@ func TestCQRSGetRunsIncludesFinalEndedAtUntilBoundary(t *testing.T) {
 	baseTime := time.Now().UTC().Truncate(time.Second)
 	insideRunID := ulid.Make()
 	outsideRunID := ulid.Make()
+	attrs, err := json.Marshal(map[string]any{
+		meta.Attrs.DeferParentFnSlug.Key(): "parent-function",
+	})
+	require.NoError(t, err)
 
 	insertLifecycle := func(runID ulid.ULID, dynamicID string, finalAt time.Time) {
 		traceID := "trace-" + runID.String()
@@ -2878,6 +2900,7 @@ func TestCQRSGetRunsIncludesFinalEndedAtUntilBoundary(t *testing.T) {
 			RunID: runID.String(), TraceID: traceID, DynamicSpanID: dynamicID, Name: meta.SpanNameRun,
 			Status: enums.StepStatusQueued.String(), StartTime: baseTime.Add(-time.Second),
 			AccountID: accountID.String(), AppID: appID.String(), FunctionID: functionID.String(), EnvID: workspaceID.String(),
+			Attributes: attrs,
 		})
 		insertTestSpan(t, cm, testSpanFields{
 			RunID: runID.String(), TraceID: traceID, DynamicSpanID: dynamicID, Name: meta.SpanNameDynamicExtension,
@@ -2906,6 +2929,7 @@ func TestCQRSGetRunsIncludesFinalEndedAtUntilBoundary(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	assert.Equal(t, insideRunID.String(), runs[0].RunID)
+	assert.Equal(t, "parent-function", runs[0].DeferParentFunctionSlug)
 }
 
 //

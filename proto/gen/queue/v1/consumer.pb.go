@@ -22,11 +22,12 @@ const (
 )
 
 type DequeueRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ShardName     string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
-	Item          *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ShardName      string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
+	Item           *QueueItem             `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	CapacityLeased bool                   `protobuf:"varint,3,opt,name=capacity_leased,json=capacityLeased,proto3" json:"capacity_leased,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DequeueRequest) Reset() {
@@ -73,6 +74,13 @@ func (x *DequeueRequest) GetItem() *QueueItem {
 	return nil
 }
 
+func (x *DequeueRequest) GetCapacityLeased() bool {
+	if x != nil {
+		return x.CapacityLeased
+	}
+	return false
+}
+
 type DequeueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -113,11 +121,12 @@ var File_queue_v1_consumer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_consumer_proto_rawDesc = "" +
 	"\n" +
-	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"X\n" +
+	"\x17queue/v1/consumer.proto\x12\bqueue.v1\x1a\x14queue/v1/types.proto\"\x81\x01\n" +
 	"\x0eDequeueRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
-	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\"\x11\n" +
+	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12'\n" +
+	"\x0fcapacity_leased\x18\x03 \x01(\bR\x0ecapacityLeased\"\x11\n" +
 	"\x0fDequeueResponse2S\n" +
 	"\x0fConsumerService\x12@\n" +
 	"\aDequeue\x12\x18.queue.v1.DequeueRequest\x1a\x19.queue.v1.DequeueResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"

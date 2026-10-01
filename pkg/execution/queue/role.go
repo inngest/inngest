@@ -50,6 +50,10 @@ type QueueRoleStatus struct {
 
 type QueueRoleOpt func(*queueRole)
 
+type queueRoleLeaseCounter interface {
+	LeaseCount(context.Context, QueueShard) int
+}
+
 // WithRoleExcludesScanning makes a role suppress normal queue scanning while
 // this worker actively holds that role's lease.
 func WithRoleExcludesScanning(exclude bool) QueueRoleOpt {
@@ -67,6 +71,15 @@ func WithRoleRunInterval(interval time.Duration) QueueRoleOpt {
 	}
 }
 
+// WithRoleLeaseCount lets one responsibility be held by a bounded pool of
+// processors. Each processor owns at most one numbered lease and the first
+// lease keeps the role's historical name for backwards compatibility.
+func WithRoleLeaseCount(count func(context.Context, QueueShard) int) QueueRoleOpt {
+	return func(r *queueRole) {
+		r.leaseCount = count
+	}
+}
+
 type queueRole struct {
 	name             string
 	leaseDuration    time.Duration
@@ -74,6 +87,7 @@ type queueRole struct {
 	excludesScanning bool
 	run              func(context.Context, QueueShard) error
 	onLeaseTick      func(context.Context, QueueShard)
+	leaseCount       func(context.Context, QueueShard) int
 }
 
 func (r queueRole) Name() string {
@@ -103,6 +117,16 @@ func (r queueRole) OnLeaseTick(ctx context.Context, shard QueueShard) {
 	if r.onLeaseTick != nil {
 		r.onLeaseTick(ctx, shard)
 	}
+}
+
+func (r queueRole) LeaseCount(ctx context.Context, shard QueueShard) int {
+	if r.leaseCount == nil {
+		return 1
+	}
+	if count := r.leaseCount(ctx, shard); count > 0 {
+		return count
+	}
+	return 1
 }
 
 func newQueueRole(
@@ -144,26 +168,72 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 	}
 
 	shard := q.Shard()
+	leaseSlot := -1
 
 	// claim attempts to acquire or renew the role lease.  The current lease ID
 	// is passed back to the shard so the same worker can renew leases it already
 	// owns, while another active owner's lease is treated as expected contention.
 	claim := func(initial bool) bool {
-		leaseID, err := shard.RoleLease(ctx, name, leaseDuration, q.roleLease(name))
-		if err == ErrRoleAlreadyLeased {
-			q.setRoleLease(ctx, name, nil, shard)
-			return true
+		leaseCount := 1
+		if pooled, ok := role.(queueRoleLeaseCounter); ok {
+			leaseCount = pooled.LeaseCount(ctx, shard)
 		}
-		if err != nil {
+
+		if leaseSlot >= leaseCount {
+			// Stop using a slot as soon as the desired pool shrinks. The durable
+			// lease is left to expire because QueueShard leases have no release
+			// operation, but this processor immediately returns to normal work.
 			q.setRoleLease(ctx, name, nil, shard)
-			if initial {
-				q.quit <- err
-				return false
+			leaseSlot = -1
+		}
+
+		// Renew the slot this processor already owns before probing unrelated
+		// slots. A transient database error must not make us forget a durable
+		// lease that can still be valid until its recorded expiry.
+		if leaseSlot >= 0 {
+			leaseID, err := shard.RoleLease(
+				ctx,
+				queueRoleLeaseName(name, leaseSlot),
+				leaseDuration,
+				q.roleLease(name),
+			)
+			switch err {
+			case nil:
+				q.setRoleLease(ctx, name, leaseID, shard)
+				return true
+			case ErrRoleAlreadyLeased:
+				q.setRoleLease(ctx, name, nil, shard)
+				leaseSlot = -1
+			default:
+				logger.StdlibLogger(ctx).Error("error renewing queue role lease", "role", name, "error", err)
+				return true
 			}
-			logger.StdlibLogger(ctx).Error("error claiming queue role lease", "role", name, "error", err)
+		}
+
+		for slot := 0; slot < leaseCount; slot++ {
+			leaseName := queueRoleLeaseName(name, slot)
+			leaseID, err := shard.RoleLease(ctx, leaseName, leaseDuration)
+			if err == ErrRoleAlreadyLeased {
+				continue
+			}
+			if err != nil {
+				q.setRoleLease(ctx, name, nil, shard)
+				leaseSlot = -1
+				if initial {
+					q.quit <- err
+					return false
+				}
+				logger.StdlibLogger(ctx).Error("error claiming queue role lease", "role", name, "error", err)
+				return true
+			}
+
+			leaseSlot = slot
+			q.setRoleLease(ctx, name, leaseID, shard)
 			return true
 		}
-		q.setRoleLease(ctx, name, leaseID, shard)
+
+		q.setRoleLease(ctx, name, nil, shard)
+		leaseSlot = -1
 		return true
 	}
 
@@ -208,6 +278,13 @@ func (q *queueProcessor) runRole(ctx context.Context, role QueueRole) {
 			}
 		}
 	}
+}
+
+func queueRoleLeaseName(roleName string, slot int) string {
+	if slot <= 0 {
+		return roleName
+	}
+	return fmt.Sprintf("%s-%d", roleName, slot)
 }
 
 func (q *queueProcessor) roleLease(roleName string) *ulid.ULID {

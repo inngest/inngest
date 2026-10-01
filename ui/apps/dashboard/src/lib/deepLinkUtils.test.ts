@@ -102,13 +102,14 @@ describe('deepLinkUtils', () => {
     });
   });
 
-  it('only keeps string dashboard deep-link params', () => {
+  it('validates dashboard deep-link params', () => {
     expect(
       validateDashboardDeepLinkSearch({
         acct: 'acct_123',
         org: 'org_123',
         expires: 100,
         sig: 'a'.repeat(64),
+        forceRestRuns: 'false',
       }),
     ).toEqual({
       acct: 'acct_123',

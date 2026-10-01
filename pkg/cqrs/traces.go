@@ -362,27 +362,28 @@ type SpanMetadata struct {
 
 // TraceRun represents a function run backed by a trace
 type TraceRun struct {
-	AccountID    uuid.UUID       `json:"account_id"`
-	WorkspaceID  uuid.UUID       `json:"workspace_id"`
-	AppID        uuid.UUID       `json:"app_id"`
-	FunctionID   uuid.UUID       `json:"function_id"`
-	TraceID      string          `json:"trace_id"`
-	RunID        string          `json:"run_id"`
-	QueuedAt     time.Time       `json:"queued_at"`
-	StartedAt    time.Time       `json:"started_at,omitempty"`
-	EndedAt      time.Time       `json:"ended_at,omitempty"`
-	Duration     time.Duration   `json:"duration"`
-	SourceID     string          `json:"source_id,omitempty"`
-	TriggerIDs   []string        `json:"trigger_ids"`
-	Triggers     [][]byte        `json:"triggers"`
-	Output       []byte          `json:"output,omitempty"`
-	Status       enums.RunStatus `json:"status"`
-	IsDeferred   bool            `json:"is_deferred"`
-	IsBatch      bool            `json:"is_batch"`
-	IsDebounce   bool            `json:"is_debounce"`
-	HasAI        bool            `json:"has_ai"`
-	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
-	CronSchedule *string         `json:"cron_schedule,omitempty"`
+	AccountID               uuid.UUID       `json:"account_id"`
+	WorkspaceID             uuid.UUID       `json:"workspace_id"`
+	AppID                   uuid.UUID       `json:"app_id"`
+	FunctionID              uuid.UUID       `json:"function_id"`
+	TraceID                 string          `json:"trace_id"`
+	RunID                   string          `json:"run_id"`
+	QueuedAt                time.Time       `json:"queued_at"`
+	StartedAt               time.Time       `json:"started_at,omitempty"`
+	EndedAt                 time.Time       `json:"ended_at,omitempty"`
+	Duration                time.Duration   `json:"duration"`
+	SourceID                string          `json:"source_id,omitempty"`
+	TriggerIDs              []string        `json:"trigger_ids"`
+	Triggers                [][]byte        `json:"triggers"`
+	Output                  []byte          `json:"output,omitempty"`
+	Status                  enums.RunStatus `json:"status"`
+	IsDeferred              bool            `json:"is_deferred"`
+	DeferParentFunctionSlug string          `json:"defer_parent_function_slug,omitempty"`
+	IsBatch                 bool            `json:"is_batch"`
+	IsDebounce              bool            `json:"is_debounce"`
+	HasAI                   bool            `json:"has_ai"`
+	BatchID                 *ulid.ULID      `json:"batch_id,omitempty"`
+	CronSchedule            *string         `json:"cron_schedule,omitempty"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
 

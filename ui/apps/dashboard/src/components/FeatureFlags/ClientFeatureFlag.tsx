@@ -1,9 +1,11 @@
+import type { ClientFeatureFlagKey } from '@inngest/components/SharedContext/clientFeatureFlags';
+
 import { useBooleanFlag } from './hooks';
 
 type Props = {
   children: React.ReactNode;
   defaultValue?: boolean;
-  flag: string;
+  flag: ClientFeatureFlagKey;
 };
 
 // Conditionally renders children based on a feature flag.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"sync"
@@ -109,12 +110,27 @@ func WithLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
+func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) func(s *svc) {
+	return func(s *svc) {
+		s.syncLifecycles = append(s.syncLifecycles, l...)
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
 		o(svc)
 	}
 	return svc
+}
+
+// notifySyncLifecyclesEventReceived invokes all registered sync lifecycle
+// listeners synchronously (inline) whenever an event is durably created,
+// regardless of whether it later matches a function.
+func (s *svc) notifySyncLifecyclesEventReceived(ctx context.Context, evt event.TrackedEvent) {
+	execution.SafelyInvokeSyncListeners(ctx, s.log, s.syncLifecycles, "OnEventReceived", func(l execution.SyncLifecycleListener) {
+		l.OnEventReceived(ctx, evt)
+	})
 }
 
 type svc struct {
@@ -137,6 +153,10 @@ type svc struct {
 	batcher batch.BatchManager
 	// croner handles cron operations
 	croner cron.CronManager
+
+	// syncLifecycles are invoked synchronously (inline) whenever an event is
+	// durably created, regardless of whether it later matches a function.
+	syncLifecycles []execution.SyncLifecycleListener
 
 	log logger.Logger
 }
@@ -306,6 +326,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if err != nil {
 		return err
 	}
+	s.notifySyncLifecyclesEventReceived(ctx, tracked)
 
 	l := s.log.With(
 		"event", tracked.GetEvent().Name,
@@ -710,8 +731,8 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		},
 	})
 
-	switch err {
-	case executor.ErrFunctionRateLimited:
+	switch {
+	case errors.Is(err, executor.ErrFunctionRateLimited):
 		if opts.evt.GetEvent().IsInvokeEvent() {
 			// This function was invoked by another function, so we need to
 			// ensure that the invoker fails. If we don't do this, it'll
@@ -728,10 +749,10 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		}
 
 		return nil, nil
-	case executor.ErrFunctionDebounced,
-		executor.ErrFunctionSkipped,
-		executor.ErrFunctionSkippedIdempotency,
-		state.ErrIdentifierExists:
+	case errors.Is(err, executor.ErrFunctionDebounced),
+		errors.Is(err, executor.ErrFunctionSkipped),
+		errors.Is(err, executor.ErrFunctionSkippedIdempotency),
+		errors.Is(err, state.ErrIdentifierExists):
 		return nil, nil
 	}
 

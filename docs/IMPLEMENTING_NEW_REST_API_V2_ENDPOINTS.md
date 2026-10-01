@@ -226,9 +226,10 @@ return nil, NewErrors(http.StatusBadRequest,
 return nil, NewError(http.StatusNotImplemented, ErrorNotImplemented, "Feature not implemented in OSS")
 ```
 
-### 3. Generate Documentation Stubs
+### 3. Generate Documentation
 
-Run the following command to generate example stubs:
+Run the following command to generate the OpenAPI specification and endpoint
+pages:
 
 ```bash
 make docs
@@ -237,14 +238,17 @@ make docs
 This command will:
 
 - Generate OpenAPI documentation from your protobuf definitions
-- Create stub entries in `docs/api_v2_examples.json` for any new endpoints
+- Apply any authored examples from `docs/api_v2_examples.json`
 - Update the API documentation
 
-### 4. Add Real-World Examples
+### 4. Add Optional Real-World Examples
 
 **File:** `docs/api_v2_examples.json`
 
-After running `make docs`, you'll find TODO stubs for your new endpoint. Replace these with realistic examples:
+Add realistic examples directly when they improve the generated schema-based
+documentation. `make docs` treats this file as read-only and fails when an
+example references a path, method, or response status that does not exist in the
+generated specification.
 
 ```json
 {
@@ -312,7 +316,7 @@ After running `make docs`, you'll find TODO stubs for your new endpoint. Replace
 
 - **Realistic Data**: Use believable IDs, timestamps, and content
 - **Consistent Formatting**: Follow existing timestamp and ID formats
-- **Complete Coverage**: Include examples for all documented response codes
+- **Useful Coverage**: Add examples where realistic data clarifies the schema
 - **Error Examples**: Show realistic error scenarios with proper error codes
 
 ### 5. Use in Monorepo

@@ -1217,6 +1217,365 @@ func TestBacklogsByPartition(t *testing.T) {
 	}
 }
 
+func TestBacklogsByPartitionContinuesPastMissingMetadata(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+
+	acctID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+	backlogs := make([]osqueue.QueueBacklog, 3)
+	for i := range backlogs {
+		key := fmt.Sprintf("key-%d", i)
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("item-%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					AccountID:       acctID,
+					WorkspaceID:     wsID,
+					WorkflowID:      fnID,
+					WorkflowVersion: 1,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{{
+					Key:   key,
+					Hash:  hashConcurrencyKey(key),
+					Limit: 1,
+				}},
+			},
+		}
+		backlogs[i] = osqueue.ItemBacklog(ctx, item)
+		_, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Duration(i)*time.Millisecond), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	r.HDel(shard.Client().kg.BacklogMeta(), backlogs[0].BacklogID)
+	r.HDel(shard.Client().kg.BacklogMeta(), backlogs[1].BacklogID)
+
+	testcases := []struct {
+		name string
+		opts []osqueue.QueueIterOpt
+	}{
+		{
+			name: "with millisecond increase",
+			opts: []osqueue.QueueIterOpt{
+				osqueue.WithQueueItemIterBatchSize(2),
+				osqueue.WithQueueItemIterInterval(0),
+			},
+		},
+		{
+			name: "without millisecond increase",
+			opts: []osqueue.QueueIterOpt{
+				osqueue.WithQueueItemIterBatchSize(2),
+				osqueue.WithQueueItemIterInterval(0),
+				osqueue.WithQueueItemIterDisableMillisecondIncrease(),
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			backlogIter, err := shard.BacklogsByPartition(
+				ctx,
+				fnID.String(),
+				time.Time{},
+				clock.Now().Add(time.Hour),
+				tc.opts...,
+			)
+			require.NoError(t, err)
+
+			var backlogIDs []string
+			for backlog := range backlogIter {
+				backlogIDs = append(backlogIDs, backlog.BacklogID)
+			}
+
+			require.Equal(t, []string{backlogs[2].BacklogID}, backlogIDs)
+		})
+	}
+}
+
+func TestBacklogsByPartitionStopsWithoutMillisecondIncrease(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+
+	fnID, wsID, acctID := uuid.New(), uuid.New(), uuid.New()
+	item := osqueue.QueueItem{
+		ID:          "item",
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindEdge,
+			Identifier: state.Identifier{
+				AccountID:       acctID,
+				WorkspaceID:     wsID,
+				WorkflowID:      fnID,
+				WorkflowVersion: 1,
+			},
+			CustomConcurrencyKeys: []state.CustomConcurrency{{
+				Key:   "key",
+				Hash:  hashConcurrencyKey("key"),
+				Limit: 1,
+			}},
+		},
+	}
+	expected := osqueue.ItemBacklog(ctx, item)
+	_, err := shard.EnqueueItem(ctx, item, clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	backlogIter, err := shard.BacklogsByPartition(
+		ctx,
+		fnID.String(),
+		time.Time{},
+		clock.Now().Add(time.Hour),
+		osqueue.WithQueueItemIterBatchSize(1),
+		osqueue.WithQueueItemIterInterval(0),
+		osqueue.WithQueueItemIterDisableMillisecondIncrease(),
+	)
+	require.NoError(t, err)
+
+	done := make(chan []string, 1)
+	go func() {
+		var backlogIDs []string
+		for backlog := range backlogIter {
+			backlogIDs = append(backlogIDs, backlog.BacklogID)
+		}
+		done <- backlogIDs
+	}()
+
+	select {
+	case backlogIDs := <-done:
+		require.Equal(t, []string{expected.BacklogID}, backlogIDs)
+	case <-time.After(500 * time.Millisecond):
+		cancel()
+		<-done
+		t.Fatal("backlog iteration did not stop after the cursor stopped advancing")
+	}
+}
+
+func TestPartitionBacklogSizeCountsRequeuedBacklogOnce(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+
+	acctID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+	shadowPartition := &osqueue.QueueShadowPartition{
+		PartitionID: fnID.String(),
+		FunctionID:  &fnID,
+		EnvID:       &wsID,
+		AccountID:   &acctID,
+	}
+
+	const largeBacklogSize = 1000
+	backlogs := map[string]osqueue.QueueBacklog{}
+	for i := range largeBacklogSize + 2 {
+		key := "large"
+		at := clock.Now()
+		switch i {
+		case largeBacklogSize:
+			key = "small-1"
+			at = at.Add(time.Millisecond)
+		case largeBacklogSize + 1:
+			key = "small-2"
+			at = at.Add(3 * time.Millisecond)
+		}
+
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("item-%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					AccountID:       acctID,
+					WorkspaceID:     wsID,
+					WorkflowID:      fnID,
+					WorkflowVersion: 1,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{{
+					Key:   key,
+					Hash:  hashConcurrencyKey(key),
+					Limit: 1,
+				}},
+			},
+		}
+		if _, ok := backlogs[key]; !ok {
+			backlogs[key] = osqueue.ItemBacklog(ctx, item)
+		}
+		_, err := shard.EnqueueItem(ctx, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	backlogIter, err := shard.BacklogsByPartition(
+		ctx,
+		fnID.String(),
+		time.Time{},
+		clock.Now().Add(time.Hour),
+		osqueue.WithQueueItemIterBatchSize(1),
+		osqueue.WithQueueItemIterInterval(0),
+	)
+	require.NoError(t, err)
+
+	lateItem := osqueue.QueueItem{
+		ID:          "late-item",
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindEdge,
+			Identifier: state.Identifier{
+				AccountID:       acctID,
+				WorkspaceID:     wsID,
+				WorkflowID:      fnID,
+				WorkflowVersion: 1,
+			},
+			CustomConcurrencyKeys: []state.CustomConcurrency{{
+				Key:   "late",
+				Hash:  hashConcurrencyKey("late"),
+				Limit: 1,
+			}},
+		},
+	}
+	_, err = shard.EnqueueItem(ctx, lateItem, clock.Now().Add(4*time.Millisecond), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	largeBacklog := backlogs["large"]
+	var sizeCalls int
+	var requeueErr error
+	requeued := false
+	count := boundedPartitionBacklogSize(ctx, backlogIter, 1, func(ctx context.Context, backlogID string) (int64, error) {
+		sizeCalls++
+		if backlogID == largeBacklog.BacklogID && !requeued {
+			requeued = true
+			requeueErr = shard.BacklogRequeue(ctx, &largeBacklog, shadowPartition, clock.Now().Add(2*time.Millisecond))
+			if requeueErr != nil {
+				return 0, requeueErr
+			}
+		}
+		return shard.BacklogSize(ctx, backlogID)
+	}, nil)
+
+	require.NoError(t, requeueErr)
+	require.Equal(t, int64(largeBacklogSize+2), count)
+	require.Equal(t, len(backlogs), sizeCalls)
+}
+
+func TestBacklogsByPartitionStopsFollowingRequeuedBacklog(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithClock(clock),
+	)
+
+	acctID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+	shadowPartition := &osqueue.QueueShadowPartition{
+		PartitionID: fnID.String(),
+		FunctionID:  &fnID,
+		EnvID:       &wsID,
+		AccountID:   &acctID,
+	}
+	var movingBacklog osqueue.QueueBacklog
+	for i := range 3 {
+		key := fmt.Sprintf("key-%d", i)
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("item-%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					AccountID:       acctID,
+					WorkspaceID:     wsID,
+					WorkflowID:      fnID,
+					WorkflowVersion: 1,
+				},
+				CustomConcurrencyKeys: []state.CustomConcurrency{{
+					Key:   key,
+					Hash:  hashConcurrencyKey(key),
+					Limit: 1,
+				}},
+			},
+		}
+		if i == 0 {
+			movingBacklog = osqueue.ItemBacklog(ctx, item)
+		}
+		_, err := shard.EnqueueItem(ctx, item, clock.Now().Add(time.Duration(i)*time.Millisecond), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	backlogIter, err := shard.BacklogsByPartition(
+		ctx,
+		fnID.String(),
+		time.Time{},
+		clock.Now().Add(time.Hour),
+		osqueue.WithQueueItemIterBatchSize(1),
+		osqueue.WithQueueItemIterInterval(0),
+	)
+	require.NoError(t, err)
+
+	var yielded, requeues int
+	for backlog := range backlogIter {
+		yielded++
+		if backlog.BacklogID == movingBacklog.BacklogID && requeues < 10 {
+			requeues++
+			err := shard.BacklogRequeue(
+				ctx,
+				&movingBacklog,
+				shadowPartition,
+				clock.Now().Add(time.Duration(requeues+2)*time.Millisecond),
+			)
+			require.NoError(t, err)
+		}
+	}
+
+	require.Equal(t, 3, yielded)
+	require.Equal(t, 1, requeues)
+}
+
 func TestBacklogSize(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()

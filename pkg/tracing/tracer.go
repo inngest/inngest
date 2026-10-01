@@ -26,8 +26,17 @@ var (
 		propagation.Baggage{},
 	)
 
-	idGen = idGenerator{}
+	IDGenerator = idGenerator{}
 )
+
+// SetDeterministicIDs stores ids in ctx so IDGenerator returns them for the
+// next span started against that ctx. Exported so a second TracerProvider
+// implementation living outside this package (see pkg/tracing/v3) can drive
+// the same IDGenerator this package uses. See setDeteterministicIDs, the
+// unexported version this package's own otelTracerProvider uses directly.
+func SetDeterministicIDs(ctx context.Context, ids DeterministicIDs) context.Context {
+	return setDeteterministicIDs(ctx, ids)
+}
 
 // TracerProvider defines the interface for tracing providers.
 type TracerProvider interface {
@@ -99,7 +108,7 @@ func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
 
 	otelTP := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
-		sdktrace.WithIDGenerator(idGen),
+		sdktrace.WithIDGenerator(IDGenerator),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
@@ -202,7 +211,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		spanOptions = append(
 			spanOptions,
 			trace.WithLinks(trace.Link{
-				SpanContext: spanContextFromMetadata(opts.FollowsFrom),
+				SpanContext: SpanContextFromMetadata(opts.FollowsFrom),
 				Attributes: []attribute.KeyValue{
 					attribute.String(meta.LinkAttributeType, meta.LinkAttributeTypeFollowsFrom),
 				},

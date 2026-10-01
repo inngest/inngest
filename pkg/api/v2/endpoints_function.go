@@ -221,6 +221,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	// Schedule the function directly, instead of waiting for pubsub.  This improves latency
 	// in the fast path, and is necessary for us to return the run ID.
 	sr := execution.NewScheduleRequest(f)
+	sr.FastPath = execution.FastPathOptions{Enabled: true}
 	sr.IdempotencyKey = &idempotencyHash
 	sr.Events = append(sr.Events, event)
 	runID, _, err := s.executor.Schedule(ctx, sr)
@@ -270,10 +271,15 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 			"Function invocation was debounced.",
 		)
 	case "skipped":
+		msg := "Function invocation was skipped."
+		var skipped executor.SkippedError
+		if errors.As(err, &skipped) {
+			msg = fmt.Sprintf("Function invocation was skipped: %s.", skipped.Reason)
+		}
 		return nil, s.base.NewError(
 			http.StatusUnprocessableEntity,
 			apiv2base.ErrorFunctionSkipped,
-			"Function invocation was skipped because the function is paused or draining.",
+			msg,
 		)
 	case "idempotency":
 		_ = grpc.SetHeader(ctx, metadata.Pairs("x-http-code", "409"))

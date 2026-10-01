@@ -42,7 +42,9 @@ describe('apiKeyErrorMessage', () => {
       graphQLErrors: [{ message: 'forbidden' } as Error],
       networkError: new Error('boom'),
     });
-    expect(apiKeyErrorMessage(err)).toBe('forbidden');
+    expect(apiKeyErrorMessage(err)).toBe(
+      "You don't have permission to manage API keys. Ask an organization admin.",
+    );
   });
 
   it('returns the provided fallback when the GraphQL message is blank', () => {

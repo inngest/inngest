@@ -139,7 +139,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       onClose={close}
     >
       <Modal.Header>
-        {inRevealStep ? 'Copy your API key' : 'Create API key'}
+        {inRevealStep ? 'Copy your legacy API key' : 'Create legacy API key'}
       </Modal.Header>
 
       <Modal.Body>
@@ -148,8 +148,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         ) : (
           <div className="flex flex-col gap-5">
             <p className="text-subtle text-sm">
-              Generate an API key to give your applications secure access to
-              Inngest. You can remove keys at any time.
+              Legacy API keys have no fine-grained permissions.
             </p>
 
             <div className="flex flex-col gap-2">

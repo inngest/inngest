@@ -43,6 +43,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="flex">
           <input
             ref={ref}
+            type={type}
             className={cn(`border-muted placeholder-disabled text-basis focus:border-active w-full rounded border bg-transparent text-sm leading-none outline-none transition-all
             ${sizeStyles[inngestSize]}
             ${

@@ -41,12 +41,16 @@ var Attrs = struct {
 	SkipReason          attr[*enums.SkipReason]
 	SkipExistingRunID   attr[*string]
 
+	// Custom step concurrency attributes
+	CustomConcurrencyKeys attr[*[]CustomConcurrencyKey]
+
 	// Durable endpoint attributes
 	IsDurableEndpointRun         attr[*bool]
 	DurableEndpointModeChangedAt attr[*time.Time]
 
 	// Defer attributes
 	DeferChildRunID   attr[*ulid.ULID]
+	DeferEventID      attr[*ulid.ULID]
 	DeferFnSlug       attr[*string]
 	DeferHashedID     attr[*string]
 	DeferParentFnSlug attr[*string]
@@ -184,6 +188,7 @@ var Attrs = struct {
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
 	DeferChildRunID:                    ULIDAttr("defer.child_run_id"),
+	DeferEventID:                       ULIDAttr("defer.event_id"),
 	DeferFnSlug:                        StringAttr("defer.fn_slug"),
 	DeferHashedID:                      StringAttr("defer.hashed_id"),
 	DeferParentFnSlug:                  StringAttr("defer.parent_fn_slug"),
@@ -222,6 +227,7 @@ var Attrs = struct {
 	RunScheduleType:                    TextAttr[enums.ScheduleType]("run.schedule_type"),
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
+	CustomConcurrencyKeys:              JsonAttr[[]CustomConcurrencyKey]("concurrency.keys"),
 	StartedAt:                          TimeAttr("started_at"),
 	ScheduledAt:                        TimeAttr("scheduled_at"),
 	StepAttempt:                        IntAttr("step.attempt"),

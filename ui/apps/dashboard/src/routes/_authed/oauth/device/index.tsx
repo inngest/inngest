@@ -1,0 +1,518 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
+import { Input } from '@inngest/components/Forms/Input';
+import type { Option } from '@inngest/components/Select/Select';
+import { CredentialForm } from '@/components/OAuth/CredentialForm';
+import { useAuth } from '@clerk/tanstack-react-start';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+
+import {
+  PermissionPicker,
+  type PermissionGroup,
+  type PermissionLevel,
+} from '@/components/OAuth/PermissionPicker';
+import { useEnvironments } from '@/queries/environments';
+import { credentialEnvironmentOptions } from '@/components/OAuth/credentialEnvironments';
+import {
+  requestedPermissionLevels,
+  selectedPermissionGrants,
+} from '@/components/OAuth/permissionSelection';
+
+type Search = {
+  request?: string;
+  user_code?: string;
+};
+
+type AuthorizationDetails = {
+  client_id: string;
+  client_name: string;
+  user_code?: string;
+  flow: 'device' | 'authorization_code';
+  redirect_host?: string;
+  default_session_name: string;
+  account_id: string;
+  account_name: string;
+  requested_scopes: string[];
+  permission_groups: PermissionGroup[];
+};
+
+type LoadedAuthorizationDetails = AuthorizationDetails & {
+  request: string;
+};
+
+type Boundary = 'single_env' | 'all_envs';
+
+export const Route = createFileRoute('/_authed/oauth/device/')({
+  component: DeviceAuthorizationRoute,
+  validateSearch: (search: Record<string, unknown>): Search => ({
+    request: typeof search.request === 'string' ? search.request : undefined,
+    user_code:
+      typeof search.user_code === 'string' ? search.user_code : undefined,
+  }),
+});
+
+function DeviceAuthorizationRoute() {
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+
+  return (
+    <OAuthAuthorizationPage
+      initialRequest={search.request}
+      initialUserCode={search.user_code}
+      allowCodeEntry
+      onResolve={(request, userCode) =>
+        navigate({
+          to: '/oauth/device',
+          search: { request, user_code: userCode },
+        })
+      }
+    />
+  );
+}
+
+type OAuthAuthorizationProps = {
+  initialRequest?: string;
+  initialUserCode?: string;
+  allowCodeEntry?: boolean;
+  onResolve?: (request: string, userCode: string) => Promise<unknown>;
+};
+
+export function OAuthAuthorizationPage(props: OAuthAuthorizationProps) {
+  const { userId, orgId } = useAuth();
+  // reset consent when the user, account, or request changes
+  return (
+    <OAuthAuthorizationForm
+      key={JSON.stringify([
+        userId,
+        orgId,
+        props.initialRequest,
+        props.initialUserCode,
+      ])}
+      {...props}
+    />
+  );
+}
+
+function OAuthAuthorizationForm({
+  initialRequest,
+  initialUserCode,
+  allowCodeEntry = false,
+  onResolve,
+}: OAuthAuthorizationProps) {
+  const { getToken } = useAuth();
+  const [
+    {
+      data: environments,
+      fetching: environmentsLoading,
+      error: environmentsError,
+    },
+  ] = useEnvironments();
+  const activeSubmission = useRef<AbortController | null>(null);
+  useEffect(() => () => activeSubmission.current?.abort(), []);
+  const request = initialRequest ?? '';
+  const [userCode, setUserCode] = useState('');
+  const [details, setDetails] = useState<LoadedAuthorizationDetails | null>(
+    null,
+  );
+  const [permissionLevels, setPermissionLevels] = useState<
+    Record<string, PermissionLevel>
+  >({});
+  const [boundary, setBoundary] = useState<Boundary>('single_env');
+  const [workspace, setWorkspace] = useState<Option | null>(null);
+  const [durationDays, setDurationDays] = useState(30);
+  const [sessionName, setSessionName] = useState('Inngest');
+  const [loading, setLoading] = useState(
+    Boolean(initialRequest && (!allowCodeEntry || initialUserCode)),
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState<'approved' | 'denied' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const environmentGroups = useMemo(
+    () => credentialEnvironmentOptions(environments ?? []),
+    [environments],
+  );
+  const environmentOptions = environmentGroups.flatMap((group) => group.opts);
+
+  const selectedPermissions = useMemo(() => {
+    return selectedPermissionGrants(
+      details?.permission_groups ?? [],
+      permissionLevels,
+    );
+  }, [details?.permission_groups, permissionLevels]);
+
+  useEffect(() => {
+    const requestID = initialRequest;
+    const submittedUserCode = initialUserCode;
+    if (!requestID || (allowCodeEntry && !submittedUserCode)) {
+      setDetails(null);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    setDetails(null);
+    setPermissionLevels({});
+    setBoundary('single_env');
+    setWorkspace(null);
+    setDone(null);
+    const loadAuthorization = async () => {
+      try {
+        const response = await apiRequest<AuthorizationDetails>(
+          getToken,
+          `/oauth/authorization?request=${encodeURIComponent(requestID)}${
+            submittedUserCode
+              ? `&user_code=${encodeURIComponent(submittedUserCode)}`
+              : ''
+          }`,
+          undefined,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        setDetails({ ...response, request: requestID });
+        setSessionName(response.default_session_name);
+        // start with the client's requested access selected
+        setPermissionLevels(
+          requestedPermissionLevels({
+            groups: response.permission_groups,
+            scopes: response.requested_scopes,
+          }),
+        );
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(errorMessage(err));
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadAuthorization();
+
+    return () => controller.abort();
+  }, [allowCodeEntry, getToken, initialRequest, initialUserCode]);
+
+  async function resolveCode() {
+    const controller = new AbortController();
+    activeSubmission.current = controller;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await apiRequest<{
+        request: string;
+        user_code: string;
+      }>(
+        getToken,
+        '/oauth/device/authorization/resolve',
+        {
+          user_code: userCode,
+        },
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      await onResolve?.(response.request, response.user_code);
+    } catch (err) {
+      if (!controller.signal.aborted) setError(errorMessage(err));
+    } finally {
+      if (!controller.signal.aborted) setSubmitting(false);
+    }
+  }
+
+  async function approve() {
+    if (!details) return;
+    if (
+      boundary === 'single_env' &&
+      (environmentsLoading || environmentsError)
+    ) {
+      setError('Wait for environments to load successfully.');
+      return;
+    }
+    if (
+      boundary === 'single_env' &&
+      !environmentOptions.some((option) => option.id === workspace?.id)
+    ) {
+      setError('Select an environment.');
+      return;
+    }
+    if (sessionName.trim().length > 128) {
+      setError('Session name must be at most 128 characters.');
+      return;
+    }
+    if (selectedPermissions.length === 0) {
+      setError('Select at least one permission.');
+      return;
+    }
+    await submitAuthorization('approved', {
+      request: details.request,
+      permission_grants: selectedPermissions,
+      resource_boundary_mode: boundary,
+      workspace_id: boundary === 'single_env' ? workspace?.id : null,
+      session_name: sessionName,
+      session_duration_days: durationDays,
+    });
+  }
+
+  async function deny() {
+    if (!details) return;
+    await submitAuthorization('denied', { request: details.request });
+  }
+
+  async function submitAuthorization(
+    decision: 'approved' | 'denied',
+    body: unknown,
+  ) {
+    setSubmitting(true);
+    setError(null);
+    const controller = new AbortController();
+    activeSubmission.current = controller;
+    try {
+      const response = await apiRequest<{ redirect_uri?: string }>(
+        getToken,
+        `/oauth/authorization${decision === 'denied' ? '/deny' : ''}`,
+        body,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      if (response.redirect_uri) {
+        // keep the one-time callback out of browser history
+        window.location.replace(response.redirect_uri);
+        return;
+      }
+      setDone(decision);
+    } catch (err) {
+      if (!controller.signal.aborted) setError(errorMessage(err));
+    } finally {
+      if (!controller.signal.aborted) setSubmitting(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <Page>
+        <h1 className="text-basis text-2xl">
+          {done === 'approved' ? 'Access approved' : 'Access denied'}
+        </h1>
+        <p className="text-subtle">
+          You can close this page and return to the CLI.
+        </p>
+      </Page>
+    );
+  }
+
+  if (!request && allowCodeEntry) {
+    return (
+      <Page>
+        <h1 className="text-basis text-2xl">Connect the Inngest CLI</h1>
+        <p className="text-subtle">Enter the code shown by the CLI.</p>
+        <Input
+          id="device-code"
+          label="Code"
+          placeholder="ABCD-EFGH"
+          value={userCode}
+          onChange={(event) => setUserCode(event.target.value.toUpperCase())}
+          disabled={submitting}
+        />
+        {error && <Alert severity="error">{error}</Alert>}
+        <div className="flex justify-end">
+          <Button
+            kind="primary"
+            label="Continue"
+            onClick={resolveCode}
+            loading={submitting}
+            disabled={submitting || userCode.trim() === ''}
+          />
+        </div>
+      </Page>
+    );
+  }
+
+  if (!request) {
+    return (
+      <Page>
+        <h1 className="text-basis text-2xl">This request is not available</h1>
+      </Page>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Page>
+        <p className="text-subtle">Loading request...</p>
+      </Page>
+    );
+  }
+
+  if (!details) {
+    return (
+      <Page>
+        <h1 className="text-basis text-2xl">This request is not available</h1>
+        {error && <Alert severity="error">{error}</Alert>}
+      </Page>
+    );
+  }
+
+  return (
+    <Page>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-basis text-2xl">Connect {details.client_name}</h1>
+        {details.flow === 'authorization_code' && details.client_id && (
+          <p className="text-basis break-all text-sm">
+            Client ID: {details.client_id}
+          </p>
+        )}
+        <p className="text-subtle">
+          Grant access to{' '}
+          <strong className="text-basis font-medium">
+            {details.account_name.trim() || 'your Inngest account'}
+          </strong>
+          .{' '}
+          {details.flow === 'device' &&
+            'Log out from the CLI to revoke this session.'}
+        </p>
+        {details.redirect_host && (
+          <p className="text-subtle">
+            You will return to {details.redirect_host}.
+          </p>
+        )}
+      </div>
+
+      {details.flow === 'device' && (
+        <div className="border-subtle bg-canvasSubtle flex flex-col gap-2 rounded border p-3">
+          <p className="text-subtle text-sm">
+            Check this matches the code in your terminal. Cancel if it does not.
+          </p>
+          <code className="text-basis whitespace-nowrap text-2xl tracking-widest">
+            {details.user_code}
+          </code>
+        </div>
+      )}
+
+      <CredentialForm
+        name={sessionName}
+        nameLabel="Session name"
+        onNameChange={setSessionName}
+        expiration={{
+          value: {
+            id: String(durationDays),
+            name: expirationName(durationDays),
+          },
+          options: [7, 30, 90, 365].map((days) => ({
+            id: String(days),
+            name: expirationName(days),
+          })),
+          onChange: (option) => setDurationDays(Number(option.id)),
+        }}
+        allEnvironments={boundary === 'all_envs'}
+        onAllEnvironmentsChange={(all) =>
+          setBoundary(all ? 'all_envs' : 'single_env')
+        }
+        environment={workspace}
+        environmentGroups={environmentGroups}
+        onEnvironmentChange={setWorkspace}
+        permissions={
+          <PermissionPicker
+            groups={details.permission_groups}
+            levels={permissionLevels}
+            disabled={submitting}
+            onChange={setPermissionLevels}
+          />
+        }
+        selectedResourceCount={
+          details.permission_groups.filter(
+            (group) => (permissionLevels[group.resource] ?? 'none') !== 'none',
+          ).length
+        }
+        disabled={submitting}
+        error={
+          <>
+            {environmentsError && boundary === 'single_env' && (
+              <Alert severity="error">
+                Could not load environments. Reload the page to try again.
+              </Alert>
+            )}
+            {error && <Alert severity="error">{error}</Alert>}
+          </>
+        }
+        actions={
+          <>
+            <Button
+              kind="primary"
+              label="Approve"
+              onClick={approve}
+              loading={submitting}
+              disabled={
+                submitting ||
+                selectedPermissions.length === 0 ||
+                (boundary === 'single_env' &&
+                  (!workspace ||
+                    environmentsLoading ||
+                    Boolean(environmentsError)))
+              }
+            />
+            <Button
+              appearance="outlined"
+              kind="secondary"
+              label="Cancel"
+              onClick={deny}
+              disabled={submitting}
+            />
+          </>
+        }
+      />
+    </Page>
+  );
+}
+
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <main className="mx-auto flex w-full max-w-xl flex-col gap-8 px-4 py-8 sm:px-0">
+      {children}
+    </main>
+  );
+}
+
+async function apiRequest<T = unknown>(
+  getToken: () => Promise<string | null>,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  const token = await getToken();
+  signal?.throwIfAborted();
+  const response = await fetch(new URL(path, import.meta.env.VITE_API_URL), {
+    method: body === undefined ? 'GET' : 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  });
+  const payload = (await response.json()) as T & {
+    error?: string;
+    error_description?: string;
+  };
+  if (!response.ok) {
+    throw new Error(
+      payload.error_description ?? payload.error ?? 'Request failed.',
+    );
+  }
+  return payload;
+}
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return 'Request failed.';
+}
+
+function expirationName(days: number) {
+  if (days === 365) return '1 year';
+  return `${days} days`;
+}

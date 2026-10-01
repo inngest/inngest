@@ -27,6 +27,7 @@ type Manager interface {
 
 	AppManager
 	GetAppFunctionCounts(ctx context.Context, appIDs []uuid.UUID) (map[uuid.UUID]int, error)
+	GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*Function, error)
 	FunctionRunManager
 	EventManager
 	HistoryReader

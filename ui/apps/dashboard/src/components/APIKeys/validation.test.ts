@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   API_KEY_NAME_MAX,
   validateAPIKeyName,
+  validateRestrictedAPIKey,
 } from '@/components/APIKeys/validation';
 
 describe('validateAPIKeyName', () => {
@@ -35,5 +36,53 @@ describe('validateAPIKeyName', () => {
     // Padded with whitespace but content fits within the limit.
     const padded = '   ' + 'a'.repeat(API_KEY_NAME_MAX) + '   ';
     expect(validateAPIKeyName(padded)).toBeNull();
+  });
+});
+
+describe('restricted keys', () => {
+  const input = {
+    name: 'nightly-sync',
+    allEnvironments: false,
+    workspaceID: undefined,
+    permissions: ['apps:read:*'],
+  };
+
+  it('requires an explicit environment by default', () => {
+    expect(validateRestrictedAPIKey(input).environment).toBe(
+      'Select an environment.',
+    );
+    expect(
+      validateRestrictedAPIKey({ ...input, workspaceID: 'production-id' }),
+    ).toEqual({ name: null, environment: null, permissions: null });
+  });
+
+  it('allows an explicit all-environment choice', () => {
+    expect(
+      validateRestrictedAPIKey({ ...input, allEnvironments: true }),
+    ).toEqual({ name: null, environment: null, permissions: null });
+  });
+
+  it('requires permissions and a name', () => {
+    expect(
+      validateRestrictedAPIKey({
+        ...input,
+        allEnvironments: true,
+        permissions: [],
+      }).permissions,
+    ).toBe('Select at least one permission.');
+    expect(
+      validateRestrictedAPIKey({ ...input, name: ' ', allEnvironments: true })
+        .name,
+    ).toBe('Name is required.');
+  });
+
+  it('reports all missing fields together', () => {
+    expect(
+      validateRestrictedAPIKey({ ...input, name: '', permissions: [] }),
+    ).toEqual({
+      name: 'Name is required.',
+      environment: 'Select an environment.',
+      permissions: 'Select at least one permission.',
+    });
   });
 });

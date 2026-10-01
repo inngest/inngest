@@ -1,7 +1,0 @@
-{
-  "title": "Account",
-  "description": "Manage your account",
-  "pages": [
-    "FetchAccount"
-  ]
-}

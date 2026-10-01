@@ -217,7 +217,9 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	return evt
 }
 
-type checkpointAsyncSteps struct {
+// CheckpointAsyncStepsRequest is the decoded body of an async checkpoint.
+// Cloud deployments use its queue item reference to route in-progress runs.
+type CheckpointAsyncStepsRequest struct {
 	RunID ulid.ULID `json:"run_id"`
 	FnID  uuid.UUID `json:"fn_id"`
 	// QueueItemRef represents the queue item ID that's currently leased while
@@ -239,7 +241,7 @@ type checkpointAsyncSteps struct {
 
 // TrackLatency tracks how long it took for us to receive the async checkpoint
 // request via metrics.
-func (c checkpointAsyncSteps) TrackLatency(ctx context.Context) {
+func (c CheckpointAsyncStepsRequest) TrackLatency(ctx context.Context) {
 	if c.Timestamp == 0 {
 		return
 	}

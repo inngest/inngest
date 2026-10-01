@@ -84,6 +84,20 @@ const (
 	V2GetSandboxProcedure = "/api.v2.V2/GetSandbox"
 	// V2DestroySandboxProcedure is the fully-qualified name of the V2's DestroySandbox RPC.
 	V2DestroySandboxProcedure = "/api.v2.V2/DestroySandbox"
+	// V2PauseSandboxProcedure is the fully-qualified name of the V2's PauseSandbox RPC.
+	V2PauseSandboxProcedure = "/api.v2.V2/PauseSandbox"
+	// V2ResumeSandboxProcedure is the fully-qualified name of the V2's ResumeSandbox RPC.
+	V2ResumeSandboxProcedure = "/api.v2.V2/ResumeSandbox"
+	// V2CreateSandboxSnapshotProcedure is the fully-qualified name of the V2's CreateSandboxSnapshot
+	// RPC.
+	V2CreateSandboxSnapshotProcedure = "/api.v2.V2/CreateSandboxSnapshot"
+	// V2ListSandboxSnapshotsProcedure is the fully-qualified name of the V2's ListSandboxSnapshots RPC.
+	V2ListSandboxSnapshotsProcedure = "/api.v2.V2/ListSandboxSnapshots"
+	// V2GetSandboxSnapshotProcedure is the fully-qualified name of the V2's GetSandboxSnapshot RPC.
+	V2GetSandboxSnapshotProcedure = "/api.v2.V2/GetSandboxSnapshot"
+	// V2DeleteSandboxSnapshotProcedure is the fully-qualified name of the V2's DeleteSandboxSnapshot
+	// RPC.
+	V2DeleteSandboxSnapshotProcedure = "/api.v2.V2/DeleteSandboxSnapshot"
 	// V2ExecSandboxProcedure is the fully-qualified name of the V2's ExecSandbox RPC.
 	V2ExecSandboxProcedure = "/api.v2.V2/ExecSandbox"
 	// V2StreamSandboxLogsProcedure is the fully-qualified name of the V2's StreamSandboxLogs RPC.
@@ -172,6 +186,12 @@ type V2Client interface {
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
 	DestroySandbox(context.Context, *connect.Request[v2.DestroySandboxRequest]) (*connect.Response[v2.DestroySandboxResponse], error)
+	PauseSandbox(context.Context, *connect.Request[v2.PauseSandboxRequest]) (*connect.Response[v2.PauseSandboxResponse], error)
+	ResumeSandbox(context.Context, *connect.Request[v2.ResumeSandboxRequest]) (*connect.Response[v2.ResumeSandboxResponse], error)
+	CreateSandboxSnapshot(context.Context, *connect.Request[v2.CreateSandboxSnapshotRequest]) (*connect.Response[v2.CreateSandboxSnapshotResponse], error)
+	ListSandboxSnapshots(context.Context, *connect.Request[v2.ListSandboxSnapshotsRequest]) (*connect.Response[v2.ListSandboxSnapshotsResponse], error)
+	GetSandboxSnapshot(context.Context, *connect.Request[v2.GetSandboxSnapshotRequest]) (*connect.Response[v2.GetSandboxSnapshotResponse], error)
+	DeleteSandboxSnapshot(context.Context, *connect.Request[v2.DeleteSandboxSnapshotRequest]) (*connect.Response[v2.DeleteSandboxSnapshotResponse], error)
 	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
 	StreamSandboxLogs(context.Context, *connect.Request[v2.StreamSandboxLogsRequest]) (*connect.ServerStreamForClient[v2.StreamSandboxLogsResponse], error)
 	WriteSandboxFile(context.Context, *connect.Request[v2.WriteSandboxFileRequest]) (*connect.Response[v2.WriteSandboxFileResponse], error)
@@ -354,6 +374,42 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2DestroySandboxProcedure,
 			connect.WithSchema(v2Methods.ByName("DestroySandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		pauseSandbox: connect.NewClient[v2.PauseSandboxRequest, v2.PauseSandboxResponse](
+			httpClient,
+			baseURL+V2PauseSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("PauseSandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		resumeSandbox: connect.NewClient[v2.ResumeSandboxRequest, v2.ResumeSandboxResponse](
+			httpClient,
+			baseURL+V2ResumeSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("ResumeSandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		createSandboxSnapshot: connect.NewClient[v2.CreateSandboxSnapshotRequest, v2.CreateSandboxSnapshotResponse](
+			httpClient,
+			baseURL+V2CreateSandboxSnapshotProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateSandboxSnapshot")),
+			connect.WithClientOptions(opts...),
+		),
+		listSandboxSnapshots: connect.NewClient[v2.ListSandboxSnapshotsRequest, v2.ListSandboxSnapshotsResponse](
+			httpClient,
+			baseURL+V2ListSandboxSnapshotsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListSandboxSnapshots")),
+			connect.WithClientOptions(opts...),
+		),
+		getSandboxSnapshot: connect.NewClient[v2.GetSandboxSnapshotRequest, v2.GetSandboxSnapshotResponse](
+			httpClient,
+			baseURL+V2GetSandboxSnapshotProcedure,
+			connect.WithSchema(v2Methods.ByName("GetSandboxSnapshot")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSandboxSnapshot: connect.NewClient[v2.DeleteSandboxSnapshotRequest, v2.DeleteSandboxSnapshotResponse](
+			httpClient,
+			baseURL+V2DeleteSandboxSnapshotProcedure,
+			connect.WithSchema(v2Methods.ByName("DeleteSandboxSnapshot")),
 			connect.WithClientOptions(opts...),
 		),
 		execSandbox: connect.NewClient[v2.ExecSandboxRequest, v2.ExecSandboxResponse](
@@ -547,6 +603,12 @@ type v2Client struct {
 	listSandboxes              *connect.Client[v2.ListSandboxesRequest, v2.ListSandboxesResponse]
 	getSandbox                 *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
 	destroySandbox             *connect.Client[v2.DestroySandboxRequest, v2.DestroySandboxResponse]
+	pauseSandbox               *connect.Client[v2.PauseSandboxRequest, v2.PauseSandboxResponse]
+	resumeSandbox              *connect.Client[v2.ResumeSandboxRequest, v2.ResumeSandboxResponse]
+	createSandboxSnapshot      *connect.Client[v2.CreateSandboxSnapshotRequest, v2.CreateSandboxSnapshotResponse]
+	listSandboxSnapshots       *connect.Client[v2.ListSandboxSnapshotsRequest, v2.ListSandboxSnapshotsResponse]
+	getSandboxSnapshot         *connect.Client[v2.GetSandboxSnapshotRequest, v2.GetSandboxSnapshotResponse]
+	deleteSandboxSnapshot      *connect.Client[v2.DeleteSandboxSnapshotRequest, v2.DeleteSandboxSnapshotResponse]
 	execSandbox                *connect.Client[v2.ExecSandboxRequest, v2.ExecSandboxResponse]
 	streamSandboxLogs          *connect.Client[v2.StreamSandboxLogsRequest, v2.StreamSandboxLogsResponse]
 	writeSandboxFile           *connect.Client[v2.WriteSandboxFileRequest, v2.WriteSandboxFileResponse]
@@ -694,6 +756,36 @@ func (c *v2Client) GetSandbox(ctx context.Context, req *connect.Request[v2.GetSa
 // DestroySandbox calls api.v2.V2.DestroySandbox.
 func (c *v2Client) DestroySandbox(ctx context.Context, req *connect.Request[v2.DestroySandboxRequest]) (*connect.Response[v2.DestroySandboxResponse], error) {
 	return c.destroySandbox.CallUnary(ctx, req)
+}
+
+// PauseSandbox calls api.v2.V2.PauseSandbox.
+func (c *v2Client) PauseSandbox(ctx context.Context, req *connect.Request[v2.PauseSandboxRequest]) (*connect.Response[v2.PauseSandboxResponse], error) {
+	return c.pauseSandbox.CallUnary(ctx, req)
+}
+
+// ResumeSandbox calls api.v2.V2.ResumeSandbox.
+func (c *v2Client) ResumeSandbox(ctx context.Context, req *connect.Request[v2.ResumeSandboxRequest]) (*connect.Response[v2.ResumeSandboxResponse], error) {
+	return c.resumeSandbox.CallUnary(ctx, req)
+}
+
+// CreateSandboxSnapshot calls api.v2.V2.CreateSandboxSnapshot.
+func (c *v2Client) CreateSandboxSnapshot(ctx context.Context, req *connect.Request[v2.CreateSandboxSnapshotRequest]) (*connect.Response[v2.CreateSandboxSnapshotResponse], error) {
+	return c.createSandboxSnapshot.CallUnary(ctx, req)
+}
+
+// ListSandboxSnapshots calls api.v2.V2.ListSandboxSnapshots.
+func (c *v2Client) ListSandboxSnapshots(ctx context.Context, req *connect.Request[v2.ListSandboxSnapshotsRequest]) (*connect.Response[v2.ListSandboxSnapshotsResponse], error) {
+	return c.listSandboxSnapshots.CallUnary(ctx, req)
+}
+
+// GetSandboxSnapshot calls api.v2.V2.GetSandboxSnapshot.
+func (c *v2Client) GetSandboxSnapshot(ctx context.Context, req *connect.Request[v2.GetSandboxSnapshotRequest]) (*connect.Response[v2.GetSandboxSnapshotResponse], error) {
+	return c.getSandboxSnapshot.CallUnary(ctx, req)
+}
+
+// DeleteSandboxSnapshot calls api.v2.V2.DeleteSandboxSnapshot.
+func (c *v2Client) DeleteSandboxSnapshot(ctx context.Context, req *connect.Request[v2.DeleteSandboxSnapshotRequest]) (*connect.Response[v2.DeleteSandboxSnapshotResponse], error) {
+	return c.deleteSandboxSnapshot.CallUnary(ctx, req)
 }
 
 // ExecSandbox calls api.v2.V2.ExecSandbox.
@@ -860,6 +952,12 @@ type V2Handler interface {
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
 	DestroySandbox(context.Context, *connect.Request[v2.DestroySandboxRequest]) (*connect.Response[v2.DestroySandboxResponse], error)
+	PauseSandbox(context.Context, *connect.Request[v2.PauseSandboxRequest]) (*connect.Response[v2.PauseSandboxResponse], error)
+	ResumeSandbox(context.Context, *connect.Request[v2.ResumeSandboxRequest]) (*connect.Response[v2.ResumeSandboxResponse], error)
+	CreateSandboxSnapshot(context.Context, *connect.Request[v2.CreateSandboxSnapshotRequest]) (*connect.Response[v2.CreateSandboxSnapshotResponse], error)
+	ListSandboxSnapshots(context.Context, *connect.Request[v2.ListSandboxSnapshotsRequest]) (*connect.Response[v2.ListSandboxSnapshotsResponse], error)
+	GetSandboxSnapshot(context.Context, *connect.Request[v2.GetSandboxSnapshotRequest]) (*connect.Response[v2.GetSandboxSnapshotResponse], error)
+	DeleteSandboxSnapshot(context.Context, *connect.Request[v2.DeleteSandboxSnapshotRequest]) (*connect.Response[v2.DeleteSandboxSnapshotResponse], error)
 	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
 	StreamSandboxLogs(context.Context, *connect.Request[v2.StreamSandboxLogsRequest], *connect.ServerStream[v2.StreamSandboxLogsResponse]) error
 	WriteSandboxFile(context.Context, *connect.Request[v2.WriteSandboxFileRequest]) (*connect.Response[v2.WriteSandboxFileResponse], error)
@@ -1038,6 +1136,42 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2DestroySandboxProcedure,
 		svc.DestroySandbox,
 		connect.WithSchema(v2Methods.ByName("DestroySandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2PauseSandboxHandler := connect.NewUnaryHandler(
+		V2PauseSandboxProcedure,
+		svc.PauseSandbox,
+		connect.WithSchema(v2Methods.ByName("PauseSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ResumeSandboxHandler := connect.NewUnaryHandler(
+		V2ResumeSandboxProcedure,
+		svc.ResumeSandbox,
+		connect.WithSchema(v2Methods.ByName("ResumeSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreateSandboxSnapshotHandler := connect.NewUnaryHandler(
+		V2CreateSandboxSnapshotProcedure,
+		svc.CreateSandboxSnapshot,
+		connect.WithSchema(v2Methods.ByName("CreateSandboxSnapshot")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListSandboxSnapshotsHandler := connect.NewUnaryHandler(
+		V2ListSandboxSnapshotsProcedure,
+		svc.ListSandboxSnapshots,
+		connect.WithSchema(v2Methods.ByName("ListSandboxSnapshots")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetSandboxSnapshotHandler := connect.NewUnaryHandler(
+		V2GetSandboxSnapshotProcedure,
+		svc.GetSandboxSnapshot,
+		connect.WithSchema(v2Methods.ByName("GetSandboxSnapshot")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2DeleteSandboxSnapshotHandler := connect.NewUnaryHandler(
+		V2DeleteSandboxSnapshotProcedure,
+		svc.DeleteSandboxSnapshot,
+		connect.WithSchema(v2Methods.ByName("DeleteSandboxSnapshot")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2ExecSandboxHandler := connect.NewUnaryHandler(
@@ -1252,6 +1386,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetSandboxHandler.ServeHTTP(w, r)
 		case V2DestroySandboxProcedure:
 			v2DestroySandboxHandler.ServeHTTP(w, r)
+		case V2PauseSandboxProcedure:
+			v2PauseSandboxHandler.ServeHTTP(w, r)
+		case V2ResumeSandboxProcedure:
+			v2ResumeSandboxHandler.ServeHTTP(w, r)
+		case V2CreateSandboxSnapshotProcedure:
+			v2CreateSandboxSnapshotHandler.ServeHTTP(w, r)
+		case V2ListSandboxSnapshotsProcedure:
+			v2ListSandboxSnapshotsHandler.ServeHTTP(w, r)
+		case V2GetSandboxSnapshotProcedure:
+			v2GetSandboxSnapshotHandler.ServeHTTP(w, r)
+		case V2DeleteSandboxSnapshotProcedure:
+			v2DeleteSandboxSnapshotHandler.ServeHTTP(w, r)
 		case V2ExecSandboxProcedure:
 			v2ExecSandboxHandler.ServeHTTP(w, r)
 		case V2StreamSandboxLogsProcedure:
@@ -1409,6 +1555,30 @@ func (UnimplementedV2Handler) GetSandbox(context.Context, *connect.Request[v2.Ge
 
 func (UnimplementedV2Handler) DestroySandbox(context.Context, *connect.Request[v2.DestroySandboxRequest]) (*connect.Response[v2.DestroySandboxResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.DestroySandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) PauseSandbox(context.Context, *connect.Request[v2.PauseSandboxRequest]) (*connect.Response[v2.PauseSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) ResumeSandbox(context.Context, *connect.Request[v2.ResumeSandboxRequest]) (*connect.Response[v2.ResumeSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateSandboxSnapshot(context.Context, *connect.Request[v2.CreateSandboxSnapshotRequest]) (*connect.Response[v2.CreateSandboxSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateSandboxSnapshot is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListSandboxSnapshots(context.Context, *connect.Request[v2.ListSandboxSnapshotsRequest]) (*connect.Response[v2.ListSandboxSnapshotsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListSandboxSnapshots is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetSandboxSnapshot(context.Context, *connect.Request[v2.GetSandboxSnapshotRequest]) (*connect.Response[v2.GetSandboxSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetSandboxSnapshot is not implemented"))
+}
+
+func (UnimplementedV2Handler) DeleteSandboxSnapshot(context.Context, *connect.Request[v2.DeleteSandboxSnapshotRequest]) (*connect.Response[v2.DeleteSandboxSnapshotResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.DeleteSandboxSnapshot is not implemented"))
 }
 
 func (UnimplementedV2Handler) ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error) {

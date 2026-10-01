@@ -166,6 +166,51 @@ func TestQueueItemScore(t *testing.T) {
 	}
 }
 
+func TestPartitionPeekLimit(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	t.Cleanup(rc.Close)
+	getterCalls := 0
+	_, shard := newQueue(t, rc, osqueue.WithPartitionPeekMaxGetter(func(context.Context, string) int64 {
+		getterCalls++
+		return 1
+	}))
+	accountID := uuid.New()
+	for range osqueue.AbsolutePartitionPeekMax + 1 {
+		functionID := uuid.New()
+		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+			FunctionID: functionID,
+			Data:       osqueue.Item{Identifier: state.Identifier{WorkflowID: functionID, AccountID: accountID}},
+		}, time.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+	until := time.Now().Add(time.Hour)
+	for _, tt := range []struct {
+		name      string
+		requested int64
+		want      int
+	}{
+		{name: "uses supplied limit above default", requested: 750, want: 750},
+		{name: "preserves per-account budget", requested: 5, want: 5},
+		{name: "zero uses default", requested: 0, want: int(osqueue.PartitionPeekMax)},
+		{name: "negative uses default", requested: -1, want: int(osqueue.PartitionPeekMax)},
+		{name: "absolute cap", requested: osqueue.AbsolutePartitionPeekMax + 1, want: int(osqueue.AbsolutePartitionPeekMax)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			items, err := shard.PartitionPeek(ctx, false, until, tt.requested)
+			require.NoError(t, err)
+			require.Len(t, items, tt.want)
+			require.Zero(t, getterCalls, "PartitionPeek must not re-evaluate the scanner's limit")
+			items, err = shard.PeekAccountPartitions(ctx, accountID, tt.requested, until, false)
+			require.NoError(t, err)
+			require.Len(t, items, tt.want)
+			require.Zero(t, getterCalls, "PeekAccountPartitions must not re-evaluate the scanner's limit")
+		})
+	}
+}
+
 func TestQueueItemIsLeased(t *testing.T) {
 	now := time.Now()
 	tests := []struct {

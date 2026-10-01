@@ -31,6 +31,15 @@ func IncrQueueItemProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueArchivedWorkspaceAppSemaphoreBypassCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_archived_workspace_app_semaphore_bypass_total",
+		Description: "Total app semaphore checks bypassed to drain archived workspace queue items",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueueItemEarliestPeekTimeCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,

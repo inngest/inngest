@@ -90,6 +90,37 @@ you can sign in using these credentials:
 - Username: `test@example.com`
 - Password: `testing123`
 
+### Sandbox Secrets
+
+The `/env/$envSlug/sandboxes` page uses the shared right helper panel for secret
+management, behind the existing `sandbox_api` flag. Organization admins can list,
+create, replace and delete secrets for the selected environment. This requires
+the Cloud API's `envSecrets`, `createEnvSecret`, `updateEnvSecretValue` and
+`archiveEnvSecret` GraphQL fields and configured secret storage. The browser
+uses the existing authenticated GraphQL client; it never accesses KMS directly.
+
+Paste `.env` contents into a name field to populate editable rows, then explicitly
+save. Imports support comments, `export`, quoted and multiline values, and empty
+values. Double-quoted `\n` and `\r` are expanded; variables and commands are not.
+Invalid lines reject the entire paste. Duplicate and already-saved names are
+flagged; imports never replace an existing value. Replacement is a separate
+action. Import limits are 256 entries / 1 MiB, with the backend's 256-byte name
+and 64-KiB value limits enforced per entry.
+
+Names match exactly and become sandbox environment variable names:
+`secrets: ["OPENAI_API_KEY"]`. Saved values cannot be retrieved by this UI.
+Replacement affects future retrievals; running sandboxes and existing snapshots
+retain values already received. Deleting prevents future retrievals of that
+secret identity.
+
+Imports save sequentially and stop on the first failure. Successful rows are
+cleared, leaving only unsaved or unconfirmed rows for review. A failed network
+response can leave the last save's result unknown; check the list before trying
+again. Closing a dirty editor prompts before discarding. Changing environments
+or navigating away clears the draft; drafts are not persisted.
+
+Focused tests: `pnpm test src/components/Sandboxes/Secrets --maxWorkers=1`.
+
 ## Style Guide
 
 ### Naming Conventions

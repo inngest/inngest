@@ -232,6 +232,14 @@ func (sq *sqliteQuerier) GetFunctions(ctx context.Context) ([]*db.Function, erro
 	return convertSlice(rows, functionFromSQLite), nil
 }
 
+func (sq *sqliteQuerier) GetFunctionsBySlugs(ctx context.Context, slugs []string) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsBySlugs(ctx, slugs)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
+}
+
 func (sq *sqliteQuerier) UpsertFunction(ctx context.Context, arg db.UpsertFunctionParams) (*db.Function, error) {
 	r, err := sq.q.UpsertFunction(ctx, sqlc.UpsertFunctionParams{
 		ID: arg.ID, AppID: arg.AppID, Name: arg.Name,

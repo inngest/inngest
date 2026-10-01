@@ -85,7 +85,7 @@ export const entitlementUsageDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: ents {
         # Disable entitlements here as it queries the usage table as well - see monorepo for now
         #executions {
         # DISABLE USAGE FOR NOW - SEE EXE-1011
@@ -114,8 +114,10 @@ export const entitlementUsageDocument = graphql(`
           limit
         }
         userCount {
-          usage
           limit
+        }
+        usage {
+          userCount
         }
         hipaa {
           enabled
@@ -202,24 +204,20 @@ export const entitlementUsageWithMetricsDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: ents {
         executions {
-          usage
           limit
           overageAllowed
         }
         runCount {
-          usage
           limit
           overageAllowed
         }
         stepCount {
-          usage
           limit
           overageAllowed
         }
         concurrency {
-          usage
           limit
         }
         eventSize {
@@ -229,8 +227,14 @@ export const entitlementUsageWithMetricsDocument = graphql(`
           limit
         }
         userCount {
-          usage
           limit
+        }
+        usage {
+          concurrency
+          executions
+          runCount
+          stepCount
+          userCount
         }
         hipaa {
           enabled
@@ -310,7 +314,7 @@ export const currentPlanDocument = graphql(`
         name
         amount
         billingPeriod
-        entitlements {
+        entitlements: ents {
           concurrency {
             limit
           }
@@ -366,7 +370,7 @@ export const currentPlanDocument = graphql(`
           }
         }
       }
-      entitlements {
+      entitlements: ents {
         concurrency {
           limit
         }
@@ -464,7 +468,7 @@ export const plansDocument = graphql(`
           quantityPer
         }
       }
-      entitlements {
+      entitlements: ents {
         concurrency {
           limit
         }

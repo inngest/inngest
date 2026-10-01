@@ -257,7 +257,7 @@ export const NewCodeBlock = ({
               <Pill
                 kind={header?.status === 'error' ? 'error' : 'default'}
                 appearance="outlined"
-                className="my-2 overflow-x-auto rounded-full p-3"
+                className="my-2 rounded-full p-3"
               >
                 <OptionalTooltip
                   tooltip={header.title.length && header.title.length > 55 ? header.title : ''}

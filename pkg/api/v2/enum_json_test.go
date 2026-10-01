@@ -100,6 +100,15 @@ func TestResponseEnumMarshalerShortensStreamResults(t *testing.T) {
 	require.Equal(t, "application/x-ndjson", marshaler.(interface{ StreamContentType(any) string }).StreamContentType(response))
 }
 
+func TestResponseEnumMarshalerShortensSandboxSnapshotStatus(t *testing.T) {
+	marshaler := newResponseEnumMarshaler()
+	data, err := marshaler.Marshal(&apiv2.GetSandboxSnapshotResponse{
+		Data: &apiv2.SandboxSnapshot{Status: apiv2.SandboxSnapshotStatus_SANDBOX_SNAPSHOT_STATUS_READY},
+	})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"data":{"status":"READY"}}`, string(data))
+}
+
 func TestResponseEnumMarshalerReturnsMarshalErrors(t *testing.T) {
 	marshaler := newResponseEnumMarshaler()
 

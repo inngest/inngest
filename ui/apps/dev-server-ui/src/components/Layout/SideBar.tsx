@@ -1,5 +1,6 @@
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { MCPIcon } from '@inngest/components/icons/sections/AI';
+import { SandboxesIcon } from '@inngest/components/icons/sections/Sandboxes';
 import { EnvironmentMenu } from '../Navigation/Environments';
 import { Help } from '../Navigation/Help';
 import Manage from '../Navigation/Manage';
@@ -26,6 +27,12 @@ export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
           <EnvironmentMenu collapsed={collapsed} />
           <Monitor collapsed={collapsed} />
           <Manage collapsed={collapsed} />
+          <MenuItem
+            href="/sandboxes"
+            collapsed={collapsed}
+            text="Sandboxes"
+            icon={<SandboxesIcon className="h-[18px] w-[18px]" />}
+          />
         </div>
 
         <div>

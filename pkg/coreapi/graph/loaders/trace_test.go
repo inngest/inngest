@@ -72,6 +72,18 @@ func TestRunTraceEnded(t *testing.T) {
 	}
 }
 
+func TestConvertRunSpanToGQL_CustomConcurrencyKeys(t *testing.T) {
+	keys := []meta.CustomConcurrencyKey{{Scope: "fn", Expression: "event.data.customer", Value: "customer-a"}}
+	span := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+		Attributes:  &meta.ExtractedValues{CustomConcurrencyKeys: &keys},
+	}
+
+	result, err := (&traceReader{}).convertRunSpanToGQL(context.Background(), span)
+	require.NoError(t, err)
+	assert.Equal(t, keys, result.CustomConcurrencyKeys)
+}
+
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 	tr := &traceReader{}
 	ctx := context.Background()
