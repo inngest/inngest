@@ -1,0 +1,26 @@
+{
+  "sql": "WITH x AS (SELECT run_id FROM inngest.insights_runs(?, ?) AS runs) SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE EXISTS (SELECT run_id FROM x WHERE x.run_id = runs.run_id) LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    3
+  ],
+  "diagnostics": [
+    {
+      "start": "1:37",
+      "end": "1:125",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

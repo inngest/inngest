@@ -1,0 +1,1 @@
+SELECT t.unnest FROM runs, UNNEST(run_id) AS t

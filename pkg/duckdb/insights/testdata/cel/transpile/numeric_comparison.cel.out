@@ -1,0 +1,14 @@
+INPUT
+output.count >= 3
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+(TRY_CAST((output::JSON->>?) AS DOUBLE) >= ?)
+
+OUTPUT ARGS
+[$.data.count 3]

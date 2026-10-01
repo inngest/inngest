@@ -1,0 +1,14 @@
+INPUT
+event.name == "x" || output.ok == true
+
+EVENT SQL
+
+
+EVENT ARGS
+[]
+
+OUTPUT SQL
+(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))
+
+OUTPUT ARGS
+[$.name x $.data.ok true]

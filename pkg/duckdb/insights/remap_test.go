@@ -1,0 +1,76 @@
+package insights
+
+import (
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/stretchr/testify/require"
+)
+
+var (
+	testAccountID = uuid.MustParse("00000000-0000-4000-a000-000000000000")
+	testEnvID     = uuid.MustParse("00000000-0000-4000-b000-000000000000")
+)
+
+func TestRemapTablesBareTable(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Equal(t, []any{testAccountID.String(), testEnvID.String()}, args)
+	require.Equal(t,
+		"SELECT run_id FROM inngest.insights_runs(?, ?) AS runs",
+		parser.String(stmt),
+	)
+}
+
+func TestRemapTablesPreservesExplicitAlias(t *testing.T) {
+	stmt := mustParse(t, "SELECT r.run_id FROM runs r")
+	remapTables(stmt, testAccountID, testEnvID)
+
+	require.Equal(t,
+		"SELECT r.run_id FROM inngest.insights_runs(?, ?) AS r",
+		parser.String(stmt),
+	)
+}
+
+func TestRemapTablesJoinRewritesBothSides(t *testing.T) {
+	stmt := mustParse(t, "SELECT * FROM runs JOIN events ON runs.run_id = events.id")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Equal(t, []any{testAccountID.String(), testEnvID.String(), testAccountID.String(), testEnvID.String()}, args)
+	require.Equal(t,
+		"SELECT * FROM inngest.insights_runs(?, ?) AS runs INNER JOIN inngest.insights_events(?, ?) AS events ON runs.run_id = events.id",
+		parser.String(stmt),
+	)
+}
+
+func TestRemapTablesUnion(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs UNION SELECT run_id FROM extended_trace_spans")
+	args := remapTables(stmt, testAccountID, testEnvID)
+	require.Equal(t, []any{testAccountID.String(), testEnvID.String(), testAccountID.String(), testEnvID.String()}, args)
+}
+
+func TestRemapTablesInQuantifiedSubquery(t *testing.T) {
+	// Tenant scoping must reach a subquery under = ANY exactly as it
+	// reaches one under IN.
+	stmt := mustParse(t, "SELECT run_id FROM runs WHERE run_id = ANY (SELECT id FROM events)")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Equal(t, []any{testAccountID.String(), testEnvID.String(), testAccountID.String(), testEnvID.String()}, args)
+	require.Equal(t,
+		"SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE run_id = ANY (SELECT id FROM inngest.insights_events(?, ?) AS events)",
+		parser.String(stmt),
+	)
+}
+
+func TestRemapTablesRewritesSetOpModifierSubqueries(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id FROM runs UNION ALL SELECT run_id FROM runs ORDER BY (SELECT max(id) FROM events) LIMIT 5 OFFSET (SELECT count(*) FROM runs)")
+	args := remapTables(stmt, testAccountID, testEnvID)
+
+	require.Len(t, args, 8)
+	require.Equal(t,
+		"SELECT run_id FROM inngest.insights_runs(?, ?) AS runs UNION ALL SELECT run_id FROM inngest.insights_runs(?, ?) AS runs ORDER BY (SELECT max(id) FROM inngest.insights_events(?, ?) AS events) LIMIT 5 OFFSET (SELECT count(*) FROM inngest.insights_runs(?, ?) AS runs)",
+		parser.String(stmt),
+	)
+}
