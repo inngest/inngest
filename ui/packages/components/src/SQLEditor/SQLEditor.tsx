@@ -5,7 +5,7 @@ import type { editor } from 'monaco-editor';
 import { EDITOR_OPTIONS } from './constants';
 import { useMonacoWithTheme } from './hooks/useMonacoWithTheme';
 import { useSQLCompletions } from './hooks/useSQLCompletions';
-import { useSQLFormatter } from './hooks/useSQLFormatter';
+import { useSQLFormatter, type SQLFormatterDialect } from './hooks/useSQLFormatter';
 import type { SQLCompletionConfig } from './types';
 
 export type SQLEditorMountCallback = (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => void;
@@ -17,16 +17,24 @@ export type SQLEditorModel = editor.ITextModel;
 export type SQLEditorProps = {
   completionConfig: SQLCompletionConfig;
   content: string;
+  dialect?: SQLFormatterDialect;
   onChange: (value: string) => void;
   onMount?: SQLEditorMountCallback;
 };
 
-export function SQLEditor({ completionConfig, content, onChange, onMount }: SQLEditorProps) {
+export function SQLEditor({
+  completionConfig,
+  content,
+  dialect,
+  onChange,
+  onMount,
+}: SQLEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   useMonacoWithTheme(wrapperRef);
-  useSQLCompletions(completionConfig);
-  useSQLFormatter();
+  useSQLCompletions(completionConfig, editorRef);
+  useSQLFormatter(dialect);
 
   const handleContentChange = useCallback(
     (newValue: string | undefined) => {
@@ -37,6 +45,7 @@ export function SQLEditor({ completionConfig, content, onChange, onMount }: SQLE
 
   const handleEditorMount = useCallback(
     (editorInstance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+      editorRef.current = editorInstance;
       onMount?.(editorInstance, monaco);
     },
     [onMount]
