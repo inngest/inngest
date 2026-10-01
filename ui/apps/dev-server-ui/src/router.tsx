@@ -12,7 +12,13 @@ export const getRouter = () => {
     defaultPreload: 'intent',
     defaultErrorComponent: (err) => (
       <div className="w-full flex my-6">
-        <Error message={err.error.message} />
+        <Error
+          message={
+            err.error instanceof globalThis.Error
+              ? err.error.message
+              : String(err.error)
+          }
+        />
       </div>
     ),
     defaultNotFoundComponent: () => <NotFound />,
