@@ -6,6 +6,27 @@ import (
 	apiv2endpoint "github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 )
 
+// GetEventRunsInclude is an internal expansion selected by generated API parsers.
+type GetEventRunsInclude uint8
+
+const (
+	GetEventRunsIncludeOutput GetEventRunsInclude = iota + 1
+)
+
+// GetFunctionRunInclude is an internal expansion selected by generated API parsers.
+type GetFunctionRunInclude uint8
+
+const (
+	GetFunctionRunIncludeOutput GetFunctionRunInclude = iota + 1
+)
+
+// GetFunctionTraceInclude is an internal expansion selected by generated API parsers.
+type GetFunctionTraceInclude uint8
+
+const (
+	GetFunctionTraceIncludeOutput GetFunctionTraceInclude = iota + 1
+)
+
 // ListFunctionRunsInclude is an internal expansion selected by generated API parsers.
 type ListFunctionRunsInclude uint8
 
@@ -21,6 +42,18 @@ const (
 	ListRunsIncludeDeferredFrom ListRunsInclude = iota + 1
 	ListRunsIncludeOutput
 )
+
+var getEventRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]GetEventRunsInclude{
+	"output": GetEventRunsIncludeOutput,
+})
+
+var getFunctionRunIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]GetFunctionRunInclude{
+	"output": GetFunctionRunIncludeOutput,
+})
+
+var getFunctionTraceIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]GetFunctionTraceInclude{
+	"output": GetFunctionTraceIncludeOutput,
+})
 
 var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListFunctionRunsInclude{
 	"deferredFrom":  ListFunctionRunsIncludeDeferredFrom,
