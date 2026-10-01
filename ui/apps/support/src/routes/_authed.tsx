@@ -17,12 +17,14 @@ export const Route = createFileRoute("/_authed")({
   },
 
   errorComponent: (props) => {
-    if (props.error.message === "Not authenticated") {
+    const message =
+      props.error instanceof Error ? props.error.message : String(props.error);
+    if (message === "Not authenticated") {
       return "not authenticated";
     }
     console.error(props.error);
 
-    return <div>{props.error.message}</div>;
+    return <div>{message}</div>;
   },
 });
 

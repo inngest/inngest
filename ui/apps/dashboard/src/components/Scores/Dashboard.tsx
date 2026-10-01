@@ -66,8 +66,10 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
 
-  // `loadedAt` bumps on router.invalidate(), so RefreshButton refires queries.
-  const loadedAt = useRouterState({ select: (s) => s.loadedAt });
+  // `updatedAt` bumps on router.invalidate(), so RefreshButton refires queries.
+  const updatedAt = useRouterState({
+    select: (s) => s.matches.at(-1)?.updatedAt,
+  });
 
   // Stabilize range against the raw URL params so a fresh `now` doesn't
   // refire queries on every render.
@@ -78,7 +80,7 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     const to = new Date();
     const dur = parsedDuration || DEFAULT_DURATION;
     return { from: subtractDuration(to, dur), to };
-  }, [start, end, duration, loadedAt]);
+  }, [start, end, duration, updatedAt]);
 
   const timeRange = useMemo(
     () => ({ from: range.from.toISOString(), to: range.to.toISOString() }),

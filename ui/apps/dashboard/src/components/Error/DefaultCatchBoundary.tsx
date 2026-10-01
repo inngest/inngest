@@ -15,14 +15,17 @@ function DefaultCatchBoundary({ error }: ErrorComponentProps) {
   });
   const status = useSystemStatus();
 
-  console.error(error.message);
+  const message =
+    error instanceof globalThis.Error ? error.message : String(error);
 
-  const authError = error.message.includes('UNAUTHENTICATED');
+  console.error(message);
+
+  const authError = message.includes('UNAUTHENTICATED');
 
   return (
     <div className="flex flex-col justify-start items-start gap">
       <StatusBanner status={status} />
-      <Error message={error.message} />
+      <Error message={message} />
 
       <div className="flex gap-2 justif-start items-center flex-wrap mx-4">
         <Button
