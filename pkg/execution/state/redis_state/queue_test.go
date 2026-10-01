@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -2265,30 +2264,6 @@ func partitionIsMissingInHash(t *testing.T, r *miniredis.Miniredis, pType enums.
 	val, err := r.HKeys(kg.PartitionItem())
 	require.NoError(t, err)
 	require.NotContains(t, val, key, "expected partition to be missing")
-}
-
-func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionType, id uuid.UUID, optionalHash ...string) osqueue.QueuePartition {
-	t.Helper()
-	hash := ""
-	if len(optionalHash) > 0 {
-		hash = optionalHash[0]
-	}
-	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-
-	key := kg.PartitionQueueSet(pType, id.String(), hash)
-	if pType == enums.PartitionTypeDefault {
-		key = id.String()
-	}
-
-	val := r.HGet(kg.PartitionItem(), key)
-
-	items, _ := r.HKeys(kg.PartitionItem())
-
-	require.NotEmpty(t, val, "couldn't find partition in map with key:\n--> %s\nhave:\n%v", key, strings.Join(items, "\n"))
-	qp := osqueue.QueuePartition{}
-	err := json.Unmarshal([]byte(val), &qp)
-	require.NoError(t, err)
-	return qp
 }
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item osqueue.QueueItem, expected time.Time) {
