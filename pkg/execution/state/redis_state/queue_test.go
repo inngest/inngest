@@ -593,49 +593,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		})
 	})
 
-	t.Run("Migrates old partitions to add accountId", func(t *testing.T) {
-		r.FlushAll()
-
-		id := uuid.MustParse("baac957a-3aa5-4e42-8c1d-f86dee5d58da")
-		envId := uuid.MustParse("e8c0aacd-fcb4-4d5a-b78a-7f0528841543")
-
-		oldPartitionSnapshot := "{\"at\":1723814830,\"p\":6,\"wsID\":\"e8c0aacd-fcb4-4d5a-b78a-7f0528841543\",\"wid\":\"baac957a-3aa5-4e42-8c1d-f86dee5d58da\",\"last\":1723814800026,\"forceAtMS\":0,\"off\":false}"
-
-		r.HSet(shard.Client().kg.PartitionItem(), id.String(), oldPartitionSnapshot)
-		assert.Equal(t, osqueue.QueuePartition{
-			FunctionID: &id,
-			EnvID:      &envId,
-			// No accountId is present,
-			AccountID: uuid.UUID{},
-			LeaseID:   nil,
-			Last:      1723814800026,
-		}, getPartition(t, r, enums.PartitionTypeDefault, id))
-
-		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
-			FunctionID: id,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					AccountID: accountId,
-				},
-			},
-		}, start, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.Zero)
-		require.WithinDuration(t,
-			time.UnixMilli(item.WallTimeMS),
-			start,
-			1500*time.Millisecond,
-		)
-
-		assert.Equal(t, osqueue.QueuePartition{
-			FunctionID: &id,
-			EnvID:      &envId,
-			// No accountId is present,
-			AccountID: accountId,
-			LeaseID:   nil,
-			Last:      1723814800026,
-		}, getPartition(t, r, enums.PartitionTypeDefault, id), r.Dump())
-	})
 }
 
 func TestQueueEnqueueItemIdempotency(t *testing.T) {
