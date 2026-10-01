@@ -683,6 +683,27 @@ func (p *captureProducer) RequeueByJobID(context.Context, queue.Scope, string, s
 	return nil
 }
 
+func TestEnqueueHealthCheckWorkspaceID(t *testing.T) {
+	ctx := context.Background()
+	for _, workspaceID := range []uuid.UUID{uuid.New(), uuid.Nil} {
+		t.Run(workspaceID.String(), func(t *testing.T) {
+			producer := &captureProducer{}
+			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx))
+			item := CronItem{
+				WorkspaceID: workspaceID,
+				Op:          enums.CronHealthCheck,
+			}
+
+			require.NoError(t, mgr.EnqueueHealthCheck(ctx, item))
+			require.Equal(t, workspaceID, producer.item.WorkspaceID)
+			require.Equal(t, item, producer.item.Payload)
+			require.Equal(t, queue.KindCronHealthCheck, producer.item.Kind)
+			require.NotNil(t, producer.item.QueueName)
+			require.Equal(t, queue.KindCronHealthCheck, *producer.item.QueueName)
+		})
+	}
+}
+
 func TestScheduleNextQueueName(t *testing.T) {
 	ctx := context.Background()
 	accountID := uuid.New()
