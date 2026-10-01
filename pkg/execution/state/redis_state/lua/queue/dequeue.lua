@@ -43,21 +43,16 @@ local accountID      = ARGV[4]
 local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
 
--- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
 
---
--- Fetch this item to see if it was in progress prior to deleting.
-local item = get_queue_item(keyQueueMap, queueID)
-if item == nil then
+if redis.call("HDEL", keyQueueMap, queueID) == 0 then
 	return 1
 end
 
-redis.call("HDEL", keyQueueMap, queueID)
 redis.call("DEL", keyEarliestPeekTime)
 
 -- TODO Are these calls safe? Should we check for present keys?
