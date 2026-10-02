@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -99,11 +100,27 @@ func (b *Bridge) routes() {
 	// Derive the allowlist from the public API contract, including snapshots
 	// and streaming routes. No other Cloud API is exposed through this bridge.
 	for _, endpoint := range apiv2endpoint.Discover() {
-		if strings.HasPrefix(endpoint.AuthzPermission, "sandboxes:") {
+		if strings.HasPrefix(endpoint.AuthzPermission, "sandboxes:") || strings.HasPrefix(endpoint.AuthzPermission, "images:") {
+			if strings.Contains(endpoint.Path, "{name=**}") {
+				continue // Multi-segment image names use the validated routes below.
+			}
 			for _, prefix := range []string{"/v2", "/api/v2"} {
 				r.MethodFunc(endpoint.HTTPMethod, prefix+endpoint.Path, b.proxy)
 			}
 		}
+	}
+	imageName := `(?:inngest/)?[a-z0-9][a-z0-9._-]{0,62}`
+	inspect := regexp.MustCompile(`^/images/` + imageName + `$`)
+	tag := regexp.MustCompile(`^/images/` + imageName + `/tags/[a-z0-9][a-z0-9._-]{0,127}$`)
+	for _, prefix := range []string{"/v2", "/api/v2"} {
+		r.HandleFunc(prefix+"/images/*", func(w http.ResponseWriter, req *http.Request) {
+			path := strings.TrimPrefix(strings.TrimPrefix(req.URL.Path, "/api"), "/v2")
+			if (req.Method == http.MethodGet && inspect.MatchString(path)) || ((req.Method == http.MethodPut || req.Method == http.MethodDelete) && tag.MatchString(path)) {
+				b.proxy(w, req)
+				return
+			}
+			http.NotFound(w, req)
+		})
 	}
 	b.router = r
 }
@@ -130,7 +147,7 @@ func (b *Bridge) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reject escaped separators/dot paths rather than allowing the upstream
 	// router to normalize an allowlisted URL into another API.
-	if r.URL.RawPath != "" || strings.Contains(r.URL.Path, "..") {
+	if r.URL.RawPath != "" || hasDotSegment(r.URL.Path) {
 		writeError(w, http.StatusBadRequest, "invalid_path", "Invalid sandbox API path")
 		return
 	}
@@ -325,4 +342,13 @@ func writeError(w http.ResponseWriter, code int, name, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]any{"errors": []map[string]string{{"code": name, "message": message}}})
+}
+
+func hasDotSegment(path string) bool {
+	for _, part := range strings.Split(path, "/") {
+		if part == "." || part == ".." {
+			return true
+		}
+	}
+	return false
 }

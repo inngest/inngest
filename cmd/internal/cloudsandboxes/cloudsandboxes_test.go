@@ -114,15 +114,15 @@ func TestAllSandboxRoutesAndHeaderIsolation(t *testing.T) {
 	})
 	// Exercise real chi mounts as well as every sandbox route from the proto.
 	mux := chi.NewRouter()
-	for _, prefix := range []string{"/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots"} {
+	for _, prefix := range []string{"/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots", "/v2/images", "/v2/image-uploads", "/v2/image-builds", "/v2/image-usage", "/api/v2/images", "/api/v2/image-uploads", "/api/v2/image-builds", "/api/v2/image-usage"} {
 		mux.Mount(prefix, b)
 	}
 	for _, endpoint := range apiv2endpoint.Discover() {
-		if !strings.HasPrefix(endpoint.AuthzPermission, "sandboxes:") {
+		if !strings.HasPrefix(endpoint.AuthzPermission, "sandboxes:") && !strings.HasPrefix(endpoint.AuthzPermission, "images:") {
 			continue
 		}
 		for _, prefix := range []string{"/v2", "/api/v2"} {
-			p := endpoint.Path
+			p := strings.ReplaceAll(endpoint.Path, "{name=**}", "inngest/image")
 			for _, param := range endpoint.PathParams {
 				p = strings.ReplaceAll(p, "{"+param+"}", sandboxID)
 			}

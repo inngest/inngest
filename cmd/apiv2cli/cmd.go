@@ -628,6 +628,17 @@ func resolvePath(cmd *cli.Command, ep endpoint) (string, error) {
 			return match
 		}
 
+		if len(parts) > 2 && parts[2] == "=**" {
+			segments := strings.Split(value, "/")
+			for i, segment := range segments {
+				if segment == "" || segment == "." || segment == ".." {
+					firstErr = fmt.Errorf("invalid multi-segment --%s", flagName)
+					return match
+				}
+				segments[i] = url.PathEscape(segment)
+			}
+			return strings.Join(segments, "/")
+		}
 		return url.PathEscape(value)
 	})
 
