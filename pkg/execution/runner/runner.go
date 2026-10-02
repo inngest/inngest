@@ -308,7 +308,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		if trace, ok := m.Metadata[consts.OtelPropagationKey]; ok {
 			carrier := itrace.NewTraceCarrier()
 			if err := carrier.Unmarshal(trace); err == nil {
-				ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+				ctx = itrace.Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
 			}
 		}
 	}

@@ -45,7 +45,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -1295,7 +1294,7 @@ func (e *executor) schedule(
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 	// function run spanID
-	spanID := run.NewSpanID(ctx)
+	spanID := tracing.IDGenerator.NewSpanID(ctx, trace.TraceID{})
 
 	cfg := sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
@@ -1341,7 +1340,7 @@ func (e *executor) schedule(
 	}
 
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
 
 	// Event lifecycles that run after scheduling should observe the fully
@@ -5273,12 +5272,12 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	opcode := gen.Op.String()
 	now := e.now()
 
-	sid := run.NewSpanID(ctx)
+	sid := tracing.IDGenerator.NewSpanID(ctx, trace.TraceID{})
 	carrier := itrace.NewTraceCarrier(
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Default to failing if there's a conflict
 	shouldReplaceSignalOnConflict := false
@@ -5474,14 +5473,14 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	opcode := gen.Op.String()
 	now := e.now()
 
-	sid := run.NewSpanID(ctx)
+	sid := tracing.IDGenerator.NewSpanID(ctx, trace.TraceID{})
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := itrace.NewTraceCarrier(
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Always create an invocation event.
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
@@ -5737,14 +5736,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	opcode := gen.Op.String()
 	now := e.now()
 
-	sid := run.NewSpanID(ctx)
+	sid := tracing.IDGenerator.NewSpanID(ctx, trace.TraceID{})
 	// NOTE: the context here still contains the execSpan's traceID & spanID,
 	// which is what we want because that's the parent that needs to be referenced later on
 	carrier := itrace.NewTraceCarrier(
 		itrace.WithTraceCarrierTimestamp(now),
 		itrace.WithTraceCarrierSpanID(&sid),
 	)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+	itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// SDK-based event coordination is called both when an event is received
 	// OR on timeout, depending on which happens first.  Both routes consume
@@ -5992,39 +5991,13 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		opts = &execution.BatchExecOpts{}
 	}
 
-	evtIDs := make([]string, len(evtList))
 	events := make([]event.TrackedEvent, len(evtList))
 	for i, e := range evtList {
 		events[i] = e
-		evtIDs[i] = e.GetInternalID().String()
-	}
-
-	// root span for scheduling a batch
-	ctx, span := run.NewSpan(ctx,
-		run.WithScope(consts.OtelScopeBatch),
-		run.WithName(consts.OtelSpanBatch),
-		run.WithNewRoot(),
-		run.WithSpanAttributes(
-			attribute.String(consts.OtelSysAccountID, payload.AccountID.String()),
-			attribute.String(consts.OtelSysWorkspaceID, payload.WorkspaceID.String()),
-			attribute.String(consts.OtelSysAppID, payload.AppID.String()),
-			attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
-			attribute.String(consts.OtelSysBatchID, payload.BatchID.String()),
-			attribute.String(consts.OtelSysEventIDs, strings.Join(evtIDs, ",")),
-		))
-	defer span.End()
-
-	// still process events in case the user disables batching while a batch is still in-flight
-	if fn.EventBatch != nil {
-		if len(events) == fn.EventBatch.MaxSize {
-			span.SetAttributes(attribute.Bool(consts.OtelSysBatchFull, true))
-		} else {
-			span.SetAttributes(attribute.Bool(consts.OtelSysBatchTimeout, true))
-		}
 	}
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
-	_, md, err := e.Schedule(ctx, execution.ScheduleRequest{
+	_, _, err = e.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:        payload.AccountID,
 		WorkspaceID:      payload.WorkspaceID,
 		AppID:            payload.AppID,
@@ -6067,13 +6040,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	if errors.Is(err, queue.ErrQueueItemExists) ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return err
 	}
 
@@ -6085,10 +6055,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 			"account_id":    payload.AccountID.String(),
 		},
 	})
-
-	if md != nil {
-		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
-	}
 
 	return nil
 }
@@ -6233,7 +6199,7 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 		// NOTE:
 		// this gymastics happens because the carrier stores the spanID separately.
 		// it probably can be simplified
-		tmp := itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
+		tmp := itrace.Propagator().Extract(ctx, propagation.MapCarrier(fntrace.Context))
 		spanID, err := md.Config.GetSpanID()
 		if err != nil {
 			return ctx

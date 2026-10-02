@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -25,9 +24,6 @@ import (
 
 func TestConstraintEnforcement(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
-
-	// Instantiate the user tracer singleton, for some reason we will run into race conditions otherwise
-	trace.UserTracer()
 
 	type deps struct {
 		cm    constraintapi.CapacityManager

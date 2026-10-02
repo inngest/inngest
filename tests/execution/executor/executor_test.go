@@ -30,7 +30,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -126,7 +125,6 @@ func newFakeQueue(q queue.Queue) *fakeQueue {
 
 func TestScheduleRaceCondition(t *testing.T) {
 	ctx := context.Background()
-	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
 	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
@@ -291,7 +289,6 @@ func TestScheduleRaceCondition(t *testing.T) {
 }
 
 func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
-	_ = trace.UserTracer()
 	ctx := context.Background()
 
 	work := make(chan *hookData)
@@ -466,7 +463,6 @@ func TestFinalize(t *testing.T) {
 	t.Skip("this is flaky but helpful to understand finalize behavior")
 
 	ctx := context.Background()
-	_ = trace.UserTracer()
 	work := make(chan *hookData)
 
 	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
@@ -1696,7 +1692,6 @@ func TestExecutorScheduleBacklogSizeLimit(t *testing.T) {
 
 func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 	ctx := context.Background()
-	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
 	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})
@@ -1814,7 +1809,6 @@ func TestScheduleSkipsCancelOnPauseWhenExpressionFalse(t *testing.T) {
 
 func TestScheduleCreatesCancelOnPauseWhenExpressionTrue(t *testing.T) {
 	ctx := context.Background()
-	_ = trace.UserTracer()
 	work := make(chan *hookData, 1)
 
 	db, err := dbsqlite.Open(ctx, dbsqlite.Options{Persist: false, ForTest: true})

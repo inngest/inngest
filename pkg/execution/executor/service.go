@@ -28,12 +28,10 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
@@ -202,7 +200,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 				}
 
 				carrier := itrace.NewTraceCarrier()
-				itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+				itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 				err = pb.Publish(
 					ctx,
@@ -473,20 +471,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				return err
 			}
 
-			ctx, span := run.NewSpan(ctx,
-				run.WithScope(consts.OtelScopeDebounce),
-				run.WithName(consts.OtelSpanDebounce),
-				run.WithSpanAttributes(
-					attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
-					attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
-					attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
-					attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
-					attribute.Bool(consts.OtelSysDebounceTimeout, true),
-				),
-			)
-			defer span.End()
-
-			_, md, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
+			_, _, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
 				Function:         f,
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
@@ -507,8 +492,6 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			})
 
 			if err != nil {
-				span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-
 				// If no run was scheduled, clean up debounce item
 				if errors.Is(err, state.ErrIdentifierExists) ||
 					errors.Is(err, ErrFunctionSkipped) ||
@@ -520,10 +503,6 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 					continue
 				}
 				return err
-			}
-
-			if md != nil {
-				span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
 			}
 
 			if err := s.debouncer.DeleteDebounceItem(ctx, scope, d.DebounceID, *di); err != nil {
@@ -1103,21 +1082,6 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 			l.Error("error publishing cron event", "error", err)
 		}
 	}(ctx)
-
-	ctx, span := run.NewSpan(ctx,
-		run.WithNewRoot(),
-		run.WithName(consts.OtelSpanCron),
-		run.WithScope(consts.OtelScopeCron),
-		run.WithSpanAttributes(
-			attribute.String(consts.OtelSysFunctionID, conf.ID.String()),
-			attribute.Int(consts.OtelSysFunctionVersion, conf.FunctionVersion),
-			attribute.String(consts.OtelSysEventIDs, evt.GetEvent().ID),
-			attribute.String(consts.OtelSysCronExpr, ci.Expression),
-			attribute.Int64(consts.OtelSysCronTimestamp, scheduledAt.UnixMilli()),
-			attribute.Int64(consts.OtelSysCronFireAt, fireAt.UnixMilli()),
-		),
-	)
-	defer span.End()
 
 	// NOTE
 	// should this also handle batching and rate limit like runner.initialize?

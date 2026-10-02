@@ -41,9 +41,6 @@ const (
 )
 
 var (
-	userTracer Tracer
-	onceUser   sync.Once
-
 	systemTracer Tracer
 	onceSystem   sync.Once
 )
@@ -117,33 +114,6 @@ func (o TracerOpts) MaxPayloadSizeBytes() int {
 	}
 
 	return (consts.AbsoluteMaxEventSize + consts.MaxSDKResponseBodySize) * 2
-}
-
-func NewUserTracer(ctx context.Context, opts TracerOpts) error {
-	var err error
-	onceUser.Do(func() {
-		userTracer, err = newTracer(ctx, opts)
-	})
-	return err
-}
-
-func UserTracer() Tracer {
-	if userTracer == nil {
-		if err := NewUserTracer(context.Background(), TracerOpts{
-			ServiceName: "default",
-			Type:        TracerTypeNoop,
-		}); err != nil {
-			panic("fail to setup default user tracer")
-		}
-	}
-	return userTracer
-}
-
-func CloseUserTracer(ctx context.Context) error {
-	if userTracer != nil {
-		userTracer.Shutdown(ctx)
-	}
-	return nil
 }
 
 func NewSystemTracer(ctx context.Context, opts TracerOpts) error {
@@ -223,7 +193,7 @@ func HeadersFromTraceState(
 	})
 
 	newCtx := oteltrace.ContextWithSpanContext(ctx, lsc)
-	UserTracer().Propagator().Inject(newCtx, propagation.MapCarrier(headers))
+	Propagator().Inject(newCtx, propagation.MapCarrier(headers))
 
 	if headers["traceparent"] != "" {
 		// The span ID will be incorrect here as lifecycles can not affect the
@@ -283,7 +253,7 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 
 	otel.SetTracerProvider(tracer.Provider())
 	otel.SetTextMapPropagator(
-		newTextMapPropagator(),
+		Propagator(),
 	)
 
 	return func() {
@@ -328,7 +298,7 @@ func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error
 	)
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
@@ -357,7 +327,7 @@ func newIOTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = exp.Shutdown(ctx)
@@ -376,7 +346,7 @@ func newNoopTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 	)
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		shutdown:   func(ctx context.Context) {},
 	}, nil
 }
@@ -407,7 +377,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
@@ -454,7 +424,7 @@ func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
@@ -474,7 +444,9 @@ func jaegerExporter() (trace.SpanExporter, error) {
 	return exp, nil
 }
 
-func newTextMapPropagator() propagation.TextMapPropagator {
+// Propagator returns the shared context propagation contract used across
+// transport boundaries. It does not initialize or depend on a tracer provider.
+func Propagator() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -533,7 +505,7 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)
@@ -594,7 +566,7 @@ func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error)
 
 	return &tracer{
 		provider:   tp,
-		propagator: newTextMapPropagator(),
+		propagator: Propagator(),
 		processor:  sp,
 		shutdown: func(ctx context.Context) {
 			_ = tp.ForceFlush(ctx)

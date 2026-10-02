@@ -21,7 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -194,7 +193,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Create a new trace that may have a link to a previous one
-	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+	ctx = itrace.Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
@@ -254,15 +253,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				sessionsMetrics.Nulling,
 				metrics.CounterOpt{PkgName: metricsPkgName},
 			)
-
-			ctx, span := itrace.UserTracer().Provider().
-				Tracer(consts.OtelScopeEvent).
-				Start(ctx, consts.OtelSpanEvent,
-					trace.WithTimestamp(ts),
-					trace.WithNewRoot(),
-					trace.WithLinks(trace.LinkFromContext(ctx)),
-				)
-			defer span.End()
 
 			seed := event.SeededIDFromString(
 				r.Header.Get(headers.HeaderEventIDSeed),

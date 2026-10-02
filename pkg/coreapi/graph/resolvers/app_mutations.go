@@ -17,10 +17,8 @@ import (
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error) {
@@ -131,16 +129,6 @@ func (r *mutationResolver) InvokeFunction(
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
 	})
-
-	ctx, span := run.NewSpan(ctx,
-		run.WithName(consts.OtelSpanInvoke),
-		run.WithScope(consts.OtelScopeInvoke),
-		run.WithNewRoot(),
-		run.WithSpanAttributes(
-			attribute.String(consts.OtelSysFunctionSlug, functionSlug),
-		),
-	)
-	defer span.End()
 
 	sent := false
 	_, err = r.EventHandler(ctx, &evt.Event, nil)

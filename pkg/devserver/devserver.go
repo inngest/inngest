@@ -70,7 +70,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
@@ -534,7 +533,6 @@ func start(ctx context.Context, opts StartOpts) error {
 					Pb:         pb,
 					EventTopic: opts.Config.EventStream.Service.Concrete.TopicName(),
 				},
-				run.NewTraceLifecycleListener(nil),
 			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
@@ -870,7 +868,7 @@ func getInvokeEventHandler(ctx context.Context, pb pubsub.Publisher, topic strin
 		}
 
 		carrier := itrace.NewTraceCarrier()
-		itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+		itrace.Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 		err = pb.Publish(
 			ctx,
