@@ -2117,10 +2117,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// we're now done with this execution.
 			return nil, nil
 		}
-		// After the sleep, we start a new step.  This means we also want to start a new
-		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
-		// scheduled in this executor run)
-		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
 	_, span := e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)

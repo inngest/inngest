@@ -15,6 +15,7 @@ func WithGroupID(ctx context.Context, groupID string) context.Context {
 
 // GroupIDFromContext returns the group ID given the current context, or an
 // empty string if there's no group ID.
+// It currently has no callers in this repository and is retained for future use.
 func GroupIDFromContext(ctx context.Context) string {
 	str, _ := ctx.Value(groupCtxVal).(string)
 	return str
