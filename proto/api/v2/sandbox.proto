@@ -69,6 +69,10 @@ message Sandbox {
   optional google.protobuf.Timestamp started_at = 8;
   optional google.protobuf.Timestamp ended_at = 9;
   optional string error = 10;
+  string image_digest = 11;
+  reserved 12;
+  string image_startup_mode = 13;
+  string resolved_image_ref = 14;
 }
 
 message CreateSandboxResponse {
@@ -99,6 +103,21 @@ message CreateSandboxRequest {
   // and its name reused. Values are fetched at launch and may remain in the guest
   // and its snapshots. Cannot be supplied with snapshot_id.
   repeated string secrets = 6;
+  // Workspace image or official image, namespace/name[:tag] or @sha256:digest.
+  // Cannot be supplied with snapshot_id. Omission selects the platform default.
+  optional string image = 7;
+  SandboxImageOptions image_options = 8;
+}
+
+message SandboxImageCommand { repeated string argv = 1; }
+message SandboxImageOptions {
+  // idle (default) keeps the sandbox alive for SDK commands. image starts the
+  // resolved ENTRYPOINT + CMD and ends the sandbox when that process exits.
+  string startup_mode = 1;
+  optional string user = 2;
+  optional string working_dir = 3;
+  SandboxImageCommand entrypoint = 4;
+  SandboxImageCommand cmd = 5;
 }
 
 message ListSandboxesRequest {

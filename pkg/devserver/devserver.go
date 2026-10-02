@@ -772,7 +772,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	if opts.CloudSandboxes != nil {
-		for _, path := range []string{"/dev/cloud", "/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots"} {
+		for _, path := range []string{"/dev/cloud", "/v2/sandboxes", "/v2/snapshots", "/api/v2/sandboxes", "/api/v2/snapshots", "/v2/images", "/v2/image-uploads", "/v2/image-builds", "/v2/image-usage", "/api/v2/images", "/api/v2/image-uploads", "/api/v2/image-builds", "/api/v2/image-usage"} {
 			mounts = append(mounts, api.Mount{At: path, Handler: opts.CloudSandboxes})
 		}
 	}

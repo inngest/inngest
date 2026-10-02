@@ -34,6 +34,26 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// V2GetImageProcedure is the fully-qualified name of the V2's GetImage RPC.
+	V2GetImageProcedure = "/api.v2.V2/GetImage"
+	// V2ListImagesProcedure is the fully-qualified name of the V2's ListImages RPC.
+	V2ListImagesProcedure = "/api.v2.V2/ListImages"
+	// V2SetImageTagProcedure is the fully-qualified name of the V2's SetImageTag RPC.
+	V2SetImageTagProcedure = "/api.v2.V2/SetImageTag"
+	// V2DeleteImageTagProcedure is the fully-qualified name of the V2's DeleteImageTag RPC.
+	V2DeleteImageTagProcedure = "/api.v2.V2/DeleteImageTag"
+	// V2PrepareImageUploadProcedure is the fully-qualified name of the V2's PrepareImageUpload RPC.
+	V2PrepareImageUploadProcedure = "/api.v2.V2/PrepareImageUpload"
+	// V2CompleteImageUploadProcedure is the fully-qualified name of the V2's CompleteImageUpload RPC.
+	V2CompleteImageUploadProcedure = "/api.v2.V2/CompleteImageUpload"
+	// V2ListImageBuildsProcedure is the fully-qualified name of the V2's ListImageBuilds RPC.
+	V2ListImageBuildsProcedure = "/api.v2.V2/ListImageBuilds"
+	// V2GetImageBuildProcedure is the fully-qualified name of the V2's GetImageBuild RPC.
+	V2GetImageBuildProcedure = "/api.v2.V2/GetImageBuild"
+	// V2CancelImageBuildProcedure is the fully-qualified name of the V2's CancelImageBuild RPC.
+	V2CancelImageBuildProcedure = "/api.v2.V2/CancelImageBuild"
+	// V2GetImageUsageProcedure is the fully-qualified name of the V2's GetImageUsage RPC.
+	V2GetImageUsageProcedure = "/api.v2.V2/GetImageUsage"
 	// V2HealthProcedure is the fully-qualified name of the V2's Health RPC.
 	V2HealthProcedure = "/api.v2.V2/Health"
 	// V2XSchemaOnlyProcedure is the fully-qualified name of the V2's _SchemaOnly RPC.
@@ -159,6 +179,16 @@ const (
 
 // V2Client is a client for the api.v2.V2 service.
 type V2Client interface {
+	GetImage(context.Context, *connect.Request[v2.GetImageRequest]) (*connect.Response[v2.GetImageResponse], error)
+	ListImages(context.Context, *connect.Request[v2.ListImagesRequest]) (*connect.Response[v2.ListImagesResponse], error)
+	SetImageTag(context.Context, *connect.Request[v2.SetImageTagRequest]) (*connect.Response[v2.SetImageTagResponse], error)
+	DeleteImageTag(context.Context, *connect.Request[v2.DeleteImageTagRequest]) (*connect.Response[v2.DeleteImageTagResponse], error)
+	PrepareImageUpload(context.Context, *connect.Request[v2.PrepareImageUploadRequest]) (*connect.Response[v2.PrepareImageUploadResponse], error)
+	CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.CompleteImageUploadResponse], error)
+	ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error)
+	GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.GetImageBuildResponse], error)
+	CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.CancelImageBuildResponse], error)
+	GetImageUsage(context.Context, *connect.Request[v2.GetImageUsageRequest]) (*connect.Response[v2.GetImageUsageResponse], error)
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
 	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
@@ -232,6 +262,66 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 	baseURL = strings.TrimRight(baseURL, "/")
 	v2Methods := v2.File_api_v2_service_proto.Services().ByName("V2").Methods()
 	return &v2Client{
+		getImage: connect.NewClient[v2.GetImageRequest, v2.GetImageResponse](
+			httpClient,
+			baseURL+V2GetImageProcedure,
+			connect.WithSchema(v2Methods.ByName("GetImage")),
+			connect.WithClientOptions(opts...),
+		),
+		listImages: connect.NewClient[v2.ListImagesRequest, v2.ListImagesResponse](
+			httpClient,
+			baseURL+V2ListImagesProcedure,
+			connect.WithSchema(v2Methods.ByName("ListImages")),
+			connect.WithClientOptions(opts...),
+		),
+		setImageTag: connect.NewClient[v2.SetImageTagRequest, v2.SetImageTagResponse](
+			httpClient,
+			baseURL+V2SetImageTagProcedure,
+			connect.WithSchema(v2Methods.ByName("SetImageTag")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteImageTag: connect.NewClient[v2.DeleteImageTagRequest, v2.DeleteImageTagResponse](
+			httpClient,
+			baseURL+V2DeleteImageTagProcedure,
+			connect.WithSchema(v2Methods.ByName("DeleteImageTag")),
+			connect.WithClientOptions(opts...),
+		),
+		prepareImageUpload: connect.NewClient[v2.PrepareImageUploadRequest, v2.PrepareImageUploadResponse](
+			httpClient,
+			baseURL+V2PrepareImageUploadProcedure,
+			connect.WithSchema(v2Methods.ByName("PrepareImageUpload")),
+			connect.WithClientOptions(opts...),
+		),
+		completeImageUpload: connect.NewClient[v2.CompleteImageUploadRequest, v2.CompleteImageUploadResponse](
+			httpClient,
+			baseURL+V2CompleteImageUploadProcedure,
+			connect.WithSchema(v2Methods.ByName("CompleteImageUpload")),
+			connect.WithClientOptions(opts...),
+		),
+		listImageBuilds: connect.NewClient[v2.ListImageBuildsRequest, v2.ListImageBuildsResponse](
+			httpClient,
+			baseURL+V2ListImageBuildsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListImageBuilds")),
+			connect.WithClientOptions(opts...),
+		),
+		getImageBuild: connect.NewClient[v2.GetImageBuildRequest, v2.GetImageBuildResponse](
+			httpClient,
+			baseURL+V2GetImageBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("GetImageBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelImageBuild: connect.NewClient[v2.CancelImageBuildRequest, v2.CancelImageBuildResponse](
+			httpClient,
+			baseURL+V2CancelImageBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CancelImageBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		getImageUsage: connect.NewClient[v2.GetImageUsageRequest, v2.GetImageUsageResponse](
+			httpClient,
+			baseURL+V2GetImageUsageProcedure,
+			connect.WithSchema(v2Methods.ByName("GetImageUsage")),
+			connect.WithClientOptions(opts...),
+		),
 		health: connect.NewClient[v2.HealthRequest, v2.HealthResponse](
 			httpClient,
 			baseURL+V2HealthProcedure,
@@ -579,6 +669,16 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 
 // v2Client implements V2Client.
 type v2Client struct {
+	getImage                   *connect.Client[v2.GetImageRequest, v2.GetImageResponse]
+	listImages                 *connect.Client[v2.ListImagesRequest, v2.ListImagesResponse]
+	setImageTag                *connect.Client[v2.SetImageTagRequest, v2.SetImageTagResponse]
+	deleteImageTag             *connect.Client[v2.DeleteImageTagRequest, v2.DeleteImageTagResponse]
+	prepareImageUpload         *connect.Client[v2.PrepareImageUploadRequest, v2.PrepareImageUploadResponse]
+	completeImageUpload        *connect.Client[v2.CompleteImageUploadRequest, v2.CompleteImageUploadResponse]
+	listImageBuilds            *connect.Client[v2.ListImageBuildsRequest, v2.ListImageBuildsResponse]
+	getImageBuild              *connect.Client[v2.GetImageBuildRequest, v2.GetImageBuildResponse]
+	cancelImageBuild           *connect.Client[v2.CancelImageBuildRequest, v2.CancelImageBuildResponse]
+	getImageUsage              *connect.Client[v2.GetImageUsageRequest, v2.GetImageUsageResponse]
 	health                     *connect.Client[v2.HealthRequest, v2.HealthResponse]
 	xSchemaOnly                *connect.Client[v2.HealthRequest, v2.ErrorResponse]
 	createPartnerAccount       *connect.Client[v2.CreateAccountRequest, v2.CreateAccountResponse]
@@ -636,6 +736,56 @@ type v2Client struct {
 	listSessionKeys            *connect.Client[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse]
 	listSessions               *connect.Client[v2.ListSessionsRequest, v2.ListSessionsResponse]
 	listSessionRuns            *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
+}
+
+// GetImage calls api.v2.V2.GetImage.
+func (c *v2Client) GetImage(ctx context.Context, req *connect.Request[v2.GetImageRequest]) (*connect.Response[v2.GetImageResponse], error) {
+	return c.getImage.CallUnary(ctx, req)
+}
+
+// ListImages calls api.v2.V2.ListImages.
+func (c *v2Client) ListImages(ctx context.Context, req *connect.Request[v2.ListImagesRequest]) (*connect.Response[v2.ListImagesResponse], error) {
+	return c.listImages.CallUnary(ctx, req)
+}
+
+// SetImageTag calls api.v2.V2.SetImageTag.
+func (c *v2Client) SetImageTag(ctx context.Context, req *connect.Request[v2.SetImageTagRequest]) (*connect.Response[v2.SetImageTagResponse], error) {
+	return c.setImageTag.CallUnary(ctx, req)
+}
+
+// DeleteImageTag calls api.v2.V2.DeleteImageTag.
+func (c *v2Client) DeleteImageTag(ctx context.Context, req *connect.Request[v2.DeleteImageTagRequest]) (*connect.Response[v2.DeleteImageTagResponse], error) {
+	return c.deleteImageTag.CallUnary(ctx, req)
+}
+
+// PrepareImageUpload calls api.v2.V2.PrepareImageUpload.
+func (c *v2Client) PrepareImageUpload(ctx context.Context, req *connect.Request[v2.PrepareImageUploadRequest]) (*connect.Response[v2.PrepareImageUploadResponse], error) {
+	return c.prepareImageUpload.CallUnary(ctx, req)
+}
+
+// CompleteImageUpload calls api.v2.V2.CompleteImageUpload.
+func (c *v2Client) CompleteImageUpload(ctx context.Context, req *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.CompleteImageUploadResponse], error) {
+	return c.completeImageUpload.CallUnary(ctx, req)
+}
+
+// ListImageBuilds calls api.v2.V2.ListImageBuilds.
+func (c *v2Client) ListImageBuilds(ctx context.Context, req *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error) {
+	return c.listImageBuilds.CallUnary(ctx, req)
+}
+
+// GetImageBuild calls api.v2.V2.GetImageBuild.
+func (c *v2Client) GetImageBuild(ctx context.Context, req *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.GetImageBuildResponse], error) {
+	return c.getImageBuild.CallUnary(ctx, req)
+}
+
+// CancelImageBuild calls api.v2.V2.CancelImageBuild.
+func (c *v2Client) CancelImageBuild(ctx context.Context, req *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.CancelImageBuildResponse], error) {
+	return c.cancelImageBuild.CallUnary(ctx, req)
+}
+
+// GetImageUsage calls api.v2.V2.GetImageUsage.
+func (c *v2Client) GetImageUsage(ctx context.Context, req *connect.Request[v2.GetImageUsageRequest]) (*connect.Response[v2.GetImageUsageResponse], error) {
+	return c.getImageUsage.CallUnary(ctx, req)
 }
 
 // Health calls api.v2.V2.Health.
@@ -925,6 +1075,16 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, req *connect.Request[v2.
 
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
+	GetImage(context.Context, *connect.Request[v2.GetImageRequest]) (*connect.Response[v2.GetImageResponse], error)
+	ListImages(context.Context, *connect.Request[v2.ListImagesRequest]) (*connect.Response[v2.ListImagesResponse], error)
+	SetImageTag(context.Context, *connect.Request[v2.SetImageTagRequest]) (*connect.Response[v2.SetImageTagResponse], error)
+	DeleteImageTag(context.Context, *connect.Request[v2.DeleteImageTagRequest]) (*connect.Response[v2.DeleteImageTagResponse], error)
+	PrepareImageUpload(context.Context, *connect.Request[v2.PrepareImageUploadRequest]) (*connect.Response[v2.PrepareImageUploadResponse], error)
+	CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.CompleteImageUploadResponse], error)
+	ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error)
+	GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.GetImageBuildResponse], error)
+	CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.CancelImageBuildResponse], error)
+	GetImageUsage(context.Context, *connect.Request[v2.GetImageUsageRequest]) (*connect.Response[v2.GetImageUsageResponse], error)
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
 	// The HTTP annotation is required for protoc-gen-openapiv2 to include ErrorResponse
@@ -994,6 +1154,66 @@ type V2Handler interface {
 // and JSON codecs. They also support gzip compression.
 func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Handler) {
 	v2Methods := v2.File_api_v2_service_proto.Services().ByName("V2").Methods()
+	v2GetImageHandler := connect.NewUnaryHandler(
+		V2GetImageProcedure,
+		svc.GetImage,
+		connect.WithSchema(v2Methods.ByName("GetImage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListImagesHandler := connect.NewUnaryHandler(
+		V2ListImagesProcedure,
+		svc.ListImages,
+		connect.WithSchema(v2Methods.ByName("ListImages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2SetImageTagHandler := connect.NewUnaryHandler(
+		V2SetImageTagProcedure,
+		svc.SetImageTag,
+		connect.WithSchema(v2Methods.ByName("SetImageTag")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2DeleteImageTagHandler := connect.NewUnaryHandler(
+		V2DeleteImageTagProcedure,
+		svc.DeleteImageTag,
+		connect.WithSchema(v2Methods.ByName("DeleteImageTag")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2PrepareImageUploadHandler := connect.NewUnaryHandler(
+		V2PrepareImageUploadProcedure,
+		svc.PrepareImageUpload,
+		connect.WithSchema(v2Methods.ByName("PrepareImageUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CompleteImageUploadHandler := connect.NewUnaryHandler(
+		V2CompleteImageUploadProcedure,
+		svc.CompleteImageUpload,
+		connect.WithSchema(v2Methods.ByName("CompleteImageUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListImageBuildsHandler := connect.NewUnaryHandler(
+		V2ListImageBuildsProcedure,
+		svc.ListImageBuilds,
+		connect.WithSchema(v2Methods.ByName("ListImageBuilds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetImageBuildHandler := connect.NewUnaryHandler(
+		V2GetImageBuildProcedure,
+		svc.GetImageBuild,
+		connect.WithSchema(v2Methods.ByName("GetImageBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CancelImageBuildHandler := connect.NewUnaryHandler(
+		V2CancelImageBuildProcedure,
+		svc.CancelImageBuild,
+		connect.WithSchema(v2Methods.ByName("CancelImageBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetImageUsageHandler := connect.NewUnaryHandler(
+		V2GetImageUsageProcedure,
+		svc.GetImageUsage,
+		connect.WithSchema(v2Methods.ByName("GetImageUsage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2HealthHandler := connect.NewUnaryHandler(
 		V2HealthProcedure,
 		svc.Health,
@@ -1338,6 +1558,26 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case V2GetImageProcedure:
+			v2GetImageHandler.ServeHTTP(w, r)
+		case V2ListImagesProcedure:
+			v2ListImagesHandler.ServeHTTP(w, r)
+		case V2SetImageTagProcedure:
+			v2SetImageTagHandler.ServeHTTP(w, r)
+		case V2DeleteImageTagProcedure:
+			v2DeleteImageTagHandler.ServeHTTP(w, r)
+		case V2PrepareImageUploadProcedure:
+			v2PrepareImageUploadHandler.ServeHTTP(w, r)
+		case V2CompleteImageUploadProcedure:
+			v2CompleteImageUploadHandler.ServeHTTP(w, r)
+		case V2ListImageBuildsProcedure:
+			v2ListImageBuildsHandler.ServeHTTP(w, r)
+		case V2GetImageBuildProcedure:
+			v2GetImageBuildHandler.ServeHTTP(w, r)
+		case V2CancelImageBuildProcedure:
+			v2CancelImageBuildHandler.ServeHTTP(w, r)
+		case V2GetImageUsageProcedure:
+			v2GetImageUsageHandler.ServeHTTP(w, r)
 		case V2HealthProcedure:
 			v2HealthHandler.ServeHTTP(w, r)
 		case V2XSchemaOnlyProcedure:
@@ -1460,6 +1700,46 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 
 // UnimplementedV2Handler returns CodeUnimplemented from all methods.
 type UnimplementedV2Handler struct{}
+
+func (UnimplementedV2Handler) GetImage(context.Context, *connect.Request[v2.GetImageRequest]) (*connect.Response[v2.GetImageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetImage is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListImages(context.Context, *connect.Request[v2.ListImagesRequest]) (*connect.Response[v2.ListImagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListImages is not implemented"))
+}
+
+func (UnimplementedV2Handler) SetImageTag(context.Context, *connect.Request[v2.SetImageTagRequest]) (*connect.Response[v2.SetImageTagResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SetImageTag is not implemented"))
+}
+
+func (UnimplementedV2Handler) DeleteImageTag(context.Context, *connect.Request[v2.DeleteImageTagRequest]) (*connect.Response[v2.DeleteImageTagResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.DeleteImageTag is not implemented"))
+}
+
+func (UnimplementedV2Handler) PrepareImageUpload(context.Context, *connect.Request[v2.PrepareImageUploadRequest]) (*connect.Response[v2.PrepareImageUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PrepareImageUpload is not implemented"))
+}
+
+func (UnimplementedV2Handler) CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.CompleteImageUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CompleteImageUpload is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListImageBuilds is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.GetImageBuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetImageBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.CancelImageBuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelImageBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetImageUsage(context.Context, *connect.Request[v2.GetImageUsageRequest]) (*connect.Response[v2.GetImageUsageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetImageUsage is not implemented"))
+}
 
 func (UnimplementedV2Handler) Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.Health is not implemented"))
