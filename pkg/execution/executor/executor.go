@@ -2083,7 +2083,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		sleepStepRef = tracing.SleepStepSpanRefResolve(&item, id.RunID)
 	}
 
-	isSleepResume := isSleep && item.Attempt == 0
+	// Saving the sleep completion is idempotent and must be retried if the first
+	// attempt fails. Otherwise a retry can re-emit the same sleep, have its queue
+	// item deduplicated against the item currently executing, and leave the run
+	// with no queued work once that item is removed.
+	isSleepResume := isSleep
 	if isSleepResume {
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    e.now(),
@@ -2113,10 +2117,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// we're now done with this execution.
 			return nil, nil
 		}
-		// After the sleep, we start a new step.  This means we also want to start a new
-		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
-		// scheduled in this executor run)
-		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
 	_, span := e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
