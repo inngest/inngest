@@ -62,10 +62,8 @@ func TestPostgresV2RunProjectionBenchmark(t *testing.T) {
 	}
 
 	withoutProjection := insertSpans()
-	_, err := db.ExecContext(ctx, `TRUNCATE spans`)
-	require.NoError(t, err)
 
-	_, err = db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, `
 		CREATE TABLE trace_runs_v2 (
 			run_id TEXT PRIMARY KEY,
 			account_id TEXT NOT NULL,
@@ -182,10 +180,52 @@ func TestPostgresV2RunProjectionBenchmark(t *testing.T) {
 	`)
 	require.NoError(t, err)
 
-	withProjection := insertSpans()
+	backfillStarted := time.Now()
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO trace_runs_v2 (
+			run_id, account_id, env_id, app_id, function_id, trace_id,
+			queued_at, started_at, ended_at, status, status_updated_at,
+			event_ids, output, output_updated_at
+		)
+		SELECT
+			root.run_id, root.account_id, root.env_id, root.app_id, root.function_id, root.trace_id,
+			root.start_time,
+			MIN(fragment.start_time),
+			MAX(fragment.end_time),
+			(ARRAY_AGG(fragment.status ORDER BY fragment.end_time DESC, fragment.span_id DESC)
+				FILTER (WHERE fragment.status IS NOT NULL))[1],
+			MAX(fragment.end_time) FILTER (WHERE fragment.status IS NOT NULL),
+			CASE jsonb_typeof(root.event_ids)
+				WHEN 'string' THEN COALESCE((root.event_ids #>> '{}')::jsonb, '[]'::jsonb)
+				ELSE COALESCE(root.event_ids, '[]'::jsonb)
+			END,
+			(ARRAY_AGG(fragment.output ORDER BY fragment.end_time DESC)
+				FILTER (WHERE fragment.output IS NOT NULL))[1],
+			MAX(fragment.end_time) FILTER (WHERE fragment.output IS NOT NULL)
+		FROM spans root
+		JOIN spans fragment
+			ON fragment.run_id = root.run_id
+			AND fragment.dynamic_span_id = root.dynamic_span_id
+		WHERE root.name = 'executor.run' AND root.debug_run_id IS NULL
+		GROUP BY root.run_id, root.account_id, root.env_id, root.app_id,
+			root.function_id, root.trace_id, root.start_time, root.event_ids
+	`)
+	require.NoError(t, err)
+	backfillDuration := time.Since(backfillStarted)
 	var projected int
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM trace_runs_v2`).Scan(&projected))
 	require.Equal(t, runCount, projected)
+	t.Logf("set-based projection backfill:  %s", backfillDuration)
+	if os.Getenv("TRACE_PROJECTION_BACKFILL_ONLY") == "1" {
+		return
+	}
+
+	_, err = db.ExecContext(ctx, `TRUNCATE spans, trace_runs_v2`)
+	require.NoError(t, err)
+	withProjection := insertSpans()
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM trace_runs_v2`).Scan(&projected))
+	require.Equal(t, runCount, projected)
+
 	_, err = db.ExecContext(ctx, `VACUUM ANALYZE trace_runs_v2`)
 	require.NoError(t, err)
 	t.Logf("span ingest without projection: %s", withoutProjection)
