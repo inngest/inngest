@@ -35,6 +35,18 @@ export function formatCompactNumber(value: number): string {
   }).format(value);
 }
 
+export function boundCurrentConcurrency(
+  currentConcurrency: number,
+  accountConcurrencyLimit: number,
+  globalConcurrencyLimit: number,
+): number {
+  return Math.min(
+    Math.max(currentConcurrency, 0),
+    accountConcurrencyLimit * 3,
+    globalConcurrencyLimit,
+  );
+}
+
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }

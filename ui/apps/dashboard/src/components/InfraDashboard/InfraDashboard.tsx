@@ -57,6 +57,7 @@ import type {
 } from './placeholderData';
 import {
   billingCycleDaysRemaining,
+  boundCurrentConcurrency,
   formatCompactNumber,
   formatCentsMonthly,
   formatPercent,
@@ -189,6 +190,9 @@ export function InfraDashboard({
       <InfraFlowPanel
         backlogDepth={data.backlogDepth}
         currentConcurrency={data.currentConcurrency}
+        globalConcurrencyLimit={
+          data.concurrencyAddon?.maxValue ?? data.accountConcurrencyLimit
+        }
         currentInfraTierId={
           data.isEnterprisePlan
             ? 'dedicated'
@@ -867,6 +871,7 @@ function InfraFlowPanel({
   eventsReceived,
   eventsFetching,
   executorsFetching,
+  globalConcurrencyLimit,
   infraPlan,
   isEnterprisePlan,
   placeholders,
@@ -878,6 +883,7 @@ function InfraFlowPanel({
   eventsReceived: number;
   eventsFetching: boolean;
   executorsFetching: boolean;
+  globalConcurrencyLimit: number;
   infraPlan: InfraPlan;
   isEnterprisePlan: boolean;
   placeholders: InfraDashboardPlaceholders;
@@ -888,9 +894,10 @@ function InfraFlowPanel({
       (tier) =>
         tier.id === (currentInfraTierId ?? placeholders.defaultInfraTierId),
     ) ?? placeholders.infraTiers[0];
-  const clampedCurrentConcurrency = Math.min(
-    Math.max(currentConcurrency, 0),
+  const boundedCurrentConcurrency = boundCurrentConcurrency(
+    currentConcurrency,
     infraPlan.execConcurrencyLimit,
+    globalConcurrencyLimit,
   );
 
   return (
@@ -952,8 +959,8 @@ function InfraFlowPanel({
           label="Executors"
           primaryLabel="Concurrency in use"
           primaryHint="~ Approx."
-          primaryValue={formatCompactNumber(clampedCurrentConcurrency)}
-          progressValue={clampedCurrentConcurrency}
+          primaryValue={formatCompactNumber(boundedCurrentConcurrency)}
+          progressValue={boundedCurrentConcurrency}
           limit={infraPlan.execConcurrencyLimit}
         />
       </div>
