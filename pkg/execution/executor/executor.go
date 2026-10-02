@@ -2083,7 +2083,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		sleepStepRef = tracing.SleepStepSpanRefResolve(&item, id.RunID)
 	}
 
-	isSleepResume := isSleep && item.Attempt == 0
+	// Saving the sleep completion is idempotent and must be retried if the first
+	// attempt fails. Otherwise a retry can re-emit the same sleep, have its queue
+	// item deduplicated against the item currently executing, and leave the run
+	// with no queued work once that item is removed.
+	isSleepResume := isSleep
 	if isSleepResume {
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    e.now(),
