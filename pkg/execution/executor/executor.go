@@ -5490,7 +5490,6 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		Event:           *opts.Payload,
 		FnID:            opts.FunctionID,
 		CorrelationID:   &correlationID,
-		TraceCarrier:    carrier,
 		ExpiresAt:       expires.UnixMilli(),
 		GroupID:         runCtx.GroupID(),
 		DisplayName:     gen.UserDefinedName(),
