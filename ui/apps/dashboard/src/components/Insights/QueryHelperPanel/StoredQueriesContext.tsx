@@ -18,6 +18,7 @@ interface StoredQueriesContextValue {
   deleteQuery: (queryId: string) => void;
   deleteQuerySnapshot: (snapshotId: string) => void;
   isSavedQueriesFetching: boolean;
+  refetchSavedQueries: () => void;
   queries: {
     data: undefined | InsightsQueryStatement[];
     error: undefined | string;
@@ -162,6 +163,7 @@ export function StoredQueriesProvider({
         deleteQuery,
         deleteQuerySnapshot,
         isSavedQueriesFetching,
+        refetchSavedQueries,
         shareQuery,
         queries,
         querySnapshots: orderedQuerySnapshots,
