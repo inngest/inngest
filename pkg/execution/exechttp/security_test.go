@@ -8,8 +8,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/stretchr/testify/require"
 )
+
+// mockResolver is a test resolver that returns fixed IPs for given hosts.
+type mockResolver struct {
+	hosts map[string][]net.IP
+}
+
+func (m *mockResolver) Lookup(_ context.Context, host string) ([]net.IP, error) {
+	if ips, ok := m.hosts[host]; ok {
+		return ips, nil
+	}
+	// Fall back to treating host as an IP literal.
+	if ip := net.ParseIP(host); ip != nil {
+		return []net.IP{ip}, nil
+	}
+	return nil, fmt.Errorf("mock resolver: unknown host %q", host)
+}
+
+func (m *mockResolver) Dialer() dnscache.Dialer {
+	return (&net.Dialer{}).DialContext
+}
 
 func TestSecureDialer(t *testing.T) {
 	client := func(dial DialFunc) http.Client {
@@ -59,9 +80,18 @@ func TestSecureDialer(t *testing.T) {
 	})
 
 	t.Run("private ipv4/ipv6", func(t *testing.T) {
+		// Use a mock resolver so tests don't depend on external DNS.
+		// fbi.com is expected to resolve to 127.0.0.1 (a private IP).
+		mockRes := &mockResolver{
+			hosts: map[string][]net.IP{
+				"fbi.com":   {net.ParseIP("127.0.0.1")},
+				"localhost": {net.ParseIP("127.0.0.1")},
+			},
+		}
+
 		hosts := []string{
 			"localhost",
-			"fbi.com", // public to 127.0.0.1
+			"fbi.com", // mock-resolved to 127.0.0.1
 			"0.0.0.0",
 			"127.0.0.1",
 			"10.1.1.1",
@@ -75,7 +105,8 @@ func TestSecureDialer(t *testing.T) {
 		for _, h := range hosts {
 			t.Run(fmt.Sprintf("disabled: %s", h), func(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
-					log: true,
+					log:      true,
+					resolver: mockRes,
 					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
 						panic("should not resolve!")
 					},
@@ -87,6 +118,7 @@ func TestSecureDialer(t *testing.T) {
 
 				c = client(SecureDialer(SecureDialerOpts{
 					AllowPrivate: false,
+					resolver:     mockRes,
 					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
 						panic("should not resolve!")
 					},
@@ -101,6 +133,7 @@ func TestSecureDialer(t *testing.T) {
 				c := client(SecureDialer(SecureDialerOpts{
 					AllowPrivate: true,
 					log:          true,
+					resolver:     mockRes,
 					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
 						// do nothing.
 						return nil, nil
