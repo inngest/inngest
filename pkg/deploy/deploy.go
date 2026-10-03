@@ -183,7 +183,7 @@ func GetDeployError(resp *http.Response) error {
 			Message string `json:"message"`
 		}
 		r := &result{}
-		if err := json.Unmarshal(byt, &r); err != nil {
+		if err := json.Unmarshal(byt, r); err != nil {
 			return err
 		}
 		// XXX: We should move these error codes into each SDK.
