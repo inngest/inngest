@@ -15,6 +15,7 @@ import {
   sendChatMessage,
   type ClientState,
 } from './useInsightsAgent';
+import { trackInsightsAIMessageSent } from '@/utils/analyticsEvents';
 import { useFetchInsights } from '@/components/Insights/InsightsStateMachineContext/useFetchInsights';
 import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
 import type { InsightsRealtimeEvent, Message } from './types';
@@ -382,6 +383,10 @@ export function InsightsChatProvider({
       }));
 
       const clientState = threadClientStateRef.current.get(threadId);
+      const history = buildHistory(threadId);
+      const stateEventTypes =
+        clientState?.eventTypes ?? eventsData?.names ?? [];
+      const stateSchemas = clientState?.schemas ?? schemas;
 
       try {
         await sendChatMessage({
@@ -392,15 +397,24 @@ export function InsightsChatProvider({
           channelKey,
           state: clientState
             ? {
-                eventTypes: clientState.eventTypes,
-                schemas: clientState.schemas,
+                eventTypes: stateEventTypes,
+                schemas: stateSchemas,
                 currentQuery: clientState.currentQuery,
               }
             : {
-                eventTypes: eventsData?.names ?? [],
-                schemas,
+                eventTypes: stateEventTypes,
+                schemas: stateSchemas,
               },
-          history: buildHistory(threadId),
+          history,
+        });
+        trackInsightsAIMessageSent({
+          feature: 'insights',
+          content,
+          eventTypeCount: stateEventTypes.length,
+          hasCurrentQuery: Boolean(clientState?.currentQuery?.trim()),
+          historyMessageCount: history.length,
+          schemaCount: stateSchemas.length,
+          threadId,
         });
       } catch (error) {
         // Remove the optimistic user message and show error
