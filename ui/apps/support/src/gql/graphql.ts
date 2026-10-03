@@ -73,6 +73,11 @@ export enum BannerSeverity {
   Warning = 'WARNING'
 }
 
+export enum BurstConcurrencyMode {
+  Disabled = 'disabled',
+  Enabled = 'enabled'
+}
+
 export type CdcConnectionInput = {
   adminConn: Scalars['String']['input'];
   engine: Scalars['String']['input'];
@@ -138,6 +143,15 @@ export type ConnectV1WorkerMetricsFilter = {
   until?: InputMaybe<Scalars['Time']['input']>;
 };
 
+export type CreateApiCredentialInput = {
+  allEnvironments: Scalars['Boolean']['input'];
+  /** Null means the key does not expire. */
+  expiresAt?: InputMaybe<Scalars['Time']['input']>;
+  name: Scalars['String']['input'];
+  permissions: Array<Scalars['String']['input']>;
+  workspaceID?: InputMaybe<Scalars['UUID']['input']>;
+};
+
 export type CreateApiKeyInput = {
   name: Scalars['String']['input'];
   workspaceID: Scalars['UUID']['input'];
@@ -156,6 +170,12 @@ export type CreateCancellationInput = {
 export type CreateCancellationInputTestOnly = {
   maxStepCount?: InputMaybe<Scalars['Int']['input']>;
   queryLimit?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type CreateEnvSecretInput = {
+  name: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
 };
 
 export type CreateFunctionReplayInput = {
@@ -257,7 +277,6 @@ export enum FunctionRunStatus {
 
 export enum FunctionRunTimeField {
   EndedAt = 'ENDED_AT',
-  Mixed = 'MIXED',
   StartedAt = 'STARTED_AT'
 }
 
@@ -275,6 +294,12 @@ export type IngestKeyFilter = {
   name?: InputMaybe<Scalars['String']['input']>;
   source?: InputMaybe<Scalars['String']['input']>;
 };
+
+export enum InsightsColumnRole {
+  EventId = 'EVENT_ID',
+  RunId = 'RUN_ID',
+  Unspecified = 'UNSPECIFIED'
+}
 
 export enum InsightsColumnType {
   Date = 'DATE',
@@ -382,7 +407,6 @@ export enum ReplayRunStatus {
 }
 
 export enum ReplayType {
-  Event = 'EVENT',
   Function = 'FUNCTION'
 }
 
@@ -445,6 +469,27 @@ export enum SdkMode {
   Cloud = 'CLOUD',
   Dev = 'DEV'
 }
+
+export type SandboxMetricsFilter = {
+  from: Scalars['Time']['input'];
+  id: Scalars['UUID']['input'];
+  name: Scalars['String']['input'];
+  until?: InputMaybe<Scalars['Time']['input']>;
+};
+
+export enum SandboxStatus {
+  Failed = 'FAILED',
+  LaunchUnknown = 'LAUNCH_UNKNOWN',
+  Pending = 'PENDING',
+  Running = 'RUNNING',
+  Stopped = 'STOPPED',
+  Stopping = 'STOPPING'
+}
+
+export type SandboxesFilter = {
+  from?: InputMaybe<Scalars['Time']['input']>;
+  until?: InputMaybe<Scalars['Time']['input']>;
+};
 
 export type ScopedMetricsFilter = {
   appIDs?: InputMaybe<Array<Scalars['UUID']['input']>>;
@@ -511,7 +556,6 @@ export type StripeSubscriptionInput = {
 
 export type StripeSubscriptionItemsInput = {
   amount: Scalars['Int']['input'];
-  planID?: InputMaybe<Scalars['ID']['input']>;
   planSlug?: InputMaybe<Scalars['String']['input']>;
   quantity: Scalars['Int']['input'];
 };
@@ -545,6 +589,12 @@ export type UpdateAccount = {
   securityEmail?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateEnvSecretValueInput = {
+  id: Scalars['UUID']['input'];
+  value: Scalars['String']['input'];
+  workspaceID: Scalars['UUID']['input'];
+};
+
 export type UpdateIngestKey = {
   filterList?: InputMaybe<FilterListInput>;
   metadata?: InputMaybe<Scalars['Map']['input']>;
@@ -566,6 +616,7 @@ export type UpdateVercelAppInput = {
 export type UsageInput = {
   from?: InputMaybe<Scalars['Time']['input']>;
   period?: InputMaybe<Scalars['Period']['input']>;
+  /** @deprecated Field no longer supported */
   range?: InputMaybe<Scalars['Timerange']['input']>;
   to?: InputMaybe<Scalars['Time']['input']>;
 };
