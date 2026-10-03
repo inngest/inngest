@@ -2,17 +2,22 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -337,4 +342,126 @@ func TestFinalizeRemoveJobs_NoItemsNoSweep(t *testing.T) {
 
 	require.Equal(t, 1, shard.sweepCount, "should only scan once when queue is empty")
 	require.Equal(t, int32(0), shard.dequeueCount.Load())
+}
+
+type mockRunServiceForFinalize struct {
+	sv2.RunService
+	mock.Mock
+}
+
+func (m *mockRunServiceForFinalize) Delete(ctx context.Context, id sv2.ID, opts ...sv2.DeleteOption) error {
+	args := m.Called(ctx, id, opts)
+	return args.Error(0)
+}
+
+func (m *mockRunServiceForFinalize) LoadEvents(ctx context.Context, id sv2.ID) ([]json.RawMessage, error) {
+	args := m.Called(ctx, id)
+	if res := args.Get(0); res != nil {
+		return res.([]json.RawMessage), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *mockRunServiceForFinalize) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
+	args := m.Called(ctx, id)
+	if res := args.Get(0); res != nil {
+		return res.(map[string]sv2.Defer), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func TestFinalize_PreservesStateOnPublishFailure(t *testing.T) {
+	ms := new(mockRunServiceForFinalize)
+	ms.On("LoadEvents", mock.Anything, mock.Anything).Return([]json.RawMessage{json.RawMessage(`{"name":"test.event"}`)}, nil)
+	ms.On("LoadDefers", mock.Anything, mock.Anything).Return(map[string]sv2.Defer{}, nil)
+
+	publishErr := errors.New("transient broker error")
+	finishHandlerCalled := false
+	finishHandler := func(ctx context.Context, id sv2.ID, evts []event.Event) error {
+		finishHandlerCalled = true
+		return publishErr
+	}
+
+	e := &executor{
+		log:            logger.VoidLogger(),
+		smv2:           ms,
+		tracerProvider: tracing.NewNoopTracerProvider(),
+		finishHandler:  finishHandler,
+	}
+
+	opts := execution.FinalizeOpts{
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID:      ulid.Make(),
+				FunctionID: uuid.New(),
+				Tenant: sv2.Tenant{
+					AccountID: uuid.New(),
+					AppID:     uuid.New(),
+					EnvID:     uuid.New(),
+				},
+			},
+		},
+		Optional: execution.FinalizeOptional{
+			FnSlug: "test-fn",
+		},
+	}
+
+	err := e.Finalize(context.Background(), opts)
+	require.Error(t, err)
+	require.ErrorIs(t, err, publishErr)
+	require.True(t, finishHandlerCalled)
+
+	// Verify Delete was NOT called when publish failed so that state remains durable for retries
+	ms.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestFinalize_DeletesStateOnPublishSuccess(t *testing.T) {
+	ms := new(mockRunServiceForFinalize)
+	ms.On("LoadEvents", mock.Anything, mock.Anything).Return([]json.RawMessage{json.RawMessage(`{"name":"test.event"}`)}, nil)
+	ms.On("LoadDefers", mock.Anything, mock.Anything).Return(map[string]sv2.Defer{}, nil)
+	ms.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	finishHandlerCalled := false
+	finishHandler := func(ctx context.Context, id sv2.ID, evts []event.Event) error {
+		finishHandlerCalled = true
+		return nil
+	}
+
+	shard := &racingShard{
+		items: map[string]*queue.QueueItem{},
+	}
+	queueShard := &racingQueueShard{racingShard: shard}
+
+	e := &executor{
+		log:            logger.VoidLogger(),
+		smv2:           ms,
+		tracerProvider: tracing.NewNoopTracerProvider(),
+		finishHandler:  finishHandler,
+		shards:         &racingShardRegistry{shard: queueShard},
+		queue:          &racingQueue{shard: queueShard},
+	}
+
+	opts := execution.FinalizeOpts{
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID:      ulid.Make(),
+				FunctionID: uuid.New(),
+				Tenant: sv2.Tenant{
+					AccountID: uuid.New(),
+					AppID:     uuid.New(),
+					EnvID:     uuid.New(),
+				},
+			},
+		},
+		Optional: execution.FinalizeOptional{
+			FnSlug: "test-fn",
+		},
+	}
+
+	err := e.Finalize(context.Background(), opts)
+	require.NoError(t, err)
+	require.True(t, finishHandlerCalled)
+
+	// Verify Delete was called after publish succeeded
+	ms.AssertCalled(t, "Delete", mock.Anything, opts.Metadata.ID, mock.Anything)
 }
