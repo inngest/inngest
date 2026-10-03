@@ -24,6 +24,9 @@ type WorkflowUsage =
 type WorkflowSummary =
   GetFunctionsQuery['workspace']['workflows']['data'][number];
 
+// Keep this aligned with the Cloud executor's burst concurrency allowance.
+const BURST_CONCURRENCY_MULTIPLIER = 3;
+
 export function formatCompactNumber(value: number): string {
   if (!Number.isFinite(value)) {
     return '0';
@@ -33,6 +36,18 @@ export function formatCompactNumber(value: number): string {
     maximumFractionDigits: value >= 1_000_000 ? 1 : 0,
     notation: value >= 10_000 ? 'compact' : 'standard',
   }).format(value);
+}
+
+export function boundCurrentConcurrency(
+  currentConcurrency: number,
+  accountConcurrencyLimit: number,
+  globalConcurrencyLimit: number,
+): number {
+  return Math.min(
+    Math.max(currentConcurrency, 0),
+    accountConcurrencyLimit * BURST_CONCURRENCY_MULTIPLIER,
+    globalConcurrencyLimit,
+  );
 }
 
 export function formatPercent(value: number): string {
