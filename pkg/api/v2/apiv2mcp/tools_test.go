@@ -126,6 +126,33 @@ func TestCallPreservesIntegerArguments(t *testing.T) {
 	require.Equal(t, "limit=1000000", gotQuery)
 }
 
+func TestCallForwardsAuthorizationHeader(t *testing.T) {
+	endpoint := endpointByMethod(t, "GetApps")
+	var gotAuthorization string
+	execute := func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+		gotAuthorization = req.Header.Get("Authorization")
+		return ToolResult(map[string]any{}, "{}"), nil
+	}
+
+	header := http.Header{}
+	header.Set("Authorization", "Bearer signkey-test-0000")
+	result, err := call(context.Background(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{}`)},
+		Extra:  &mcp.RequestExtra{Header: header},
+	}, endpoint, Options{Execute: execute})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer signkey-test-0000", gotAuthorization)
+
+	gotAuthorization = "unset"
+	result, err = call(context.Background(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{}`)},
+	}, endpoint, Options{Execute: execute})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "", gotAuthorization)
+}
+
 func TestEndpointInputsDoNotUseReservedEnvField(t *testing.T) {
 	for _, endpoint := range apiv2endpoint.Discover() {
 		require.Nil(t, endpoint.Input.Fields().ByJSONName("env"), endpoint.MethodName)
