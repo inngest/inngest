@@ -1160,7 +1160,6 @@ export type FunctionRun = {
   status: FunctionRunStatus;
   workflowID: Scalars['UUID']['output'];
   workflowVersion: Maybe<WorkflowVersion>;
-  workflowVersionInt: Scalars['Int']['output'];
   workspaceID: Scalars['UUID']['output'];
 };
 
