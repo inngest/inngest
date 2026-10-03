@@ -32,13 +32,13 @@ func TestDurableEndpoint_SyncResponseRecorded(t *testing.T) {
 	require.Equal(t, `{"hello":"world"}`, string(body), "body from JS endpoint should match handler")
 	require.Contains(t, resp.Header.Get("content-type"), "application/json")
 
-	// 2. Wait for the run to be recorded with COMPLETED status.
-	runID := waitForRecentRun(t, cli, ctx, "POST /api/durable/sync", start, "COMPLETED", 15*time.Second)
+	// 2. Wait for any run to appear for this function (may initially be RUNNING/QUEUED).
+	runID := waitForRecentRun(t, cli, ctx, "POST /api/durable/sync", start, "", 30*time.Second)
 
-	run := cli.Run(ctx, runID)
-	require.Equal(t, "COMPLETED", run.Status)
+	// 3. Poll the individual run endpoint until it reaches COMPLETED.
+	run := cli.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 30 * time.Second})
 
-	// 3. When the user handler returns a `Response`, the JS SDK delivers it
+	// 4. When the user handler returns a `Response`, the JS SDK delivers it
 	// directly to the original caller and checkpoints `null` for the body to the
 	// Inngest server (the body is already on its way out). So the recorded body
 	// is the four-character string "null".
@@ -142,13 +142,16 @@ func waitForRecentRun(t *testing.T, cli *client.Client, ctx context.Context, fnS
 			time.Sleep(200 * time.Millisecond)
 			continue
 		}
-		edges, _, _ := cli.FunctionRuns(ctx, client.FunctionRunOpt{
+		opts := client.FunctionRunOpt{
 			Items:       10,
-			Status:      []string{status},
 			Start:       start,
 			End:         time.Now().Add(time.Minute),
 			FunctionIDs: []uuid.UUID{fnID},
-		})
+		}
+		if status != "" {
+			opts.Status = []string{status}
+		}
+		edges, _, _ := cli.FunctionRuns(ctx, opts)
 		if len(edges) > 0 {
 			return edges[0].Node.ID
 		}
