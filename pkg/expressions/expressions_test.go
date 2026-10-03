@@ -1547,3 +1547,27 @@ func BenchmarkEvaluateRandomExpressionParallel(b *testing.B) {
 		}
 	})
 }
+
+func TestSharedLiftedPlanKeepsVariablesIsolated(t *testing.T) {
+	ctx := context.Background()
+	first, err := NewExpressionEvaluator(ctx, `event.data.accountID == "shared-plan-acct-1"`)
+	require.NoError(t, err)
+	second, err := NewExpressionEvaluator(ctx, `event.data.accountID == "shared-plan-acct-2"`)
+	require.NoError(t, err)
+
+	firstEvaluator := first.(*expressionEvaluator)
+	secondEvaluator := second.(*expressionEvaluator)
+	require.Same(t, firstEvaluator.prog, secondEvaluator.prog)
+
+	data := NewData(map[string]any{
+		"event": map[string]any{
+			"data": map[string]any{"accountID": "shared-plan-acct-1"},
+		},
+	})
+	got, err := first.Evaluate(ctx, data)
+	require.NoError(t, err)
+	require.Equal(t, true, got)
+	got, err = second.Evaluate(ctx, data)
+	require.NoError(t, err)
+	require.Equal(t, false, got)
+}
