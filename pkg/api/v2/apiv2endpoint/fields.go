@@ -1,6 +1,8 @@
 package apiv2endpoint
 
 import (
+	"strings"
+
 	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/proto"
@@ -8,16 +10,31 @@ import (
 )
 
 func FieldDescription(field protoreflect.FieldDescriptor) string {
+	description := string(field.JSONName())
+	if schema := openAPISchema(field); schema != nil && schema.GetDescription() != "" {
+		description = schema.GetDescription()
+	}
+	if values := FieldEnum(field); len(values) > 0 {
+		description = strings.TrimSuffix(description, ".") + ". Accepted values: " + strings.Join(values, ", ") + "."
+	}
+	return description
+}
+
+func FieldEnum(field protoreflect.FieldDescriptor) []string {
+	schema := openAPISchema(field)
+	if schema == nil {
+		return nil
+	}
+	return append([]string(nil), schema.GetEnum()...)
+}
+
+func openAPISchema(field protoreflect.FieldDescriptor) *openapiv2.JSONSchema {
 	opts := field.Options()
 	if !proto.HasExtension(opts, openapiv2.E_Openapiv2Field) {
-		return string(field.JSONName())
+		return nil
 	}
-
-	schema, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema)
-	if !ok || schema.GetDescription() == "" {
-		return string(field.JSONName())
-	}
-	return schema.GetDescription()
+	schema, _ := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema)
+	return schema
 }
 
 func IsRequired(field protoreflect.FieldDescriptor) bool {

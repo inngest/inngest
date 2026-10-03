@@ -61,7 +61,7 @@ describe('fetchRestRuns', () => {
 
       expect(apiFetch).toHaveBeenCalledOnce();
       expect(apiFetch).toHaveBeenCalledWith(
-        `/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&appId=app&functionId=${encodedFunctionID}`,
+        `/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferredFrom&appId=app&functionId=${encodedFunctionID}`,
         { signal: expect.any(AbortSignal) },
       );
     },
@@ -96,7 +96,7 @@ describe('fetchRestRuns', () => {
     );
 
     expect(apiFetch).toHaveBeenCalledWith(
-      '/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferred_from&until=2026-09-16T00%3A00%3A00Z&cursor=next%2Fpage&query=event.data.user+%3D%3D+%22test%22&isDeferred=false&status=RUNNING&status=FAILED&appId=app&functionId=teams%2Fmember.created',
+      '/v2/runs?from=2026-09-15T00%3A00%3A00Z&timeField=STARTED_AT&order=DESC&limit=40&include=deferredFrom&until=2026-09-16T00%3A00%3A00Z&cursor=next%2Fpage&query=event.data.user+%3D%3D+%22test%22&isDeferred=false&status=RUNNING&status=FAILED&appId=app&functionId=teams%2Fmember.created',
       { signal: expect.any(AbortSignal) },
     );
   });
