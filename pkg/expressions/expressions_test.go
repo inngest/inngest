@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1570,4 +1571,24 @@ func TestSharedLiftedPlanKeepsVariablesIsolated(t *testing.T) {
 	got, err = second.Evaluate(ctx, data)
 	require.NoError(t, err)
 	require.Equal(t, false, got)
+}
+
+func TestExpressionPlanCacheUsesLiftedSource(t *testing.T) {
+	env, err := exprenv.Env()
+	require.NoError(t, err)
+	const lifted = `event.data.accountID == vars.a && event.data.attempt >= vars.b`
+	firstAST, issues := env.Parse(lifted)
+	require.Nil(t, issues)
+	secondAST, issues := env.Parse(lifted)
+	require.Nil(t, issues)
+	require.NotSame(t, firstAST, secondAST)
+
+	key := "plan:" + lifted
+	cache.Delete(key)
+	t.Cleanup(func() { cache.Delete(key) })
+	first, err := cachedExpressionPlan(context.Background(), firstAST, env)
+	require.NoError(t, err)
+	second, err := cachedExpressionPlan(context.Background(), secondAST, env)
+	require.NoError(t, err)
+	require.Same(t, first, second)
 }

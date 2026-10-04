@@ -15,7 +15,6 @@ package expressions
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -38,6 +38,7 @@ var (
 
 	exprCompiler expr.CELCompiler
 	treeParser   expr.TreeParser
+	planBuilds   singleflight.Group
 )
 
 func init() {
@@ -269,18 +270,29 @@ type expressionEvaluator struct {
 }
 
 func cachedExpressionPlan(ctx context.Context, ast *cel.Ast, env *cel.Env) (*expressionPlan, error) {
-	key := fmt.Sprintf("plan:%p", ast)
+	key := "plan:" + ast.Source().Content()
 	if cached := cache.Get(key); cached != nil {
 		cached.Extend(CacheExtendTime)
 		return cached.Value().(*expressionPlan), nil
 	}
 
-	plan, err := buildExpressionPlan(ctx, ast, env)
+	value, err, _ := planBuilds.Do(key, func() (any, error) {
+		if cached := cache.Get(key); cached != nil {
+			cached.Extend(CacheExtendTime)
+			return cached.Value().(*expressionPlan), nil
+		}
+
+		plan, err := buildExpressionPlan(ctx, ast, env)
+		if err != nil {
+			return nil, err
+		}
+		cache.Set(key, plan, CacheTTL)
+		return plan, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	cache.Set(key, plan, CacheTTL)
-	return plan, nil
+	return value.(*expressionPlan), nil
 }
 
 func buildExpressionPlan(ctx context.Context, ast *cel.Ast, env *cel.Env) (*expressionPlan, error) {
