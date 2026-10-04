@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +13,8 @@ func TestCreateStateMaterializeEvents(t *testing.T) {
 		json.RawMessage(`{"name":"first"}`),
 		json.RawMessage(`{"name":"second"}`),
 	}
-	serialized := []string{string(rawEvents[0]), string(rawEvents[1])}
+	serialized, err := event.NewSerializedEvents(rawEvents)
+	require.NoError(t, err)
 	state := CreateState{SerializedEvents: serialized}
 
 	require.Equal(t, rawEvents, state.MaterializeEvents())

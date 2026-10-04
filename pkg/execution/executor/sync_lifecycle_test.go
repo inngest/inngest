@@ -41,7 +41,11 @@ func (r *recordingSyncLifecycle) OnFunctionScheduled(_ context.Context, _ sv2.Me
 
 func TestRunFunctionScheduledSyncListenersMaterializesOnlyForListeners(t *testing.T) {
 	ctx := context.Background()
-	serialized := []string{`{"name":"first"}`, `{"name":"second"}`}
+	serialized, err := event.NewSerializedEvents([]json.RawMessage{
+		json.RawMessage(`{"name":"first"}`),
+		json.RawMessage(`{"name":"second"}`),
+	})
+	require.NoError(t, err)
 	e := &executor{log: logger.VoidLogger()}
 
 	allocs := testing.AllocsPerRun(100, func() {
@@ -105,7 +109,8 @@ func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSharedEvents(t *testi
 		json.RawMessage(`{"name":"first"}`),
 		json.RawMessage(`{"name":"second"}`),
 	}
-	serialized := []string{string(rawEvents[0]), string(rawEvents[1])}
+	serialized, err := event.NewSerializedEvents(rawEvents)
+	require.NoError(t, err)
 	runService := &recordingScheduleRunService{}
 	listener := &mutatingScheduledSyncLifecycle{runService: runService}
 	e := &executor{
@@ -150,7 +155,7 @@ func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSharedEvents(t *testi
 		RunMode:          enums.RunModeSync,
 	}
 
-	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+	_, _, err = e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 	require.NoError(t, err)
 	require.True(t, listener.called)
 	require.True(t, listener.createCalledFirst, "state creation must complete before invoking the listener")

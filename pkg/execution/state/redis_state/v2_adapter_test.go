@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
@@ -75,7 +76,9 @@ func TestV2Adapter(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Create returns serialized events", func(t *testing.T) {
-		serializedEvents := []string{`{"name":"first"}`, `{"name":"second"}`}
+		rawEvents := []json.RawMessage{json.RawMessage(`{"name":"first"}`), json.RawMessage(`{"name":"second"}`)}
+		serializedEvents, err := event.NewSerializedEvents(rawEvents)
+		require.NoError(t, err)
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 		createdState, err := v2svc.Create(ctx, statev2.CreateState{
 			Metadata: statev2.Metadata{
@@ -96,10 +99,7 @@ func TestV2Adapter(t *testing.T) {
 			SerializedEvents: serializedEvents,
 		})
 		require.NoError(t, err)
-		require.Equal(t, []json.RawMessage{
-			json.RawMessage(serializedEvents[0]),
-			json.RawMessage(serializedEvents[1]),
-		}, createdState.Events)
+		require.Equal(t, rawEvents, createdState.Events)
 	})
 
 	t.Run("Create method functionality", func(t *testing.T) {

@@ -1094,26 +1094,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
 	req.Context = maps.Clone(req.Context)
 	req.Events = slices.Clone(req.Events)
-	req.SerializedEvents = slices.Clone(req.SerializedEvents)
 	return req
 }
 
-func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immutableEvents []string) ([]json.RawMessage, []string, string, error) {
-	if len(immutableEvents) > 0 {
-		if len(immutableEvents) != len(trackedEvents) {
-			return nil, nil, "", fmt.Errorf("serialized event count does not match event count")
+func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immutableEvents event.SerializedEvents) ([]json.RawMessage, event.SerializedEvents, string, error) {
+	if immutableEvents.Len() > 0 {
+		if immutableEvents.Len() != len(trackedEvents) {
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("serialized event count does not match event count")
 		}
-		immutableEvents = slices.Clone(immutableEvents)
-		var input strings.Builder
-		input.WriteByte('[')
-		for i, item := range immutableEvents {
-			if i > 0 {
-				input.WriteByte(',')
-			}
-			input.WriteString(item)
-		}
-		input.WriteByte(']')
-		return nil, immutableEvents, input.String(), nil
+		return nil, immutableEvents, immutableEvents.Input(), nil
 	}
 
 	// Legacy compatibility path. Remove after every ScheduleRequest caller provides
@@ -1122,34 +1111,30 @@ func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immut
 	for n, item := range trackedEvents {
 		byt, err := json.Marshal(item.GetEvent())
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("error marshalling event: %w", err)
+			return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling event: %w", err)
 		}
 		rawEvents[n] = byt
 	}
 	bytEvts, err := json.Marshal(rawEvents)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("error marshalling events: %w", err)
+		return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling events: %w", err)
 	}
 
-	return rawEvents, nil, string(bytEvts), nil
+	return rawEvents, event.SerializedEvents{}, string(bytEvts), nil
 }
 
-func rawEventPayloads(rawEvents []json.RawMessage, immutableEvents []string) []json.RawMessage {
+func rawEventPayloads(rawEvents []json.RawMessage, immutableEvents event.SerializedEvents) []json.RawMessage {
 	if len(rawEvents) > 0 {
 		// Raw messages are mutable by type but treated as immutable event payloads.
 		return rawEvents
 	}
-	if len(immutableEvents) == 0 {
+	if immutableEvents.Len() == 0 {
 		return rawEvents
 	}
 
 	// The shared immutable path materializes owned raw messages only for consumers
 	// that still require that representation.
-	rawEvents = make([]json.RawMessage, len(immutableEvents))
-	for i, item := range immutableEvents {
-		rawEvents[i] = json.RawMessage(item)
-	}
-	return rawEvents
+	return immutableEvents.RawMessages()
 }
 
 // prepareStateEventsForSyncListeners switches state creation to raw event

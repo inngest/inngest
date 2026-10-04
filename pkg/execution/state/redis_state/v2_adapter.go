@@ -85,7 +85,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 	// Supplying both representations is a caller bug. Reject the request rather
 	// than choosing one and risking inconsistent durable state. The legacy Events
 	// representation and this guard will be removed after all callers migrate.
-	if len(s.Events) > 0 && len(s.SerializedEvents) > 0 {
+	if len(s.Events) > 0 && s.SerializedEvents.Len() > 0 {
 		return state.State{}, fmt.Errorf("create state contains raw and immutable event payloads")
 	}
 	rawEvents := s.MaterializeEvents()
