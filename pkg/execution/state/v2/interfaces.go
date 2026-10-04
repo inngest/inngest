@@ -26,12 +26,31 @@ type CreateState struct {
 	Metadata Metadata
 	// Events contains a slice of JSON-encoded events.
 	Events []json.RawMessage
+	// SerializedEvents contains immutable JSON-encoded events. Implementations
+	// should prefer this representation when present and materialize bytes only
+	// within the transport or backend that owns them.
+	SerializedEvents []string
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
 	Steps []state.MemoizedStep
 	// StepInputs allows users to specify pre-defined step inputs to run
 	// workflows from arbitrary points.
 	StepInputs []state.MemoizedStep
+}
+
+// MaterializeEvents makes Events the sole event representation and returns it.
+// Existing raw messages are reused; otherwise the immutable snapshot is copied
+// into independently owned byte slices. Event payloads remain semantically
+// immutable regardless of representation.
+func (s *CreateState) MaterializeEvents() []json.RawMessage {
+	if len(s.Events) == 0 && len(s.SerializedEvents) > 0 {
+		s.Events = make([]json.RawMessage, len(s.SerializedEvents))
+		for i, event := range s.SerializedEvents {
+			s.Events[i] = json.RawMessage(event)
+		}
+	}
+	s.SerializedEvents = nil
+	return s.Events
 }
 
 // MigrateState carries a run-state snapshot for cross-cluster JIT migration.

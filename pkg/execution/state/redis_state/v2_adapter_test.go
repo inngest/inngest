@@ -74,6 +74,34 @@ func TestV2Adapter(t *testing.T) {
 	eventBytes, err := json.Marshal(testEvent)
 	require.NoError(t, err)
 
+	t.Run("Create returns serialized events", func(t *testing.T) {
+		serializedEvents := []string{`{"name":"first"}`, `{"name":"second"}`}
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		createdState, err := v2svc.Create(ctx, statev2.CreateState{
+			Metadata: statev2.Metadata{
+				ID: statev2.ID{
+					RunID:      runID,
+					FunctionID: functionID,
+					Tenant: statev2.Tenant{
+						AccountID: accountID,
+						EnvID:     workspaceID,
+						AppID:     appID,
+					},
+				},
+				Config: *statev2.InitConfig(&statev2.Config{
+					SpanID:      "serialized-events-span",
+					Idempotency: "serialized-events-" + runID.String(),
+				}),
+			},
+			SerializedEvents: serializedEvents,
+		})
+		require.NoError(t, err)
+		require.Equal(t, []json.RawMessage{
+			json.RawMessage(serializedEvents[0]),
+			json.RawMessage(serializedEvents[1]),
+		}, createdState.Events)
+	})
+
 	t.Run("Create method functionality", func(t *testing.T) {
 		stepData1 := map[string]any{"result": "step1_output", "count": 42}
 		stepData2 := map[string]any{"result": "step2_output", "status": "completed"}

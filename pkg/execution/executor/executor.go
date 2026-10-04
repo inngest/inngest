@@ -1094,7 +1094,80 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
 	req.Context = maps.Clone(req.Context)
 	req.Events = slices.Clone(req.Events)
+	req.SerializedEvents = slices.Clone(req.SerializedEvents)
 	return req
+}
+
+func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immutableEvents []string) ([]json.RawMessage, []string, string, error) {
+	if len(immutableEvents) > 0 {
+		if len(immutableEvents) != len(trackedEvents) {
+			return nil, nil, "", fmt.Errorf("serialized event count does not match event count")
+		}
+		immutableEvents = slices.Clone(immutableEvents)
+		var input strings.Builder
+		input.WriteByte('[')
+		for i, item := range immutableEvents {
+			if i > 0 {
+				input.WriteByte(',')
+			}
+			input.WriteString(item)
+		}
+		input.WriteByte(']')
+		return nil, immutableEvents, input.String(), nil
+	}
+
+	// Legacy compatibility path. Remove after every ScheduleRequest caller provides
+	// SerializedEvents.
+	rawEvents := make([]json.RawMessage, len(trackedEvents))
+	for n, item := range trackedEvents {
+		byt, err := json.Marshal(item.GetEvent())
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("error marshalling event: %w", err)
+		}
+		rawEvents[n] = byt
+	}
+	bytEvts, err := json.Marshal(rawEvents)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("error marshalling events: %w", err)
+	}
+
+	return rawEvents, nil, string(bytEvts), nil
+}
+
+func rawEventPayloads(rawEvents []json.RawMessage, immutableEvents []string) []json.RawMessage {
+	if len(rawEvents) > 0 {
+		// Raw messages are mutable by type but treated as immutable event payloads.
+		return rawEvents
+	}
+	if len(immutableEvents) == 0 {
+		return rawEvents
+	}
+
+	// The shared immutable path materializes owned raw messages only for consumers
+	// that still require that representation.
+	rawEvents = make([]json.RawMessage, len(immutableEvents))
+	for i, item := range immutableEvents {
+		rawEvents[i] = json.RawMessage(item)
+	}
+	return rawEvents
+}
+
+// prepareStateEventsForSyncListeners switches state creation to raw event
+// payloads when synchronous listeners are registered. Create consumes these
+// events first; successful scheduling then passes the same buffers to every
+// listener, preserving legacy behavior without a second materialization.
+func (e *executor) prepareStateEventsForSyncListeners(newState *sv2.CreateState) []json.RawMessage {
+	if len(e.syncLifecycles) == 0 {
+		return nil
+	}
+
+	return newState.MaterializeEvents()
+}
+
+func (e *executor) notifyFunctionScheduledSyncListeners(ctx context.Context, metadata sv2.Metadata, item queue.Item, events []json.RawMessage) {
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionScheduled(ctx, metadata, item, events)
+	})
 }
 
 func cloneMetadata(md sv2.Metadata) sv2.Metadata {
@@ -1259,9 +1332,8 @@ func (e *executor) schedule(
 
 	var eventName *string
 
-	evts := make([]json.RawMessage, len(req.Events))
 	sessions := meta.EventSessions{}
-	for n, item := range req.Events {
+	for _, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
@@ -1271,13 +1343,11 @@ func (e *executor) schedule(
 		for name, id := range evt.Meta.Sessions {
 			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
+	}
 
-		// serialize this data to the span at the same time
-		byt, err := json.Marshal(evt)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
-		}
-		evts[n] = byt
+	rawEvents, immutableEvents, traceInput, err := prepareStateAndTraceEventPayloads(req.Events, req.SerializedEvents)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var droppedSessions int
@@ -1363,13 +1433,6 @@ func (e *executor) schedule(
 		},
 		Config: config,
 	}
-
-	bytEvts, err := json.Marshal(evts)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error marshalling events: %w", err)
-	}
-
-	strEvts := string(bytEvts)
 
 	var (
 		runSpanRef       *tracing.DroppableSpan
@@ -1513,18 +1576,21 @@ func (e *executor) schedule(
 	//
 
 	newState := sv2.CreateState{
-		Events:   evts,
-		Metadata: metadata,
-		Steps:    []state.MemoizedStep{},
+		Events:           rawEvents,
+		SerializedEvents: immutableEvents,
+		Metadata:         metadata,
+		Steps:            []state.MemoizedStep{},
 	}
 	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
+		newState.MaterializeEvents()
 		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
+	var listenerEvents []json.RawMessage
 
 	stv1ID := sv2.V1FromMetadata(metadata)
 
@@ -1539,6 +1605,7 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
+		listenerEvents = e.prepareStateEventsForSyncListeners(&newState)
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
@@ -1615,7 +1682,7 @@ func (e *executor) schedule(
 		Attributes: meta.NewAttrSet(
 			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
 			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			meta.Attr(meta.Attrs.EventsInput, &strEvts),
+			meta.Attr(meta.Attrs.EventsInput, &traceInput),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ScheduledAt, &scheduledAt),
@@ -1627,11 +1694,7 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
-	var firstEvent json.RawMessage
-	if len(evts) > 0 {
-		firstEvent = evts[0]
-	}
-	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, firstEvent); len(keys) > 0 {
+	if keys := customConcurrencyTraceKeys(ctx, &req.Function, metadata.Config.CustomConcurrencyKeys, concurrencyTraceEventInput{decoded: evtMap}); len(keys) > 0 {
 		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 	if len(sessions) > 0 {
@@ -1698,7 +1761,7 @@ func (e *executor) schedule(
 	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, skipReason)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1789,9 +1852,7 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
-			sl.OnFunctionScheduled(ctx, metadata, item, evts)
-		})
+		e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -1907,7 +1968,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), enums.SkipReasonSingleton)
 
 	case errors.Is(err, queue.ErrQueueShardNotFound):
 		if stateCreated {
@@ -1927,9 +1988,7 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
-	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
-		sl.OnFunctionScheduled(ctx, metadata, item, evts)
-	})
+	e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -2324,7 +2383,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if len(events) > 0 {
 		firstEvent = events[0]
 	}
-	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), firstEvent); len(keys) > 0 {
+	if keys := customConcurrencyTraceKeys(ctx, ef.Function, item.GetConcurrencyKeys(), concurrencyTraceEventInput{raw: firstEvent}); len(keys) > 0 {
 		meta.AddAttr(execAttrs, meta.Attrs.CustomConcurrencyKeys, &keys)
 	}
 
