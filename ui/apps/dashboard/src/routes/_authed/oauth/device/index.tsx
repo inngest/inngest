@@ -4,6 +4,7 @@ import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import type { Option } from '@inngest/components/Select/Select';
 import { CredentialForm } from '@/components/OAuth/CredentialForm';
+import { oauthRequest } from '@/components/OAuth/oauthRequest';
 import { useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
@@ -161,7 +162,7 @@ function OAuthAuthorizationForm({
     setDone(null);
     const loadAuthorization = async () => {
       try {
-        const response = await apiRequest<AuthorizationDetails>(
+        const response = await oauthRequest<AuthorizationDetails>(
           getToken,
           `/oauth/authorization?request=${encodeURIComponent(requestID)}${
             submittedUserCode
@@ -203,7 +204,7 @@ function OAuthAuthorizationForm({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await apiRequest<{
+      const response = await oauthRequest<{
         request: string;
         user_code: string;
       }>(
@@ -271,7 +272,7 @@ function OAuthAuthorizationForm({
     const controller = new AbortController();
     activeSubmission.current = controller;
     try {
-      const response = await apiRequest<{ redirect_uri?: string }>(
+      const response = await oauthRequest<{ redirect_uri?: string }>(
         getToken,
         `/oauth/authorization${decision === 'denied' ? '/deny' : ''}`,
         body,
@@ -474,37 +475,6 @@ function Page({ children }: { children: React.ReactNode }) {
       {children}
     </main>
   );
-}
-
-async function apiRequest<T = unknown>(
-  getToken: () => Promise<string | null>,
-  path: string,
-  body?: unknown,
-  signal?: AbortSignal,
-): Promise<T> {
-  const token = await getToken();
-  signal?.throwIfAborted();
-  const response = await fetch(new URL(path, import.meta.env.VITE_API_URL), {
-    method: body === undefined ? 'GET' : 'POST',
-    credentials: 'include',
-    headers: {
-      Accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal,
-  });
-  const payload = (await response.json()) as T & {
-    error?: string;
-    error_description?: string;
-  };
-  if (!response.ok) {
-    throw new Error(
-      payload.error_description ?? payload.error ?? 'Request failed.',
-    );
-  }
-  return payload;
 }
 
 function errorMessage(error: unknown) {

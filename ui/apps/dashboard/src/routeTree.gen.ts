@@ -53,6 +53,7 @@ import { Route as AuthedOauthAuthorizeIndexRouteImport } from './routes/_authed/
 import { Route as AuthedOauthDeviceIndexRouteImport } from './routes/_authed/oauth/device/index'
 import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index'
+import { Route as AuthedSettingsOauthSessionsIndexRouteImport } from './routes/_authed/settings/oauth-sessions/index'
 import { Route as AuthedSettingsOrganizationSplatRouteImport } from './routes/_authed/settings/organization/$'
 import { Route as AuthedSettingsUserSplatRouteImport } from './routes/_authed/settings/user/$'
 import { Route as AuthedEnvEnvSlugAiOverviewIndexRouteImport } from './routes/_authed/env/$envSlug/ai-overview/index'
@@ -348,6 +349,12 @@ const AuthedSettingsIntegrationsIndexRoute =
   AuthedSettingsIntegrationsIndexRouteImport.update({
     id: '/integrations/',
     path: '/integrations/',
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any)
+const AuthedSettingsOauthSessionsIndexRoute =
+  AuthedSettingsOauthSessionsIndexRouteImport.update({
+    id: '/oauth-sessions/',
+    path: '/oauth-sessions/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
 const AuthedSettingsOrganizationSplatRoute =
@@ -774,6 +781,7 @@ export interface FileRoutesByFullPath {
   '/oauth/device/': typeof AuthedOauthDeviceIndexRoute
   '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
+  '/settings/oauth-sessions/': typeof AuthedSettingsOauthSessionsIndexRoute
   '/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
   '/env/$envSlug/event-types/$eventTypeName': typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren
@@ -877,6 +885,7 @@ export interface FileRoutesByTo {
   '/oauth/device': typeof AuthedOauthDeviceIndexRoute
   '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute
+  '/settings/oauth-sessions': typeof AuthedSettingsOauthSessionsIndexRoute
   '/env/$envSlug/ai-overview': typeof AuthedEnvEnvSlugAiOverviewIndexRoute
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsIndexRoute
   '/env/$envSlug/debugger': typeof AuthedEnvEnvSlugDebuggerIndexRoute
@@ -979,6 +988,7 @@ export interface FileRoutesById {
   '/_authed/oauth/device/': typeof AuthedOauthDeviceIndexRoute
   '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
+  '/_authed/settings/oauth-sessions/': typeof AuthedSettingsOauthSessionsIndexRoute
   '/_authed/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/_authed/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
   '/_authed/env/$envSlug/event-types/$eventTypeName': typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren
@@ -1089,6 +1099,7 @@ export interface FileRouteTypes {
     | '/oauth/device/'
     | '/settings/api-keys/'
     | '/settings/integrations/'
+    | '/settings/oauth-sessions/'
     | '/env/$envSlug/apps/$externalID'
     | '/env/$envSlug/apps/sync-new'
     | '/env/$envSlug/event-types/$eventTypeName'
@@ -1192,6 +1203,7 @@ export interface FileRouteTypes {
     | '/oauth/device'
     | '/settings/api-keys'
     | '/settings/integrations'
+    | '/settings/oauth-sessions'
     | '/env/$envSlug/ai-overview'
     | '/env/$envSlug/apps'
     | '/env/$envSlug/debugger'
@@ -1293,6 +1305,7 @@ export interface FileRouteTypes {
     | '/_authed/oauth/device/'
     | '/_authed/settings/api-keys/'
     | '/_authed/settings/integrations/'
+    | '/_authed/settings/oauth-sessions/'
     | '/_authed/env/$envSlug/apps/$externalID'
     | '/_authed/env/$envSlug/apps/sync-new'
     | '/_authed/env/$envSlug/event-types/$eventTypeName'
@@ -1688,6 +1701,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/settings/integrations/'
       preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport
+      parentRoute: typeof AuthedSettingsRouteRoute
+    }
+    '/_authed/settings/oauth-sessions/': {
+      id: '/_authed/settings/oauth-sessions/'
+      path: '/oauth-sessions'
+      fullPath: '/settings/oauth-sessions/'
+      preLoaderRoute: typeof AuthedSettingsOauthSessionsIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
     }
     '/_authed/settings/organization/$': {
@@ -2200,6 +2220,7 @@ interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsUserSplatRoute: typeof AuthedSettingsUserSplatRoute
   AuthedSettingsApiKeysIndexRoute: typeof AuthedSettingsApiKeysIndexRoute
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute
+  AuthedSettingsOauthSessionsIndexRoute: typeof AuthedSettingsOauthSessionsIndexRoute
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren
   AuthedSettingsIntegrationsDatadogIndexRoute: typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -2221,6 +2242,7 @@ const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsUserSplatRoute: AuthedSettingsUserSplatRoute,
   AuthedSettingsApiKeysIndexRoute: AuthedSettingsApiKeysIndexRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
+  AuthedSettingsOauthSessionsIndexRoute: AuthedSettingsOauthSessionsIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
   AuthedSettingsIntegrationsSupabaseStepRouteRoute:

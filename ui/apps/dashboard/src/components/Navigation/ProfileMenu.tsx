@@ -96,6 +96,17 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            value="oauthSessions"
+            onClick={() => navigate({ to: '/settings/oauth-sessions' })}
+          >
+            <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+              <RiKey2Line className="text-muted mr-2 h-4 w-4" />
+              <div>OAuth sessions</div>
+            </div>
+          </Listbox.Option>
+
+          <Listbox.Option
+            className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="billing"
             onClick={() => navigate({ to: pathCreator.billing() })}
           >
