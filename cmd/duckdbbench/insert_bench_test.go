@@ -30,7 +30,7 @@ import (
 var spanColumns = []string{
 	"account_id", "env_id", "run_id", "run_queued_at", "app_id", "function_id",
 	"name", "start_time", "end_time", "trace_id", "span_id", "parent_span_id",
-	"attributes", "links", "output", "input",
+	"attributes", "output", "input",
 }
 
 // spanRow is a synthetic inngest.run_trace_spans row for benchmarking.
@@ -108,7 +108,7 @@ func (d dbInserter) insertBatch(ctx context.Context, rows []spanRow) error {
 		args = append(args,
 			s.accountID.String(), s.envID.String(), s.runID, s.runQueuedAt,
 			s.appID.String(), s.functionID.String(), s.name, s.startTime, s.endTime,
-			s.traceID, s.spanID, nil, s.attributes, nil, nil, nil,
+			s.traceID, s.spanID, nil, s.attributes, nil, nil,
 		)
 	}
 	query := batchInsertQuery(driver.DuckLakeAlias+".run_trace_spans", spanColumns, len(rows))
@@ -155,7 +155,7 @@ func (q quackAppendInserter) insertBatch(ctx context.Context, rows []spanRow) er
 		if err := q.appender.AppendRow(
 			s.accountID.String(), s.envID.String(), s.runID, s.runQueuedAt,
 			s.appID.String(), s.functionID.String(), s.name, s.startTime, s.endTime,
-			s.traceID, s.spanID, nil, s.attributes, nil, nil, nil,
+			s.traceID, s.spanID, nil, s.attributes, nil, nil,
 		); err != nil {
 			return fmt.Errorf("appending row: %w", err)
 		}
@@ -188,7 +188,7 @@ func (a appenderInserter) insertBatch(ctx context.Context, rows []spanRow) error
 		if err := appender.AppendRow(
 			duckdbgo.UUID(s.accountID), duckdbgo.UUID(s.envID), s.runID, s.runQueuedAt,
 			duckdbgo.UUID(s.appID), duckdbgo.UUID(s.functionID), s.name, s.startTime, s.endTime,
-			s.traceID, s.spanID, nil, json.RawMessage(s.attributes), nil, nil, nil,
+			s.traceID, s.spanID, nil, json.RawMessage(s.attributes), nil, nil,
 		); err != nil {
 			_ = appender.Close()
 			return fmt.Errorf("appending row: %w", err)
@@ -317,7 +317,7 @@ var quackAppendColumns = []driver.QuackColumnKind{
 	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
 	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampMS, driver.QuackColumnTimestampMS, // app_id, function_id, name, start_time, end_time
 	driver.QuackColumnVarchar, driver.QuackColumnVarchar, driver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
-	driver.QuackColumnJSON, driver.QuackColumnJSON, driver.QuackColumnJSON, driver.QuackColumnJSON, // attributes, links, output, input
+	driver.QuackColumnJSON, driver.QuackColumnJSON, driver.QuackColumnJSON, // attributes, output, input
 }
 
 // openQuackAppend returns an open func for the quack transport (schema
