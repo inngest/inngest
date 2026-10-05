@@ -50,6 +50,10 @@ func sendDataColumnType(k ColumnKind) (string, error) {
 		return "VARCHAR", nil
 	case ColumnTimestampMS:
 		return "TIMESTAMP_MS", nil
+	case ColumnBool:
+		return "BOOLEAN", nil
+	case ColumnBigint:
+		return "BIGINT", nil
 	default:
 		return "", fmt.Errorf("duckdb: quack appender: unsupported ColumnKind %d", k)
 	}

@@ -72,3 +72,32 @@ func TestMapRowsNextOnEmptyResultReturnsEOFImmediately(t *testing.T) {
 	dest := make([]driver.Value, 0)
 	require.ErrorIs(t, r.Next(dest), io.EOF)
 }
+
+func TestMapRowsConvertsBooleans(t *testing.T) {
+	tests := []struct {
+		name string
+		in   any
+		want driver.Value
+	}{
+		{"CLI text true", "true", true},
+		{"CLI text false", "false", false},
+		{"JSON boolean", true, true},
+		{"NULL", nil, nil},
+		{"unrecognized text passes through", "yes", "yes"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := newMapRows([]string{"b"}, []string{"BOOLEAN"}, testRows([]string{"b"}, []any{tt.in}))
+			dest := make([]driver.Value, 1)
+			require.NoError(t, r.Next(dest))
+			require.Equal(t, tt.want, dest[0])
+		})
+	}
+}
+
+func TestMapRowsLeavesBooleanTextInOtherColumnsAlone(t *testing.T) {
+	r := newMapRows([]string{"s"}, []string{"VARCHAR"}, testRows([]string{"s"}, []any{"true"}))
+	dest := make([]driver.Value, 1)
+	require.NoError(t, r.Next(dest))
+	require.Equal(t, "true", dest[0])
+}

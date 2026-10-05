@@ -29,8 +29,9 @@ import (
 // PrepareResponse's chunks get.
 //
 // Type coverage is scoped to exactly what inngest.run_trace_spans uses today
-// (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMP_MS) — extend as new
-// callers need new types.
+// (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMP_MS), plus BOOLEAN and
+// BIGINT for federate's Arrow ingestion — extend as new callers need new
+// types.
 
 // ColumnKind identifies one column's physical wire type for
 // driver.QuackAppender.AppendRow.
@@ -46,6 +47,10 @@ const (
 	ColumnJSON
 	// ColumnTimestampMS accepts a time.Time or nil.
 	ColumnTimestampMS
+	// ColumnBool accepts a bool or nil.
+	ColumnBool
+	// ColumnBigint accepts an int64 (or any Go integer type) or nil.
+	ColumnBigint
 )
 
 // wireID returns this kind's LogicalTypeId and, for ColumnJSON, its
@@ -63,6 +68,10 @@ func (k ColumnKind) wireID() (id byte, alias string) {
 		return logicalTypeUUID, ""
 	case ColumnJSON:
 		return logicalTypeVarchar, aliasJSON
+	case ColumnBool:
+		return logicalTypeBoolean, ""
+	case ColumnBigint:
+		return logicalTypeBigInt, ""
 	default: // ColumnVarchar, ColumnTimestampMS
 		if k == ColumnTimestampMS {
 			return logicalTypeTimestampMs, ""
@@ -172,6 +181,36 @@ func encodeVectorColumn(w *writer, kind ColumnKind, rows [][]any, colIdx int) er
 			putLE64(data[i*8:i*8+8], uint64(micros))
 		}
 		w.writeData(data)
+	case ColumnBool:
+		w.writeFieldID(102)
+		data := make([]byte, n)
+		for i, row := range rows {
+			if row[colIdx] == nil {
+				continue
+			}
+			b, ok := row[colIdx].(bool)
+			if !ok {
+				return fmt.Errorf("row %d: expected bool, got %T", i, row[colIdx])
+			}
+			if b {
+				data[i] = 1
+			}
+		}
+		w.writeData(data)
+	case ColumnBigint:
+		w.writeFieldID(102)
+		data := make([]byte, n*8)
+		for i, row := range rows {
+			if row[colIdx] == nil {
+				continue
+			}
+			v, err := valueToInt64(row[colIdx])
+			if err != nil {
+				return fmt.Errorf("row %d: %w", i, err)
+			}
+			putLE64(data[i*8:i*8+8], uint64(v))
+		}
+		w.writeData(data)
 	case ColumnVarchar, ColumnJSON:
 		if err := encodeVarcharVectorData(w, rows, colIdx); err != nil {
 			return err
@@ -233,6 +272,29 @@ func valueToTimestampMS(v any) (int64, error) {
 		return 0, fmt.Errorf("expected time.Time, got %T", v)
 	}
 	return t.UnixMilli(), nil
+}
+
+func valueToInt64(v any) (int64, error) {
+	switch val := v.(type) {
+	case int64:
+		return val, nil
+	case int:
+		return int64(val), nil
+	case int32:
+		return int64(val), nil
+	case int16:
+		return int64(val), nil
+	case int8:
+		return int64(val), nil
+	case uint32:
+		return int64(val), nil
+	case uint16:
+		return int64(val), nil
+	case uint8:
+		return int64(val), nil
+	default:
+		return 0, fmt.Errorf("expected an integer, got %T", v)
+	}
 }
 
 // timeLike avoids importing "time" solely for a type assertion signature;
