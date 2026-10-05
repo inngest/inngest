@@ -12,8 +12,16 @@ type Pushed = Record<string, unknown> & { eventCallback?: () => void };
 let dataLayer: Pushed[];
 let storage: Map<string, string>;
 
-const stubWindow = ({ gtm = true } = {}) => {
+const stubWindow = ({ gtm = true, autoCallback = false } = {}) => {
   dataLayer = [];
+  if (autoCallback) {
+    // Behave like GTM: run the event's tags, then call eventCallback.
+    dataLayer.push = (item: Pushed) => {
+      Array.prototype.push.call(dataLayer, item);
+      item.eventCallback?.();
+      return dataLayer.length;
+    };
+  }
   vi.stubGlobal('window', {
     dataLayer,
     ...(gtm && { google_tag_manager: {} }),
@@ -84,19 +92,69 @@ describe('trackAccountCreated', () => {
     await expect(done).resolves.toBeUndefined();
   });
 
-  it('does not wait when GTM is not on the page', async () => {
+  it('gives up after a short wait when GTM never loads', async () => {
+    vi.useFakeTimers();
     stubWindow({ gtm: false });
-    await trackAccountCreated({
+    const done = trackAccountCreated({
       accountID: 'acct_1',
       email: undefined,
       isFirstOrganization: true,
     });
-    expect(dataLayer).toHaveLength(1);
+    await vi.waitFor(() => expect(dataLayer).toHaveLength(1));
     expect(dataLayer[0]).not.toHaveProperty('user_data');
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(done).resolves.toBeUndefined();
+  });
+
+  it('waits for GTM that loads after the push', async () => {
+    vi.useFakeTimers();
+    stubWindow({ gtm: false });
+    let resolved = false;
+    const done = trackAccountCreated({
+      accountID: 'acct_1',
+      email: 'pat@example.com',
+      isFirstOrganization: true,
+    }).then(() => {
+      resolved = true;
+    });
+    await vi.waitFor(() => expect(dataLayer).toHaveLength(1));
+
+    await vi.advanceTimersByTimeAsync(300);
+    expect(resolved).toBe(false);
+
+    (window as Window & { google_tag_manager?: unknown }).google_tag_manager =
+      {};
+    await vi.advanceTimersByTimeAsync(100);
+    expect(resolved).toBe(false);
+
+    dataLayer[0].eventCallback?.();
+    await done;
+    expect(storage.size).toBe(1);
+  });
+
+  it('allows a retry when GTM never loaded', async () => {
+    vi.useFakeTimers();
+    stubWindow({ gtm: false });
+    const input = {
+      accountID: 'acct_1',
+      email: undefined,
+      isFirstOrganization: true,
+    };
+
+    const first = trackAccountCreated(input);
+    await vi.waitFor(() => expect(dataLayer).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(1000);
+    await first;
+    expect(storage.size).toBe(0);
+
+    const second = trackAccountCreated(input);
+    await vi.waitFor(() => expect(dataLayer).toHaveLength(2));
+    await vi.advanceTimersByTimeAsync(1000);
+    await second;
   });
 
   it('fires once per account', async () => {
-    stubWindow({ gtm: false });
+    stubWindow({ autoCallback: true });
     const input = {
       accountID: 'acct_1',
       email: 'pat@example.com',
@@ -104,6 +162,22 @@ describe('trackAccountCreated', () => {
     };
     await trackAccountCreated(input);
     await trackAccountCreated(input);
+    expect(dataLayer).toHaveLength(1);
+  });
+
+  it('ignores a concurrent call for the same account', async () => {
+    stubWindow();
+    const input = {
+      accountID: 'acct_1',
+      email: 'pat@example.com',
+      isFirstOrganization: true,
+    };
+    const first = trackAccountCreated(input);
+    await trackAccountCreated(input);
+
+    await vi.waitFor(() => expect(dataLayer).toHaveLength(1));
+    dataLayer[0].eventCallback?.();
+    await first;
     expect(dataLayer).toHaveLength(1);
   });
 

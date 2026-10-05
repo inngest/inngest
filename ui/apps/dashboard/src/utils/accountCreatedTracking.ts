@@ -8,6 +8,17 @@ export const ACCOUNT_CREATED_TIMEOUT_MS = 2000;
 
 const TRACKED_KEY_PREFIX = 'inngest_account_created_tracked:';
 
+// GTM loads asynchronously. If it is not on the page yet, the push below is
+// queued in the dataLayer and GTM runs it once it initializes, but only if the
+// page stays alive long enough. Give GTM a short window to appear before
+// concluding it is blocked (ad blockers, consent tools).
+const GTM_LOAD_WAIT_MS = 1000;
+const GTM_POLL_MS = 50;
+
+// Calls for the same account that overlap while the first is still hashing or
+// waiting (React strict mode, a double-fired callback) should push only once.
+const inFlight = new Set<string>();
+
 type GTMWindow = Window & {
   dataLayer?: unknown[];
   google_tag_manager?: unknown;
@@ -57,8 +68,10 @@ type TrackAccountCreatedInput = {
 /**
  * Pushes `account_created` to the GTM dataLayer and resolves once GTM reports
  * that the tags it triggered have run, or after `timeoutMs`, so the caller can
- * navigate away without cutting those requests off. Only a SHA-256 hash of the
- * normalized email is pushed, never the raw address. Never rejects.
+ * navigate away without cutting those requests off. If GTM has not loaded yet
+ * it waits briefly for it to appear; if it never does, it gives up and does not
+ * mark the account as tracked, so a later visit can try again. Only a SHA-256
+ * hash of the normalized email is pushed, never the raw address. Never rejects.
  */
 export async function trackAccountCreated({
   accountID,
@@ -71,34 +84,59 @@ export async function trackAccountCreated({
   }
   // /organization-setup returns the existing account on reload or revisit;
   // count each account once.
-  if (hasTracked(accountID)) return;
-  markTracked(accountID);
+  if (hasTracked(accountID) || inFlight.has(accountID)) return;
+  inFlight.add(accountID);
 
-  let hashedEmail: string | undefined;
   try {
-    hashedEmail = email ? await sha256Hex(normalizeEmail(email)) : undefined;
-  } catch {
-    hashedEmail = undefined;
-  }
+    let hashedEmail: string | undefined;
+    try {
+      hashedEmail = email ? await sha256Hex(normalizeEmail(email)) : undefined;
+    } catch {
+      hashedEmail = undefined;
+    }
 
-  const w = window as GTMWindow;
-  w.dataLayer = w.dataLayer || [];
-  const dataLayer = w.dataLayer;
-  // Without GTM on the page (e.g. Segment blocked), nothing would ever call
-  // eventCallback, so don't wait.
-  const waitMs = w.google_tag_manager ? timeoutMs : 0;
+    const w = window as GTMWindow;
+    w.dataLayer = w.dataLayer || [];
+    const dataLayer = w.dataLayer;
 
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, waitMs);
-    dataLayer.push({
-      event: ACCOUNT_CREATED_EVENT,
-      account_id: accountID,
-      ...(hashedEmail && { user_data: { sha256_email_address: hashedEmail } }),
-      eventCallback: () => {
-        clearTimeout(timer);
+    await new Promise<void>((resolve) => {
+      let pollTimer: ReturnType<typeof setInterval> | undefined;
+      const finish = () => {
+        clearTimeout(timeoutTimer);
+        clearInterval(pollTimer);
         resolve();
-      },
-      eventTimeout: timeoutMs,
+      };
+      const timeoutTimer = setTimeout(finish, timeoutMs);
+
+      if (!w.google_tag_manager) {
+        // Stop early only if GTM never shows up. Once it does, the remaining
+        // wait is for eventCallback or the overall timeout.
+        let waited = 0;
+        pollTimer = setInterval(() => {
+          if (w.google_tag_manager) {
+            clearInterval(pollTimer);
+            return;
+          }
+          waited += GTM_POLL_MS;
+          if (waited >= GTM_LOAD_WAIT_MS) finish();
+        }, GTM_POLL_MS);
+      }
+
+      dataLayer.push({
+        event: ACCOUNT_CREATED_EVENT,
+        account_id: accountID,
+        ...(hashedEmail && {
+          user_data: { sha256_email_address: hashedEmail },
+        }),
+        eventCallback: finish,
+        eventTimeout: timeoutMs,
+      });
     });
-  });
+
+    // Only count the account as tracked if GTM was there to receive the event.
+    // Otherwise leave it unmarked so a later visit can retry.
+    if (w.google_tag_manager) markTracked(accountID);
+  } finally {
+    inFlight.delete(accountID);
+  }
 }
