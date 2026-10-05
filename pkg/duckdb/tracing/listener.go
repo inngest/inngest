@@ -118,6 +118,16 @@ func addRunEventAttrs(attrs *meta.SerializableAttrs, md sv2.Metadata, evts []jso
 	}
 }
 
+// addScheduledAtAttr sets the run's scheduled_at from its run state, fixed
+// when the run was scheduled. State written before scheduled_at was recorded
+// has none, so the attribute is left unset and readers fall back to the
+// run's queued_at.
+func addScheduledAtAttr(attrs *meta.SerializableAttrs, md sv2.Metadata) {
+	if !md.Config.ScheduledAt.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.ScheduledAt, &md.Config.ScheduledAt)
+	}
+}
+
 // addEventsInputAttr sets meta.Attrs.EventsInput to evts marshaled as a
 // single JSON array, so the run spans' `input` column (see spanExportRow)
 // carries the triggering events. A nil evts (e.g. a cron-triggered run,
@@ -171,6 +181,7 @@ func (l *listener) OnFunctionScheduled(ctx context.Context, md sv2.Metadata, ite
 	meta.AddAttr(attrs, meta.Attrs.StartedAt, (*time.Time)(nil))
 	meta.AddAttr(attrs, meta.Attrs.EndedAt, (*time.Time)(nil))
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusQueued))
+	addScheduledAtAttr(attrs, md)
 	addEventsInputAttr(ctx, attrs, evts)
 	addRunEventAttrs(attrs, md, evts)
 
@@ -237,6 +248,7 @@ func (l *listener) OnFunctionStarted(ctx context.Context, md sv2.Metadata, item 
 		meta.AddAttr(attrs, meta.Attrs.StartedAt, &md.Config.StartedAt)
 	}
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusRunning))
+	addScheduledAtAttr(attrs, md)
 	addEventsInputAttr(ctx, attrs, evts)
 	addRunEventAttrs(attrs, md, evts)
 
@@ -287,15 +299,15 @@ func (l *listener) OnFunctionFinished(ctx context.Context, md sv2.Metadata, item
 	// specific finish call, which for a multi-step function isn't the run's
 	// original enqueue.
 	//
-	// ScheduledAt is omitted: item.At would be equally wrong for the same
-	// reason, and the run's real scheduled_at isn't otherwise available
-	// here. FIXME: thread the run's actual scheduled_at through sv2.Metadata;
-	// until then materializeRuns falls back to queued_at.
+	// ScheduledAt comes from run state for the same reason: item.At would
+	// be equally wrong. md.Config.ScheduledAt is fixed when the run is
+	// scheduled (zero for state written before it was recorded, which
+	// AddTimingAttrs then leaves unset).
 	runAttrs := meta.NewAttrSet()
 	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &stepStatus)
 	addEventsInputAttr(ctx, runAttrs, evts)
 	addRunEventAttrs(runAttrs, md, evts)
-	tracing.AddTimingAttrs(runAttrs, queuedAt, time.Time{}, start, end)
+	tracing.AddTimingAttrs(runAttrs, queuedAt, md.Config.ScheduledAt, start, end)
 	addRunSpanAttrs(runAttrs, mdPtr)
 	// Mirrors executor.Finalize: production stamps the function output onto
 	// both the nonstep span and the root run span, so this root span needs
@@ -370,7 +382,7 @@ func (l *listener) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, _ e
 	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &status)
 	addEventsInputAttr(ctx, runAttrs, evts)
 	addRunEventAttrs(runAttrs, md, evts)
-	tracing.AddTimingAttrs(runAttrs, queuedAt, time.Time{}, md.Config.StartedAt, now)
+	tracing.AddTimingAttrs(runAttrs, queuedAt, md.Config.ScheduledAt, md.Config.StartedAt, now)
 	if md.Config.StartedAt.IsZero() {
 		// Explicitly nil, as in OnFunctionScheduled: otherwise
 		// tracingv3.CreateSpan defaults started_at to StartTime (queuedAt).
