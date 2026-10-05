@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/cel-go/cel"
+	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/interpreter"
 	"github.com/pkg/errors"
@@ -29,7 +30,7 @@ func buildProgram(ast *cel.Ast, env *cel.Env, evalUnknowns bool) (*celProgram, e
 		// Event-matching path: OptTrackState/OptExhaustiveEval only needed for ResidualAst.
 		opts = []cel.ProgramOption{
 			cel.EvalOptions(cel.OptPartialEval),
-			cel.CustomDecorator(unknownDecorator()),
+			cel.CustomDecorator(unknownDecorator(presenceTestIDs(ast))),
 		}
 	} else {
 		// Residual/interpolation path: OptTrackState for ResidualAst, OptExhaustiveEval so
@@ -43,6 +44,16 @@ func buildProgram(ast *cel.Ast, env *cel.Env, evalUnknowns bool) (*celProgram, e
 		return nil, err
 	}
 	return &celProgram{Program: prog}, nil
+}
+
+func presenceTestIDs(a *cel.Ast) map[int64]struct{} {
+	ids := map[int64]struct{}{}
+	celast.PostOrderVisit(a.NativeRep().Expr(), celast.NewExprVisitor(func(expr celast.Expr) {
+		if expr.Kind() == celast.SelectKind && expr.AsSelect().IsTestOnly() {
+			ids[expr.ID()] = struct{}{}
+		}
+	}))
+	return ids
 }
 
 // program builds a one-shot program+activation pair.  Used by the residual/interpolation
