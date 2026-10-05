@@ -1,14 +1,46 @@
+import { useMemo } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Chart } from '@inngest/components/Chart/Chart';
 import { Select } from '@inngest/components/Select/Select';
 import Tabs from '@inngest/components/Tabs/Tabs';
+import { cn } from '@inngest/components/utils/classNames';
 import { useQuery } from 'urql';
 
 import { GetBurstConcurrencyDocument } from '@/components/Billing/Usage/BurstConcurrency';
+import { createConcurrencyChartOptions } from '@/components/Billing/Usage/concurrencyChart';
+import { graphql } from '@/gql';
 import { Route as BillingRoute } from '@/routes/_authed/billing/route';
 import { pathCreator } from '@/utils/urls';
 
+const GetAccountConcurrencyTimeSeriesDocument = graphql(`
+  query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {
+    account {
+      concurrencyTimeSeries(from: $from, to: $to) {
+        baseLimit
+        burstLimit
+        peak
+        buckets {
+          bucket
+          value
+        }
+        limitHits {
+          bucket
+          value
+        }
+        bursts {
+          startedAt
+          endedAt
+          peak
+          limitHits
+        }
+      }
+    }
+  }
+`);
+
 const ref = 'app-billing-usage-concurrency';
 const periodOption = { id: '30d', name: '30 days' };
+const periodDays = 30;
 
 function formatBurstLimit(burstLimit: number, baseLimit?: number) {
   if (baseLimit && burstLimit % baseLimit === 0) {
@@ -25,6 +57,24 @@ export function AccountConcurrency({ baseLimit }: Props) {
   const { profile } = BillingRoute.useLoaderData();
   const [{ data, error }] = useQuery({ query: GetBurstConcurrencyDocument });
   const burstLimit = error ? undefined : data?.account.burstConcurrency?.limit;
+
+  const range = useMemo(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - periodDays * 24 * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, []);
+  const [{ data: seriesData, error: seriesError, fetching: seriesFetching }] =
+    useQuery({
+      query: GetAccountConcurrencyTimeSeriesDocument,
+      variables: range,
+    });
+  const series = seriesError
+    ? undefined
+    : seriesData?.account.concurrencyTimeSeries;
+  const chartOption = useMemo(
+    () => (series ? createConcurrencyChartOptions(series, range) : undefined),
+    [series, range],
+  );
 
   return (
     <div className="mt-10">
@@ -70,6 +120,17 @@ export function AccountConcurrency({ baseLimit }: Props) {
             </Select.Button>
           </Select>
         </div>
+        {chartOption && (
+          <div className="mt-6">
+            <Chart
+              option={chartOption}
+              settings={{ notMerge: true }}
+              theme="light"
+              className="h-[384px] w-full"
+              loading={seriesFetching}
+            />
+          </div>
+        )}
         <div className="mt-6 flex flex-wrap gap-10">
           {baseLimit !== undefined && (
             <div>
@@ -82,6 +143,22 @@ export function AccountConcurrency({ baseLimit }: Props) {
               <p className="text-basis text-sm">Burst limit</p>
               <p className="text-basis text-3xl">
                 {formatBurstLimit(burstLimit, baseLimit)}
+              </p>
+            </div>
+          )}
+          {series && (
+            <div>
+              <p className="text-basis text-sm">
+                Max concurrent steps{' '}
+                <span className="text-muted">[{periodOption.id}]</span>
+              </p>
+              <p
+                className={cn(
+                  'text-3xl',
+                  series.peak >= series.baseLimit ? 'text-error' : 'text-basis',
+                )}
+              >
+                {series.peak}
               </p>
             </div>
           )}
