@@ -29,13 +29,16 @@ import (
 )
 
 func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
-	l := newListenerWithChannels(1, 1) // capacity 1 for each of events/metadata
+	// A BatchingSink with capacity 1 per entity and no batchers draining it.
+	sink := newBatchingSinkChannels(1, 1, 1)
+	l := newListenerWithSink(sink)
 
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "test"}, nil)
 
 	// Fill the events channel to capacity.
 	l.OnEventReceived(context.Background(), evt)
-	require.Equal(t, int64(0), l.droppedEvents.Load())
+	_, dropped, _ := sink.Dropped()
+	require.Equal(t, int64(0), dropped)
 
 	// This second call must return immediately (not block) even though the
 	// channel is full, and must increment the dropped counter.
@@ -50,7 +53,8 @@ func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
 	case <-timeAfter():
 		t.Fatal("OnEventReceived blocked on a full channel")
 	}
-	require.Equal(t, int64(1), l.droppedEvents.Load())
+	_, dropped, _ = sink.Dropped()
+	require.Equal(t, int64(1), dropped)
 }
 
 // runRow reads back the single inngest.runs row tracing.go's materializeRuns

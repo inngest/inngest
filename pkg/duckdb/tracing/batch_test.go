@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	duckdbdriver "github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,24 +24,25 @@ var (
 	batchTestFunctionID = uuid.New()
 )
 
-// eventRow builds a row shaped like the listener's OnEventReceived output
+// testEvent builds an Event shaped like the listener's OnEventReceived output
 // (see inngest.events in pkg/db/duckdb/migrations/000001_baseline.sql):
 // account_id/env_id/internal_id/received_at/source/event_id/event_name/
 // event_data/event_v/event_ts are all NOT NULL, so a test row omitting any
 // of them would trip a real constraint violation against the actual duckdb
 // subprocess.
-func eventRow(id, name string) map[string]any {
-	return map[string]any{
-		"account_id":  batchTestAccountID.String(),
-		"env_id":      batchTestEnvID.String(),
-		"internal_id": id,
-		"received_at": time.Now().UTC(),
-		"source":      "test",
-		"event_id":    id,
-		"event_name":  name,
-		"event_data":  "{}",
-		"event_v":     "1",
-		"event_ts":    time.Now().UTC(),
+func testEvent(id, name string) Event {
+	return Event{
+		AccountID:  batchTestAccountID,
+		EnvID:      batchTestEnvID,
+		InternalID: ulid.Make(),
+		ReceivedAt: time.Now().UTC(),
+		Source:     "test",
+		EventID:    id,
+		EventName:  name,
+		EventData:  json.RawMessage(`{}`),
+		EventMeta:  json.RawMessage(`{}`),
+		EventV:     "1",
+		EventTS:    time.Now().UTC(),
 	}
 }
 
@@ -49,13 +50,13 @@ func TestBatcherFlushesOnSize(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
-	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{maxSize: 2, flushInterval: time.Hour})
 	go b.run(t.Context())
 	defer b.stop()
 
-	ch <- eventRow("1", "a")
-	ch <- eventRow("2", "b")
+	ch <- testEvent("1", "a")
+	ch <- testEvent("2", "b")
 
 	require.Eventually(t, func() bool {
 		var count int
@@ -71,12 +72,12 @@ func TestBatcherFlushesOnTimeout(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
-	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 100, flushInterval: 50 * time.Millisecond})
+	ch := make(chan Event, 10)
+	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{maxSize: 100, flushInterval: 50 * time.Millisecond})
 	go b.run(t.Context())
 	defer b.stop()
 
-	ch <- eventRow("1", "a")
+	ch <- testEvent("1", "a")
 
 	require.Eventually(t, func() bool {
 		var count int
@@ -88,40 +89,38 @@ func TestBatcherFlushesOnTimeout(t *testing.T) {
 	}, 2*time.Second, 20*time.Millisecond)
 }
 
-// TestBatcherHandlesMixedColumnsAcrossRowsInABatch is a regression test for
-// a real bug found while fixing this batcher: insert() used to build its
-// column list from rows[0]'s keys alone. inngest.run_trace_spans' "output"
-// column is optional — spanExportRow (tracing.go) only sets it when the span
-// actually carries a StepOutput attribute — so a real batch can freely mix
-// rows with different key sets. With the old rows[0]-only logic, a row with
-// no output landing first in the batch would silently drop the "output"
-// column from the INSERT for every row in the batch — including a later row
-// that *did* have output data. This proves the fixed union-of-keys column
-// list preserves every row's data regardless of its position in the batch.
-func TestBatcherHandlesMixedColumnsAcrossRowsInABatch(t *testing.T) {
+// TestBatcherHandlesOptionalSpanColumnsInABatch is a regression test for a
+// real bug in the old map-row inserter, which built its column list from
+// rows[0]'s keys alone: inngest.run_trace_spans' "output" column is optional
+// (spanExportRow only sets it when the span carries a StepOutput attribute),
+// so a batch whose first span had no output silently dropped every later
+// span's output too. Typed Spans always write every column; this pins that a
+// span without output (NULL) and one with output mix correctly in one batch.
+func TestBatcherHandlesOptionalSpanColumnsInABatch(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
-	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "inngest.run_trace_spans", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
+	ch := make(chan Span, 10)
+	b := newBatcher("run_trace_spans", ch, NewDuckDBInserter(db).InsertSpans, batcherOpts{maxSize: 2, flushInterval: time.Hour})
 	go b.run(t.Context())
 	defer b.stop()
 
-	base := map[string]any{
-		"account_id": batchTestAccountID.String(), "env_id": batchTestEnvID.String(),
-		"run_id": "run-1", "run_queued_at": time.Now().UTC(),
-		"app_id": batchTestAppID.String(), "app_name": "test-app",
-		"function_id": batchTestFunctionID.String(), "function_slug": "test-fn",
-		"name": "executor.step", "start_time": time.Now().UTC(), "end_time": time.Now().UTC(),
-		"trace_id": "trace-1", "attributes": "{}",
+	base := Span{
+		AccountID: batchTestAccountID.String(), EnvID: batchTestEnvID.String(),
+		RunID: ulid.Make().String(), RunQueuedAt: time.Now().UTC(),
+		AppID: batchTestAppID.String(), AppName: "test-app",
+		FunctionID: batchTestFunctionID.String(), FunctionSlug: "test-fn",
+		Name: "executor.step", StartTime: time.Now().UTC(), EndTime: time.Now().UTC(),
+		TraceID: "trace-1", Attributes: json.RawMessage(`{}`),
 	}
 
-	// span-without-output first, deliberately without an "output" key, so a
-	// rows[0]-only column list would omit "output" from the whole batch.
-	withoutOutput := map[string]any{"span_id": "span-without-output"}
-	maps.Copy(withoutOutput, base)
-	withOutput := map[string]any{"span_id": "span-with-output", "output": json.RawMessage(`{"data":"my-output"}`)}
-	maps.Copy(withOutput, base)
+	// span-without-output first, so an inserter that derived its columns
+	// from the first row would omit "output" for the whole batch.
+	withoutOutput := base
+	withoutOutput.SpanID = "span-without-output"
+	withOutput := base
+	withOutput.SpanID = "span-with-output"
+	withOutput.Output = json.RawMessage(`{"data":"my-output"}`)
 	ch <- withoutOutput
 	ch <- withOutput
 
@@ -171,11 +170,11 @@ func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
 	defer cleanup()
 
 	const n = 50
-	ch := make(chan map[string]any, n)
-	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: n * 10, flushInterval: time.Hour})
+	ch := make(chan Event, n)
+	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{maxSize: n * 10, flushInterval: time.Hour})
 
 	for i := 0; i < n; i++ {
-		ch <- eventRow(fmt.Sprintf("id-%d", i), "burst")
+		ch <- testEvent(fmt.Sprintf("id-%d", i), "burst")
 	}
 	b.stop()
 
@@ -230,8 +229,8 @@ func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	ch := make(chan map[string]any, 100)
-	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
+	ch := make(chan Event, 100)
+	b := newBatcher("events", ch, NewDuckDBInserter(db).InsertEvents, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
 
 	done := make(chan struct{})
 	go func() {
@@ -240,7 +239,7 @@ func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
 	}()
 	t.Cleanup(b.stop)
 
-	ch <- eventRow("1", "a")
+	ch <- testEvent("1", "a")
 
 	// The batcher must exit of its own accord once it observes ErrDisabled,
 	// rather than spinning on a subprocess that will never come back.
@@ -255,7 +254,7 @@ func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
 	require.True(t, b.opts.disabled.disabled())
 
 	// Further rows are simply never flushed: no more ExecContext calls.
-	ch <- eventRow("2", "b")
+	ch <- testEvent("2", "b")
 	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, int64(1), drv.attempts.Load())
 }
@@ -277,18 +276,19 @@ func TestDisabledStateSharedAcrossBatchersLogsOnce(t *testing.T) {
 
 	// Only this batcher ever gets a row, so only it can discover the
 	// terminal state.
-	discoverer := make(chan map[string]any, 10)
-	bystander := make(chan map[string]any, 10)
+	discoverer := make(chan Event, 10)
+	bystander := make(chan RunMetadata, 10)
 
-	b1 := newBatcher(db, "inngest.events", discoverer, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
-	b2 := newBatcher(db, "inngest.runs", bystander, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	ins := NewDuckDBInserter(db)
+	b1 := newBatcher("events", discoverer, ins.InsertEvents, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b2 := newBatcher("run_metadata", bystander, ins.InsertRunMetadata, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
 
 	done1, done2 := make(chan struct{}), make(chan struct{})
 	go func() { b1.run(context.Background()); close(done1) }()
 	go func() { b2.run(context.Background()); close(done2) }()
 	t.Cleanup(func() { b1.stop(); b2.stop() })
 
-	discoverer <- eventRow("1", "a")
+	discoverer <- testEvent("1", "a")
 
 	for _, done := range []chan struct{}{done1, done2} {
 		select {
