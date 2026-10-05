@@ -24,7 +24,7 @@ func (l Lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	md state.Metadata,
 	item queue.Item,
-	_ []event.TrackedEvent,
+	_ event.SerializedEvents,
 ) {
 	_ = l.Cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
 		RunID:         md.ID.RunID,

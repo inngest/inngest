@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,4 +54,23 @@ func TestSerializedEventsOwnsImmutableEventAndInputSnapshots(t *testing.T) {
 func TestSerializedEventsRejectsInvalidJSON(t *testing.T) {
 	_, err := NewSerializedEvents([]json.RawMessage{json.RawMessage(`{"name":`)})
 	require.EqualError(t, err, "serialized event 0 is invalid JSON")
+}
+
+func TestSerializedEventsRetainsTrackedMetadataInEventOrder(t *testing.T) {
+	firstID := ulid.Make()
+	secondID := ulid.Make()
+	tracked := []TrackedEvent{
+		NewBaseTrackedEventWithID(Event{Name: "café", Data: map[string]any{"city": "아산"}}, firstID),
+		NewBaseTrackedEventWithID(Event{Name: "아산", Data: map[string]any{"drink": "café"}}, secondID),
+	}
+
+	serialized, err := NewSerializedEventsFromTrackedEvents(tracked)
+	require.NoError(t, err)
+	require.True(t, serialized.HasTrackedEvents())
+	require.Equal(t, firstID, serialized.TrackedEvent(0).GetInternalID())
+	require.Equal(t, secondID, serialized.TrackedEvent(1).GetInternalID())
+	require.Equal(t, "café", serialized.TrackedEvent(0).GetEvent().Name)
+	require.Equal(t, "아산", serialized.TrackedEvent(1).GetEvent().Name)
+	require.Equal(t, `[{"name":"café","data":{"city":"아산"}},{"name":"아산","data":{"drink":"café"}}]`, serialized.Input())
+	require.Equal(t, serialized.Event(0), string(serialized.RawMessages()[0]))
 }

@@ -41,10 +41,11 @@ type traceLifecycle struct {
 	log logger.Logger
 }
 
-func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
+func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts event.SerializedEvents) {
 	runID := md.ID.RunID
 	evtIDs := []string{}
-	for _, e := range evts {
+	for i := 0; i < evts.Len(); i++ {
+		e := evts.TrackedEvent(i)
 		id := e.GetInternalID()
 		evtIDs = append(evtIDs, id.String())
 	}
@@ -92,19 +93,17 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 		}
 	}
 
-	for _, e := range evts {
-		evt := e.GetEvent()
-		// serialize event data to the span
-		if byt, err := json.Marshal(evt); err == nil {
-			span.AddEvent(string(byt), trace.WithAttributes(
-				attribute.Bool(consts.OtelSysEventData, true),
-				attribute.String(consts.OtelSysEventInternalID, e.GetInternalID().String()),
-			))
-		}
+	for i := 0; i < evts.Len(); i++ {
+		e := evts.TrackedEvent(i)
+		span.AddEvent(evts.Event(i), trace.WithAttributes(
+			attribute.Bool(consts.OtelSysEventData, true),
+			attribute.String(consts.OtelSysEventInternalID, e.GetInternalID().String()),
+		))
 	}
 
 	// annotate the invoke span with target function run ID for reference purposes
-	for _, e := range evts {
+	for i := 0; i < evts.Len(); i++ {
+		e := evts.TrackedEvent(i)
 		go func(ctx context.Context, evt event.Event) {
 			if v, ok := evt.Data[consts.InngestEventDataPrefix]; ok {
 				meta := event.InngestMetadata{}
@@ -419,6 +418,7 @@ func (l traceLifecycle) OnFunctionSkipped(
 	s execution.SkipState,
 ) {
 	ctx = l.extractTraceCtx(ctx, md, true)
+	evts := s.Events.RawMessages()
 
 	start := time.Now()
 	if !md.Config.StartedAt.IsZero() {
@@ -486,12 +486,12 @@ func (l traceLifecycle) OnFunctionSkipped(
 			}
 		}
 
-		if err := trigger.SetEvents(ctx, s.Events, md.Config.EventIDMapping()); err != nil {
+		if err := trigger.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
 			l.log.Warn("error settings events for trigger",
 				"lifecycle", "OnFunctionSkipped",
 				"errors", err,
 				"meta", md,
-				"evts", s.Events,
+				"evts", evts,
 			)
 		}
 	}
@@ -528,12 +528,12 @@ func (l traceLifecycle) OnFunctionSkipped(
 		)
 	}
 
-	if err := span.SetEvents(ctx, s.Events, md.Config.EventIDMapping()); err != nil {
+	if err := span.SetEvents(ctx, evts, md.Config.EventIDMapping()); err != nil {
 		l.log.Warn("error setting events",
 			"lifecycle", "OnFunctionSkipped",
 			"errors", err,
 			"meta", md,
-			"evts", s.Events,
+			"evts", evts,
 		)
 	}
 }

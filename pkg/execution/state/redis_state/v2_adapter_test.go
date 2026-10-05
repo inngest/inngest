@@ -22,6 +22,13 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
 
+func mustSerializedEvents(t *testing.T, events []json.RawMessage) event.SerializedEvents {
+	t.Helper()
+	serialized, err := event.NewSerializedEvents(events)
+	require.NoError(t, err)
+	return serialized
+}
+
 func TestV2Adapter(t *testing.T) {
 	ctx := context.Background()
 
@@ -141,7 +148,7 @@ func TestV2Adapter(t *testing.T) {
 					},
 				}),
 			},
-			Events: []json.RawMessage{eventBytes},
+			SerializedEvents: mustSerializedEvents(t, []json.RawMessage{eventBytes}),
 			Steps: []state.MemoizedStep{
 				{
 					ID:   "step-1",
@@ -412,7 +419,7 @@ func TestV2Adapter(t *testing.T) {
 						RequestVersion:  1,
 					}),
 				},
-				Events: []json.RawMessage{eventBytes},
+				SerializedEvents: mustSerializedEvents(t, []json.RawMessage{eventBytes}),
 			}
 
 			// Create first time should succeed
@@ -448,7 +455,7 @@ func TestV2Adapter(t *testing.T) {
 						RequestVersion:  1,
 					}),
 				},
-				Events: []json.RawMessage{eventBytes},
+				SerializedEvents: mustSerializedEvents(t, []json.RawMessage{eventBytes}),
 			}
 
 			createdState, err := v2svc.Create(ctx, freshInput)
@@ -491,7 +498,7 @@ func TestV2Adapter(t *testing.T) {
 						RequestVersion:  1,
 					}),
 				},
-				Events: []json.RawMessage{eventBytes},
+				SerializedEvents: mustSerializedEvents(t, []json.RawMessage{eventBytes}),
 			}
 
 			createdState, err := v2svc.Create(ctx, idempotentInput)
@@ -580,8 +587,8 @@ func TestV2AdapterClaimFinalization(t *testing.T) {
 	}
 
 	_, err = v2svc.Create(ctx, statev2.CreateState{
-		Metadata: md,
-		Events:   []json.RawMessage{rawEvent},
+		Metadata:         md,
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{rawEvent}),
 	})
 	require.NoError(t, err)
 
@@ -676,8 +683,8 @@ func TestV2AdapterFinalizationReleaseDoesNotDeleteNewerClaim(t *testing.T) {
 	}
 
 	_, err = v2svc.Create(ctx, statev2.CreateState{
-		Metadata: md,
-		Events:   []json.RawMessage{rawEvent},
+		Metadata:         md,
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{rawEvent}),
 	})
 	require.NoError(t, err)
 
@@ -774,7 +781,7 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 					RequestVersion:  1,
 				}),
 			},
-			Events: []json.RawMessage{eventBytes},
+			SerializedEvents: mustSerializedEvents(t, []json.RawMessage{eventBytes}),
 		}
 
 		createdState, err := v2svc.Create(ctx, v2Input)
@@ -851,7 +858,7 @@ func TestV2AdapterLoadMetadataPersistsSizeFields(t *testing.T) {
 				Idempotency: "sizes-" + id.RunID.String(),
 			}),
 		},
-		Events: []json.RawMessage{event},
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{event}),
 		Steps: []state.MemoizedStep{
 			{ID: "step-1", Data: stepData},
 		},
@@ -891,7 +898,7 @@ func TestV2AdapterMigrate(t *testing.T) {
 				Idempotency: "migrate-" + id.RunID.String(),
 			}),
 		},
-		Events: []json.RawMessage{event},
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{event}),
 		Steps: []state.MemoizedStep{
 			{ID: "step-a", Data: map[string]any{"v": 1}},
 		},
@@ -1013,7 +1020,7 @@ func TestV2AdapterLookupIdempotency(t *testing.T) {
 				Idempotency: key,
 			}),
 		},
-		Events: []json.RawMessage{[]byte(`{"name":"lookup.test"}`)},
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{[]byte(`{"name":"lookup.test"}`)}),
 	})
 	require.NoError(t, err)
 
@@ -1121,7 +1128,7 @@ func TestV2AdapterDeleteWithIsMigration(t *testing.T) {
 					Idempotency: "delete-" + id.RunID.String(),
 				}),
 			},
-			Events: []json.RawMessage{[]byte(`{"name":"delete.test"}`)},
+			SerializedEvents: mustSerializedEvents(t, []json.RawMessage{[]byte(`{"name":"delete.test"}`)}),
 		})
 		require.NoError(t, err)
 		return id

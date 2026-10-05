@@ -91,7 +91,7 @@ type SyncLifecycleListener interface {
 		context.Context,
 		statev2.Metadata,
 		queue.Item,
-		[]json.RawMessage,
+		event.SerializedEvents,
 	)
 
 	// OnFunctionStarted is called synchronously when the function starts.
@@ -424,7 +424,7 @@ type ExtendedTraceSpan struct {
 // implementation to override only the hooks you need.
 type NoopSyncLifecycleListener struct{}
 
-func (NoopSyncLifecycleListener) OnFunctionScheduled(context.Context, statev2.Metadata, queue.Item, []json.RawMessage) {
+func (NoopSyncLifecycleListener) OnFunctionScheduled(context.Context, statev2.Metadata, queue.Item, event.SerializedEvents) {
 }
 
 func (NoopSyncLifecycleListener) OnFunctionStarted(context.Context, statev2.Metadata, queue.Item, []json.RawMessage) {

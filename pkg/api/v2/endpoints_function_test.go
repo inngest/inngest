@@ -56,7 +56,7 @@ func TestService_InvokeFunctionFastPath(t *testing.T) {
 					require.True(t, req.FastPath.Enabled)
 					require.Equal(t, enums.RunModeAsync, req.RunMode)
 					require.Equal(t, fn.AccountID, req.AccountID)
-					require.Len(t, req.Events, 1)
+					require.Equal(t, 1, req.Events.Len())
 					return &runID, nil, tc.err
 				}),
 			})

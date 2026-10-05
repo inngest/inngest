@@ -203,7 +203,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		InvokeFnID:           f.ID.String(),
 		InvokeIdempotencyKey: idempotencyHash,
 	}
-	event := event.BaseTrackedEvent{
+	trackedEvent := event.BaseTrackedEvent{
 		ID:          eventID,
 		AccountID:   f.AccountID,
 		WorkspaceID: f.EnvironmentID,
@@ -214,16 +214,20 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 			Timestamp: time.Now().UnixMilli(),
 		},
 	}
-	if err := s.eventPublisher.Publish(context.WithoutCancel(ctx), event); err != nil {
+	if err := s.eventPublisher.Publish(context.WithoutCancel(ctx), trackedEvent); err != nil {
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to publish invoke event")
 	}
 
 	// Schedule the function directly, instead of waiting for pubsub.  This improves latency
 	// in the fast path, and is necessary for us to return the run ID.
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{trackedEvent})
+	if err != nil {
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to serialize invoke event")
+	}
 	sr := execution.NewScheduleRequest(f)
 	sr.FastPath = execution.FastPathOptions{Enabled: true}
 	sr.IdempotencyKey = &idempotencyHash
-	sr.Events = append(sr.Events, event)
+	sr.Events = serializedEvents
 	runID, _, err := s.executor.Schedule(ctx, sr)
 	scheduleStatus := executor.ScheduleStatus(err)
 

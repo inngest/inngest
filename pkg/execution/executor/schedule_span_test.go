@@ -43,7 +43,7 @@ func TestScheduleRunSpanIncludesFunctionMetadata(t *testing.T) {
 			}},
 		},
 		FunctionPausedAt: &pausedAt,
-		Events: []event.TrackedEvent{
+		Events: testSerializedEvents(t,
 			event.InternalEvent{
 				ID: eventID,
 				Event: event.Event{
@@ -53,14 +53,10 @@ func TestScheduleRunSpanIncludesFunctionMetadata(t *testing.T) {
 					Data:      map[string]any{"customer": "customer-a"},
 				},
 			},
-		},
+		),
 	}
-	rawEvent, err := json.Marshal(req.Events[0].GetEvent())
-	require.NoError(t, err)
-	req.SerializedEvents, err = event.NewSerializedEvents([]json.RawMessage{rawEvent})
-	require.NoError(t, err)
 
-	_, _, err = e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 	require.ErrorIs(t, err, ErrFunctionSkipped)
 
 	var runSpan *createSpanCall
@@ -79,6 +75,9 @@ func TestScheduleRunSpanIncludesFunctionMetadata(t *testing.T) {
 	functionSlug, ok := runSpan.opts.Attributes.Get(meta.Attrs.FunctionSlug.Key()).(*string)
 	require.True(t, ok)
 	require.Equal(t, "send-weekly-email", *functionSlug)
+	eventsInput, ok := runSpan.opts.Attributes.Get(meta.Attrs.EventsInput.Key()).(*string)
+	require.True(t, ok)
+	require.Equal(t, req.Events.Input(), *eventsInput)
 
 	keys, ok := runSpan.opts.Attributes.Get(meta.Attrs.CustomConcurrencyKeys.Key()).(*[]meta.CustomConcurrencyKey)
 	require.True(t, ok)

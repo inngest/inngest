@@ -86,7 +86,7 @@ func (l *PrometheusLifecycleListener) OnFunctionScheduled(
 	_ context.Context,
 	md statev2.Metadata,
 	_ queue.Item,
-	_ []event.TrackedEvent,
+	_ event.SerializedEvents,
 ) {
 	functionRunScheduled.WithLabelValues(fnLabel(md)).Inc()
 }

@@ -3,6 +3,7 @@ package event
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -29,8 +30,9 @@ import (
 // independently owned byte slices for APIs that require mutable []byte values;
 // callers should otherwise keep the data in its string-backed form.
 type SerializedEvents struct {
-	events []serializedEventRange
-	input  string
+	events        []serializedEventRange
+	input         string
+	trackedEvents []TrackedEvent
 }
 
 type serializedEventRange struct {
@@ -58,6 +60,28 @@ func NewSerializedEvents(events []json.RawMessage) (SerializedEvents, error) {
 	return serialized, nil
 }
 
+// NewSerializedEventsFromTrackedEvents creates an immutable serialized snapshot
+// while retaining read-only access to scheduling metadata. The tracked event
+// slice is copied; callers and consumers must treat the tracked events themselves
+// as immutable.
+func NewSerializedEventsFromTrackedEvents(events []TrackedEvent) (SerializedEvents, error) {
+	rawEvents := make([]json.RawMessage, len(events))
+	for i, tracked := range events {
+		data, err := json.Marshal(tracked.GetEvent())
+		if err != nil {
+			return SerializedEvents{}, fmt.Errorf("serialize event %d: %w", i, err)
+		}
+		rawEvents[i] = data
+	}
+
+	serialized, err := NewSerializedEvents(rawEvents)
+	if err != nil {
+		return SerializedEvents{}, err
+	}
+	serialized.trackedEvents = slices.Clone(events)
+	return serialized, nil
+}
+
 func (s SerializedEvents) Len() int {
 	return len(s.events)
 }
@@ -65,6 +89,19 @@ func (s SerializedEvents) Len() int {
 func (s SerializedEvents) Event(index int) string {
 	event := s.events[index]
 	return s.input[event.start:event.end]
+}
+
+// TrackedEvent returns the scheduling metadata and decoded event at index.
+// It panics when the snapshot was constructed from raw messages because state
+// and persistence consumers do not have tracked metadata.
+func (s SerializedEvents) TrackedEvent(index int) TrackedEvent {
+	return s.trackedEvents[index]
+}
+
+// HasTrackedEvents reports whether every serialized event has corresponding
+// scheduling metadata and a decoded event.
+func (s SerializedEvents) HasTrackedEvents() bool {
+	return len(s.trackedEvents) == len(s.events) && len(s.events) > 0
 }
 
 func (s SerializedEvents) Input() string {

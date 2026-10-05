@@ -724,9 +724,9 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 		// rerun multiple times.
 		key = runID.String()
 	}
-	if key == "" && len(req.Events) == 1 {
+	if key == "" && req.Events.Len() == 1 {
 		// If not provided, use the incoming event ID if there's not a batch.
-		key = req.Events[0].GetInternalID().String()
+		key = req.Events.TrackedEvent(0).GetInternalID().String()
 	}
 	if key == "" && req.BatchID != nil {
 		// Finally, if there is a batch use the batch ID as the idempotency key.
@@ -781,7 +781,7 @@ func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger
 		}
 
 		// The triggering event ID should be the first ID in the batch.
-		triggeringID := req.Events[0].GetInternalID().String()
+		triggeringID := req.Events.TrackedEvent(0).GetInternalID().String()
 		idSrc := fmt.Sprintf("%s-%s", idempontenceKey, c.Event)
 
 		var expr *string
@@ -989,6 +989,12 @@ func (e *executor) checkExecutionCap(ctx context.Context, req execution.Schedule
 // metadata will be nil.  This will return the original run ID if runs were skipped due
 // to idemptoency.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
+	if req.Events.Len() == 0 {
+		return nil, nil, fmt.Errorf("no events provided in schedule request")
+	}
+	if !req.Events.HasTrackedEvents() {
+		return nil, nil, fmt.Errorf("schedule request events do not contain tracked metadata")
+	}
 	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
 
@@ -1006,10 +1012,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	key := idempotencyKey(req, *runID)
 
-	if len(req.Events) == 0 {
-		return nil, nil, fmt.Errorf("no events provided in schedule request")
-	}
-
 	var attemptedRunID ulid.ULID
 	if runID != nil {
 		attemptedRunID = *runID
@@ -1021,12 +1023,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		"app_id", req.AppID,
 		"fn_id", req.Function.ID,
 		"fn_v", req.Function.FunctionVersion,
-		"evt_id", req.Events[0].GetInternalID(),
+		"evt_id", req.Events.TrackedEvent(0).GetInternalID(),
 		"run_id", runID,
 		"schedule_req", req,
 	)
 
-	span.SetAttributes(attribute.String("event_id", req.Events[0].GetInternalID().String()))
+	span.SetAttributes(attribute.String("event_id", req.Events.TrackedEvent(0).GetInternalID().String()))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
 
 	l.Optional(req.AccountID, "schedule").Debug("hitting constraint API")
@@ -1036,9 +1038,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// handling kick in by bypassing in-process cache entries that were
 	// populated after the event was received.
 	var requestTime time.Time
-	if len(req.Events) > 0 {
-		requestTime = req.Events[0].GetReceivedAt()
-	}
+	requestTime = req.Events.TrackedEvent(0).GetReceivedAt()
 
 	callbackReq := cloneScheduleRequest(req)
 
@@ -1093,63 +1093,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
 	req.Context = maps.Clone(req.Context)
-	req.Events = slices.Clone(req.Events)
 	return req
 }
 
-func prepareStateAndTraceEventPayloads(trackedEvents []event.TrackedEvent, immutableEvents event.SerializedEvents) ([]json.RawMessage, event.SerializedEvents, string, error) {
-	if immutableEvents.Len() > 0 {
-		if immutableEvents.Len() != len(trackedEvents) {
-			return nil, event.SerializedEvents{}, "", fmt.Errorf("serialized event count does not match event count")
-		}
-		return nil, immutableEvents, immutableEvents.Input(), nil
-	}
-
-	// Legacy compatibility path. Remove after every ScheduleRequest caller provides
-	// SerializedEvents.
-	rawEvents := make([]json.RawMessage, len(trackedEvents))
-	for n, item := range trackedEvents {
-		byt, err := json.Marshal(item.GetEvent())
-		if err != nil {
-			return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling event: %w", err)
-		}
-		rawEvents[n] = byt
-	}
-	bytEvts, err := json.Marshal(rawEvents)
-	if err != nil {
-		return nil, event.SerializedEvents{}, "", fmt.Errorf("error marshalling events: %w", err)
-	}
-
-	return rawEvents, event.SerializedEvents{}, string(bytEvts), nil
-}
-
-func rawEventPayloads(rawEvents []json.RawMessage, immutableEvents event.SerializedEvents) []json.RawMessage {
-	if len(rawEvents) > 0 {
-		// Raw messages are mutable by type but treated as immutable event payloads.
-		return rawEvents
-	}
-	if immutableEvents.Len() == 0 {
-		return rawEvents
-	}
-
-	// The shared immutable path materializes owned raw messages only for consumers
-	// that still require that representation.
-	return immutableEvents.RawMessages()
-}
-
-// prepareStateEventsForSyncListeners switches state creation to raw event
-// payloads when synchronous listeners are registered. Create consumes these
-// events first; successful scheduling then passes the same buffers to every
-// listener, preserving legacy behavior without a second materialization.
-func (e *executor) prepareStateEventsForSyncListeners(newState *sv2.CreateState) []json.RawMessage {
-	if len(e.syncLifecycles) == 0 {
-		return nil
-	}
-
-	return newState.MaterializeEvents()
-}
-
-func (e *executor) notifyFunctionScheduledSyncListeners(ctx context.Context, metadata sv2.Metadata, item queue.Item, events []json.RawMessage) {
+func (e *executor) notifyFunctionScheduledSyncListeners(ctx context.Context, metadata sv2.Metadata, item queue.Item, events event.SerializedEvents) {
 	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionScheduled", func(sl execution.SyncLifecycleListener) {
 		sl.OnFunctionScheduled(ctx, metadata, item, events)
 	})
@@ -1201,13 +1148,13 @@ func (e *executor) schedule(
 		"app_id", req.AppID,
 		"fn_id", req.Function.ID,
 		"fn_v", req.Function.FunctionVersion,
-		"evt_id", req.Events[0].GetInternalID(),
+		"evt_id", req.Events.TrackedEvent(0).GetInternalID(),
 	)
 
 	if performChecks {
 		// Attempt to rate-limit the incoming function.
 		if e.rateLimiter != nil && req.Function.RateLimit != nil && !req.PreventRateLimit {
-			evtMap := req.Events[0].GetEvent().Map()
+			evtMap := req.Events.TrackedEvent(0).GetEvent().Map()
 			rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, evtMap)
 
 			l.Optional(req.AccountID, "schedule-ratelimit").Debug("ratelimiting schedule", "key", rateLimitKey, "error", err)
@@ -1284,8 +1231,8 @@ func (e *executor) schedule(
 			AppName:          req.AppName,
 			FunctionID:       req.Function.ID,
 			FunctionVersion:  req.Function.FunctionVersion,
-			EventID:          req.Events[0].GetInternalID(),
-			Event:            req.Events[0].GetEvent(),
+			EventID:          req.Events.TrackedEvent(0).GetInternalID(),
+			Event:            req.Events.TrackedEvent(0).GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
 		}
 		debounceID, err := e.debouncer.Debounce(ctx, item, req.Function)
@@ -1307,10 +1254,14 @@ func (e *executor) schedule(
 	if req.Context == nil {
 		req.Context = map[string]any{}
 	}
+	trackedEvents := make([]event.TrackedEvent, req.Events.Len())
+	for i := range trackedEvents {
+		trackedEvents[i] = req.Events.TrackedEvent(i)
+	}
 
 	// Normalization
 	eventIDs := []ulid.ULID{}
-	for _, e := range req.Events {
+	for _, e := range trackedEvents {
 		id := e.GetInternalID()
 		eventIDs = append(eventIDs, id)
 	}
@@ -1318,7 +1269,7 @@ func (e *executor) schedule(
 	var eventName *string
 
 	sessions := meta.EventSessions{}
-	for _, item := range req.Events {
+	for _, item := range trackedEvents {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
@@ -1330,10 +1281,7 @@ func (e *executor) schedule(
 		}
 	}
 
-	rawEvents, immutableEvents, traceInput, err := prepareStateAndTraceEventPayloads(req.Events, req.SerializedEvents)
-	if err != nil {
-		return nil, nil, err
-	}
+	traceInput := req.Events.Input()
 
 	var droppedSessions int
 	sessions, droppedSessions = normalizeRunSessions(sessions)
@@ -1347,7 +1295,7 @@ func (e *executor) schedule(
 	}
 
 	// Evaluate the run priority based off of the input event data.
-	evtMap := req.Events[0].GetEvent().Map()
+	evtMap := req.Events.TrackedEvent(0).GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 	// function run spanID
 	spanID := run.NewSpanID(ctx)
@@ -1377,8 +1325,8 @@ func (e *executor) schedule(
 
 	// Grab the cron schedule for function config.  This is necessary for fast
 	// lookups, trace info, etc.
-	if len(req.Events) == 1 && req.Events[0].GetEvent().Name == event.FnCronName {
-		if cron, ok := req.Events[0].GetEvent().Data["cron"].(string); ok {
+	if req.Events.Len() == 1 && req.Events.TrackedEvent(0).GetEvent().Name == event.FnCronName {
+		if cron, ok := req.Events.TrackedEvent(0).GetEvent().Data["cron"].(string); ok {
 			config.SetCronSchedule(cron)
 		}
 	}
@@ -1386,7 +1334,7 @@ func (e *executor) schedule(
 	// FunctionSlug is not stored in V1 format, so needs to be stored in Context
 	config.SetFunctionSlug(req.Function.GetSlug())
 	config.SetDebounceFlag(req.PreventDebounce)
-	config.SetEventIDMapping(req.Events)
+	config.SetEventIDMapping(trackedEvents)
 
 	if req.DebugSessionID != nil {
 		config.SetDebugSessionID(*req.DebugSessionID)
@@ -1467,8 +1415,8 @@ func (e *executor) schedule(
 		}
 	}()
 
-	mapped := make([]map[string]any, len(req.Events))
-	for n, item := range req.Events {
+	mapped := make([]map[string]any, len(trackedEvents))
+	for n, item := range trackedEvents {
 		mapped[n] = item.GetEvent().Map()
 	}
 
@@ -1493,7 +1441,7 @@ func (e *executor) schedule(
 	// Create singleton information and try to handle it prior to creating state.
 	//
 	var singletonConfig *queue.Singleton
-	data := req.Events[0].GetEvent().Map()
+	data := req.Events.TrackedEvent(0).GetEvent().Map()
 
 	if skipReason == enums.SkipReasonNone && req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
@@ -1516,7 +1464,7 @@ func (e *executor) schedule(
 				return nil, nil, err
 			}
 
-			eventID := req.Events[0].GetInternalID()
+			eventID := req.Events.TrackedEvent(0).GetInternalID()
 
 			if singletonRunID != nil {
 				switch req.Function.Singleton.Mode {
@@ -1561,22 +1509,19 @@ func (e *executor) schedule(
 	//
 
 	newState := sv2.CreateState{
-		Events:           rawEvents,
-		SerializedEvents: immutableEvents,
+		SerializedEvents: req.Events,
 		Metadata:         metadata,
 		Steps:            []state.MemoizedStep{},
 	}
+	var err error
 	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-		newState.MaterializeEvents()
 		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
-	var listenerEvents []json.RawMessage
-
 	stv1ID := sv2.V1FromMetadata(metadata)
 
 	// Check if the function should be skipped (paused, draining, backlog limit)
@@ -1590,7 +1535,6 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
-		listenerEvents = e.prepareStateEventsForSyncListeners(&newState)
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
@@ -1639,7 +1583,7 @@ func (e *executor) schedule(
 
 	at := e.now()
 	if req.BatchID == nil {
-		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
+		evtTs := time.UnixMilli(req.Events.TrackedEvent(0).GetEvent().Timestamp)
 		if evtTs.After(at) {
 			// Schedule functions in the future if there's a future
 			// event `ts` field.
@@ -1727,7 +1671,7 @@ func (e *executor) schedule(
 	updateDeferSpans(
 		logger.WithStdlib(ctx, l),
 		e.tracerProvider,
-		req.Events,
+		trackedEvents,
 		runSpanOpts,
 		metadata,
 	)
@@ -1746,7 +1690,7 @@ func (e *executor) schedule(
 	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), skipReason)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1827,7 +1771,7 @@ func (e *executor) schedule(
 
 	// If this run was triggered by an invoke, write the invoked run's ID back
 	// onto the invoking function's invoke span so the in-progress trace shows it.
-	e.updateInvokeSpanWithInvokedRunID(ctx, l, req.Events, metadata.ID.RunID)
+	e.updateInvokeSpanWithInvokedRunID(ctx, l, trackedEvents, metadata.ID.RunID)
 
 	// If this is run mode sync, we do NOT need to create a queue item, as the
 	// Inngest SDK is checkpointing and the execution is happening in a single
@@ -1837,7 +1781,7 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
-		e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
+		e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, req.Events)
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -1898,7 +1842,7 @@ func (e *executor) schedule(
 						"run_id", metadata.ID.RunID.String(),
 						"account_id", req.AccountID.String(),
 						"workspace_id", req.WorkspaceID.String(),
-						"event_internal_id", req.Events[0].GetInternalID().String(),
+						"event_internal_id", req.Events.TrackedEvent(0).GetInternalID().String(),
 					)
 				}
 			}
@@ -1907,7 +1851,7 @@ func (e *executor) schedule(
 			if eventName != nil {
 				triggeringEventName = *eventName
 			}
-			evt := req.Events[0].GetEvent()
+			evt := req.Events.TrackedEvent(0).GetEvent()
 			var batchID, originalRunID, replayID, scheduleIdempotencyKey string
 			if req.BatchID != nil {
 				batchID = req.BatchID.String()
@@ -1931,7 +1875,7 @@ func (e *executor) schedule(
 				"idempotency_key", key,
 				"is_invoke_event", evt.IsInvokeEvent(),
 				"triggering_event_name", triggeringEventName,
-				"event_internal_id", req.Events[0].GetInternalID().String(),
+				"event_internal_id", req.Events.TrackedEvent(0).GetInternalID().String(),
 				"event_id", evt.ID,
 				"event_name", evt.Name,
 				"event_ts", evt.Timestamp,
@@ -1953,7 +1897,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, rawEventPayloads(rawEvents, immutableEvents), enums.SkipReasonSingleton)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, enums.SkipReasonSingleton)
 
 	case errors.Is(err, queue.ErrQueueShardNotFound):
 		if stateCreated {
@@ -1973,7 +1917,7 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
-	e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, listenerEvents)
+	e.notifyFunctionScheduledSyncListeners(ctx, metadata, item, req.Events)
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
@@ -2037,7 +1981,7 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 	}
 }
 
-func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
+func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
 	reqSnapshot := cloneScheduleRequest(req)
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -2048,9 +1992,9 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		service.Go(
 			func() {
 				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+					CronSchedule: req.Events.TrackedEvent(0).GetEvent().CronSchedule(),
 					Reason:       reason,
-					Events:       evts,
+					Events:       req.Events,
 				})
 			})
 	}
@@ -6069,12 +6013,16 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	key := fmt.Sprintf("%s-%s", fn.ID, payload.BatchID)
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents(events)
+	if err != nil {
+		return fmt.Errorf("serialize batch schedule events: %w", err)
+	}
 	_, md, err := e.Schedule(ctx, execution.ScheduleRequest{
 		AccountID:        payload.AccountID,
 		WorkspaceID:      payload.WorkspaceID,
 		AppID:            payload.AppID,
 		Function:         fn,
-		Events:           events,
+		Events:           serializedEvents,
 		BatchID:          &payload.BatchID,
 		IdempotencyKey:   &key,
 		FunctionPausedAt: opts.FunctionPausedAt,

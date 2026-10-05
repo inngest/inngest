@@ -280,13 +280,9 @@ type ScheduleRequest struct {
 	// FromStep is the step that this function is being scheduled from.
 	FromStep *ScheduleRequestFromStep
 
-	// Events represent one or more events that the function is being triggered with.
-	Events []event.TrackedEvent
-	// SerializedEvents optionally contains an immutable JSON snapshot of Events.
-	// It remains optional for backwards compatibility with existing ScheduleRequest
-	// callers. When absent, the executor preserves the previous per-run serialization
-	// behavior; callers that provide a snapshot share it across fan-out runs.
-	SerializedEvents event.SerializedEvents
+	// Events is the immutable snapshot of events that trigger the function. It
+	// includes read-only access to tracked metadata required while scheduling.
+	Events event.SerializedEvents
 	// BatchID refers to the batch ID, if this function is started as a batch.
 	BatchID *ulid.ULID
 	// IdempotencyKey represents an optional idempotency key for the function.

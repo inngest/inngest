@@ -54,7 +54,7 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	md sv2.Metadata,
 	item queue.Item,
-	_ []event.TrackedEvent,
+	_ event.SerializedEvents,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {

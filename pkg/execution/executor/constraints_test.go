@@ -61,14 +61,14 @@ func TestRateLimitKeyExpressionHashConsistency(t *testing.T) {
 			// Get KeyExpressionHash from getScheduleConstraints
 			req := execution.ScheduleRequest{
 				Function: fn,
-				Events: []event.TrackedEvent{
+				Events: testSerializedEvents(t,
 					event.InternalEvent{
 						Event: event.Event{
 							Name: "test",
 							Data: map[string]any{"userId": "test-user"},
 						},
 					},
-				},
+				),
 			}
 
 			constraints, err := getScheduleConstraints(context.Background(), req)
@@ -184,7 +184,7 @@ func TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion(t *testing.T) {
 		AccountID:   accountID,
 		WorkspaceID: envID,
 		AppID:       appID,
-		Events:      []event.TrackedEvent{evt},
+		Events:      testSerializedEvents(t, evt),
 	}
 
 	tracer := trace.NoopConditionalTracer()

@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -32,8 +33,10 @@ func TestReconstructUsesExecutorStepSpans(t *testing.T) {
 		},
 	}
 
-	newState := &sv2.CreateState{}
-	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{
+	serialized, err := event.NewSerializedEvents([]json.RawMessage{json.RawMessage(`{"name":"rerun"}`)})
+	require.NoError(t, err)
+	newState := &sv2.CreateState{SerializedEvents: serialized}
+	_, err = reconstruct(context.Background(), fakeReconstructTraceReader{
 		root: root,
 		outputs: map[string]*cqrs.SpanOutput{
 			outputSpanID: {Data: []byte(`{"ok":true}`)},
@@ -46,6 +49,7 @@ func TestReconstructUsesExecutorStepSpans(t *testing.T) {
 	}, newState)
 
 	require.NoError(t, err)
+	require.True(t, serialized.Equal(newState.SerializedEvents), "reconstruction must preserve serialized events")
 	require.Equal(t, []state.MemoizedStep{
 		{
 			ID: stepID,

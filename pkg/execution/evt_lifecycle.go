@@ -39,7 +39,7 @@ type EventLifecycleListener interface {
 	OnFunctionScheduled(
 		context.Context,
 		sv2.Metadata,
-		[]event.TrackedEvent,
+		event.SerializedEvents,
 	)
 
 	// OnRateLimited is called when a matched function is not scheduled because
@@ -92,7 +92,7 @@ func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context, evt eve
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context, req ScheduleRequest) {}
 
-func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, evts []event.TrackedEvent) {
+func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, evts event.SerializedEvents) {
 }
 
 func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req ScheduleRequest) {}

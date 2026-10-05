@@ -130,7 +130,7 @@ func WithConstraints[T any](
 		"app_id", req.AppID,
 		"fn_id", req.Function.ID,
 		"fn_v", req.Function.FunctionVersion,
-		"evt_id", req.Events[0].GetInternalID(),
+		"evt_id", req.Events.TrackedEvent(0).GetInternalID(),
 		"constraints", constraints,
 		"results", checkResult,
 	)
@@ -339,7 +339,7 @@ func getScheduleConstraints(ctx context.Context, req execution.ScheduleRequest) 
 	// The only constraint we care about in run scheduling is rate limiting.
 	// Throttle + concurrency constraints are checked in the queue.
 	if req.Function.RateLimit != nil && !req.PreventRateLimit {
-		rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events[0].GetEvent().Map())
+		rateLimitKey, err := ratelimit.RateLimitKey(ctx, req.Function.ID, *req.Function.RateLimit, req.Events.TrackedEvent(0).GetEvent().Map())
 		switch err {
 		case ratelimit.ErrNotRateLimited:
 			// no rate limit configured, do not return constraints

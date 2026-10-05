@@ -486,13 +486,17 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			)
 			defer span.End()
 
+			serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{di})
+			if err != nil {
+				return fmt.Errorf("serialize debounce schedule events: %w", err)
+			}
 			_, md, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
 				Function:         f,
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
 				AppID:            di.AppID,
 				AppName:          di.AppName,
-				Events:           []event.TrackedEvent{di},
+				Events:           serializedEvents,
 				PreventDebounce:  true,
 				PreventRateLimit: true, // Rate limit was already enforced for this
 				FunctionPausedAt: di.FunctionPausedAt,
@@ -1122,12 +1126,16 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	// NOTE
 	// should this also handle batching and rate limit like runner.initialize?
 	// seems kinda weird to have those settisngs with cron tbh
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{evt})
+	if err != nil {
+		return fmt.Errorf("serialize cron schedule events: %w", err)
+	}
 	_, _, err = s.Executor().Schedule(ctx, execution.ScheduleRequest{
 		AccountID:      ci.AccountID,
 		WorkspaceID:    ci.WorkspaceID,
 		AppID:          ci.AppID,
 		Function:       *conf,
-		Events:         []event.TrackedEvent{evt},
+		Events:         serializedEvents,
 		At:             &fireAt,
 		IdempotencyKey: &idempotencyKey,
 	})

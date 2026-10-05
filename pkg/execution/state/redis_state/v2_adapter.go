@@ -82,13 +82,9 @@ type v2 struct {
 
 // Create creates new state in the store for the given run ID.
 func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
-	// Supplying both representations is a caller bug. Reject the request rather
-	// than choosing one and risking inconsistent durable state. The legacy Events
-	// representation and this guard will be removed after all callers migrate.
-	if len(s.Events) > 0 && s.SerializedEvents.Len() > 0 {
-		return state.State{}, fmt.Errorf("create state contains raw and immutable event payloads")
-	}
-	rawEvents := s.MaterializeEvents()
+	// Redis owns the mutable byte representation. Keep scheduling and state APIs
+	// on the immutable snapshot until this persistence boundary.
+	rawEvents := s.SerializedEvents.RawMessages()
 	batchData := make([]map[string]any, len(rawEvents))
 	for n, evt := range rawEvents {
 		data := map[string]any{}

@@ -27,19 +27,19 @@ type recordingSyncLifecycle struct {
 	execution.NoopSyncLifecycleListener
 	finishedCalls   int
 	scheduledCalls  int
-	scheduledEvents []json.RawMessage
+	scheduledEvents event.SerializedEvents
 }
 
 func (r *recordingSyncLifecycle) OnFunctionFinished(context.Context, sv2.Metadata, queue.Item, []json.RawMessage, statev1.DriverResponse, time.Time) {
 	r.finishedCalls++
 }
 
-func (r *recordingSyncLifecycle) OnFunctionScheduled(_ context.Context, _ sv2.Metadata, _ queue.Item, events []json.RawMessage) {
+func (r *recordingSyncLifecycle) OnFunctionScheduled(_ context.Context, _ sv2.Metadata, _ queue.Item, events event.SerializedEvents) {
 	r.scheduledCalls++
 	r.scheduledEvents = events
 }
 
-func TestRunFunctionScheduledSyncListenersMaterializesOnlyForListeners(t *testing.T) {
+func TestRunFunctionScheduledSyncListenersReuseSerializedEvents(t *testing.T) {
 	ctx := context.Background()
 	serialized, err := event.NewSerializedEvents([]json.RawMessage{
 		json.RawMessage(`{"name":"first"}`),
@@ -47,43 +47,26 @@ func TestRunFunctionScheduledSyncListenersMaterializesOnlyForListeners(t *testin
 	})
 	require.NoError(t, err)
 	e := &executor{log: logger.VoidLogger()}
-
-	allocs := testing.AllocsPerRun(100, func() {
-		newState := sv2.CreateState{SerializedEvents: serialized}
-		e.prepareStateEventsForSyncListeners(&newState)
-	})
-	require.Zero(t, allocs, "serialized payloads must not be materialized without listeners")
-
 	sync := &recordingSyncLifecycle{}
 	e.syncLifecycles = []execution.SyncLifecycleListener{sync}
-	newState := sv2.CreateState{SerializedEvents: serialized}
-	listenerEvents := e.prepareStateEventsForSyncListeners(&newState)
-	require.Empty(t, newState.SerializedEvents)
-	require.Equal(t, listenerEvents, newState.Events)
-	e.notifyFunctionScheduledSyncListeners(ctx, sv2.Metadata{}, queue.Item{}, listenerEvents)
+	e.notifyFunctionScheduledSyncListeners(ctx, sv2.Metadata{}, queue.Item{}, serialized)
 	require.Equal(t, 1, sync.scheduledCalls)
-	require.Equal(t, []json.RawMessage{
-		json.RawMessage(`{"name":"first"}`),
-		json.RawMessage(`{"name":"second"}`),
-	}, sync.scheduledEvents)
-	require.Same(t, &newState.Events[0][0], &sync.scheduledEvents[0][0], "state creation and listeners must share one materialization")
+	require.True(t, serialized.Equal(sync.scheduledEvents))
+	require.Equal(t, serialized.Input(), sync.scheduledEvents.Input())
 }
 
 type recordingScheduleRunService struct {
 	sv2.RunService
 	createCalled   bool
-	createEvents   []json.RawMessage
+	createEvents   event.SerializedEvents
 	persistedEvent []json.RawMessage
 }
 
 func (r *recordingScheduleRunService) Create(_ context.Context, s sv2.CreateState) (sv2.State, error) {
 	r.createCalled = true
-	r.createEvents = s.Events
-	r.persistedEvent = make([]json.RawMessage, len(s.Events))
-	for i, evt := range s.Events {
-		r.persistedEvent[i] = append(json.RawMessage(nil), evt...)
-	}
-	return sv2.State{Metadata: s.Metadata, Events: s.Events}, nil
+	r.createEvents = s.SerializedEvents
+	r.persistedEvent = s.SerializedEvents.RawMessages()
+	return sv2.State{Metadata: s.Metadata, Events: r.persistedEvent}, nil
 }
 
 type mutatingScheduledSyncLifecycle struct {
@@ -91,26 +74,44 @@ type mutatingScheduledSyncLifecycle struct {
 	runService        *recordingScheduleRunService
 	called            bool
 	createCalledFirst bool
-	receivedEvents    []json.RawMessage
+	receivedEvents    event.SerializedEvents
 }
 
-func (l *mutatingScheduledSyncLifecycle) OnFunctionScheduled(_ context.Context, _ sv2.Metadata, _ queue.Item, events []json.RawMessage) {
+type recordingSkippedLifecycle struct {
+	execution.NoopLifecyceListener
+	events chan event.SerializedEvents
+}
+
+func (l *recordingSkippedLifecycle) OnFunctionSkipped(_ context.Context, _ sv2.Metadata, state execution.SkipState) {
+	l.events <- state.Events
+}
+
+func TestHandleFunctionSkippedPassesSerializedEvents(t *testing.T) {
+	listener := &recordingSkippedLifecycle{events: make(chan event.SerializedEvents, 1)}
+	e := &executor{lifecycles: []execution.LifecycleListener{listener}}
+	req := execution.ScheduleRequest{Events: testSerializedEvents(t,
+		event.NewBaseTrackedEvent(event.Event{Name: "test/skipped", Data: map[string]any{}}, nil),
+	)}
+
+	_, _, err := e.handleFunctionSkipped(context.Background(), req, sv2.Metadata{}, enums.SkipReasonFunctionPaused)
+	require.ErrorIs(t, err, ErrFunctionSkipped)
+	select {
+	case events := <-listener.events:
+		require.True(t, req.Events.Equal(events))
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for skipped lifecycle")
+	}
+}
+
+func (l *mutatingScheduledSyncLifecycle) OnFunctionScheduled(_ context.Context, _ sv2.Metadata, _ queue.Item, events event.SerializedEvents) {
 	l.called = true
 	l.createCalledFirst = l.runService.createCalled
-	l.receivedEvents = make([]json.RawMessage, len(events))
-	for i, evt := range events {
-		l.receivedEvents[i] = append(json.RawMessage(nil), evt...)
-	}
-	events[0][0] = 'x'
+	l.receivedEvents = events
+	raw := events.RawMessages()
+	raw[0][0] = 'x'
 }
 
-func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSharedEvents(t *testing.T) {
-	rawEvents := []json.RawMessage{
-		json.RawMessage(`{"name":"first"}`),
-		json.RawMessage(`{"name":"second"}`),
-	}
-	serialized, err := event.NewSerializedEvents(rawEvents)
-	require.NoError(t, err)
+func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSerializedEvents(t *testing.T) {
 	runService := &recordingScheduleRunService{}
 	listener := &mutatingScheduledSyncLifecycle{runService: runService}
 	e := &executor{
@@ -131,7 +132,7 @@ func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSharedEvents(t *testi
 			FunctionVersion: 1,
 			Name:            "sync-listener-ordering",
 		},
-		Events: []event.TrackedEvent{
+		Events: testSerializedEvents(t,
 			event.InternalEvent{
 				ID: firstEventID,
 				Event: event.Event{
@@ -150,18 +151,18 @@ func TestScheduleCreatesStateBeforeInvokingSyncListenerWithSharedEvents(t *testi
 					Data:      map[string]any{},
 				},
 			},
-		},
-		SerializedEvents: serialized,
-		RunMode:          enums.RunModeSync,
+		),
+		RunMode: enums.RunModeSync,
 	}
 
-	_, _, err = e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
+	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 	require.NoError(t, err)
 	require.True(t, listener.called)
 	require.True(t, listener.createCalledFirst, "state creation must complete before invoking the listener")
-	require.Equal(t, rawEvents, listener.receivedEvents)
-	require.Equal(t, rawEvents, runService.persistedEvent, "listener mutation must not alter persisted state")
-	require.Equal(t, byte('x'), runService.createEvents[0][0], "state creation and listener must receive the same backing bytes")
+	require.True(t, req.Events.Equal(listener.receivedEvents))
+	require.True(t, req.Events.Equal(runService.createEvents))
+	require.Equal(t, req.Events.RawMessages(), runService.persistedEvent)
+	require.Equal(t, byte('{'), req.Events.Event(0)[0], "listener materialization must not mutate the immutable snapshot")
 }
 
 func TestRunFunctionFinishedLifecycleCallsSyncListenerInline(t *testing.T) {

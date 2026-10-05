@@ -74,7 +74,7 @@ func TestHandleFunctionSkippedSnapshotsMetadataContextForAsyncListeners(t *testi
 		}),
 	}
 
-	_, _, err := e.handleFunctionSkipped(context.Background(), execution.ScheduleRequest{}, metadata, nil, enums.SkipReasonFunctionPaused)
+	_, _, err := e.handleFunctionSkipped(context.Background(), execution.ScheduleRequest{}, metadata, enums.SkipReasonFunctionPaused)
 	require.ErrorIs(t, err, ErrFunctionSkipped)
 
 	select {

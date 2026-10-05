@@ -63,7 +63,7 @@ func TestScheduleQueueShardNotFoundCleansFreshState(t *testing.T) {
 					FunctionVersion: 1,
 					Name:            "Queue routing test",
 				},
-				Events: []event.TrackedEvent{
+				Events: testSerializedEvents(t,
 					event.InternalEvent{
 						ID: eventID,
 						Event: event.Event{
@@ -73,7 +73,7 @@ func TestScheduleQueueShardNotFoundCleansFreshState(t *testing.T) {
 							Data:      map[string]any{},
 						},
 					},
-				},
+				),
 			}
 
 			_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)

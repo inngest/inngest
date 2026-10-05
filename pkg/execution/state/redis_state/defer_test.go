@@ -69,7 +69,7 @@ func newDeferTestRunService(t *testing.T) (statev2.RunService, statev2.ID) {
 				EventIDs: []ulid.ULID{eventID},
 			}),
 		},
-		Events: []json.RawMessage{[]byte(`{"name":"test.event"}`)},
+		SerializedEvents: mustSerializedEvents(t, []json.RawMessage{[]byte(`{"name":"test.event"}`)}),
 	})
 	require.NoError(t, err)
 

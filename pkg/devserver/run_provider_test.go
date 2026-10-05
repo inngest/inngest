@@ -80,9 +80,9 @@ func TestRunProviderRerunSchedulesOriginalEvent(t *testing.T) {
 	require.NotNil(t, scheduler.req.FromStep)
 	require.Equal(t, "step-1", scheduler.req.FromStep.StepID)
 	require.JSONEq(t, `[{"foo":"bar"}]`, string(scheduler.req.FromStep.Input))
-	require.Len(t, scheduler.req.Events, 1)
-	require.Equal(t, eventID, scheduler.req.Events[0].GetInternalID())
-	require.Equal(t, "test/event", scheduler.req.Events[0].GetEvent().Name)
+	require.Equal(t, 1, scheduler.req.Events.Len())
+	require.Equal(t, eventID, scheduler.req.Events.TrackedEvent(0).GetInternalID())
+	require.Equal(t, "test/event", scheduler.req.Events.TrackedEvent(0).GetEvent().Name)
 }
 
 func TestRunProviderRerunUsesRunIDWhenOriginalRunIDIsMissing(t *testing.T) {

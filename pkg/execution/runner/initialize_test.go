@@ -40,11 +40,15 @@ func TestInitializeScheduleErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tracked := event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, ulid.Make())
+			serialized, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{tracked})
+			require.NoError(t, err)
 			md, err := Initialize(context.Background(), InitOpts{
-				appID: uuid.New(),
-				fn:    inngest.Function{ID: uuid.New(), Slug: "fn"},
-				evt:   event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, ulid.Make()),
-				exec:  scheduleErrExecutor{err: tt.err},
+				appID:  uuid.New(),
+				fn:     inngest.Function{ID: uuid.New(), Slug: "fn"},
+				evt:    tracked,
+				events: serialized,
+				exec:   scheduleErrExecutor{err: tt.err},
 			})
 			require.Nil(t, md)
 			require.ErrorIs(t, err, tt.wantErr)

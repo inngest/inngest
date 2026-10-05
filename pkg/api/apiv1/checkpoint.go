@@ -196,6 +196,11 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 
 	appID := input.AppID(auth.WorkspaceID())
 	fn := input.Fn(appID)
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{evt})
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusInternalServerError, "Unable to serialize run event"))
+		return
+	}
 
 	// Create a new run.  Note that this is currently of type API, and is a sync function.
 	// Because of this, it has no job in the queue.
@@ -210,7 +215,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		WorkspaceID:    auth.WorkspaceID(),
 		AppID:          input.AppID(auth.WorkspaceID()),
 		RunMode:        enums.RunModeSync,
-		Events:         []event.TrackedEvent{evt},
+		Events:         serializedEvents,
 		URL:            input.URL(),
 		RequestVersion: input.RequestVersion,
 	})

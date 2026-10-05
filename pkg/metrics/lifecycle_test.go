@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
@@ -73,7 +74,7 @@ func TestPrometheusLifecycleListener_FunctionRun(t *testing.T) {
 	baseCompleted := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "completed"})
 	baseFailed := counterValue(t, "inngest_function_run_ended_total", map[string]string{"fn": slug, "status": "failed"})
 
-	l.OnFunctionScheduled(ctx, md, queue.Item{}, nil)
+	l.OnFunctionScheduled(ctx, md, queue.Item{}, event.SerializedEvents{})
 	assert.Equal(t, baseScheduled+1, counterValue(t, "inngest_function_run_scheduled_total", labels))
 
 	l.OnFunctionStarted(ctx, md, queue.Item{}, nil)

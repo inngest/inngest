@@ -341,15 +341,17 @@ func (r *mutationResolver) Rerun(
 		originalRunID = fnrun.OriginalRunID
 	}
 
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{
+		// Preserve the original internal ID for rerun idempotency and tracing.
+		event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
+	})
+	if err != nil {
+		return ulid.Zero, fmt.Errorf("serialize rerun events: %w", err)
+	}
 	newRunID, _, err := r.Executor.Schedule(ctx, execution.ScheduleRequest{
-		Function: *fn,
-		AppID:    fnCQRS.AppID,
-		Events: []event.TrackedEvent{
-			// We need NewBaseTrackedEventWithID to ensure that the tracked event
-			// has the same ID as the original event. Calling NewBaseTrackedEvent
-			// will result in the creation of a new ID
-			event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
-		},
+		Function:       *fn,
+		AppID:          fnCQRS.AppID,
+		Events:         serializedEvents,
 		OriginalRunID:  originalRunID,
 		AccountID:      consts.DevServerAccountID,
 		FromStep:       fromStepReq,

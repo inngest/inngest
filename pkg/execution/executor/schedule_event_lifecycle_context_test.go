@@ -43,7 +43,7 @@ func TestScheduleSkippedEventLifecycleReceivesEnrichedRequestContext(t *testing.
 			Name:            "Send Weekly Email",
 		},
 		FunctionPausedAt: &pausedAt,
-		Events: []event.TrackedEvent{
+		Events: testSerializedEvents(t,
 			event.InternalEvent{
 				ID: eventID,
 				Event: event.Event{
@@ -53,7 +53,7 @@ func TestScheduleSkippedEventLifecycleReceivesEnrichedRequestContext(t *testing.
 					Data:      map[string]any{},
 				},
 			},
-		},
+		),
 	}
 
 	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
@@ -91,7 +91,7 @@ func TestScheduleIdempotencySkippedEventLifecycleReceivesEnrichedRequestContext(
 			FunctionVersion: 1,
 			Name:            "Send Weekly Email",
 		},
-		Events: []event.TrackedEvent{
+		Events: testSerializedEvents(t,
 			event.InternalEvent{
 				ID: eventID,
 				Event: event.Event{
@@ -101,7 +101,7 @@ func TestScheduleIdempotencySkippedEventLifecycleReceivesEnrichedRequestContext(
 					Data:      map[string]any{},
 				},
 			},
-		},
+		),
 	}
 
 	_, _, err := e.Schedule(context.Background(), req)

@@ -20,8 +20,8 @@ type SkipState struct {
 	Reason enums.SkipReason
 	// CronSchedule, if present, is the cron schedule string that triggered the skipped function.
 	CronSchedule *string
-	// Events are the list of events being used when attempted to trigger a run
-	Events []json.RawMessage
+	// Events are the immutable events used when attempting to trigger a run.
+	Events event.SerializedEvents
 }
 
 var _ LifecycleListener = (*NoopLifecyceListener)(nil)
@@ -46,7 +46,7 @@ type LifecycleListener interface {
 		context.Context,
 		statev2.Metadata,
 		queue.Item,
-		[]event.TrackedEvent,
+		event.SerializedEvents,
 	)
 
 	// OnFunctionSkipped is called when a function run is skipped.
@@ -229,7 +229,7 @@ func (NoopLifecyceListener) OnFunctionScheduled(
 	context.Context,
 	statev2.Metadata,
 	queue.Item,
-	[]event.TrackedEvent,
+	event.SerializedEvents,
 ) {
 }
 

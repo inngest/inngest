@@ -282,12 +282,16 @@ func (p *runProvider) Rerun(ctx context.Context, runID ulid.ULID, opts apiv2.Rer
 		originalRunID = fnrun.OriginalRunID
 	}
 
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{
+		event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
+	})
+	if err != nil {
+		return ulid.ULID{}, fmt.Errorf("serialize rerun events: %w", err)
+	}
 	newRunID, _, err := p.scheduler.Schedule(ctx, execution.ScheduleRequest{
-		Function: *fn,
-		AppID:    fnCQRS.AppID,
-		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
-		},
+		Function:         *fn,
+		AppID:            fnCQRS.AppID,
+		Events:           serializedEvents,
 		OriginalRunID:    originalRunID,
 		AccountID:        consts.DevServerAccountID,
 		FromStep:         fromStep,

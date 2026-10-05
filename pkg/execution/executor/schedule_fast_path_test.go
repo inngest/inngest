@@ -55,9 +55,9 @@ func TestScheduleFastPathIntent(t *testing.T) {
 			req := execution.ScheduleRequest{
 				AccountID: uuid.New(), WorkspaceID: uuid.New(), AppID: uuid.New(),
 				Function: inngest.Function{ID: uuid.New(), FunctionVersion: 1, Name: "fast-path"},
-				Events: []event.TrackedEvent{event.InternalEvent{ID: ulid.Make(), Event: event.Event{
+				Events: testSerializedEvents(t, event.InternalEvent{ID: ulid.Make(), Event: event.Event{
 					Name: "test/fast-path", Timestamp: time.Now().UnixMilli(), Data: map[string]any{},
-				}}},
+				}}),
 				RunMode: tc.mode, FastPath: tc.fastPath,
 				IdempotencyKey: new("request-idempotency-key"),
 				Context:        map[string]any{"caller": "original-request"},

@@ -426,6 +426,10 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	evt := tracked.GetEvent()
+	serializedEvents, err := event.NewSerializedEventsFromTrackedEvents([]event.TrackedEvent{tracked})
+	if err != nil {
+		return fmt.Errorf("serialize schedule events: %w", err)
+	}
 
 	// Don't use an errgroup here as we want all errors together, vs the first
 	// non-nil error.
@@ -460,7 +464,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		if fn != nil {
 			// Initialize this function for this event only once;  we don't
 			// want multiple matching triggers to run the function more than once.
-			err := s.initialize(ctx, *fn, tracked)
+			err := s.initialize(ctx, *fn, tracked, serializedEvents)
 			if err != nil {
 				s.log.Error("error invoking fn",
 					"error", err,
@@ -535,7 +539,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 				// Initialize this function for this event only once;  we don't
 				// want multiple matching triggers to run the function more than once.
-				err := s.initialize(ctx, copied, tracked)
+				err := s.initialize(ctx, copied, tracked, serializedEvents)
 				if err != nil {
 					s.log.Error("error initializing fn",
 						"error", err,
@@ -592,7 +596,7 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	return err
 }
 
-func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
+func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent, serializedEvents event.SerializedEvents) error {
 	l := logger.StdlibLogger(ctx).With(
 		"function", fn.Name,
 		"function_id", fn.ID.String(),
@@ -646,10 +650,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 
 	l.Info("initializing fn")
 	_, err := Initialize(ctx, InitOpts{
-		appID: appID,
-		fn:    fn,
-		evt:   evt,
-		exec:  s.executor,
+		appID:  appID,
+		fn:     fn,
+		evt:    evt,
+		events: serializedEvents,
+		exec:   s.executor,
 	})
 	if err == state.ErrIdentifierExists {
 		// This run exists;  do not attempt to recreate it.
@@ -662,10 +667,11 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 }
 
 type InitOpts struct {
-	appID uuid.UUID
-	fn    inngest.Function
-	evt   event.TrackedEvent
-	exec  execution.Executor
+	appID  uuid.UUID
+	fn     inngest.Function
+	evt    event.TrackedEvent
+	events event.SerializedEvents
+	exec   execution.Executor
 }
 
 type functionMatchLifecycleRecorder interface {
@@ -704,12 +710,11 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 			debugRunID = metadata.DebugRunID
 		}
 	}
-
 	req := execution.ScheduleRequest{
 		WorkspaceID:    wsID,
 		AppID:          opts.appID,
 		Function:       fn,
-		Events:         []event.TrackedEvent{tracked},
+		Events:         opts.events,
 		IdempotencyKey: &idempotencyKey,
 		AccountID:      consts.DevServerAccountID,
 		DebugSessionID: debugSessionID,

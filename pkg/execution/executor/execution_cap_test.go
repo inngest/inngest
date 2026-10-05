@@ -70,12 +70,12 @@ func TestScheduleAccountExecutionCap(t *testing.T) {
 				accountExecutionCap: tt.capFn,
 			}
 
-			req := capScheduleRequest(nil)
+			req := capScheduleRequest(t, nil)
 			req.FunctionPausedAt = tt.pausedAt
 			if tt.eventName != "" {
-				evt := req.Events[0].(event.InternalEvent)
+				evt := req.Events.TrackedEvent(0).(event.InternalEvent)
 				evt.Event.Name = tt.eventName
-				req.Events[0] = evt
+				req.Events = testSerializedEvents(t, evt)
 			}
 
 			runID, md, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
@@ -112,7 +112,7 @@ func TestScheduleAccountExecutionCapSkipsSingletonHandling(t *testing.T) {
 		accountExecutionCap: capDecision(ExecutionCapLimitDecision{Exceeded: true, Enforce: true}),
 	}
 
-	req := capScheduleRequest(&inngest.Singleton{Mode: enums.SingletonModeCancel})
+	req := capScheduleRequest(t, &inngest.Singleton{Mode: enums.SingletonModeCancel})
 
 	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 
@@ -126,7 +126,7 @@ func capDecision(d ExecutionCapLimitDecision) ExecutionCapFn {
 	return func(context.Context, uuid.UUID) ExecutionCapLimitDecision { return d }
 }
 
-func capScheduleRequest(singleton *inngest.Singleton) execution.ScheduleRequest {
+func capScheduleRequest(t *testing.T, singleton *inngest.Singleton) execution.ScheduleRequest {
 	eventID := ulid.Make()
 	return execution.ScheduleRequest{
 		AccountID:   uuid.New(),
@@ -138,7 +138,7 @@ func capScheduleRequest(singleton *inngest.Singleton) execution.ScheduleRequest 
 			Name:            "capped-fn",
 			Singleton:       singleton,
 		},
-		Events: []event.TrackedEvent{
+		Events: testSerializedEvents(t,
 			event.InternalEvent{
 				ID: eventID,
 				Event: event.Event{
@@ -148,7 +148,7 @@ func capScheduleRequest(singleton *inngest.Singleton) execution.ScheduleRequest 
 					Data:      map[string]any{},
 				},
 			},
-		},
+		),
 	}
 }
 
