@@ -12,6 +12,7 @@ type SelectProps = {
   children: React.ReactNode;
   className?: string;
   size?: 'small' | 'medium';
+  disabled?: boolean;
 };
 
 export type Option = {
@@ -43,9 +44,10 @@ export function Select({
   multiple,
   className,
   size = 'medium',
+  disabled,
 }: Props) {
   return (
-    <Listbox value={value} onChange={onChange} multiple={multiple}>
+    <Listbox value={value} onChange={onChange} multiple={multiple} disabled={disabled}>
       {({ open: _open }) => (
         <span
           className={cn(

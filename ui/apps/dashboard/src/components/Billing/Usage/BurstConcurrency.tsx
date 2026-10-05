@@ -11,7 +11,7 @@ import { useQuery } from 'urql';
 import { graphql } from '@/gql';
 import { type GetBurstConcurrencyQuery } from '@/gql/graphql';
 
-const GetBurstConcurrencyDocument = graphql(`
+export const GetBurstConcurrencyDocument = graphql(`
   query GetBurstConcurrency {
     account {
       entitlements: ents {
@@ -20,6 +20,7 @@ const GetBurstConcurrencyDocument = graphql(`
         }
       }
       burstConcurrency {
+        limit
         budgetMinutes
         periodEnd
         usage {
