@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -144,9 +145,12 @@ func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.
 		return driver.QuackStream{}, nil, err
 	}
 
-	var total int
+	count := &deltaCount{table: t, kind: deltaRows, rowCap: rowCap}
 	next := func(ctx context.Context) ([][]any, error) {
 		b, err := r.Next(ctx)
+		if errors.Is(err, io.EOF) {
+			count.done(ctx)
+		}
 		if err != nil {
 			return nil, err // io.EOF ends the stream
 		}
@@ -155,9 +159,8 @@ func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.
 		if err := b.validateFor(schema); err != nil {
 			return nil, fmt.Errorf("federate: %s delta: %w", t, err)
 		}
-		total += b.Len()
-		if rowCap > 0 && total > rowCap {
-			return nil, fmt.Errorf("%w: %s delta has more than %d rows", ErrRowCapExceeded, t, rowCap)
+		if err := count.add(ctx, b.Len()); err != nil {
+			return nil, fmt.Errorf("%w: %s delta has more than %d rows", err, t, rowCap)
 		}
 		rows := make([][]any, b.Len())
 		for i := range rows {

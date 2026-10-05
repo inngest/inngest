@@ -164,7 +164,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			if err := sameColumns(r.Schema(), req.Columns); err != nil {
 				return fail(fmt.Errorf("federate: %s delta: %w", t, err))
 			}
-			st, def, err := encodedDeltaStream(t, r, q.RowCap)
+			st, def, err := encodedDeltaStream(t, r, q.RowCap, deltaRows)
 			if err != nil {
 				return fail(err)
 			}
