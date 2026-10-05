@@ -1,0 +1,18 @@
+{
+  "description": "BETWEEN becomes a \u003e= and a \u003c= predicate.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "function_id \u003e= 'a'",
+        "physical": "runs.function_slug \u003e= 'a'",
+        "pushed": true
+      },
+      {
+        "logical": "function_id \u003c= 'm'",
+        "physical": "runs.function_slug \u003c= 'm'",
+        "pushed": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "description": "A LEFT JOIN's ON condition on the nullable side only limits which rows match.",
+  "mode": "product"
+}

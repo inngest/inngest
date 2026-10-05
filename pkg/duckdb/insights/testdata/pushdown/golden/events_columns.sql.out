@@ -1,0 +1,23 @@
+{
+  "description": "Events columns map to their physical names.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "name = 'app/user.created'",
+        "physical": "events.event_name = 'app/user.created'",
+        "pushed": true
+      },
+      {
+        "logical": "id IN ('e1', 'e2')",
+        "physical": "events.event_id IN ('e1', 'e2')",
+        "pushed": true
+      },
+      {
+        "logical": "v = '2024-01-01'",
+        "physical": "events.event_v = '2024-01-01'",
+        "pushed": true
+      }
+    ]
+  }
+}
