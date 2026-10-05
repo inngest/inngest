@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -71,6 +72,12 @@ func ConfigToProto(c Config) (*pb.Config, error) {
 		startedAt = timestamppb.New(c.StartedAt)
 	}
 
+	// ScheduledAt: time.Time -> *timestamppb.Timestamp
+	var scheduledAt *timestamppb.Timestamp
+	if !c.ScheduledAt.IsZero() {
+		scheduledAt = timestamppb.New(c.ScheduledAt)
+	}
+
 	// ReplayID: *uuid.UUID -> *string
 	var replayID *string
 	if c.ReplayID != nil {
@@ -127,6 +134,7 @@ func ConfigToProto(c Config) (*pb.Config, error) {
 		SpanId:          c.SpanID,
 		BatchId:         batchID,
 		StartedAt:       startedAt,
+		ScheduledAt:     scheduledAt,
 		EventIds:        eventIDs,
 		RequestVersion:  int64(c.RequestVersion),
 		Idempotency:     c.Idempotency,
@@ -169,6 +177,14 @@ func ConfigFromProto(pbCfg *pb.Config) (Config, error) {
 
 	// StartedAt: *timestamppb.Timestamp -> time.Time
 	var startedAt = pbCfg.StartedAt.AsTime()
+
+	// ScheduledAt: *timestamppb.Timestamp -> time.Time.  Unset stays zero
+	// (AsTime on nil would return the Unix epoch) so state written before
+	// this field existed reads as unknown.
+	var scheduledAt time.Time
+	if pbCfg.ScheduledAt != nil {
+		scheduledAt = pbCfg.ScheduledAt.AsTime()
+	}
 
 	// ReplayID: *string -> *uuid.UUID
 	var replayID *uuid.UUID
@@ -226,6 +242,7 @@ func ConfigFromProto(pbCfg *pb.Config) (Config, error) {
 		SpanID:                pbCfg.SpanId,
 		BatchID:               batchID,
 		StartedAt:             startedAt,
+		ScheduledAt:           scheduledAt,
 		EventIDs:              eventIDs,
 		RequestVersion:        int(pbCfg.RequestVersion),
 		Idempotency:           pbCfg.Idempotency,

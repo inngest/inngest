@@ -228,7 +228,8 @@ type Config struct {
 	// semaphores_json stores semaphore constraints as a JSON-encoded string.
 	// This avoids a proto schema change while ensuring semaphores survive
 	// the state proxy round-trip.
-	SemaphoresJson string `protobuf:"bytes,17,opt,name=semaphores_json,json=semaphoresJson,proto3" json:"semaphores_json,omitempty"`
+	SemaphoresJson string                 `protobuf:"bytes,17,opt,name=semaphores_json,json=semaphoresJson,proto3" json:"semaphores_json,omitempty"`
+	ScheduledAt    *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=scheduled_at,json=scheduledAt,proto3" json:"scheduled_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -373,6 +374,13 @@ func (x *Config) GetSemaphoresJson() string {
 		return x.SemaphoresJson
 	}
 	return ""
+}
+
+func (x *Config) GetScheduledAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ScheduledAt
+	}
+	return nil
 }
 
 type ConcurrencyKey struct {
@@ -2477,7 +2485,7 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
 	"functionId\x12(\n" +
-	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\xc2\x05\n" +
+	"\x06tenant\x18\x03 \x01(\v2\x10.state.v2.TenantR\x06tenant\"\x81\x06\n" +
 	"\x06Config\x12)\n" +
 	"\x10function_version\x18\x02 \x01(\x03R\x0ffunctionVersion\x12#\n" +
 	"\rcron_schedule\x18\x03 \x01(\tR\fcronSchedule\x12\x17\n" +
@@ -2496,7 +2504,8 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0fforce_step_plan\x18\x0e \x01(\bR\rforceStepPlan\x121\n" +
 	"\acontext\x18\x0f \x01(\v2\x17.google.protobuf.StructR\acontext\x12\x15\n" +
 	"\x06has_ai\x18\x10 \x01(\bR\x05hasAi\x12'\n" +
-	"\x0fsemaphores_json\x18\x11 \x01(\tR\x0esemaphoresJsonB\f\n" +
+	"\x0fsemaphores_json\x18\x11 \x01(\tR\x0esemaphoresJson\x12=\n" +
+	"\fscheduled_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vscheduledAtB\f\n" +
 	"\n" +
 	"_replay_idB\x12\n" +
 	"\x10_original_run_idB\x12\n" +
@@ -2750,77 +2759,78 @@ var file_state_v2_state_proto_depIdxs = []int32{
 	50, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
 	4,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
 	51, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
-	1,  // 7: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
-	1,  // 8: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
-	45, // 9: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
-	2,  // 10: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
-	2,  // 11: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
-	1,  // 12: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
-	2,  // 13: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	50, // 14: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
-	2,  // 15: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
-	2,  // 16: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
-	2,  // 17: state.v2.ExistsRequest.id:type_name -> state.v2.ID
-	2,  // 18: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
-	2,  // 19: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	46, // 20: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
-	2,  // 21: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
-	1,  // 22: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	47, // 23: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
-	0,  // 24: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
-	0,  // 25: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
-	2,  // 26: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
-	27, // 27: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
-	2,  // 28: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
-	0,  // 29: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
-	2,  // 30: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
-	2,  // 31: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
-	48, // 32: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
-	2,  // 33: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
-	49, // 34: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
-	39, // 35: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
-	40, // 36: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
-	41, // 37: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
-	42, // 38: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
-	27, // 39: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
-	28, // 40: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
-	7,  // 41: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	9,  // 42: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	19, // 43: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	13, // 44: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	15, // 45: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	17, // 46: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	43, // 47: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
-	29, // 48: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
-	31, // 49: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
-	33, // 50: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
-	11, // 51: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	21, // 52: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	23, // 53: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	25, // 54: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	35, // 55: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
-	37, // 56: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
-	8,  // 57: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	10, // 58: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	20, // 59: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	14, // 60: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	16, // 61: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	18, // 62: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	44, // 63: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
-	30, // 64: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
-	32, // 65: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
-	34, // 66: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
-	12, // 67: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	22, // 68: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	24, // 69: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	26, // 70: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	36, // 71: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
-	38, // 72: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
-	57, // [57:73] is the sub-list for method output_type
-	41, // [41:57] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	50, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
+	1,  // 8: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
+	1,  // 9: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
+	45, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	2,  // 11: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
+	2,  // 12: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
+	1,  // 13: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
+	2,  // 14: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
+	50, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	2,  // 16: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
+	2,  // 17: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
+	2,  // 18: state.v2.ExistsRequest.id:type_name -> state.v2.ID
+	2,  // 19: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
+	2,  // 20: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
+	46, // 21: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	2,  // 22: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
+	1,  // 23: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
+	47, // 24: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	0,  // 25: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
+	0,  // 26: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
+	2,  // 27: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
+	27, // 28: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
+	2,  // 29: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
+	0,  // 30: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
+	2,  // 31: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
+	2,  // 32: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
+	48, // 33: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
+	2,  // 34: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
+	49, // 35: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
+	39, // 36: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
+	40, // 37: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
+	41, // 38: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
+	42, // 39: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
+	27, // 40: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
+	28, // 41: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
+	7,  // 42: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	9,  // 43: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	19, // 44: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	13, // 45: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	15, // 46: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	17, // 47: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	43, // 48: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
+	29, // 49: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
+	31, // 50: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
+	33, // 51: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
+	11, // 52: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	21, // 53: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	23, // 54: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	25, // 55: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	35, // 56: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
+	37, // 57: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
+	8,  // 58: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	10, // 59: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	20, // 60: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	14, // 61: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	16, // 62: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	18, // 63: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	44, // 64: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
+	30, // 65: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
+	32, // 66: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
+	34, // 67: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
+	12, // 68: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	22, // 69: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	24, // 70: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	26, // 71: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	36, // 72: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
+	38, // 73: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
+	58, // [58:74] is the sub-list for method output_type
+	42, // [42:58] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }

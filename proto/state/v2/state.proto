@@ -40,6 +40,7 @@ message Config {
   // This avoids a proto schema change while ensuring semaphores survive
   // the state proxy round-trip.
   string                            semaphores_json  = 17;
+  google.protobuf.Timestamp         scheduled_at     = 18;
 }
 
 message ConcurrencyKey {
