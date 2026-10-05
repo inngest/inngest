@@ -35,9 +35,9 @@ func insertGQLSessionRun(t *testing.T, db *sql.DB, appID, functionID uuid.UUID, 
 	sessions := fmt.Sprintf("[{'key': '%s', 'id': '%s'}]", sessionKey, sessionID)
 	_, err := db.ExecContext(t.Context(), fmt.Sprintf(`
 INSERT INTO inngest.runs
-  (account_id, env_id, run_id, queued_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, sessions)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[{"name": "e1", "data": {}}]', %s);`, sessions),
-		consts.DevServerAccountID.String(), consts.DevServerEnvID.String(), runID, queuedAt,
+  (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, sessions)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[{"name": "e1", "data": {}}]', %s);`, sessions),
+		consts.DevServerAccountID.String(), consts.DevServerEnvID.String(), runID, queuedAt, queuedAt,
 		appID.String(), "app", functionID.String(), "fn", status,
 	)
 	require.NoError(t, err)
