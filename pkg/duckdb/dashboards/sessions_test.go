@@ -87,10 +87,10 @@ func insertRun(t *testing.T, db *sql.DB, r testRun) {
 
 	query := fmt.Sprintf(`
 INSERT INTO inngest.runs
-  (account_id, env_id, run_id, queued_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, sessions)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, %s);`, sessionsLiteral)
+  (account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, sessions)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, %s);`, sessionsLiteral)
 	_, err := db.ExecContext(t.Context(), query,
-		r.accountID.String(), r.envID.String(), r.runID, r.queuedAt, r.endedAt,
+		r.accountID.String(), r.envID.String(), r.runID, r.queuedAt, r.queuedAt, r.endedAt,
 		r.appID.String(), r.appName, r.functionID.String(), r.functionSlug, r.status, inputs,
 	)
 	require.NoError(t, err)

@@ -55,9 +55,9 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 func insertRunRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, status string, queuedAt time.Time) {
 	t.Helper()
 	_, err := db.ExecContext(t.Context(),
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-		accountID.String(), envID.String(), runID, queuedAt, uuid.New().String(), "test-app", uuid.New().String(), "test-fn", status, "{}", "{}",
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, queuedAt, queuedAt, uuid.New().String(), "test-app", uuid.New().String(), "test-fn", status, "{}", "{}",
 	)
 	require.NoError(t, err)
 }
