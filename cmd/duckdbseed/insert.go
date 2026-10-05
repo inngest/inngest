@@ -40,12 +40,11 @@ type Timings struct {
 }
 
 // Column kind lists mirror each table's column order exactly, as created by
-// pkg/db/duckdb/migrations (000001_baseline.sql, plus columns later
-// migrations append). duckdbdriver.QuackAppender's wire
+// pkg/db/duckdb/migrations (000001_baseline.sql). duckdbdriver.QuackAppender's wire
 // protocol carries no column names — a row's values are matched
 // positionally against the table's own full column list — so there is no
 // way to scope the appender to a subset of columns: defaulted columns such
-// as inngest.runs' is_deferred and inserted_at must be supplied explicitly
+// as inngest.runs' is_deferred must be supplied explicitly
 // too (see runRowValues). A schema change to any of these tables must be
 // mirrored here; insert_test.go exercises every table against the real
 // migrations.
@@ -56,13 +55,12 @@ var (
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
 		duckdbdriver.QuackColumnVarchar,                                                          // status
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
-		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
-		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
-		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
-		duckdbdriver.QuackColumnVarchar,     // defer_parent_fn_slug
-		duckdbdriver.QuackColumnVarchar,     // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
-		duckdbdriver.QuackColumnTimestampMS, // inserted_at
-		duckdbdriver.QuackColumnVarchar,     // trace_id (000003_runs_trace_id.sql, appended)
+		duckdbdriver.QuackColumnVarchar, // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
+		duckdbdriver.QuackColumnVarchar, // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
+		duckdbdriver.QuackColumnVarchar, // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
+		duckdbdriver.QuackColumnVarchar, // defer_parent_fn_slug
+		duckdbdriver.QuackColumnVarchar, // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
+		duckdbdriver.QuackColumnVarchar, // trace_id
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
@@ -70,7 +68,7 @@ var (
 		duckdbdriver.QuackColumnVarchar,                                          // name
 		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, links, output, input
+		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, internal_id, received_at
@@ -166,9 +164,8 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 		metadataRows = append(metadataRows, g.Metadata...)
 	}
 
-	now := time.Now().UTC()
 	for _, r := range runs {
-		if err := a.runs.AppendRow(runRowValues(r, now)...); err != nil {
+		if err := a.runs.AppendRow(runRowValues(r)...); err != nil {
 			return Summary{}, fmt.Errorf("duckdbseed: appending run %s: %w", r.RunID, err)
 		}
 	}
@@ -211,19 +208,21 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 // gap — duckdb-quack's AppendRequest handler crashes (empty-bodied HTTP
 // 500) on any native LIST-typed column, verified down to the minimal case;
 // see pkg/duckdb/driver/internal/quack/append.go's ColumnKind.wireID doc comment for the full
-// writeup. now stands in for inserted_at's DEFAULT current_timestamp, which
-// this appender (having no column-name info on the wire) cannot leave
-// unsupplied — see runColumns' doc comment.
-func runRowValues(r RunRow, now time.Time) []any {
+// writeup. scheduled_at is NOT NULL: a run with none falls back to its
+// queued_at, as the dual-write path's materializeRuns does.
+func runRowValues(r RunRow) []any {
+	scheduledAt := r.QueuedAt
+	if r.ScheduledAt != nil {
+		scheduledAt = *r.ScheduledAt
+	}
 	return []any{
 		r.AccountID, r.EnvID, r.RunID, r.QueuedAt,
-		nullableTime(r.ScheduledAt), nullableTime(r.StartedAt), nullableTime(r.EndedAt),
+		scheduledAt, nullableTime(r.StartedAt), nullableTime(r.EndedAt),
 		r.AppID, r.AppName, r.FunctionID, r.FunctionSlug, r.Status,
 		nonEmptyJSON(r.Attributes), r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
 		"false", // is_deferred — this tool never generates deferred runs
 		nil,     // defer_parent_fn_slug
-		nil,     // defer_parent_run_ids
-		now,
+		"[]",    // defer_parent_run_ids
 		r.TraceID,
 	}
 }
@@ -236,7 +235,7 @@ func spanRowValues(s SpanRow) []any {
 	return []any{
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
 		s.AppID, s.AppName, s.FunctionID, s.FunctionSlug, s.Name, s.StartTime, s.EndTime,
-		s.TraceID, s.SpanID, parent, s.Attributes, nil, nullableJSON(s.Output), nullableJSON(s.Input),
+		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
 	}
 }
 
@@ -313,7 +312,7 @@ func nullableJSON(s string) any {
 // json.Marshal is used regardless rather than hand-building the literal.
 func eventIDsLiteral(s []string) any {
 	if len(s) == 0 {
-		return nil
+		return "[]"
 	}
 	b, err := json.Marshal(s)
 	if err != nil {
@@ -323,7 +322,7 @@ func eventIDsLiteral(s []string) any {
 }
 
 // sessionsLiteral renders pairs as DuckDB list-of-struct-literal text (e.g.
-// `[{"key":"a","id":"b"}]`), or nil for NULL when pairs is empty — the same
+// `[{"key":"a","id":"b"}]`), or "[]" when pairs is empty — the same
 // VARCHAR->LIST(STRUCT) implicit-casting trick eventIDsLiteral uses for
 // event_ids' VARCHAR->LIST casting, verified empirically (real `duckdb`
 // CLI, v1.5.2) that a JSON-object-shaped VARCHAR string casts cleanly into
@@ -332,7 +331,7 @@ func eventIDsLiteral(s []string) any {
 // match the column's struct field names exactly.
 func sessionsLiteral(pairs []SessionPair) any {
 	if len(pairs) == 0 {
-		return nil
+		return "[]"
 	}
 	b, err := json.Marshal(pairs)
 	if err != nil {
