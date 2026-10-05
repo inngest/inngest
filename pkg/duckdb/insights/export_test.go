@@ -9,7 +9,7 @@ import (
 
 // CheckRenderedSQL exposes checkRenderedSQL to insights_test.
 func CheckRenderedSQL(ctx context.Context, db *sql.DB, query string) error {
-	return checkRenderedSQL(ctx, db, query)
+	return checkRenderedSQL(ctx, db, query, productCatalog)
 }
 
 // DisableRenderedSQLGuard turns off Execute's post-render guard for the rest

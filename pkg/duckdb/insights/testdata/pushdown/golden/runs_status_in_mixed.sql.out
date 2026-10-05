@@ -1,0 +1,13 @@
+{
+  "description": "An IN mixing terminal and non-terminal statuses is pushed whole.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status IN ('Completed', 'Running')",
+        "physical": "runs.status IN ('Completed', 'Running')",
+        "pushed": true
+      }
+    ]
+  }
+}
