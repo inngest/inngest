@@ -299,9 +299,9 @@ SELECT
   env_id,
   run_id,
   run_queued_at AS queued_at,
-  -- FIXME: _inngest.scheduled_at isn't plumbed onto every run span yet
-  -- (see listener.OnFunctionFinished), so fall back to queued_at. Designed
-  -- as if it were: scheduled_at is NOT NULL and fixed at schedule time.
+  -- Every run span carries the run's scheduled_at from its run state,
+  -- except for state written before scheduled_at was recorded: those fall
+  -- back to queued_at.
   COALESCE(make_timestamp_ms(TRY_CAST(attributes."_inngest.scheduled_at" AS BIGINT)), run_queued_at) AS scheduled_at,
   make_timestamp_ms(TRY_CAST(attributes."_inngest.started_at" AS BIGINT)) AS started_at,
   make_timestamp_ms(TRY_CAST(attributes."_inngest.ended_at" AS BIGINT)) AS ended_at,
