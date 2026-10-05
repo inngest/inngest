@@ -1,0 +1,18 @@
+{
+  "description": "Raw-mode events.",
+  "mode": "raw",
+  "tables": {
+    "events": [
+      {
+        "logical": "event_name = 'app/evt'",
+        "physical": "events.event_name = 'app/evt'",
+        "pushed": true
+      },
+      {
+        "logical": "event_data-\u003e\u003e'k' = 'v'",
+        "physical": "events.event_data-\u003e\u003e'k' = 'v'",
+        "pushed": true
+      }
+    ]
+  }
+}
