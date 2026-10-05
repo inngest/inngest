@@ -143,6 +143,7 @@ var AttrsByKey = map[string]Serializer{
 	Attrs.RunScheduleType.Key(): Attrs.RunScheduleType,
 	Attrs.SkipReason.Key(): Attrs.SkipReason,
 	Attrs.SkipExistingRunID.Key(): Attrs.SkipExistingRunID,
+	Attrs.CustomConcurrencyKeys.Key(): Attrs.CustomConcurrencyKeys,
 	Attrs.IsDurableEndpointRun.Key(): Attrs.IsDurableEndpointRun,
 	Attrs.DurableEndpointModeChangedAt.Key(): Attrs.DurableEndpointModeChangedAt,
 	Attrs.DeferChildRunID.Key(): Attrs.DeferChildRunID,
