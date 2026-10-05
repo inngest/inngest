@@ -1,0 +1,4 @@
+{
+  "description": "Only WHERE conjuncts are extracted, not HAVING.",
+  "mode": "product"
+}

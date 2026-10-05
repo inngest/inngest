@@ -1,0 +1,13 @@
+{
+  "description": "Extracted predicates are null-rejecting, so they're safe on the nullable side of an outer join too.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "name = 'app/evt'",
+        "physical": "events.event_name = 'app/evt'",
+        "pushed": true
+      }
+    ]
+  }
+}

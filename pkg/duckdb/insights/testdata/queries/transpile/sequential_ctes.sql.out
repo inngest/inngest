@@ -1,5 +1,5 @@
 {
-  "sql": "WITH a AS (SELECT run_id, app_id FROM inngest.insights_runs(?, ?) AS runs), b AS (SELECT run_id FROM a) SELECT * FROM b LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)), a AS (SELECT run_id, app_id FROM __inngest_runs AS runs), b AS (SELECT run_id FROM a) SELECT * FROM b LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

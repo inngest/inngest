@@ -1,0 +1,4 @@
+{
+  "description": "Each UNION operand reads runs: two reads, nothing pushed.",
+  "mode": "product"
+}

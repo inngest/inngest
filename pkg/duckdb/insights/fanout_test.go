@@ -23,7 +23,7 @@ func TestComprehensionFanOut(t *testing.T) {
 	}
 	for _, q := range accepts {
 		t.Run(q, func(t *testing.T) {
-			_, _, _, err := validate(mustParse(t, q))
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
 			require.NoError(t, err)
 		})
 	}
@@ -46,7 +46,7 @@ func TestComprehensionFanOut(t *testing.T) {
 	}
 	for q, want := range rejects {
 		t.Run(q, func(t *testing.T) {
-			_, _, _, err := validate(mustParse(t, q))
+			_, _, _, err := validate(mustParse(t, q), productCatalog)
 			require.ErrorContains(t, err, want)
 		})
 	}
