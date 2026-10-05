@@ -19,6 +19,8 @@ const (
 	QuackColumnVarchar     = quack.ColumnVarchar
 	QuackColumnJSON        = quack.ColumnJSON
 	QuackColumnTimestampMS = quack.ColumnTimestampMS
+	QuackColumnBool        = quack.ColumnBool
+	QuackColumnBigint      = quack.ColumnBigint
 )
 
 // QuackAppender bulk-loads rows into one table over quack's

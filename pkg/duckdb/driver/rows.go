@@ -51,7 +51,7 @@ func (r *mapRows) Next(dest []driver.Value) error {
 			val = cur.Vals[i]
 		}
 		if i < len(r.types) {
-			val = convertTimeValue(r.types[i], val)
+			val = convertValue(r.types[i], val)
 		}
 		dest[i] = val
 	}
@@ -83,6 +83,28 @@ var timeColumnLayouts = map[string]string{
 // TIME ZONE columns, handled separately from timeColumnLayouts — see
 // parseDuckDBTimestampTZ.
 const timestampTZColumnType = "TIMESTAMP WITH TIME ZONE"
+
+// convertValue converts a jsonlines-decoded value to the Go type its
+// column's DuckDB type calls for, where its JSON shape alone doesn't say.
+func convertValue(dbType string, val any) any {
+	if dbType == "BOOLEAN" {
+		return convertBoolValue(val)
+	}
+	return convertTimeValue(dbType, val)
+}
+
+// convertBoolValue converts a BOOLEAN column's jsonlines text to a bool: the
+// duckdb CLI (v1.5) prints BOOLEANs as the strings "true" and "false", not
+// JSON booleans. Anything else passes through unchanged.
+func convertBoolValue(val any) any {
+	switch val {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+	return val
+}
 
 // convertTimeValue converts a jsonlines-decoded value into a time.Time when
 // dbType names one of DuckDB's date/time/timestamp types, so a
