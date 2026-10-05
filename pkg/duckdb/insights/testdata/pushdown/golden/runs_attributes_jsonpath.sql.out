@@ -1,0 +1,4 @@
+{
+  "description": "A $-JSONPath isn't a plain key: not extracted.",
+  "mode": "product"
+}

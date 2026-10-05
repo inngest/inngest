@@ -1,0 +1,13 @@
+{
+  "description": "Boolean literals against a boolean column.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "is_deferred = true",
+        "physical": "runs.is_deferred = true",
+        "pushed": true
+      }
+    ]
+  }
+}

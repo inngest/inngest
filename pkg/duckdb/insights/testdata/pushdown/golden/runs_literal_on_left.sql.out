@@ -1,0 +1,13 @@
+{
+  "description": "A literal on the left flips the operator.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "function_id \u003e= 'my-fn'",
+        "physical": "runs.function_slug \u003e= 'my-fn'",
+        "pushed": true
+      }
+    ]
+  }
+}

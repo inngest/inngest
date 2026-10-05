@@ -50,7 +50,7 @@ var syntaxFunctions = map[string]bool{
 // renderer or lexer gap that makes DuckDB read something other than what
 // validate checked (a smuggled read_text, query(), or a bare physical
 // inngest.* table that skips env scoping) is rejected here instead of run.
-func checkRenderedSQL(ctx context.Context, db *sql.DB, query string) error {
+func checkRenderedSQL(ctx context.Context, db *sql.DB, query string, cat catalog) error {
 	if !guardRenderedSQL {
 		return nil
 	}
@@ -75,7 +75,13 @@ func checkRenderedSQL(ctx context.Context, db *sql.DB, query string) error {
 
 	ctes := map[string]bool{}
 	collectCTENames(tree.Statements[0], ctes)
-	return checkRenderedNode(tree.Statements[0], ctes)
+	macros := map[string]bool{}
+	for _, t := range cat.tables {
+		if t.view != "" {
+			macros[t.view] = true
+		}
+	}
+	return checkRenderedNode(tree.Statements[0], ctes, macros)
 }
 
 // collectCTENames gathers every CTE name defined anywhere in n. Scope is
@@ -105,7 +111,7 @@ func collectCTENames(n any, into map[string]bool) {
 	}
 }
 
-func checkRenderedNode(n any, ctes map[string]bool) error {
+func checkRenderedNode(n any, ctes, macros map[string]bool) error {
 	switch v := n.(type) {
 	case map[string]any:
 		// A FROM-clause table function may only be a logical table's macro
@@ -114,19 +120,19 @@ func checkRenderedNode(n any, ctes map[string]bool) error {
 		if v["type"] == "TABLE_FUNCTION" {
 			fn, _ := v["function"].(map[string]any)
 			name, schema := strings.ToLower(str(fn["function_name"])), str(fn["schema"])
-			macro := schema == driver.DuckLakeAlias && isLogicalTableMacro(name)
+			macro := schema == driver.DuckLakeAlias && macros[name]
 			unnest := schema == "" && name == "unnest"
 			if str(fn["catalog"]) != "" || !macro && !unnest {
 				return fmt.Errorf("rendered query reads from table function %q, which is not allowed", str(fn["function_name"]))
 			}
-			if err := checkRenderedNode(fn["arguments"], ctes); err != nil {
+			if err := checkRenderedNode(fn["arguments"], ctes, macros); err != nil {
 				return err
 			}
 			for k, child := range v {
 				if k == "function" {
 					continue
 				}
-				if err := checkRenderedNode(child, ctes); err != nil {
+				if err := checkRenderedNode(child, ctes, macros); err != nil {
 					return err
 				}
 			}
@@ -143,13 +149,13 @@ func checkRenderedNode(n any, ctes map[string]bool) error {
 			}
 		}
 		for _, child := range v {
-			if err := checkRenderedNode(child, ctes); err != nil {
+			if err := checkRenderedNode(child, ctes, macros); err != nil {
 				return err
 			}
 		}
 	case []any:
 		for _, child := range v {
-			if err := checkRenderedNode(child, ctes); err != nil {
+			if err := checkRenderedNode(child, ctes, macros); err != nil {
 				return err
 			}
 		}
@@ -169,15 +175,6 @@ func checkRenderedFunction(name, schema, catalog string) error {
 		qualified = schema + "." + qualified
 	}
 	return fmt.Errorf("rendered query calls function %q, which is not allowed", qualified)
-}
-
-func isLogicalTableMacro(name string) bool {
-	for _, t := range logicalTables {
-		if t.view == name {
-			return true
-		}
-	}
-	return false
 }
 
 // isOperatorName reports whether name is a symbolic operator (+, ~~, ->>,

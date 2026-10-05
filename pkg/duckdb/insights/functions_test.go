@@ -109,7 +109,7 @@ func TestValidateRejectsWrongArgumentCount(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			stmt := mustParse(t, tc.sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tc.wantErrSub)
 
@@ -139,7 +139,7 @@ func TestValidateAcceptsBoundaryArgumentCounts(t *testing.T) {
 	for _, sql := range queries {
 		t.Run(sql, func(t *testing.T) {
 			stmt := mustParse(t, sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.NoError(t, err)
 		})
 	}
@@ -162,7 +162,7 @@ func TestValidateRejectsIfConditionTypeMismatch(t *testing.T) {
 	for _, sql := range cases {
 		t.Run(sql, func(t *testing.T) {
 			stmt := mustParse(t, sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "IF's argument 1 expects BOOLEAN, got STRING")
 		})
@@ -184,7 +184,7 @@ func TestValidateAcceptsIfConditionVariants(t *testing.T) {
 	for _, sql := range cases {
 		t.Run(sql, func(t *testing.T) {
 			stmt := mustParse(t, sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.NoError(t, err)
 		})
 	}
@@ -209,7 +209,7 @@ func TestValidateRejectsListAggregateNameTypeMismatch(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.sql, func(t *testing.T) {
 			stmt := mustParse(t, tc.sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "LIST_AGGREGATE's argument 2 expects STRING, got "+tc.wantType)
 		})
@@ -225,7 +225,7 @@ func TestValidateAcceptsListAggregateNameVariants(t *testing.T) {
 	for _, sql := range cases {
 		t.Run(sql, func(t *testing.T) {
 			stmt := mustParse(t, sql)
-			_, _, _, err := validate(stmt)
+			_, _, _, err := validate(stmt, productCatalog)
 			require.NoError(t, err)
 		})
 	}

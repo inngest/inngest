@@ -1,0 +1,18 @@
+{
+  "description": "OR pushes nothing, but a sibling AND conjunct still does.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "(function_id = 'a' OR function_id = 'b')",
+        "physical": "(runs.function_slug = 'a' OR runs.function_slug = 'b')",
+        "pushed": true
+      },
+      {
+        "logical": "app_id = 'x'",
+        "physical": "runs.app_name = 'x'",
+        "pushed": true
+      }
+    ]
+  }
+}

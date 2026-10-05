@@ -1,0 +1,4 @@
+{
+  "description": "A cast on the column isn't extracted, even to the column's own type.",
+  "mode": "product"
+}

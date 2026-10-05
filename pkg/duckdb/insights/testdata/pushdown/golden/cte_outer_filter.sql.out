@@ -1,0 +1,4 @@
+{
+  "description": "A filter on the CTE's output isn't a filter on the table.",
+  "mode": "product"
+}

@@ -1,0 +1,23 @@
+{
+  "description": "NOT, NOT IN and NOT BETWEEN each become a NOT predicate.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "NOT function_id = 'a'",
+        "physical": "NOT runs.function_slug = 'a'",
+        "pushed": true
+      },
+      {
+        "logical": "NOT app_id IN ('b')",
+        "physical": "NOT runs.app_name IN ('b')",
+        "pushed": true
+      },
+      {
+        "logical": "NOT (run_id \u003e= 'a' AND run_id \u003c= 'b')",
+        "physical": "NOT (runs.run_id \u003e= 'a' AND runs.run_id \u003c= 'b')",
+        "pushed": true
+      }
+    ]
+  }
+}

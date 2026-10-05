@@ -1,0 +1,13 @@
+{
+  "description": "A filter inside a CTE that reads the table once is pushed.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "function_id = 'my-fn'",
+        "physical": "runs.function_slug = 'my-fn'",
+        "pushed": true
+      }
+    ]
+  }
+}

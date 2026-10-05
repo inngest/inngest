@@ -10,7 +10,7 @@ import (
 func mustRewriteArrayOfStructAccess(t *testing.T, sql string) (*parser.SelectStatement, []Diagnostic) {
 	t.Helper()
 	stmt := mustParse(t, sql)
-	_, ctes, _, err := validate(stmt)
+	_, ctes, _, err := validate(stmt, productCatalog)
 	require.NoError(t, err)
 	diags, err := rewriteArrayOfStructAccess(stmt, ctes, nil)
 	require.NoError(t, err)

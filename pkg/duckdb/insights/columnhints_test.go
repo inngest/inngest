@@ -9,9 +9,9 @@ import (
 func hintsFor(t *testing.T, sql string) []ColumnHint {
 	t.Helper()
 	stmt := mustParse(t, sql)
-	scope, err := resolveScope(stmt.From, nil, nil)
+	scope, err := resolveScope(stmt.From, logicalTables, nil)
 	require.NoError(t, err)
-	return buildColumnHints(stmt, scope, nil)
+	return buildColumnHints(stmt, scope, logicalTables)
 }
 
 func TestBuildColumnHintsBareColumn(t *testing.T) {
@@ -156,9 +156,9 @@ func TestBuildColumnHintsArrayAggWholeValueGetsNoHint(t *testing.T) {
 func pathHintsFor(t *testing.T, sql string) [][]PathHint {
 	t.Helper()
 	stmt := mustParse(t, sql)
-	scope, err := resolveScope(stmt.From, nil, nil)
+	scope, err := resolveScope(stmt.From, logicalTables, nil)
 	require.NoError(t, err)
-	return buildColumnPathHints(stmt, scope, nil)
+	return buildColumnPathHints(stmt, scope, logicalTables)
 }
 
 // TestBuildColumnPathHints{List,ArrayAgg}ElementsInheritArgHint is

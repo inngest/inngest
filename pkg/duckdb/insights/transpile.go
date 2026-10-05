@@ -11,6 +11,11 @@ import (
 // TranspileResult is Transpile's output: DuckDB-ready SQL text, its
 // positional args, and everything the GQL layer needs to build an
 // InsightsQueryResult without touching the database itself.
+//
+// Every logical table reference points at a reserved CTE (TableCTEName).
+// SQL/Args are the query rendered with MacroSource (each CTE an inlined
+// alias for its table macro); Render renders it with any other source, e.g.
+// a federated executor's lake-plus-buffer bodies.
 type TranspileResult struct {
 	SQL          string
 	Args         []any
@@ -35,7 +40,28 @@ type TranspileResult struct {
 	// Diagnostics is every non-fatal note a pipeline stage produced.
 	// Ordered by pipeline stage, not by source position.
 	Diagnostics []Diagnostic
+	// Pushdown is the pre-filter predicates a federated executor may push
+	// into each logical table's delta source. See extractPushdown.
+	Pushdown Pushdown
+
+	// body is the rewritten query without the reserved CTEs; tables are
+	// the logical tables it reads (one reserved CTE each), in first-seen
+	// order.
+	body     string
+	bodyArgs []any
+	tables   []string
+	// accountID/envID scope the table macros a renderer calls; cat is the
+	// mode's catalog.
+	accountID, envID uuid.UUID
+	cat              catalog
 }
+
+// Raw reports whether the query was transpiled in raw mode (TranspileRaw).
+func (r *TranspileResult) Raw() bool { return r.cat.raw }
+
+// ReadTables returns the logical tables the query reads, one reserved CTE
+// each, in the order Render defines them.
+func (r *TranspileResult) ReadTables() []string { return append([]string(nil), r.tables...) }
 
 // pipelineState threads one query's working state through Transpile's
 // ordered stage list. Each stage reads/writes only the fields it owns;
@@ -46,11 +72,13 @@ type pipelineState struct {
 	accountID uuid.UUID
 	envID     uuid.UUID
 
+	cat         catalog
 	scope       *tableScope
 	ctes        map[string]logicalTable
 	info        QueryInfo
+	pushdown    Pushdown
 	pathHints   [][]PathHint
-	args        []any
+	tables      []string
 	limited     bool
 	diagnostics []Diagnostic
 }
@@ -61,8 +89,10 @@ type pipelineState struct {
 type stage func(*pipelineState) error
 
 var pipeline = []stage{
+	stageCheckReservedNames,
 	stageValidate,
 	stageExtractQueryInfo,
+	stageExtractPushdown,
 	stageBuildColumnHints,
 	stageRewriteArrayOfStructAccess,
 	stageCastTZFunctions,
@@ -77,7 +107,7 @@ var pipeline = []stage{
 // already handles that case. ctes lets stageBuildColumnHints resolve a
 // UNION operand's own scope independently.
 func stageValidate(ps *pipelineState) error {
-	scope, ctes, diags, err := validate(ps.stmt)
+	scope, ctes, diags, err := validate(ps.stmt, ps.cat)
 	ps.diagnostics = append(ps.diagnostics, diags...)
 	if err != nil {
 		return err
@@ -89,6 +119,13 @@ func stageValidate(ps *pipelineState) error {
 
 func stageExtractQueryInfo(ps *pipelineState) error {
 	ps.info = extractQueryInfo(ps.stmt)
+	return nil
+}
+
+// stageExtractPushdown must run before remapTables, which rewrites away the
+// logical table names it reads.
+func stageExtractPushdown(ps *pipelineState) error {
+	ps.pushdown = extractPushdown(ps.stmt, ps.cat.tables)
 	return nil
 }
 
@@ -116,8 +153,12 @@ func stageCastTZFunctions(ps *pipelineState) error {
 	return nil
 }
 
+func stageCheckReservedNames(ps *pipelineState) error {
+	return checkReservedNames(ps.stmt)
+}
+
 func stageRemapTables(ps *pipelineState) error {
-	ps.args = remapTables(ps.stmt, ps.accountID, ps.envID)
+	ps.tables = remapTables(ps.stmt, ps.cat.tables)
 	return nil
 }
 
@@ -142,7 +183,20 @@ func stageAddDefaultLimit(ps *pipelineState) error {
 // touches the database. A panic in any stage (an AST shape a stage or
 // parser.Write doesn't handle) is returned as an error, never propagated:
 // sql is user-controlled, so it must not be able to crash the caller.
-func Transpile(sql string, accountID, envID uuid.UUID) (res *TranspileResult, err error) {
+func Transpile(sql string, accountID, envID uuid.UUID) (*TranspileResult, error) {
+	return transpile(sql, accountID, envID, productCatalog)
+}
+
+// TranspileRaw transpiles sql in raw mode, for internal debugging and usage
+// only — never expose it to customers: the query reads the physical tables
+// themselves (runs, collapsed to one row per run, and run_trace_spans), with
+// every column, across every tenant. account_id/env_id are ordinary
+// columns, and pushable like any other.
+func TranspileRaw(sql string) (*TranspileResult, error) {
+	return transpile(sql, uuid.Nil, uuid.Nil, rawCatalog)
+}
+
+func transpile(sql string, accountID, envID uuid.UUID, cat catalog) (res *TranspileResult, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			res, err = nil, fmt.Errorf("insights: transpiling query: %v", r)
@@ -154,7 +208,7 @@ func Transpile(sql string, accountID, envID uuid.UUID) (res *TranspileResult, er
 		return nil, fmt.Errorf("insights: parsing query: %w", err)
 	}
 
-	ps := &pipelineState{stmt: stmt, accountID: accountID, envID: envID}
+	ps := &pipelineState{stmt: stmt, accountID: accountID, envID: envID, cat: cat}
 	for _, st := range pipeline {
 		if err := st(ps); err != nil {
 			return nil, err
@@ -166,9 +220,12 @@ func Transpile(sql string, accountID, envID uuid.UUID) (res *TranspileResult, er
 		return nil, fmt.Errorf("insights: rendering query: %w", err)
 	}
 
-	return &TranspileResult{
-		SQL:             out.String(),
-		Args:            ps.args,
+	res = &TranspileResult{
+		body:            out.String(),
+		tables:          ps.tables,
+		accountID:       accountID,
+		envID:           envID,
+		cat:             cat,
 		Start:           stmt.Pos(),
 		End:             stmt.End(),
 		PrimaryTable:    ps.info.PrimaryTable,
@@ -176,5 +233,10 @@ func Transpile(sql string, accountID, envID uuid.UUID) (res *TranspileResult, er
 		Limited:         ps.limited,
 		ColumnPathHints: ps.pathHints,
 		Diagnostics:     ps.diagnostics,
-	}, nil
+		Pushdown:        ps.pushdown,
+	}
+	if res.SQL, res.Args, err = res.Render(res.defaultSource()); err != nil {
+		return nil, fmt.Errorf("insights: rendering query: %w", err)
+	}
+	return res, nil
 }

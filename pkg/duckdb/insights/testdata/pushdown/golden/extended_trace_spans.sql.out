@@ -1,0 +1,23 @@
+{
+  "description": "extended_trace_spans federates onto run_trace_spans.",
+  "mode": "product",
+  "tables": {
+    "extended_trace_spans": [
+      {
+        "logical": "name = 'my.span'",
+        "physical": "spans.name = 'my.span'",
+        "pushed": true
+      },
+      {
+        "logical": "function_id = 'my-fn'",
+        "physical": "spans.function_slug = 'my-fn'",
+        "pushed": true
+      },
+      {
+        "logical": "attributes-\u003e\u003e'_inngest.app.name' = 'app'",
+        "physical": "spans.attributes-\u003e\u003e'_inngest.app.name' = 'app'",
+        "pushed": true
+      }
+    ]
+  }
+}

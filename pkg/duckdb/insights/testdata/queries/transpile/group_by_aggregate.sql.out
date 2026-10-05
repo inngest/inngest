@@ -1,5 +1,5 @@
 {
-  "sql": "SELECT COUNT(*) FROM inngest.insights_runs(?, ?) AS runs GROUP BY app_id LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)) SELECT COUNT(*) FROM __inngest_runs AS runs GROUP BY app_id LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

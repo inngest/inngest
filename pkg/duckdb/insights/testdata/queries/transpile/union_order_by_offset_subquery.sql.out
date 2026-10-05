@@ -1,8 +1,6 @@
 {
-  "sql": "SELECT now()::TIMESTAMP AS t FROM inngest.insights_runs(?, ?) AS runs UNION ALL SELECT now()::TIMESTAMP FROM inngest.insights_runs(?, ?) AS runs ORDER BY now()::TIMESTAMP LIMIT 5 OFFSET (SELECT count(*) FROM inngest.insights_events(?, ?) AS events)",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)), __inngest_events AS NOT MATERIALIZED (SELECT * FROM inngest.insights_events(?, ?)) SELECT now()::TIMESTAMP AS t FROM __inngest_runs AS runs UNION ALL SELECT now()::TIMESTAMP FROM __inngest_runs AS runs ORDER BY now()::TIMESTAMP LIMIT 5 OFFSET (SELECT count(*) FROM __inngest_events AS events)",
   "args": [
-    "00000000-0000-4000-a000-000000000000",
-    "00000000-0000-4000-b000-000000000000",
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000",
     "00000000-0000-4000-a000-000000000000",
