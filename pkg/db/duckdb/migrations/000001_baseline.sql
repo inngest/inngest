@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
 	env_id UUID NOT NULL,
 	run_id VARCHAR NOT NULL,
   queued_at TIMESTAMP_MS NOT NULL,
-  -- FIXME: not every span plumbs _inngest.scheduled_at yet, so
-  -- materializeRuns falls back to queued_at; designed as set at schedule time.
+  -- When the run was due to start, fixed at schedule time (from run state;
+  -- queued_at for a run whose state predates it).
   scheduled_at TIMESTAMP_MS NOT NULL,
   started_at TIMESTAMP_MS NULL,
   ended_at TIMESTAMP_MS NULL,
