@@ -34,9 +34,9 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	receivedAt := now.Add(-200 * time.Millisecond)
 
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, started_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, event_ids)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?);`,
-		accountID.String(), envID.String(), runID, now, startedAt, endedAt, appID.String(), "my-app", functionID.String(), "my-app-my-function",
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, now, now, startedAt, endedAt, appID.String(), "my-app", functionID.String(), "my-app-my-function",
 		"Completed", `{"event":{"name":"app/one"}}`, `{"data":"ok"}`, []string{eventInternalID},
 	)
 	require.NoError(t, err)
@@ -133,9 +133,9 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	now := time.Now().UTC()
 
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output)
-		 VALUES (?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, '{}', ?, ?);`,
-		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, output)
+		 VALUES (?, ?, ?, ?, ?, ?, 'my-app', ?, 'my-app-my-function', ?, '{}', ?, ?);`,
+		accountID.String(), envID.String(), runID, now, now, appID.String(), functionID.String(),
 		"Completed", `{}`, `{}`,
 	)
 	require.NoError(t, err)
