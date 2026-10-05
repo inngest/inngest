@@ -54,11 +54,9 @@ const InsightsChatContext = createContext<ContextValue | undefined>(undefined);
 
 export function InsightsChatProvider({
   userId,
-  channelKey,
   children,
 }: {
   userId?: string;
-  channelKey?: string;
   children: ReactNode;
 }) {
   // Per-thread UI flags
@@ -98,8 +96,8 @@ export function InsightsChatProvider({
 
   // Realtime subscription
   const { messages: realtimeMessages, connectionStatus } = useInsightsRealtime({
-    channelKey,
-    enabled: !!channelKey,
+    userId,
+    enabled: !!userId,
   });
 
   // The browser half of the agent's validate_query round trip: run the
@@ -388,8 +386,6 @@ export function InsightsChatProvider({
           content,
           messageId,
           threadId,
-          userId,
-          channelKey,
           state: clientState
             ? {
                 eventTypes: clientState.eventTypes,
@@ -427,7 +423,7 @@ export function InsightsChatProvider({
         }));
       }
     },
-    [userId, channelKey, eventsData?.names, schemas, buildHistory],
+    [userId, eventsData?.names, schemas, buildHistory],
   );
 
   const clearThreadMessages = useCallback((threadId: string) => {

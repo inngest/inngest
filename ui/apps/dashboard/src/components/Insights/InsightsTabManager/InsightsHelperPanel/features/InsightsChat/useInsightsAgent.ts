@@ -1,7 +1,10 @@
 import { useRealtime } from 'inngest/react';
 import { useCallback, useMemo } from 'react';
 
-import { insightsChannel } from '@/lib/inngest/realtime';
+import {
+  insightsChannel,
+  insightsUserChannelKey,
+} from '@/lib/inngest/realtime';
 
 export type ClientState = {
   sqlQuery: string;
@@ -18,33 +21,32 @@ export type ClientState = {
  * Handles token fetching and channel setup.
  */
 export function useInsightsRealtime({
-  channelKey,
+  userId,
   enabled = true,
 }: {
-  channelKey?: string;
+  userId?: string;
   enabled?: boolean;
 }) {
   const channel = useMemo(
-    () => (channelKey ? insightsChannel(channelKey) : undefined),
-    [channelKey],
+    () =>
+      userId ? insightsChannel(insightsUserChannelKey(userId)) : undefined,
+    [userId],
   );
 
   const tokenFactory = useCallback(async () => {
-    if (!channelKey) throw new Error('No channel key');
+    if (!userId) throw new Error('No user ID');
     const res = await fetch('/api/realtime/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelKey }),
     });
     if (!res.ok) throw new Error('Failed to get subscription token');
     return res.json();
-  }, [channelKey]);
+  }, [userId]);
 
   return useRealtime({
     channel,
     topics: ['agent_stream'] as const,
-    token: channelKey ? tokenFactory : undefined,
-    enabled: enabled && !!channelKey,
+    token: userId ? tokenFactory : undefined,
+    enabled: enabled && !!userId,
     autoCloseOnTerminal: false,
     reconnect: true,
     historyLimit: 200,
@@ -58,8 +60,6 @@ export async function sendChatMessage(params: {
   content: string;
   messageId: string;
   threadId: string;
-  userId: string;
-  channelKey?: string;
   state?: Record<string, unknown>;
   history?: Array<Record<string, unknown>>;
 }): Promise<{ success: boolean; threadId?: string }> {
@@ -74,8 +74,6 @@ export async function sendChatMessage(params: {
         state: params.state,
       },
       threadId: params.threadId,
-      userId: params.userId,
-      channelKey: params.channelKey,
       history: params.history,
     }),
   });
