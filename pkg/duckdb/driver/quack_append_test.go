@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -77,6 +78,58 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 
 	require.Nil(t, got[1]["id"])
 	require.Nil(t, got[1]["name"])
+}
+
+// TestQuackAppenderBoolAndBigint checks the BOOLEAN and BIGINT wire kinds
+// against a real duckdb-quack server, including NULLs and int64 extremes.
+func TestQuackAppenderBoolAndBigint(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	dir := t.TempDir()
+	addr := EphemeralQuackAddr
+	db, err := Open(t.Context(), Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+		DuckLake: &DuckLakeOptions{
+			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
+			DataPath:    filepath.Join(dir, "data"),
+		},
+		QuackAddr: &addr,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".append_bi (name VARCHAR, ok BOOLEAN, n BIGINT);")
+	require.NoError(t, err)
+
+	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "append_bi",
+		[]QuackColumnKind{QuackColumnVarchar, QuackColumnBool, QuackColumnBigint})
+	require.NoError(t, err)
+	require.NoError(t, appender.AppendRow("a", true, int64(9223372036854775807)))
+	require.NoError(t, appender.AppendRow("b", false, int64(-9223372036854775808)))
+	require.NoError(t, appender.AppendRow("c", nil, nil))
+	require.NoError(t, appender.AppendRow("d", true, 42))
+	require.NoError(t, appender.Close(t.Context()))
+
+	rows, err := db.QueryContext(t.Context(), "SELECT name, ok, n FROM "+DuckLakeAlias+".append_bi ORDER BY name;")
+	require.NoError(t, err)
+	defer rows.Close()
+	var got [][3]any
+	for rows.Next() {
+		var name string
+		var ok sql.NullBool
+		var n sql.NullInt64
+		require.NoError(t, rows.Scan(&name, &ok, &n))
+		got = append(got, [3]any{name, ok, n})
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, [][3]any{
+		{"a", sql.NullBool{Bool: true, Valid: true}, sql.NullInt64{Int64: 9223372036854775807, Valid: true}},
+		{"b", sql.NullBool{Bool: false, Valid: true}, sql.NullInt64{Int64: -9223372036854775808, Valid: true}},
+		{"c", sql.NullBool{}, sql.NullInt64{}},
+		{"d", sql.NullBool{Bool: true, Valid: true}, sql.NullInt64{Int64: 42, Valid: true}},
+	}, got)
 }
 
 // TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows pins a real,
