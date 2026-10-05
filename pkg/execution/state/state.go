@@ -487,4 +487,7 @@ type Input struct {
 	// RequestVersion represents the executor request versioning/hashing style
 	// used to manage state.
 	RequestVersion *int
+
+	// ScheduledAt is the time the run was due to start.
+	ScheduledAt time.Time
 }
