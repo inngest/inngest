@@ -13,6 +13,8 @@ const insightsRealtimeEventSchema = z.object({
   timestamp: z.number(),
 });
 
+export const insightsUserChannelKey = (userId: string) => `insights:${userId}`;
+
 export const insightsChannel = realtime.channel({
   name: (targetChannel: string) => targetChannel,
   topics: {

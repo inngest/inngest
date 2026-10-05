@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
 import { z } from 'zod/v3';
 import { inngest } from '@/lib/inngest/client';
+import { insightsUserChannelKey } from '@/lib/inngest/realtime';
 
 //
 // Zod schema for UserMessage
@@ -19,8 +20,6 @@ const userMessageSchema = z.object({
 const chatRequestSchema = z.object({
   userMessage: userMessageSchema,
   threadId: z.string().uuid().optional(),
-  userId: z.string(),
-  channelKey: z.string().optional(),
   history: z.array(z.any()).optional(),
 });
 
@@ -64,23 +63,8 @@ export const Route = createFileRoute('/api/chat')({
           const {
             userMessage,
             threadId: providedThreadId,
-            channelKey,
             history,
           } = validationResult.data;
-
-          //
-          // Channel-first validation: require either userId OR channelKey
-          if (!userId && !channelKey) {
-            return new Response(
-              JSON.stringify({
-                error: 'Either userId or channelKey is required',
-              }),
-              {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-              },
-            );
-          }
 
           //
           // If the client didn't provide a threadId, omit generation here.
@@ -96,7 +80,7 @@ export const Route = createFileRoute('/api/chat')({
               history,
               userMessage,
               userId,
-              channelKey,
+              channelKey: insightsUserChannelKey(userId),
               // The chat UI subscribes to the agent stream and can execute
               // validate_query round trips on the agent's behalf.
               canValidate: true,

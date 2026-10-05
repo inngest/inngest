@@ -2,17 +2,15 @@ import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
 import { getClientSubscriptionToken } from 'inngest/react';
 import { inngest } from '@/lib/inngest/client';
-import { insightsChannel } from '@/lib/inngest/realtime';
-
-export type RequestBody = {
-  userId?: string;
-  channelKey?: string;
-};
+import {
+  insightsChannel,
+  insightsUserChannelKey,
+} from '@/lib/inngest/realtime';
 
 export const Route = createFileRoute('/api/realtime/token')({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async () => {
         //
         // Authenticate the user using Clerk
         const { userId } = await auth();
@@ -28,22 +26,9 @@ export const Route = createFileRoute('/api/realtime/token')({
 
         try {
           //
-          // Get the channel key from the request body and validate it
-          const { channelKey } = (await request.json()) as RequestBody;
-          if (!channelKey) {
-            return new Response(
-              JSON.stringify({ error: 'channelKey is required' }),
-              {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-              },
-            );
-          }
-
-          //
-          // Create a subscription token for the resolved channel
+          // Create a subscription token for the authenticated user's channel
           const token = await getClientSubscriptionToken(inngest, {
-            channel: insightsChannel(channelKey),
+            channel: insightsChannel(insightsUserChannelKey(userId)),
             topics: ['agent_stream'],
           });
 

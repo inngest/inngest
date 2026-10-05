@@ -571,10 +571,7 @@ function InsightsTabManagerInternal({
         tabs={tabs}
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
-        <InsightsChatProvider
-          userId={user?.id || undefined}
-          channelKey={user?.id ? `insights:${user.id}` : undefined}
-        >
+        <InsightsChatProvider userId={user?.id || undefined}>
           <ActiveThreadBridge
             activeTabId={activeTabId}
             getAgentThreadIdForTab={getAgentThreadIdForTab}
