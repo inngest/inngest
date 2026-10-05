@@ -18,8 +18,6 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -42,53 +40,33 @@ import (
 )
 
 // listener implements execution.SyncLifecycleListener. Every hook body does
-// nothing but build a row and non-blocking-send it onto the matching
-// channel — no I/O, no locking, no flush logic — which is what makes it safe
-// to call synchronously from the executor and runner.
+// nothing but build an entity and hand it to the Sink (spans via the
+// listener's own TracerProvider and SpanExporter) — no I/O, no locking, no
+// flush logic, since a Sink must never block — which is what makes it safe to
+// call synchronously from the executor and runner.
 type listener struct {
 	execution.NoopSyncLifecycleListener
 
-	events   chan map[string]any
-	metadata chan map[string]any
+	sink Sink
 
-	droppedEvents   atomic.Int64
-	droppedMetadata atomic.Int64
-
-	// spanExporter/tp back every per-step hook's span creation — see
-	// tracing.go. tp is what hooks call (l.createSpan); spanExporter is the
-	// sdktrace.SpanExporter tp is wired to, kept here so Close can shut it
-	// down.
-	spanExporter *SpanExporter
-	tp           tracingv3.TracerProvider
-
-	// db and batchers/wg back Close: they stop the background batcher
-	// goroutines this listener starts and close the db handed to NewListener.
-	db       *sql.DB
-	batchers []*batcher
-	wg       sync.WaitGroup
+	// tp backs every per-step hook's span creation (l.createSpan) — see
+	// tracing.go. It exports through a SpanExporter wired to sink.
+	tp tracingv3.TracerProvider
 }
 
-func newListenerWithChannels(eventsCap, metadataCap int) *listener {
-	return &listener{
-		events:   make(chan map[string]any, eventsCap),
-		metadata: make(chan map[string]any, metadataCap),
-	}
+// newListenerWithSink returns a listener with no TracerProvider, so hooks
+// that only create spans are no-ops. Used by tests that exercise a hook's
+// own entity building in isolation.
+func newListenerWithSink(sink Sink) *listener {
+	return &listener{sink: sink}
 }
 
-func (l *listener) sendEvent(row map[string]any) {
-	select {
-	case l.events <- row:
-	default:
-		l.droppedEvents.Add(1)
-	}
+func (l *listener) sendEvent(ctx context.Context, e Event) {
+	l.sink.SendEvent(ctx, e)
 }
 
-func (l *listener) sendMetadata(row map[string]any) {
-	select {
-	case l.metadata <- row:
-	default:
-		l.droppedMetadata.Add(1)
-	}
+func (l *listener) sendMetadata(ctx context.Context, m RunMetadata) {
+	l.sink.SendRunMetadata(ctx, m)
 }
 
 // scanTriggerEvents collects every triggering event's Meta.Sessions into the
@@ -163,7 +141,7 @@ func addEventsInputAttr(ctx context.Context, attrs *meta.SerializableAttrs, evts
 }
 
 // createSpan is nil-safe: l.tp is nil on a *listener built via
-// newListenerWithChannels directly (see listener_test.go) rather than
+// newListenerWithSink directly (see listener_test.go) rather than
 // NewListener, and calling a method on a nil interface panics, so every hook
 // must go through this rather than l.tp.CreateSpan directly.
 func (l *listener) createSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
@@ -459,22 +437,21 @@ func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) 
 	// NOTE: Use internalID.Timestamp() instead of time.Now() for ordering simplicity in queries
 	receivedAt := internalID.Timestamp()
 
-	row := map[string]any{
-		"account_id":  evt.GetAccountID(),
-		"env_id":      evt.GetWorkspaceID(),
-		"internal_id": internalID,
-		"received_at": receivedAt,
-		// TODO: source/source_id?
-		"source":     "",
-		"event_id":   event.ID,
-		"event_name": event.Name,
-		"event_ts":   time.UnixMilli(event.Timestamp),
-		"event_data": json.RawMessage(eventDataBytes),
-		"event_v":    event.Version,
-		"event_meta": json.RawMessage(eventMetaBytes),
-	}
-
-	l.sendEvent(row)
+	l.sendEvent(ctx, Event{
+		AccountID:  evt.GetAccountID(),
+		EnvID:      evt.GetWorkspaceID(),
+		InternalID: internalID,
+		ReceivedAt: receivedAt,
+		// TODO: source/source_id: event.TrackedEvent doesn't expose the
+		// ingest source, so both stay unset (SourceID nil → NULL) until it does.
+		Source:    "",
+		EventID:   event.ID,
+		EventName: event.Name,
+		EventTS:   time.UnixMilli(event.Timestamp),
+		EventData: json.RawMessage(eventDataBytes),
+		EventV:    event.Version,
+		EventMeta: json.RawMessage(eventMetaBytes),
+	})
 }
 
 // OnExtendedTraceSpan creates the userland (extended-trace) span through
@@ -523,29 +500,25 @@ func (l *listener) OnMetadataEntry(ctx context.Context, entry execution.Metadata
 
 	spanID := tracing.SpanContextFromMetadata(entry.Parent).SpanID().String()
 
-	row := map[string]any{
-		"account_id":    entry.AccountID.String(),
-		"env_id":        entry.EnvID.String(),
-		"run_id":        entry.RunID.String(),
-		"run_queued_at": ulid.Time(entry.RunID.Time()),
-		"span_id":       spanID,
-		"scope":         entry.Scope.String(),
-		"kind":          entry.Kind.Suffix(),
-		"is_user":       entry.Kind.IsUser(),
-		"values":        json.RawMessage(valuesByt),
-		"created_at":    entry.CreatedAt,
+	m := RunMetadata{
+		AccountID:   entry.AccountID.String(),
+		EnvID:       entry.EnvID.String(),
+		RunID:       entry.RunID.String(),
+		RunQueuedAt: ulid.Time(entry.RunID.Time()),
+		SpanID:      spanID,
+		Scope:       entry.Scope.String(),
+		Kind:        entry.Kind.Suffix(),
+		IsUser:      entry.Kind.IsUser(),
+		Values:      json.RawMessage(valuesByt),
+		CreatedAt:   entry.CreatedAt,
+		StepIndex:   entry.StepIndex,
+		StepAttempt: entry.StepAttempt,
 	}
 	if entry.StepID != "" {
-		row["step_id"] = entry.StepID
-	}
-	if entry.StepIndex != nil {
-		row["step_index"] = *entry.StepIndex
-	}
-	if entry.StepAttempt != nil {
-		row["step_attempt"] = *entry.StepAttempt
+		m.StepID = &entry.StepID
 	}
 
-	l.sendMetadata(row)
+	l.sendMetadata(ctx, m)
 }
 
 // OnDeferAdd writes the run's own executor.defer span. Multiple physical
@@ -1000,80 +973,50 @@ func defaultSetupOpts() setupOpts {
 // an execution.SyncLifecycleListener, so reaching this requires a type
 // assertion (`l.(tracing.Closer)`), as pkg/devserver's stopDualWrite does.
 type Closer interface {
-	// Close stops every batcher goroutine, waits for them to exit (bounded
-	// by ctx), then closes the db passed to NewListener. Call at most once.
+	// Close stops span export and closes the listener's Sink (for
+	// NewListener, draining its batchers and closing the db). Call at most
+	// once.
 	Close(ctx context.Context) error
 }
 
 // NewListener returns an execution.SyncLifecycleListener that dual-writes
-// runs/events into db, and starts its own background batching goroutines
-// (batch.go) that drain the listener's channels and flush into staging
-// tables. It also starts a standalone SpanExporter (tracing.go) backing
-// this listener's own TracerProvider, sharing db. The batching goroutines
-// run for the lifetime of the process unless the caller stops them via
-// Close.
+// runs/spans/events/metadata into db: NewListenerWithInserter with a
+// DuckDBInserter, so Close also closes db.
 func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
+	return NewListenerWithInserter(NewDuckDBInserter(db), opts...)
+}
+
+// NewListenerWithInserter returns a listener whose entities are buffered and
+// batched in process (NewBatchingSink) and flushed through ins. Close stops
+// the batchers and closes ins if it implements interface{ Close() error }.
+func NewListenerWithInserter(ins Inserter, opts ...Option) execution.SyncLifecycleListener {
+	return NewListenerWithSink(NewBatchingSink(ins, opts...), opts...)
+}
+
+// NewListenerWithSink returns an execution.SyncLifecycleListener that hands
+// every entity it builds to sink: events and metadata directly from their
+// hooks, spans through the listener's own TracerProvider and SpanExporter.
+// Use this when the destination does its own buffering (e.g. an async Kafka
+// producer). Close closes sink if it implements
+// interface{ Close(context.Context) error }.
+func NewListenerWithSink(sink Sink, opts ...Option) execution.SyncLifecycleListener {
 	o := defaultSetupOpts()
 	for _, apply := range opts {
 		apply(&o)
 	}
 
-	l := newListenerWithChannels(o.eventsCap, o.metadataCap)
-	l.db = db
-
-	tables := map[string]chan map[string]any{
-		"inngest.events":       l.events,
-		"inngest.run_metadata": l.metadata,
-	}
-	// One shared disabledState across every batcher, so the driver's
-	// terminal duckdb.ErrDisabled state stops the whole dual-write path and
-	// is logged once rather than once per table.
-	disabled := &disabledState{}
-	for table, ch := range tables {
-		b := newBatcher(db, table, ch, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled})
-		l.batchers = append(l.batchers, b)
-		l.wg.Add(1)
-		go func() {
-			defer l.wg.Done()
-			b.run(context.Background())
-		}()
-	}
-
-	l.spanExporter = newSpanExporter(db, o.spansCap, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled})
-	l.tp = newListenerTracerProvider(l.spanExporter, o.batchInterval)
-
+	l := newListenerWithSink(sink)
+	l.tp = newListenerTracerProvider(&SpanExporter{sink: sink}, o.batchInterval)
 	return l
 }
 
-// Close implements Closer.
-//
-// If ctx expires before every batcher has drained, Close does not wait
-// forever: it closes db anyway, which kills any subprocess a batcher is
-// still blocked on and unblocks it — so a wedged batcher self-resolves
-// within roughly db.Close()'s own teardown bound rather than leaking
-// permanently.
+// Close implements Closer. It closes the Sink if it implements
+// interface{ Close(context.Context) error } (BatchingSink drains its batchers
+// and closes its Inserter). The TracerProvider needs no shutdown of its own:
+// it exports synchronously (SimpleSpanProcessor), so nothing is buffered in it.
 func (l *listener) Close(ctx context.Context) error {
-	for _, b := range l.batchers {
-		b.stop()
-	}
-	// Stop the span exporter's own batcher too, before db is closed below.
-	if l.spanExporter != nil {
-		_ = l.spanExporter.Shutdown(ctx)
-	}
-
-	done := make(chan struct{})
-	go func() {
-		l.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-ctx.Done():
-	}
-
-	if l.db != nil {
-		return l.db.Close()
+	if c, ok := l.sink.(interface{ Close(context.Context) error }); ok {
+		return c.Close(ctx)
 	}
 	return nil
 }
