@@ -3,6 +3,7 @@ package federate
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -183,7 +184,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			if err := sameColumns(r.Schema(), req.Columns); err != nil {
 				return fail(fmt.Errorf("federate: %s delta: %w", t, err))
 			}
-			st, def, err := encodedDeltaStream(t, r, q.RowCap)
+			st, def, err := encodedDeltaStream(t, r, q.RowCap, deltaRows)
 			if err != nil {
 				return fail(err)
 			}
@@ -214,9 +215,15 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 		}
 		name := fmt.Sprintf("__delta_%s_%d", t, seq)
 		temps = append(temps, name)
-		if _, err := e.Ingester.Ingest(ctx, conn, name, r, q.RowCap); err != nil {
+		n, err := e.Ingester.Ingest(ctx, conn, name, r, q.RowCap)
+		if err != nil {
+			if errors.Is(err, ErrRowCapExceeded) {
+				recordRowCapExceeded(ctx, t, deltaRows)
+			}
 			return fail(err)
 		}
+		count := &deltaCount{table: t, kind: deltaRows, total: int(n)}
+		count.done(ctx)
 		deltaRel[t] = name
 	}
 
