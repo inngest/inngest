@@ -1,8 +1,6 @@
 {
-  "sql": "SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE run_id IN (SELECT run_id FROM inngest.insights_runs(?, ?) AS runs) LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)) SELECT run_id FROM __inngest_runs AS runs WHERE run_id IN (SELECT run_id FROM __inngest_runs AS runs) LIMIT 1000",
   "args": [
-    "00000000-0000-4000-a000-000000000000",
-    "00000000-0000-4000-b000-000000000000",
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"
   ],

@@ -1,0 +1,13 @@
+{
+  "description": "LIKE is extracted; a function of a column (lower(app_id)) isn't.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "function_id LIKE 'my-%'",
+        "physical": "runs.function_slug LIKE 'my-%'",
+        "pushed": true
+      }
+    ]
+  }
+}

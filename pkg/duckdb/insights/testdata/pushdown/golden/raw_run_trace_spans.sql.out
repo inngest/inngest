@@ -1,0 +1,28 @@
+{
+  "description": "Raw mode reads run_trace_spans itself.",
+  "mode": "raw",
+  "tables": {
+    "run_trace_spans": [
+      {
+        "logical": "env_id = '00000000-0000-4000-b000-000000000000'",
+        "physical": "spans.env_id = '00000000-0000-4000-b000-000000000000'",
+        "pushed": true
+      },
+      {
+        "logical": "name = 'executor.step'",
+        "physical": "spans.name = 'executor.step'",
+        "pushed": true
+      },
+      {
+        "logical": "output-\u003e\u003e'data' = 'x'",
+        "physical": "spans.output-\u003e\u003e'data' = 'x'",
+        "pushed": true
+      },
+      {
+        "logical": "input-\u003e\u003e'k' = 'v'",
+        "physical": "spans.input-\u003e\u003e'k' = 'v'",
+        "pushed": true
+      }
+    ]
+  }
+}
