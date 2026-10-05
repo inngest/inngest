@@ -1,16 +1,27 @@
 import { useMemo } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Select } from '@inngest/components/Select/Select';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import Tabs from '@inngest/components/Tabs/Tabs';
 import { cn } from '@inngest/components/utils/classNames';
 import { useQuery } from 'urql';
 
-import { GetBurstConcurrencyDocument } from '@/components/Billing/Usage/BurstConcurrency';
 import { createConcurrencyChartOptions } from '@/components/Billing/Usage/concurrencyChart';
 import { graphql } from '@/gql';
 import { Route as BillingRoute } from '@/routes/_authed/billing/route';
 import { pathCreator } from '@/utils/urls';
+
+const GetBurstConcurrencyLimitDocument = graphql(`
+  query GetBurstConcurrencyLimit {
+    account {
+      burstConcurrency {
+        limit
+      }
+    }
+  }
+`);
 
 const GetAccountConcurrencyTimeSeriesDocument = graphql(`
   query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {
@@ -42,11 +53,28 @@ const ref = 'app-billing-usage-concurrency';
 const periodOption = { id: '30d', name: '30 days' };
 const periodDays = 30;
 
-function formatBurstLimit(burstLimit: number, baseLimit?: number) {
+function burstMultiplier(burstLimit: number, baseLimit?: number) {
   if (baseLimit && burstLimit % baseLimit === 0) {
-    return `${burstLimit} (${baseLimit}×${burstLimit / baseLimit})`;
+    return `${baseLimit}*${burstLimit / baseLimit}`;
   }
-  return `${burstLimit}`;
+  return undefined;
+}
+
+type TileProps = {
+  title: React.ReactNode;
+  loading?: boolean;
+  children: React.ReactNode;
+};
+
+function Tile({ title, loading, children }: TileProps) {
+  return (
+    <div className="bg-canvasBase border-subtle w-[245px] rounded-md border px-4 py-4">
+      <p className="text-subtle text-sm">{title}</p>
+      <p className="text-basis mt-1 text-2xl">
+        {loading ? <Skeleton className="h-8 w-24" /> : children}
+      </p>
+    </div>
+  );
 }
 
 type Props = {
@@ -55,8 +83,16 @@ type Props = {
 
 export function AccountConcurrency({ baseLimit }: Props) {
   const { profile } = BillingRoute.useLoaderData();
-  const [{ data, error }] = useQuery({ query: GetBurstConcurrencyDocument });
-  const burstLimit = error ? undefined : data?.account.burstConcurrency?.limit;
+  const [{ data: burstData, error: burstError }] = useQuery({
+    query: GetBurstConcurrencyLimitDocument,
+  });
+  const burstLimit = burstError
+    ? undefined
+    : burstData?.account.burstConcurrency?.limit;
+  const multiplier =
+    burstLimit !== undefined
+      ? burstMultiplier(burstLimit, baseLimit)
+      : undefined;
 
   const range = useMemo(() => {
     const to = new Date();
@@ -67,6 +103,7 @@ export function AccountConcurrency({ baseLimit }: Props) {
     useQuery({
       query: GetAccountConcurrencyTimeSeriesDocument,
       variables: range,
+      pause: burstLimit === undefined,
     });
   const series = seriesError
     ? undefined
@@ -76,18 +113,23 @@ export function AccountConcurrency({ baseLimit }: Props) {
     [series, range],
   );
 
+  if (burstLimit === undefined) {
+    return null;
+  }
+
   return (
     <div className="mt-10">
-      <h3 className="text-basis mb-3 text-xl">Account concurrency</h3>
-      <div className="mb-6 flex items-start justify-between gap-6">
-        <p className="text-muted text-sm">
-          The maximum number of steps your account can execute at the same time.
-          Steps above this limit wait in the queue until capacity frees up.
-        </p>
+      <div className="mb-6 flex items-center justify-between gap-6">
+        <div>
+          <h3 className="text-basis mb-1 text-xl">Account concurrency</h3>
+          <p className="text-subtle text-sm italic">
+            Maximum number of concurrently executing steps{' '}
+            <span className="font-bold">in your entire account</span>
+          </p>
+        </div>
         <div className="flex shrink-0 gap-2">
           <Button
             appearance="outlined"
-            kind="secondary"
             label="Talk to sales"
             href={pathCreator.support({ ref })}
             target="_blank"
@@ -100,18 +142,54 @@ export function AccountConcurrency({ baseLimit }: Props) {
           )}
         </div>
       </div>
+      <div className="mb-4 flex flex-wrap gap-4">
+        <Tile title="Account concurrency" loading={baseLimit === undefined}>
+          {baseLimit} steps
+        </Tile>
+        <Tile title="Concurrency during burst">
+          {burstLimit} steps
+          {multiplier && (
+            <span className="text-muted ml-2 text-xs">({multiplier})</span>
+          )}
+        </Tile>
+        {!seriesError && (
+          <Tile
+            title={
+              <>
+                Peak concurrency{' '}
+                <span className="text-muted">[{periodOption.id}]</span>
+              </>
+            }
+            loading={!series}
+          >
+            <span
+              className={cn(
+                series?.limitHits.some((point) => (point.value ?? 0) > 0)
+                  ? 'text-error'
+                  : 'text-basis',
+              )}
+            >
+              {series?.peak} steps
+            </span>
+          </Tile>
+        )}
+      </div>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-center justify-between">
-          <Tabs defaultValue="account" className="w-auto">
-            <Tabs.List className="border-b-0">
-              <Tabs.Tab value="account" title="Account concurrency" />
+          <Tabs defaultValue="account" className="mr-4 flex-1">
+            <Tabs.List>
+              <Tabs.Tab
+                value="account"
+                title="Account concurrency"
+                className="flex-none max-w-none border-r-0"
+              />
             </Tabs.List>
           </Tabs>
           <Select
             disabled
             onChange={() => {}}
             isLabelVisible
-            label="Period"
+            label="Time"
             multiple={false}
             value={periodOption}
           >
@@ -120,47 +198,28 @@ export function AccountConcurrency({ baseLimit }: Props) {
             </Select.Button>
           </Select>
         </div>
-        {chartOption && (
-          <div className="mt-6">
+        <div className="mt-6">
+          {seriesError ? (
+            <div className="flex h-full min-h-[384px] w-full items-center justify-center overflow-hidden">
+              <Alert severity="warning">
+                Failed to load concurrency data. Please{' '}
+                <Alert.Link
+                  severity="warning"
+                  href="https://support.inngest.com"
+                >
+                  contact support
+                </Alert.Link>{' '}
+                if this does not resolve.
+              </Alert>
+            </div>
+          ) : (
             <Chart
-              option={chartOption}
+              option={chartOption ?? {}}
               settings={{ notMerge: true }}
               theme="light"
               className="h-[384px] w-full"
               loading={seriesFetching}
             />
-          </div>
-        )}
-        <div className="mt-6 flex flex-wrap gap-10">
-          {baseLimit !== undefined && (
-            <div>
-              <p className="text-basis text-sm">Concurrency limit</p>
-              <p className="text-basis text-3xl">{baseLimit}</p>
-            </div>
-          )}
-          {burstLimit !== undefined && (
-            <div>
-              <p className="text-basis text-sm">Burst limit</p>
-              <p className="text-basis text-3xl">
-                {formatBurstLimit(burstLimit, baseLimit)}
-              </p>
-            </div>
-          )}
-          {series && (
-            <div>
-              <p className="text-basis text-sm">
-                Max concurrent steps{' '}
-                <span className="text-muted">[{periodOption.id}]</span>
-              </p>
-              <p
-                className={cn(
-                  'text-3xl',
-                  series.peak >= series.baseLimit ? 'text-error' : 'text-basis',
-                )}
-              >
-                {series.peak}
-              </p>
-            </div>
           )}
         </div>
       </div>

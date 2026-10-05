@@ -1,5 +1,6 @@
 import { type ChartProps } from '@inngest/components/Chart/Chart';
 import { resolveColor } from '@inngest/components/utils/colors';
+import { formatInTimeZone } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 
 import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
@@ -19,12 +20,20 @@ export type TimeRange = { from: string; to: string };
 type MarkAreaBound = { xAxis: number };
 type MarkAreaRange = [MarkAreaBound, MarkAreaBound];
 
+type TooltipParam = {
+  seriesName?: string;
+  marker?: string;
+  value?: unknown;
+};
+
 const HOUR_MS = 60 * 60 * 1000;
+const BAND_OPACITY = 0.15;
 
 const seriesNames = {
   concurrentSteps: 'Total concurrent steps',
-  bursts: 'Burst',
-  limitHits: 'Limit hits',
+  limit: 'Concurrency limit',
+  bursts: 'Concurrency burst',
+  limitHits: 'Concurrency hit',
 };
 
 export function mergeLimitHitRanges(
@@ -47,37 +56,53 @@ export function mergeLimitHitRanges(
   return ranges;
 }
 
+export function niceCeiling(value: number): number {
+  const raw = value * 1.1;
+  if (raw <= 0) return 0;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw / 5)));
+  const step =
+    [1, 2, 2.5, 5, 10]
+      .map((factor) => factor * magnitude)
+      .find((candidate) => candidate * 5 >= raw) ?? 10 * magnitude;
+  return Math.max(10, Math.ceil(raw / step) * step);
+}
+
+function widenRange(range: MarkAreaRange, minMs: number): MarkAreaRange {
+  const [start, end] = [range[0].xAxis, range[1].xAxis];
+  if (end - start >= minMs) return range;
+  const mid = (start + end) / 2;
+  return [{ xAxis: mid - minMs / 2 }, { xAxis: mid + minMs / 2 }];
+}
+
 function markArea(data: MarkAreaRange[], color: string) {
-  if (data.length === 0) return undefined;
   return {
     animation: false,
     silent: true,
-    itemStyle: { color, opacity: 0.4 },
+    z: 3,
+    itemStyle: {
+      color,
+      opacity: BAND_OPACITY,
+    },
     data,
   };
 }
 
-function limitLine(
-  value: number,
-  label: string,
-  color: string,
-  dashed = false,
-) {
-  return {
-    yAxis: value,
-    label: {
-      show: true,
-      position: 'insideEndTop' as const,
-      formatter: label,
-      fontSize: 11,
-      color,
-    },
-    lineStyle: {
-      type: dashed ? ('dashed' as const) : ('solid' as const),
-      width: 1,
-      color,
-    },
-  };
+function formatTooltip(params: TooltipParam | TooltipParam[]) {
+  const rows = (Array.isArray(params) ? params : [params]).filter(
+    (param) =>
+      param.seriesName === seriesNames.concurrentSteps &&
+      Array.isArray(param.value),
+  );
+  const first = rows[0];
+  if (!first) return '';
+
+  const [bucket] = first.value as [number, number];
+  const time = formatInTimeZone(new Date(bucket), 'UTC', 'MMM d, HH:mm');
+  const lines = rows.map((param) => {
+    const [, value] = param.value as [number, number];
+    return `${param.marker ?? ''}${param.seriesName} <b>${value}</b>`;
+  });
+  return [`${time} UTC`, ...lines].join('<br/>');
 }
 
 export function createConcurrencyChartOptions(
@@ -91,35 +116,41 @@ export function createConcurrencyChartOptions(
       [new Date(point.bucket).getTime(), point.value ?? 0] as [number, number],
   );
 
-  const burstRanges: MarkAreaRange[] = series.bursts.map((burst) => [
-    { xAxis: new Date(burst.startedAt).getTime() },
-    { xAxis: new Date(burst.endedAt).getTime() },
-  ]);
-  const limitHitRanges = mergeLimitHitRanges(series.limitHits);
-
-  const baseLimitColor = resolveColor(
-    colors.tertiary['moderate'],
-    dark,
-    '#F54A3F',
+  const minBandMs =
+    (new Date(range.to).getTime() - new Date(range.from).getTime()) / 300;
+  const burstRanges = series.bursts.map((burst) =>
+    widenRange(
+      [
+        { xAxis: new Date(burst.startedAt).getTime() },
+        { xAxis: new Date(burst.endedAt).getTime() },
+      ],
+      minBandMs,
+    ),
   );
-  const burstLimitColor = resolveColor(borderColor.warning, dark, '#B86E00');
-  const burstAreaColor = resolveColor(backgroundColor.warning, dark, '#FEF3DD');
-  const limitHitAreaColor = resolveColor(
-    backgroundColor.error,
-    dark,
-    '#FEF4F3',
+  const limitHitRanges = mergeLimitHitRanges(series.limitHits).map((r) =>
+    widenRange(r, minBandMs),
   );
-  const lineColor = resolveColor(CHART_COLORS[2], dark, '#9CD2FF');
 
-  const ceiling = Math.max(series.baseLimit, series.burstLimit ?? 0);
+  const limitColor = resolveColor(colors.tertiary['moderate'], dark, '#F54A3F');
+  const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
+  const limitHitAreaColor = resolveColor(borderColor.error, dark, '#CB2A1D');
+  const stepsColor = resolveColor(CHART_COLORS[3], dark, '#FCC43F');
+
+  const dataMax = points.reduce((max, [, value]) => Math.max(max, value), 0);
+  const yMax = niceCeiling(
+    Math.max(dataMax, series.baseLimit, series.burstLimit ?? 0),
+  );
 
   return {
+    useUTC: true,
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'line' },
       backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
       borderColor: resolveColor(borderColor.subtle, dark),
       textStyle: { color: resolveColor(textColor.basis, dark) },
+      formatter: (params) =>
+        formatTooltip(params as TooltipParam | TooltipParam[]),
     },
     legend: {
       type: 'scroll',
@@ -134,8 +165,16 @@ export function createConcurrencyChartOptions(
       },
       data: [
         seriesNames.concurrentSteps,
-        ...(burstRanges.length > 0 ? [seriesNames.bursts] : []),
-        ...(limitHitRanges.length > 0 ? [seriesNames.limitHits] : []),
+        { name: seriesNames.limit, icon: 'path://M0,4 L10,4 L10,6 L0,6 Z' },
+        ...(series.burstLimit != null
+          ? [
+              {
+                name: seriesNames.bursts,
+                itemStyle: { opacity: BAND_OPACITY },
+              },
+            ]
+          : []),
+        { name: seriesNames.limitHits, itemStyle: { opacity: BAND_OPACITY } },
       ],
     },
     xAxis: {
@@ -163,7 +202,8 @@ export function createConcurrencyChartOptions(
     },
     yAxis: {
       type: 'value',
-      max: ({ max }) => Math.ceil((Math.max(max, ceiling) * 11) / 10),
+      min: 0,
+      max: yMax,
       axisLabel: {
         fontSize: 10,
         fontWeight: 400,
@@ -190,33 +230,6 @@ export function createConcurrencyChartOptions(
     },
     series: [
       {
-        name: seriesNames.concurrentSteps,
-        data: points,
-        type: 'line',
-        showSymbol: false,
-        lineStyle: { width: 1.5, color: lineColor },
-        itemStyle: { color: lineColor },
-        areaStyle: { color: lineColor, opacity: 0.2 },
-        markLine: {
-          animation: false,
-          silent: true,
-          symbol: 'none',
-          data: [
-            limitLine(series.baseLimit, 'Concurrency limit', baseLimitColor),
-            ...(series.burstLimit !== null
-              ? [
-                  limitLine(
-                    series.burstLimit,
-                    'Burst limit',
-                    burstLimitColor,
-                    true,
-                  ),
-                ]
-              : []),
-          ],
-        },
-      },
-      {
         name: seriesNames.bursts,
         data: [],
         type: 'line',
@@ -231,6 +244,34 @@ export function createConcurrencyChartOptions(
         itemStyle: { color: limitHitAreaColor },
         lineStyle: { color: limitHitAreaColor },
         markArea: markArea(limitHitRanges, limitHitAreaColor),
+      },
+      {
+        name: seriesNames.limit,
+        data: [],
+        type: 'line',
+        itemStyle: { color: limitColor },
+        lineStyle: { color: limitColor },
+      },
+      {
+        name: seriesNames.concurrentSteps,
+        data: points,
+        type: 'line',
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: stepsColor },
+        itemStyle: { color: stepsColor },
+        areaStyle: { color: stepsColor, opacity: 0.8 },
+        markLine: {
+          animation: false,
+          silent: true,
+          symbol: 'none' as const,
+          data: [{ yAxis: series.baseLimit }],
+          label: { show: false },
+          lineStyle: {
+            type: 'solid' as const,
+            width: 1,
+            color: limitColor,
+          },
+        },
       },
     ],
   };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeLimitHitRanges } from './concurrencyChart';
+import { mergeLimitHitRanges, niceCeiling } from './concurrencyChart';
 
 const hour = (n: number) => `2026-09-01T${String(n).padStart(2, '0')}:00:00Z`;
 const ms = (iso: string) => new Date(iso).getTime();
@@ -29,5 +29,15 @@ describe('mergeLimitHitRanges', () => {
     ]);
 
     expect(ranges).toHaveLength(2);
+  });
+});
+
+describe('niceCeiling', () => {
+  it.each([
+    [29, 40],
+    [60, 80],
+    [5, 10],
+  ])('rounds %d up to the clean tick ceiling %d', (value, expected) => {
+    expect(niceCeiling(value)).toBe(expected);
   });
 });
