@@ -1,0 +1,343 @@
+diff --git a/pkg/api/v2/endpoints_runs.go b/pkg/api/v2/endpoints_runs.go
+index b62e72719..d1ab90356 100644
+--- a/pkg/api/v2/endpoints_runs.go
++++ b/pkg/api/v2/endpoints_runs.go
+@@ -34,6 +34,15 @@ const (
+ 
+ var runsCELTooLongMessage = fmt.Sprintf("Query cannot exceed %d bytes", maxRunsCELBytes)
+ 
++var (
++	listRunsProviderIncludes = map[ListRunsInclude]RunListInclude{
++		ListRunsIncludeDeferredFrom: RunListIncludeDeferredFrom,
++	}
++	listFunctionRunsProviderIncludes = map[ListFunctionRunsInclude]RunListInclude{
++		ListFunctionRunsIncludeDeferredFrom: RunListIncludeDeferredFrom,
++	}
++)
++
+ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
+ 	if req.RunId == "" {
+ 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
+@@ -86,7 +95,12 @@ func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*ap
+ 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "List runs is not yet implemented")
+ 	}
+ 
+-	opts, err := listRunsOpts(req, listRunsIncludeSelector)
++	opts, err := listRunsOpts(
++		req,
++		listRunsIncludeSelector,
++		ListRunsIncludeOutput,
++		listRunsProviderIncludes,
++	)
+ 	if err != nil {
+ 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+ 	}
+@@ -126,7 +140,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
+ 		Order:         req.Order,
+ 		Query:         req.Query,
+ 		Include:       req.Include,
+-	}, listFunctionRunsIncludeSelector)
++	}, listFunctionRunsIncludeSelector, ListFunctionRunsIncludeOutput, listFunctionRunsProviderIncludes)
+ 	if err != nil {
+ 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+ 	}
+@@ -283,7 +297,12 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
+ 	}, nil
+ }
+ 
+-func listRunsOpts(req *apiv2.ListRunsRequest, selector apiv2endpoint.IncludeSelector[RunListInclude]) (GetRunsOpts, error) {
++func listRunsOpts[T comparable](
++	req *apiv2.ListRunsRequest,
++	selector apiv2endpoint.IncludeSelector[T],
++	outputValue T,
++	providerIncludes map[T]RunListInclude,
++) (GetRunsOpts, error) {
+ 	if len(req.GetFunctionId()) > 0 && len(req.GetAppId()) == 0 {
+ 		return GetRunsOpts{}, fmt.Errorf("appId is required when filtering by functionId")
+ 	}
+@@ -324,11 +343,15 @@ func listRunsOpts(req *apiv2.ListRunsRequest, selector apiv2endpoint.IncludeSele
+ 		if err != nil {
+ 			return GetRunsOpts{}, err
+ 		}
+-		if parsed == RunListIncludeOutput {
++		if parsed == outputValue {
+ 			includeOutput = true
+ 			continue
+ 		}
+-		include = append(include, parsed)
++		providerInclude, ok := providerIncludes[parsed]
++		if !ok {
++			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
++		}
++		include = append(include, providerInclude)
+ 	}
+ 
+ 	return GetRunsOpts{
+diff --git a/pkg/api/v2/include_selectors.gen.go b/pkg/api/v2/include_selectors.gen.go
+index 077126683..958cf2732 100644
+--- a/pkg/api/v2/include_selectors.gen.go
++++ b/pkg/api/v2/include_selectors.gen.go
+@@ -6,19 +6,30 @@ import (
+ 	apiv2endpoint "github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+ )
+ 
++// ListFunctionRunsInclude is an internal expansion selected by generated API parsers.
++type ListFunctionRunsInclude uint8
++
++const (
++	ListFunctionRunsIncludeDeferredFrom ListFunctionRunsInclude = iota + 1
++	ListFunctionRunsIncludeOutput
++)
++
++// ListRunsInclude is an internal expansion selected by generated API parsers.
++type ListRunsInclude uint8
++
+ const (
+-	RunListIncludeDeferredFrom RunListInclude = iota + 1
+-	RunListIncludeOutput
++	ListRunsIncludeDeferredFrom ListRunsInclude = iota + 1
++	ListRunsIncludeOutput
+ )
+ 
+-var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
+-	"deferredFrom":  RunListIncludeDeferredFrom,
+-	"deferred_from": RunListIncludeDeferredFrom,
+-	"output":        RunListIncludeOutput,
++var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListFunctionRunsInclude{
++	"deferredFrom":  ListFunctionRunsIncludeDeferredFrom,
++	"deferred_from": ListFunctionRunsIncludeDeferredFrom,
++	"output":        ListFunctionRunsIncludeOutput,
+ })
+ 
+-var listRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]RunListInclude{
+-	"deferredFrom":  RunListIncludeDeferredFrom,
+-	"deferred_from": RunListIncludeDeferredFrom,
+-	"output":        RunListIncludeOutput,
++var listRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListRunsInclude{
++	"deferredFrom":  ListRunsIncludeDeferredFrom,
++	"deferred_from": ListRunsIncludeDeferredFrom,
++	"output":        ListRunsIncludeOutput,
+ })
+diff --git a/pkg/api/v2/interfaces.go b/pkg/api/v2/interfaces.go
+index a77676d0d..2e791f475 100644
+--- a/pkg/api/v2/interfaces.go
++++ b/pkg/api/v2/interfaces.go
+@@ -107,10 +107,13 @@ type GetRunsOpts struct {
+ 	Include       []RunListInclude
+ }
+ 
+-// RunListInclude is an internal expansion selected by generated API parsers.
+-// Its values are generated from protobuf OpenAPI metadata.
++// RunListInclude is an expansion understood by the run provider.
+ type RunListInclude uint8
+ 
++const (
++	RunListIncludeDeferredFrom RunListInclude = iota + 1
++)
++
+ type RunTimeField int
+ 
+ const (
+diff --git a/pkg/api/v2/service_test.go b/pkg/api/v2/service_test.go
+index d399c75ed..c03260eab 100644
+--- a/pkg/api/v2/service_test.go
++++ b/pkg/api/v2/service_test.go
+@@ -1310,11 +1310,11 @@ func TestService_ListFunctionRuns(t *testing.T) {
+ 	})
+ }
+ 
+-func TestRunListIncludeFromAPI(t *testing.T) {
+-	for value, expected := range map[string]RunListInclude{
+-		"deferredFrom":  RunListIncludeDeferredFrom,
+-		"deferred_from": RunListIncludeDeferredFrom,
+-		"output":        RunListIncludeOutput,
++func TestListRunsIncludeFromAPI(t *testing.T) {
++	for value, expected := range map[string]ListRunsInclude{
++		"deferredFrom":  ListRunsIncludeDeferredFrom,
++		"deferred_from": ListRunsIncludeDeferredFrom,
++		"output":        ListRunsIncludeOutput,
+ 	} {
+ 		t.Run(value, func(t *testing.T) {
+ 			got, err := listRunsIncludeSelector.Parse(value)
+diff --git a/tools/protoc-gen-inngest-includes/main.go b/tools/protoc-gen-inngest-includes/main.go
+index b6feb06da..2cfa06244 100644
+--- a/tools/protoc-gen-inngest-includes/main.go
++++ b/tools/protoc-gen-inngest-includes/main.go
+@@ -20,9 +20,10 @@ const (
+ )
+ 
+ type selectorSpec struct {
+-	method  string
+-	values  []string
+-	aliases map[string]string
++	method   string
++	typeName string
++	values   []string
++	aliases  map[string]string
+ }
+ 
+ func main() {
+@@ -43,7 +44,11 @@ func generate(plugin *protogen.Plugin) error {
+ 				if len(values) == 0 {
+ 					continue
+ 				}
+-				spec, err := newSelectorSpec(string(method.Desc.Name()), values)
++				spec, err := newSelectorSpec(
++					string(method.Desc.Name()),
++					includeTypeName(method.Desc),
++					values,
++				)
+ 				if err != nil {
+ 					return err
+ 				}
+@@ -80,8 +85,17 @@ func includeValues(method protoreflect.MethodDescriptor) []string {
+ 	return schema.GetEnum()
+ }
+ 
+-func newSelectorSpec(name string, values []string) (selectorSpec, error) {
+-	spec := selectorSpec{method: name, values: append([]string(nil), values...), aliases: map[string]string{}}
++func includeTypeName(method protoreflect.MethodDescriptor) string {
++	return string(method.Name()) + "Include"
++}
++
++func newSelectorSpec(name, typeName string, values []string) (selectorSpec, error) {
++	spec := selectorSpec{
++		method:   name,
++		typeName: typeName,
++		values:   append([]string(nil), values...),
++		aliases:  map[string]string{},
++	}
+ 	for _, canonical := range values {
+ 		if !isLowerCamel(canonical) {
+ 			return selectorSpec{}, fmt.Errorf("include value %q for %s must be lowerCamelCase", canonical, name)
+@@ -131,8 +145,13 @@ func snakeCase(value string) string {
+ }
+ 
+ func emitSelectors(g *protogen.GeneratedFile, specs []selectorSpec) error {
+-	values := map[string]string{}
++	types := map[string]map[string]string{}
+ 	for _, spec := range specs {
++		values, ok := types[spec.typeName]
++		if !ok {
++			values = map[string]string{}
++			types[spec.typeName] = values
++		}
+ 		for _, value := range spec.values {
+ 			name := goName(value)
+ 			if existing, ok := values[name]; ok && existing != value {
+@@ -142,32 +161,43 @@ func emitSelectors(g *protogen.GeneratedFile, specs []selectorSpec) error {
+ 		}
+ 	}
+ 
+-	names := make([]string, 0, len(values))
+-	for name := range values {
+-		names = append(names, name)
++	typeNames := make([]string, 0, len(types))
++	for typeName := range types {
++		typeNames = append(typeNames, typeName)
+ 	}
+-	sort.Strings(names)
+-	g.P("const (")
+-	for i, name := range names {
+-		if i == 0 {
+-			g.P("RunListInclude", name, " RunListInclude = iota + 1")
+-			continue
++	sort.Strings(typeNames)
++	for _, typeName := range typeNames {
++		g.P("// ", typeName, " is an internal expansion selected by generated API parsers.")
++		g.P("type ", typeName, " uint8")
++		g.P()
++		values := types[typeName]
++		names := make([]string, 0, len(values))
++		for name := range values {
++			names = append(names, name)
++		}
++		sort.Strings(names)
++		g.P("const (")
++		for i, name := range names {
++			if i == 0 {
++				g.P(typeName, name, " ", typeName, " = iota + 1")
++				continue
++			}
++			g.P(typeName, name)
+ 		}
+-		g.P("RunListInclude", name)
++		g.P(")")
++		g.P()
+ 	}
+-	g.P(")")
+-	g.P()
+ 
+ 	for _, spec := range specs {
+ 		g.P()
+-		g.P("var ", lowerFirst(spec.method), "IncludeSelector = ", g.QualifiedGoIdent(endpointPackage.Ident("NewIncludeSelector")), "(map[string]RunListInclude{")
++		g.P("var ", lowerFirst(spec.method), "IncludeSelector = ", g.QualifiedGoIdent(endpointPackage.Ident("NewIncludeSelector")), "(map[string]", spec.typeName, "{")
+ 		aliases := make([]string, 0, len(spec.aliases))
+ 		for alias := range spec.aliases {
+ 			aliases = append(aliases, alias)
+ 		}
+ 		sort.Strings(aliases)
+ 		for _, alias := range aliases {
+-			g.P(fmt.Sprintf("%q: RunListInclude%s,", alias, goName(spec.aliases[alias])))
++			g.P(fmt.Sprintf("%q: %s%s,", alias, spec.typeName, goName(spec.aliases[alias])))
+ 		}
+ 		g.P("})")
+ 		g.P()
+diff --git a/tools/protoc-gen-inngest-includes/main_test.go b/tools/protoc-gen-inngest-includes/main_test.go
+index 1bda04f7b..7369557d8 100644
+--- a/tools/protoc-gen-inngest-includes/main_test.go
++++ b/tools/protoc-gen-inngest-includes/main_test.go
+@@ -3,12 +3,22 @@ package main
+ import (
+ 	"testing"
+ 
++	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+ 	"github.com/stretchr/testify/require"
++	"google.golang.org/protobuf/compiler/protogen"
+ )
+ 
++func TestIncludeValues(t *testing.T) {
++	method := apiv2.File_api_v2_service_proto.Services().ByName("V2").Methods().ByName("ListRuns")
++	values := includeValues(method)
++	require.Equal(t, []string{"output", "deferredFrom"}, values)
++	require.Equal(t, "ListRunsInclude", includeTypeName(method))
++}
++
+ func TestNewSelectorSpec(t *testing.T) {
+-	spec, err := newSelectorSpec("ListRuns", []string{"output", "deferredFrom", "summaryDetails"})
++	spec, err := newSelectorSpec("ListRuns", "ListRunsInclude", []string{"output", "deferredFrom", "summaryDetails"})
+ 	require.NoError(t, err)
++	require.Equal(t, "ListRunsInclude", spec.typeName)
+ 	require.Equal(t, []string{"output", "deferredFrom", "summaryDetails"}, spec.values)
+ 	require.Equal(t, map[string]string{
+ 		"output":          "output",
+@@ -20,10 +30,28 @@ func TestNewSelectorSpec(t *testing.T) {
+ }
+ 
+ func TestNewSelectorSpecRejectsSnakeCase(t *testing.T) {
+-	_, err := newSelectorSpec("ListRuns", []string{"deferred_from"})
++	_, err := newSelectorSpec("ListRuns", "ListRunsInclude", []string{"deferred_from"})
+ 	require.ErrorContains(t, err, `include value "deferred_from" for ListRuns must be lowerCamelCase`)
+ }
+ 
++func TestEmitSelectorsGeneratesIndependentTypes(t *testing.T) {
++	runs, err := newSelectorSpec("ListRuns", "ListRunsInclude", []string{"output"})
++	require.NoError(t, err)
++	trace, err := newSelectorSpec("GetTrace", "GetTraceInclude", []string{"output"})
++	require.NoError(t, err)
++
++	plugin := &protogen.Plugin{}
++	generated := plugin.NewGeneratedFile("include_selectors.go", generatedPackage)
++	generated.P("package apiv2")
++	require.NoError(t, emitSelectors(generated, []selectorSpec{runs, trace}))
++	content, err := generated.Content()
++	require.NoError(t, err)
++	require.Contains(t, string(content), "type ListRunsInclude uint8")
++	require.Contains(t, string(content), "type GetTraceInclude uint8")
++	require.Contains(t, string(content), "map[string]ListRunsInclude")
++	require.Contains(t, string(content), "map[string]GetTraceInclude")
++}
++
+ func TestGoName(t *testing.T) {
+ 	require.Equal(t, "DeferredFrom", goName("deferredFrom"))
+ 	require.Equal(t, "TotalCount", goName("totalCount"))
