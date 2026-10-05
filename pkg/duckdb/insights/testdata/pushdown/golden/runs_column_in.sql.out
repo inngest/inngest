@@ -1,0 +1,18 @@
+{
+  "description": "IN on columns; each AND conjunct is its own predicate.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "app_id IN ('app-a', 'app-b')",
+        "physical": "runs.app_name IN ('app-a', 'app-b')",
+        "pushed": true
+      },
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "runs.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      }
+    ]
+  }
+}

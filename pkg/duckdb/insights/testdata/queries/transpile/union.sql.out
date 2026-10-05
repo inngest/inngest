@@ -1,5 +1,5 @@
 {
-  "sql": "SELECT run_id FROM inngest.insights_runs(?, ?) AS runs UNION SELECT run_id FROM inngest.insights_extended_trace_spans(?, ?) AS extended_trace_spans LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)), __inngest_extended_trace_spans AS NOT MATERIALIZED (SELECT * FROM inngest.insights_extended_trace_spans(?, ?)) SELECT run_id FROM __inngest_runs AS runs UNION SELECT run_id FROM __inngest_extended_trace_spans AS extended_trace_spans LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000",

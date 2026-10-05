@@ -136,10 +136,9 @@ func (s *tableScope) addBaseTable(r *parser.BaseTableRef, ctes map[string]logica
 	if len(r.Name) != 1 {
 		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", strings.Join(r.Name, "."))}
 	}
+	// ctes' root layer is the transpile mode's catalog (validate seeds it),
+	// so a CTE declared above shadows a table of the same name.
 	tbl, ok := ctes[r.Name[0]]
-	if !ok {
-		tbl, ok = logicalTables[r.Name[0]]
-	}
 	if !ok {
 		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", r.Name[0])}
 	}
