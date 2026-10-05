@@ -2,11 +2,7 @@ package tracing
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"fmt"
-	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,28 +39,25 @@ type batcherOpts struct {
 	// instance to all of them); left nil, each batcher gets its own, which is
 	// fine for tests but not production.
 	disabled *disabledState
-	// afterInsert, if set, runs once per flush right after the INSERT
-	// succeeds, given exactly the rows that flush just wrote. Used by
-	// tracing.go's newSpanExporter (materializeRuns); most tables leave it
-	// nil.
-	afterInsert func(ctx context.Context, db *sql.DB, rows []map[string]any) error
 }
 
-// batcher drains a single per-table channel, buffering rows until maxSize or
-// flushInterval, then flushes them into <table> via INSERT. A flush failure
-// (e.g. subprocess down, or a row DuckDB rejects) is logged and the batch is
-// dropped — it is never surfaced to the channel's senders. driver.ErrDisabled
-// is the one exception: it's terminal, so it stops the batcher for good
-// (see run) instead of being retried and re-logged on every flush.
-type batcher struct {
-	db    *sql.DB
-	table string
-	in    chan map[string]any
+// batcher drains a single per-entity channel, buffering items until maxSize
+// or flushInterval, then hands them to flush (an Inserter method). A flush
+// failure (e.g. subprocess down, or a row the store rejects) is logged and
+// the batch is dropped — it is never surfaced to the channel's senders.
+// driver.ErrDisabled is the one exception: it's terminal, so it stops the
+// batcher for good (see run) instead of being retried and re-logged on every
+// flush.
+type batcher[T any] struct {
+	// name identifies the entity in logs (e.g. "events").
+	name  string
+	flush func(ctx context.Context, items []T) error
+	in    chan T
 	opts  batcherOpts
 	stopc chan struct{}
 }
 
-func newBatcher(db *sql.DB, table string, in chan map[string]any, opts batcherOpts) *batcher {
+func newBatcher[T any](name string, in chan T, flush func(ctx context.Context, items []T) error, opts batcherOpts) *batcher[T] {
 	if opts.maxSize <= 0 {
 		opts.maxSize = 10_000
 	}
@@ -74,12 +67,12 @@ func newBatcher(db *sql.DB, table string, in chan map[string]any, opts batcherOp
 	if opts.disabled == nil {
 		opts.disabled = &disabledState{}
 	}
-	return &batcher{db: db, table: table, in: in, opts: opts, stopc: make(chan struct{})}
+	return &batcher[T]{name: name, flush: flush, in: in, opts: opts, stopc: make(chan struct{})}
 }
 
-func (b *batcher) stop() { close(b.stopc) }
+func (b *batcher[T]) stop() { close(b.stopc) }
 
-// flushExecTimeout bounds a single flush's INSERT (and afterInsert, if set)
+// flushExecTimeout bounds a single flush's Inserter call
 // regardless of run's own ctx, which NewListener starts with
 // context.Background() and so never expires on its own. Without this, a
 // flush wedged on the duckdb subprocess (e.g. a genuine hang, not just a
@@ -96,12 +89,12 @@ func (b *batcher) stop() { close(b.stopc) }
 // runWithRestartLocked's ctx.Err() branch.
 const flushExecTimeout = 30 * time.Second
 
-func (b *batcher) run(ctx context.Context) {
-	buf := make([]map[string]any, 0, b.opts.maxSize)
+func (b *batcher[T]) run(ctx context.Context) {
+	buf := make([]T, 0, b.opts.maxSize)
 	timer := time.NewTimer(b.opts.flushInterval)
 	defer timer.Stop()
 
-	flush := func() {
+	flushBuf := func() {
 		if len(buf) == 0 {
 			return
 		}
@@ -109,9 +102,9 @@ func (b *batcher) run(ctx context.Context) {
 			buf = buf[:0]
 			return
 		}
-		logger.StdlibLogger(ctx).Debug("dualwrite: flushing batch", "table", b.table, "rows", len(buf))
+		logger.StdlibLogger(ctx).Debug("dualwrite: flushing batch", "entity", b.name, "rows", len(buf))
 		flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), flushExecTimeout)
-		err := b.insert(flushCtx, buf)
+		err := b.flush(flushCtx, buf)
 		cancel()
 		if err != nil {
 			// driver.ErrDisabled is terminal, so record it (logging once
@@ -119,7 +112,7 @@ func (b *batcher) run(ctx context.Context) {
 			if errors.Is(err, driver.ErrDisabled) {
 				b.opts.disabled.disable(ctx, err)
 			} else {
-				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "table", b.table, "error", err, "rows", len(buf))
+				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "entity", b.name, "error", err, "rows", len(buf))
 			}
 		}
 		buf = buf[:0]
@@ -133,8 +126,8 @@ func (b *batcher) run(ctx context.Context) {
 	drainRemaining := func() {
 		for {
 			select {
-			case row := <-b.in:
-				buf = append(buf, row)
+			case item := <-b.in:
+				buf = append(buf, item)
 			default:
 				return
 			}
@@ -151,78 +144,23 @@ func (b *batcher) run(ctx context.Context) {
 		}
 
 		select {
-		case row := <-b.in:
-			buf = append(buf, row)
+		case item := <-b.in:
+			buf = append(buf, item)
 			if len(buf) >= b.opts.maxSize {
-				flush()
+				flushBuf()
 				timer.Reset(b.opts.flushInterval)
 			}
 		case <-timer.C:
-			flush()
+			flushBuf()
 			timer.Reset(b.opts.flushInterval)
 		case <-b.stopc:
 			drainRemaining()
-			flush()
+			flushBuf()
 			return
 		case <-ctx.Done():
 			drainRemaining()
-			flush()
+			flushBuf()
 			return
 		}
 	}
-}
-
-func (b *batcher) insert(ctx context.Context, rows []map[string]any) error {
-	if len(rows) == 0 {
-		return nil
-	}
-
-	// Rows within one flush batch don't reliably share an identical key set
-	// (some hooks only add a key when there's a value for it), so build the
-	// column list from the union of every row's keys rather than just
-	// rows[0] — otherwise a column the first row omits would silently drop
-	// for the whole batch. A row missing a given key falls through as an
-	// explicit NULL via row[col]'s zero value.
-	seen := make(map[string]struct{})
-	var cols []string
-	for _, row := range rows {
-		for k := range row {
-			if _, ok := seen[k]; ok {
-				continue
-			}
-			seen[k] = struct{}{}
-			cols = append(cols, k)
-		}
-	}
-	// Sort for a deterministic column order across flushes/tests.
-	sort.Strings(cols)
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", b.table, strings.Join(cols, ", "))
-
-	args := make([]any, 0, len(rows)*len(cols))
-	for i, row := range rows {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("(")
-		for j, col := range cols {
-			if j > 0 {
-				sb.WriteString(", ")
-			}
-			sb.WriteString("?")
-			args = append(args, row[col])
-		}
-		sb.WriteString(")")
-	}
-	sb.WriteString(";")
-
-	if _, err := b.db.ExecContext(ctx, sb.String(), args...); err != nil {
-		return err
-	}
-
-	if b.opts.afterInsert != nil {
-		return b.opts.afterInsert(ctx, b.db, rows)
-	}
-	return nil
 }
