@@ -121,6 +121,7 @@ func TestBatcherHandlesOptionalSpanColumnsInABatch(t *testing.T) {
 	withOutput := base
 	withOutput.SpanID = "span-with-output"
 	withOutput.Output = json.RawMessage(`{"data":"my-output"}`)
+	withOutput.ParentSpanID = "span-without-output"
 	ch <- withoutOutput
 	ch <- withOutput
 
@@ -147,6 +148,22 @@ func TestBatcherHandlesOptionalSpanColumnsInABatch(t *testing.T) {
 		"SELECT output FROM inngest.run_trace_spans WHERE span_id = 'span-without-output';",
 	).Scan(&output))
 	require.Nil(t, output, "span-without-output row never had output")
+
+	// A root span's parent_span_id is NULL, not "".
+	parents := map[string]sql.NullString{}
+	rows, err := db.QueryContext(context.Background(), "SELECT span_id, parent_span_id FROM inngest.run_trace_spans;")
+	require.NoError(t, err)
+	for rows.Next() {
+		var id string
+		var parent sql.NullString
+		require.NoError(t, rows.Scan(&id, &parent))
+		parents[id] = parent
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, map[string]sql.NullString{
+		"span-without-output": {},
+		"span-with-output":    {String: "span-without-output", Valid: true},
+	}, parents)
 }
 
 // TestBatcherDrainsChannelOnStopBeforeExiting is a regression test for a
