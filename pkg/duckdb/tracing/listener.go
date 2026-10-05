@@ -146,8 +146,7 @@ func addRunEventAttrs(attrs *meta.SerializableAttrs, md sv2.Metadata, evts []jso
 // which has no triggering event at all) is substituted with an empty slice
 // first — json.Marshal(nil slice) writes the JSON literal null, not [],
 // which downstream VARIANT columns treat as an actual SQL NULL rather than
-// "zero events" (tracing.go's spanExportRow makes the same substitution for
-// span.Links() for identical reasons), and inngest.runs.inputs is NOT NULL.
+// "zero events", and inngest.runs.inputs is NOT NULL.
 func addEventsInputAttr(ctx context.Context, attrs *meta.SerializableAttrs, evts []json.RawMessage) {
 	if evts == nil {
 		evts = []json.RawMessage{}
@@ -312,7 +311,8 @@ func (l *listener) OnFunctionFinished(ctx context.Context, md sv2.Metadata, item
 	//
 	// ScheduledAt is omitted: item.At would be equally wrong for the same
 	// reason, and the run's real scheduled_at isn't otherwise available
-	// here. TODO: thread the run's actual scheduled_at through sv2.Metadata.
+	// here. FIXME: thread the run's actual scheduled_at through sv2.Metadata;
+	// until then materializeRuns falls back to queued_at.
 	runAttrs := meta.NewAttrSet()
 	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &stepStatus)
 	addEventsInputAttr(ctx, runAttrs, evts)
@@ -439,8 +439,7 @@ func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) 
 	// value, and this row always sets it. event.Meta needs no equivalent
 	// substitution: it's a struct (EventMeta), never nil, so it always
 	// marshals to a real JSON object. See addEventsInputAttr's identical
-	// substitution for evts, and spanExportRow's for span.Links(), for the
-	// same reason.
+	// substitution for evts, for the same reason.
 	if event.Data == nil {
 		event.Data = map[string]any{}
 	}
