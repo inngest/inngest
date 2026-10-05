@@ -125,6 +125,54 @@ func TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns(t *testing.T) {
 	require.Equal(t, []any{}, row["event_ids"], "a cron-triggered run has no event_ids: [], not NULL")
 }
 
+// TestListenerStampsScheduledAtFromRunState checks a run row's scheduled_at
+// is the run state's, on the queued row and the final one, and falls back to
+// queued_at for state written before scheduled_at was recorded.
+func TestListenerStampsScheduledAtFromRunState(t *testing.T) {
+	tests := []struct {
+		name      string
+		scheduled func(queuedAt time.Time) time.Time
+		fire      func(l execution.SyncLifecycleListener, md sv2.Metadata)
+		status    enums.StepStatus
+	}{
+		{"queued row, recorded", func(q time.Time) time.Time { return q.Add(time.Hour) },
+			func(l execution.SyncLifecycleListener, md sv2.Metadata) {
+				l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+			}, enums.StepStatusQueued},
+		{"queued row, state predates it", func(time.Time) time.Time { return time.Time{} },
+			func(l execution.SyncLifecycleListener, md sv2.Metadata) {
+				l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+			}, enums.StepStatusQueued},
+		{"final row, recorded", func(q time.Time) time.Time { return q.Add(time.Hour) },
+			func(l execution.SyncLifecycleListener, md sv2.Metadata) {
+				l.OnFunctionCancelled(context.Background(), md, execution.CancelRequest{}, nil, time.Now())
+			}, enums.StepStatusCancelled},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, cleanup := newTestDuckDB(t)
+			defer cleanup()
+			l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+			md := testMetadata(t)
+			queuedAt := ulid.Time(md.ID.RunID.Time())
+			md.Config.ScheduledAt = tt.scheduled(queuedAt)
+			want := md.Config.ScheduledAt
+			if want.IsZero() {
+				want = queuedAt
+			}
+
+			tt.fire(l, md)
+			runRow(t, db, md.ID.RunID.String(), tt.status)
+			rows := selectRows(t, db, "SELECT scheduled_at FROM inngest.runs WHERE run_id = ? AND status = ?;",
+				md.ID.RunID.String(), tt.status.String())
+			require.Len(t, rows, 1)
+			got, ok := rows[0]["scheduled_at"].(time.Time)
+			require.True(t, ok, "scheduled_at is %T", rows[0]["scheduled_at"])
+			require.Equal(t, want.UnixMilli(), got.UnixMilli())
+		})
+	}
+}
+
 // TestListenerOnFunctionScheduledSetsSessionsFromTriggeringEvents proves the
 // run.queued span's event.sessions attribute (and so inngest.runs'
 // "sessions" column) is sourced from each triggering event's own
