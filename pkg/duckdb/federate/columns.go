@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -29,7 +30,7 @@ type EncodedReader interface {
 }
 
 // encodedDeltaStream is deltaStream for an EncodedReader.
-func encodedDeltaStream(t Table, r EncodedReader, rowCap int) (driver.QuackStream, string, error) {
+func encodedDeltaStream(t Table, r EncodedReader, rowCap int, kind deltaKind) (driver.QuackStream, string, error) {
 	cols := r.Schema()
 	if len(cols) == 0 {
 		return driver.QuackStream{}, "", fmt.Errorf("federate: delta for %s has no columns", t)
@@ -39,15 +40,17 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int) (driver.QuackStrea
 		return driver.QuackStream{}, "", err
 	}
 	def := fmt.Sprintf("%s AS MATERIALIZED (%s)", quoteIdent(deltaCTEName(t)), scan)
-	var total int
+	count := &deltaCount{table: t, kind: kind, rowCap: rowCap}
 	next := func(ctx context.Context) ([]byte, uint64, error) {
 		blob, chunks, rows, err := r.NextEncoded(ctx)
+		if errors.Is(err, io.EOF) {
+			count.done(ctx)
+		}
 		if err != nil {
 			return nil, 0, err // io.EOF ends the stream
 		}
-		total += rows
-		if rowCap > 0 && total > rowCap {
-			return nil, 0, fmt.Errorf("%w: %s delta has more than %d rows", ErrRowCapExceeded, t, rowCap)
+		if err := count.add(ctx, rows); err != nil {
+			return nil, 0, fmt.Errorf("%w: %s delta has more than %d rows", err, t, rowCap)
 		}
 		return blob, chunks, nil
 	}

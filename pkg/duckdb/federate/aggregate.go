@@ -113,6 +113,7 @@ func (e *Executor) Aggregate(ctx context.Context, q AggregateQuery) (*Rows, erro
 		if !errors.Is(err, ErrNotExact) {
 			return rows, err
 		}
+		recordAggregateFallback(ctx, q.Table)
 	}
 	return e.aggregateRows(ctx, q)
 }
@@ -135,7 +136,7 @@ func (e *Executor) aggregatePushed(ctx context.Context, as AggregateStreamer, q 
 	if err := sameColumns(r.Schema(), aggregateColumns(q)); err != nil {
 		return nil, fmt.Errorf("federate: %s aggregate delta: %w", q.Table, err)
 	}
-	stream, deltaDef, err := encodedDeltaStream(q.Table, r, q.RowCap)
+	stream, deltaDef, err := encodedDeltaStream(q.Table, r, q.RowCap, deltaPartials)
 	if err != nil {
 		return nil, err
 	}
