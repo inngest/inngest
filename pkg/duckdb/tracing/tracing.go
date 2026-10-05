@@ -262,20 +262,6 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (row map[str
 		l.Error("dualwrite: failed to marshal span attributes", "span_id", spanID, "trace_id", traceID, "error", err)
 		return nil, false
 	}
-	// span.Links() returns nil, not an empty slice, when a span has no
-	// links (the common case — nothing in this package sets any yet) —
-	// json.Marshal(nil slice) writes the JSON literal null, not [], so
-	// substitute an empty slice first to keep the column's shape consistent
-	// (always a JSON array) regardless of link count.
-	links := span.Links()
-	if links == nil {
-		links = []sdktrace.Link{}
-	}
-	linksByt, err := json.Marshal(links)
-	if err != nil {
-		l.Error("dualwrite: failed to marshal span links", "span_id", spanID, "trace_id", traceID, "error", err)
-		return nil, false
-	}
 
 	row = map[string]any{
 		"span_id":        spanID,
@@ -293,7 +279,6 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (row map[str
 		"function_id":    functionID,
 		"function_slug":  functionSlug,
 		"attributes":     json.RawMessage(attrsByt),
-		"links":          json.RawMessage(linksByt),
 	}
 
 	if outByt := anyToJSONBytes(output); len(outByt) > 0 {
@@ -375,7 +360,10 @@ SELECT
   env_id,
   run_id,
   run_queued_at AS queued_at,
-  make_timestamp_ms(TRY_CAST(attributes."_inngest.scheduled_at" AS BIGINT)) AS scheduled_at,
+  -- FIXME: _inngest.scheduled_at isn't plumbed onto every run span yet
+  -- (see listener.OnFunctionFinished), so fall back to queued_at. Designed
+  -- as if it were: scheduled_at is NOT NULL and fixed at schedule time.
+  COALESCE(make_timestamp_ms(TRY_CAST(attributes."_inngest.scheduled_at" AS BIGINT)), run_queued_at) AS scheduled_at,
   make_timestamp_ms(TRY_CAST(attributes."_inngest.started_at" AS BIGINT)) AS started_at,
   make_timestamp_ms(TRY_CAST(attributes."_inngest.ended_at" AS BIGINT)) AS ended_at,
   app_id,
@@ -386,12 +374,13 @@ SELECT
   attributes,
   input AS inputs,
   output,
-  TRY_CAST(attributes."_inngest.event.ids" AS VARCHAR[]) AS event_ids,
-  TRY_CAST(attributes."_inngest.event.sessions" AS STRUCT(key VARCHAR, id VARCHAR)[]) AS sessions,
+  -- Lists are [] (never NULL) when the attribute is missing, as the
+  -- ClickHouse buffer stores them, so a run reads the same in either tier.
+  COALESCE(TRY_CAST(attributes."_inngest.event.ids" AS VARCHAR[]), []::VARCHAR[]) AS event_ids,
+  COALESCE(TRY_CAST(attributes."_inngest.event.sessions" AS STRUCT(key VARCHAR, id VARCHAR)[]), []::STRUCT(key VARCHAR, id VARCHAR)[]) AS sessions,
   attributes."_inngest.defer.parent_fn_slug" IS NOT NULL AS is_deferred,
   attributes."_inngest.defer.parent_fn_slug"::VARCHAR AS defer_parent_fn_slug,
-  TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]) AS defer_parent_run_ids,
-  current_timestamp,
+  COALESCE(TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]), []::VARCHAR[]) AS defer_parent_run_ids,
   trace_id
 FROM inngest.run_trace_spans
 WHERE span_id IN (%s)

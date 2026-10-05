@@ -135,12 +135,10 @@ func (m *Manager) resolveAppAndFunctionFilters(ctx context.Context, filter cqrs.
 // a run's lifecycle rows, so they must be evaluated together with the
 // row-ranking window function, not a separate WHERE.
 //
-// Tiebreak by COALESCE(ended_at, started_at, queued_at) DESC, not
-// inserted_at: a batch flush writes all of a run's lifecycle rows in one
-// INSERT, and DuckDB evaluates a DEFAULT like current_timestamp once per
-// statement, so every row in that flush gets an identical inserted_at.
-// COALESCE instead picks the furthest lifecycle state each row's own
-// columns encode.
+// Tiebreak by COALESCE(ended_at, started_at, queued_at) DESC: a batch flush
+// writes all of a run's lifecycle rows in one INSERT, so no insert-time
+// column could order them; COALESCE picks the furthest lifecycle state each
+// row's own columns encode.
 func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	where := []string{
 		`ROW_NUMBER() OVER (
@@ -556,7 +554,7 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		AppID:       appID,
 		FunctionID:  functionID,
 		RunID:       runID,
-		TraceID:     traceID.String, // NULL for rows written before migration 000003
+		TraceID:     traceID.String, // NULL when the source span carried no trace ID
 		QueuedAt:    queuedAt,
 		StartedAt:   startedAt,
 		EndedAt:     endedAt,
