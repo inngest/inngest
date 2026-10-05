@@ -121,7 +121,7 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	for i, s := range spans {
 		rows[i] = []any{
 			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
-			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, s.ParentSpanID, s.Name,
+			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
 			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
 		}
 	}
@@ -197,6 +197,15 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 // (invalid) JSON literal.
 func nullableJSON(v json.RawMessage) any {
 	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+// nullableString maps "" to SQL NULL, so a root span's parent_span_id is
+// NULL rather than empty.
+func nullableString(v string) any {
+	if v == "" {
 		return nil
 	}
 	return v
