@@ -17,13 +17,16 @@ export async function oauthRequest<T = unknown>(
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
-  const payload = (await response.json()) as T & {
+  const payload = (await response.json().catch((error: unknown) => {
+    if (response.ok) throw error;
+    return null;
+  })) as T & {
     error?: string;
     error_description?: string;
   };
   if (!response.ok) {
     throw new Error(
-      payload.error_description ?? payload.error ?? 'Request failed.',
+      payload?.error_description ?? payload?.error ?? 'Request failed.',
     );
   }
   return payload;

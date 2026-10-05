@@ -37,13 +37,23 @@ export function OAuthSessions() {
     activeSubmission.current = controller;
     setSaving(true);
     setError(null);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      await oauthRequest(
-        getToken,
-        `/oauth/sessions/${confirmation.id}/revoke`,
-        {},
-        controller.signal,
-      );
+      // Bound token acquisition as well as the network request.
+      await Promise.race([
+        oauthRequest(
+          getToken,
+          `/oauth/sessions/${confirmation.id}/revoke`,
+          {},
+          controller.signal,
+        ),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Request timed out')),
+            30_000,
+          );
+        }),
+      ]);
       if (controller.signal.aborted) return;
       setConfirmation(null);
       toast.success('OAuth session revoked');
@@ -54,8 +64,10 @@ export function OAuthSessions() {
       if (!controller.signal.aborted)
         setError('Could not revoke this session. Please try again.');
     } finally {
+      clearTimeout(timeout);
       activeSubmission.current = null;
       if (!controller.signal.aborted) setSaving(false);
+      controller.abort();
     }
   }
 
@@ -195,7 +207,7 @@ export function OAuthSessions() {
           isOpen
           className="w-full max-w-lg"
           title={`Revoke "${confirmation.name}"?`}
-          description="Applications using this session will lose access immediately. They will need to sign in again. This cannot be undone."
+          description="Applications using this session will lose access. They will need to sign in again. This cannot be undone."
           confirmButtonKind="danger"
           confirmButtonLabel="Revoke"
           cancelButtonLabel="Cancel"

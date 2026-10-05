@@ -70,9 +70,11 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   vi.stubEnv('VITE_API_URL', 'https://api.inngest.test');
   auth.orgId = 'org-1';
+  auth.getToken.mockReset().mockResolvedValue('browser-token');
 });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   document.getElementById('modals')?.remove();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -154,6 +156,59 @@ describe('OAuth sessions', () => {
     );
     expect(await screen.findByText('Revoked')).toBeTruthy();
   });
+
+  it.each(['token', 'fetch'])(
+    'allows retry after stalled %s acquisition',
+    async (stage) => {
+      fetchMock.mockResolvedValueOnce(page());
+      setup();
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Work laptop' }),
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Revoke session' }),
+      );
+      const dialog = await screen.findByRole('alertdialog');
+      let finishToken: (token: string) => void = () => {};
+      if (stage === 'token') {
+        auth.getToken.mockImplementationOnce(
+          () =>
+            new Promise<string>((resolve) => {
+              finishToken = resolve;
+            }),
+        );
+      } else {
+        fetchMock.mockImplementationOnce(() => new Promise(() => {}));
+      }
+      vi.useFakeTimers();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Revoke' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(
+        screen.getByText('Could not revoke this session. Please try again.'),
+      ).toBeTruthy();
+      expect(
+        within(dialog)
+          .getByRole('button', { name: 'Cancel' })
+          .hasAttribute('disabled'),
+      ).toBe(false);
+      if (stage === 'fetch') {
+        expect(fetchMock.mock.calls[1]?.[1].signal.aborted).toBe(true);
+      } else {
+        await act(async () => finishToken('late-token'));
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      }
+      vi.useRealTimers();
+      fetchMock
+        .mockResolvedValueOnce(response({ status: 'revoked' }))
+        .mockResolvedValue(
+          page([{ ...session, revoked_at: '2026-10-05T00:00:00Z' }]),
+        );
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Revoke' }));
+      expect(await screen.findByText('Revoked')).toBeTruthy();
+    },
+  );
 
   it('retries failed loads and shows an empty state', async () => {
     fetchMock
