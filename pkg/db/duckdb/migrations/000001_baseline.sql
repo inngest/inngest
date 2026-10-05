@@ -4,7 +4,9 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
 	env_id UUID NOT NULL,
 	run_id VARCHAR NOT NULL,
   queued_at TIMESTAMP_MS NOT NULL,
-  scheduled_at TIMESTAMP_MS NULL,
+  -- FIXME: not every span plumbs _inngest.scheduled_at yet, so
+  -- materializeRuns falls back to queued_at; designed as set at schedule time.
+  scheduled_at TIMESTAMP_MS NOT NULL,
   started_at TIMESTAMP_MS NULL,
   ended_at TIMESTAMP_MS NULL,
   app_id UUID NOT NULL,
@@ -34,11 +36,17 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   is_deferred BOOLEAN NOT NULL DEFAULT FALSE,
   defer_parent_fn_slug VARCHAR,
   defer_parent_run_ids VARCHAR[],
-  inserted_at TIMESTAMP_MS NOT NULL DEFAULT current_timestamp
+  -- The run's OTel trace ID, copied from the span row materializeRuns builds
+  -- each runs row from, so run listings can report it without joining
+  -- run_trace_spans.
+  trace_id VARCHAR
 );
 -- +goose ENVSUB ON
+-- Partitioned by time only: a partition per account would mean a file per active
+-- account per export. account_id leads the sort order instead, so row-group
+-- statistics still prune by tenant.
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET SORTED BY (year(queued_at), month(queued_at), account_id, env_id, run_id, queued_at)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET PARTITIONED BY (year(queued_at), month(queued_at), account_id)};
+${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET PARTITIONED BY (year(queued_at), month(queued_at))};
 -- +goose ENVSUB OFF
 
 -- inngest.run_metadata holds one row per metadata emission (executor
@@ -84,7 +92,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET PARTITIONED BY (year(run_queued_at), month(run_queued_at), account_id)};
+${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET PARTITIONED BY (year(run_queued_at), month(run_queued_at))};
 -- +goose ENVSUB OFF
 
 
@@ -110,13 +118,12 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   span_id VARCHAR NOT NULL,
   parent_span_id VARCHAR,
   attributes VARIANT NOT NULL,
-  links VARIANT,
   output VARIANT,
-  input VARIANT,
+  input VARIANT
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, start_time, end_time)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (year(run_queued_at), month(run_queued_at), account_id)};
+${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (year(run_queued_at), month(run_queued_at))};
 -- +goose ENVSUB OFF
 
 -- CREATE TRIGGER inngest_runs_mv AFTER INSERT ON inngest.run_trace_spans is
@@ -137,7 +144,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (y
 --     env_id,
 --     run_id,
 --     run_queued_at AS queued_at,
---     make_timestamp_ms(TRY_CAST(attributes->>'_inngest.scheduled_at' AS BIGINT)) AS scheduled_at,
+--     COALESCE(make_timestamp_ms(TRY_CAST(attributes->>'_inngest.scheduled_at' AS BIGINT)), run_queued_at) AS scheduled_at,
 --     make_timestamp_ms(TRY_CAST(attributes->>'_inngest.started_at' AS BIGINT)) AS started_at,
 --     make_timestamp_ms(TRY_CAST(attributes->>'_inngest.ended_at' AS BIGINT)) AS ended_at,
 --     app_id,
@@ -171,11 +178,11 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   event_data VARIANT NOT NULL DEFAULT '{}',
   event_v VARCHAR NOT NULL,
   event_ts TIMESTAMP_MS NOT NULL,
-  event_meta VARIANT NOT NULL DEFAULT '{}',
+  event_meta VARIANT NOT NULL DEFAULT '{}'
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET SORTED BY (year(received_at), month(received_at), account_id, env_id, internal_id, received_at)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(received_at), month(received_at), account_id)};
+${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(received_at), month(received_at))};
 -- +goose ENVSUB OFF
 
 -- +goose Down

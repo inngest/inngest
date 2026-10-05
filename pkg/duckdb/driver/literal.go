@@ -62,7 +62,7 @@ func encodeLiteral(v driver.Value) (string, error) {
 		// Cast through ::JSON rather than encoded as an ordinary VARCHAR
 		// literal (the plain string case above): this matters for any
 		// VARIANT-typed column (migrations/000001_baseline.sql: attributes,
-		// inputs, output, values, links, input, event_data, event_meta).
+		// inputs, output, values, input, event_data, event_meta).
 		// DuckDB's implicit VARCHAR->VARIANT assignment cast does NOT parse
 		// a plain string's content — it wraps the whole string as a single
 		// VARCHAR-typed variant leaf instead of the structured value

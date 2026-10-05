@@ -118,7 +118,7 @@ func TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns(t *testing.T) {
 	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
 
 	row := runRow(t, db, md.ID.RunID.String(), enums.StepStatusQueued)
-	require.Nil(t, row["event_ids"], "a cron-triggered run must not set event_ids")
+	require.Equal(t, []any{}, row["event_ids"], "a cron-triggered run has no event_ids: [], not NULL")
 }
 
 // TestListenerOnFunctionScheduledSetsSessionsFromTriggeringEvents proves the
@@ -170,7 +170,7 @@ func TestListenerOnFunctionScheduledOmitsSessionsWhenNoTriggeringEventHasOne(t *
 	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, []json.RawMessage{evt})
 
 	row := runRow(t, db, md.ID.RunID.String(), enums.StepStatusQueued)
-	require.Nil(t, row["sessions"], "a run with no session-tagged triggering event must not set sessions")
+	require.Equal(t, []any{}, row["sessions"], "a run with no session-tagged triggering event has no sessions: [], not NULL")
 }
 
 // TestNewListenerEndToEndEventFlow proves a row makes it from a hook call,
@@ -425,35 +425,6 @@ func TestListenerOmitsGroupIDOnSpansWithoutQueueItem(t *testing.T) {
 	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
 	_, hasGroupID := attrs[meta.Attrs.GroupID.Key()]
 	require.False(t, hasGroupID, "a span with no queue.Item must not set GroupID")
-}
-
-// TestListenerEmitsEmptyArrayNotNullForSpansWithNoLinks proves
-// spanExportRow substitutes an empty slice for a nil span.Links() before
-// marshaling, so the links column is always a JSON array ([]) rather than
-// sometimes JSON null — no hook in this package ever sets span links today,
-// so every span exercises this path.
-func TestListenerEmitsEmptyArrayNotNullForSpansWithNoLinks(t *testing.T) {
-	db, cleanup := newTestDuckDB(t)
-	defer cleanup()
-
-	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
-
-	md := testMetadata(t)
-	stepName := "my-step"
-	l.OnStepScheduled(context.Background(), md, queue.Item{}, &stepName, time.Now())
-
-	require.Eventually(t, func() bool {
-		var count int
-		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
-		_ = row.Scan(&count)
-		return count == 1
-	}, 2*time.Second, 20*time.Millisecond, "span row should land in inngest.run_trace_spans after a batch flush")
-
-	rows := selectRows(t, db, "SELECT links FROM inngest.run_trace_spans;")
-	require.Len(t, rows, 1)
-	links, ok := rows[0]["links"].([]any)
-	require.True(t, ok, "links column should decode to a slice, got %T", rows[0]["links"])
-	require.Empty(t, links)
 }
 
 // singleSpanAttrs drives a hook expected to emit exactly one span through a
