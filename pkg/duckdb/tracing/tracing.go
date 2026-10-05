@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -105,92 +103,40 @@ func addRunSpanAttrs(attrs *meta.SerializableAttrs, md *sv2.Metadata) {
 	}
 }
 
-// SpanExporter is a standalone, DuckDB-specific sdktrace.SpanExporter
-// backing the listener's private TracerProvider (see newListenerTracerProvider)
-// with the same channel+batcher machinery as listener's runs/events. Every
-// span the listener's hooks create — via l.tp.CreateSpan, never by hand —
-// arrives here as a real OTel ReadOnlySpan, converted into an
-// inngest.run_trace_spans row the same way pkg/tracing/tracer_sqlc.go's
-// dbExporter converts one for pkg/db/sqlite's `spans` table (see
-// spanExportRow), so the same span, by the same span_id/trace_id, lands
-// equivalently in both stores. It's a deliberately separate exporter
-// (rather than folding into dbExporter, or wiring into the process's real
-// TracerProvider) because which spans and which attributes land in DuckDB
-// is expected to diverge from sqlite over time.
+// SpanExporter is a standalone sdktrace.SpanExporter backing the listener's
+// private TracerProvider (see newListenerTracerProvider). Every span the
+// listener's hooks create — via l.tp.CreateSpan, never by hand — arrives here
+// as a real OTel ReadOnlySpan, is converted into a Span the same way
+// pkg/tracing/tracer_sqlc.go's dbExporter converts one for pkg/db/sqlite's
+// `spans` table (see spanExportRow), so the same span, by the same
+// span_id/trace_id, lands equivalently in both stores, and is handed to the
+// listener's Sink. It's a deliberately separate exporter (rather than folding
+// into dbExporter, or wiring into the process's real TracerProvider) because
+// which spans and which attributes this package emits is expected to diverge
+// from sqlite over time.
 type SpanExporter struct {
-	spans   chan map[string]any
-	dropped atomic.Int64
-	b       *batcher
-	wg      sync.WaitGroup
-}
-
-func newSpanExporter(db *sql.DB, spansCap int, opts batcherOpts) *SpanExporter {
-	opts.afterInsert = materializeRuns
-	ch := make(chan map[string]any, spansCap)
-	se := &SpanExporter{
-		spans: ch,
-		b:     newBatcher(db, "inngest.run_trace_spans", ch, opts),
-	}
-	se.wg.Add(1)
-	go func() {
-		defer se.wg.Done()
-		se.b.run(context.Background())
-	}()
-	return se
+	sink Sink
 }
 
 // ExportSpans implements sdktrace.SpanExporter. The listener's private
 // TracerProvider uses a SimpleSpanProcessor (see NewOtelTracerProvider), so
 // this runs synchronously on the calling hook's own goroutine — but it does
-// no I/O of its own: converting a span to a row and non-blocking
-// channel-sending it (send) is exactly as cheap as every other hook body in
-// this package. batcher.go's own background goroutine is what actually
-// talks to the duckdb subprocess.
+// no I/O of its own: converting a span and calling the Sink (which must not
+// block) is exactly as cheap as every other hook body in this package.
 func (se *SpanExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
 	for _, span := range spans {
-		row, ok := spanExportRow(ctx, span)
+		s, ok := spanExportRow(ctx, span)
 		if !ok {
 			continue
 		}
-		se.send(row)
+		se.sink.SendSpan(ctx, s)
 	}
 	return nil
 }
 
-// send is nil-receiver-safe: a *listener built via newListenerWithChannels
-// directly (see listener_test.go) rather than NewListener has no
-// spanExporter/tracer provider at all, and this package's hooks must never
-// crash the executor's critical path over that.
-func (se *SpanExporter) send(row map[string]any) {
-	if se == nil {
-		return
-	}
-	select {
-	case se.spans <- row:
-	default:
-		se.dropped.Add(1)
-	}
-}
-
-// Shutdown implements sdktrace.SpanExporter. It stops the batcher and waits
-// (bounded by ctx) for it to drain and flush, but never closes db —
-// listener.Close owns that, since this exporter shares its db connection
-// with the listener's runs/events batchers.
-func (se *SpanExporter) Shutdown(ctx context.Context) error {
-	se.b.stop()
-
-	done := make(chan struct{})
-	go func() {
-		se.wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-ctx.Done():
-	}
-	return nil
-}
+// Shutdown implements sdktrace.SpanExporter. It's a no-op: the Sink is shared
+// with the listener's other hooks, and listener.Close owns closing it.
+func (se *SpanExporter) Shutdown(context.Context) error { return nil }
 
 // spanExportRow converts one real OTel span into an inngest.run_trace_spans
 // row, mirroring pkg/tracing/tracer_sqlc.go's dbExporter.ExportSpans
@@ -201,7 +147,7 @@ func (se *SpanExporter) Shutdown(ctx context.Context) error {
 // ID, or a marshaling failure) — attributes is NOT NULL, so a row silently
 // missing whatever it was trying to say is worse than not emitting it at
 // all.
-func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (row map[string]any, ok bool) {
+func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (s Span, ok bool) {
 	traceID := span.SpanContext().TraceID().String()
 	spanID := span.SpanContext().SpanID().String()
 	parentID := span.Parent().SpanID().String()
@@ -249,46 +195,40 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (row map[str
 
 	if runID == "" {
 		l.Error("dualwrite: span export missing run ID", "span_id", spanID, "trace_id", traceID, "name", span.Name())
-		return nil, false
+		return Span{}, false
 	}
 	rid, err := ulid.Parse(runID)
 	if err != nil {
 		l.Error("dualwrite: span export run ID is not a valid ULID", "run_id", runID, "error", err)
-		return nil, false
+		return Span{}, false
 	}
 
 	attrsByt, err := json.Marshal(attrs)
 	if err != nil {
 		l.Error("dualwrite: failed to marshal span attributes", "span_id", spanID, "trace_id", traceID, "error", err)
-		return nil, false
+		return Span{}, false
+	}
+	s = Span{
+		SpanID:       spanID,
+		TraceID:      traceID,
+		ParentSpanID: parentID,
+		Name:         span.Name(),
+		StartTime:    span.StartTime().Round(0), // strip monotonic clock reading, as dbExporter does
+		EndTime:      span.EndTime().Round(0),
+		RunID:        runID,
+		RunQueuedAt:  rid.Timestamp(),
+		AccountID:    accountID,
+		EnvID:        envID,
+		AppID:        appID,
+		AppName:      appName,
+		FunctionID:   functionID,
+		FunctionSlug: functionSlug,
+		Attributes:   json.RawMessage(attrsByt),
+		Output:       anyToJSONBytes(output),
+		Input:        anyToJSONBytes(input),
 	}
 
-	row = map[string]any{
-		"span_id":        spanID,
-		"trace_id":       traceID,
-		"parent_span_id": parentID,
-		"name":           span.Name(),
-		"start_time":     span.StartTime().Round(0), // strip monotonic clock reading, as dbExporter does
-		"end_time":       span.EndTime().Round(0),
-		"run_id":         runID,
-		"run_queued_at":  rid.Timestamp(),
-		"account_id":     accountID,
-		"env_id":         envID,
-		"app_id":         appID,
-		"app_name":       appName,
-		"function_id":    functionID,
-		"function_slug":  functionSlug,
-		"attributes":     json.RawMessage(attrsByt),
-	}
-
-	if outByt := anyToJSONBytes(output); len(outByt) > 0 {
-		row["output"] = json.RawMessage(outByt)
-	}
-	if inByt := anyToJSONBytes(input); len(inByt) > 0 {
-		row["input"] = json.RawMessage(inByt)
-	}
-
-	return row, true
+	return s, true
 }
 
 // anyToJSONBytes converts a value to []byte for storage in a JSON column,
@@ -329,21 +269,20 @@ func safeMetadata(md sv2.Metadata) *sv2.Metadata {
 	return &md
 }
 
-// materializeRuns is the SpanExporter's batcherOpts.afterInsert: once per
-// span batch, after that batch's own rows land in inngest.run_trace_spans, it
+// materializeRuns is DuckDBInserter.InsertSpans' follow-up: once per span
+// batch, after that batch's own rows land in inngest.run_trace_spans, it
 // promotes whichever of those rows name a run-level span (
 // runsMaterializingSpanNames) into a corresponding row in inngest.runs.
 // Scoping the follow-up SELECT to exactly this batch's span_ids (rather than
 // e.g. every row for the run) keeps a concurrent flush, or a row a prior
 // flush already materialized, from ever being touched twice.
-func materializeRuns(ctx context.Context, db *sql.DB, rows []map[string]any) error {
+func materializeRuns(ctx context.Context, db *sql.DB, spans []Span) error {
 	var spanIDs []any
-	for _, row := range rows {
-		name, _ := row["name"].(string)
-		if !slices.Contains(runsMaterializingSpanNames, name) {
+	for _, s := range spans {
+		if !slices.Contains(runsMaterializingSpanNames, s.Name) {
 			continue
 		}
-		spanIDs = append(spanIDs, row["span_id"])
+		spanIDs = append(spanIDs, s.SpanID)
 	}
 	if len(spanIDs) == 0 {
 		return nil
