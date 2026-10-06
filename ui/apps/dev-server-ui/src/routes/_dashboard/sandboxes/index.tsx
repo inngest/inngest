@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { createFileRoute } from '@tanstack/react-router';
@@ -15,6 +16,8 @@ type CloudStatus = {
   environmentId?: string;
   sandboxIds: string[];
   warning?: string;
+  // Set once Cloud rejects a sandbox request because the plan lacks access.
+  upgradeUrl?: string;
 };
 type Sandbox = { id: string; name: string; status: string };
 type Envelope<T> = { data: T; errors?: { code: string; message: string }[] };
@@ -128,6 +131,25 @@ function SandboxesPage() {
         runs remain local. Sandboxes are real Cloud resources and persist when
         this server stops.
       </div>
+
+      {status?.upgradeUrl && (
+        <Alert
+          severity="info"
+          button={
+            <Button
+              kind="primary"
+              label="Upgrade plan"
+              href={status.upgradeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            />
+          }
+        >
+          <strong>Cloud sandboxes require a paid plan.</strong> Sandbox requests
+          from this project are being rejected. Upgrade your plan to start using
+          sandboxes.
+        </Alert>
+      )}
 
       {!status ? (
         <Card>
