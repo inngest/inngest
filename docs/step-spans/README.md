@@ -148,16 +148,19 @@ user called, like `commands.run`), and the optional flat fields `sandbox_id`,
   not grouped.
 
 ## Screenshots
+## Screenshots
 
-From the hand-built fixture
-(`ui/packages/components/src/RunDetailsV4/utils/stepSpans.fixture.ts`):
+Rendered in dark mode from the hand-built fixture
+(`ui/packages/components/src/RunDetailsV4/utils/stepSpans.fixture.ts`). Rows
+that CI or the SDK added on the user's behalf are dimmed; the user's own
+commands (`$ …`) and the failed `Attempt 1` are not.
 
-- Collapsed: ![](lean-collapsed.png)
-- Both jobs and the retried `test` group expanded: ![](lean-expanded.png)
-
-Origins, in dark mode (CI's own rows and the snapshot's are dimmed; the failed
-`Attempt 1` is not):
-
-- Collapsed: ![](origin-collapsed.png)
-- Expanded: ![](origin-expanded.png)
-- An internal step selected, "Added by @inngest/ci@0.1.0": ![](origin-selected.png)
+- Collapsed, one row per job with the `GitHub` check updates dimmed:
+  ![](step-spans-collapsed.png)
+- Both jobs open: dimmed CI work, bright `$` commands, the retried `test`
+  group with its red `Attempt 1`, and the `api` group on its own sandbox
+  (`S3`): ![](step-spans-expanded.png)
+- A CI step selected, with "Added by @inngest/ci@0.1.0" in the step panel:
+  ![](step-spans-selected.png)
+- An agent nest with `[AGENT]` and `[TOOL]` tags, steps inside the tool, and
+  retries rolled up: ![](step-spans-agent.png)
