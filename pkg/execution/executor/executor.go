@@ -4939,6 +4939,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 
 	_ = span.Send()
 
+	// A sleep runs no SDK handler, so a sleep that waits on behalf of a
+	// sandbox statement (like the pause between a CI command's polls) is
+	// described here from its opts.
+	e.emitSandboxSleepMetadataFromOpts(ctx, runCtx, &gen)
+
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, until)
 	}
@@ -6346,6 +6351,42 @@ func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx ex
 		gen,
 	); err != nil {
 		e.log.Warn("error creating experiment metadata span", "error", err)
+	}
+}
+
+// emitSandboxSleepMetadataFromOpts writes a step-scoped inngest.sandbox
+// metadata span for a sleep whose opts name the sandbox statement it serves
+// (set by the SDK inside a sandbox statement scope), so the trace can fold
+// the sleep into that statement's row. The span hangs off the sleep step's
+// own span.
+//
+// Errors are logged and swallowed: failing to describe a sleep must not
+// interrupt it.
+func (e *executor) emitSandboxSleepMetadataFromOpts(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode) {
+	md, err := extractors.ExtractSandboxStatementOptsMetadata(gen.Opts, extractors.SandboxActionSleep)
+	if err != nil {
+		e.log.Warn("error extracting sandbox statement opts metadata", "error", err)
+		return
+	}
+	if md == nil {
+		return
+	}
+
+	attrs := tracing.GeneratorAttrs(gen)
+	attempt := runCtx.AttemptCount()
+	meta.AddAttr(attrs, meta.Attrs.StepAttempt, &attempt)
+	parent := tracing.SleepStepSpanRef(runCtx.Metadata().ID.RunID, gen.ID)
+
+	if _, err := e.createMetadataSpanOnParent(
+		ctx,
+		runCtx,
+		"executor.handleGeneratorSleep.sandbox",
+		md,
+		enums.MetadataScopeStep,
+		parent,
+		attrs,
+	); err != nil {
+		e.log.Warn("error creating sandbox sleep metadata span", "error", err)
 	}
 }
 
