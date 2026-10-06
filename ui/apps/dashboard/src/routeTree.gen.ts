@@ -26,7 +26,6 @@ import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
-import { Route as ApiWaitlistRouteImport } from './routes/api/waitlist'
 import { Route as SupportIndexRouteImport } from './routes/support/index'
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$'
 import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$'
@@ -199,11 +198,6 @@ const ApiSentryRoute = ApiSentryRouteImport.update({
 const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
   id: '/api/support-tickets',
   path: '/api/support-tickets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiWaitlistRoute = ApiWaitlistRouteImport.update({
-  id: '/api/waitlist',
-  path: '/api/waitlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportIndexRoute = SupportIndexRouteImport.update({
@@ -745,7 +739,6 @@ export interface FileRoutesByFullPath {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
-  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/organization-list/$': typeof authOrganizationListSplatRoute
@@ -852,7 +845,6 @@ export interface FileRoutesByTo {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
-  '/api/waitlist': typeof ApiWaitlistRoute
   '/support': typeof SupportIndexRoute
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
@@ -950,7 +942,6 @@ export interface FileRoutesById {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
-  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/_authed/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/(auth)/organization-list/$': typeof authOrganizationListSplatRoute
@@ -1060,7 +1051,6 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
-    | '/api/waitlist'
     | '/support/'
     | '/env/$envSlug'
     | '/organization-list/$'
@@ -1167,7 +1157,6 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
-    | '/api/waitlist'
     | '/support'
     | '/organization-list/$'
     | '/sign-in/$'
@@ -1264,7 +1253,6 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
-    | '/api/waitlist'
     | '/support/'
     | '/_authed/env/$envSlug'
     | '/(auth)/organization-list/$'
@@ -1371,7 +1359,6 @@ export interface RootRouteChildren {
   ApiInngestRoute: typeof ApiInngestRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
-  ApiWaitlistRoute: typeof ApiWaitlistRoute
   SupportIndexRoute: typeof SupportIndexRoute
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute
   authSignInSplatRoute: typeof authSignInSplatRoute
@@ -1499,13 +1486,6 @@ declare module '@tanstack/react-router' {
       path: '/api/support-tickets'
       fullPath: '/api/support-tickets'
       preLoaderRoute: typeof ApiSupportTicketsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/waitlist': {
-      id: '/api/waitlist'
-      path: '/api/waitlist'
-      fullPath: '/api/waitlist'
-      preLoaderRoute: typeof ApiWaitlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support/': {
@@ -2562,7 +2542,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInngestRoute: ApiInngestRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
-  ApiWaitlistRoute: ApiWaitlistRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
