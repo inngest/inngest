@@ -322,8 +322,6 @@ function traceToBarData(
  * run's direct children.
  */
 type RollupGroups = {
-  /** span groups, passed through with their own children rolled up */
-  spanGroups: Trace[];
   /** stepIDs in first-seen order, so rollups keep the original span order */
   stepOrder: string[];
   /** attempt spans per stepID, keyed by attempt number */
@@ -359,7 +357,6 @@ type RollupGroups = {
  * of that step) because the server emits it after that step.
  */
 function collectRollupGroups(children: Trace[]): RollupGroups {
-  const spanGroups: Trace[] = [];
   const stepOrder: string[] = [];
   const steps = new Map<string, Map<number, Trace>>();
   const ungroupedFinalizations: Trace[] = [];
@@ -369,10 +366,6 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
   let finalSpan: Trace | null = null;
 
   for (const child of children) {
-    if (isSpanGroup(child)) {
-      spanGroups.push(child);
-      continue;
-    }
     if (child.outputID && !child.stepID) {
       if (child.groupID) {
         finalSpan = child;
@@ -419,7 +412,7 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
     ? groupedSpans.get(finalSpan.groupID) ?? null
     : null;
 
-  return { spanGroups, stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
+  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
 }
 
 /** First (lowest attempt number) and last (highest) attempt spans of a group */
@@ -567,14 +560,12 @@ export function traceRollup(root: Trace): Trace {
  * steps retry as separate spans just like the run's do.
  */
 function rollupChildren(children: Trace[]): Trace[] {
-  const { spanGroups, stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
-    collectRollupGroups(children);
+  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
+    collectRollupGroups(children.filter((child) => !isSpanGroup(child)));
 
-  const rolledUpRunChildren: Trace[] = [];
-
-  for (const group of spanGroups) {
+  const rolledUpRunChildren = children.filter(isSpanGroup);
+  for (const group of rolledUpRunChildren) {
     group.childrenSpans = rollupChildren(group.childrenSpans ?? []);
-    rolledUpRunChildren.push(group);
   }
 
   for (const stepID of stepOrder) {
