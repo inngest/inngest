@@ -36,7 +36,6 @@ describe('sandboxBarData', () => {
       sandboxId: MACHINE_A.sandbox_id,
       machineLabel: 'ci-01JB7Q2XKZ-base',
       command: 'pnpm install --frozen-lockfile',
-      exitCode: 0,
     });
   });
 
@@ -45,13 +44,11 @@ describe('sandboxBarData', () => {
     expect(sandboxBarData(child('Research network'))).toBeUndefined();
   });
 
-  it("gives a group its shared machine and its last step's exit code", () => {
+  it('gives a group its shared machine', () => {
     expect(sandboxBarData(child('test'))).toEqual({
       sandboxId: MACHINE_A.sandbox_id,
       machineLabel: 'ci-01JB7Q2XKZ-base',
-      exitCode: 0,
     });
-    expect(sandboxBarData(child('dev server'))?.exitCode).toBe(143);
   });
 
   it("doesn't let steps that name no machine hide a group's machine", () => {
@@ -63,11 +60,7 @@ describe('sandboxBarData', () => {
       ...child('lint'),
       childrenSpans: [...child('machine').childrenSpans!, ...child('e2e').childrenSpans!],
     };
-    expect(sandboxBarData(mixed)).toEqual({
-      sandboxId: undefined,
-      machineLabel: undefined,
-      exitCode: 0,
-    });
+    expect(sandboxBarData(mixed)).toBeUndefined();
   });
 });
 
@@ -95,13 +88,6 @@ describe('machine highlight', () => {
 
     // machine, lint, dev server, test, snapshot, e2e
     expect(screen.getAllByTestId('machine-chip')).toHaveLength(6);
-    expect(screen.getAllByTestId('exit-badge').map((b) => b.textContent)).toEqual([
-      'exit 0',
-      'exit 0',
-      'exit 143',
-      'exit 0',
-      'exit 0',
-    ]);
   });
 
   it('pins a highlight on every row of a machine until Escape', () => {

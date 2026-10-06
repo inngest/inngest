@@ -70,9 +70,9 @@ that step's `stepID`. Group span IDs are virtual and never sent.
 **Sandbox chips** (`RunDetailsV4/SandboxAnnotation.tsx`, kept separate so they
 are easy to drop). Steps with `inngest.sandbox` metadata show the command, a
 machine chip (coloured by first appearance in the run, middle-truncated with
-the full name in its tooltip) and an exit badge. A group shows the chip when
-its sandbox steps share one `sandbox_id` (steps that name no machine don't
-count), and the exit code of its last step that has one. Clicking a chip pins a
+the full name in its tooltip). Row status already shows success or failure, so
+there's no exit badge. A group shows the chip when its sandbox steps share one
+`sandbox_id` (steps that name no machine don't count). Clicking a chip pins a
 dotted highlight on every row of that machine, hovering previews it, and Escape
 clears it.
 

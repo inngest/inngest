@@ -22,12 +22,11 @@ export type SandboxBarData = {
   sandboxId?: string;
   machineLabel?: string;
   command?: string;
-  exitCode?: number;
 };
 
 /**
- * What a row shows about its sandbox work: a step's command, machine and exit
- * code, or a group's shared machine and its last exit code.
+ * What a row shows about its sandbox work: a step's command and machine, or a
+ * group's shared machine.
  */
 export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
   if (!isSpanGroup(trace)) {
@@ -38,7 +37,6 @@ export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
       sandboxId: md.sandbox_id,
       machineLabel: md.sandbox_name ?? md.sandbox_id,
       command: md.command_display ?? md.command?.join(' '),
-      exitCode: md.exit_code,
     };
   }
 
@@ -60,10 +58,9 @@ export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
   const shared = steps.every((s) => !s.sandboxId || s.sandboxId === machine?.sandboxId)
     ? machine
     : undefined;
-  const exitCode = steps.filter((s) => s.exitCode !== undefined).pop()?.exitCode;
-  if (!shared && exitCode === undefined) return undefined;
+  if (!shared) return undefined;
 
-  return { sandboxId: shared?.sandboxId, machineLabel: shared?.machineLabel, exitCode };
+  return { sandboxId: shared.sandboxId, machineLabel: shared.machineLabel };
 }
 
 // Theme-aware chart colours, skipping green and red so a machine never reads
@@ -209,7 +206,7 @@ function MachineChip({ sandboxId, label }: { sandboxId: string; label: string })
 
 /** The line under a sandbox row's name */
 export function SandboxAnnotation({
-  sandbox: { sandboxId, machineLabel, command, exitCode },
+  sandbox: { sandboxId, machineLabel, command },
   className,
 }: {
   sandbox: SandboxBarData;
@@ -230,19 +227,6 @@ export function SandboxAnnotation({
       )}
       {command && sandboxId && <span className="shrink-0">on</span>}
       {sandboxId && <MachineChip sandboxId={sandboxId} label={machineLabel ?? sandboxId} />}
-      {exitCode !== undefined && (
-        <span
-          data-testid="exit-badge"
-          className={cn(
-            'shrink-0 rounded px-1 font-mono text-[11px] leading-4',
-            exitCode === 0
-              ? 'bg-primary-3xSubtle text-primary-intense'
-              : 'bg-tertiary-3xSubtle text-tertiary-intense'
-          )}
-        >
-          exit {exitCode}
-        </span>
-      )}
     </span>
   );
 }
