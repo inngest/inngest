@@ -1,10 +1,13 @@
 package helper
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +21,17 @@ import (
 
 // NewValkeyClient initializes a new valkey client (using redis protocol)
 func NewValkeyClient(addr, username, password string, cluster bool) (rueidis.Client, error) {
+	var dialFn func(context.Context, string, *net.Dialer, *tls.Config) (net.Conn, error)
+	if cluster {
+		// The test cluster is a single node that announces its in-container port,
+		// so route every cluster address back to the mapped host address.
+		dialFn = func(ctx context.Context, _ string, d *net.Dialer, _ *tls.Config) (net.Conn, error) {
+			return d.DialContext(ctx, "tcp", addr)
+		}
+	}
+
 	return rueidis.NewClient(rueidis.ClientOption{
+		DialCtxFn:         dialFn,
 		InitAddress:       []string{addr},
 		Username:          username,
 		Password:          password,
@@ -500,6 +513,13 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 						return nil, fmt.Errorf("failed to initialize cluster slots: %w", err)
 					}
 				}
+
+				// Slot assignment is applied asynchronously; commands fail with
+				// CLUSTERDOWN until the node reports a healthy cluster.
+				require.Eventually(t, func() bool {
+					info, err := rc.Do(ctx, rc.B().ClusterInfo().Build()).ToString()
+					return err == nil && strings.Contains(info, "cluster_state:ok")
+				}, 10*time.Second, 100*time.Millisecond, "valkey cluster did not become ready")
 			}
 
 			rc.Close()
