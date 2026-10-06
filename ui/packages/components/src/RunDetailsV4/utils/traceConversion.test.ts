@@ -63,6 +63,13 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.name).toBe('Run');
     });
 
+    it('passes a span’s origin through to its bar', () => {
+      const trace = createTrace({ isRoot: true, origin: '@inngest/ci@0.1.0' });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.origin).toBe('@inngest/ci@0.1.0');
+    });
+
     it('sets isRoot to true on root bar', () => {
       const trace = createTrace({ isRoot: true });
       const result = traceToTimelineData(trace, { runID: 'run-1' });

@@ -30,6 +30,8 @@ export type Trace = {
   stepType?: string | null;
   /** A span group's kind, as its caller named it, like `job` or `agent` */
   groupKind?: string | null;
+  /** The library that created this step or span group, as `<package>@<version>` */
+  origin?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
   debugRunID?: string | null;

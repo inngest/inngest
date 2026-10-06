@@ -54,6 +54,7 @@ import type {
 } from './TimelineBar.types';
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
+import { isInngestOrigin } from './utils/origin';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 // ============================================================================
@@ -859,8 +860,14 @@ export function TimelineBar({
   scores,
   sandbox,
   groupKind,
+  origin,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
+
+  // Rows Inngest's libraries added recede so the user's own stand out; a
+  // failure never does.
+  const dimmed = isInngestOrigin(origin) && status !== 'FAILED';
+
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -948,7 +955,7 @@ export function TimelineBar({
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-                barStyle.textColor ?? 'text-basis',
+                dimmed ? 'text-subtle' : barStyle.textColor ?? 'text-basis',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
@@ -983,7 +990,7 @@ export function TimelineBar({
           <span
             className={cn(
               'shrink-0 text-xs font-medium tabular-nums',
-              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+              dimmed ? 'text-subtle' : barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
             )}
           >
             {formatDuration(duration)}
@@ -1021,7 +1028,10 @@ export function TimelineBar({
           )}
 
           {/* Bar container, centered vertically */}
-          <div className="absolute inset-y-0 flex w-full items-center">
+          <div
+            data-testid="timeline-bar-track"
+            className={cn('absolute inset-y-0 flex w-full items-center', dimmed && 'opacity-50')}
+          >
             {transformed && (
               <>
                 <VisualBar

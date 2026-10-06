@@ -647,6 +647,7 @@ function TimelineBarRenderer({
       scores={bar.scores}
       sandbox={bar.sandbox}
       groupKind={bar.groupKind}
+      origin={bar.origin}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}

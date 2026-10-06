@@ -241,6 +241,9 @@ export interface TimelineBarProps {
 
   /** A span group's kind, shown as a tag before its name */
   groupKind?: string;
+
+  /** The library that created this row; Inngest's own rows are dimmed */
+  origin?: string;
 }
 
 /**
@@ -347,6 +350,9 @@ export interface TimelineBarData {
 
   /** A span group's kind, as its caller named it */
   groupKind?: string;
+
+  /** The library that created this step or span group, as `<package>@<version>` */
+  origin?: string;
 }
 
 /**

@@ -315,6 +315,7 @@ function traceToBarData(
     scores: getScores(trace.metadata),
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
+    origin: trace.origin ?? undefined,
   };
 }
 

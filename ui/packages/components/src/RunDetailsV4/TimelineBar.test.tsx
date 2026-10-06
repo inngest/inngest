@@ -308,3 +308,50 @@ describe('TimelineBar', () => {
     });
   });
 });
+
+describe('TimelineBar origin', () => {
+  const props = {
+    name: 'create sandbox',
+    duration: 1234,
+    startPercent: 10,
+    widthPercent: 25,
+    depth: 0,
+    leftWidth: 40,
+    style: 'step.run' as const,
+  };
+
+  it('dims the name, duration and bar of a row Inngest added', () => {
+    render(<TimelineBar {...props} origin="@inngest/ci@0.1.0" status="COMPLETED" />, {
+      wrapper: Wrapper,
+    });
+
+    expect(screen.getByText('create sandbox').className).toContain('text-subtle');
+    expect(screen.getByText('1.234s').className).toContain('text-subtle');
+    expect(screen.getByTestId('timeline-bar-track').className).toContain('opacity-50');
+  });
+
+  it('keeps a failed row Inngest added at full strength', () => {
+    render(<TimelineBar {...props} origin="@inngest/ci@0.1.0" status="FAILED" />, {
+      wrapper: Wrapper,
+    });
+
+    expect(screen.getByText('create sandbox').className).not.toContain('text-subtle');
+    expect(screen.getByTestId('timeline-bar-track').className).not.toContain('opacity-50');
+  });
+
+  it('keeps rows from other libraries and the user’s own at full strength', () => {
+    render(
+      <>
+        <TimelineBar {...props} name="mine" />
+        <TimelineBar {...props} name="theirs" origin="@acme/ci@1.0.0" />
+      </>,
+      { wrapper: Wrapper }
+    );
+
+    expect(screen.getByText('mine').className).not.toContain('text-subtle');
+    expect(screen.getByText('theirs').className).not.toContain('text-subtle');
+    for (const track of screen.getAllByTestId('timeline-bar-track')) {
+      expect(track.className).not.toContain('opacity-50');
+    }
+  });
+});
