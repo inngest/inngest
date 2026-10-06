@@ -27,10 +27,16 @@ import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
-import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
+import {
+  firstStepID,
+  formatDuration,
+  maybeBooleanToString,
+  type StepInfoType,
+} from './runDetailsUtils';
 import {
   isExperimentMetadata,
   isScoreMetadata,
+  isSpanGroup,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
@@ -210,9 +216,12 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
-  const showRerunFromStep = !isDurableEndpoint && !debug && runID && trace.stepID;
+  const spanGroup = isSpanGroup(trace);
+  const rerunStepID = spanGroup ? firstStepID(trace) : trace.stepID;
+  const showRerunFromStep = !isDurableEndpoint && !debug && runID && rerunStepID;
   const editableInput =
-    trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
+    !spanGroup &&
+    (trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input));
 
   const showAINudge =
     Boolean(result?.data && looksLikeAIOutput(result.data)) &&
@@ -314,14 +323,14 @@ export const StepInfo = ({
               kind="primary"
               appearance="outlined"
               size="medium"
-              label="Rerun from step"
+              label={spanGroup ? 'Rerun from start of span' : 'Rerun from step'}
               onClick={() => setRerunModalOpen(true)}
             />
             <RerunModal
               open={rerunModalOpen}
               setOpen={setRerunModalOpen}
               runID={runID}
-              stepID={trace.stepID!}
+              stepID={rerunStepID!}
               input={prettyInput || result?.input || ''}
               editableInput={editableInput}
             />

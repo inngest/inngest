@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { type Trace } from './types';
+import { isSpanGroup, type Trace } from './types';
 
 export const FINAL_SPAN_DISPLAY = 'Finalization';
 export const FINAL_SPAN_NAME = 'function success';
@@ -57,6 +57,24 @@ export function traceWalk(trace: Trace, fn: (trace: Trace) => void) {
   };
 
   return walkChildren(trace);
+}
+
+/**
+ * The stepID of a span group's earliest-queued step, which is where rerunning
+ * the group starts. A group's own span ID is virtual, so it can't be rerun.
+ */
+export function firstStepID(group: Trace): string | undefined {
+  let first: Trace | undefined;
+  traceWalk(group, (trace) => {
+    if (
+      trace.stepID &&
+      !isSpanGroup(trace) &&
+      (!first || Date.parse(trace.queuedAt) < Date.parse(first.queuedAt))
+    ) {
+      first = trace;
+    }
+  });
+  return first?.stepID ?? undefined;
 }
 
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
