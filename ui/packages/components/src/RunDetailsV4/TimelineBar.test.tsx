@@ -325,8 +325,8 @@ describe('TimelineBar origin', () => {
       wrapper: Wrapper,
     });
 
-    expect(screen.getByText('create sandbox').className).toContain('text-subtle');
-    expect(screen.getByText('1.234s').className).toContain('text-subtle');
+    expect(screen.getByText('create sandbox').className).toContain('text-light');
+    expect(screen.getByText('1.234s').className).toContain('text-light');
     expect(screen.getByTestId('timeline-bar-track').className).toContain('opacity-50');
   });
 
@@ -335,7 +335,7 @@ describe('TimelineBar origin', () => {
       wrapper: Wrapper,
     });
 
-    expect(screen.getByText('create sandbox').className).not.toContain('text-subtle');
+    expect(screen.getByText('create sandbox').className).not.toContain('text-light');
     expect(screen.getByTestId('timeline-bar-track').className).not.toContain('opacity-50');
   });
 
@@ -348,8 +348,8 @@ describe('TimelineBar origin', () => {
       { wrapper: Wrapper }
     );
 
-    expect(screen.getByText('mine').className).not.toContain('text-subtle');
-    expect(screen.getByText('theirs').className).not.toContain('text-subtle');
+    expect(screen.getByText('mine').className).not.toContain('text-light');
+    expect(screen.getByText('theirs').className).not.toContain('text-light');
     for (const track of screen.getAllByTestId('timeline-bar-track')) {
       expect(track.className).not.toContain('opacity-50');
     }

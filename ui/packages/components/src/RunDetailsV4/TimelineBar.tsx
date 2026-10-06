@@ -955,7 +955,7 @@ export function TimelineBar({
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-                dimmed ? 'text-subtle' : barStyle.textColor ?? 'text-basis',
+                dimmed ? 'text-light' : barStyle.textColor ?? 'text-basis',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
@@ -990,7 +990,7 @@ export function TimelineBar({
           <span
             className={cn(
               'shrink-0 text-xs font-medium tabular-nums',
-              dimmed ? 'text-subtle' : barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+              dimmed ? 'text-light' : barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
             )}
           >
             {formatDuration(duration)}
