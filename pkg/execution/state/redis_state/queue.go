@@ -143,13 +143,12 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	now := q.Clock.Now()
 
 	// XXX: If the length of ID >= max, error.
+
+	// WallTimeMS is the time the item was meant to run. An item enqueued after
+	// that time keeps it, so the delay before it reached the queue is reported
+	// as latency rather than hidden.
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
-	}
-
-	if at.Before(now) {
-		// Normalize to now to minimize latency.
-		i.WallTimeMS = now.UnixMilli()
 	}
 
 	// Add the At timestamp, if not included.
