@@ -26,6 +26,7 @@ import {
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
+import { annotateSandboxRows, getSandboxBarData, rollupSandboxStatements } from './sandbox';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -237,25 +238,31 @@ function traceToBarData(
   discoveryStartAtMs?: number | null,
   functionSlug?: string
 ): TimelineBarData {
-  const shouldShowTiming = (isStepRunSpan(trace) || isNonStepSpan(trace)) && !trace.isUserland;
+  // A sandbox statement row spans several steps, so per-step timing doesn't
+  // apply to it; its bar shows the statement's states instead.
+  const isSandboxStatement = !!trace.sandboxMembers;
+  const shouldShowTiming =
+    (isStepRunSpan(trace) || isNonStepSpan(trace)) && !trace.isUserland && !isSandboxStatement;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
   let timingBreakdown = shouldShowTiming
     ? getTimingFromMetadata(trace, trace.metadata) ?? calculateTimingBreakdown(trace)
     : undefined;
 
   // HTTP timing applies to any step that Inngest calls via HTTP, not just step.run
-  const httpTimingBreakdown = !trace.isRoot
-    ? getHTTPTimingFromMetadata(trace.metadata) ?? undefined
-    : undefined;
+  const httpTimingBreakdown =
+    !trace.isRoot && !isSandboxStatement
+      ? getHTTPTimingFromMetadata(trace.metadata) ?? undefined
+      : undefined;
 
   // Each bar uses its own status for coloring. rootStatus is only used as a
   // fallback for bars that don't have a meaningful status of their own.
   const status = trace.status || rootStatus;
 
   // Actual queue delay: time from when the step was queued to when execution started
-  const delayMs = trace.startedAt
-    ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
-    : undefined;
+  const delayMs =
+    trace.startedAt && !isSandboxStatement
+      ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
+      : undefined;
 
   // Per-step Inngest overhead breakdown (discovery + metadata timing)
   const inngestBreakdown = shouldShowTiming
@@ -305,6 +312,7 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
     scores: getScores(trace.metadata),
+    sandbox: getSandboxBarData(trace),
   };
 }
 
@@ -572,9 +580,14 @@ export function traceRollup(root: Trace): Trace {
     rolledUpRunChildren.push(...ungroupedFinalizations);
   }
 
+  // Fold each sandbox statement's steps (a CI command's start, sleeps, polls
+  // and output fetch; a snapshot's readiness wait) into the statement's row.
+  // A no-op for runs without `inngest.sandbox` metadata.
+  const groupedRunChildren = rollupSandboxStatements(rolledUpRunChildren);
+
   const sortingKey = (trace: Trace) =>
     toMaybeDate(trace.queuedAt)?.getTime() ?? toMaybeDate(trace.startedAt)?.getTime() ?? 0;
-  root.childrenSpans = rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
+  root.childrenSpans = groupedRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
 
   return root;
 }
@@ -618,6 +631,8 @@ export function traceToTimelineData(
     runStartedAtMs,
     functionSlug
   );
+
+  annotateSandboxRows(rootBar.children ?? []);
 
   // Give the Run bar a timingBreakdown matching the step-level inngest/execution split.
   // Sum execution time from all step children, and attribute the rest to Inngest overhead.

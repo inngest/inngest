@@ -6,6 +6,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
+import { getSandboxMetadata } from './sandbox';
+import {
+  BUILD_SANDBOX_ID,
+  SNAPSHOT_STATEMENT_ID,
+  TEST_STATEMENT_ID,
+  ciTestSteps,
+  sandboxCIRun,
+  snapshotSteps,
+} from './sandboxTrace.fixture';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -1426,6 +1435,234 @@ describe('traceConversion', () => {
       // this is what the memoized render does across re-renders/polls.
       const second = traceRollup(root);
       expect(childNames(second)).toEqual(childNames(first));
+    });
+  });
+
+  describe('sandbox statements', () => {
+    const rolledUp = () => traceRollup(sandboxCIRun());
+    const childByName = (root: Trace, name: string) =>
+      root.childrenSpans?.find((c) => c.name === name);
+    const barsOf = (root: Trace) =>
+      traceToTimelineData(root, { runID: 'run-1' }).bars[0]?.children ?? [];
+    const barByName = (root: Trace, name: string) => barsOf(root).find((b) => b.name === name);
+    const phaseSummary = (root: Trace, name: string) =>
+      barByName(root, name)?.sandbox?.phases?.map((p) => ({
+        label: p.label,
+        start: p.startTime.toISOString(),
+        end: p.endTime?.toISOString() ?? null,
+      }));
+
+    it('folds a CI command with no statement step, sleeps included, into one row', () => {
+      const root = rolledUp();
+
+      expect(root.childrenSpans?.map((c) => c.name)).toEqual([
+        'build-machine',
+        'get-e2e',
+        'install',
+        'e2e-install',
+        'notify-start',
+        'test',
+        'e2e',
+        'e2e-release',
+        'snapshot-build',
+        'destroy-build',
+      ]);
+
+      const test = childByName(root, 'test')!;
+      expect(test.spanID).toBe(`${TEST_STATEMENT_ID}-statement`);
+      expect(test.queuedAt).toBe('2026-10-01T12:00:38.000Z');
+      expect(test.endedAt).toBe('2026-10-01T12:02:02.200Z');
+      expect(test.status).toBe('COMPLETED');
+      expect(test.sandboxMembers).toHaveLength(8);
+      // Internal steps are states of the row, not sub-rows
+      expect(test.childrenSpans).toEqual([]);
+      // The step panel shows the command's output, with its command and exit code
+      expect(test.outputID).toBe('output-a100000000000000000000000000000000output-0');
+      expect(getSandboxMetadata(test)).toMatchObject({
+        action: 'process.output',
+        command_display: 'pnpm test',
+        exit_code: 0,
+      });
+    });
+
+    it('draws the CI command as a few states, not one per step', () => {
+      const root = rolledUp();
+      const bar = barByName(root, 'test')!;
+
+      expect(phaseSummary(root, 'test')).toEqual([
+        {
+          label: 'Starting',
+          start: '2026-10-01T12:00:38.000Z',
+          end: '2026-10-01T12:00:38.500Z',
+        },
+        {
+          label: 'Running',
+          start: '2026-10-01T12:00:38.500Z',
+          end: '2026-10-01T12:01:55.200Z',
+        },
+        {
+          label: 'Collecting output',
+          start: '2026-10-01T12:01:55.200Z',
+          end: '2026-10-01T12:02:02.200Z',
+        },
+      ]);
+      expect(bar.sandbox?.phases?.map((p) => p.waiting)).toEqual([false, true, false]);
+      expect(bar.sandbox).toMatchObject({
+        sandboxId: BUILD_SANDBOX_ID,
+        machineLabel: 'ci-build',
+        statement: 'commands.run',
+        command: 'pnpm test',
+        exitCode: 0,
+      });
+      // Per-step timing doesn't apply to a row that spans several steps
+      expect(bar.timingBreakdown).toBeUndefined();
+      expect(bar.inngestBreakdown).toBeUndefined();
+      expect(bar.delayMs).toBeUndefined();
+    });
+
+    it('titles a snapshot row by its statement step and owns its readiness wait', () => {
+      const root = rolledUp();
+      const snapshot = childByName(root, 'snapshot-build')!;
+
+      expect(snapshot.spanID).toBe(`${SNAPSHOT_STATEMENT_ID}-statement`);
+      expect(snapshot.stepID).toBe(SNAPSHOT_STATEMENT_ID);
+      expect(childByName(root, 'snapshot-build:wait-until-ready')).toBeUndefined();
+      expect(snapshot.outputID).toBe('output-b2000000000000000000000000wait-until-ready-0');
+      expect(phaseSummary(root, 'snapshot-build')).toEqual([
+        {
+          label: 'Creating snapshot',
+          start: '2026-10-01T12:02:02.500Z',
+          end: '2026-10-01T12:02:03.300Z',
+        },
+        {
+          label: 'Waiting until ready',
+          start: '2026-10-01T12:02:03.300Z',
+          end: '2026-10-01T12:02:23.300Z',
+        },
+      ]);
+    });
+
+    it('passes single-step statements through unchanged', () => {
+      const raw = sandboxCIRun();
+      const install = raw.childrenSpans!.find((c) => c.name === 'install')!;
+      const root = traceRollup(raw);
+
+      expect(childByName(root, 'install')).toEqual(install);
+      expect(barByName(root, 'install')?.sandbox).toMatchObject({
+        command: 'pnpm install',
+        exitCode: 0,
+        annotate: true,
+      });
+      expect(barByName(root, 'install')?.sandbox?.phases).toBeUndefined();
+    });
+
+    it('keeps retries of the statement step as its attempts', () => {
+      const [create, wait] = snapshotSteps();
+      const failedCreate = { ...create!, spanID: 'snap-attempt-0', status: 'FAILED' };
+      const retriedCreate = {
+        ...create!,
+        spanID: 'snap-attempt-1',
+        attempts: 1,
+        queuedAt: '2026-10-01T12:02:02.900Z',
+      };
+      const root = traceRollup(
+        createTrace({ isRoot: true, childrenSpans: [failedCreate, retriedCreate, wait!] })
+      );
+
+      expect(root.childrenSpans).toHaveLength(1);
+      const snapshot = root.childrenSpans![0]!;
+      expect(snapshot.name).toBe('snapshot-build');
+      expect(snapshot.attempts).toBe(1);
+      expect(snapshot.status).toBe('COMPLETED');
+      expect(snapshot.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+    });
+
+    it('hides retries of an internal step inside the row', () => {
+      const steps = ciTestSteps();
+      const check = steps[2]!;
+      const retriedCheck = { ...check, spanID: 'check-retry', attempts: 1 };
+      const root = traceRollup(
+        createTrace({ isRoot: true, childrenSpans: [...steps, retriedCheck] })
+      );
+
+      expect(root.childrenSpans).toHaveLength(1);
+      expect(root.childrenSpans![0]!.name).toBe('test');
+      expect(root.childrenSpans![0]!.childrenSpans).toEqual([]);
+      expect(root.childrenSpans![0]!.sandboxMembers).toHaveLength(8);
+    });
+
+    it('keeps a still-running statement open', () => {
+      const steps = ciTestSteps().slice(0, 6);
+      const lastSleep = steps[5]!;
+      steps[5] = { ...lastSleep, endedAt: null, status: 'WAITING' };
+      const root = traceRollup(createTrace({ isRoot: true, childrenSpans: steps }));
+      const test = root.childrenSpans![0]!;
+
+      expect(test.endedAt).toBeNull();
+      expect(test.status).toBe('RUNNING');
+
+      const phases = barsOf(root)[0]?.sandbox?.phases;
+      expect(phases?.map((p) => p.label)).toEqual(['Starting', 'Running']);
+      expect(phases?.[1]?.endTime).toBeNull();
+    });
+
+    it('marks a statement failed when its last step failed', () => {
+      const steps = ciTestSteps();
+      const output = steps[7]!;
+      steps[7] = { ...output, status: 'FAILED' };
+      const root = traceRollup(createTrace({ isRoot: true, childrenSpans: steps }));
+
+      expect(root.childrenSpans![0]!.status).toBe('FAILED');
+    });
+
+    it('falls back to the first step name with no statement step or statement_name', () => {
+      const steps = ciTestSteps().map((step) => ({
+        ...step,
+        metadata: step.metadata?.map((md) => ({
+          ...md,
+          values: { ...md.values, statement_name: undefined },
+        })),
+      })) as Trace[];
+      const root = traceRollup(createTrace({ isRoot: true, childrenSpans: steps }));
+
+      expect(root.childrenSpans![0]!.name).toBe('test › start');
+    });
+
+    it('marks the first row of a machine the run did not create as existing', () => {
+      const root = rolledUp();
+      const existing = barsOf(root).map((b) => [b.name, b.sandbox?.existing]);
+
+      expect(existing).toEqual([
+        ['build-machine', false],
+        ['get-e2e', true],
+        ['install', undefined],
+        ['e2e-install', undefined],
+        ['notify-start', undefined],
+        ['test', undefined],
+        ['e2e', undefined],
+        ['e2e-release', undefined],
+        ['snapshot-build', undefined],
+        ['destroy-build', undefined],
+      ]);
+    });
+
+    it('leaves runs without sandbox metadata exactly as before', () => {
+      const plain = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({ spanID: 'a', stepID: 'step-a', attempts: 0 }),
+          createTrace({
+            spanID: 'b',
+            stepID: 'step-b',
+            attempts: 0,
+            queuedAt: '2024-01-01T00:00:05Z',
+          }),
+        ],
+      });
+      const root = traceRollup(plain);
+
+      expect(root).toEqual(plain);
+      expect(barsOf(root).map((b) => b.sandbox)).toEqual([undefined, undefined]);
     });
   });
 });

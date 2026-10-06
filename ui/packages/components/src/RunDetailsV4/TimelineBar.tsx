@@ -168,6 +168,16 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'uppercase',
     statusBased: true,
   },
+  'sandbox.active': {
+    barColor: 'bg-status-completed',
+    pattern: 'barber-pole',
+    statusBased: true,
+  },
+  'sandbox.waiting': {
+    barColor: 'bg-status-completed',
+    pattern: 'vertical-lines',
+    statusBased: true,
+  },
   default: {
     barColor: 'bg-surfaceMuted',
     statusBased: true,

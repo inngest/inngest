@@ -1,11 +1,13 @@
 import {
   KindInngestAISummary,
+  KindInngestSandbox,
   KindInngestScore,
   type AIMetadata,
   type AISummaryMetadata,
   type SpanMetadataKind as GeneratedSpanMetadataKind,
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
+  type SandboxMetadata,
   type Warnings,
 } from '../generated/index';
 
@@ -32,6 +34,12 @@ export type Trace = {
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
   response?: ResponseInfo;
+  /**
+   * Set only on a virtual sandbox statement span (see traceRollup): the steps
+   * that served the statement, in time order. They're folded into the
+   * statement's row instead of being rows of their own.
+   */
+  sandboxMembers?: Trace[];
 };
 
 export type ResponseInfo = {
@@ -55,6 +63,7 @@ export type SpanMetadata =
   | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestTiming
   | SpanMetadataInngestResponseHeaders
+  | SpanMetadataInngestSandbox
   | SpanMetadataInngestScore
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
@@ -144,6 +153,13 @@ export type SpanMetadataInngestWarnings = {
   kind: 'inngest.warnings';
   updatedAt: string;
   values: Warnings;
+};
+
+export type SpanMetadataInngestSandbox = {
+  scope: SpanMetadataScope;
+  kind: typeof KindInngestSandbox;
+  updatedAt: string;
+  values: SandboxMetadata;
 };
 
 export type SpanMetadataInngestScore = {
@@ -251,6 +267,10 @@ export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepI
 
 export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInngestExperiment {
   return md.kind === 'inngest.experiment';
+}
+
+export function isSandboxMetadata(md: SpanMetadata): md is SpanMetadataInngestSandbox {
+  return md.kind === KindInngestSandbox;
 }
 
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {

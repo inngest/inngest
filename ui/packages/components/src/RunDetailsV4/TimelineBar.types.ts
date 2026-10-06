@@ -58,6 +58,9 @@ export type BarStyleKey =
   | 'timing.http.tls' // TLS handshake (short, teal)
   | 'timing.http.server' // Server processing / TTFB (short, emerald)
   | 'timing.http.transfer' // Content transfer (short, green)
+  // Sandbox statement states (segments of one statement row)
+  | 'sandbox.active' // Doing work: starting, creating, collecting output (tall, status color)
+  | 'sandbox.waiting' // Waiting on the machine: running, waiting until ready (tall, hollow lines)
   // Generic fallback
   | 'default';
 
@@ -229,6 +232,60 @@ export interface TimelineBarProps {
 
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
+
+  /** Sandbox annotation (description, machine chip, exit badge) shown under the name */
+  sandbox?: SandboxBarData;
+
+  /**
+   * Machine this row belongs to, for the machine highlight. Child rows inherit
+   * their parent's, like insideExperiment.
+   */
+  sandboxId?: string;
+}
+
+/**
+ * Sandbox details for a row, derived from `inngest.sandbox` step metadata.
+ */
+export interface SandboxBarData {
+  /** Machine identity; chips, colours and highlights key on this alone */
+  sandboxId?: string;
+
+  /** Chip label: the sandbox name, or a short ID */
+  machineLabel?: string;
+
+  /** SDK method the user called, like "commands.run" */
+  statement: string;
+
+  /** Command as the user wrote it, or the argv joined */
+  command?: string;
+
+  /** Exit code of the command (the last step that reported one) */
+  exitCode?: number;
+
+  /** Sandbox API operations behind the row, used to tell whether the run created the machine */
+  actions: string[];
+
+  /** True on the first row of a machine the run didn't create */
+  existing?: boolean;
+
+  /** Whether to render the annotation line (top-level statement rows only) */
+  annotate?: boolean;
+
+  /** States the statement moved through, for a row that owns several steps */
+  phases?: SandboxPhaseData[];
+}
+
+/**
+ * One state of a sandbox statement row, like "Running" or "Collecting output".
+ */
+export interface SandboxPhaseData {
+  key: string;
+  label: string;
+  /** Waiting on the machine (drawn hollow) rather than doing work */
+  waiting: boolean;
+  startTime: Date;
+  /** Null while this is the current state of a statement still in progress */
+  endTime: Date | null;
 }
 
 /**
@@ -326,6 +383,9 @@ export interface TimelineBarData {
 
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
+
+  /** Sandbox details, when the span carries `inngest.sandbox` metadata */
+  sandbox?: SandboxBarData;
 }
 
 /**
