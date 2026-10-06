@@ -41,10 +41,11 @@ step IDs or the step input shape.
 | Field | Type | Meaning |
 |---|---|---|
 | `version` | `1` | Shape version. |
-| `action` | string | Sandbox API operation this step performed: `create`, `exec`, `process.start`, `process.wait`, `snapshot.create`, `snapshot.waitUntilReady`, `destroy`, ... |
+| `action` | string | Sandbox API operation this step performed: `create`, `exec`, `process.start`, `process.wait`, `snapshot.create`, `snapshot.waitUntilReady`, `destroy`, ... `sleep` is an internal `step.sleep` waiting on behalf of a statement (a CI command's pause between polls). |
 | `statement` | string | SDK method the user called: `create`, `commands.run`, `processes.start`, `process.wait`, `snapshot`, `snapshot.clone`, `destroy`, ... Internal steps carry their statement's method. |
 | `statement_id` | string | Hashed step ID (the trace's `stepID`, and `run_metadata.step_id`) of the statement step this step belongs to. Never the user's step ID. Equal to the step's own ID for a statement step. **This is the grouping key for rule 2.** |
 | `role` | `statement` \| `internal` | Whether this step is the row the user wrote, or work serving another row. |
+| `statement_name` | string | The user's label for the statement (a CI command's name). Set on internal steps when the statement has no step of its own, so the row still has a title. |
 | `sandbox_id`, `sandbox_name` | string | The machine this step acted on or created. **This is the linking key for rule 3.** Taken from the reference the operation targets, so it's present before any result and on failure. A failed `create` has only the name. See [Machines from outside the run](#machines-from-outside-the-run). |
 | `source_snapshot_id` | string | For `create`/`snapshot.clone`, the snapshot the machine was cloned from. Links a clone to the `snapshot` row that made it. |
 | `command` | string[] | Argv of a command or process (cut to 1 KiB total). |

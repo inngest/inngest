@@ -45,7 +45,9 @@ type SandboxMetadata struct {
 	Version int `json:"version"`
 
 	// Action is the sandbox API operation this step performed, like "create",
-	// "exec", "snapshot.create" or "snapshot.waitUntilReady".
+	// "exec", "snapshot.create" or "snapshot.waitUntilReady". "sleep" is an
+	// internal step.sleep that waits on behalf of a statement, like the pause
+	// between a long command's polls.
 	Action string `json:"action"`
 
 	// Statement is the SDK method the user called, like "create",
@@ -60,6 +62,11 @@ type SandboxMetadata struct {
 	StatementID string `json:"statement_id"`
 
 	Role SandboxRole `json:"role"`
+
+	// StatementName is the user's label for the statement, like a CI
+	// command's name. Internal steps carry it when their statement has no
+	// step of its own to title its row.
+	StatementName string `json:"statement_name,omitempty"`
 
 	// SandboxID and SandboxName identify the machine this step acted on, or
 	// created. Every step on the same machine shares the ID, and it's the key

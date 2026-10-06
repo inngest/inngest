@@ -57,7 +57,9 @@ export interface SandboxMetadata {
   version: number /* int */;
   /**
    * Action is the sandbox API operation this step performed, like "create",
-   * "exec", "snapshot.create" or "snapshot.waitUntilReady".
+   * "exec", "snapshot.create" or "snapshot.waitUntilReady". "sleep" is an
+   * internal step.sleep that waits on behalf of a statement, like the pause
+   * between a long command's polls.
    */
   action: string;
   /**
@@ -74,6 +76,12 @@ export interface SandboxMetadata {
    */
   statement_id: string;
   role: SandboxRole;
+  /**
+   * StatementName is the user's label for the statement, like a CI
+   * command's name. Internal steps carry it when their statement has no
+   * step of its own to title its row.
+   */
+  statement_name?: string;
   /**
    * SandboxID and SandboxName identify the machine this step acted on, or
    * created. Every step on the same machine shares the ID, and it's the key
