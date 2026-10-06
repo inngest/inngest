@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState, type JSX, type ReactNode } from 'react'
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
+import { MachineHighlightProvider } from './SandboxAnnotation';
 import { TimelineBar } from './TimelineBar';
 import type {
   BarSegment,
@@ -644,6 +645,7 @@ function TimelineBarRenderer({
       insideExperiment={insideExperiment}
       experimentMetadata={bar.experimentMetadata}
       scores={bar.scores}
+      sandbox={bar.sandbox}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
@@ -982,37 +984,39 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
 
   return (
-    <div className="w-full pb-4 pr-2" data-testid="timeline-container">
-      {/* Run duration header with timing markers */}
-      <TimelineHeader
-        minTime={minTime}
-        maxTime={maxTime}
-        leftWidth={leftWidth}
-        onSelectionChange={handleSelectionChange}
-        status={rootStatus}
-        selectionStart={viewStartOffset}
-        selectionEnd={viewEndOffset}
-      />
-
-      {/* Step bars */}
-      {bars.map((bar) => (
-        <TimelineBarRenderer
-          key={bar.id}
-          bar={bar}
-          depth={0}
+    <MachineHighlightProvider bars={bars}>
+      <div className="w-full pb-4 pr-2" data-testid="timeline-container">
+        {/* Run duration header with timing markers */}
+        <TimelineHeader
           minTime={minTime}
           maxTime={maxTime}
           leftWidth={leftWidth}
-          orgName={orgName}
-          expandedBars={expandedBars}
-          onToggleExpand={handleToggleExpand}
-          onSelectStep={handleSelectStep}
-          selectedStepId={selectedStepId}
-          viewStartOffset={viewStartOffset}
-          viewEndOffset={viewEndOffset}
-          actions={bar.isRoot ? expandCollapseActions : undefined}
+          onSelectionChange={handleSelectionChange}
+          status={rootStatus}
+          selectionStart={viewStartOffset}
+          selectionEnd={viewEndOffset}
         />
-      ))}
-    </div>
+
+        {/* Step bars */}
+        {bars.map((bar) => (
+          <TimelineBarRenderer
+            key={bar.id}
+            bar={bar}
+            depth={0}
+            minTime={minTime}
+            maxTime={maxTime}
+            leftWidth={leftWidth}
+            orgName={orgName}
+            expandedBars={expandedBars}
+            onToggleExpand={handleToggleExpand}
+            onSelectStep={handleSelectStep}
+            selectedStepId={selectedStepId}
+            viewStartOffset={viewStartOffset}
+            viewEndOffset={viewEndOffset}
+            actions={bar.isRoot ? expandCollapseActions : undefined}
+          />
+        ))}
+      </div>
+    </MachineHighlightProvider>
   );
 }

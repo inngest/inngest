@@ -8,6 +8,7 @@ import { max, min } from 'date-fns';
 
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { KindInngestExperiment } from '../../generated';
+import { sandboxBarData } from '../SandboxAnnotation';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
@@ -312,6 +313,7 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
     scores: getScores(trace.metadata),
+    sandbox: sandboxBarData(trace),
   };
 }
 

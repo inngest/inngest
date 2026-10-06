@@ -5,6 +5,8 @@
 
 import type { ReactNode } from 'react';
 
+import type { SandboxBarData } from './SandboxAnnotation';
+
 // ============================================================================
 // Core Component Types
 // ============================================================================
@@ -233,6 +235,9 @@ export interface TimelineBarProps {
 
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
+
+  /** Sandbox work behind this row (shows a machine chip line under the name) */
+  sandbox?: SandboxBarData;
 }
 
 /**
@@ -333,6 +338,9 @@ export interface TimelineBarData {
 
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
+
+  /** Sandbox work behind this row, from `inngest.sandbox` metadata */
+  sandbox?: SandboxBarData;
 }
 
 /**

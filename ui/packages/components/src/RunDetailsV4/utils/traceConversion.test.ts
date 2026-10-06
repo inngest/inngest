@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
+import { stepSpansTrace } from './stepSpans.fixture';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -1541,6 +1542,22 @@ describe('traceConversion', () => {
       );
 
       expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['early', 'g', 'late']);
+    });
+
+    it('rolls up the CI fixture: groups kept, the retried tool step rolled up', () => {
+      const result = traceRollup(stepSpansTrace);
+
+      expect(result.childrenSpans?.map((c) => c.name)).toEqual(
+        stepSpansTrace.childrenSpans?.map((c) => c.name)
+      );
+      const search = result.childrenSpans
+        ?.find((c) => c.name === 'Research network')
+        ?.childrenSpans?.[0]?.childrenSpans?.find((c) => c.name === 'search tool');
+      expect(search?.childrenSpans?.map((c) => c.name)).toEqual(['query', 'backoff', 'summarise']);
+      expect(search?.childrenSpans?.[0]?.childrenSpans?.map((c) => c.name)).toEqual([
+        'Attempt 0',
+        'Attempt 1',
+      ]);
     });
   });
 });
