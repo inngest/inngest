@@ -45,6 +45,7 @@ import {
   SandboxAnnotation,
   useRowMachineId,
 } from './SandboxAnnotation';
+import { SpanKindTag } from './SpanKindTag';
 import type {
   BarHeight,
   BarIcon,
@@ -862,6 +863,7 @@ export function TimelineBar({
   experimentMetadata,
   scores,
   sandbox,
+  spanKind,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const machineId = useRowMachineId(sandbox?.sandboxId);
@@ -965,6 +967,7 @@ export function TimelineBar({
                 sandbox && 'flex-none'
               )}
             >
+              {spanKind && <SpanKindTag kind={spanKind} className="mr-1.5" />}
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>

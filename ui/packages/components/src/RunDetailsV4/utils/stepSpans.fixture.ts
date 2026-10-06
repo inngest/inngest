@@ -9,6 +9,9 @@
  * - a snapshot whose readiness wait names no machine
  * - an ordinary step outside any group
  * - an agent → tool → steps nest three groups deep, with a retried step
+ *
+ * Groups carry the kinds CI and agents give them (`machine`, `cmd`, `job`,
+ * `agent`, `tool`); the attempt subgroups, snapshot and network have none.
  */
 
 import type { SandboxMetadata } from '../../generated';
@@ -77,7 +80,7 @@ const exec = (
 });
 
 /** A group as the loader builds it: children by queue time, times and status from them */
-function group(id: string, name: string, children: Trace[]): Trace {
+function group(id: string, name: string, children: Trace[], spanKind?: string): Trace {
   const sorted = [...children].sort((a, b) => Date.parse(a.queuedAt) - Date.parse(b.queuedAt));
   const last = sorted.reduce((a, b) =>
     Date.parse(b.endedAt ?? '') > Date.parse(a.endedAt ?? '') ? b : a
@@ -100,6 +103,7 @@ function group(id: string, name: string, children: Trace[]): Trace {
     stepInfo: null,
     stepOp: null,
     stepType: 'SPAN_GROUP',
+    spanKind: spanKind ?? null,
     userlandSpan: null,
     metadata: [],
   };
@@ -108,33 +112,53 @@ function group(id: string, name: string, children: Trace[]): Trace {
 export const stepSpansTrace: Trace = {
   attempts: 0,
   childrenSpans: [
-    group('machine', 'machine', [
-      step('create', 'create', 0, 6, {
-        sandbox: { action: 'create', method: 'create', ...MACHINE_A },
-      }),
-      step('setup', 'setup', 6, 14, { sandbox: exec('pnpm install --frozen-lockfile', 0) }),
-    ]),
-    group('lint', 'lint', [step('lint', 'pnpm lint', 14, 22, { sandbox: exec('pnpm lint', 0) })]),
-    group('dev-server', 'dev server', [
-      step('dev-start', 'start', 22, 24, {
-        sandbox: { ...exec('pnpm dev', 0), action: 'process.start', process_id: 'p_1' },
-      }),
-      step('dev-ready', 'wait for port', 24, 30, { stepOp: 'SLEEP' }),
-      step('dev-kill', 'kill', 104, 106, {
-        sandbox: { ...exec('pnpm dev', 143), action: 'process.kill', process_id: 'p_1' },
-      }),
-    ]),
-    group('test', 'test', [
-      group('test-1', 'Attempt 1', [
-        step('test-a1', 'pnpm test', 30, 52, {
-          status: 'FAILED',
-          sandbox: exec('pnpm test', 1),
+    group(
+      'machine',
+      'machine',
+      [
+        step('create', 'create', 0, 6, {
+          sandbox: { action: 'create', method: 'create', ...MACHINE_A },
         }),
-      ]),
-      group('test-2', 'Attempt 2', [
-        step('test-a2', 'pnpm test', 58, 78, { sandbox: exec('pnpm test', 0) }),
-      ]),
-    ]),
+        step('setup', 'setup', 6, 14, { sandbox: exec('pnpm install --frozen-lockfile', 0) }),
+      ],
+      'machine'
+    ),
+    group(
+      'lint',
+      'lint',
+      [step('lint', 'pnpm lint', 14, 22, { sandbox: exec('pnpm lint', 0) })],
+      'cmd'
+    ),
+    group(
+      'dev-server',
+      'dev server',
+      [
+        step('dev-start', 'start', 22, 24, {
+          sandbox: { ...exec('pnpm dev', 0), action: 'process.start', process_id: 'p_1' },
+        }),
+        step('dev-ready', 'wait for port', 24, 30, { stepOp: 'SLEEP' }),
+        step('dev-kill', 'kill', 104, 106, {
+          sandbox: { ...exec('pnpm dev', 143), action: 'process.kill', process_id: 'p_1' },
+        }),
+      ],
+      'cmd'
+    ),
+    group(
+      'test',
+      'test',
+      [
+        group('test-1', 'Attempt 1', [
+          step('test-a1', 'pnpm test', 30, 52, {
+            status: 'FAILED',
+            sandbox: exec('pnpm test', 1),
+          }),
+        ]),
+        group('test-2', 'Attempt 2', [
+          step('test-a2', 'pnpm test', 58, 78, { sandbox: exec('pnpm test', 0) }),
+        ]),
+      ],
+      'cmd'
+    ),
     step('retry-check', 'check retry', 52, 58),
     group('snapshot', 'snapshot', [
       step('snap-create', 'create snapshot', 78, 82, {
@@ -145,24 +169,39 @@ export const stepSpansTrace: Trace = {
         sandbox: { action: 'snapshot.waitUntilReady', method: 'snapshot', snapshot_id: 'snap_1' },
       }),
     ]),
-    group('e2e', 'e2e', [
-      step('e2e-create', 'create', 90, 94, {
-        sandbox: { action: 'create', method: 'create', ...MACHINE_B },
-      }),
-      step('e2e', 'pnpm e2e', 94, 104, { sandbox: exec('pnpm e2e', 0, MACHINE_B) }),
-    ]),
+    group(
+      'e2e',
+      'e2e',
+      [
+        step('e2e-create', 'create', 90, 94, {
+          sandbox: { action: 'create', method: 'create', ...MACHINE_B },
+        }),
+        step('e2e', 'pnpm e2e', 94, 104, { sandbox: exec('pnpm e2e', 0, MACHINE_B) }),
+      ],
+      'job'
+    ),
     step('notify', 'notify', 106, 108),
     group('network', 'Research network', [
-      group('agent', 'Research agent', [
-        step('plan', 'plan', 108, 113, { stepOp: 'AI_GATEWAY' }),
-        group('search', 'search tool', [
-          step('query', 'query', 113, 115, { status: 'FAILED' }),
-          step('query', 'query', 117, 119, { attempts: 1 }),
-          step('backoff', 'backoff', 119, 122, { stepOp: 'SLEEP' }),
-          step('summarise', 'summarise', 122, 126),
-        ]),
-        step('approval', 'approval', 126, 132, { stepOp: 'WAIT_FOR_EVENT' }),
-      ]),
+      group(
+        'agent',
+        'Research agent',
+        [
+          step('plan', 'plan', 108, 113, { stepOp: 'AI_GATEWAY' }),
+          group(
+            'search',
+            'search tool',
+            [
+              step('query', 'query', 113, 115, { status: 'FAILED' }),
+              step('query', 'query', 117, 119, { attempts: 1 }),
+              step('backoff', 'backoff', 119, 122, { stepOp: 'SLEEP' }),
+              step('summarise', 'summarise', 122, 126),
+            ],
+            'tool'
+          ),
+          step('approval', 'approval', 126, 132, { stepOp: 'WAIT_FOR_EVENT' }),
+        ],
+        'agent'
+      ),
     ]),
   ],
   endedAt: at(133),

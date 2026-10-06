@@ -28,6 +28,8 @@ export type Trace = {
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
   stepOp?: string | null;
   stepType?: string | null;
+  /** A span group's kind, as its caller named it, like `job` or `agent` */
+  spanKind?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
   debugRunID?: string | null;

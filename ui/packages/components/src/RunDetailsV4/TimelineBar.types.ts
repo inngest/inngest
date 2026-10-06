@@ -236,8 +236,11 @@ export interface TimelineBarProps {
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
 
-  /** Sandbox work behind this row (shows a machine chip line under the name) */
+  /** Sandbox work behind this row (shows a MACHINE tag line under the name) */
   sandbox?: SandboxBarData;
+
+  /** A span group's kind, shown as a tag before its name */
+  spanKind?: string;
 }
 
 /**
@@ -341,6 +344,9 @@ export interface TimelineBarData {
 
   /** Sandbox work behind this row, from `inngest.sandbox` metadata */
   sandbox?: SandboxBarData;
+
+  /** A span group's kind, as its caller named it */
+  spanKind?: string;
 }
 
 /**
