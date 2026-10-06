@@ -161,9 +161,40 @@ same fields could answer questions across runs:
 These need an index or materialised column on `sandbox_id`, since it lives in
 metadata values today. No data change is needed.
 
+## As built
+
+Screenshots of a real `@inngest/ci` pipeline on Cloud sandboxes, from the dev
+server built from this branch (run `01M48E91707ZCZRE410EPTDMQG`). Each
+statement is one row: CI commands, including their polls, sleeps and retries,
+and machines, including their setup.
+
+The whole run:
+
+![Timeline](./built-timeline.png)
+
+A long command moves from Starting to Running to Collecting output:
+
+![Managed command hover](./built-hover-managed.png)
+
+A command that failed once and passed on retry:
+
+![Retried command hover](./built-retried-hover.png)
+
+A machine row covers creating and setting up the machine:
+
+![Machine row hover](./built-machine-hover.png)
+
+A snapshot moves from creating to waiting until ready:
+
+![Snapshot row](./built-snapshot.png)
+
+Clicking a machine chip pins a highlight on that machine's rows:
+
+![Pinned machine](./built-pinned-machine.png)
+
 ## UI options
 
-All mocks below use one scenario: a CI-like run with two machines in parallel.
+The mocks below predate the build and are kept for the design record. All of them use one scenario: a CI-like run with two machines in parallel.
 `ci-build` is created and destroyed by the run. `ci-e2e` is an existing
 machine the run picks up with `step.sandbox.get` and leaves running, so its
 create and destroy happen outside this run. There's also an unrelated
