@@ -377,6 +377,12 @@ export const StepInfo = ({
             </ElementWrapper>
           )}
 
+          {trace.origin && (
+            <ElementWrapper label="Added by">
+              <TextElement>{trace.origin}</TextElement>
+            </ElementWrapper>
+          )}
+
           {stepKindInfo}
 
           {experimentMetadata && (
