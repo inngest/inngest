@@ -870,7 +870,7 @@ export function TimelineBar({
 
   // Machine highlight: rows on the active machine get its dotted background,
   // every other row (except the run itself) is dimmed.
-  const { activeId: highlightedSandboxId } = useSandboxHighlight();
+  const { activeId: highlightedSandboxId, machineIds } = useSandboxHighlight();
   const machineHighlighted = !!highlightedSandboxId && highlightedSandboxId === sandboxId;
   const dimmed = !!highlightedSandboxId && !machineHighlighted && style !== 'root';
 
@@ -1040,7 +1040,7 @@ export function TimelineBar({
           {/* Dotted background: the highlighted machine's rows, or experiment
               steps and their children */}
           {machineHighlighted ? (
-            <DottedBackground color={machineColor(sandboxId!, 0.6)} />
+            <DottedBackground color={machineColor(sandboxId!, machineIds, 0.6)} />
           ) : (
             showExperimentBackground && <DottedBackground />
           )}

@@ -457,6 +457,24 @@ function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
 // ============================================================================
 
 /**
+ * The machines rows belong to, in row order (which is time order), each once.
+ */
+export function collectMachineIds(bars: TimelineBarData[]): string[] {
+  const ids: string[] = [];
+  const visit = (list: TimelineBarData[]) => {
+    for (const bar of list) {
+      const id = bar.sandbox?.sandboxId;
+      if (id && !ids.includes(id)) {
+        ids.push(id);
+      }
+      visit(bar.children ?? []);
+    }
+  };
+  visit(bars);
+  return ids;
+}
+
+/**
  * Recursively collect all expandable bar IDs from the timeline data.
  * This includes:
  * - Step bars with timingBreakdown or children (non-root)
@@ -999,11 +1017,14 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
     setViewEndOffset(end);
   }, []);
 
+  // The run's machines in order of first appearance, for machine colours
+  const machineIds = useMemo(() => collectMachineIds(bars), [bars]);
+
   // Get status from the first (root) bar for header coloring
   const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
 
   return (
-    <SandboxHighlightProvider>
+    <SandboxHighlightProvider machineIds={machineIds}>
       <div className="w-full pb-4 pr-2" data-testid="timeline-container">
         {/* Run duration header with timing markers */}
         <TimelineHeader

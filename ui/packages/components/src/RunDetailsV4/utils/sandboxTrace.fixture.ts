@@ -1,11 +1,16 @@
 /**
  * A CI-like run with two sandboxes, shaped like the scenario in
- * docs/sandbox-traces/README.md. Used by tests and the Timeline story.
+ * docs/sandbox-traces/README.md and like real `@inngest/ci` runs (machine
+ * names, step names, sha1 statement IDs). Used by tests and the Timeline story.
  *
- * - `ci-build` is created and destroyed by the run.
- * - `ci-e2e` already existed: the run picks it up with `get` and leaves it.
- * - `test` is a CI command with no statement step of its own: a start, three
- *   sleeps, three polls and an output fetch, all `role: "internal"`.
+ * - The build machine (`ci-<runID>-build`) is created and destroyed by the
+ *   run. Its create row owns CI's setup command, an internal `exec`.
+ * - The e2e machine already existed: the run picks it up with `get` and
+ *   leaves it.
+ * - `test › pnpm test` is a CI command with no statement step of its own: a
+ *   start, three sleeps, three polls and an output fetch, all
+ *   `role: "internal"`.
+ * - `build › pnpm serve` is a CI background process: a lone internal start.
  * - `snapshot-build` is a snapshot statement plus its readiness wait.
  * - `notify-start` is an ordinary step.run with no sandbox metadata.
  */
@@ -17,9 +22,14 @@ const T0 = Date.parse('2026-10-01T12:00:00.000Z');
 
 export const BUILD_SANDBOX_ID = '7f3a2c1e-4b5d-4e6f-8a9b-0c1d2e3f4a5b';
 export const E2E_SANDBOX_ID = '91c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
-// sha1("test"): a CI command has no step of its own, so its statement_id
-// isn't any step's ID
+export const BUILD_MACHINE_NAME = 'ci-01M48D0A2NS1T6C051P07DC8RB-build';
+export const E2E_MACHINE_NAME = 'ci-01M48D0A2NS1T6C051P07DC8RB-e2e';
+// The CI command's step ID and title. It has no step of its own, so its
+// statement_id (sha1 of the step ID) isn't any step's ID.
+export const TEST_NAME = 'test › pnpm test';
 export const TEST_STATEMENT_ID = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3';
+export const BUILD_MACHINE_STATEMENT_ID = 'd1000000000000000000000000build-machine';
+export const SERVE_NAME = 'build › pnpm serve';
 export const SNAPSHOT_STATEMENT_ID = 'c0ffee00000000000000000000000000snapshot';
 
 function at(seconds: number): string {
@@ -84,8 +94,8 @@ export function sandboxStep({
   };
 }
 
-const build = { sandbox_id: BUILD_SANDBOX_ID, sandbox_name: 'ci-build' };
-const e2e = { sandbox_id: E2E_SANDBOX_ID, sandbox_name: 'ci-e2e' };
+const build = { sandbox_id: BUILD_SANDBOX_ID, sandbox_name: BUILD_MACHINE_NAME };
+const e2e = { sandbox_id: E2E_SANDBOX_ID, sandbox_name: E2E_MACHINE_NAME };
 
 /** Internal metadata for one step of the CI `test` command */
 function testStep(action: string, extra: Partial<SandboxMetadata> = {}): Partial<SandboxMetadata> {
@@ -94,7 +104,7 @@ function testStep(action: string, extra: Partial<SandboxMetadata> = {}): Partial
     action,
     statement: 'commands.run',
     statement_id: TEST_STATEMENT_ID,
-    statement_name: 'test',
+    statement_name: TEST_NAME,
     role: 'internal',
     command: ['/bin/sh', '-c', 'pnpm test'],
     command_display: 'pnpm test',
@@ -113,7 +123,7 @@ export function ciTestSteps({
   attempt,
 }: { offset?: number; exitCode?: number; attempt?: number } = {}): Trace[] {
   const process = { process_id: `proc-test-${attempt ?? 1}` };
-  const label = attempt ? `test #attempt-${attempt}` : 'test';
+  const label = attempt ? `${TEST_NAME} #attempt-${attempt}` : TEST_NAME;
   const id = (suffix: string) => `a1${attempt ?? 0}-${suffix}`;
   const t = (seconds: number) => seconds + offset;
   return [
@@ -210,16 +220,43 @@ export function snapshotSteps(): Trace[] {
   ];
 }
 
+/**
+ * CI's machine: the create statement step plus its setup command, run inside
+ * the same statement so it is a state of the create row.
+ */
+export function machineSteps(): Trace[] {
+  return [
+    sandboxStep({
+      name: 'build › machine',
+      stepID: BUILD_MACHINE_STATEMENT_ID,
+      start: 0,
+      end: 4.6,
+      sandbox: { ...build, action: 'create', statement: 'create' },
+    }),
+    sandboxStep({
+      name: 'build › machine › setup',
+      stepID: 'd1000000000000000000000000machine-setup',
+      start: 4.7,
+      end: 5.1,
+      sandbox: {
+        ...build,
+        action: 'exec',
+        statement: 'create',
+        statement_id: BUILD_MACHINE_STATEMENT_ID,
+        statement_name: 'build › machine',
+        role: 'internal',
+        command: ['/bin/sh', '-c', 'mkdir -p /work && (ip link set lo up 2>/dev/null || true)'],
+        command_display: 'mkdir -p /work && (ip link set lo up 2>/dev/null || true)',
+        exit_code: 0,
+      },
+    }),
+  ];
+}
+
 /** The whole run, before traceRollup */
 export function sandboxCIRun(): Trace {
   const children: Trace[] = [
-    sandboxStep({
-      name: 'build-machine',
-      stepID: 'd1000000000000000000000000build-machine',
-      start: 0,
-      end: 5.1,
-      sandbox: { ...build, action: 'create', statement: 'create' },
-    }),
+    ...machineSteps(),
     sandboxStep({
       name: 'get-e2e',
       stepID: 'd10000000000000000000000000000000get-e2e',
@@ -290,7 +327,32 @@ export function sandboxCIRun(): Trace {
         exit_code: 0,
       },
     }),
+    sandboxStep({
+      name: `${SERVE_NAME} › start`,
+      stepID: 'd10000000000000000000000000serve-start',
+      start: 99.8,
+      end: 100.2,
+      sandbox: {
+        ...build,
+        action: 'process.start',
+        statement: 'processes.start',
+        statement_id: 'd1000000000000000000000000000serve-stmt',
+        statement_name: SERVE_NAME,
+        role: 'internal',
+        command: ['/bin/sh', '-c', 'pnpm serve'],
+        command_display: 'pnpm serve',
+        process_id: 'proc-serve',
+        process_state: 'RUNNING',
+      },
+    }),
     ...snapshotSteps(),
+    sandboxStep({
+      name: 'build › pause',
+      stepID: 'd10000000000000000000000000build-pause',
+      start: 143,
+      end: 143.4,
+      sandbox: { ...build, action: 'pause', statement: 'pause' },
+    }),
     sandboxStep({
       name: 'destroy-build',
       stepID: 'd100000000000000000000000destroy-build',

@@ -262,6 +262,12 @@ export interface SandboxBarData {
   /** Exit code of the command (the last step that reported one) */
   exitCode?: number;
 
+  /** Whether the row's title already ends with the command, so it isn't repeated */
+  commandInTitle?: boolean;
+
+  /** How many times a retried command ran, when more than once */
+  attempts?: number;
+
   /** Sandbox API operations behind the row, used to tell whether the run created the machine */
   actions: string[];
 

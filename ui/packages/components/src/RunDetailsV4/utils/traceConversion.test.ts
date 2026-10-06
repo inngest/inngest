@@ -6,12 +6,17 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
-import { getSandboxMetadata } from './sandbox';
+import { STATEMENT_VERBS, getSandboxMetadata, statementVerb } from './sandbox';
 import {
+  BUILD_MACHINE_NAME,
+  BUILD_MACHINE_STATEMENT_ID,
   BUILD_SANDBOX_ID,
+  SERVE_NAME,
   SNAPSHOT_STATEMENT_ID,
+  TEST_NAME,
   TEST_STATEMENT_ID,
   ciTestSteps,
+  machineSteps,
   sandboxCIRun,
   snapshotSteps,
 } from './sandboxTrace.fixture';
@@ -1456,19 +1461,21 @@ describe('traceConversion', () => {
       const root = rolledUp();
 
       expect(root.childrenSpans?.map((c) => c.name)).toEqual([
-        'build-machine',
+        'build › machine',
         'get-e2e',
         'install',
         'e2e-install',
         'notify-start',
-        'test',
+        TEST_NAME,
         'e2e',
         'e2e-release',
+        SERVE_NAME,
         'snapshot-build',
+        'build › pause',
         'destroy-build',
       ]);
 
-      const test = childByName(root, 'test')!;
+      const test = childByName(root, TEST_NAME)!;
       expect(test.spanID).toBe(`${TEST_STATEMENT_ID}-statement`);
       expect(test.queuedAt).toBe('2026-10-01T12:00:38.000Z');
       expect(test.endedAt).toBe('2026-10-01T12:02:02.200Z');
@@ -1487,9 +1494,9 @@ describe('traceConversion', () => {
 
     it('draws the CI command as a few states, not one per step', () => {
       const root = rolledUp();
-      const bar = barByName(root, 'test')!;
+      const bar = barByName(root, TEST_NAME)!;
 
-      expect(phaseSummary(root, 'test')).toEqual([
+      expect(phaseSummary(root, TEST_NAME)).toEqual([
         {
           label: 'Starting',
           start: '2026-10-01T12:00:38.000Z',
@@ -1509,11 +1516,14 @@ describe('traceConversion', () => {
       expect(bar.sandbox?.phases?.map((p) => p.waiting)).toEqual([false, true, false]);
       expect(bar.sandbox).toMatchObject({
         sandboxId: BUILD_SANDBOX_ID,
-        machineLabel: 'ci-build',
+        machineLabel: BUILD_MACHINE_NAME,
         statement: 'commands.run',
         command: 'pnpm test',
+        // CI titles the row with the command, so the annotation doesn't repeat it
+        commandInTitle: true,
         exitCode: 0,
       });
+      expect(bar.sandbox?.attempts).toBeUndefined();
       // Per-step timing doesn't apply to a row that spans several steps
       expect(bar.timingBreakdown).toBeUndefined();
       expect(bar.inngestBreakdown).toBeUndefined();
@@ -1586,7 +1596,7 @@ describe('traceConversion', () => {
       );
 
       expect(root.childrenSpans).toHaveLength(1);
-      expect(root.childrenSpans![0]!.name).toBe('test');
+      expect(root.childrenSpans![0]!.name).toBe(TEST_NAME);
       expect(root.childrenSpans![0]!.childrenSpans).toEqual([]);
       expect(root.childrenSpans![0]!.sandboxMembers).toHaveLength(8);
     });
@@ -1615,7 +1625,7 @@ describe('traceConversion', () => {
 
       expect(root.childrenSpans).toHaveLength(1);
       const test = root.childrenSpans![0]!;
-      expect(test.name).toBe('test');
+      expect(test.name).toBe(TEST_NAME);
       expect(test.sandboxMembers).toHaveLength(16);
       expect(test.childrenSpans).toEqual([]);
       expect(test.status).toBe('COMPLETED');
@@ -1623,6 +1633,8 @@ describe('traceConversion', () => {
 
       const bar = barsOf(root)[0]!;
       expect(bar.sandbox?.exitCode).toBe(0);
+      // The badge reads "exit 0 · 2 attempts"
+      expect(bar.sandbox?.attempts).toBe(2);
       expect(bar.sandbox?.phases?.map((p) => [p.label, p.failed])).toEqual([
         ['Attempt 1: Starting', true],
         ['Attempt 1: Running', true],
@@ -1654,7 +1666,7 @@ describe('traceConversion', () => {
       })) as Trace[];
       const root = traceRollup(createTrace({ isRoot: true, childrenSpans: steps }));
 
-      expect(root.childrenSpans![0]!.name).toBe('test › start');
+      expect(root.childrenSpans![0]!.name).toBe(`${TEST_NAME} › start`);
     });
 
     it('marks the first row of a machine the run did not create as existing', () => {
@@ -1662,17 +1674,128 @@ describe('traceConversion', () => {
       const existing = barsOf(root).map((b) => [b.name, b.sandbox?.existing]);
 
       expect(existing).toEqual([
-        ['build-machine', false],
+        ['build › machine', false],
         ['get-e2e', true],
         ['install', undefined],
         ['e2e-install', undefined],
         ['notify-start', undefined],
-        ['test', undefined],
+        [TEST_NAME, undefined],
         ['e2e', undefined],
         ['e2e-release', undefined],
+        [SERVE_NAME, undefined],
         ['snapshot-build', undefined],
+        ['build › pause', undefined],
         ['destroy-build', undefined],
       ]);
+    });
+
+    it('titles a lone internal step by its statement_name and gives it states', () => {
+      const root = rolledUp();
+      const serve = childByName(root, SERVE_NAME)!;
+
+      expect(childByName(root, `${SERVE_NAME} › start`)).toBeUndefined();
+      expect(serve.sandboxMembers).toHaveLength(1);
+      expect(serve.childrenSpans).toEqual([]);
+      expect(barByName(root, SERVE_NAME)?.sandbox).toMatchObject({
+        statement: 'processes.start',
+        command: 'pnpm serve',
+        commandInTitle: true,
+      });
+      expect(phaseSummary(root, SERVE_NAME)?.map((p) => p.label)).toEqual(['Starting']);
+    });
+
+    it("folds a machine's setup into its create row as states", () => {
+      const root = rolledUp();
+      const machine = childByName(root, 'build › machine')!;
+
+      expect(childByName(root, 'build › machine › setup')).toBeUndefined();
+      expect(machine.stepID).toBe(BUILD_MACHINE_STATEMENT_ID);
+      expect(machine.sandboxMembers).toHaveLength(2);
+      expect(phaseSummary(root, 'build › machine')).toEqual([
+        { label: 'Creating', start: '2026-10-01T12:00:00.000Z', end: '2026-10-01T12:00:04.700Z' },
+        { label: 'Setting up', start: '2026-10-01T12:00:04.700Z', end: '2026-10-01T12:00:05.100Z' },
+      ]);
+      // The setup command is CI's own work, not the row's command
+      const sandbox = barByName(root, 'build › machine')?.sandbox;
+      expect(sandbox?.statement).toBe('create');
+      expect(sandbox?.command).toBeUndefined();
+      expect(sandbox?.exitCode).toBeUndefined();
+    });
+
+    it("shows a create row's failing setup exit code", () => {
+      const [create, setup] = machineSteps();
+      const failedSetup = {
+        ...setup!,
+        status: 'FAILED',
+        metadata: setup!.metadata?.map((md) => ({
+          ...md,
+          values: { ...md.values, exit_code: 2 },
+        })),
+      } as Trace;
+      const root = traceRollup(
+        createTrace({ isRoot: true, childrenSpans: [create!, failedSetup] })
+      );
+
+      expect(barsOf(root)[0]?.sandbox?.exitCode).toBe(2);
+    });
+
+    it('only skips repeating the command when the title ends with it', () => {
+      const root = rolledUp();
+
+      expect(barByName(root, 'install')?.sandbox?.commandInTitle).toBe(false);
+
+      const cut = ciTestSteps().map((step) => ({
+        ...step,
+        name: step.name.replace(TEST_NAME, 'test › pnpm t…'),
+      }));
+      const cutRoot = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: cut.map((step) => ({
+            ...step,
+            metadata: step.metadata?.map((md) => ({
+              ...md,
+              values: { ...md.values, statement_name: 'test › pnpm t…' },
+            })),
+          })) as Trace[],
+        })
+      );
+      // CI cuts long labels with an ellipsis; a cut-off command still counts
+      expect(barsOf(cutRoot)[0]?.sandbox?.commandInTitle).toBe(true);
+    });
+
+    it('has a verb for every statement the SDK emits', () => {
+      // inngest-js components/sandbox/durable.ts statementForAction, plus the
+      // explicit snapshot and snapshot.clone statements
+      const sdkStatements = [
+        'create',
+        'list',
+        'get',
+        'waitUntilRunning',
+        'commands.run',
+        'destroy',
+        'pause',
+        'resume',
+        'processes.start',
+        'processes.list',
+        'processes.get',
+        'process.signal',
+        'process.wait',
+        'process.getOutput',
+        'snapshot',
+        'snapshots.list',
+        'snapshots.get',
+        'snapshot.waitUntilReady',
+        'snapshot.delete',
+        'snapshot.clone',
+      ];
+
+      expect(Object.keys(STATEMENT_VERBS).sort()).toEqual([...sdkStatements].sort());
+      expect(statementVerb('pause')).toBe('Pause');
+      expect(statementVerb('resume')).toBe('Resume');
+      for (const statement of sdkStatements) {
+        expect(statementVerb(statement)).toMatch(/^[A-Z]/);
+      }
     });
 
     it('leaves runs without sandbox metadata exactly as before', () => {

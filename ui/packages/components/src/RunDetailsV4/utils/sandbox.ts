@@ -117,9 +117,23 @@ function rollupSandboxStatement(statementID: string, members: Trace[]): Trace {
 }
 
 /**
+ * Whether a statement's steps fold into one virtual row. Two or more steps
+ * always do. A lone step does only when it's internal work titled by
+ * `statement_name` (like a CI background process that is just a start), so
+ * the row is still titled by the statement and drawn with its states.
+ */
+function foldsIntoRow(members: Trace[]): boolean {
+  if (members.length >= 2) {
+    return true;
+  }
+  const md = members[0] && getSandboxMetadata(members[0]);
+  return md?.role === 'internal' && !!md.statement_name;
+}
+
+/**
  * Group the run's (already attempt-rolled-up) children by `statement_id`.
- * Groups with one member, and spans without sandbox metadata, pass through
- * unchanged.
+ * Statements that don't fold (see foldsIntoRow), and spans without sandbox
+ * metadata, pass through unchanged.
  */
 export function rollupSandboxStatements(children: Trace[]): Trace[] {
   const groups = new Map<string, Trace[]>();
@@ -134,7 +148,7 @@ export function rollupSandboxStatements(children: Trace[]): Trace[] {
   for (const child of children) {
     const statementID = getSandboxMetadata(child)?.statement_id;
     const members = statementID ? groups.get(statementID) : undefined;
-    if (!statementID || !members || members.length < 2) {
+    if (!statementID || !members || !foldsIntoRow(members)) {
       result.push(child);
     } else if (members[0] === child) {
       result.push(rollupSandboxStatement(statementID, members));
@@ -154,6 +168,17 @@ const RUNNING: Phase = { key: 'running', label: 'Running', waiting: true };
 function phaseOf(member: Trace, statement: string): Phase {
   const action = getSandboxMetadata(member)?.action ?? '';
 
+  if (statement === 'create' || statement === 'snapshot.clone') {
+    if (action === 'create') {
+      return { key: 'creating', label: 'Creating', waiting: false };
+    }
+    if (action === 'waitUntilRunning') {
+      return { key: 'booting', label: 'Waiting until running', waiting: true };
+    }
+    // Work done on a new machine before it's handed over, like CI's setup
+    return { key: 'setup', label: 'Setting up', waiting: false };
+  }
+
   if (statement.startsWith('snapshot')) {
     return action === 'snapshot.create'
       ? { key: 'creating', label: 'Creating snapshot', waiting: false }
@@ -163,9 +188,6 @@ function phaseOf(member: Trace, statement: string): Phase {
   const isSleep = action === 'sleep' || member.stepOp?.toUpperCase() === 'SLEEP';
   if (isSleep) {
     return RUNNING;
-  }
-  if (action === 'create') {
-    return { key: 'creating', label: 'Creating sandbox', waiting: false };
   }
   if (action.endsWith('.start')) {
     return { key: 'starting', label: 'Starting', waiting: false };
@@ -252,6 +274,23 @@ function statementPhases(
 }
 
 /**
+ * Whether a row's title already ends with its command, like CI's
+ * `test › echo done`. CI cuts long labels with an ellipsis, so a title ending
+ * in a cut-off start of the command counts too.
+ */
+function titleEndsWithCommand(title: string, command: string): boolean {
+  const wanted = command.trim();
+  const last = title.split(' › ').pop()?.trim() ?? '';
+  if (!wanted || !last) {
+    return false;
+  }
+  if (title.trimEnd().endsWith(wanted)) {
+    return true;
+  }
+  return last.endsWith('…') && last.length > 1 && wanted.startsWith(last.slice(0, -1));
+}
+
+/**
  * Describe a span for its row: machine, command, exit code, and for a
  * statement that owns several steps, its states. Undefined for spans without
  * sandbox metadata.
@@ -266,18 +305,26 @@ export function getSandboxBarData(trace: Trace): SandboxBarData | undefined {
   const sandboxId = entries.find((md) => md.sandbox_id)?.sandbox_id;
   const sandboxName = entries.find((md) => md.sandbox_name)?.sandbox_name;
   const withCommand = entries.find((md) => md.command_display || md.command?.length);
-  const exitCode = [...entries].reverse().find((md) => md.exit_code !== undefined)?.exit_code;
+  const lastExitCode = [...entries].reverse().find((md) => md.exit_code !== undefined)?.exit_code;
+  const members = trace.sandboxMembers;
+  const attempts = members ? splitAttempts(members).length : 1;
+
+  // A create row's commands are setup on the new machine, not the user's
+  // command, so only a failing one is worth showing.
+  const isCreate = statementEntry.statement === 'create';
+  const command = withCommand?.command_display ?? withCommand?.command?.join(' ');
+  const exitCode = isCreate && lastExitCode === 0 ? undefined : lastExitCode;
 
   return {
     sandboxId,
     machineLabel: sandboxName ?? sandboxId?.slice(0, 8),
     statement: statementEntry.statement,
-    command: withCommand?.command_display ?? withCommand?.command?.join(' '),
+    command: isCreate ? undefined : command,
+    commandInTitle: !!command && titleEndsWithCommand(trace.name, command),
     exitCode,
+    attempts: attempts > 1 ? attempts : undefined,
     actions: entries.map((md) => md.action),
-    phases: trace.sandboxMembers
-      ? statementPhases(trace.sandboxMembers, statementEntry.statement, trace.endedAt)
-      : undefined,
+    phases: members ? statementPhases(members, statementEntry.statement, trace.endedAt) : undefined,
   };
 }
 
@@ -308,16 +355,29 @@ export function annotateSandboxRows(rows: { sandbox?: SandboxBarData }[]): void 
   }
 }
 
-const STATEMENT_VERBS: Record<string, string> = {
+// Every `statement` the SDK emits (statementForAction and the explicit ones
+// in inngest-js components/sandbox/durable.ts)
+export const STATEMENT_VERBS: Record<string, string> = {
   create: 'Create sandbox',
+  list: 'List sandboxes',
   get: 'Get sandbox',
+  waitUntilRunning: 'Wait until running',
   'commands.run': 'Run',
+  destroy: 'Destroy',
+  pause: 'Pause',
+  resume: 'Resume',
   'processes.start': 'Start',
+  'processes.list': 'List processes',
+  'processes.get': 'Get process',
+  'process.signal': 'Signal',
   'process.wait': 'Wait for',
-  'process.kill': 'Kill',
+  'process.getOutput': 'Get output of',
   snapshot: 'Snapshot',
   'snapshot.clone': 'Clone snapshot',
-  destroy: 'Destroy',
+  'snapshots.list': 'List snapshots',
+  'snapshots.get': 'Get snapshot',
+  'snapshot.waitUntilReady': 'Wait for snapshot',
+  'snapshot.delete': 'Delete snapshot',
 };
 
 /** Human verb for the SDK method, falling back to the method itself */
