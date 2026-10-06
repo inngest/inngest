@@ -1,24 +1,17 @@
 /**
- * Sandbox machine chips and the machine highlight.
- *
- * A row backed by `inngest.sandbox` metadata shows a line under its name: the
- * command, a chip for its machine (coloured by when the machine first appears
- * in the run) and the exit code. A span group shows the chip when all its
- * sandbox steps ran on one machine, and its last exit code. Clicking a chip
- * pins a highlight on every row of that machine; hovering one previews it;
- * Escape clears it.
- *
- * Everything sandbox-specific in the timeline lives here.
+ * Sandbox machine chips and the machine highlight, from `inngest.sandbox`
+ * metadata. Everything sandbox-specific in the timeline lives here.
  */
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react';
 
 import { cn } from '../utils/classNames';
@@ -32,7 +25,10 @@ export type SandboxBarData = {
   exitCode?: number;
 };
 
-/** What a row shows about the sandbox work behind it, if any */
+/**
+ * What a row shows about its sandbox work: a step's command, machine and exit
+ * code, or a group's shared machine and its last exit code.
+ */
 export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
   if (!isSpanGroup(trace)) {
     const md = trace.metadata?.find(isSandboxMetadata)?.values;
@@ -46,8 +42,6 @@ export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
     };
   }
 
-  // A group's sandbox steps, in order. Steps that name no machine (like a
-  // snapshot readiness wait) don't count against a shared machine.
   const steps: SandboxBarData[] = [];
   const visit = (t: Trace) => {
     for (const child of t.childrenSpans ?? []) {
@@ -61,31 +55,15 @@ export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
   };
   visit(trace);
 
-  const machines = steps.filter((s) => s.sandboxId);
-  const sharedMachine = machines.every((s) => s.sandboxId === machines[0]?.sandboxId)
-    ? machines[0]
+  // Steps that name no machine (like a snapshot readiness wait) don't count
+  const machine = steps.find((s) => s.sandboxId);
+  const shared = steps.every((s) => !s.sandboxId || s.sandboxId === machine?.sandboxId)
+    ? machine
     : undefined;
-  const exitCode = [...steps].reverse().find((s) => s.exitCode !== undefined)?.exitCode;
-  if (!sharedMachine && exitCode === undefined) return undefined;
+  const exitCode = steps.filter((s) => s.exitCode !== undefined).pop()?.exitCode;
+  if (!shared && exitCode === undefined) return undefined;
 
-  return {
-    sandboxId: sharedMachine?.sandboxId,
-    machineLabel: sharedMachine?.machineLabel,
-    exitCode,
-  };
-}
-
-/** The run's machines in order of first appearance, each once */
-export function collectMachineIds(bars: TimelineBarData[]): string[] {
-  const ids = new Set<string>();
-  const visit = (list: TimelineBarData[]) => {
-    for (const bar of list) {
-      if (bar.sandbox?.sandboxId) ids.add(bar.sandbox.sandboxId);
-      visit(bar.children ?? []);
-    }
-  };
-  visit(bars);
-  return [...ids];
+  return { sandboxId: shared?.sandboxId, machineLabel: shared?.machineLabel, exitCode };
 }
 
 // Theme-aware chart colours, skipping green and red so a machine never reads
@@ -97,8 +75,8 @@ const MACHINE_COLORS = [
   '--color-chart-line-3',
 ];
 
-/** A machine's colour as an rgb() string, by its first appearance in the run */
-export function machineColor(sandboxId: string, machineIds: string[], alpha = 1): string {
+/** A machine's colour, by its first appearance in the run */
+function machineColor(sandboxId: string, machineIds: string[], alpha = 1): string {
   const index = Math.max(0, machineIds.indexOf(sandboxId));
   return `rgb(var(${MACHINE_COLORS[index % MACHINE_COLORS.length]}) / ${alpha})`;
 }
@@ -109,29 +87,23 @@ export function machineColor(sandboxId: string, machineIds: string[], alpha = 1)
  */
 export function shortMachineLabel(label: string, max = 20): string {
   if (label.length <= max) return label;
-  const tail = max - 7;
-  return `${label.slice(0, 6)}…${label.slice(-tail)}`;
+  return `${label.slice(0, 6)}…${label.slice(-(max - 7))}`;
 }
-
-// ============================================================================
-// Highlight state
-// ============================================================================
 
 type MachineHighlightState = {
   machineIds: string[];
-  /** The pinned machine, else the previewed one */
-  activeId: string | null;
   pinnedId: string | null;
-  togglePin: (sandboxId: string) => void;
-  preview: (sandboxId: string | null) => void;
+  previewId: string | null;
+  setPinnedId: Dispatch<SetStateAction<string | null>>;
+  setPreviewId: Dispatch<SetStateAction<string | null>>;
 };
 
 const MachineHighlightContext = createContext<MachineHighlightState>({
   machineIds: [],
-  activeId: null,
   pinnedId: null,
-  togglePin: () => {},
-  preview: () => {},
+  previewId: null,
+  setPinnedId: () => {},
+  setPreviewId: () => {},
 });
 
 export function MachineHighlightProvider({
@@ -141,32 +113,32 @@ export function MachineHighlightProvider({
   bars: TimelineBarData[];
   children: ReactNode;
 }) {
-  const machineIds = useMemo(() => collectMachineIds(bars), [bars]);
+  // The run's machines in order of first appearance
+  const machineIds = useMemo(() => {
+    const ids = new Set<string>();
+    const visit = (list: TimelineBarData[]) => {
+      for (const bar of list) {
+        if (bar.sandbox?.sandboxId) ids.add(bar.sandbox.sandboxId);
+        visit(bar.children ?? []);
+      }
+    };
+    visit(bars);
+    return [...ids];
+  }, [bars]);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
 
-  const togglePin = useCallback((sandboxId: string) => {
-    setPinnedId((current) => (current === sandboxId ? null : sandboxId));
-  }, []);
-
   useEffect(() => {
-    if (!pinnedId) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPinnedId(null);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [pinnedId]);
+  }, []);
 
   const value = useMemo(
-    () => ({
-      machineIds,
-      activeId: pinnedId ?? previewId,
-      pinnedId,
-      togglePin,
-      preview: setPreviewId,
-    }),
-    [machineIds, pinnedId, previewId, togglePin]
+    () => ({ machineIds, pinnedId, previewId, setPinnedId, setPreviewId }),
+    [machineIds, pinnedId, previewId]
   );
 
   return (
@@ -177,42 +149,33 @@ export function MachineHighlightProvider({
 /** The machine of the nearest row above that has one, so sub-rows highlight too */
 const RowMachineContext = createContext<string | undefined>(undefined);
 
+export const MachineScope = RowMachineContext.Provider;
+
 export function useRowMachineId(ownId?: string): string | undefined {
   const inherited = useContext(RowMachineContext);
   return ownId ?? inherited;
 }
 
-export function MachineScope({ sandboxId, children }: { sandboxId?: string; children: ReactNode }) {
-  return <RowMachineContext.Provider value={sandboxId}>{children}</RowMachineContext.Provider>;
-}
-
 /** Dotted background in the machine's colour while its rows are highlighted */
 export function MachineHighlight({ sandboxId }: { sandboxId?: string }) {
-  const { activeId, machineIds } = useContext(MachineHighlightContext);
-  if (!sandboxId || sandboxId !== activeId) return null;
+  const { machineIds, pinnedId, previewId } = useContext(MachineHighlightContext);
+  if (!sandboxId || sandboxId !== (pinnedId ?? previewId)) return null;
 
+  const dot = machineColor(sandboxId, machineIds, 0.6);
   return (
     <div
       data-testid="machine-highlight"
       className="pointer-events-none absolute inset-0"
       style={{
-        backgroundImage: `radial-gradient(circle, ${machineColor(
-          sandboxId,
-          machineIds,
-          0.6
-        )} 1px, transparent 1px)`,
+        backgroundImage: `radial-gradient(circle, ${dot} 1px, transparent 1px)`,
         backgroundSize: '7px 7px',
       }}
     />
   );
 }
 
-// ============================================================================
-// Row annotation
-// ============================================================================
-
 function MachineChip({ sandboxId, label }: { sandboxId: string; label: string }) {
-  const { machineIds, pinnedId, togglePin, preview } = useContext(MachineHighlightContext);
+  const { machineIds, pinnedId, setPinnedId, setPreviewId } = useContext(MachineHighlightContext);
   const pinned = pinnedId === sandboxId;
   const color = (alpha?: number) => machineColor(sandboxId, machineIds, alpha);
 
@@ -232,11 +195,11 @@ function MachineChip({ sandboxId, label }: { sandboxId: string; label: string })
       // The chip sits inside a clickable row; don't select or toggle the row
       onClick={(e) => {
         e.stopPropagation();
-        togglePin(sandboxId);
+        setPinnedId((current) => (current === sandboxId ? null : sandboxId));
       }}
       onMouseDown={(e) => e.stopPropagation()}
-      onMouseEnter={() => preview(sandboxId)}
-      onMouseLeave={() => preview(null)}
+      onMouseEnter={() => setPreviewId(sandboxId)}
+      onMouseLeave={() => setPreviewId(null)}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color() }} />
       <span className="truncate">{shortMachineLabel(label)}</span>
@@ -244,32 +207,14 @@ function MachineChip({ sandboxId, label }: { sandboxId: string; label: string })
   );
 }
 
-function ExitBadge({ exitCode }: { exitCode: number }) {
-  return (
-    <span
-      data-testid="exit-badge"
-      className={cn(
-        'shrink-0 rounded px-1 font-mono text-[11px] leading-4',
-        exitCode === 0
-          ? 'bg-primary-3xSubtle text-primary-intense'
-          : 'bg-tertiary-3xSubtle text-tertiary-intense'
-      )}
-    >
-      exit {exitCode}
-    </span>
-  );
-}
-
 /** The line under a sandbox row's name */
 export function SandboxAnnotation({
-  sandbox,
+  sandbox: { sandboxId, machineLabel, command, exitCode },
   className,
 }: {
   sandbox: SandboxBarData;
   className?: string;
 }) {
-  const { sandboxId, machineLabel, command, exitCode } = sandbox;
-
   return (
     <span
       data-testid="sandbox-annotation"
@@ -285,7 +230,19 @@ export function SandboxAnnotation({
       )}
       {command && sandboxId && <span className="shrink-0">on</span>}
       {sandboxId && <MachineChip sandboxId={sandboxId} label={machineLabel ?? sandboxId} />}
-      {exitCode !== undefined && <ExitBadge exitCode={exitCode} />}
+      {exitCode !== undefined && (
+        <span
+          data-testid="exit-badge"
+          className={cn(
+            'shrink-0 rounded px-1 font-mono text-[11px] leading-4',
+            exitCode === 0
+              ? 'bg-primary-3xSubtle text-primary-intense'
+              : 'bg-tertiary-3xSubtle text-tertiary-intense'
+          )}
+        >
+          exit {exitCode}
+        </span>
+      )}
     </span>
   );
 }

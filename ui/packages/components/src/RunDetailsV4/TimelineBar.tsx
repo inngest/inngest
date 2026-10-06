@@ -1095,7 +1095,7 @@ export function TimelineBar({
       )}
 
       {/* Children (expanded content) */}
-      {expanded && <MachineScope sandboxId={machineId}>{children}</MachineScope>}
+      {expanded && <MachineScope value={machineId}>{children}</MachineScope>}
     </div>
   );
 }
