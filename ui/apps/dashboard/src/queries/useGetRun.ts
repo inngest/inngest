@@ -41,6 +41,7 @@ const traceDetailsFragment = graphql(`
     stepOp
     stepType
     groupKind
+    origin
     stepInfo {
       __typename
       ... on InvokeStepInfo {
