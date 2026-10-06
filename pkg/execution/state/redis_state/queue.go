@@ -1689,7 +1689,8 @@ func (q *queue) AccountPeek(ctx context.Context, sequential bool, until time.Tim
 
 	// Look up each account's priority concurrently. The lookups are independent
 	// and can each wait on a remote cache; done one after another, they stall
-	// the scan loop while many accounts have work due, such as at a cron herd.
+	// the scan loop while many accounts have work due, such as during a burst
+	// of cron runs scheduled for the same time.
 	weights := make([]float64, len(items))
 	eg := errgroup.Group{}
 	eg.SetLimit(int(osqueue.AccountPeekMax))
