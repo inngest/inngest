@@ -85,21 +85,37 @@ describe('numberSandboxes', () => {
     ]);
   });
 
-  it('follows run time, not row order', () => {
-    const bar = (id: string, secs: number): TimelineBarData => {
-      return {
-        id,
-        name: id,
-        startTime: new Date(secs * 1000),
-        endTime: null,
-        style: 'step.run',
-        sandbox: { sandboxId: id, label: id },
-      };
+  const bar = (
+    id: string,
+    secs: number,
+    style: TimelineBarData['style'] = 'step.run',
+    children?: TimelineBarData[]
+  ): TimelineBarData => {
+    return {
+      id,
+      name: id,
+      startTime: new Date(secs * 1000),
+      endTime: null,
+      style,
+      sandbox: { sandboxId: id, label: id },
+      children,
     };
+  };
 
+  it('orders siblings by start time, not row order', () => {
     expect([...numberSandboxes([bar('late', 9), bar('early', 1)])]).toEqual([
       ['early', 1],
       ['late', 2],
+    ]);
+  });
+
+  it("numbers a group's own sandbox before an extra one inside it that starts first", () => {
+    const job = bar('job', 5, 'span.group', [bar('extra', 1), bar('job', 6)]);
+
+    expect([...numberSandboxes([bar('base', 0, 'span.group'), job])]).toEqual([
+      ['base', 1],
+      ['job', 2],
+      ['extra', 3],
     ]);
   });
 });

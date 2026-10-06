@@ -49,18 +49,23 @@ export function sandboxBarData(trace: Trace): SandboxBarData | undefined {
 }
 
 /**
- * The run's sandboxes numbered from 1 in the order steps first use them.
- * Groups only repeat their steps' sandboxes, so they're skipped.
+ * The run's sandboxes numbered from 1 in reading order: siblings by start
+ * time, and a row's own sandbox before the ones its children add. A job is
+ * then numbered before an extra sandbox it starts, even one that starts first.
  */
 export function numberSandboxes(bars: TimelineBarData[]): Map<string, number> {
-  const firstUse = new Map<string, number>();
+  const numbers = new Map<string, number>();
 
   const visit = (list: TimelineBarData[]) => {
-    for (const bar of list) {
+    const byStart = [...list].sort((a, b) => {
+      return a.startTime.getTime() - b.startTime.getTime();
+    });
+
+    for (const bar of byStart) {
       const id = bar.sandbox?.sandboxId;
 
-      if (id && bar.style !== 'span.group') {
-        firstUse.set(id, Math.min(firstUse.get(id) ?? Infinity, bar.startTime.getTime()));
+      if (id && !numbers.has(id)) {
+        numbers.set(id, numbers.size + 1);
       }
 
       visit(bar.children ?? []);
@@ -69,15 +74,7 @@ export function numberSandboxes(bars: TimelineBarData[]): Map<string, number> {
 
   visit(bars);
 
-  const ordered = [...firstUse].sort((a, b) => {
-    return a[1] - b[1];
-  });
-
-  return new Map(
-    ordered.map(([id], index) => {
-      return [id, index + 1];
-    })
-  );
+  return numbers;
 }
 
 const SandboxNumbers = createContext<Map<string, number>>(new Map());
