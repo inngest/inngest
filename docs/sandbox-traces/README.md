@@ -176,8 +176,12 @@ and B–E add to it.
 ### A. Annotated rows
 
 The step ID stays the title. Under it: a description built from `statement`,
-`command_display`/`command` and `sandbox_name`, a machine chip coloured from
-`sandbox_id`, and an exit-code badge from `exit_code`. Rows with internal steps
+`command_display`/`command` and `sandbox_name`, a machine chip, and an
+exit-code badge from `exit_code`. Machines are coloured in order of first
+appearance in the run, so neighbouring machines differ. A long chip name is cut
+in the middle, keeping the end (`ci-01M…-base`), with the full name in its
+title. When the title already ends with the command (CI titles a command's row
+with the command), the description is just the verb and the machine. Rows with internal steps
 say how many. A machine with no `create` row in the run is marked "existing"
 on its first row. Cheapest option; no interaction.
 
@@ -213,8 +217,15 @@ times:
   is just running), **Collecting output** (the output fetch).
 - A snapshot: **Creating snapshot** (`snapshot.create`), **Waiting until
   ready** (`snapshot.waitUntilReady`).
+- A machine: **Creating** (`create`), **Setting up** (anything run inside the
+  create statement, like `@inngest/ci`'s setup command). The setup command and
+  a zero exit code aren't shown as the row's command.
 
-Waiting states are drawn hollow, working states solid, and every state takes
+A statement with a single internal step (a CI background process that is just a
+start) still folds, so its row is titled by `statement_name`.
+
+Each state is one continuous segment: waiting states are a hollow outline,
+working states solid, and every state takes
 the row's final status colour (red if the last step failed). Each state lasts
 until the next begins, so there are no gaps. The hover card lists how long each
 state took. Selecting the row shows the statement's result: the last step's
@@ -224,8 +235,8 @@ as attempts, the same as any step; retries of an internal step don't show.
 A retried CI command (`X #attempt-1`, `X #attempt-2`) shares one
 `statement_id` and has no statement step, so its attempts stay on the one row:
 each `process.start` opens an attempt, an earlier attempt that failed (a failed
-step or a non-zero exit code) is drawn in the failed colour, and the hover card
-labels states by attempt. If attempts need to expand like step retries, the
+step or a non-zero exit code) is drawn in the failed colour, the hover card
+labels states by attempt, and the badge counts them (`exit 0 · 2 attempts`). If attempts need to expand like step retries, the
 metadata would need a `statement_attempt` field; the UI never reads attempts
 from step names.
 
