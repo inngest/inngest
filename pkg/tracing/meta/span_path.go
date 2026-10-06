@@ -5,4 +5,7 @@ package meta
 type SpanPathElement struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// Kind is an optional short word the caller chose for the group, such as
+	// "job" or "agent".
+	Kind string `json:"kind,omitempty"`
 }

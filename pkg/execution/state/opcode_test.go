@@ -417,10 +417,10 @@ func TestGeneratorOpcode_SetOpt(t *testing.T) {
 
 func TestGeneratorOpcode_SpanPath(t *testing.T) {
 	path := []meta.SpanPathElement{
-		{ID: "agent", Name: "Research agent"},
+		{ID: "agent", Name: "Research agent", Kind: "agent"},
 		{ID: "search", Name: "search tool"},
 	}
-	raw := `{"stackLine":"fn.ts:1","span":[{"id":"agent","name":"Research agent"},{"id":"search","name":"search tool"}]}`
+	raw := `{"stackLine":"fn.ts:1","span":[{"id":"agent","name":"Research agent","kind":"agent"},{"id":"search","name":"search tool"}]}`
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
 

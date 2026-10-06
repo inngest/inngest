@@ -422,7 +422,7 @@ func TestGeneratorAttrsSpanPath(t *testing.T) {
 	}
 
 	// Any opcode, sleeps included, records its span path.
-	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent"}, {ID: "search", Name: "search tool"}}
+	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}, {ID: "search", Name: "search tool"}}
 	sleep := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{"span": path}})
 	require.Equal(t, &path, sleep.StepSpanPath)
 
