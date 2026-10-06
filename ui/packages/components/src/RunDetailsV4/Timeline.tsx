@@ -984,20 +984,20 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
 
   return (
-    <MachineHighlightProvider bars={bars}>
-      <div className="w-full pb-4 pr-2" data-testid="timeline-container">
-        {/* Run duration header with timing markers */}
-        <TimelineHeader
-          minTime={minTime}
-          maxTime={maxTime}
-          leftWidth={leftWidth}
-          onSelectionChange={handleSelectionChange}
-          status={rootStatus}
-          selectionStart={viewStartOffset}
-          selectionEnd={viewEndOffset}
-        />
+    <div className="w-full pb-4 pr-2" data-testid="timeline-container">
+      {/* Run duration header with timing markers */}
+      <TimelineHeader
+        minTime={minTime}
+        maxTime={maxTime}
+        leftWidth={leftWidth}
+        onSelectionChange={handleSelectionChange}
+        status={rootStatus}
+        selectionStart={viewStartOffset}
+        selectionEnd={viewEndOffset}
+      />
 
-        {/* Step bars */}
+      {/* Step bars */}
+      <MachineHighlightProvider bars={bars}>
         {bars.map((bar) => (
           <TimelineBarRenderer
             key={bar.id}
@@ -1016,7 +1016,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
             actions={bar.isRoot ? expandCollapseActions : undefined}
           />
         ))}
-      </div>
-    </MachineHighlightProvider>
+      </MachineHighlightProvider>
+    </div>
   );
 }
