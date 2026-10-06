@@ -46,7 +46,8 @@ run-level spans and land in the same group. Runs without span paths are
 unchanged.
 
 GraphQL, the REST v2 trace, the CLI and MCP share this converter. The REST
-`TraceSpan` has a `step_type` field, `SPAN_GROUP` for groups.
+`TraceSpan` has a `stepType` field (`step_type` in the proto), `SPAN_GROUP`
+for groups.
 
 **Rerun.** Rerunning a group reruns from its earliest-queued step: the UI sends
 that step's `stepID`. Group span IDs are virtual and never sent.
