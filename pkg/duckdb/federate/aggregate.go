@@ -88,8 +88,7 @@ type AggregateRequest struct {
 }
 
 // AggregateStreamer is an optional DeltaStreamer extension: it aggregates a
-// delta itself, so only partials are streamed. The executor uses it when
-// Streaming is set.
+// delta itself, so only partials are streamed.
 type AggregateStreamer interface {
 	StreamAggregate(ctx context.Context, req AggregateRequest) (EncodedReader, error)
 }
@@ -108,7 +107,7 @@ func (e *Executor) Aggregate(ctx context.Context, q AggregateQuery) (*Rows, erro
 	if err := validateAggregate(q); err != nil {
 		return nil, err
 	}
-	if as, ok := e.Delta.(AggregateStreamer); ok && e.Streaming {
+	if as, ok := e.Delta.(AggregateStreamer); ok {
 		rows, err := e.aggregatePushed(ctx, as, q)
 		if !errors.Is(err, ErrNotExact) {
 			return rows, err
@@ -160,7 +159,7 @@ func (e *Executor) aggregatePushed(ctx context.Context, as AggregateStreamer, q 
 	}
 	rows, err := conn.QueryContext(driver.WithQuackStreams(ctx, stream), sqlText, args...)
 	if err != nil {
-		_ = releaseConn(conn, nil)
+		_ = releaseConn(conn)
 		return nil, fmt.Errorf("federate: aggregate: %w", err)
 	}
 	return &Rows{Rows: rows, conn: conn}, nil
