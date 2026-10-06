@@ -59,8 +59,8 @@ export type BarStyleKey =
   | 'timing.http.server' // Server processing / TTFB (short, emerald)
   | 'timing.http.transfer' // Content transfer (short, green)
   // Sandbox statement states (segments of one statement row)
-  | 'sandbox.active' // Doing work: starting, creating, collecting output (tall, status color)
-  | 'sandbox.waiting' // Waiting on the machine: running, waiting until ready (tall, hollow lines)
+  | 'sandbox.active' // Doing work: starting, creating, collecting output (tall, solid status color)
+  | 'sandbox.waiting' // Waiting on the machine: running, waiting until ready (tall, hollow status outline)
   // Generic fallback
   | 'default';
 
