@@ -220,8 +220,7 @@ export const StepInfo = ({
   const rerunStepID = spanGroup ? firstStepID(trace) : trace.stepID;
   const showRerunFromStep = !isDurableEndpoint && !debug && runID && rerunStepID;
   const editableInput =
-    !spanGroup &&
-    (trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input));
+    trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
 
   const showAINudge =
     Boolean(result?.data && looksLikeAIOutput(result.data)) &&
