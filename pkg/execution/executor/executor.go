@@ -5732,7 +5732,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 		// Update the generator to use the interpolated data, ensuring history
 		// is updated. Only `if` changes, so the SDK's other opts survive.
-		opts.If = expr
 		if err := gen.SetOpt("if", interpolated); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
