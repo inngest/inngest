@@ -176,6 +176,26 @@ func TestGroupBySpanPath(t *testing.T) {
 		}
 	})
 
+	t.Run("an attempt that failed before the SDK answered joins the group of its step", func(t *testing.T) {
+		stepless := func(id string, at int) *cqrs.OtelSpan {
+			span := groupedStep(id, at, 1, failed)
+			span.Name = meta.SpanNameNonStep
+			span.Attributes.StepID = nil
+			span.Attributes.GroupID = new("g")
+			span.OutputID = new(id)
+			return span
+		}
+		step := groupedStep("work", 2, 1, completed, agent)
+		step.Attributes.GroupID = new("g")
+
+		// The function's own error after the step shares its group ID too, but
+		// isn't the step's, so it stays on the run.
+		result := convertGroupedRun(t, stepless("lost", 0), step, stepless("final", 4))
+
+		require.Equal(t, []string{"Research agent", "final"}, childNames(result))
+		assert.Equal(t, []string{"lost", "work"}, childNames(result.ChildrenSpans[0]))
+	})
+
 	t.Run("reads the path from a step's execution", func(t *testing.T) {
 		step := groupedStep("query", 0, 1, completed)
 		execPath := []meta.SpanPathElement{agent}

@@ -23,6 +23,20 @@ func groupBySpanPath(run *models.RunTraceSpan) {
 	children := run.ChildrenSpans
 	run.ChildrenSpans = nil
 
+	// An attempt that failed before the SDK answered has no step ID or path,
+	// only the group ID it shares with the later attempts of its step, so it
+	// takes the path of the next step with that group ID.
+	nextStepPath := map[string][]meta.SpanPathElement{}
+	for _, child := range slices.Backward(children) {
+		switch {
+		case child.GroupID == nil:
+		case child.StepID != nil && *child.StepID != "":
+			nextStepPath[*child.GroupID] = child.SpanPath
+		case child.SpanPath == nil:
+			child.SpanPath = nextStepPath[*child.GroupID]
+		}
+	}
+
 	for _, child := range children {
 		parent := run
 		for i := range child.SpanPath {

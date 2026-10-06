@@ -26,8 +26,10 @@ opcode type and on both checkpoint paths, so sleeps and waits are grouped too.
 **API.** The trace loader (`pkg/coreapi/graph/loaders/span_groups.go`) makes
 one pass over the run span's direct children. Execution spans may carry the
 attribute too and are ignored; a step whose path is only on its execution
-inherits it like its step ID. Each step with a path is placed under virtual
-spans, one per path prefix:
+inherits it like its step ID. An attempt that failed before the SDK answered
+has no step ID or path, so it takes the path of the next step with its
+`groupID`, and stays rolled up with that step. Each step with a path is placed
+under virtual spans, one per path prefix:
 
 | Field | Value |
 | --- | --- |
