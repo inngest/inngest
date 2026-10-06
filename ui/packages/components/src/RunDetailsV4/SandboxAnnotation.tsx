@@ -15,7 +15,7 @@ import {
 } from 'react';
 
 import { cn } from '../utils/classNames';
-import { SpanKindTag } from './SpanKindTag';
+import { GroupKindTag } from './GroupKindTag';
 import type { TimelineBarData } from './TimelineBar.types';
 import { isSandboxMetadata, isSpanGroup, type Trace } from './types';
 
@@ -212,7 +212,7 @@ function MachineTag({ sandboxId, label }: { sandboxId: string; label: string }) 
       onMouseEnter={() => setPreviewId(sandboxId)}
       onMouseLeave={() => setPreviewId(null)}
     >
-      <SpanKindTag kind="machine" />
+      <GroupKindTag kind="machine" />
       <span className="truncate">{shortMachineLabel(label)}</span>
     </button>
   );

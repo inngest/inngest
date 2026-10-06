@@ -240,7 +240,7 @@ export interface TimelineBarProps {
   sandbox?: SandboxBarData;
 
   /** A span group's kind, shown as a tag before its name */
-  spanKind?: string;
+  groupKind?: string;
 }
 
 /**
@@ -346,7 +346,7 @@ export interface TimelineBarData {
   sandbox?: SandboxBarData;
 
   /** A span group's kind, as its caller named it */
-  spanKind?: string;
+  groupKind?: string;
 }
 
 /**

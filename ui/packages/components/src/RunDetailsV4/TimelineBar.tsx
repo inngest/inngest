@@ -39,6 +39,7 @@ import {
 } from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
+import { GroupKindTag } from './GroupKindTag';
 import {
   MachineHighlight,
   MachineScope,
@@ -46,7 +47,6 @@ import {
   useRowMachineId,
   useVisibleAnnotation,
 } from './SandboxAnnotation';
-import { SpanKindTag } from './SpanKindTag';
 import type {
   BarHeight,
   BarIcon,
@@ -864,7 +864,7 @@ export function TimelineBar({
   experimentMetadata,
   scores,
   sandbox,
-  spanKind,
+  groupKind,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const machineId = useRowMachineId(sandbox?.sandboxId);
@@ -969,7 +969,7 @@ export function TimelineBar({
                 annotation && 'flex-none'
               )}
             >
-              {spanKind && <SpanKindTag kind={spanKind} className="mr-1.5" />}
+              {groupKind && <GroupKindTag kind={groupKind} className="mr-1.5" />}
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>

@@ -314,7 +314,7 @@ function traceToBarData(
     experimentMetadata,
     scores: getScores(trace.metadata),
     sandbox: sandboxBarData(trace),
-    spanKind: trace.spanKind ?? undefined,
+    groupKind: trace.groupKind ?? undefined,
   };
 }
 

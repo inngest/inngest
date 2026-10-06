@@ -40,7 +40,7 @@ under virtual spans, one per path prefix:
 | `spanID` | `span:` + 16 hex chars of a SHA-256 over the path's IDs |
 | `name` | the last path element's name |
 | `stepType` | `SPAN_GROUP` (`stepOp`, `stepID`, `outputID` are null) |
-| `spanKind` | the last path element's `kind`, or null without one (always null for steps) |
+| `groupKind` | the last path element's `kind`, or null without one (always null for steps) |
 | `queuedAt`, `startedAt` | the earliest of its children's |
 | `endedAt` | the latest of its children's, or null while any child is running |
 | `status` | `RUNNING` while any child is, otherwise the status of the child that ended last |
@@ -54,7 +54,9 @@ unchanged.
 
 GraphQL, the REST v2 trace, the CLI and MCP share this converter. The REST
 `TraceSpan` has a `stepType` field (`step_type` in the proto), `SPAN_GROUP`
-for groups, and a `spanKind` field (`span_kind`), absent when null.
+for groups, and a `groupKind` field (`group_kind`), absent when null.
+It is `groupKind`, not `spanKind`, because `UserlandSpan.spanKind` already
+means the OpenTelemetry span kind.
 
 **Rerun.** Rerunning a group reruns from its earliest-queued step: the UI sends
 that step's `stepID`. Group span IDs are virtual and never sent.
@@ -71,8 +73,8 @@ that step's `stepID`. Group span IDs are virtual and never sent.
   Expanded, its own bar hides like any expanded parent.
 - The hover lists the direct children and their durations.
 - The step panel for a group offers "Rerun from start of span".
-- A group with a `spanKind` shows it upper-cased as a small tag before its
-  name (`SpanKindTag.tsx`, `bg-info text-info`): `[JOB] e2e`,
+- A group with a `groupKind` shows it upper-cased as a small tag before its
+  name (`GroupKindTag.tsx`, `bg-info text-info`): `[JOB] e2e`,
   `[AGENT] Research agent`. The kind is shown as given, with no mapping.
 
 **Sandbox machines** (`RunDetailsV4/SandboxAnnotation.tsx`, kept separate so
@@ -99,7 +101,7 @@ user called, like `commands.run`), and the optional flat fields `sandbox_id`,
   → userland. Deeper nesting is cut off. Returning spans as a flat list with
   parent IDs would remove the cap.
 - **Dashboard codegen.** `ui/apps/dashboard/src/gql/*` were patched by script
-  for `spanKind` (the documents deep-equal the parsed queries), as its codegen
+  for `groupKind` (the documents deep-equal the parsed queries), as its codegen
   needs the cloud schema. Run the real codegen to confirm.
 - **Flat loader.** The cloud's flat-span loader (`convertFlatSpanToGQL`) needs
   the same post-pass, and planned steps there get no path until they finish,

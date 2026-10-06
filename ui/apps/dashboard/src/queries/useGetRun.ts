@@ -40,7 +40,7 @@ const traceDetailsFragment = graphql(`
     groupID
     stepOp
     stepType
-    spanKind
+    groupKind
     stepInfo {
       __typename
       ... on InvokeStepInfo {

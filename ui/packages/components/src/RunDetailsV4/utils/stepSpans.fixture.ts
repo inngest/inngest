@@ -80,7 +80,7 @@ const exec = (
 });
 
 /** A group as the loader builds it: children by queue time, times and status from them */
-function group(id: string, name: string, children: Trace[], spanKind?: string): Trace {
+function group(id: string, name: string, children: Trace[], groupKind?: string): Trace {
   const sorted = [...children].sort((a, b) => Date.parse(a.queuedAt) - Date.parse(b.queuedAt));
   const last = sorted.reduce((a, b) =>
     Date.parse(b.endedAt ?? '') > Date.parse(a.endedAt ?? '') ? b : a
@@ -103,7 +103,7 @@ function group(id: string, name: string, children: Trace[], spanKind?: string): 
     stepInfo: null,
     stepOp: null,
     stepType: 'SPAN_GROUP',
-    spanKind: spanKind ?? null,
+    groupKind: groupKind ?? null,
     userlandSpan: null,
     metadata: [],
   };

@@ -100,13 +100,13 @@ func TestGroupBySpanPath(t *testing.T) {
 		assert.Nil(t, group.StepID)
 		assert.Nil(t, group.StepOp)
 		assert.Nil(t, group.OutputID)
-		assert.Equal(t, "agent", *group.SpanKind)
+		assert.Equal(t, "agent", *group.GroupKind)
 		require.Equal(t, []string{"plan", "search tool"}, childNames(group))
 
 		sub := group.ChildrenSpans[1]
 		assert.Equal(t, SpanGroupStepType, sub.StepType)
-		assert.Nil(t, sub.SpanKind)
-		assert.Nil(t, sub.ChildrenSpans[0].SpanKind)
+		assert.Nil(t, sub.GroupKind)
+		assert.Nil(t, sub.ChildrenSpans[0].GroupKind)
 		assert.Equal(t, group.SpanID, *sub.ParentSpanID)
 		assert.NotEqual(t, group.SpanID, sub.SpanID)
 		assert.Equal(t, []string{"query", "retry-query"}, childNames(sub))

@@ -2771,7 +2771,7 @@ message TraceSpan {
   optional string step_type = 14;
   // The kind its caller gave a span group, such as "job" or "agent". Absent
   // for steps and for groups without one.
-  optional string span_kind = 15;
+  optional string group_kind = 15;
 }
 
 message FunctionTrace {

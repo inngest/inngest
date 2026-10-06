@@ -21,11 +21,11 @@ afterEach(() => {
 
 /** The kind tags on a row's name line, leaving out its MACHINE tag */
 const kindTagsFor = (rowName: string) =>
-  [...screen.getByText(rowName).querySelectorAll('[data-testid=span-kind-tag]')].map(
+  [...screen.getByText(rowName).querySelectorAll('[data-testid=group-kind-tag]')].map(
     (tag) => tag.textContent
   );
 
-describe('span kind tags', () => {
+describe('group kind tags', () => {
   it('tags a span group with its kind, upper-cased, before its name', () => {
     render(<Timeline data={traceToTimelineData(traceRollup(stepSpansTrace), { runID: 'run' })} />, {
       wrapper: Wrapper,
