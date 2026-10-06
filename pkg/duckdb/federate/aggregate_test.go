@@ -49,7 +49,7 @@ func scanStrings(t *testing.T, rows interface {
 // can't aggregate, so this covers the row fallback; chdelta's integration
 // tests cover the pushed path against ClickHouse.
 func TestExecutorAggregate(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base.Truncate(time.Hour)
 		done := q.Add(time.Minute)
 		// Lake: final rows only. Delta: a finished run and an open one.

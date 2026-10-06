@@ -2,8 +2,6 @@ package federate
 
 import (
 	"context"
-	"database/sql"
-	sqldriver "database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,96 +12,8 @@ import (
 	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
-// Ingester loads a delta stream into a TEMP table on conn, so the views
-// built for that same connection can read it. It returns the number of rows
-// loaded, failing (rather than truncating) once more than rowCap rows arrive
-// (rowCap <= 0 means no cap).
-type Ingester interface {
-	Ingest(ctx context.Context, conn *sql.Conn, table string, r BatchReader, rowCap int) (int64, error)
-}
-
 // ErrRowCapExceeded is returned when a delta exceeds its row cap.
 var ErrRowCapExceeded = errors.New("federate: delta row cap exceeded")
-
-// QuackIngester ingests over the OSS driver's quack SEND_DATA path: the
-// TEMP table declares each column's real DuckDB type, and each value travels
-// as the closest wire kind the appender supports. LIST columns travel as
-// list-literal VARCHAR (the quack server crashes on a native LIST append;
-// see quack.ColumnKind) and DuckDB casts them on insert. conn must be a
-// quack-transport connection.
-//
-// Cloud's in-process DuckDB will use an Arrow-registration Ingester instead;
-// the views don't depend on which one loaded the TEMP table.
-type QuackIngester struct{}
-
-func (QuackIngester) Ingest(ctx context.Context, conn *sql.Conn, table string, r BatchReader, rowCap int) (int64, error) {
-	defer r.Close()
-
-	cols := r.Schema()
-	if len(cols) == 0 {
-		return 0, fmt.Errorf("federate: delta for %s has no columns", table)
-	}
-	defs := make([]string, len(cols))
-	kinds := make([]driver.QuackColumnKind, len(cols))
-	for i, c := range cols {
-		defs[i] = quoteIdent(c.Name) + " " + c.Type.DuckDBType()
-		kinds[i] = quackKind(c.Type)
-	}
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE TEMP TABLE %s (%s);", quoteIdent(table), strings.Join(defs, ", "))); err != nil {
-		return 0, fmt.Errorf("federate: creating delta table %s: %w", table, err)
-	}
-
-	var total int64
-	err := conn.Raw(func(dc any) error {
-		dconn, ok := dc.(sqldriver.Conn)
-		if !ok {
-			return fmt.Errorf("federate: unexpected driver connection %T", dc)
-		}
-		// No catalog: the appender must not USE one ("temp" can't be the
-		// default catalog), and an unqualified main.<table> resolves to the
-		// TEMP table, which shadows same-named tables.
-		app, err := driver.NewQuackAppenderFromConn(ctx, dconn, "", "main", table, kinds)
-		if err != nil {
-			return err
-		}
-		for {
-			b, err := r.Next(ctx)
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			if err != nil {
-				_ = app.Close(ctx)
-				return err
-			}
-			if err := b.Validate(); err != nil {
-				_ = app.Close(ctx)
-				return err
-			}
-			total += int64(b.Len())
-			if rowCap > 0 && total > int64(rowCap) {
-				_ = app.Close(ctx)
-				return fmt.Errorf("%w: %s has more than %d rows", ErrRowCapExceeded, table, rowCap)
-			}
-			for i := 0; i < b.Len(); i++ {
-				row, err := toWire(cols, b.Row(i))
-				if err != nil {
-					_ = app.Close(ctx)
-					return fmt.Errorf("federate: %s row: %w", table, err)
-				}
-				if err := app.AppendRow(row...); err != nil {
-					_ = app.Close(ctx)
-					return err
-				}
-			}
-			if err := app.Flush(ctx); err != nil {
-				_ = app.Close(ctx)
-				return err
-			}
-		}
-		return app.Close(ctx)
-	})
-	return total, err
-}
 
 func quackKind(t schema.Type) driver.QuackColumnKind {
 	switch t {
@@ -217,8 +127,8 @@ func WireKind(t schema.Type) driver.QuackColumnKind { return quackKind(t) }
 func deltaCTEName(t Table) string { return "__delta_" + string(t) }
 
 // deltaStream turns a delta reader into a quack stream and the MATERIALIZED
-// CTE definition that reads it, typed and named like the delta's TEMP table
-// would be. Exceeding rowCap fails the query with ErrRowCapExceeded.
+// CTE definition that reads it, each column typed and named as its lake
+// column. Exceeding rowCap fails the query with ErrRowCapExceeded.
 func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, string, error) {
 	st, scan, err := deltaScan(t, r, rowCap)
 	if err != nil {
@@ -228,7 +138,7 @@ func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, string
 }
 
 // deltaScan turns a delta reader into a quack stream and the SELECT that
-// reads it, typed and named like the delta's TEMP table would be.
+// reads it, each column typed and named as its lake column.
 func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, string, error) {
 	schema := r.Schema()
 	if len(schema) == 0 {

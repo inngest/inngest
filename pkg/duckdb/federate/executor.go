@@ -3,7 +3,6 @@ package federate
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -15,20 +14,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// Executor runs queries over lake ∪ delta. Each query holds one connection
-// for its whole life: the deltas are ingested into TEMP tables on it (or
-// streamed into the query itself, with Streaming), and the query that reads
-// them through the views runs on it too.
+// Executor runs queries over lake ∪ delta. Each delta streams straight into
+// the query that reads it, over quack's SEND_DATA streams, as a MATERIALIZED
+// CTE: no TEMP table or extra copy, and the query starts while the deltas
+// are still arriving. DB must be a quack-transport connection pool.
 type Executor struct {
-	DB       *sql.DB
-	Delta    DeltaStreamer
-	Ingester Ingester
-	// Streaming feeds each delta straight into the query over quack's
-	// SEND_DATA streams, as a MATERIALIZED CTE per delta, instead of
-	// ingesting it into a TEMP table first: no DDL, no extra copy, and the
-	// query starts while the deltas are still arriving. Requires a quack
-	// connection; Ingester is unused.
-	Streaming bool
+	DB    *sql.DB
+	Delta DeltaStreamer
 }
 
 // Query is one federated query.
@@ -87,19 +79,17 @@ type Source struct {
 	// (SourceName); pass it to a macro taking a physical source.
 	Name string
 	// Prelude is the CTE definitions Name needs, ending with its own. Place
-	// them first in the query's top-level WITH, each once: with Streaming
-	// they include the delta's stream scan, which may be read only once and
-	// so must not be nested in a CTE DuckDB could inline at several
-	// references.
+	// them first in the query's top-level WITH, each once: they include the
+	// delta's stream scan, which may be read only once and so must not be
+	// nested in a CTE DuckDB could inline at several references.
 	Prelude []CTEDef
 }
 
-// Rows is a query result. Close releases the result, drops the delta TEMP
-// tables and returns the connection.
+// Rows is a query result. Close releases the result and returns the
+// connection.
 type Rows struct {
 	*sql.Rows
 	conn   *sql.Conn
-	temps  []string
 	closed atomic.Bool
 }
 
@@ -108,7 +98,7 @@ func (r *Rows) Close() error {
 		return nil
 	}
 	err := r.Rows.Close()
-	if cerr := releaseConn(r.conn, r.temps); err == nil {
+	if cerr := releaseConn(r.conn); err == nil {
 		err = cerr
 	}
 	return err
@@ -116,8 +106,7 @@ func (r *Rows) Close() error {
 
 var querySeq atomic.Int64
 
-// Query streams and ingests the deltas q needs, then runs q.SQL over the
-// logical views on the same connection.
+// Query runs q.SQL over the logical views, streaming in the deltas q needs.
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(q.SQL)), "WITH") {
 		return nil, fmt.Errorf("federate: query SQL must not start with WITH; wrap it in a subquery")
@@ -139,7 +128,6 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 
 	needed := deltaTables(q.Tables)
 	seq := querySeq.Add(1)
-	var temps []string
 	var closers []func() error
 	closeReaders := func() {
 		for _, c := range closers {
@@ -149,7 +137,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	}
 	fail := func(err error) (*Rows, error) {
 		closeReaders()
-		_ = releaseConn(conn, temps)
+		_ = releaseConn(conn)
 		return nil, err
 	}
 
@@ -175,7 +163,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			Watermark: q.Watermark, RowCap: q.RowCap,
 		}
 		req.Predicates = q.Predicates[t]
-		if es, ok := e.Delta.(EncodedDeltaStreamer); ok && e.Streaming {
+		if es, ok := e.Delta.(EncodedDeltaStreamer); ok {
 			r, err := es.StreamEncoded(ctx, req)
 			if err != nil {
 				return fail(fmt.Errorf("federate: streaming %s delta: %w", t, err))
@@ -201,47 +189,28 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			_ = r.Close()
 			return fail(fmt.Errorf("federate: %s delta: %w", t, err))
 		}
-		if e.Streaming {
-			st, def, err := deltaStream(t, r, q.RowCap)
-			if err != nil {
-				_ = r.Close()
-				return fail(err)
-			}
-			closers = append(closers, r.Close)
-			streams = append(streams, st)
-			preludes[t] = def
-			deltaRel[t] = deltaCTEName(t)
-			continue
-		}
-		name := fmt.Sprintf("__delta_%s_%d", t, seq)
-		temps = append(temps, name)
-		n, err := e.Ingester.Ingest(ctx, conn, name, r, q.RowCap)
+		st, def, err := deltaStream(t, r, q.RowCap)
 		if err != nil {
-			if errors.Is(err, ErrRowCapExceeded) {
-				recordRowCapExceeded(ctx, t, deltaRows)
-			}
+			_ = r.Close()
 			return fail(err)
 		}
-		count := &deltaCount{table: t, kind: deltaRows, total: int(n)}
-		count.done(ctx)
-		deltaRel[t] = name
+		closers = append(closers, r.Close)
+		streams = append(streams, st)
+		preludes[t] = def
+		deltaRel[t] = deltaCTEName(t)
 	}
 
 	sqlText, args, err := assemble(q, needed, deltaRel, preludes, deltaCols)
 	if err != nil {
 		return fail(err)
 	}
-	qctx := ctx
-	if len(streams) > 0 {
-		qctx = driver.WithQuackStreams(ctx, streams...)
-	}
-	rows, err := conn.QueryContext(qctx, sqlText, args...)
+	rows, err := conn.QueryContext(driver.WithQuackStreams(ctx, streams...), sqlText, args...)
 	// QueryContext has consumed every stream by the time it returns.
 	closeReaders()
 	if err != nil {
 		return fail(fmt.Errorf("federate: query: %w", err))
 	}
-	return &Rows{Rows: rows, conn: conn, temps: temps}, nil
+	return &Rows{Rows: rows, conn: conn}, nil
 }
 
 // assemble renders the final query over the federated sources: each table's
@@ -321,18 +290,9 @@ func sameColumns(got, want []Column) error {
 	return nil
 }
 
-// releaseConn drops the query's TEMP tables, restores the session setting
-// Query changed, and returns the connection to the pool.
-func releaseConn(conn *sql.Conn, temps []string) error {
-	dropTemps(conn, temps)
+// releaseConn restores the session setting Query changed and returns the
+// connection to the pool.
+func releaseConn(conn *sql.Conn) error {
 	_, _ = conn.ExecContext(context.Background(), "RESET preserve_insertion_order;")
 	return conn.Close()
-}
-
-func dropTemps(conn *sql.Conn, temps []string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	for _, name := range temps {
-		_, _ = conn.ExecContext(ctx, "DROP TABLE IF EXISTS temp.main."+quoteIdent(name)+";")
-	}
 }

@@ -16,7 +16,7 @@ import (
 // EncodedDeltaStreamer is an optional DeltaStreamer extension: it streams a
 // delta already encoded for quack (driver.EncodeQuackVectors), column by
 // column, so the executor's streaming path sends it without boxing each
-// value. The executor uses it when Streaming is set.
+// value. The executor prefers it to Stream.
 type EncodedDeltaStreamer interface {
 	StreamEncoded(ctx context.Context, req DeltaRequest) (EncodedReader, error)
 }
