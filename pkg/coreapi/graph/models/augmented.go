@@ -48,6 +48,7 @@ type RunTraceSpan struct {
 	StepID                *string                     `json:"stepID,omitempty"`
 	StepInfo              StepInfo                    `json:"stepInfo,omitempty"`
 	StepType              string                      `json:"stepType"`
+	SpanKind              *string                     `json:"spanKind,omitempty"`
 	IsRoot                bool                        `json:"isRoot"`
 	ParentSpanID          *string                     `json:"parentSpanID,omitempty"`
 	ParentSpan            *RunTraceSpan               `json:"parentSpan,omitempty"`

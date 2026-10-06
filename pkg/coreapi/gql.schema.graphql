@@ -643,6 +643,7 @@ type RunTraceSpan {
   stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
   stepType: String!
+  spanKind: String # the kind its caller gave a span group, such as "job" or "agent"; null otherwise
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String

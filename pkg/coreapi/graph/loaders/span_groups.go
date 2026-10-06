@@ -53,6 +53,9 @@ func groupBySpanPath(run *models.RunTraceSpan) {
 					Name:         child.SpanPath[i].Name,
 					StepType:     SpanGroupStepType,
 				}
+				if kind := child.SpanPath[i].Kind; kind != "" {
+					group.SpanKind = &kind
+				}
 				groups[id] = group
 				created = append(created, group)
 				parent.ChildrenSpans = append(parent.ChildrenSpans, group)

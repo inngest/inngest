@@ -481,6 +481,7 @@ type ComplexityRoot struct {
 		SkipExistingRunID     func(childComplexity int) int
 		SkipReason            func(childComplexity int) int
 		SpanID                func(childComplexity int) int
+		SpanKind              func(childComplexity int) int
 		StartedAt             func(childComplexity int) int
 		Status                func(childComplexity int) int
 		StepID                func(childComplexity int) int
@@ -2881,6 +2882,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.SpanID(childComplexity), true
 
+	case "RunTraceSpan.spanKind":
+		if e.complexity.RunTraceSpan.SpanKind == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.SpanKind(childComplexity), true
+
 	case "RunTraceSpan.startedAt":
 		if e.complexity.RunTraceSpan.StartedAt == nil {
 			break
@@ -4278,6 +4286,7 @@ type RunTraceSpan {
   stepID: String # the ID of the step this span is associated with
   stepInfo: StepInfo # info about the step - use fragments to access appropriately
   stepType: String!
+  spanKind: String # the kind its caller gave a span group, such as "job" or "agent"; null otherwise
   # Nice-to-haves for navigating the trace
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
@@ -12046,6 +12055,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "stepType":
 				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
+			case "spanKind":
+				return ec.fieldContext_RunTraceSpan_spanKind(ctx, field)
 			case "isRoot":
 				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
 			case "parentSpanID":
@@ -14968,6 +14979,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "stepType":
 				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
+			case "spanKind":
+				return ec.fieldContext_RunTraceSpan_spanKind(ctx, field)
 			case "isRoot":
 				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
 			case "parentSpanID":
@@ -18997,6 +19010,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "stepType":
 				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
+			case "spanKind":
+				return ec.fieldContext_RunTraceSpan_spanKind(ctx, field)
 			case "isRoot":
 				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
 			case "parentSpanID":
@@ -19197,6 +19212,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_stepType(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_spanKind(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_spanKind(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SpanKind, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_spanKind(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_isRoot(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
 	if err != nil {
@@ -19360,6 +19416,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_stepInfo(ctx, field)
 			case "stepType":
 				return ec.fieldContext_RunTraceSpan_stepType(ctx, field)
+			case "spanKind":
+				return ec.fieldContext_RunTraceSpan_spanKind(ctx, field)
 			case "isRoot":
 				return ec.fieldContext_RunTraceSpan_isRoot(ctx, field)
 			case "parentSpanID":
@@ -28701,6 +28759,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "spanKind":
+
+			out.Values[i] = ec._RunTraceSpan_spanKind(ctx, field, obj)
+
 		case "isRoot":
 
 			out.Values[i] = ec._RunTraceSpan_isRoot(ctx, field, obj)
