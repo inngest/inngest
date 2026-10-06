@@ -1,6 +1,6 @@
 # Readable sandbox traces
 
-Status: data slice implemented, UI proposed. Branch `jack/sandbox-traces` in
+Status: data slice and UI options A + B + C implemented. Branch `jack/sandbox-traces` in
 `inngest` and `inngest-js`.
 
 ## Problem
@@ -26,7 +26,10 @@ Agreed with the user:
    "just like always". A generated description is secondary text.
 2. **A row includes everything done to serve it.** Internal steps (a snapshot's
    readiness wait; CI polling, sleeping and output fetches) belong to their
-   statement's row, not to rows of their own.
+   statement's row, not to rows of their own, and aren't listed under it
+   either. The row is one bar that moves through the statement's states, like
+   starting, running and collecting output. Retries of the statement step are
+   the only thing it expands to.
 3. **Rows are linked to their machine.** Creating a machine is a row, and every
    later command, snapshot, and destroy on that machine is visibly tied to it.
 4. **Chronological order is kept**, so parallel work still reads as parallel.
@@ -195,13 +198,33 @@ machine is pinned. The mock shows `ci-build` pinned.
 
 ### C. Statement rows own their internal steps
 
-Steps sharing a `statement_id` render as one row, titled by the `role:
-"statement"` step, with a bar that's the union of its steps (waits drawn
-hollow). Expanding shows the internal steps as sub-rows. This is what makes a
-CI command "one row per statement" instead of a start, N sleeps, N polls, and
-an output fetch.
+Steps sharing a `statement_id` render as one row. It's titled by the `role:
+"statement"` step, or by `statement_name` when the statement has no step of its
+own (a CI command), and spans the earliest step's start to the latest step's
+end. This is what makes a CI command "one row per statement" instead of a
+start, N sleeps, N polls, and an output fetch.
+
+The internal steps are never sub-rows. The row's bar is split into the few
+states the statement went through, derived from each step's `action` and span
+times:
+
+- A command: **Starting** (`process.start`), **Running** (from then until the
+  output fetch; every sleep and every poll, including the one that saw it exit,
+  is just running), **Collecting output** (the output fetch).
+- A snapshot: **Creating snapshot** (`snapshot.create`), **Waiting until
+  ready** (`snapshot.waitUntilReady`).
+
+Waiting states are drawn hollow, working states solid, and every state takes
+the row's final status colour (red if the last step failed). Each state lasts
+until the next begins, so there are no gaps. The hover card lists how long each
+state took. Selecting the row shows the statement's result: the last step's
+output, with the command and exit code. Retries of the statement step expand
+as attempts, the same as any step; retries of an internal step don't show.
 
 ![C. Statement rows own their internal steps](./expanded.png)
+
+The mock above predates this decision: it expands into one sub-row per
+internal step, which the implementation deliberately doesn't do.
 
 ### D. Machine rails
 
@@ -220,7 +243,7 @@ horizontal space when many machines overlap.
 Selecting a sandbox row replaces the raw step output with a purpose-built view:
 the command, exit code, working directory, a terminal-style stdout/stderr
 (decoded from the step output), the machine card with a link to the Sandboxes
-page, and the internal steps behind the row.
+page, and how long the statement spent in each state.
 
 ![E. Command detail panel](./detail.png)
 
@@ -234,11 +257,16 @@ machines.
 
 ## Where the UI work lives
 
-- `utils/traceConversion.ts`: read `inngest.sandbox` in `traceToBarData`, like
-  `hasExperiment`. Group sibling spans by `statement_id` into one bar (C).
-- `TimelineBar.tsx`: secondary text, machine chip, exit badge (A); the
-  highlight background keyed by a selected `sandbox_id` (B), generalising the
-  existing experiment background.
+- `utils/sandbox.ts`, called from `utils/traceConversion.ts`: `traceRollup`
+  groups the run's children by `statement_id` into one virtual span per
+  statement, after the per-step attempt rollup (C). `traceToBarData` reads
+  `inngest.sandbox` into the bar's description, machine, exit code and
+  states, and marks a machine's first row "existing" when no row created it
+  (A).
+- `Timeline.tsx`: draws a statement's states as bar segments (C).
+- `TimelineBar.tsx` and `SandboxAnnotation.tsx`: secondary text, machine chip,
+  exit badge (A); the highlight background keyed by a selected `sandbox_id`
+  (B), sharing the experiment background's dotted pattern.
 - `StepInfo.tsx`: a sandbox tab or panel (E).
 
 Runs without the metadata (older SDKs, other languages) render exactly as
