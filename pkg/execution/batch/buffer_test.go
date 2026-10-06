@@ -1214,3 +1214,68 @@ func TestBufferedByteSize(t *testing.T) {
 		require.Zero(t, buffered.(*redisBatchManager).buffer.totalPendingBytes.Load())
 	})
 }
+
+// TestBufferedOverflowSchedulesBothBatches covers a flush that overflows a
+// partially filled batch: the full batch must run now and the overflow batch
+// must be scheduled at the batch timeout, or it would never execute.
+func TestBufferedOverflowSchedulesBothBatches(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	fnID := uuid.New()
+	fn := inngest.Function{
+		ID:         fnID,
+		EventBatch: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "60s"},
+	}
+	newItem := func() BatchItem {
+		return BatchItem{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			FunctionID:  fnID,
+			EventID:     ulid.Make(),
+			Event:       event.Event{Name: "test/event"},
+		}
+	}
+
+	// Leave one slot in the current batch.
+	unbuffered := NewRedisBatchManager(bc, nil, WithoutBuffer())
+	prefill, err := unbuffered.(*redisBatchManager).BulkAppend(ctx, []BatchItem{newItem(), newItem()}, fn)
+	require.NoError(t, err)
+	require.Equal(t, "new", prefill.Status)
+
+	q := &recordingProducer{}
+	buffered := NewRedisBatchManager(bc, q, WithBufferSettings(5*time.Second, 3))
+	defer buffered.Close()
+
+	var wg sync.WaitGroup
+	for range 3 {
+		wg.Go(func() {
+			_, err := buffered.Append(ctx, newItem(), fn)
+			require.NoError(t, err)
+		})
+	}
+	wg.Wait()
+
+	enqueued := q.enqueued()
+	require.Len(t, enqueued, 2)
+
+	full := enqueued[0].item.Payload.(ScheduleBatchPayload)
+	require.Equal(t, prefill.BatchID, full.BatchID.String())
+	require.WithinDuration(t, time.Now(), enqueued[0].at, 5*time.Second)
+
+	overflow := enqueued[1].item.Payload.(ScheduleBatchPayload)
+	require.NotEqual(t, prefill.BatchID, overflow.BatchID.String())
+	require.WithinDuration(t, time.Now().Add(time.Minute), enqueued[1].at, 5*time.Second)
+
+	items, err := buffered.RetrieveItems(ctx, fnID, overflow.BatchID)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+}
