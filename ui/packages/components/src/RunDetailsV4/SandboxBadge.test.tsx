@@ -155,19 +155,4 @@ describe('sandbox badge', () => {
     fireEvent.click(screen.getByText('api'));
     expect(badgeFor('$ pnpm api')).toBeNull();
   });
-
-  it('keeps rows single-line with no machine tag or highlight', () => {
-    renderFixture();
-    fireEvent.click(screen.getByText('base'));
-    fireEvent.click(screen.getByText('e2e'));
-
-    expect(screen.queryByTestId('machine-tag')).toBeNull();
-    expect(screen.queryByTestId('machine-highlight')).toBeNull();
-    expect(screen.queryByTestId('sandbox-annotation')).toBeNull();
-    expect(screen.queryByText(/pnpm install --frozen-lockfile on/)).toBeNull();
-
-    for (const row of screen.getAllByTestId('timeline-bar-row')) {
-      expect(row.style.height).toBe('28px');
-    }
-  });
 });

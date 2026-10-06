@@ -29,8 +29,8 @@ export const SANDBOX_A = { sandbox_id: 'sb_0a1f', sandbox_name: 'ci-01JB7Q2XKZ-b
 export const SANDBOX_B = { sandbox_id: 'sb_7c3e', sandbox_name: 'ci-01JB7Q2XKZ-e2e' };
 export const SANDBOX_C = { sandbox_id: 'sb_9d42', sandbox_name: 'ci-01JB7Q2XKZ-api' };
 
-export const CI_ORIGIN = '@inngest/ci@0.1.0';
-export const SDK_ORIGIN = 'inngest@3.44.0';
+const CI_ORIGIN = '@inngest/ci@0.1.0';
+const SDK_ORIGIN = 'inngest@3.44.0';
 
 /** Marks a row as added by a library on the user's behalf */
 function addedBy(origin: string, trace: Trace): Trace {
@@ -209,17 +209,14 @@ export const stepSpansTrace: Trace = {
   childrenSpans: [
     ciGroup('github', 'GitHub', [
       ciStep('gh-create', 'Create check: pr', 0, 1),
-      ciStep('gh-base-start', 'Report base: started', 1, 2),
-      ciStep('gh-e2e-start', 'Report e2e: started', 90, 91),
-      ciStep('gh-base-pass', 'Report base: passed', 105, 106),
-      ciStep('gh-e2e-pass', 'Report e2e: passed', 106, 107),
+      ciStep('gh-start', 'Report e2e: started', 90, 91),
       ciStep('gh-complete', 'Complete check: pr', 132, 133),
     ]),
     group(
       'base',
       'base',
       [
-        startSandbox('base-machine', 'Start sandbox', 0, 6, SANDBOX_A),
+        startSandbox('base-sandbox', 'Start sandbox', 0, 6, SANDBOX_A),
         command('setup', 'pnpm install --frozen-lockfile', 6, 14),
         command('lint', 'pnpm lint', 14, 22),
         group('dev-server', '$ pnpm dev', [
@@ -274,9 +271,9 @@ export const stepSpansTrace: Trace = {
       'e2e',
       'e2e',
       [
-        startSandbox('e2e-machine', 'Start sandbox from base', 90, 94, SANDBOX_B),
+        startSandbox('e2e-sandbox', 'Start sandbox from base', 90, 94, SANDBOX_B),
         group('api', 'api', [
-          startSandbox('api-machine', 'Start sandbox', 94, 98, SANDBOX_C),
+          startSandbox('api-sandbox', 'Start sandbox', 94, 98, SANDBOX_C),
           command('api-cmd', 'pnpm api', 98, 100, SANDBOX_C),
         ]),
         command('e2e', 'pnpm e2e', 100, 104, SANDBOX_B),
