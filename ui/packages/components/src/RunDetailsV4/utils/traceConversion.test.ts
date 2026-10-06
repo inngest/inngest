@@ -186,6 +186,30 @@ describe('traceConversion', () => {
 
       expect(result.bars[0]?.children?.[0]?.style).toBe('step.sleep');
     });
+
+    it('gives span groups their own style, with no timing breakdown', () => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({
+            spanID: 'group',
+            stepID: null,
+            stepOp: null,
+            stepType: 'SPAN_GROUP',
+            childrenSpans: [
+              createTrace({ spanID: 'run' }),
+              createTrace({ spanID: 'wait', stepOp: 'WAIT_FOR_SIGNAL' }),
+            ],
+          }),
+        ],
+      });
+      const group = traceToTimelineData(trace, { runID: 'run-1' }).bars[0]?.children?.[0];
+
+      expect(group?.style).toBe('span.group');
+      expect(group?.timingBreakdown).toBeUndefined();
+      expect(group?.inngestBreakdown).toBeUndefined();
+      expect(group?.children?.map((c) => c.isWait)).toEqual([undefined, true]);
+    });
   });
 
   describe('timing breakdown', () => {

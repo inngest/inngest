@@ -44,6 +44,10 @@ export type BarStyleKey =
   | 'step.sleep'
   | 'step.waitForEvent'
   | 'step.invoke'
+  // Span groups: the group row, and a collapsed group's segments (solid for
+  // work, hollow for sleeps and waits)
+  | 'span.group'
+  | 'span.group.wait'
   // Timing categories
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
@@ -290,6 +294,9 @@ export interface TimelineBarData {
 
   /** Nested child bars */
   children?: TimelineBarData[];
+
+  /** Whether this is a sleep or wait, drawn hollow in a collapsed span group */
+  isWait?: boolean;
 
   /** Timing breakdown data (for expandable bars) */
   timingBreakdown?: TimingBreakdownData;

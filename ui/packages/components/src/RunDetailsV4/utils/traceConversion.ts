@@ -40,6 +40,9 @@ function isNonStepSpan(trace: Trace): boolean {
   return !trace.stepOp && !trace.stepType;
 }
 
+/** Step ops that wait rather than run, drawn hollow in a collapsed span group */
+const WAIT_OPS = new Set(['SLEEP', 'WAIT_FOR_EVENT', 'WAIT_FOR_SIGNAL']);
+
 /**
  * Get the display name for a span
  */
@@ -73,6 +76,8 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
       return 'step.waitForEvent';
     case 'INVOKE':
       return 'step.invoke';
+    case 'SPAN_GROUP':
+      return 'span.group';
     default:
       return 'step.run';
   }
@@ -290,6 +295,7 @@ function traceToBarData(
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
+    isWait: WAIT_OPS.has(trace.stepOp ?? '') || undefined,
     children: tracesToBarData(
       trace.childrenSpans,
       orgName,

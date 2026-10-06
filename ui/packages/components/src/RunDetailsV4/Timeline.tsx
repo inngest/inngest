@@ -300,6 +300,31 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
   return segments.length > 0 ? segments : undefined;
 }
 
+/**
+ * Generate one segment per direct child of a collapsed span group, over the
+ * child's own time range, so the row still shows what ran when. Sleeps and
+ * waits are hollow; everything else, subgroups included, is solid.
+ */
+function generateSpanGroupSegments(bar: TimelineBarData): BarSegment[] | undefined {
+  if (bar.style !== 'span.group' || !bar.children?.length) return undefined;
+
+  const startMs = bar.startTime.getTime();
+  const totalMs = calculateDuration(bar.startTime, bar.endTime);
+  if (totalMs <= 0) return undefined;
+
+  return bar.children.map((child) => {
+    const childStartMs = child.startTime.getTime() - startMs;
+    const childMs = calculateDuration(child.startTime, child.endTime);
+    return {
+      id: `${bar.id}-seg-${child.id}`,
+      startPercent: (childStartMs / totalMs) * 100,
+      widthPercent: (childMs / totalMs) * 100,
+      style: child.isWait ? 'span.group.wait' : 'span.group',
+      status: child.status,
+    };
+  });
+}
+
 /** Generate HTTP timing segments for the "Your server" compound bar. */
 function generateHTTPSegments(
   barId: string,
@@ -360,6 +385,7 @@ const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
   'step.sleep': 'step.sleep',
   'step.waitForEvent': 'step.waitForEvent',
   'step.invoke': 'step.invoke',
+  'span.group': 'span',
   'timing.inngest': 'Inngest overhead',
   'timing.inngest.queue': 'Run queue delay',
   'timing.inngest.concurrency': 'Concurrency delay',
@@ -384,6 +410,14 @@ function detailsFromPhases<T>(phases: PhaseDefinition<T>[], data: T): TimingDeta
  * Build timing detail rows for a bar's hover tooltip based on available data.
  */
 function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
+  // A span group lists what it ran
+  if (bar.style === 'span.group') {
+    return bar.children?.map((child) => ({
+      label: child.name,
+      durationMs: calculateDuration(child.startTime, child.endTime),
+    }));
+  }
+
   const details: TimingDetail[] = [];
 
   // Inngest overhead breakdown (per-step)
@@ -511,8 +545,10 @@ function TimelineBarRenderer({
   const childInsideExperiment = insideExperiment || bar.hasExperiment;
 
   // Generate segments for compound bar visualization
-  // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
-  const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
+  // Span groups draw their children; bars with timingBreakdown use
+  // queue+execution segments; others fall back to delay+execution
+  const segments =
+    generateSpanGroupSegments(bar) ?? generateBarSegments(bar) ?? generateDelaySegments(bar);
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.

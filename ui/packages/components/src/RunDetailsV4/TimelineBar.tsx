@@ -32,7 +32,11 @@ import { formatVariantWeight } from '../Experiments/format';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
 import { formatScoreValue } from '../RunDetails/ScoresAttrs';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
+import {
+  getStatusBackgroundClass,
+  getStatusBorderClass,
+  getStatusTextClass,
+} from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import type {
@@ -166,6 +170,15 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     barHeight: 'thin',
     pattern: 'dotted',
     labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'span.group': {
+    barColor: 'bg-status-completed',
+    statusBased: true,
+  },
+  'span.group.wait': {
+    barColor: 'bg-status-completed',
+    outlined: true,
     statusBased: true,
   },
   default: {
@@ -742,19 +755,28 @@ const VisualBar = memo(function VisualBar({
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
           const segmentColor = getBarColor(segment.style, segment.status);
           const isOutlined = segmentStyle.outlined;
+          // A status-based outline takes the status colour (span group waits)
+          const statusOutline =
+            isOutlined && segmentStyle.statusBased && segment.status
+              ? getStatusBorderClass(segment.status)
+              : undefined;
           return (
             <div
               key={segment.id}
+              data-segment-style={segment.style}
               className={cn(
                 'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,
-                isOutlined ? 'bg-canvasBase' : segmentColor
+                isOutlined ? 'bg-canvasBase' : segmentColor,
+                statusOutline && `border ${statusOutline}`
               )}
               style={{
                 left: `${segment.transformedStart}%`,
                 width: `${segment.transformedWidth}%`,
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-                ...(isOutlined
+                ...(statusOutline
+                  ? {}
+                  : isOutlined
                   ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
                   : segmentPattern),
               }}
