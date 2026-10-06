@@ -208,11 +208,29 @@ func TestGroupBySpanPath(t *testing.T) {
 				DynamicStatus: &completed,
 				StepID:        new("query"),
 				StepSpanPath:  &execPath,
+				StepOrigin:    new("inngest@3.44.0"),
 			},
 		}}
 
 		result := convertGroupedRun(t, step)
 		require.Equal(t, []string{"Research agent"}, childNames(result))
 		assert.Equal(t, []string{"query"}, childNames(result.ChildrenSpans[0]))
+		assert.Equal(t, "inngest@3.44.0", *result.ChildrenSpans[0].ChildrenSpans[0].Origin)
+	})
+
+	t.Run("steps and groups carry their own origin", func(t *testing.T) {
+		ci := meta.SpanPathElement{ID: "ci", Name: "CI", Origin: "@inngest/ci@0.1.0"}
+		job := meta.SpanPathElement{ID: "job", Name: "e2e", Kind: "job"}
+		internal := groupedStep("setup", 0, 1, completed, ci, job)
+		internal.Attributes.StepOrigin = new("@inngest/ci@0.1.0")
+
+		result := convertGroupedRun(t, internal, groupedStep("cmd", 1, 1, completed, ci, job))
+
+		group := result.ChildrenSpans[0]
+		assert.Equal(t, "@inngest/ci@0.1.0", *group.Origin)
+		sub := group.ChildrenSpans[0]
+		assert.Nil(t, sub.Origin)
+		assert.Equal(t, "@inngest/ci@0.1.0", *sub.ChildrenSpans[0].Origin)
+		assert.Nil(t, sub.ChildrenSpans[1].Origin)
 	})
 }

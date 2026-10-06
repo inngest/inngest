@@ -227,6 +227,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	if span.Attributes.StepSpanPath != nil {
 		gqlSpan.SpanPath = *span.Attributes.StepSpanPath
 	}
+	gqlSpan.Origin = span.Attributes.StepOrigin
 
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
@@ -441,6 +442,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					}
 					if child.SpanPath != nil {
 						gqlSpan.SpanPath = child.SpanPath
+					}
+					if child.Origin != nil {
+						gqlSpan.Origin = child.Origin
 					}
 					if child.StepInfo != nil {
 						gqlSpan.StepInfo = child.StepInfo
