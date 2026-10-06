@@ -25,3 +25,11 @@ export function isInngestOrigin(origin: string | null | undefined): boolean {
 
   return pkg === 'inngest' || pkg.startsWith('@inngest/');
 }
+
+/**
+ * Whether to draw a row or segment faded: Inngest added it, and it didn't fail.
+ * A failure is never drawn quieter than the user's own work.
+ */
+export function isDimmed(origin: string | null | undefined, status: string | undefined): boolean {
+  return isInngestOrigin(origin) && status !== 'FAILED';
+}

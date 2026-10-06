@@ -409,5 +409,40 @@ describe('Timeline', () => {
       const visual = groupRow().querySelector('[data-testid=timeline-bar-visual]') as HTMLElement;
       expect(visual.style.opacity).toBe('0');
     });
+
+    it('fades segments Inngest added, unless they failed or the group is already faded', () => {
+      const ci = '@inngest/ci@0.1.0';
+      const group = groupData.bars[0]!.children![0]!;
+      const withOrigins = (groupOrigin?: string): TimelineData => {
+        return {
+          ...groupData,
+          bars: [
+            {
+              ...groupData.bars[0]!,
+              children: [
+                {
+                  ...group,
+                  origin: groupOrigin,
+                  children: group.children!.map((child) => {
+                    return { ...child, origin: ci };
+                  }),
+                },
+              ],
+            },
+          ],
+        };
+      };
+
+      render(<Timeline data={withOrigins()} />, { wrapper: Wrapper });
+
+      const segments = Array.from(groupRow().querySelectorAll('[data-segment-style]'));
+      expect(segments.map((s) => s.className.includes('opacity-50'))).toEqual([false, true, true]);
+
+      cleanup();
+      render(<Timeline data={withOrigins(ci)} />, { wrapper: Wrapper });
+
+      const faded = Array.from(groupRow().querySelectorAll('[data-segment-style]'));
+      expect(faded.some((s) => s.className.includes('opacity-50'))).toBe(false);
+    });
   });
 });

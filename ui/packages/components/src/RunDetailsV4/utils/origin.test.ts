@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isInngestOrigin } from './origin';
+import { isDimmed, isInngestOrigin } from './origin';
 
 describe('isInngestOrigin', () => {
   it.each([
@@ -18,5 +18,15 @@ describe('isInngestOrigin', () => {
     [undefined, false],
   ])('%s → %s', (origin, expected) => {
     expect(isInngestOrigin(origin)).toBe(expected);
+  });
+});
+
+describe('isDimmed', () => {
+  it('dims what Inngest added unless it failed', () => {
+    expect(isDimmed('@inngest/ci@0.1.0', 'COMPLETED')).toBe(true);
+    expect(isDimmed('@inngest/ci@0.1.0', 'RUNNING')).toBe(true);
+    expect(isDimmed('@inngest/ci@0.1.0', 'FAILED')).toBe(false);
+    expect(isDimmed('my-lib@1.0.0', 'COMPLETED')).toBe(false);
+    expect(isDimmed(undefined, 'COMPLETED')).toBe(false);
   });
 });

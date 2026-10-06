@@ -125,6 +125,9 @@ export interface BarSegment {
 
   /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
   status?: string;
+
+  /** Draw the segment faded, for work Inngest added inside a collapsed group */
+  dimmed?: boolean;
 }
 
 /**

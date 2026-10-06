@@ -26,6 +26,7 @@ import type {
   TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
+import { isDimmed } from './utils/origin';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
 // ============================================================================
@@ -313,6 +314,9 @@ function generateSpanGroupSegments(bar: TimelineBarData): BarSegment[] | undefin
   const totalMs = calculateDuration(bar.startTime, bar.endTime);
   if (totalMs <= 0) return undefined;
 
+  // A faded group is already drawn at half strength as a whole
+  const groupDimmed = isDimmed(bar.origin, bar.status);
+
   return bar.children.map((child) => {
     const childStartMs = child.startTime.getTime() - startMs;
     const childMs = calculateDuration(child.startTime, child.endTime);
@@ -322,6 +326,7 @@ function generateSpanGroupSegments(bar: TimelineBarData): BarSegment[] | undefin
       widthPercent: (childMs / totalMs) * 100,
       style: child.isWait ? 'span.group.wait' : 'span.group',
       status: child.status,
+      dimmed: !groupDimmed && isDimmed(child.origin, child.status),
     };
   });
 }

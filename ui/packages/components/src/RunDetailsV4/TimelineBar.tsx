@@ -54,7 +54,7 @@ import type {
 } from './TimelineBar.types';
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
-import { isInngestOrigin } from './utils/origin';
+import { isDimmed } from './utils/origin';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 // ============================================================================
@@ -771,7 +771,8 @@ const VisualBar = memo(function VisualBar({
                 'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,
                 isOutlined ? 'bg-canvasBase' : segmentColor,
-                statusOutline && `border ${statusOutline}`
+                statusOutline && `border ${statusOutline}`,
+                segment.dimmed && 'opacity-50'
               )}
               style={{
                 left: `${segment.transformedStart}%`,
@@ -866,7 +867,7 @@ export function TimelineBar({
 
   // Rows Inngest's libraries added recede so the user's own stand out; a
   // failure never does.
-  const dimmed = isInngestOrigin(origin) && status !== 'FAILED';
+  const dimmed = isDimmed(origin, status);
 
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);

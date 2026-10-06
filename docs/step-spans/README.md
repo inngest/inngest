@@ -115,7 +115,9 @@ package (`isInngestOrigin` in `utils/origin.ts`; the package is the origin
 without a trailing `@<version>`, so scoped names work) is Inngest's own work,
 not the user's. It dims: `text-light` name and duration, and the bar and its
 segments at half opacity, so the user's rows stand out. A failed row is never
-dimmed. Kind tags and sandbox badges are unchanged. The step panel shows
+dimmed. A collapsed group the user owns fades the segments of the children
+Inngest added the same way, so its bar shows the user's work at full strength.
+Kind tags and sandbox badges are unchanged. The step panel shows
 "Added by `<origin>`" for any row with an origin.
 
 Row status already shows success or failure, so there's no exit badge. The
