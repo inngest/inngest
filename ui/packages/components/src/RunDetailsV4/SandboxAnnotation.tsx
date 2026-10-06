@@ -1,5 +1,5 @@
 /**
- * Sandbox machine chips and the machine highlight, from `inngest.sandbox`
+ * Sandbox machine tags and the machine highlight, from `inngest.sandbox`
  * metadata. Everything sandbox-specific in the timeline lives here.
  */
 
@@ -15,6 +15,7 @@ import {
 } from 'react';
 
 import { cn } from '../utils/classNames';
+import { SpanKindTag } from './SpanKindTag';
 import type { TimelineBarData } from './TimelineBar.types';
 import { isSandboxMetadata, isSpanGroup, type Trace } from './types';
 
@@ -171,25 +172,24 @@ export function MachineHighlight({ sandboxId }: { sandboxId?: string }) {
   );
 }
 
-function MachineChip({ sandboxId, label }: { sandboxId: string; label: string }) {
-  const { machineIds, pinnedId, setPinnedId, setPreviewId } = useContext(MachineHighlightContext);
+/** A MACHINE tag and the machine's name; clicking pins its highlight */
+function MachineTag({ sandboxId, label }: { sandboxId: string; label: string }) {
+  const { pinnedId, setPinnedId, setPreviewId } = useContext(MachineHighlightContext);
   const pinned = pinnedId === sandboxId;
-  const color = (alpha?: number) => machineColor(sandboxId, machineIds, alpha);
 
   return (
     <button
       type="button"
-      data-testid="machine-chip"
+      data-testid="machine-tag"
       aria-pressed={pinned}
       title={`${label}\n${
         pinned ? 'Clear machine highlight' : 'Highlight every row on this machine'
       }`}
-      className="text-subtle inline-flex h-4 min-w-0 shrink items-center gap-1 rounded-full border px-1.5 font-mono text-[11px] leading-none"
-      style={{
-        borderColor: color(pinned ? 1 : 0.6),
-        backgroundColor: color(pinned ? 0.25 : 0.1),
-      }}
-      // The chip sits inside a clickable row; don't select or toggle the row
+      className={cn(
+        'text-subtle hover:text-basis inline-flex min-w-0 shrink items-center gap-1.5 font-mono text-[11px] leading-none',
+        pinned && 'text-basis'
+      )}
+      // The tag sits inside a clickable row; don't select or toggle the row
       onClick={(e) => {
         e.stopPropagation();
         setPinnedId((current) => (current === sandboxId ? null : sandboxId));
@@ -198,7 +198,7 @@ function MachineChip({ sandboxId, label }: { sandboxId: string; label: string })
       onMouseEnter={() => setPreviewId(sandboxId)}
       onMouseLeave={() => setPreviewId(null)}
     >
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color() }} />
+      <SpanKindTag kind="machine" />
       <span className="truncate">{shortMachineLabel(label)}</span>
     </button>
   );
@@ -226,7 +226,7 @@ export function SandboxAnnotation({
         </code>
       )}
       {command && sandboxId && <span className="shrink-0">on</span>}
-      {sandboxId && <MachineChip sandboxId={sandboxId} label={machineLabel ?? sandboxId} />}
+      {sandboxId && <MachineTag sandboxId={sandboxId} label={machineLabel ?? sandboxId} />}
     </span>
   );
 }

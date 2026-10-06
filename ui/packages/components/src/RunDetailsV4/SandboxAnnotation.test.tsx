@@ -77,23 +77,28 @@ describe('machine highlight', () => {
       wrapper: Wrapper,
     });
 
-  const chipFor = (rowName: string) =>
-    screen
-      .getAllByTestId('timeline-bar-row')
-      .find((row) => row.textContent?.startsWith(rowName))!
-      .querySelector('[data-testid=machine-chip]') as HTMLElement;
+  const rowFor = (rowName: string) =>
+    screen.getByText(rowName).closest('[data-testid=timeline-bar-row]') as HTMLElement;
 
-  it('shows chips on sandbox rows and groups', () => {
+  const machineTagFor = (rowName: string) =>
+    rowFor(rowName).querySelector('[data-testid=machine-tag]') as HTMLElement;
+
+  it('shows a MACHINE tag on sandbox rows and groups', () => {
     renderFixture();
 
     // machine, lint, dev server, test, snapshot, e2e
-    expect(screen.getAllByTestId('machine-chip')).toHaveLength(6);
+    expect(screen.getAllByTestId('machine-tag')).toHaveLength(6);
+
+    const tag = machineTagFor('e2e');
+    expect(tag.textContent).toBe('MACHINEci-01JB7Q2XKZ-e2e');
+    expect(tag.title).toMatch(/^ci-01JB7Q2XKZ-e2e\n/);
   });
 
   it('pins a highlight on every row of a machine until Escape', () => {
     renderFixture();
 
-    fireEvent.click(chipFor('e2e'));
+    fireEvent.click(machineTagFor('e2e'));
+    expect(machineTagFor('e2e').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getAllByTestId('machine-highlight')).toHaveLength(1);
 
     // Rows inside a highlighted group are highlighted too
@@ -109,10 +114,10 @@ describe('machine highlight', () => {
   it('previews a machine on hover', () => {
     renderFixture();
 
-    fireEvent.mouseEnter(chipFor('machine'));
+    fireEvent.mouseEnter(machineTagFor('machine'));
     expect(screen.getAllByTestId('machine-highlight')).toHaveLength(5);
 
-    fireEvent.mouseLeave(chipFor('machine'));
+    fireEvent.mouseLeave(machineTagFor('machine'));
     expect(screen.queryByTestId('machine-highlight')).toBeNull();
   });
 });
