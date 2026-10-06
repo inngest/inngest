@@ -1428,4 +1428,95 @@ describe('traceConversion', () => {
       expect(childNames(second)).toEqual(childNames(first));
     });
   });
+
+  describe('traceRollup — span groups', () => {
+    const attempt = (spanID: string, stepID: string, attempts: number, secs: number) =>
+      createTrace({
+        spanID,
+        stepID,
+        attempts,
+        name: stepID,
+        queuedAt: `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`,
+        startedAt: `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`,
+        endedAt: `2024-01-01T00:00:${String(secs + 1).padStart(2, '0')}Z`,
+        status: attempts === 0 ? 'FAILED' : 'COMPLETED',
+      });
+
+    const group = (spanID: string, childrenSpans: Trace[]) =>
+      createTrace({
+        spanID,
+        name: spanID,
+        stepID: null,
+        stepOp: null,
+        stepType: 'SPAN_GROUP',
+        queuedAt: childrenSpans[0]!.queuedAt,
+        childrenSpans,
+      });
+
+    // A retried step, an ordinary step and a trailing finalization
+    const runChildren = () => [
+      attempt('a0', 'retried', 0, 1),
+      attempt('a1', 'retried', 1, 3),
+      attempt('b0', 'plain', 0, 5),
+      createTrace({
+        spanID: 'final',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-final',
+        attempts: 0,
+        outputID: 'o-final',
+        queuedAt: '2024-01-01T00:00:08Z',
+      }),
+    ];
+
+    it('leaves the rest of the run exactly as it is without groups', () => {
+      const without = traceRollup(createTrace({ isRoot: true, childrenSpans: runChildren() }));
+      const withGroup = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: [...runChildren(), group('g', [attempt('c0', 'grouped', 0, 7)])],
+        })
+      );
+
+      expect(withGroup.childrenSpans?.filter((c) => c.spanID !== 'g')).toEqual(
+        without.childrenSpans
+      );
+    });
+
+    it('keeps groups and rolls up retries inside them, at any depth', () => {
+      const steps = () => [attempt('a0', 'retried', 0, 1), attempt('a1', 'retried', 1, 3)];
+      const atRoot = traceRollup(createTrace({ isRoot: true, childrenSpans: steps() }));
+      const nested = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: [group('outer', [group('inner', steps())])],
+        })
+      );
+
+      const outer = nested.childrenSpans?.[0];
+      expect(outer?.spanID).toBe('outer');
+      const inner = outer?.childrenSpans?.[0];
+      expect(inner?.spanID).toBe('inner');
+      expect(inner?.childrenSpans).toEqual(atRoot.childrenSpans);
+      expect(inner?.childrenSpans?.[0]?.childrenSpans?.map((c) => c.name)).toEqual([
+        'Attempt 0',
+        'Attempt 1',
+      ]);
+    });
+
+    it('orders groups among the steps by queue time', () => {
+      const result = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: [
+            attempt('late', 'late', 1, 9),
+            group('g', [attempt('c0', 'grouped', 1, 4)]),
+            attempt('early', 'early', 1, 1),
+          ],
+        })
+      );
+
+      expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['early', 'g', 'late']);
+    });
+  });
 });

@@ -20,6 +20,7 @@ import { traceWalk } from '../runDetailsUtils';
 import {
   isExperimentMetadata,
   isScoreMetadata,
+  isSpanGroup,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
@@ -313,6 +314,8 @@ function traceToBarData(
  * run's direct children.
  */
 type RollupGroups = {
+  /** span groups, passed through with their own children rolled up */
+  spanGroups: Trace[];
   /** stepIDs in first-seen order, so rollups keep the original span order */
   stepOrder: string[];
   /** attempt spans per stepID, keyed by attempt number */
@@ -348,6 +351,7 @@ type RollupGroups = {
  * of that step) because the server emits it after that step.
  */
 function collectRollupGroups(children: Trace[]): RollupGroups {
+  const spanGroups: Trace[] = [];
   const stepOrder: string[] = [];
   const steps = new Map<string, Map<number, Trace>>();
   const ungroupedFinalizations: Trace[] = [];
@@ -357,6 +361,10 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
   let finalSpan: Trace | null = null;
 
   for (const child of children) {
+    if (isSpanGroup(child)) {
+      spanGroups.push(child);
+      continue;
+    }
     if (child.outputID && !child.stepID) {
       if (child.groupID) {
         finalSpan = child;
@@ -403,7 +411,7 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
     ? groupedSpans.get(finalSpan.groupID) ?? null
     : null;
 
-  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
+  return { spanGroups, stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
 }
 
 /** First (lowest attempt number) and last (highest) attempt spans of a group */
@@ -542,11 +550,24 @@ export function traceRollup(root: Trace): Trace {
   // branch). The helpers below rename/reshape spans in place, which is safe
   // precisely because they only ever see this clone.
   root = structuredClone(root);
+  root.childrenSpans = rollupChildren(root.childrenSpans ?? []);
+  return root;
+}
 
-  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
-    collectRollupGroups(root.childrenSpans ?? []);
+/**
+ * Roll up one level of a trace: the run's children, or a span group's, whose
+ * steps retry as separate spans just like the run's do.
+ */
+function rollupChildren(children: Trace[]): Trace[] {
+  const { spanGroups, stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
+    collectRollupGroups(children);
 
   const rolledUpRunChildren: Trace[] = [];
+
+  for (const group of spanGroups) {
+    group.childrenSpans = rollupChildren(group.childrenSpans ?? []);
+    rolledUpRunChildren.push(group);
+  }
 
   for (const stepID of stepOrder) {
     const attempts = steps.get(stepID);
@@ -574,9 +595,7 @@ export function traceRollup(root: Trace): Trace {
 
   const sortingKey = (trace: Trace) =>
     toMaybeDate(trace.queuedAt)?.getTime() ?? toMaybeDate(trace.startedAt)?.getTime() ?? 0;
-  root.childrenSpans = rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
-
-  return root;
+  return rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
 }
 
 /**

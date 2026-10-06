@@ -260,3 +260,11 @@ export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScor
 export function isAISummaryMetadata(md: SpanMetadata): md is SpanMetadataInngestAISummary {
   return md.kind === KindInngestAISummary;
 }
+
+/**
+ * Whether a span is a virtual span group: the steps an SDK called inside a
+ * span, nested by the API.
+ */
+export function isSpanGroup(trace: Pick<Trace, 'stepType'>): boolean {
+  return trace.stepType === 'SPAN_GROUP';
+}
