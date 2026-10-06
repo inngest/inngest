@@ -546,29 +546,39 @@ func TestCommandBuildsRerunFromStepBody(t *testing.T) {
 }
 
 func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
-	var gotQuery string
+	for name, tc := range map[string]struct {
+		args  []string
+		query string
+	}{
+		"include selector":     {args: []string{"--include", "output"}, query: "include=output"},
+		"legacy includeOutput": {args: []string{"--include-output"}, query: "includeOutput=true"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var gotQuery string
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotQuery = r.URL.RawQuery
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
-	}))
-	defer srv.Close()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotQuery = r.URL.RawQuery
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+			}))
+			defer srv.Close()
 
-	cmd := Command()
-	out := bytes.Buffer{}
-	cmd.Writer = &out
+			cmd := Command()
+			out := bytes.Buffer{}
+			cmd.Writer = &out
 
-	err := cmd.Run(context.Background(), []string{
-		"api",
-		"--api-host", srv.URL,
-		"get-function-trace",
-		"--run-id", "01J00000000000000000000000",
-		"--include", "output",
-	})
+			args := []string{
+				"api",
+				"--api-host", srv.URL,
+				"get-function-trace",
+				"--run-id", "01J00000000000000000000000",
+			}
+			err := cmd.Run(context.Background(), append(args, tc.args...))
 
-	require.NoError(t, err)
-	require.Equal(t, "include=output", gotQuery)
+			require.NoError(t, err)
+			require.Equal(t, tc.query, gotQuery)
+		})
+	}
 }
 
 func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {

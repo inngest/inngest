@@ -863,9 +863,9 @@ func TestService_GetFunctionRun(t *testing.T) {
 		EndedAt:      &endedAt,
 	}
 	functions := &mockFunctionProvider{}
-	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
+	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Twice()
 	runs := &mockRunProvider{}
-	runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(run, nil).Once()
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(run, nil).Twice()
 
 	service := NewService(ServiceOptions{
 		Functions: functions,
@@ -876,23 +876,25 @@ func TestService_GetFunctionRun(t *testing.T) {
 		runs.AssertExpectations(t)
 	})
 
-	t.Run("returns mapped run data", func(t *testing.T) {
-		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
-			RunId:   runID.String(),
-			Include: []string{"output"},
+	for name, req := range map[string]*apiv2.GetFunctionRunRequest{
+		"include selector":     {RunId: runID.String(), Include: []string{"output"}},
+		"legacy includeOutput": {RunId: runID.String(), IncludeOutput: new(true)},
+	} {
+		t.Run("returns mapped run data/"+name, func(t *testing.T) {
+			resp, err := service.GetFunctionRun(context.Background(), req)
+			require.NoError(t, err)
+			require.Equal(t, runID.String(), resp.Data.Id)
+			require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
+			require.Equal(t, ulid.Time(runID.Time()).UTC(), resp.Data.QueuedAt.AsTime())
+			require.Equal(t, startedAt, resp.Data.StartedAt.AsTime())
+			require.Equal(t, "test-fn", resp.Data.Function.Id)
+			require.Equal(t, "Test function", resp.Data.Function.Name)
+			require.Equal(t, "my-app", resp.Data.App.Id)
+			require.Nil(t, resp.Data.Output)
+			require.NotNil(t, resp.Data.DurationMs)
+			require.Equal(t, uint64(2000), *resp.Data.DurationMs)
 		})
-		require.NoError(t, err)
-		require.Equal(t, runID.String(), resp.Data.Id)
-		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data.Status)
-		require.Equal(t, ulid.Time(runID.Time()).UTC(), resp.Data.QueuedAt.AsTime())
-		require.Equal(t, startedAt, resp.Data.StartedAt.AsTime())
-		require.Equal(t, "test-fn", resp.Data.Function.Id)
-		require.Equal(t, "Test function", resp.Data.Function.Name)
-		require.Equal(t, "my-app", resp.Data.App.Id)
-		require.Nil(t, resp.Data.Output)
-		require.NotNil(t, resp.Data.DurationMs)
-		require.Equal(t, uint64(2000), *resp.Data.DurationMs)
-	})
+	}
 
 	t.Run("requires run id", func(t *testing.T) {
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{})
@@ -1453,36 +1455,38 @@ func TestService_GetEventRuns(t *testing.T) {
 		AppID:        "my-app",
 	}
 
-	t.Run("returns mapped event runs", func(t *testing.T) {
-		reader := &mockRunProvider{}
-		reader.On("GetRuns", mock.Anything, GetRunsOpts{
-			EventID:       eventID,
-			Limit:         defaultEventRunsLimit,
-			IncludeOutput: true,
-		}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
-		t.Cleanup(func() {
-			reader.AssertExpectations(t)
-		})
+	for name, req := range map[string]*apiv2.GetEventRunsRequest{
+		"include selector":     {EventId: eventID.String(), Include: []string{"output"}},
+		"legacy includeOutput": {EventId: eventID.String(), IncludeOutput: new(true)},
+	} {
+		t.Run("returns mapped event runs/"+name, func(t *testing.T) {
+			reader := &mockRunProvider{}
+			reader.On("GetRuns", mock.Anything, GetRunsOpts{
+				EventID:       eventID,
+				Limit:         defaultEventRunsLimit,
+				IncludeOutput: true,
+			}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
+			t.Cleanup(func() {
+				reader.AssertExpectations(t)
+			})
 
-		service := NewService(ServiceOptions{Runs: reader})
-		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
-			EventId: eventID.String(),
-			Include: []string{"output"},
-		})
+			service := NewService(ServiceOptions{Runs: reader})
+			resp, err := service.GetEventRuns(context.Background(), req)
 
-		require.NoError(t, err)
-		require.Len(t, resp.Data, 1)
-		require.Equal(t, runID.String(), resp.Data[0].Id)
-		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
-		require.Equal(t, "Test function", resp.Data[0].Function.Name)
-		require.Equal(t, "my-app", resp.Data[0].App.Id)
-		require.Equal(t, []string{eventID.String()}, resp.Data[0].Trigger.EventIds)
-		require.NotNil(t, resp.Data[0].Output)
-		require.True(t, resp.Data[0].Output.Fields["ok"].GetBoolValue())
-		require.NotNil(t, resp.Page)
-		require.False(t, resp.Page.HasMore)
-		require.Equal(t, int32(defaultEventRunsLimit), resp.Page.Limit)
-	})
+			require.NoError(t, err)
+			require.Len(t, resp.Data, 1)
+			require.Equal(t, runID.String(), resp.Data[0].Id)
+			require.Equal(t, "test-fn", resp.Data[0].Function.Id)
+			require.Equal(t, "Test function", resp.Data[0].Function.Name)
+			require.Equal(t, "my-app", resp.Data[0].App.Id)
+			require.Equal(t, []string{eventID.String()}, resp.Data[0].Trigger.EventIds)
+			require.NotNil(t, resp.Data[0].Output)
+			require.True(t, resp.Data[0].Output.Fields["ok"].GetBoolValue())
+			require.NotNil(t, resp.Page)
+			require.False(t, resp.Page.HasMore)
+			require.Equal(t, int32(defaultEventRunsLimit), resp.Page.Limit)
+		})
+	}
 
 	t.Run("passes pagination to reader", func(t *testing.T) {
 		reader := &mockRunProvider{}
@@ -1963,36 +1967,38 @@ func TestService_GetFunctionTrace(t *testing.T) {
 		FunctionTraces: &mockFunctionTraceReader{},
 	})
 
-	t.Run("returns a nested trace response", func(t *testing.T) {
-		service := newService(t, true)
+	for name, req := range map[string]*apiv2.GetFunctionTraceRequest{
+		"include selector":     {RunId: runID.String(), Include: []string{"output"}},
+		"legacy includeOutput": {RunId: runID.String(), IncludeOutput: new(true)},
+	} {
+		t.Run("returns a nested trace response/"+name, func(t *testing.T) {
+			service := newService(t, true)
 
-		resp, err := service.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{
-			RunId:   runID.String(),
-			Include: []string{"output"},
+			resp, err := service.GetFunctionTrace(context.Background(), req)
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.NotNil(t, resp.Data)
+			require.Equal(t, runID.String(), resp.Data.RunId)
+			require.NotNil(t, resp.Data.RootSpan)
+			require.Equal(t, "Run", resp.Data.RootSpan.Name)
+			require.Equal(t, "run-span", resp.Data.RootSpan.Id)
+			require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, resp.Data.RootSpan.Status)
+			require.Len(t, resp.Data.RootSpan.Children, 1)
+
+			child := resp.Data.RootSpan.Children[0]
+			require.Equal(t, "Fetch data", child.Name)
+			require.Equal(t, "step-span", child.Id)
+			require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, child.Status)
+			require.NotNil(t, child.StepOp)
+			require.Equal(t, apiv2.TraceStepOp_TRACE_STEP_OP_RUN, *child.StepOp)
+			require.NotNil(t, child.StepId)
+			require.Equal(t, "step-1", *child.StepId)
+			require.NotNil(t, child.Input)
+			require.Equal(t, "hello", child.Input.Fields["message"].GetStringValue())
+			require.NotNil(t, child.Output)
+			require.True(t, child.Output.Fields["ok"].GetBoolValue())
 		})
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.NotNil(t, resp.Data)
-		require.Equal(t, runID.String(), resp.Data.RunId)
-		require.NotNil(t, resp.Data.RootSpan)
-		require.Equal(t, "Run", resp.Data.RootSpan.Name)
-		require.Equal(t, "run-span", resp.Data.RootSpan.Id)
-		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, resp.Data.RootSpan.Status)
-		require.Len(t, resp.Data.RootSpan.Children, 1)
-
-		child := resp.Data.RootSpan.Children[0]
-		require.Equal(t, "Fetch data", child.Name)
-		require.Equal(t, "step-span", child.Id)
-		require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, child.Status)
-		require.NotNil(t, child.StepOp)
-		require.Equal(t, apiv2.TraceStepOp_TRACE_STEP_OP_RUN, *child.StepOp)
-		require.NotNil(t, child.StepId)
-		require.Equal(t, "step-1", *child.StepId)
-		require.NotNil(t, child.Input)
-		require.Equal(t, "hello", child.Input.Fields["message"].GetStringValue())
-		require.NotNil(t, child.Output)
-		require.True(t, child.Output.Fields["ok"].GetBoolValue())
-	})
+	}
 
 	t.Run("validates missing run ID", func(t *testing.T) {
 		resp, err := validationService.GetFunctionTrace(context.Background(), &apiv2.GetFunctionTraceRequest{})
