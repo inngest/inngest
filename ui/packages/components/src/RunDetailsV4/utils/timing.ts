@@ -19,6 +19,9 @@ export const TIMELINE_CONSTANTS = {
   /** Row height in pixels */
   ROW_HEIGHT_PX: 28,
 
+  /** Height of a row with a second line (sandbox annotation) */
+  ANNOTATED_ROW_HEIGHT_PX: 44,
+
   /** Transition duration for expand/collapse */
   TRANSITION_MS: 150,
 

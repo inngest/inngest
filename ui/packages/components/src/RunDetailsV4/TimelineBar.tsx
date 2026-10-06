@@ -35,6 +35,12 @@ import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
+import {
+  DottedBackground,
+  SandboxAnnotation,
+  machineColor,
+  useSandboxHighlight,
+} from './SandboxAnnotation';
 import type {
   BarHeight,
   BarIcon,
@@ -843,8 +849,22 @@ export function TimelineBar({
   insideExperiment,
   experimentMetadata,
   scores,
+  sandbox,
+  sandboxId,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
+
+  // Machine highlight: rows on the active machine get its dotted background,
+  // every other row (except the run itself) is dimmed.
+  const { activeId: highlightedSandboxId } = useSandboxHighlight();
+  const machineHighlighted = !!highlightedSandboxId && highlightedSandboxId === sandboxId;
+  const dimmed = !!highlightedSandboxId && !machineHighlighted && style !== 'root';
+
+  const showAnnotation = !!sandbox?.annotate;
+  const rowHeightPx = showAnnotation
+    ? TIMELINE_CONSTANTS.ANNOTATED_ROW_HEIGHT_PX
+    : TIMELINE_CONSTANTS.ROW_HEIGHT_PX;
+
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -878,14 +898,17 @@ export function TimelineBar({
       {/* Main row */}
       <div
         data-testid="timeline-bar-row"
-        className="relative isolate flex h-7 cursor-pointer items-center"
+        className={cn(
+          'relative isolate flex h-7 cursor-pointer items-center transition-opacity',
+          dimmed && 'opacity-40'
+        )}
         onClick={() => {
           onClick?.();
           if (expandable) {
             onToggle?.();
           }
         }}
-        style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
+        style={{ height: `${rowHeightPx}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
         {(selected || hoverCardOpen) && (
@@ -927,13 +950,19 @@ export function TimelineBar({
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
           {/* Name + actions wrapper */}
-          <div className="flex min-w-0 flex-1 items-center">
+          <div
+            className={cn(
+              'flex min-w-0 flex-1',
+              showAnnotation ? 'flex-col items-stretch gap-0.5' : 'items-center'
+            )}
+          >
             {/* Name */}
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
                 barStyle.textColor ?? 'text-basis',
-                !effectiveIcon && 'pl-1.5'
+                !effectiveIcon && 'pl-1.5',
+                showAnnotation && 'flex-none'
               )}
             >
               {displayName}
@@ -956,6 +985,10 @@ export function TimelineBar({
                 </Tooltip>
               )}
             </span>
+
+            {showAnnotation && (
+              <SandboxAnnotation sandbox={sandbox!} className={cn(!effectiveIcon && 'pl-1.5')} />
+            )}
 
             {/* Actions slot */}
             {actions}
@@ -990,16 +1023,12 @@ export function TimelineBar({
           {/* Center line */}
           <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
 
-          {/* Dotted background pattern for experiment steps and their children */}
-          {showExperimentBackground && (
-            <div
-              className="bg-canvasSubtle pointer-events-none absolute inset-0"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle, rgb(var(--color-border-muted)) 1px, transparent 1px)',
-                backgroundSize: '7px 7px',
-              }}
-            />
+          {/* Dotted background: the highlighted machine's rows, or experiment
+              steps and their children */}
+          {machineHighlighted ? (
+            <DottedBackground color={machineColor(sandboxId!, 0.6)} />
+          ) : (
+            showExperimentBackground && <DottedBackground />
           )}
 
           {/* Bar container, centered vertically */}
@@ -1054,7 +1083,7 @@ export function TimelineBar({
           className="bg-canvasMuted absolute w-px"
           style={{
             left: `${indentPx + 8}px`,
-            top: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px`,
+            top: `${rowHeightPx}px`,
             bottom: 0,
           }}
         />

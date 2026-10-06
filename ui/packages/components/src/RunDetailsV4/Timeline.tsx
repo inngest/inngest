@@ -13,6 +13,7 @@ import { useCallback, useMemo, useState, type JSX, type ReactNode } from 'react'
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
+import { SandboxHighlightProvider } from './SandboxAnnotation';
 import { TimelineBar } from './TimelineBar';
 import type {
   BarSegment,
@@ -123,6 +124,7 @@ function PhaseSubBars<T extends { totalMs: number }>({
   viewEndOffset,
   startTime,
   minTime,
+  sandboxId,
 }: {
   phases: PhaseDefinition<T>[];
   data: T;
@@ -136,6 +138,7 @@ function PhaseSubBars<T extends { totalMs: number }>({
   viewEndOffset?: number;
   startTime?: Date;
   minTime: Date;
+  sandboxId?: string;
 }) {
   if (data.totalMs <= 0) return null;
 
@@ -174,6 +177,7 @@ function PhaseSubBars<T extends { totalMs: number }>({
           startTime={phaseStartTime}
           endTime={phaseEndTime}
           minTime={minTime}
+          sandboxId={sandboxId}
         />
       );
     });
@@ -300,6 +304,32 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
   return segments.length > 0 ? segments : undefined;
 }
 
+/**
+ * Generate one segment per state of a sandbox statement row (e.g. starting,
+ * running, collecting output), so a command reads as one bar moving through
+ * its states rather than a row per internal step.
+ */
+function generateSandboxPhaseSegments(bar: TimelineBarData): BarSegment[] | undefined {
+  const phases = bar.sandbox?.phases;
+  if (!phases || phases.length === 0) return undefined;
+
+  const startMs = bar.startTime.getTime();
+  const totalMs = (bar.endTime?.getTime() ?? Date.now()) - startMs;
+  if (totalMs <= 0) return undefined;
+
+  return phases.map((phase, i) => {
+    const phaseStartMs = phase.startTime.getTime() - startMs;
+    const phaseEndMs = (phase.endTime?.getTime() ?? startMs + totalMs) - startMs;
+    return {
+      id: `${bar.id}-seg-sandbox-${i}`,
+      startPercent: (phaseStartMs / totalMs) * 100,
+      widthPercent: (Math.max(0, phaseEndMs - phaseStartMs) / totalMs) * 100,
+      style: phase.waiting ? 'sandbox.waiting' : 'sandbox.active',
+      status: bar.status,
+    };
+  });
+}
+
 /** Generate HTTP timing segments for the "Your server" compound bar. */
 function generateHTTPSegments(
   barId: string,
@@ -386,6 +416,17 @@ function detailsFromPhases<T>(phases: PhaseDefinition<T>[], data: T): TimingDeta
 function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
   const details: TimingDetail[] = [];
 
+  // Sandbox statement states, in order; a state entered twice is summed
+  for (const phase of bar.sandbox?.phases ?? []) {
+    const durationMs = (phase.endTime?.getTime() ?? Date.now()) - phase.startTime.getTime();
+    const existing = details.find((d) => d.label === phase.label);
+    if (existing) {
+      existing.durationMs += durationMs;
+    } else {
+      details.push({ label: phase.label, durationMs });
+    }
+  }
+
   // Inngest overhead breakdown (per-step)
   if (bar.inngestBreakdown) {
     details.push(...detailsFromPhases(INNGEST_PHASES, bar.inngestBreakdown));
@@ -469,6 +510,8 @@ type TimelineBarRendererProps = {
   actions?: ReactNode;
   /** Whether this bar is inside an experiment (inherited from parent) */
   insideExperiment?: boolean;
+  /** Machine of the nearest sandbox ancestor (inherited, for the machine highlight) */
+  sandboxId?: string;
 };
 
 /**
@@ -489,6 +532,7 @@ function TimelineBarRenderer({
   viewEndOffset = 100,
   actions,
   insideExperiment,
+  sandboxId,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -510,9 +554,14 @@ function TimelineBarRenderer({
   // Children of experiment bars inherit the dotted background
   const childInsideExperiment = insideExperiment || bar.hasExperiment;
 
+  // Rows (and their sub-rows) belong to the nearest machine, for the highlight
+  const rowSandboxId = bar.sandbox?.sandboxId ?? sandboxId;
+
   // Generate segments for compound bar visualization
-  // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
-  const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
+  // Sandbox statement rows show their states; bars with timingBreakdown use
+  // queue+execution segments; others fall back to delay+execution
+  const segments =
+    generateSandboxPhaseSegments(bar) ?? generateBarSegments(bar) ?? generateDelaySegments(bar);
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
@@ -585,7 +634,7 @@ function TimelineBarRenderer({
       depth={depth}
       leftWidth={leftWidth}
       style={bar.style}
-      styleLabel={STYLE_LABELS[bar.style]}
+      styleLabel={bar.sandbox ? `step.sandbox · ${bar.sandbox.statement}` : STYLE_LABELS[bar.style]}
       segments={segments}
       // Root bar is always expanded (children always visible) but not expandable
       // (no toggle UI). expandable=false ensures VisualBar keeps opacity 1.
@@ -608,6 +657,8 @@ function TimelineBarRenderer({
       insideExperiment={insideExperiment}
       experimentMetadata={bar.experimentMetadata}
       scores={bar.scores}
+      sandbox={bar.sandbox}
+      sandboxId={rowSandboxId}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
@@ -633,6 +684,7 @@ function TimelineBarRenderer({
           startTime={bar.startTime}
           endTime={bar.endTime}
           minTime={minTime}
+          sandboxId={rowSandboxId}
         >
           {/* Inngest breakdown sub-bars — each positioned within the Inngest bar's range */}
           {isInngestExpanded && hasInngestBreakdown && (
@@ -649,6 +701,7 @@ function TimelineBarRenderer({
               viewEndOffset={viewEndOffset}
               startTime={bar.startTime}
               minTime={minTime}
+              sandboxId={rowSandboxId}
             />
           )}
         </TimelineBar>
@@ -679,6 +732,7 @@ function TimelineBarRenderer({
           endTime={bar.endTime}
           minTime={minTime}
           insideExperiment={childInsideExperiment}
+          sandboxId={rowSandboxId}
         >
           {/* HTTP timing bars — each positioned within the server bar's range */}
           {isServerExpanded && hasHTTPTiming && (
@@ -695,6 +749,7 @@ function TimelineBarRenderer({
               viewEndOffset={viewEndOffset}
               startTime={bar.startTime}
               minTime={minTime}
+              sandboxId={rowSandboxId}
             />
           )}
 
@@ -717,6 +772,7 @@ function TimelineBarRenderer({
                 viewStartOffset={viewStartOffset}
                 viewEndOffset={viewEndOffset}
                 insideExperiment={childInsideExperiment}
+                sandboxId={rowSandboxId}
               />
             ))}
         </TimelineBar>
@@ -833,6 +889,7 @@ function TimelineBarRenderer({
             viewStartOffset={viewStartOffset}
             viewEndOffset={viewEndOffset}
             insideExperiment={childInsideExperiment}
+            sandboxId={rowSandboxId}
           />
         ))}
     </TimelineBar>
@@ -946,37 +1003,39 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
 
   return (
-    <div className="w-full pb-4 pr-2" data-testid="timeline-container">
-      {/* Run duration header with timing markers */}
-      <TimelineHeader
-        minTime={minTime}
-        maxTime={maxTime}
-        leftWidth={leftWidth}
-        onSelectionChange={handleSelectionChange}
-        status={rootStatus}
-        selectionStart={viewStartOffset}
-        selectionEnd={viewEndOffset}
-      />
-
-      {/* Step bars */}
-      {bars.map((bar) => (
-        <TimelineBarRenderer
-          key={bar.id}
-          bar={bar}
-          depth={0}
+    <SandboxHighlightProvider>
+      <div className="w-full pb-4 pr-2" data-testid="timeline-container">
+        {/* Run duration header with timing markers */}
+        <TimelineHeader
           minTime={minTime}
           maxTime={maxTime}
           leftWidth={leftWidth}
-          orgName={orgName}
-          expandedBars={expandedBars}
-          onToggleExpand={handleToggleExpand}
-          onSelectStep={handleSelectStep}
-          selectedStepId={selectedStepId}
-          viewStartOffset={viewStartOffset}
-          viewEndOffset={viewEndOffset}
-          actions={bar.isRoot ? expandCollapseActions : undefined}
+          onSelectionChange={handleSelectionChange}
+          status={rootStatus}
+          selectionStart={viewStartOffset}
+          selectionEnd={viewEndOffset}
         />
-      ))}
-    </div>
+
+        {/* Step bars */}
+        {bars.map((bar) => (
+          <TimelineBarRenderer
+            key={bar.id}
+            bar={bar}
+            depth={0}
+            minTime={minTime}
+            maxTime={maxTime}
+            leftWidth={leftWidth}
+            orgName={orgName}
+            expandedBars={expandedBars}
+            onToggleExpand={handleToggleExpand}
+            onSelectStep={handleSelectStep}
+            selectedStepId={selectedStepId}
+            viewStartOffset={viewStartOffset}
+            viewEndOffset={viewEndOffset}
+            actions={bar.isRoot ? expandCollapseActions : undefined}
+          />
+        ))}
+      </div>
+    </SandboxHighlightProvider>
   );
 }
