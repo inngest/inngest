@@ -104,8 +104,6 @@ func (r *Rows) Close() error {
 	return err
 }
 
-var querySeq atomic.Int64
-
 // Query runs q.SQL over the logical views, streaming in the deltas q needs.
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(q.SQL)), "WITH") {
@@ -127,7 +125,6 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	}
 
 	needed := deltaTables(q.Tables)
-	seq := querySeq.Add(1)
 	var closers []func() error
 	closeReaders := func() {
 		for _, c := range closers {
@@ -142,7 +139,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	}
 
 	// Only stream the delta columns the query reads.
-	used, err := deltaColumnsUsed(ctx, conn, q, needed, seq)
+	used, err := deltaColumnsUsed(ctx, conn, q, needed)
 	if err != nil {
 		return fail(err)
 	}
