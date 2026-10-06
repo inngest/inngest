@@ -304,6 +304,12 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, []string{"span_id", "name"}, names(f.streamer.reqs[0].Columns))
 
+		// Every scan of the table counts: a self-join reads the union.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans}, nil, `SELECT a.span_id, b.name FROM spans a JOIN spans b ON a.parent_span_id = b.span_id`)
+		require.Len(t, f.streamer.reqs, 1)
+		require.ElementsMatch(t, []string{"span_id", "parent_span_id", "name"}, names(f.streamer.reqs[0].Columns))
+
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
 		require.Len(t, f.streamer.reqs, 1)
