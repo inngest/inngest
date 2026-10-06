@@ -415,19 +415,22 @@ func (x *SandboxPage) GetLimit() int32 {
 }
 
 type Sandbox struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Status        SandboxStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.SandboxStatus" json:"status,omitempty"`
-	VpcId         string                 `protobuf:"bytes,4,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
-	ImageRef      string                 `protobuf:"bytes,5,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
-	Resources     *SandboxResourceSpec   `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
-	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
-	Error         *string                `protobuf:"bytes,10,opt,name=error,proto3,oneof" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Status           SandboxStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.SandboxStatus" json:"status,omitempty"`
+	VpcId            string                 `protobuf:"bytes,4,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	ImageRef         string                 `protobuf:"bytes,5,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
+	Resources        *SandboxResourceSpec   `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	StartedAt        *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	EndedAt          *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
+	Error            *string                `protobuf:"bytes,10,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	ImageDigest      string                 `protobuf:"bytes,11,opt,name=image_digest,json=imageDigest,proto3" json:"image_digest,omitempty"`
+	ImageStartupMode string                 `protobuf:"bytes,13,opt,name=image_startup_mode,json=imageStartupMode,proto3" json:"image_startup_mode,omitempty"`
+	ResolvedImageRef string                 `protobuf:"bytes,14,opt,name=resolved_image_ref,json=resolvedImageRef,proto3" json:"resolved_image_ref,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Sandbox) Reset() {
@@ -526,6 +529,27 @@ func (x *Sandbox) GetEndedAt() *timestamppb.Timestamp {
 func (x *Sandbox) GetError() string {
 	if x != nil && x.Error != nil {
 		return *x.Error
+	}
+	return ""
+}
+
+func (x *Sandbox) GetImageDigest() string {
+	if x != nil {
+		return x.ImageDigest
+	}
+	return ""
+}
+
+func (x *Sandbox) GetImageStartupMode() string {
+	if x != nil {
+		return x.ImageStartupMode
+	}
+	return ""
+}
+
+func (x *Sandbox) GetResolvedImageRef() string {
+	if x != nil {
+		return x.ResolvedImageRef
 	}
 	return ""
 }
@@ -699,7 +723,11 @@ type CreateSandboxRequest struct {
 	// workload; create recovery retains those bindings even if a secret is archived
 	// and its name reused. Values are fetched at launch and may remain in the guest
 	// and its snapshots. Cannot be supplied with snapshot_id.
-	Secrets       []string `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	Secrets []string `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	// Workspace image or official image, namespace/name[:tag] or @sha256:digest.
+	// Cannot be supplied with snapshot_id. Omission selects the platform default.
+	Image         *string              `protobuf:"bytes,7,opt,name=image,proto3,oneof" json:"image,omitempty"`
+	ImageOptions  *SandboxImageOptions `protobuf:"bytes,8,opt,name=image_options,json=imageOptions,proto3" json:"image_options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -776,6 +804,142 @@ func (x *CreateSandboxRequest) GetSecrets() []string {
 	return nil
 }
 
+func (x *CreateSandboxRequest) GetImage() string {
+	if x != nil && x.Image != nil {
+		return *x.Image
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetImageOptions() *SandboxImageOptions {
+	if x != nil {
+		return x.ImageOptions
+	}
+	return nil
+}
+
+type SandboxImageCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Argv          []string               `protobuf:"bytes,1,rep,name=argv,proto3" json:"argv,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SandboxImageCommand) Reset() {
+	*x = SandboxImageCommand{}
+	mi := &file_api_v2_sandbox_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SandboxImageCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SandboxImageCommand) ProtoMessage() {}
+
+func (x *SandboxImageCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_sandbox_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SandboxImageCommand.ProtoReflect.Descriptor instead.
+func (*SandboxImageCommand) Descriptor() ([]byte, []int) {
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SandboxImageCommand) GetArgv() []string {
+	if x != nil {
+		return x.Argv
+	}
+	return nil
+}
+
+type SandboxImageOptions struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// idle (default) keeps the sandbox alive for SDK commands. image starts the
+	// resolved ENTRYPOINT + CMD and ends the sandbox when that process exits.
+	StartupMode   string               `protobuf:"bytes,1,opt,name=startup_mode,json=startupMode,proto3" json:"startup_mode,omitempty"`
+	User          *string              `protobuf:"bytes,2,opt,name=user,proto3,oneof" json:"user,omitempty"`
+	WorkingDir    *string              `protobuf:"bytes,3,opt,name=working_dir,json=workingDir,proto3,oneof" json:"working_dir,omitempty"`
+	Entrypoint    *SandboxImageCommand `protobuf:"bytes,4,opt,name=entrypoint,proto3" json:"entrypoint,omitempty"`
+	Cmd           *SandboxImageCommand `protobuf:"bytes,5,opt,name=cmd,proto3" json:"cmd,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SandboxImageOptions) Reset() {
+	*x = SandboxImageOptions{}
+	mi := &file_api_v2_sandbox_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SandboxImageOptions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SandboxImageOptions) ProtoMessage() {}
+
+func (x *SandboxImageOptions) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_sandbox_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SandboxImageOptions.ProtoReflect.Descriptor instead.
+func (*SandboxImageOptions) Descriptor() ([]byte, []int) {
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SandboxImageOptions) GetStartupMode() string {
+	if x != nil {
+		return x.StartupMode
+	}
+	return ""
+}
+
+func (x *SandboxImageOptions) GetUser() string {
+	if x != nil && x.User != nil {
+		return *x.User
+	}
+	return ""
+}
+
+func (x *SandboxImageOptions) GetWorkingDir() string {
+	if x != nil && x.WorkingDir != nil {
+		return *x.WorkingDir
+	}
+	return ""
+}
+
+func (x *SandboxImageOptions) GetEntrypoint() *SandboxImageCommand {
+	if x != nil {
+		return x.Entrypoint
+	}
+	return nil
+}
+
+func (x *SandboxImageOptions) GetCmd() *SandboxImageCommand {
+	if x != nil {
+		return x.Cmd
+	}
+	return nil
+}
+
 type ListSandboxesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
@@ -786,7 +950,7 @@ type ListSandboxesRequest struct {
 
 func (x *ListSandboxesRequest) Reset() {
 	*x = ListSandboxesRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[8]
+	mi := &file_api_v2_sandbox_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -798,7 +962,7 @@ func (x *ListSandboxesRequest) String() string {
 func (*ListSandboxesRequest) ProtoMessage() {}
 
 func (x *ListSandboxesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[8]
+	mi := &file_api_v2_sandbox_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -811,7 +975,7 @@ func (x *ListSandboxesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxesRequest.ProtoReflect.Descriptor instead.
 func (*ListSandboxesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{8}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListSandboxesRequest) GetCursor() string {
@@ -839,7 +1003,7 @@ type ListSandboxesResponse struct {
 
 func (x *ListSandboxesResponse) Reset() {
 	*x = ListSandboxesResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[9]
+	mi := &file_api_v2_sandbox_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -851,7 +1015,7 @@ func (x *ListSandboxesResponse) String() string {
 func (*ListSandboxesResponse) ProtoMessage() {}
 
 func (x *ListSandboxesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[9]
+	mi := &file_api_v2_sandbox_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -864,7 +1028,7 @@ func (x *ListSandboxesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxesResponse.ProtoReflect.Descriptor instead.
 func (*ListSandboxesResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{9}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListSandboxesResponse) GetData() []*Sandbox {
@@ -897,7 +1061,7 @@ type GetSandboxRequest struct {
 
 func (x *GetSandboxRequest) Reset() {
 	*x = GetSandboxRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[10]
+	mi := &file_api_v2_sandbox_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -909,7 +1073,7 @@ func (x *GetSandboxRequest) String() string {
 func (*GetSandboxRequest) ProtoMessage() {}
 
 func (x *GetSandboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[10]
+	mi := &file_api_v2_sandbox_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -922,7 +1086,7 @@ func (x *GetSandboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxRequest.ProtoReflect.Descriptor instead.
 func (*GetSandboxRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{10}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetSandboxRequest) GetSandboxId() string {
@@ -941,7 +1105,7 @@ type DestroySandboxRequest struct {
 
 func (x *DestroySandboxRequest) Reset() {
 	*x = DestroySandboxRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[11]
+	mi := &file_api_v2_sandbox_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -953,7 +1117,7 @@ func (x *DestroySandboxRequest) String() string {
 func (*DestroySandboxRequest) ProtoMessage() {}
 
 func (x *DestroySandboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[11]
+	mi := &file_api_v2_sandbox_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -966,7 +1130,7 @@ func (x *DestroySandboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroySandboxRequest.ProtoReflect.Descriptor instead.
 func (*DestroySandboxRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{11}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DestroySandboxRequest) GetSandboxId() string {
@@ -985,7 +1149,7 @@ type PauseSandboxRequest struct {
 
 func (x *PauseSandboxRequest) Reset() {
 	*x = PauseSandboxRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[12]
+	mi := &file_api_v2_sandbox_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -997,7 +1161,7 @@ func (x *PauseSandboxRequest) String() string {
 func (*PauseSandboxRequest) ProtoMessage() {}
 
 func (x *PauseSandboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[12]
+	mi := &file_api_v2_sandbox_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1010,7 +1174,7 @@ func (x *PauseSandboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseSandboxRequest.ProtoReflect.Descriptor instead.
 func (*PauseSandboxRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{12}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PauseSandboxRequest) GetSandboxId() string {
@@ -1030,7 +1194,7 @@ type PauseSandboxResponse struct {
 
 func (x *PauseSandboxResponse) Reset() {
 	*x = PauseSandboxResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[13]
+	mi := &file_api_v2_sandbox_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1206,7 @@ func (x *PauseSandboxResponse) String() string {
 func (*PauseSandboxResponse) ProtoMessage() {}
 
 func (x *PauseSandboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[13]
+	mi := &file_api_v2_sandbox_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1219,7 @@ func (x *PauseSandboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseSandboxResponse.ProtoReflect.Descriptor instead.
 func (*PauseSandboxResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{13}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PauseSandboxResponse) GetData() *Sandbox {
@@ -1081,7 +1245,7 @@ type ResumeSandboxRequest struct {
 
 func (x *ResumeSandboxRequest) Reset() {
 	*x = ResumeSandboxRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[14]
+	mi := &file_api_v2_sandbox_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1093,7 +1257,7 @@ func (x *ResumeSandboxRequest) String() string {
 func (*ResumeSandboxRequest) ProtoMessage() {}
 
 func (x *ResumeSandboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[14]
+	mi := &file_api_v2_sandbox_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1106,7 +1270,7 @@ func (x *ResumeSandboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeSandboxRequest.ProtoReflect.Descriptor instead.
 func (*ResumeSandboxRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{14}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResumeSandboxRequest) GetSandboxId() string {
@@ -1126,7 +1290,7 @@ type ResumeSandboxResponse struct {
 
 func (x *ResumeSandboxResponse) Reset() {
 	*x = ResumeSandboxResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[15]
+	mi := &file_api_v2_sandbox_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1138,7 +1302,7 @@ func (x *ResumeSandboxResponse) String() string {
 func (*ResumeSandboxResponse) ProtoMessage() {}
 
 func (x *ResumeSandboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[15]
+	mi := &file_api_v2_sandbox_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1151,7 +1315,7 @@ func (x *ResumeSandboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeSandboxResponse.ProtoReflect.Descriptor instead.
 func (*ResumeSandboxResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{15}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ResumeSandboxResponse) GetData() *Sandbox {
@@ -1188,7 +1352,7 @@ type SandboxSnapshot struct {
 
 func (x *SandboxSnapshot) Reset() {
 	*x = SandboxSnapshot{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[16]
+	mi := &file_api_v2_sandbox_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1364,7 @@ func (x *SandboxSnapshot) String() string {
 func (*SandboxSnapshot) ProtoMessage() {}
 
 func (x *SandboxSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[16]
+	mi := &file_api_v2_sandbox_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1377,7 @@ func (x *SandboxSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SandboxSnapshot.ProtoReflect.Descriptor instead.
 func (*SandboxSnapshot) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{16}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SandboxSnapshot) GetId() string {
@@ -1309,7 +1473,7 @@ type CreateSandboxSnapshotRequest struct {
 
 func (x *CreateSandboxSnapshotRequest) Reset() {
 	*x = CreateSandboxSnapshotRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[17]
+	mi := &file_api_v2_sandbox_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1321,7 +1485,7 @@ func (x *CreateSandboxSnapshotRequest) String() string {
 func (*CreateSandboxSnapshotRequest) ProtoMessage() {}
 
 func (x *CreateSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[17]
+	mi := &file_api_v2_sandbox_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1334,7 +1498,7 @@ func (x *CreateSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSandboxSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*CreateSandboxSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{17}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateSandboxSnapshotRequest) GetSandboxId() string {
@@ -1354,7 +1518,7 @@ type CreateSandboxSnapshotResponse struct {
 
 func (x *CreateSandboxSnapshotResponse) Reset() {
 	*x = CreateSandboxSnapshotResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[18]
+	mi := &file_api_v2_sandbox_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1366,7 +1530,7 @@ func (x *CreateSandboxSnapshotResponse) String() string {
 func (*CreateSandboxSnapshotResponse) ProtoMessage() {}
 
 func (x *CreateSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[18]
+	mi := &file_api_v2_sandbox_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1379,7 +1543,7 @@ func (x *CreateSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSandboxSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*CreateSandboxSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{18}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateSandboxSnapshotResponse) GetData() *SandboxSnapshot {
@@ -1406,7 +1570,7 @@ type ListSandboxSnapshotsRequest struct {
 
 func (x *ListSandboxSnapshotsRequest) Reset() {
 	*x = ListSandboxSnapshotsRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[19]
+	mi := &file_api_v2_sandbox_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1418,7 +1582,7 @@ func (x *ListSandboxSnapshotsRequest) String() string {
 func (*ListSandboxSnapshotsRequest) ProtoMessage() {}
 
 func (x *ListSandboxSnapshotsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[19]
+	mi := &file_api_v2_sandbox_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1431,7 +1595,7 @@ func (x *ListSandboxSnapshotsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxSnapshotsRequest.ProtoReflect.Descriptor instead.
 func (*ListSandboxSnapshotsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{19}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListSandboxSnapshotsRequest) GetCursor() string {
@@ -1459,7 +1623,7 @@ type ListSandboxSnapshotsResponse struct {
 
 func (x *ListSandboxSnapshotsResponse) Reset() {
 	*x = ListSandboxSnapshotsResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[20]
+	mi := &file_api_v2_sandbox_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1471,7 +1635,7 @@ func (x *ListSandboxSnapshotsResponse) String() string {
 func (*ListSandboxSnapshotsResponse) ProtoMessage() {}
 
 func (x *ListSandboxSnapshotsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[20]
+	mi := &file_api_v2_sandbox_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1484,7 +1648,7 @@ func (x *ListSandboxSnapshotsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxSnapshotsResponse.ProtoReflect.Descriptor instead.
 func (*ListSandboxSnapshotsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{20}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListSandboxSnapshotsResponse) GetData() []*SandboxSnapshot {
@@ -1517,7 +1681,7 @@ type GetSandboxSnapshotRequest struct {
 
 func (x *GetSandboxSnapshotRequest) Reset() {
 	*x = GetSandboxSnapshotRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[21]
+	mi := &file_api_v2_sandbox_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1529,7 +1693,7 @@ func (x *GetSandboxSnapshotRequest) String() string {
 func (*GetSandboxSnapshotRequest) ProtoMessage() {}
 
 func (x *GetSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[21]
+	mi := &file_api_v2_sandbox_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1542,7 +1706,7 @@ func (x *GetSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetSandboxSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{21}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetSandboxSnapshotRequest) GetSnapshotId() string {
@@ -1562,7 +1726,7 @@ type GetSandboxSnapshotResponse struct {
 
 func (x *GetSandboxSnapshotResponse) Reset() {
 	*x = GetSandboxSnapshotResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[22]
+	mi := &file_api_v2_sandbox_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1574,7 +1738,7 @@ func (x *GetSandboxSnapshotResponse) String() string {
 func (*GetSandboxSnapshotResponse) ProtoMessage() {}
 
 func (x *GetSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[22]
+	mi := &file_api_v2_sandbox_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1587,7 +1751,7 @@ func (x *GetSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetSandboxSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{22}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetSandboxSnapshotResponse) GetData() *SandboxSnapshot {
@@ -1613,7 +1777,7 @@ type DeleteSandboxSnapshotRequest struct {
 
 func (x *DeleteSandboxSnapshotRequest) Reset() {
 	*x = DeleteSandboxSnapshotRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[23]
+	mi := &file_api_v2_sandbox_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1625,7 +1789,7 @@ func (x *DeleteSandboxSnapshotRequest) String() string {
 func (*DeleteSandboxSnapshotRequest) ProtoMessage() {}
 
 func (x *DeleteSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[23]
+	mi := &file_api_v2_sandbox_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1638,7 +1802,7 @@ func (x *DeleteSandboxSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSandboxSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSandboxSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{23}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DeleteSandboxSnapshotRequest) GetSnapshotId() string {
@@ -1656,7 +1820,7 @@ type DeleteSandboxSnapshotResponse struct {
 
 func (x *DeleteSandboxSnapshotResponse) Reset() {
 	*x = DeleteSandboxSnapshotResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[24]
+	mi := &file_api_v2_sandbox_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1832,7 @@ func (x *DeleteSandboxSnapshotResponse) String() string {
 func (*DeleteSandboxSnapshotResponse) ProtoMessage() {}
 
 func (x *DeleteSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[24]
+	mi := &file_api_v2_sandbox_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1845,7 @@ func (x *DeleteSandboxSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteSandboxSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*DeleteSandboxSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{24}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{26}
 }
 
 type ExecSandboxRequest struct {
@@ -1697,7 +1861,7 @@ type ExecSandboxRequest struct {
 
 func (x *ExecSandboxRequest) Reset() {
 	*x = ExecSandboxRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[25]
+	mi := &file_api_v2_sandbox_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1709,7 +1873,7 @@ func (x *ExecSandboxRequest) String() string {
 func (*ExecSandboxRequest) ProtoMessage() {}
 
 func (x *ExecSandboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[25]
+	mi := &file_api_v2_sandbox_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1722,7 +1886,7 @@ func (x *ExecSandboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecSandboxRequest.ProtoReflect.Descriptor instead.
 func (*ExecSandboxRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{25}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ExecSandboxRequest) GetSandboxId() string {
@@ -1772,7 +1936,7 @@ type ExecSandboxData struct {
 
 func (x *ExecSandboxData) Reset() {
 	*x = ExecSandboxData{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[26]
+	mi := &file_api_v2_sandbox_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1784,7 +1948,7 @@ func (x *ExecSandboxData) String() string {
 func (*ExecSandboxData) ProtoMessage() {}
 
 func (x *ExecSandboxData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[26]
+	mi := &file_api_v2_sandbox_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1797,7 +1961,7 @@ func (x *ExecSandboxData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecSandboxData.ProtoReflect.Descriptor instead.
 func (*ExecSandboxData) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{26}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ExecSandboxData) GetStdout() []byte {
@@ -1838,7 +2002,7 @@ type ExecSandboxResponse struct {
 
 func (x *ExecSandboxResponse) Reset() {
 	*x = ExecSandboxResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[27]
+	mi := &file_api_v2_sandbox_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1850,7 +2014,7 @@ func (x *ExecSandboxResponse) String() string {
 func (*ExecSandboxResponse) ProtoMessage() {}
 
 func (x *ExecSandboxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[27]
+	mi := &file_api_v2_sandbox_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1863,7 +2027,7 @@ func (x *ExecSandboxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecSandboxResponse.ProtoReflect.Descriptor instead.
 func (*ExecSandboxResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{27}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ExecSandboxResponse) GetData() *ExecSandboxData {
@@ -1890,7 +2054,7 @@ type StreamSandboxLogsRequest struct {
 
 func (x *StreamSandboxLogsRequest) Reset() {
 	*x = StreamSandboxLogsRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[28]
+	mi := &file_api_v2_sandbox_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1902,7 +2066,7 @@ func (x *StreamSandboxLogsRequest) String() string {
 func (*StreamSandboxLogsRequest) ProtoMessage() {}
 
 func (x *StreamSandboxLogsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[28]
+	mi := &file_api_v2_sandbox_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1915,7 +2079,7 @@ func (x *StreamSandboxLogsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSandboxLogsRequest.ProtoReflect.Descriptor instead.
 func (*StreamSandboxLogsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{28}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *StreamSandboxLogsRequest) GetSandboxId() string {
@@ -1944,7 +2108,7 @@ type SandboxLogChunk struct {
 
 func (x *SandboxLogChunk) Reset() {
 	*x = SandboxLogChunk{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[29]
+	mi := &file_api_v2_sandbox_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1956,7 +2120,7 @@ func (x *SandboxLogChunk) String() string {
 func (*SandboxLogChunk) ProtoMessage() {}
 
 func (x *SandboxLogChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[29]
+	mi := &file_api_v2_sandbox_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1969,7 +2133,7 @@ func (x *SandboxLogChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SandboxLogChunk.ProtoReflect.Descriptor instead.
 func (*SandboxLogChunk) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{29}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SandboxLogChunk) GetStream() SandboxLogStream {
@@ -2009,7 +2173,7 @@ type StreamSandboxLogsResponse struct {
 
 func (x *StreamSandboxLogsResponse) Reset() {
 	*x = StreamSandboxLogsResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[30]
+	mi := &file_api_v2_sandbox_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2021,7 +2185,7 @@ func (x *StreamSandboxLogsResponse) String() string {
 func (*StreamSandboxLogsResponse) ProtoMessage() {}
 
 func (x *StreamSandboxLogsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[30]
+	mi := &file_api_v2_sandbox_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2034,7 +2198,7 @@ func (x *StreamSandboxLogsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSandboxLogsResponse.ProtoReflect.Descriptor instead.
 func (*StreamSandboxLogsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{30}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *StreamSandboxLogsResponse) GetData() *SandboxLogChunk {
@@ -2056,7 +2220,7 @@ type WriteSandboxFileRequest struct {
 
 func (x *WriteSandboxFileRequest) Reset() {
 	*x = WriteSandboxFileRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[31]
+	mi := &file_api_v2_sandbox_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2068,7 +2232,7 @@ func (x *WriteSandboxFileRequest) String() string {
 func (*WriteSandboxFileRequest) ProtoMessage() {}
 
 func (x *WriteSandboxFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[31]
+	mi := &file_api_v2_sandbox_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2081,7 +2245,7 @@ func (x *WriteSandboxFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteSandboxFileRequest.ProtoReflect.Descriptor instead.
 func (*WriteSandboxFileRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{31}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *WriteSandboxFileRequest) GetSandboxId() string {
@@ -2122,7 +2286,7 @@ type WriteSandboxFileData struct {
 
 func (x *WriteSandboxFileData) Reset() {
 	*x = WriteSandboxFileData{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[32]
+	mi := &file_api_v2_sandbox_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2134,7 +2298,7 @@ func (x *WriteSandboxFileData) String() string {
 func (*WriteSandboxFileData) ProtoMessage() {}
 
 func (x *WriteSandboxFileData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[32]
+	mi := &file_api_v2_sandbox_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +2311,7 @@ func (x *WriteSandboxFileData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteSandboxFileData.ProtoReflect.Descriptor instead.
 func (*WriteSandboxFileData) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{32}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *WriteSandboxFileData) GetPath() string {
@@ -2174,7 +2338,7 @@ type WriteSandboxFileResponse struct {
 
 func (x *WriteSandboxFileResponse) Reset() {
 	*x = WriteSandboxFileResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[33]
+	mi := &file_api_v2_sandbox_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2186,7 +2350,7 @@ func (x *WriteSandboxFileResponse) String() string {
 func (*WriteSandboxFileResponse) ProtoMessage() {}
 
 func (x *WriteSandboxFileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[33]
+	mi := &file_api_v2_sandbox_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2199,7 +2363,7 @@ func (x *WriteSandboxFileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteSandboxFileResponse.ProtoReflect.Descriptor instead.
 func (*WriteSandboxFileResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{33}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *WriteSandboxFileResponse) GetData() *WriteSandboxFileData {
@@ -2226,7 +2390,7 @@ type ReadSandboxFileRequest struct {
 
 func (x *ReadSandboxFileRequest) Reset() {
 	*x = ReadSandboxFileRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[34]
+	mi := &file_api_v2_sandbox_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2238,7 +2402,7 @@ func (x *ReadSandboxFileRequest) String() string {
 func (*ReadSandboxFileRequest) ProtoMessage() {}
 
 func (x *ReadSandboxFileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[34]
+	mi := &file_api_v2_sandbox_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2251,7 +2415,7 @@ func (x *ReadSandboxFileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadSandboxFileRequest.ProtoReflect.Descriptor instead.
 func (*ReadSandboxFileRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{34}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ReadSandboxFileRequest) GetSandboxId() string {
@@ -2284,7 +2448,7 @@ type SandboxProcess struct {
 
 func (x *SandboxProcess) Reset() {
 	*x = SandboxProcess{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[35]
+	mi := &file_api_v2_sandbox_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2296,7 +2460,7 @@ func (x *SandboxProcess) String() string {
 func (*SandboxProcess) ProtoMessage() {}
 
 func (x *SandboxProcess) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[35]
+	mi := &file_api_v2_sandbox_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2309,7 +2473,7 @@ func (x *SandboxProcess) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SandboxProcess.ProtoReflect.Descriptor instead.
 func (*SandboxProcess) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{35}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SandboxProcess) GetId() string {
@@ -2378,7 +2542,7 @@ type StartSandboxProcessResponse struct {
 
 func (x *StartSandboxProcessResponse) Reset() {
 	*x = StartSandboxProcessResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[36]
+	mi := &file_api_v2_sandbox_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2390,7 +2554,7 @@ func (x *StartSandboxProcessResponse) String() string {
 func (*StartSandboxProcessResponse) ProtoMessage() {}
 
 func (x *StartSandboxProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[36]
+	mi := &file_api_v2_sandbox_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2403,7 +2567,7 @@ func (x *StartSandboxProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartSandboxProcessResponse.ProtoReflect.Descriptor instead.
 func (*StartSandboxProcessResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{36}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *StartSandboxProcessResponse) GetData() *SandboxProcess {
@@ -2430,7 +2594,7 @@ type GetSandboxProcessResponse struct {
 
 func (x *GetSandboxProcessResponse) Reset() {
 	*x = GetSandboxProcessResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[37]
+	mi := &file_api_v2_sandbox_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2442,7 +2606,7 @@ func (x *GetSandboxProcessResponse) String() string {
 func (*GetSandboxProcessResponse) ProtoMessage() {}
 
 func (x *GetSandboxProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[37]
+	mi := &file_api_v2_sandbox_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2455,7 +2619,7 @@ func (x *GetSandboxProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxProcessResponse.ProtoReflect.Descriptor instead.
 func (*GetSandboxProcessResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{37}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetSandboxProcessResponse) GetData() *SandboxProcess {
@@ -2482,7 +2646,7 @@ type WaitSandboxProcessResponse struct {
 
 func (x *WaitSandboxProcessResponse) Reset() {
 	*x = WaitSandboxProcessResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[38]
+	mi := &file_api_v2_sandbox_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2494,7 +2658,7 @@ func (x *WaitSandboxProcessResponse) String() string {
 func (*WaitSandboxProcessResponse) ProtoMessage() {}
 
 func (x *WaitSandboxProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[38]
+	mi := &file_api_v2_sandbox_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2507,7 +2671,7 @@ func (x *WaitSandboxProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitSandboxProcessResponse.ProtoReflect.Descriptor instead.
 func (*WaitSandboxProcessResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{38}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *WaitSandboxProcessResponse) GetData() *SandboxProcess {
@@ -2536,7 +2700,7 @@ type StartSandboxProcessRequest struct {
 
 func (x *StartSandboxProcessRequest) Reset() {
 	*x = StartSandboxProcessRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[39]
+	mi := &file_api_v2_sandbox_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2548,7 +2712,7 @@ func (x *StartSandboxProcessRequest) String() string {
 func (*StartSandboxProcessRequest) ProtoMessage() {}
 
 func (x *StartSandboxProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[39]
+	mi := &file_api_v2_sandbox_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2561,7 +2725,7 @@ func (x *StartSandboxProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartSandboxProcessRequest.ProtoReflect.Descriptor instead.
 func (*StartSandboxProcessRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{39}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *StartSandboxProcessRequest) GetSandboxId() string {
@@ -2603,7 +2767,7 @@ type ListSandboxProcessesRequest struct {
 
 func (x *ListSandboxProcessesRequest) Reset() {
 	*x = ListSandboxProcessesRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[40]
+	mi := &file_api_v2_sandbox_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2615,7 +2779,7 @@ func (x *ListSandboxProcessesRequest) String() string {
 func (*ListSandboxProcessesRequest) ProtoMessage() {}
 
 func (x *ListSandboxProcessesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[40]
+	mi := &file_api_v2_sandbox_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2628,7 +2792,7 @@ func (x *ListSandboxProcessesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxProcessesRequest.ProtoReflect.Descriptor instead.
 func (*ListSandboxProcessesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{40}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ListSandboxProcessesRequest) GetSandboxId() string {
@@ -2663,7 +2827,7 @@ type ListSandboxProcessesResponse struct {
 
 func (x *ListSandboxProcessesResponse) Reset() {
 	*x = ListSandboxProcessesResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[41]
+	mi := &file_api_v2_sandbox_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2675,7 +2839,7 @@ func (x *ListSandboxProcessesResponse) String() string {
 func (*ListSandboxProcessesResponse) ProtoMessage() {}
 
 func (x *ListSandboxProcessesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[41]
+	mi := &file_api_v2_sandbox_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2688,7 +2852,7 @@ func (x *ListSandboxProcessesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSandboxProcessesResponse.ProtoReflect.Descriptor instead.
 func (*ListSandboxProcessesResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{41}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListSandboxProcessesResponse) GetData() []*SandboxProcess {
@@ -2722,7 +2886,7 @@ type GetSandboxProcessRequest struct {
 
 func (x *GetSandboxProcessRequest) Reset() {
 	*x = GetSandboxProcessRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[42]
+	mi := &file_api_v2_sandbox_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2734,7 +2898,7 @@ func (x *GetSandboxProcessRequest) String() string {
 func (*GetSandboxProcessRequest) ProtoMessage() {}
 
 func (x *GetSandboxProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[42]
+	mi := &file_api_v2_sandbox_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2747,7 +2911,7 @@ func (x *GetSandboxProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxProcessRequest.ProtoReflect.Descriptor instead.
 func (*GetSandboxProcessRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{42}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GetSandboxProcessRequest) GetSandboxId() string {
@@ -2776,7 +2940,7 @@ type SignalSandboxProcessRequest struct {
 
 func (x *SignalSandboxProcessRequest) Reset() {
 	*x = SignalSandboxProcessRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[43]
+	mi := &file_api_v2_sandbox_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2788,7 +2952,7 @@ func (x *SignalSandboxProcessRequest) String() string {
 func (*SignalSandboxProcessRequest) ProtoMessage() {}
 
 func (x *SignalSandboxProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[43]
+	mi := &file_api_v2_sandbox_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2801,7 +2965,7 @@ func (x *SignalSandboxProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalSandboxProcessRequest.ProtoReflect.Descriptor instead.
 func (*SignalSandboxProcessRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{43}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *SignalSandboxProcessRequest) GetSandboxId() string {
@@ -2840,7 +3004,7 @@ type SignalSandboxProcessResponse struct {
 
 func (x *SignalSandboxProcessResponse) Reset() {
 	*x = SignalSandboxProcessResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[44]
+	mi := &file_api_v2_sandbox_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2852,7 +3016,7 @@ func (x *SignalSandboxProcessResponse) String() string {
 func (*SignalSandboxProcessResponse) ProtoMessage() {}
 
 func (x *SignalSandboxProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[44]
+	mi := &file_api_v2_sandbox_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2865,7 +3029,7 @@ func (x *SignalSandboxProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalSandboxProcessResponse.ProtoReflect.Descriptor instead.
 func (*SignalSandboxProcessResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{44}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{46}
 }
 
 type WaitSandboxProcessRequest struct {
@@ -2879,7 +3043,7 @@ type WaitSandboxProcessRequest struct {
 
 func (x *WaitSandboxProcessRequest) Reset() {
 	*x = WaitSandboxProcessRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[45]
+	mi := &file_api_v2_sandbox_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2891,7 +3055,7 @@ func (x *WaitSandboxProcessRequest) String() string {
 func (*WaitSandboxProcessRequest) ProtoMessage() {}
 
 func (x *WaitSandboxProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[45]
+	mi := &file_api_v2_sandbox_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2904,7 +3068,7 @@ func (x *WaitSandboxProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitSandboxProcessRequest.ProtoReflect.Descriptor instead.
 func (*WaitSandboxProcessRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{45}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *WaitSandboxProcessRequest) GetSandboxId() string {
@@ -2939,7 +3103,7 @@ type GetSandboxProcessOutputRequest struct {
 
 func (x *GetSandboxProcessOutputRequest) Reset() {
 	*x = GetSandboxProcessOutputRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[46]
+	mi := &file_api_v2_sandbox_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2951,7 +3115,7 @@ func (x *GetSandboxProcessOutputRequest) String() string {
 func (*GetSandboxProcessOutputRequest) ProtoMessage() {}
 
 func (x *GetSandboxProcessOutputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[46]
+	mi := &file_api_v2_sandbox_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2964,7 +3128,7 @@ func (x *GetSandboxProcessOutputRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxProcessOutputRequest.ProtoReflect.Descriptor instead.
 func (*GetSandboxProcessOutputRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{46}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetSandboxProcessOutputRequest) GetSandboxId() string {
@@ -2997,7 +3161,7 @@ type GetSandboxProcessOutputData struct {
 
 func (x *GetSandboxProcessOutputData) Reset() {
 	*x = GetSandboxProcessOutputData{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[47]
+	mi := &file_api_v2_sandbox_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3009,7 +3173,7 @@ func (x *GetSandboxProcessOutputData) String() string {
 func (*GetSandboxProcessOutputData) ProtoMessage() {}
 
 func (x *GetSandboxProcessOutputData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[47]
+	mi := &file_api_v2_sandbox_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3022,7 +3186,7 @@ func (x *GetSandboxProcessOutputData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxProcessOutputData.ProtoReflect.Descriptor instead.
 func (*GetSandboxProcessOutputData) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{47}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *GetSandboxProcessOutputData) GetChunks() []*SandboxLogChunk {
@@ -3042,7 +3206,7 @@ type GetSandboxProcessOutputResponse struct {
 
 func (x *GetSandboxProcessOutputResponse) Reset() {
 	*x = GetSandboxProcessOutputResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[48]
+	mi := &file_api_v2_sandbox_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3054,7 +3218,7 @@ func (x *GetSandboxProcessOutputResponse) String() string {
 func (*GetSandboxProcessOutputResponse) ProtoMessage() {}
 
 func (x *GetSandboxProcessOutputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[48]
+	mi := &file_api_v2_sandbox_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3067,7 +3231,7 @@ func (x *GetSandboxProcessOutputResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSandboxProcessOutputResponse.ProtoReflect.Descriptor instead.
 func (*GetSandboxProcessOutputResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{48}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *GetSandboxProcessOutputResponse) GetData() *GetSandboxProcessOutputData {
@@ -3095,7 +3259,7 @@ type StreamSandboxProcessOutputRequest struct {
 
 func (x *StreamSandboxProcessOutputRequest) Reset() {
 	*x = StreamSandboxProcessOutputRequest{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[49]
+	mi := &file_api_v2_sandbox_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3107,7 +3271,7 @@ func (x *StreamSandboxProcessOutputRequest) String() string {
 func (*StreamSandboxProcessOutputRequest) ProtoMessage() {}
 
 func (x *StreamSandboxProcessOutputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[49]
+	mi := &file_api_v2_sandbox_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3120,7 +3284,7 @@ func (x *StreamSandboxProcessOutputRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use StreamSandboxProcessOutputRequest.ProtoReflect.Descriptor instead.
 func (*StreamSandboxProcessOutputRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{49}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *StreamSandboxProcessOutputRequest) GetSandboxId() string {
@@ -3153,7 +3317,7 @@ type StreamSandboxProcessOutputResponse struct {
 
 func (x *StreamSandboxProcessOutputResponse) Reset() {
 	*x = StreamSandboxProcessOutputResponse{}
-	mi := &file_api_v2_sandbox_proto_msgTypes[50]
+	mi := &file_api_v2_sandbox_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3165,7 +3329,7 @@ func (x *StreamSandboxProcessOutputResponse) String() string {
 func (*StreamSandboxProcessOutputResponse) ProtoMessage() {}
 
 func (x *StreamSandboxProcessOutputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_sandbox_proto_msgTypes[50]
+	mi := &file_api_v2_sandbox_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3178,7 +3342,7 @@ func (x *StreamSandboxProcessOutputResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use StreamSandboxProcessOutputResponse.ProtoReflect.Descriptor instead.
 func (*StreamSandboxProcessOutputResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{50}
+	return file_api_v2_sandbox_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *StreamSandboxProcessOutputResponse) GetData() *SandboxLogChunk {
@@ -3203,7 +3367,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\bhas_more\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor\"\xc3\x03\n" +
+	"\a_cursor\"\xc8\x04\n" +
 	"\aSandbox\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12-\n" +
@@ -3217,10 +3381,13 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tstartedAt\x88\x01\x01\x12:\n" +
 	"\bended_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampH\x01R\aendedAt\x88\x01\x01\x12\x19\n" +
 	"\x05error\x18\n" +
-	" \x01(\tH\x02R\x05error\x88\x01\x01B\r\n" +
+	" \x01(\tH\x02R\x05error\x88\x01\x01\x12!\n" +
+	"\fimage_digest\x18\v \x01(\tR\vimageDigest\x12,\n" +
+	"\x12image_startup_mode\x18\r \x01(\tR\x10imageStartupMode\x12,\n" +
+	"\x12resolved_image_ref\x18\x0e \x01(\tR\x10resolvedImageRefB\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\b\n" +
-	"\x06_error\"y\n" +
+	"\x06_errorJ\x04\b\f\x10\r\"y\n" +
 	"\x15CreateSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x12;\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"v\n" +
@@ -3231,7 +3398,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxH\x00R\x04data\x88\x01\x01\x12@\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataH\x01R\bmetadata\x88\x01\x01B\a\n" +
 	"\x05_dataB\v\n" +
-	"\t_metadata\"\xbc\x02\n" +
+	"\t_metadata\"\xa3\x03\n" +
 	"\x14CreateSandboxRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1b\n" +
@@ -3239,11 +3406,27 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x12$\n" +
 	"\vsnapshot_id\x18\x05 \x01(\tH\x00R\n" +
 	"snapshotId\x88\x01\x01\x12\x18\n" +
-	"\asecrets\x18\x06 \x03(\tR\asecrets\x1a>\n" +
+	"\asecrets\x18\x06 \x03(\tR\asecrets\x12\x19\n" +
+	"\x05image\x18\a \x01(\tH\x01R\x05image\x88\x01\x01\x12@\n" +
+	"\rimage_options\x18\b \x01(\v2\x1b.api.v2.SandboxImageOptionsR\fimageOptions\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
-	"\f_snapshot_id\"c\n" +
+	"\f_snapshot_idB\b\n" +
+	"\x06_image\")\n" +
+	"\x13SandboxImageCommand\x12\x12\n" +
+	"\x04argv\x18\x01 \x03(\tR\x04argv\"\xfc\x01\n" +
+	"\x13SandboxImageOptions\x12!\n" +
+	"\fstartup_mode\x18\x01 \x01(\tR\vstartupMode\x12\x17\n" +
+	"\x04user\x18\x02 \x01(\tH\x00R\x04user\x88\x01\x01\x12$\n" +
+	"\vworking_dir\x18\x03 \x01(\tH\x01R\n" +
+	"workingDir\x88\x01\x01\x12;\n" +
+	"\n" +
+	"entrypoint\x18\x04 \x01(\v2\x1b.api.v2.SandboxImageCommandR\n" +
+	"entrypoint\x12-\n" +
+	"\x03cmd\x18\x05 \x01(\v2\x1b.api.v2.SandboxImageCommandR\x03cmdB\a\n" +
+	"\x05_userB\x0e\n" +
+	"\f_working_dir\"c\n" +
 	"\x14ListSandboxesRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
@@ -3502,7 +3685,7 @@ func file_api_v2_sandbox_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_sandbox_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_api_v2_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
+var file_api_v2_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
 var file_api_v2_sandbox_proto_goTypes = []any{
 	(SandboxStatus)(0),                         // 0: api.v2.SandboxStatus
 	(SandboxProcessState)(0),                   // 1: api.v2.SandboxProcessState
@@ -3516,119 +3699,124 @@ var file_api_v2_sandbox_proto_goTypes = []any{
 	(*GetSandboxResponse)(nil),                 // 9: api.v2.GetSandboxResponse
 	(*DestroySandboxResponse)(nil),             // 10: api.v2.DestroySandboxResponse
 	(*CreateSandboxRequest)(nil),               // 11: api.v2.CreateSandboxRequest
-	(*ListSandboxesRequest)(nil),               // 12: api.v2.ListSandboxesRequest
-	(*ListSandboxesResponse)(nil),              // 13: api.v2.ListSandboxesResponse
-	(*GetSandboxRequest)(nil),                  // 14: api.v2.GetSandboxRequest
-	(*DestroySandboxRequest)(nil),              // 15: api.v2.DestroySandboxRequest
-	(*PauseSandboxRequest)(nil),                // 16: api.v2.PauseSandboxRequest
-	(*PauseSandboxResponse)(nil),               // 17: api.v2.PauseSandboxResponse
-	(*ResumeSandboxRequest)(nil),               // 18: api.v2.ResumeSandboxRequest
-	(*ResumeSandboxResponse)(nil),              // 19: api.v2.ResumeSandboxResponse
-	(*SandboxSnapshot)(nil),                    // 20: api.v2.SandboxSnapshot
-	(*CreateSandboxSnapshotRequest)(nil),       // 21: api.v2.CreateSandboxSnapshotRequest
-	(*CreateSandboxSnapshotResponse)(nil),      // 22: api.v2.CreateSandboxSnapshotResponse
-	(*ListSandboxSnapshotsRequest)(nil),        // 23: api.v2.ListSandboxSnapshotsRequest
-	(*ListSandboxSnapshotsResponse)(nil),       // 24: api.v2.ListSandboxSnapshotsResponse
-	(*GetSandboxSnapshotRequest)(nil),          // 25: api.v2.GetSandboxSnapshotRequest
-	(*GetSandboxSnapshotResponse)(nil),         // 26: api.v2.GetSandboxSnapshotResponse
-	(*DeleteSandboxSnapshotRequest)(nil),       // 27: api.v2.DeleteSandboxSnapshotRequest
-	(*DeleteSandboxSnapshotResponse)(nil),      // 28: api.v2.DeleteSandboxSnapshotResponse
-	(*ExecSandboxRequest)(nil),                 // 29: api.v2.ExecSandboxRequest
-	(*ExecSandboxData)(nil),                    // 30: api.v2.ExecSandboxData
-	(*ExecSandboxResponse)(nil),                // 31: api.v2.ExecSandboxResponse
-	(*StreamSandboxLogsRequest)(nil),           // 32: api.v2.StreamSandboxLogsRequest
-	(*SandboxLogChunk)(nil),                    // 33: api.v2.SandboxLogChunk
-	(*StreamSandboxLogsResponse)(nil),          // 34: api.v2.StreamSandboxLogsResponse
-	(*WriteSandboxFileRequest)(nil),            // 35: api.v2.WriteSandboxFileRequest
-	(*WriteSandboxFileData)(nil),               // 36: api.v2.WriteSandboxFileData
-	(*WriteSandboxFileResponse)(nil),           // 37: api.v2.WriteSandboxFileResponse
-	(*ReadSandboxFileRequest)(nil),             // 38: api.v2.ReadSandboxFileRequest
-	(*SandboxProcess)(nil),                     // 39: api.v2.SandboxProcess
-	(*StartSandboxProcessResponse)(nil),        // 40: api.v2.StartSandboxProcessResponse
-	(*GetSandboxProcessResponse)(nil),          // 41: api.v2.GetSandboxProcessResponse
-	(*WaitSandboxProcessResponse)(nil),         // 42: api.v2.WaitSandboxProcessResponse
-	(*StartSandboxProcessRequest)(nil),         // 43: api.v2.StartSandboxProcessRequest
-	(*ListSandboxProcessesRequest)(nil),        // 44: api.v2.ListSandboxProcessesRequest
-	(*ListSandboxProcessesResponse)(nil),       // 45: api.v2.ListSandboxProcessesResponse
-	(*GetSandboxProcessRequest)(nil),           // 46: api.v2.GetSandboxProcessRequest
-	(*SignalSandboxProcessRequest)(nil),        // 47: api.v2.SignalSandboxProcessRequest
-	(*SignalSandboxProcessResponse)(nil),       // 48: api.v2.SignalSandboxProcessResponse
-	(*WaitSandboxProcessRequest)(nil),          // 49: api.v2.WaitSandboxProcessRequest
-	(*GetSandboxProcessOutputRequest)(nil),     // 50: api.v2.GetSandboxProcessOutputRequest
-	(*GetSandboxProcessOutputData)(nil),        // 51: api.v2.GetSandboxProcessOutputData
-	(*GetSandboxProcessOutputResponse)(nil),    // 52: api.v2.GetSandboxProcessOutputResponse
-	(*StreamSandboxProcessOutputRequest)(nil),  // 53: api.v2.StreamSandboxProcessOutputRequest
-	(*StreamSandboxProcessOutputResponse)(nil), // 54: api.v2.StreamSandboxProcessOutputResponse
-	nil,                           // 55: api.v2.CreateSandboxRequest.EnvironmentEntry
-	nil,                           // 56: api.v2.ExecSandboxRequest.EnvironmentEntry
-	nil,                           // 57: api.v2.StartSandboxProcessRequest.EnvironmentEntry
-	(*timestamppb.Timestamp)(nil), // 58: google.protobuf.Timestamp
-	(*httpbody.HttpBody)(nil),     // 59: google.api.HttpBody
+	(*SandboxImageCommand)(nil),                // 12: api.v2.SandboxImageCommand
+	(*SandboxImageOptions)(nil),                // 13: api.v2.SandboxImageOptions
+	(*ListSandboxesRequest)(nil),               // 14: api.v2.ListSandboxesRequest
+	(*ListSandboxesResponse)(nil),              // 15: api.v2.ListSandboxesResponse
+	(*GetSandboxRequest)(nil),                  // 16: api.v2.GetSandboxRequest
+	(*DestroySandboxRequest)(nil),              // 17: api.v2.DestroySandboxRequest
+	(*PauseSandboxRequest)(nil),                // 18: api.v2.PauseSandboxRequest
+	(*PauseSandboxResponse)(nil),               // 19: api.v2.PauseSandboxResponse
+	(*ResumeSandboxRequest)(nil),               // 20: api.v2.ResumeSandboxRequest
+	(*ResumeSandboxResponse)(nil),              // 21: api.v2.ResumeSandboxResponse
+	(*SandboxSnapshot)(nil),                    // 22: api.v2.SandboxSnapshot
+	(*CreateSandboxSnapshotRequest)(nil),       // 23: api.v2.CreateSandboxSnapshotRequest
+	(*CreateSandboxSnapshotResponse)(nil),      // 24: api.v2.CreateSandboxSnapshotResponse
+	(*ListSandboxSnapshotsRequest)(nil),        // 25: api.v2.ListSandboxSnapshotsRequest
+	(*ListSandboxSnapshotsResponse)(nil),       // 26: api.v2.ListSandboxSnapshotsResponse
+	(*GetSandboxSnapshotRequest)(nil),          // 27: api.v2.GetSandboxSnapshotRequest
+	(*GetSandboxSnapshotResponse)(nil),         // 28: api.v2.GetSandboxSnapshotResponse
+	(*DeleteSandboxSnapshotRequest)(nil),       // 29: api.v2.DeleteSandboxSnapshotRequest
+	(*DeleteSandboxSnapshotResponse)(nil),      // 30: api.v2.DeleteSandboxSnapshotResponse
+	(*ExecSandboxRequest)(nil),                 // 31: api.v2.ExecSandboxRequest
+	(*ExecSandboxData)(nil),                    // 32: api.v2.ExecSandboxData
+	(*ExecSandboxResponse)(nil),                // 33: api.v2.ExecSandboxResponse
+	(*StreamSandboxLogsRequest)(nil),           // 34: api.v2.StreamSandboxLogsRequest
+	(*SandboxLogChunk)(nil),                    // 35: api.v2.SandboxLogChunk
+	(*StreamSandboxLogsResponse)(nil),          // 36: api.v2.StreamSandboxLogsResponse
+	(*WriteSandboxFileRequest)(nil),            // 37: api.v2.WriteSandboxFileRequest
+	(*WriteSandboxFileData)(nil),               // 38: api.v2.WriteSandboxFileData
+	(*WriteSandboxFileResponse)(nil),           // 39: api.v2.WriteSandboxFileResponse
+	(*ReadSandboxFileRequest)(nil),             // 40: api.v2.ReadSandboxFileRequest
+	(*SandboxProcess)(nil),                     // 41: api.v2.SandboxProcess
+	(*StartSandboxProcessResponse)(nil),        // 42: api.v2.StartSandboxProcessResponse
+	(*GetSandboxProcessResponse)(nil),          // 43: api.v2.GetSandboxProcessResponse
+	(*WaitSandboxProcessResponse)(nil),         // 44: api.v2.WaitSandboxProcessResponse
+	(*StartSandboxProcessRequest)(nil),         // 45: api.v2.StartSandboxProcessRequest
+	(*ListSandboxProcessesRequest)(nil),        // 46: api.v2.ListSandboxProcessesRequest
+	(*ListSandboxProcessesResponse)(nil),       // 47: api.v2.ListSandboxProcessesResponse
+	(*GetSandboxProcessRequest)(nil),           // 48: api.v2.GetSandboxProcessRequest
+	(*SignalSandboxProcessRequest)(nil),        // 49: api.v2.SignalSandboxProcessRequest
+	(*SignalSandboxProcessResponse)(nil),       // 50: api.v2.SignalSandboxProcessResponse
+	(*WaitSandboxProcessRequest)(nil),          // 51: api.v2.WaitSandboxProcessRequest
+	(*GetSandboxProcessOutputRequest)(nil),     // 52: api.v2.GetSandboxProcessOutputRequest
+	(*GetSandboxProcessOutputData)(nil),        // 53: api.v2.GetSandboxProcessOutputData
+	(*GetSandboxProcessOutputResponse)(nil),    // 54: api.v2.GetSandboxProcessOutputResponse
+	(*StreamSandboxProcessOutputRequest)(nil),  // 55: api.v2.StreamSandboxProcessOutputRequest
+	(*StreamSandboxProcessOutputResponse)(nil), // 56: api.v2.StreamSandboxProcessOutputResponse
+	nil,                           // 57: api.v2.CreateSandboxRequest.EnvironmentEntry
+	nil,                           // 58: api.v2.ExecSandboxRequest.EnvironmentEntry
+	nil,                           // 59: api.v2.StartSandboxProcessRequest.EnvironmentEntry
+	(*timestamppb.Timestamp)(nil), // 60: google.protobuf.Timestamp
+	(*httpbody.HttpBody)(nil),     // 61: google.api.HttpBody
 }
 var file_api_v2_sandbox_proto_depIdxs = []int32{
-	58, // 0: api.v2.SandboxResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	60, // 0: api.v2.SandboxResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
 	0,  // 1: api.v2.Sandbox.status:type_name -> api.v2.SandboxStatus
 	4,  // 2: api.v2.Sandbox.resources:type_name -> api.v2.SandboxResourceSpec
-	58, // 3: api.v2.Sandbox.created_at:type_name -> google.protobuf.Timestamp
-	58, // 4: api.v2.Sandbox.started_at:type_name -> google.protobuf.Timestamp
-	58, // 5: api.v2.Sandbox.ended_at:type_name -> google.protobuf.Timestamp
+	60, // 3: api.v2.Sandbox.created_at:type_name -> google.protobuf.Timestamp
+	60, // 4: api.v2.Sandbox.started_at:type_name -> google.protobuf.Timestamp
+	60, // 5: api.v2.Sandbox.ended_at:type_name -> google.protobuf.Timestamp
 	7,  // 6: api.v2.CreateSandboxResponse.data:type_name -> api.v2.Sandbox
 	5,  // 7: api.v2.CreateSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
 	7,  // 8: api.v2.GetSandboxResponse.data:type_name -> api.v2.Sandbox
 	5,  // 9: api.v2.GetSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
 	7,  // 10: api.v2.DestroySandboxResponse.data:type_name -> api.v2.Sandbox
 	5,  // 11: api.v2.DestroySandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	55, // 12: api.v2.CreateSandboxRequest.environment:type_name -> api.v2.CreateSandboxRequest.EnvironmentEntry
-	7,  // 13: api.v2.ListSandboxesResponse.data:type_name -> api.v2.Sandbox
-	5,  // 14: api.v2.ListSandboxesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	6,  // 15: api.v2.ListSandboxesResponse.page:type_name -> api.v2.SandboxPage
-	7,  // 16: api.v2.PauseSandboxResponse.data:type_name -> api.v2.Sandbox
-	5,  // 17: api.v2.PauseSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	7,  // 18: api.v2.ResumeSandboxResponse.data:type_name -> api.v2.Sandbox
-	5,  // 19: api.v2.ResumeSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	3,  // 20: api.v2.SandboxSnapshot.status:type_name -> api.v2.SandboxSnapshotStatus
-	4,  // 21: api.v2.SandboxSnapshot.resources:type_name -> api.v2.SandboxResourceSpec
-	58, // 22: api.v2.SandboxSnapshot.created_at:type_name -> google.protobuf.Timestamp
-	58, // 23: api.v2.SandboxSnapshot.updated_at:type_name -> google.protobuf.Timestamp
-	58, // 24: api.v2.SandboxSnapshot.expires_at:type_name -> google.protobuf.Timestamp
-	20, // 25: api.v2.CreateSandboxSnapshotResponse.data:type_name -> api.v2.SandboxSnapshot
-	5,  // 26: api.v2.CreateSandboxSnapshotResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	20, // 27: api.v2.ListSandboxSnapshotsResponse.data:type_name -> api.v2.SandboxSnapshot
-	5,  // 28: api.v2.ListSandboxSnapshotsResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	6,  // 29: api.v2.ListSandboxSnapshotsResponse.page:type_name -> api.v2.SandboxPage
-	20, // 30: api.v2.GetSandboxSnapshotResponse.data:type_name -> api.v2.SandboxSnapshot
-	5,  // 31: api.v2.GetSandboxSnapshotResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	56, // 32: api.v2.ExecSandboxRequest.environment:type_name -> api.v2.ExecSandboxRequest.EnvironmentEntry
-	30, // 33: api.v2.ExecSandboxResponse.data:type_name -> api.v2.ExecSandboxData
-	5,  // 34: api.v2.ExecSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	2,  // 35: api.v2.SandboxLogChunk.stream:type_name -> api.v2.SandboxLogStream
-	58, // 36: api.v2.SandboxLogChunk.at:type_name -> google.protobuf.Timestamp
-	33, // 37: api.v2.StreamSandboxLogsResponse.data:type_name -> api.v2.SandboxLogChunk
-	59, // 38: api.v2.WriteSandboxFileRequest.body:type_name -> google.api.HttpBody
-	36, // 39: api.v2.WriteSandboxFileResponse.data:type_name -> api.v2.WriteSandboxFileData
-	5,  // 40: api.v2.WriteSandboxFileResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	1,  // 41: api.v2.SandboxProcess.state:type_name -> api.v2.SandboxProcessState
-	58, // 42: api.v2.SandboxProcess.started_at:type_name -> google.protobuf.Timestamp
-	58, // 43: api.v2.SandboxProcess.ended_at:type_name -> google.protobuf.Timestamp
-	39, // 44: api.v2.StartSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	5,  // 45: api.v2.StartSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	39, // 46: api.v2.GetSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	5,  // 47: api.v2.GetSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	39, // 48: api.v2.WaitSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	5,  // 49: api.v2.WaitSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	57, // 50: api.v2.StartSandboxProcessRequest.environment:type_name -> api.v2.StartSandboxProcessRequest.EnvironmentEntry
-	39, // 51: api.v2.ListSandboxProcessesResponse.data:type_name -> api.v2.SandboxProcess
-	5,  // 52: api.v2.ListSandboxProcessesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	6,  // 53: api.v2.ListSandboxProcessesResponse.page:type_name -> api.v2.SandboxPage
-	33, // 54: api.v2.GetSandboxProcessOutputData.chunks:type_name -> api.v2.SandboxLogChunk
-	51, // 55: api.v2.GetSandboxProcessOutputResponse.data:type_name -> api.v2.GetSandboxProcessOutputData
-	5,  // 56: api.v2.GetSandboxProcessOutputResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	33, // 57: api.v2.StreamSandboxProcessOutputResponse.data:type_name -> api.v2.SandboxLogChunk
-	58, // [58:58] is the sub-list for method output_type
-	58, // [58:58] is the sub-list for method input_type
-	58, // [58:58] is the sub-list for extension type_name
-	58, // [58:58] is the sub-list for extension extendee
-	0,  // [0:58] is the sub-list for field type_name
+	57, // 12: api.v2.CreateSandboxRequest.environment:type_name -> api.v2.CreateSandboxRequest.EnvironmentEntry
+	13, // 13: api.v2.CreateSandboxRequest.image_options:type_name -> api.v2.SandboxImageOptions
+	12, // 14: api.v2.SandboxImageOptions.entrypoint:type_name -> api.v2.SandboxImageCommand
+	12, // 15: api.v2.SandboxImageOptions.cmd:type_name -> api.v2.SandboxImageCommand
+	7,  // 16: api.v2.ListSandboxesResponse.data:type_name -> api.v2.Sandbox
+	5,  // 17: api.v2.ListSandboxesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	6,  // 18: api.v2.ListSandboxesResponse.page:type_name -> api.v2.SandboxPage
+	7,  // 19: api.v2.PauseSandboxResponse.data:type_name -> api.v2.Sandbox
+	5,  // 20: api.v2.PauseSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	7,  // 21: api.v2.ResumeSandboxResponse.data:type_name -> api.v2.Sandbox
+	5,  // 22: api.v2.ResumeSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	3,  // 23: api.v2.SandboxSnapshot.status:type_name -> api.v2.SandboxSnapshotStatus
+	4,  // 24: api.v2.SandboxSnapshot.resources:type_name -> api.v2.SandboxResourceSpec
+	60, // 25: api.v2.SandboxSnapshot.created_at:type_name -> google.protobuf.Timestamp
+	60, // 26: api.v2.SandboxSnapshot.updated_at:type_name -> google.protobuf.Timestamp
+	60, // 27: api.v2.SandboxSnapshot.expires_at:type_name -> google.protobuf.Timestamp
+	22, // 28: api.v2.CreateSandboxSnapshotResponse.data:type_name -> api.v2.SandboxSnapshot
+	5,  // 29: api.v2.CreateSandboxSnapshotResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	22, // 30: api.v2.ListSandboxSnapshotsResponse.data:type_name -> api.v2.SandboxSnapshot
+	5,  // 31: api.v2.ListSandboxSnapshotsResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	6,  // 32: api.v2.ListSandboxSnapshotsResponse.page:type_name -> api.v2.SandboxPage
+	22, // 33: api.v2.GetSandboxSnapshotResponse.data:type_name -> api.v2.SandboxSnapshot
+	5,  // 34: api.v2.GetSandboxSnapshotResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	58, // 35: api.v2.ExecSandboxRequest.environment:type_name -> api.v2.ExecSandboxRequest.EnvironmentEntry
+	32, // 36: api.v2.ExecSandboxResponse.data:type_name -> api.v2.ExecSandboxData
+	5,  // 37: api.v2.ExecSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	2,  // 38: api.v2.SandboxLogChunk.stream:type_name -> api.v2.SandboxLogStream
+	60, // 39: api.v2.SandboxLogChunk.at:type_name -> google.protobuf.Timestamp
+	35, // 40: api.v2.StreamSandboxLogsResponse.data:type_name -> api.v2.SandboxLogChunk
+	61, // 41: api.v2.WriteSandboxFileRequest.body:type_name -> google.api.HttpBody
+	38, // 42: api.v2.WriteSandboxFileResponse.data:type_name -> api.v2.WriteSandboxFileData
+	5,  // 43: api.v2.WriteSandboxFileResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	1,  // 44: api.v2.SandboxProcess.state:type_name -> api.v2.SandboxProcessState
+	60, // 45: api.v2.SandboxProcess.started_at:type_name -> google.protobuf.Timestamp
+	60, // 46: api.v2.SandboxProcess.ended_at:type_name -> google.protobuf.Timestamp
+	41, // 47: api.v2.StartSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	5,  // 48: api.v2.StartSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	41, // 49: api.v2.GetSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	5,  // 50: api.v2.GetSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	41, // 51: api.v2.WaitSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	5,  // 52: api.v2.WaitSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	59, // 53: api.v2.StartSandboxProcessRequest.environment:type_name -> api.v2.StartSandboxProcessRequest.EnvironmentEntry
+	41, // 54: api.v2.ListSandboxProcessesResponse.data:type_name -> api.v2.SandboxProcess
+	5,  // 55: api.v2.ListSandboxProcessesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	6,  // 56: api.v2.ListSandboxProcessesResponse.page:type_name -> api.v2.SandboxPage
+	35, // 57: api.v2.GetSandboxProcessOutputData.chunks:type_name -> api.v2.SandboxLogChunk
+	53, // 58: api.v2.GetSandboxProcessOutputResponse.data:type_name -> api.v2.GetSandboxProcessOutputData
+	5,  // 59: api.v2.GetSandboxProcessOutputResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	35, // 60: api.v2.StreamSandboxProcessOutputResponse.data:type_name -> api.v2.SandboxLogChunk
+	61, // [61:61] is the sub-list for method output_type
+	61, // [61:61] is the sub-list for method input_type
+	61, // [61:61] is the sub-list for extension type_name
+	61, // [61:61] is the sub-list for extension extendee
+	0,  // [0:61] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_sandbox_proto_init() }
@@ -3640,28 +3828,29 @@ func file_api_v2_sandbox_proto_init() {
 	file_api_v2_sandbox_proto_msgTypes[3].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[6].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[7].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[8].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[16].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[19].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[25].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[26].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[9].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[10].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[18].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[21].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[27].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[28].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[29].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[30].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[31].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[35].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[39].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[40].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[43].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[33].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[37].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[41].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[42].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[45].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[46].OneofWrappers = []any{}
-	file_api_v2_sandbox_proto_msgTypes[49].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[47].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[48].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[51].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_sandbox_proto_rawDesc), len(file_api_v2_sandbox_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   54,
+			NumMessages:   56,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

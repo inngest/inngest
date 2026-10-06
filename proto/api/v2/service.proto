@@ -5,6 +5,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
+import "api/v2/image.proto";
 import "third_party/google/api/annotations.proto";
 import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
@@ -49,6 +50,87 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 
 
 service V2 {
+  rpc GetImage(GetImageRequest) returns (GetImageResponse) {
+    option (google.api.http) = { get: "/images/{name=**}" };
+    option (authz) = { require_authz: true permission: "images:read:get" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "GetImage" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {
+    option (google.api.http) = { get: "/images" };
+    option (authz) = { require_authz: true permission: "images:read:list" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "ListImages" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc SetImageTag(SetImageTagRequest) returns (SetImageTagResponse) {
+    option (google.api.http) = { put: "/images/{name=**}/tags/{tag}" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:set_tag" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "SetImageTag" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc DeleteImageTag(DeleteImageTagRequest) returns (DeleteImageTagResponse) {
+    option (google.api.http) = { delete: "/images/{name=**}/tags/{tag}" };
+    option (authz) = { require_authz: true permission: "images:write:delete_tag" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "DeleteImageTag" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc PrepareImageUpload(PrepareImageUploadRequest) returns (PrepareImageUploadResponse) {
+    option (google.api.http) = { post: "/image-uploads" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:upload" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "PrepareImageUpload" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CompleteImageUpload(CompleteImageUploadRequest) returns (CompleteImageUploadResponse) {
+    option (google.api.http) = { post: "/image-uploads/{upload_id}/complete" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:upload" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "CompleteImageUpload" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListImageBuilds(ListImageBuildsRequest) returns (ListImageBuildsResponse) {
+    option (google.api.http) = { get: "/image-builds" };
+    option (authz) = { require_authz: true permission: "images:read:list_builds" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "ListImageBuilds" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetImageBuild(GetImageBuildRequest) returns (GetImageBuildResponse) {
+    option (google.api.http) = { get: "/image-builds/{build_id}" };
+    option (authz) = { require_authz: true permission: "images:read:get_build" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "GetImageBuild" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CancelImageBuild(CancelImageBuildRequest) returns (CancelImageBuildResponse) {
+    option (google.api.http) = { post: "/image-builds/{build_id}/cancel" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:cancel_build" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "CancelImageBuild" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetImageUsage(GetImageUsageRequest) returns (GetImageUsageResponse) {
+    option (google.api.http) = { get: "/image-usage" };
+    option (authz) = { require_authz: true permission: "images:read:usage" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "GetImageUsage" tags: "Images"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
   rpc Health(HealthRequest) returns (HealthResponse) {
     option (google.api.http) = {
       get: "/health"

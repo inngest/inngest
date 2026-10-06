@@ -1,0 +1,140 @@
+syntax = "proto3";
+package api.v2;
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+// OCI metadata. Volumes and exposed ports are informational: they do not create
+// persistent volumes or public network access. Docker HEALTHCHECK is unsupported.
+message ImageConfig {
+  repeated string entrypoint = 1;
+  repeated string cmd = 2;
+  map<string,string> env = 3;
+  string working_dir = 4;
+  string user = 5;
+  string stop_signal = 6;
+  map<string,string> labels = 7;
+  repeated string exposed_ports = 8;
+  repeated string volumes = 9;
+}
+message ImageBuildRecipe {
+  string dockerfile = 1;
+  string target = 2;
+  map<string,string> build_args = 3;
+  // Explicitly accepts reuse of prior RUN results. Mutable FROM tags and builds
+  // using secrets always rebuild. Change cache_epoch to force fresh results.
+  bool use_cache = 4;
+  string cache_epoch = 5;
+  repeated string secrets = 6;
+  // Registry hostname -> workspace secret name. Secret value is JSON containing
+  // username and password. Credentials are supplied only inside the build VM.
+  map<string,string> registry_auth = 7;
+}
+message ImageManifest {
+  int32 manifest_version = 1;
+  string os = 2;
+  string architecture = 3;
+  string variant = 4;
+  string rootfs_sha256 = 5;
+  int64 size_bytes = 6;
+  ImageConfig config = 7;
+  string builder = 8;
+}
+message ImageTag {
+  string name = 1;
+  optional string digest = 2;
+  int64 generation = 3;
+  string architecture = 4;
+  bool immutable = 5;
+  bool deleted = 6;
+}
+message ImageArtifact {
+  reserved 1;
+  string digest = 2;
+  ImageManifest manifest = 3;
+  string state = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+message Image {
+  string id = 1;
+  string name = 2;
+  string scope = 3;
+  google.protobuf.Timestamp created_at = 4;
+  repeated ImageTag tags = 5;
+  repeated ImageArtifact artifacts = 6;
+  optional string next_artifact_cursor = 7;
+}
+message ListImagesRequest { string cursor = 1; int32 limit = 2; }
+message ListImagesResponse { repeated Image data = 1; optional string next_cursor = 2; }
+message GetImageRequest { string name = 1; string artifact_cursor = 2; }
+message GetImageResponse { Image data = 1; }
+message SetImageTagRequest { string name = 1; string tag = 2; string digest = 3; int64 expected_generation = 4; bool immutable = 5; }
+message SetImageTagResponse { ImageTag data = 1; }
+message DeleteImageTagRequest { string name = 1; string tag = 2; int64 expected_generation = 3; }
+message DeleteImageTagResponse { ImageTag data = 1; }
+message PrepareImageUploadRequest {
+  // Caller-generated UUID makes retries idempotent.
+  string id = 1;
+  string name = 2;
+  string tag = 3;
+  int64 expected_generation = 4;
+  // rootfs.tar.gz for a local docker export; context.tar.gz for remote BuildKit.
+  string format = 5;
+  string sha256 = 6;
+  int64 size_bytes = 7;
+  string platform = 8;
+  ImageConfig config = 9;
+  ImageBuildRecipe recipe = 10;
+  bool immutable_tag = 11;
+  // docker_export for rootfs archives; dockerfile or sdk_builder for contexts.
+  string source_type = 12;
+}
+message ImageUploadPart { int32 number = 1; int64 offset = 2; int64 size_bytes = 3; string url = 4; map<string,string> headers = 5; }
+message ImageUploadGrant {
+  string upload_id = 1; string url = 2; google.protobuf.Timestamp expires_at = 3; map<string,string> headers = 4;
+  // Upload each byte range to its URL. The completion endpoint assembles parts.
+  repeated ImageUploadPart parts = 5;
+  // An identical retry after multipart completion can skip the byte upload.
+  bool already_uploaded = 6;
+}
+message PrepareImageUploadResponse { ImageUploadGrant data = 1; }
+message CompleteImageUploadRequest { string upload_id = 1; }
+message CompleteImageUploadResponse { string build_id = 1; }
+message ImageBuild {
+  string id = 1;
+  string source_id = 2;
+  string state = 3;
+  int32 attempt_count = 4;
+  optional string artifact_digest = 5;
+  bool cache_hit = 6;
+  bool tag_updated = 7;
+  string logs = 8;
+  string error_message = 9;
+  int64 execution_milliseconds = 10;
+  google.protobuf.Timestamp created_at = 11;
+  string name = 12;
+  string tag = 13;
+  string image_ref = 14;
+  string image_id = 15;
+  // pending (awaiting upload), uploaded (processing), ready, or failed.
+  string status = 16;
+  string architecture = 17;
+  string source_type = 18;
+  ImageConfig config = 19;
+  int64 upload_size_bytes = 20;
+  optional string builder_workload_id = 21;
+}
+message ListImageBuildsRequest { string cursor = 1; int32 limit = 2; }
+message ListImageBuildsResponse { repeated ImageBuild data = 1; optional string next_cursor = 2; }
+message GetImageBuildRequest { string build_id = 1; }
+message GetImageBuildResponse { ImageBuild data = 1; }
+message CancelImageBuildRequest { string build_id = 1; }
+message CancelImageBuildResponse { ImageBuild data = 1; }
+message GetImageUsageRequest {}
+message ImageUsage {
+  int64 stored_bytes = 1;
+  int64 upload_bytes = 2;
+  int64 build_milliseconds = 3;
+  int64 conversion_milliseconds = 4;
+  int32 active_builds = 5;
+}
+message GetImageUsageResponse { ImageUsage data = 1; }
