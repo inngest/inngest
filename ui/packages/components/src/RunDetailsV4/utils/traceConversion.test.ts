@@ -302,6 +302,40 @@ describe('traceConversion', () => {
       expect(rootBar?.timingBreakdown?.totalMs).toBe(71000);
     });
 
+    it("counts only span groups' step execution in root bar execution time", () => {
+      const group = (childrenSpans: Trace[]) => {
+        return createTrace({ stepID: null, stepOp: null, stepType: 'SPAN_GROUP', childrenSpans });
+      };
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        startedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:00:20Z',
+        childrenSpans: [
+          group([
+            createTrace({
+              queuedAt: '2024-01-01T00:00:01Z',
+              startedAt: '2024-01-01T00:00:02Z',
+              endedAt: '2024-01-01T00:00:03Z',
+            }),
+            group([
+              createTrace({
+                queuedAt: '2024-01-01T00:00:10Z',
+                startedAt: '2024-01-01T00:00:11Z',
+                endedAt: '2024-01-01T00:00:13Z',
+              }),
+            ]),
+          ]),
+        ],
+      });
+      const rootBar = traceToTimelineData(trace, { runID: 'run-1' }).bars[0];
+
+      // 1s + 2s of steps, not the group's 12s wall clock
+      expect(rootBar?.timingBreakdown?.executionMs).toBe(3000);
+      expect(rootBar?.timingBreakdown?.inngestMs).toBe(17000);
+      expect(rootBar?.runInngestBreakdown?.finalizationMs).toBe(7000);
+    });
+
     it('prefers metadata timing over timestamp-based calculation', () => {
       const trace = createTrace({
         isRoot: true,

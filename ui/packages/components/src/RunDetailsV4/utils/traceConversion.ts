@@ -598,6 +598,16 @@ function rollupChildren(children: Trace[]): Trace[] {
 }
 
 /**
+ * Replace each span group with the steps inside it, at any depth, so a group
+ * counts only its steps' time and not the gaps between them.
+ */
+function withoutSpanGroups(bars: TimelineBarData[]): TimelineBarData[] {
+  return bars.flatMap((bar) => {
+    return bar.style === 'span.group' ? withoutSpanGroups(bar.children ?? []) : [bar];
+  });
+}
+
+/**
  * Convert a V3 Trace to V4 TimelineData
  */
 export function traceToTimelineData(
@@ -641,11 +651,12 @@ export function traceToTimelineData(
   // Sum execution time from all step children, and attribute the rest to Inngest overhead.
   // For children without a timingBreakdown (sleep, waitForEvent, invoke, etc.),
   // use their wall-clock duration as execution time so it isn't misattributed as overhead.
+  const steps = withoutSpanGroups(rootBar.children ?? []);
   if (rootBar.endTime) {
     const runDurationMs = rootBar.endTime.getTime() - rootBar.startTime.getTime();
     if (runDurationMs > 0) {
       let totalExecutionMs = 0;
-      for (const child of rootBar.children ?? []) {
+      for (const child of steps) {
         if (child.timingBreakdown) {
           totalExecutionMs += child.timingBreakdown.executionMs;
         } else if (child.endTime) {
@@ -674,7 +685,7 @@ export function traceToTimelineData(
 
     // Finalization: time after last step ended until run ended
     let lastStepEndedAtMs = 0;
-    for (const child of rootBar.children ?? []) {
+    for (const child of steps) {
       if (child.endTime) {
         lastStepEndedAtMs = Math.max(lastStepEndedAtMs, child.endTime.getTime());
       }
