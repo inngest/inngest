@@ -83,6 +83,9 @@ func (r *Result) durations() map[string]time.Duration {
 
 // Format formats stats result.
 func (r *Result) Format(s fmt.State, verb rune) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	switch verb {
 	case 'v':
 		if s.Flag('+') {
