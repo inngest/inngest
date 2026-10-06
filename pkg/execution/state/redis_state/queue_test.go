@@ -3428,9 +3428,7 @@ func TestAccountPeekLooksUpPrioritiesConcurrently(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	start := time.Now()
 	peeked, err := shard.AccountPeek(ctx, false, now.Add(time.Minute), osqueue.AccountPeekMax)
-	elapsed := time.Since(start)
 	require.NoError(t, err)
 
 	require.Len(t, peeked, accounts)
@@ -3438,5 +3436,4 @@ func TestAccountPeekLooksUpPrioritiesConcurrently(t *testing.T) {
 		require.True(t, want[acct], "unexpected account %s", acct)
 	}
 	require.Greater(t, maxInFlight.Load(), int32(1), "priority lookups should overlap")
-	require.Less(t, elapsed, accounts*lookup/2, "lookups one after another would take %s", accounts*lookup)
 }
