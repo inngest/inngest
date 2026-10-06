@@ -1,19 +1,22 @@
 /**
- * A hand-built run trace shaped like the API's output for a CI-like run that
- * uses span groups, for tests and for previewing the timeline:
+ * A hand-built run trace shaped like the API's output for a run of
+ * `@inngest/ci`, for tests and for previewing the timeline. It mirrors the span
+ * tree CI emits, as drawn by its `spans.test.ts`:
  *
- * - a `base` job on sandbox A: `$ …` command steps, a command retried in
- *   `Attempt 1`/`Attempt 2` subgroups with a retry check between them, a
- *   background `dev server` group re-entered to kill it at the end, and a
- *   snapshot whose readiness wait names no sandbox
- * - an `e2e` job on sandbox B that also starts an API on sandbox C
+ * - a `GitHub` span of check updates, and `Clean up sandboxes` at the end
+ * - a `base` job on sandbox A: `Start sandbox`, `$ …` command spans, a command
+ *   retried in `Attempt 1`/`Attempt 2` spans, a background `$ pnpm dev` span
+ *   re-entered to kill it at the end, and a `Save sandbox` span holding the
+ *   `Snapshot sandbox` span, whose steps are the SDK's
+ * - an `e2e` job on sandbox B that uses an extra sandbox C in its own `api`
+ *   span, with its commands inside it
  * - an ordinary step outside any group
  * - an agent → tool → steps nest three groups deep, with a retried step
  *
- * Groups carry the kinds CI and agents give them (`job`, `agent`, `tool`);
- * the other groups have none. Rows CI adds on the user's behalf carry its
- * origin (`@inngest/ci@0.1.0`), and the snapshot's rows the SDK's
- * (`inngest@3.44.0`); the user's own rows carry none.
+ * Groups carry the kinds CI and agents give them (`job`, `agent`, `tool`). CI
+ * marks only its own work with its origin (`@inngest/ci@0.1.0`), and the SDK
+ * the snapshot's steps (`inngest@3.44.0`). Jobs, `$ …` commands, `api` and the
+ * user's own rows carry none, because the user wrote them.
  */
 
 import type { SandboxMetadata } from '../../generated';
@@ -78,6 +81,17 @@ function step(
   };
 }
 
+/** A step CI runs on the user's behalf */
+function ciStep(
+  id: string,
+  name: string,
+  from: number,
+  to: number | null,
+  options: StepOptions = {}
+): Trace {
+  return addedBy(CI_ORIGIN, step(id, name, from, to, options));
+}
+
 const exec = (
   command: string,
   exitCode: number,
@@ -91,7 +105,13 @@ const exec = (
 });
 
 /** A group as the loader builds it: children by queue time, times and status from them */
-function group(id: string, name: string, children: Trace[], groupKind?: string): Trace {
+function group(
+  id: string,
+  name: string,
+  children: Trace[],
+  groupKind?: string,
+  origin?: string
+): Trace {
   const sorted = [...children].sort((a, b) => Date.parse(a.queuedAt) - Date.parse(b.queuedAt));
   const last = sorted.reduce((a, b) =>
     Date.parse(b.endedAt ?? '') > Date.parse(a.endedAt ?? '') ? b : a
@@ -115,86 +135,138 @@ function group(id: string, name: string, children: Trace[], groupKind?: string):
     stepOp: null,
     stepType: 'SPAN_GROUP',
     groupKind: groupKind ?? null,
+    origin: origin ?? null,
     userlandSpan: null,
     metadata: [],
   };
 }
 
+/** A span CI opens for its own work */
+function ciGroup(id: string, name: string, children: Trace[]): Trace {
+  return group(id, name, children, undefined, CI_ORIGIN);
+}
+
+/** The steps CI runs for a captured command, spread evenly over `from`..`to` */
+function commandSteps(
+  id: string,
+  command: string,
+  from: number,
+  to: number,
+  { sandbox = SANDBOX_A, exitCode = 0 } = {}
+): Trace[] {
+  const quarter = (to - from) / 4;
+  const failed = exitCode !== 0;
+
+  return [
+    ciStep(`${id}-start`, 'Start process', from, from + quarter, {
+      sandbox: { ...exec(command, 0, sandbox), action: 'process.start', process_id: `p_${id}` },
+    }),
+    ciStep(`${id}-wait`, 'Wait 1s', from + quarter, from + 2 * quarter, { stepOp: 'SLEEP' }),
+    ciStep(`${id}-poll`, 'Poll process', from + 2 * quarter, from + 3 * quarter, {
+      sandbox: { ...exec(command, 0, sandbox), action: 'process.status', process_id: `p_${id}` },
+    }),
+    ciStep(`${id}-output`, 'Read output', from + 3 * quarter, to - (failed ? 0.5 : 0), {
+      sandbox: { ...exec(command, exitCode, sandbox), action: 'process.output' },
+    }),
+    ...(failed
+      ? [
+          ciStep(`${id}-exit`, `Exited with code ${exitCode}`, to - 0.5, to, {
+            status: 'FAILED',
+            sandbox: exec(command, exitCode, sandbox),
+          }),
+        ]
+      : []),
+  ];
+}
+
+/** A `$ …` span: the user's command, with CI's steps inside */
+function command(id: string, text: string, from: number, to: number, sandbox = SANDBOX_A): Trace {
+  return group(id, `$ ${text}`, commandSteps(id, text, from, to, { sandbox }));
+}
+
+/** A `Start sandbox` span, with the steps that create it and prepare its workspace */
+function startSandbox(
+  id: string,
+  name: string,
+  from: number,
+  to: number,
+  sandbox: typeof SANDBOX_A
+) {
+  const mid = (from + to) / 2;
+
+  return ciGroup(id, name, [
+    ciStep(`${id}-create`, 'Create sandbox', from, mid, {
+      sandbox: { action: 'create', method: 'create', ...sandbox },
+    }),
+    ciStep(`${id}-setup`, 'Prepare workspace', mid, to, {
+      sandbox: { ...exec('mkdir -p /workspace', 0, sandbox) },
+    }),
+  ]);
+}
+
 export const stepSpansTrace: Trace = {
   attempts: 0,
   childrenSpans: [
+    ciGroup('github', 'GitHub', [
+      ciStep('gh-create', 'Create check: pr', 0, 1),
+      ciStep('gh-base-start', 'Report base: started', 1, 2),
+      ciStep('gh-e2e-start', 'Report e2e: started', 90, 91),
+      ciStep('gh-base-pass', 'Report base: passed', 105, 106),
+      ciStep('gh-e2e-pass', 'Report e2e: passed', 106, 107),
+      ciStep('gh-complete', 'Complete check: pr', 132, 133),
+    ]),
     group(
       'base',
       'base',
       [
-        addedBy(
-          CI_ORIGIN,
-          step('create', 'create sandbox', 0, 6, {
-            sandbox: { action: 'create', method: 'create', ...SANDBOX_A },
-          })
-        ),
-        step('setup', '$ pnpm install --frozen-lockfile', 6, 14, {
-          sandbox: exec('pnpm install --frozen-lockfile', 0),
-        }),
-        step('lint', '$ pnpm lint', 14, 22, { sandbox: exec('pnpm lint', 0) }),
-        addedBy(
-          CI_ORIGIN,
-          group('dev-server', 'dev server', [
-            step('dev-start', '$ pnpm dev', 22, 24, {
-              sandbox: { ...exec('pnpm dev', 0), action: 'process.start', process_id: 'p_1' },
-            }),
-            addedBy(CI_ORIGIN, step('dev-ready', 'wait for port', 24, 30, { stepOp: 'SLEEP' })),
-            addedBy(
-              CI_ORIGIN,
-              step('dev-kill', 'kill', 104, 106, {
-                sandbox: { ...exec('pnpm dev', 143), action: 'process.kill', process_id: 'p_1' },
-              })
-            ),
-          ])
-        ),
-        addedBy(
-          CI_ORIGIN,
-          group('test', 'test', [
-            addedBy(
-              CI_ORIGIN,
-              group('test-1', 'Attempt 1', [
-                step('test-a1', '$ pnpm test', 30, 52, {
-                  status: 'FAILED',
-                  sandbox: exec('pnpm test', 1),
-                }),
-              ])
-            ),
-            addedBy(
-              CI_ORIGIN,
-              group('test-2', 'Attempt 2', [
-                step('test-a2', '$ pnpm test', 58, 78, { sandbox: exec('pnpm test', 0) }),
-              ])
-            ),
-          ])
-        ),
-        addedBy(CI_ORIGIN, step('retry-check', 'check retry', 52, 58)),
-        addedBy(
-          SDK_ORIGIN,
-          group('snapshot', 'snapshot', [
-            addedBy(
-              SDK_ORIGIN,
-              step('snap-create', 'create snapshot', 78, 82, {
-                sandbox: { action: 'snapshot.create', method: 'snapshot', ...SANDBOX_A },
-              })
-            ),
-            addedBy(
-              SDK_ORIGIN,
-              step('snap-ready', 'wait until ready', 82, 90, {
-                stepOp: 'SLEEP',
-                sandbox: {
-                  action: 'snapshot.waitUntilReady',
-                  method: 'snapshot',
-                  snapshot_id: 'snap_1',
-                },
-              })
-            ),
-          ])
-        ),
+        startSandbox('base-machine', 'Start sandbox', 0, 6, SANDBOX_A),
+        command('setup', 'pnpm install --frozen-lockfile', 6, 14),
+        command('lint', 'pnpm lint', 14, 22),
+        group('dev-server', '$ pnpm dev', [
+          ...commandSteps('dev', 'pnpm dev', 22, 30),
+          ciStep('dev-kill', 'Kill process', 104, 106, {
+            sandbox: { ...exec('pnpm dev', 143), action: 'process.kill', process_id: 'p_dev' },
+          }),
+        ]),
+        group('test', '$ pnpm test', [
+          ciGroup(
+            'test-1',
+            'Attempt 1',
+            commandSteps('test-a1', 'pnpm test', 30, 52, { exitCode: 1 })
+          ),
+          ciStep('retry-check', 'Wait 6s', 52, 58, { stepOp: 'SLEEP' }),
+          ciGroup('test-2', 'Attempt 2', commandSteps('test-a2', 'pnpm test', 58, 78)),
+        ]),
+        ciGroup('save', 'Save sandbox', [
+          ciStep('pause', 'Pause sandbox', 78, 79),
+          ciStep('resume', 'Resume sandbox', 79, 80),
+          ciStep('record', 'Record snapshot contents', 80, 81),
+          group(
+            'snapshot',
+            'Snapshot sandbox',
+            [
+              addedBy(
+                SDK_ORIGIN,
+                step('snap-create', 'Create snapshot', 81, 84, {
+                  sandbox: { action: 'snapshot.create', method: 'snapshot', ...SANDBOX_A },
+                })
+              ),
+              addedBy(
+                SDK_ORIGIN,
+                step('snap-ready', 'Wait for snapshot', 84, 90, {
+                  stepOp: 'SLEEP',
+                  sandbox: {
+                    action: 'snapshot.waitUntilReady',
+                    method: 'snapshot',
+                    snapshot_id: 'snap_1',
+                  },
+                })
+              ),
+            ],
+            undefined,
+            CI_ORIGIN
+          ),
+        ]),
       ],
       'job'
     ),
@@ -202,20 +274,17 @@ export const stepSpansTrace: Trace = {
       'e2e',
       'e2e',
       [
-        addedBy(
-          CI_ORIGIN,
-          step('e2e-create', 'create sandbox', 90, 94, {
-            sandbox: { action: 'create', method: 'create', ...SANDBOX_B },
-          })
-        ),
-        step('api', '$ pnpm api', 94, 96, {
-          sandbox: {
-            ...exec('pnpm api', 0, SANDBOX_C),
-            action: 'process.start',
-            process_id: 'p_2',
-          },
-        }),
-        step('e2e', '$ pnpm e2e', 96, 104, { sandbox: exec('pnpm e2e', 0, SANDBOX_B) }),
+        startSandbox('e2e-machine', 'Start sandbox from base', 90, 94, SANDBOX_B),
+        group('api', 'api', [
+          startSandbox('api-machine', 'Start sandbox', 94, 98, SANDBOX_C),
+          command('api-cmd', 'pnpm api', 98, 100, SANDBOX_C),
+        ]),
+        command('e2e', 'pnpm e2e', 100, 104, SANDBOX_B),
+        ciGroup('e2e-save', 'Save sandbox', [
+          ciStep('e2e-pause', 'Pause sandbox', 104, 105, {
+            sandbox: { ...exec('pause', 0, SANDBOX_B), action: 'pause' },
+          }),
+        ]),
       ],
       'job'
     ),
@@ -242,8 +311,9 @@ export const stepSpansTrace: Trace = {
         'agent'
       ),
     ]),
+    ciStep('cleanup', 'Clean up sandboxes', 133, 135),
   ],
-  endedAt: at(133),
+  endedAt: at(135),
   isRoot: true,
   isUserland: false,
   name: 'ci',

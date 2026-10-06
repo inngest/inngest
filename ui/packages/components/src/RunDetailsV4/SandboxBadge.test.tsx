@@ -43,7 +43,7 @@ const fixtureBars = () => {
 
 describe('sandboxBarData', () => {
   it('gives a step its own sandbox, named for the tooltip', () => {
-    expect(sandboxBarData(span('$ pnpm lint'))).toEqual({
+    expect(sandboxBarData(span('Create sandbox'))).toEqual({
       sandboxId: SANDBOX_A.sandbox_id,
       label: 'ci-01JB7Q2XKZ-base',
     });
@@ -51,23 +51,23 @@ describe('sandboxBarData', () => {
 
   it('gives no sandbox to steps without a sandbox ID', () => {
     expect(sandboxBarData(span('notify'))).toBeUndefined();
-    expect(sandboxBarData(span('wait until ready'))).toBeUndefined();
+    expect(sandboxBarData(span('Wait for snapshot'))).toBeUndefined();
   });
 
   it('gives a group the sandbox most of its direct children use', () => {
-    // create sandbox and `$ pnpm e2e` on B outvote `$ pnpm api` on C
+    // Start sandbox, `$ pnpm e2e` and Save sandbox on B outvote `api` on C
     expect(sandboxBarData(span('e2e'))?.sandboxId).toBe(SANDBOX_B.sandbox_id);
   });
 
   it('counts a subgroup as one vote for its own sandbox', () => {
-    expect(sandboxBarData(span('test'))?.sandboxId).toBe(SANDBOX_A.sandbox_id);
+    expect(sandboxBarData(span('$ pnpm test'))?.sandboxId).toBe(SANDBOX_A.sandbox_id);
 
-    const oneSubgroupOnA = groupOf(span('test'), span('$ pnpm api'), span('$ pnpm e2e'));
+    const oneSubgroupOnA = groupOf(span('$ pnpm test'), span('api'), span('$ pnpm e2e'));
     expect(sandboxBarData(oneSubgroupOnA)).toBeUndefined();
   });
 
   it("doesn't count children without a sandbox", () => {
-    expect(sandboxBarData(span('snapshot'))?.sandboxId).toBe(SANDBOX_A.sandbox_id);
+    expect(sandboxBarData(span('Snapshot sandbox'))?.sandboxId).toBe(SANDBOX_A.sandbox_id);
     expect(sandboxBarData(span('Research network'))).toBeUndefined();
   });
 
@@ -129,6 +129,8 @@ describe('sandbox badge', () => {
     expect(badgeFor('base')?.title).toBe('ci-01JB7Q2XKZ-base');
     expect(badgeFor('e2e')?.textContent).toBe('S2');
     expect(badgeFor('notify')).toBeNull();
+    expect(badgeFor('GitHub')).toBeNull();
+    expect(badgeFor('Clean up sandboxes')).toBeNull();
     expect(badgeFor('Research network')).toBeNull();
 
     const name = screen.getByText('e2e');
@@ -143,12 +145,15 @@ describe('sandbox badge', () => {
 
     fireEvent.click(screen.getByText('base'));
     expect(badgeFor('$ pnpm lint')).toBeNull();
-    expect(badgeFor('test')).toBeNull();
+    expect(badgeFor('$ pnpm test')).toBeNull();
 
     fireEvent.click(screen.getByText('e2e'));
     expect(badgeFor('$ pnpm e2e')).toBeNull();
-    expect(badgeFor('$ pnpm api')?.textContent).toBe('S3');
-    expect(badgeFor('$ pnpm api')?.title).toBe('ci-01JB7Q2XKZ-api');
+    expect(badgeFor('api')?.textContent).toBe('S3');
+    expect(badgeFor('api')?.title).toBe('ci-01JB7Q2XKZ-api');
+
+    fireEvent.click(screen.getByText('api'));
+    expect(badgeFor('$ pnpm api')).toBeNull();
   });
 
   it('keeps rows single-line with no machine tag or highlight', () => {

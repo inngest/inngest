@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { Timeline } from './Timeline';
-import { stepSpansTrace } from './utils/stepSpans.fixture';
+import { traceWalk } from './runDetailsUtils';
+import { CI_ORIGIN, SDK_ORIGIN, stepSpansTrace } from './utils/stepSpans.fixture';
 import { traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 vi.mock('../Button', () => ({
@@ -38,6 +39,7 @@ describe('group kind tags', () => {
     expect(kindTagsFor('e2e')).toEqual(['JOB']);
     expect(kindTagsFor('Research network')).toEqual([]);
     expect(kindTagsFor('notify')).toEqual([]);
+    expect(kindTagsFor('GitHub')).toEqual([]);
 
     fireEvent.click(screen.getByText('Research network'));
     expect(kindTagsFor('Research agent')).toEqual(['AGENT']);
@@ -58,6 +60,27 @@ describe('group kind tags', () => {
     }
 
     expect(kindTagsFor('$ pnpm lint')).toEqual([]);
+    expect(kindTagsFor('api')).toEqual([]);
     expect(kindTagsFor('search tool')).toEqual(['TOOL']);
+  });
+});
+
+describe('fixture origins', () => {
+  it('marks only what CI does itself, never jobs, commands or `api`', () => {
+    const origins = new Map<string, string | null | undefined>();
+
+    traceWalk(stepSpansTrace, (t) => {
+      origins.set(t.name, t.origin);
+    });
+
+    for (const name of ['base', 'e2e', 'api', '$ pnpm test', '$ pnpm dev', 'notify']) {
+      expect(origins.get(name) ?? null).toBeNull();
+    }
+
+    for (const name of ['GitHub', 'Start sandbox', 'Attempt 1', 'Save sandbox', 'Read output']) {
+      expect(origins.get(name)).toBe(CI_ORIGIN);
+    }
+
+    expect(origins.get('Create snapshot')).toBe(SDK_ORIGIN);
   });
 });
