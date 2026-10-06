@@ -179,6 +179,30 @@ func (r *GenericOpts) UnmarshalAny(a any) error {
 	return nil
 }
 
+// SetOpt sets one key in the opcode's opts, keeping every other key the SDK
+// sent, such as stackLine and parallelMode.
+func (g *GeneratorOpcode) SetOpt(key string, value any) error {
+	byt, ok := g.Opts.([]byte)
+	if !ok {
+		var err error
+		if byt, err = json.Marshal(g.Opts); err != nil {
+			return err
+		}
+	}
+
+	var opts map[string]any
+	if err := json.Unmarshal(byt, &opts); err != nil {
+		return err
+	}
+	if opts == nil {
+		opts = map[string]any{}
+	}
+
+	opts[key] = value
+	g.Opts = opts
+	return nil
+}
+
 func (g GeneratorOpcode) StackLine() (*string, error) {
 	opts := &GenericOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {

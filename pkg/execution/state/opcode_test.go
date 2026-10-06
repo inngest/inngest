@@ -392,3 +392,40 @@ func TestInvokeFunctionOptsPreservesSessionNulls(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratorOpcode_SetOpt(t *testing.T) {
+	// waitForEvent interpolates `if` in place; the SDK's other opts must
+	// survive so the pause and history keep them.
+	op := GeneratorOpcode{
+		Op: enums.OpcodeWaitForEvent,
+		Opts: map[string]any{
+			"event":        "user.updated",
+			"if":           "async.data.id == event.data.id",
+			"timeout":      "1h",
+			"stackLine":    "fn.ts:12",
+			"parallelMode": "race",
+		},
+	}
+
+	require.NoError(t, op.SetOpt("if", "async.data.id == 'u_1'"))
+
+	opts, err := op.WaitForEventOpts()
+	require.NoError(t, err)
+	assert.Equal(t, "async.data.id == 'u_1'", *opts.If)
+	assert.Equal(t, "user.updated", opts.Event)
+	assert.Equal(t, "1h", opts.Timeout)
+	assert.Equal(t, enums.ParallelModeRace, op.ParallelMode())
+	stack, err := op.StackLine()
+	require.NoError(t, err)
+	assert.Equal(t, "fn.ts:12", *stack)
+
+	t.Run("raw and empty opts", func(t *testing.T) {
+		raw := GeneratorOpcode{Opts: []byte(`{"stackLine":"a.ts:1"}`)}
+		require.NoError(t, raw.SetOpt("if", "true"))
+		assert.Equal(t, map[string]any{"stackLine": "a.ts:1", "if": "true"}, raw.Opts)
+
+		empty := GeneratorOpcode{}
+		require.NoError(t, empty.SetOpt("if", "true"))
+		assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
+	})
+}
