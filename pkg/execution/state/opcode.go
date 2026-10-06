@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -182,16 +183,8 @@ func (r *GenericOpts) UnmarshalAny(a any) error {
 // SetOpt sets one key in the opcode's opts, keeping every other key the SDK
 // sent, such as stackLine and parallelMode.
 func (g *GeneratorOpcode) SetOpt(key string, value any) error {
-	byt, ok := g.Opts.([]byte)
-	if !ok {
-		var err error
-		if byt, err = json.Marshal(g.Opts); err != nil {
-			return err
-		}
-	}
-
 	var opts map[string]any
-	if err := json.Unmarshal(byt, &opts); err != nil {
+	if err := g.unmarshalOpts(&opts); err != nil {
 		return err
 	}
 	if opts == nil {
@@ -201,6 +194,29 @@ func (g *GeneratorOpcode) SetOpt(key string, value any) error {
 	opts[key] = value
 	g.Opts = opts
 	return nil
+}
+
+// SpanPath returns the span groups the SDK called this step in, outermost
+// first, or nil if it's in none.
+func (g GeneratorOpcode) SpanPath() []meta.SpanPathElement {
+	var opts struct {
+		Span []meta.SpanPathElement `json:"span"`
+	}
+	if err := g.unmarshalOpts(&opts); err != nil {
+		return nil
+	}
+	return opts.Span
+}
+
+func (g GeneratorOpcode) unmarshalOpts(v any) error {
+	byt, ok := g.Opts.([]byte)
+	if !ok {
+		var err error
+		if byt, err = json.Marshal(g.Opts); err != nil {
+			return err
+		}
+	}
+	return json.Unmarshal(byt, v)
 }
 
 func (g GeneratorOpcode) StackLine() (*string, error) {

@@ -90,6 +90,9 @@ var Attrs = struct {
 	StepMaxAttempts  attr[*int]
 	StepCodeLocation attr[*string]
 	StepType         attr[*enums.StepType]
+	// StepSpanPath lists the span groups the step was called in, outermost
+	// first.
+	StepSpanPath attr[*[]SpanPathElement]
 	// StepInput is the data that has been explicitly captured as input for a
 	// step. This data may not be stored with the span when it hits a store,
 	// and instead may be removed to be stored separately.
@@ -249,6 +252,7 @@ var Attrs = struct {
 	StepOutputRef:                      StringAttr("step.output_ref"),
 	StepRunType:                        StringAttr("step.run.type"),
 	StepType:                           TextAttr[enums.StepType]("step.type"),
+	StepSpanPath:                       JsonAttr[[]SpanPathElement]("step.span_path"),
 	ExperimentName:                     StringAttr("inngest.experiment.name"),
 	ExperimentStepID:                   StringAttr("inngest.experiment.step_id"),
 	ExperimentVariant:                  StringAttr("inngest.experiment.variant"),

@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -427,5 +428,41 @@ func TestGeneratorOpcode_SetOpt(t *testing.T) {
 		empty := GeneratorOpcode{}
 		require.NoError(t, empty.SetOpt("if", "true"))
 		assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
+	})
+}
+
+func TestGeneratorOpcode_SpanPath(t *testing.T) {
+	path := []meta.SpanPathElement{
+		{ID: "agent", Name: "Research agent"},
+		{ID: "search", Name: "search tool"},
+	}
+
+	t.Run("decoded opts", func(t *testing.T) {
+		op := GeneratorOpcode{Opts: map[string]any{
+			"stackLine": "fn.ts:1",
+			"span": []any{
+				map[string]any{"id": "agent", "name": "Research agent"},
+				map[string]any{"id": "search", "name": "search tool"},
+			},
+		}}
+		assert.Equal(t, path, op.SpanPath())
+	})
+
+	t.Run("raw opts", func(t *testing.T) {
+		op := GeneratorOpcode{Opts: []byte(`{"span":[{"id":"agent","name":"Research agent"},{"id":"search","name":"search tool"}]}`)}
+		assert.Equal(t, path, op.SpanPath())
+	})
+
+	t.Run("no span", func(t *testing.T) {
+		assert.Nil(t, GeneratorOpcode{}.SpanPath())
+		assert.Nil(t, GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1"}}.SpanPath())
+	})
+
+	t.Run("malformed span doesn't break other opts", func(t *testing.T) {
+		op := GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1", "span": "nope"}}
+		assert.Nil(t, op.SpanPath())
+		stack, err := op.StackLine()
+		require.NoError(t, err)
+		assert.Equal(t, "fn.ts:1", *stack)
 	})
 }
