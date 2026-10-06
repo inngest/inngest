@@ -2772,6 +2772,9 @@ message TraceSpan {
   // The kind its caller gave a span group, such as "job" or "agent". Absent
   // for steps and for groups without one.
   optional string group_kind = 15;
+  // The library that created this step or span group on the user's behalf,
+  // as "<package>@<version>", such as "@inngest/ci@0.1.0". Absent otherwise.
+  optional string origin = 16;
 }
 
 message FunctionTrace {

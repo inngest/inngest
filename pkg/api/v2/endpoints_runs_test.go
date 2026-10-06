@@ -339,6 +339,7 @@ func TestToTraceSpan(t *testing.T) {
 				QueuedAt:  startedAt,
 				StepType:  "SPAN_GROUP",
 				GroupKind: new("job"),
+				Origin:    new("@inngest/ci@0.1.0"),
 			},
 		},
 	}, true)
@@ -366,6 +367,8 @@ func TestToTraceSpan(t *testing.T) {
 	require.Equal(t, "SPAN_GROUP", *result.Children[0].StepType)
 	require.Equal(t, "job", *result.Children[0].GroupKind)
 	require.Nil(t, result.GroupKind)
+	require.Equal(t, "@inngest/ci@0.1.0", *result.Children[0].Origin)
+	require.Nil(t, result.Origin)
 }
 
 func TestToTraceSpanOmitsOutputWithoutOutputID(t *testing.T) {

@@ -740,6 +740,7 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 	}
 
 	result.GroupKind = span.GroupKind
+	result.Origin = span.Origin
 
 	if span.StartedAt != nil {
 		result.StartedAt = timestamppb.New(*span.StartedAt)

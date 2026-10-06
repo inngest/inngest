@@ -2731,7 +2731,10 @@ type TraceSpan struct {
 	StepType *string `protobuf:"bytes,14,opt,name=step_type,json=stepType,proto3,oneof" json:"step_type,omitempty"`
 	// The kind its caller gave a span group, such as "job" or "agent". Absent
 	// for steps and for groups without one.
-	GroupKind     *string `protobuf:"bytes,15,opt,name=group_kind,json=groupKind,proto3,oneof" json:"group_kind,omitempty"`
+	GroupKind *string `protobuf:"bytes,15,opt,name=group_kind,json=groupKind,proto3,oneof" json:"group_kind,omitempty"`
+	// The library that created this step or span group on the user's behalf,
+	// as "<package>@<version>", such as "@inngest/ci@0.1.0". Absent otherwise.
+	Origin        *string `protobuf:"bytes,16,opt,name=origin,proto3,oneof" json:"origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2867,6 +2870,13 @@ func (x *TraceSpan) GetStepType() string {
 func (x *TraceSpan) GetGroupKind() string {
 	if x != nil && x.GroupKind != nil {
 		return *x.GroupKind
+	}
+	return ""
+}
+
+func (x *TraceSpan) GetOrigin() string {
+	if x != nil && x.Origin != nil {
+		return *x.Origin
 	}
 	return ""
 }
@@ -9194,7 +9204,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x98\x06\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc0\x06\n" +
 	"\tTraceSpan\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12/\n" +
@@ -9214,7 +9224,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bchildren\x18\r \x03(\v2\x11.api.v2.TraceSpanR\bchildren\x12 \n" +
 	"\tstep_type\x18\x0e \x01(\tH\aR\bstepType\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"group_kind\x18\x0f \x01(\tH\bR\tgroupKind\x88\x01\x01B\n" +
+	"group_kind\x18\x0f \x01(\tH\bR\tgroupKind\x88\x01\x01\x12\x1b\n" +
+	"\x06origin\x18\x10 \x01(\tH\tR\x06origin\x88\x01\x01B\n" +
 	"\n" +
 	"\b_step_opB\n" +
 	"\n" +
@@ -9226,7 +9237,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\a_outputB\f\n" +
 	"\n" +
 	"_step_typeB\r\n" +
-	"\v_group_kind\"V\n" +
+	"\v_group_kindB\t\n" +
+	"\a_origin\"V\n" +
 	"\rFunctionTrace\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12.\n" +
 	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"o\n" +
