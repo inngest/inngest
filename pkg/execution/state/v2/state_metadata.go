@@ -145,6 +145,11 @@ type Config struct {
 	// StartedAt stores the time that the first step started.  This allows us to
 	// track wall time for `timeout.finish` configuration.
 	StartedAt time.Time
+	// ScheduledAt stores the time the run was due to start, fixed when the
+	// run is scheduled.  This differs from the run ID's timestamp (queued at)
+	// for delayed runs, eg. debounces, future event timestamps, and cron.
+	// Zero for runs whose state predates this field.
+	ScheduledAt time.Time
 	// EventIDs represents the IDs of the event(s) that trirgger the function.
 	EventIDs []ulid.ULID
 	// RequestVersion represents the executor request versioning/hashing style

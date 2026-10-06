@@ -1297,9 +1297,26 @@ func (e *executor) schedule(
 	// function run spanID
 	spanID := run.NewSpanID(ctx)
 
+	at := e.now()
+	if req.BatchID == nil {
+		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
+		if evtTs.After(at) {
+			// Schedule functions in the future if there's a future
+			// event `ts` field.
+			at = evtTs
+		}
+	}
+	if req.At != nil {
+		at = *req.At
+	}
+
+	// Fudge the timestamp slightly so that scheduledAt >= queuedAt
+	scheduledAt := slices.MaxFunc([]time.Time{at, runID.Timestamp()}, time.Time.Compare)
+
 	cfg := sv2.Config{
 		FunctionVersion: req.Function.FunctionVersion,
 		SpanID:          spanID.String(),
+		ScheduledAt:     scheduledAt,
 		EventIDs:        eventIDs,
 		Idempotency:     key,
 		ReplayID:        req.ReplayID,
@@ -1584,22 +1601,6 @@ func (e *executor) schedule(
 			}
 		}
 	}
-
-	at := e.now()
-	if req.BatchID == nil {
-		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
-		if evtTs.After(at) {
-			// Schedule functions in the future if there's a future
-			// event `ts` field.
-			at = evtTs
-		}
-	}
-	if req.At != nil {
-		at = *req.At
-	}
-
-	// Fudge the timestamp slightly so that scheduledAt >= queuedAt
-	scheduledAt := slices.MaxFunc([]time.Time{at, runID.Timestamp()}, time.Time.Compare)
 
 	runTimestamp := runID.Timestamp()
 	var scheduleTypePtr *enums.ScheduleType

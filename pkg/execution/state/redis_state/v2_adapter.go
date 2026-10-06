@@ -115,6 +115,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 		RequestVersion: &s.Metadata.Config.RequestVersion,
+		ScheduledAt:    s.Metadata.Config.ScheduledAt,
 	})
 	switch err {
 	case nil:
@@ -369,6 +370,10 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 	if !cfg.StartedAt.IsZero() {
 		startedAtMS = cfg.StartedAt.UnixMilli()
 	}
+	var scheduledAtMS int64
+	if !cfg.ScheduledAt.IsZero() {
+		scheduledAtMS = cfg.ScheduledAt.UnixMilli()
+	}
 	md := runMetadata{
 		Identifier:                v1id,
 		Status:                    enums.RunStatusRunning,
@@ -382,6 +387,7 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 		DisableImmediateExecution: cfg.ForceStepPlan,
 		SpanID:                    cfg.SpanID,
 		StartedAt:                 startedAtMS,
+		ScheduledAt:               scheduledAtMS,
 		HasAI:                     cfg.HasAI,
 	}
 
@@ -616,6 +622,10 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetada
 	if md.StartedAt > 0 {
 		startedAt = time.UnixMilli(md.StartedAt)
 	}
+	var scheduledAt time.Time
+	if md.ScheduledAt > 0 {
+		scheduledAt = time.UnixMilli(md.ScheduledAt)
+	}
 
 	result := state.Metadata{
 		ID: state.ID{
@@ -631,6 +641,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetada
 			FunctionVersion:       md.Identifier.WorkflowVersion,
 			SpanID:                md.SpanID,
 			StartedAt:             startedAt,
+			ScheduledAt:           scheduledAt,
 			EventIDs:              md.Identifier.EventIDs,
 			BatchID:               md.Identifier.BatchID,
 			RequestVersion:        md.RequestVersion,

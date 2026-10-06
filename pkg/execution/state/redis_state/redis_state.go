@@ -335,6 +335,9 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		StateSize:      len(events) + len(stepsByt) + len(stepInputsByt),
 		StepCount:      len(input.Steps),
 	}
+	if !input.ScheduledAt.IsZero() {
+		metadata.ScheduledAt = input.ScheduledAt.UnixMilli()
+	}
 	if input.RunType != nil {
 		metadata.RunType = *input.RunType
 	}
@@ -1535,6 +1538,14 @@ func newRunMetadata(data map[string]string) (*runMetadata, error) {
 		m.StartedAt = v
 	}
 
+	if val, ok := data["schat"]; ok && val != "" {
+		v, err := strconv.ParseInt(strings.TrimSuffix(val, ".0"), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid scheduled at timestamp detected: %#v", val)
+		}
+		m.ScheduledAt = v
+	}
+
 	// The below fields are optional
 	if val, ok := data["debugger"]; ok {
 		if val == "true" || val == "1" {
@@ -1726,6 +1737,7 @@ type runMetadata struct {
 	DisableImmediateExecution bool           `json:"die,omitempty"`
 	SpanID                    string         `json:"sid"`
 	StartedAt                 int64          `json:"sat,omitempty"`
+	ScheduledAt               int64          `json:"schat,omitempty"`
 	HasAI                     bool           `json:"hasAI,omitempty"`
 }
 
@@ -1741,6 +1753,7 @@ func (r runMetadata) Map() map[string]any {
 		"die":           r.DisableImmediateExecution,
 		"sid":           r.SpanID,
 		"sat":           r.StartedAt,
+		"schat":         r.ScheduledAt,
 		"hasAI":         r.HasAI,
 		"state_size":    r.StateSize,
 		"event_size":    r.EventSize,
