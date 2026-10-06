@@ -1,8 +1,7 @@
 # Step spans
 
 Step spans (span groups) say "these steps belong together", to any depth, so a
-trace shows one row per thing the code did: a CI command, a sandbox machine, an
-agent, a tool call. The SDK tags each step with its group path, the API nests
+trace shows one row per thing the code did: a CI job, an agent, a tool call. The SDK tags each step with its group path, the API nests
 the steps, and the UI renders the tree it's given.
 
 ## Contract
@@ -15,7 +14,7 @@ outermost first, in `opts.span`. Steps outside any group have no `span` key.
 ```
 
 `kind` is optional: a short free-form word the caller picks for the group
-(CI uses `job`, `machine` and `cmd`; agents `agent` and `tool`). It's left
+(CI uses `job`; agents `agent` and `tool`). It's left
 out when not given.
 
 The same path is the same group: opening a group with an ID its parent has
@@ -73,19 +72,28 @@ that step's `stepID`. Group span IDs are virtual and never sent.
   Expanded, its own bar hides like any expanded parent.
 - The hover lists the direct children and their durations.
 - The step panel for a group offers "Rerun from start of span".
-- A group with a `groupKind` shows it upper-cased as a small tag before its
-  name (`GroupKindTag.tsx`, `bg-info text-info`): `[JOB] e2e`,
-  `[AGENT] Research agent`. The kind is shown as given, with no mapping.
+- Rows are one line with at most one tag. A group with a `groupKind` shows it
+  upper-cased as a small tag before its name (`GroupKindTag.tsx`,
+  `bg-info text-info`): `[JOB] e2e`, `[AGENT] Research agent`. The kind is
+  shown as given, with no mapping.
 
-**Sandbox machines** (`RunDetailsV4/SandboxAnnotation.tsx`, kept separate so
-they are easy to drop). Steps with `inngest.sandbox` metadata show the command
-and a `[MACHINE] <name>` tag (the same kind tag, then `sandbox_name` or
-`sandbox_id`, middle-truncated with the full name in its tooltip). Row status
-already shows success or failure, so there's no exit badge. A group shows the
-MACHINE tag when its sandbox steps share one `sandbox_id` (steps that name no
-machine don't count). Clicking the tag pins a dotted highlight on every row of
-that machine, hovering previews it, and Escape clears it. Each machine keeps a
-colour, by first appearance in the run, for its highlight dots only.
+**Sandbox badge** (`RunDetailsV4/SandboxBadge.tsx`, kept separate so it is easy
+to drop). A muted monospace `S1`, `S2`, … before a row's name (after its kind
+tag, if any: `[JOB] S1 base`) says which sandbox the row ran on. Its tooltip is
+the `sandbox_name`, else the `sandbox_id`.
+
+- Sandboxes are numbered from 1 by the start time of the first step that uses
+  them (`sandbox_id` in `inngest.sandbox` metadata).
+- A step's sandbox is its own `sandbox_id`. A group's is the one most of its
+  direct children use: each step votes with its own sandbox, each subgroup
+  with its computed one, children without a sandbox don't vote, and a tie
+  means no sandbox.
+- A row shows its badge only when its sandbox differs from that of the
+  nearest row above it that has one. Under `[JOB] S1 base`, rows on S1 show
+  nothing; under `[JOB] S2 e2e`, a step on the API sandbox shows `S3`.
+
+Row status already shows success or failure, so there's no exit badge. The
+full sandbox details, command included, are in the step panel's metadata view.
 
 `inngest.sandbox` values: `version`, `action`, `method` (the SDK method the
 user called, like `commands.run`), and the optional flat fields `sandbox_id`,
@@ -116,9 +124,5 @@ user called, like `commands.run`), and the optional flat fields `sandbox_id`,
 From the hand-built fixture
 (`ui/packages/components/src/RunDetailsV4/utils/stepSpans.fixture.ts`):
 
-- Collapsed groups: ![](fixture-collapsed.png)
-- A nested agent group expanded: ![](fixture-expanded.png)
-- A machine pinned: ![](fixture-pinned-machine.png)
-- Kind tags, collapsed: ![](kinds-collapsed.png)
-- Kind tags, expanded: ![](kinds-expanded.png)
-- Kind tags, a machine pinned: ![](kinds-pinned-machine.png)
+- Collapsed: ![](lean-collapsed.png)
+- Both jobs and the retried `test` group expanded: ![](lean-expanded.png)
