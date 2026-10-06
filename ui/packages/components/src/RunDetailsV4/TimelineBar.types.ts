@@ -5,7 +5,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { SandboxBarData } from './SandboxAnnotation';
+import type { SandboxBarData } from './SandboxBadge';
 
 // ============================================================================
 // Core Component Types
@@ -236,7 +236,7 @@ export interface TimelineBarProps {
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
 
-  /** Sandbox work behind this row (shows a MACHINE tag line under the name) */
+  /** The sandbox this row ran on (shows an `S1` badge before its name) */
   sandbox?: SandboxBarData;
 
   /** A span group's kind, shown as a tag before its name */
@@ -342,7 +342,7 @@ export interface TimelineBarData {
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
 
-  /** Sandbox work behind this row, from `inngest.sandbox` metadata */
+  /** The sandbox this row ran on, from `inngest.sandbox` metadata */
   sandbox?: SandboxBarData;
 
   /** A span group's kind, as its caller named it */

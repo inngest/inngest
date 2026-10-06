@@ -40,13 +40,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
 import { GroupKindTag } from './GroupKindTag';
-import {
-  MachineHighlight,
-  MachineScope,
-  SandboxAnnotation,
-  useRowMachineId,
-  useVisibleAnnotation,
-} from './SandboxAnnotation';
+import { SandboxBadge, SandboxScope } from './SandboxBadge';
 import type {
   BarHeight,
   BarIcon,
@@ -867,11 +861,6 @@ export function TimelineBar({
   groupKind,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
-  const machineId = useRowMachineId(sandbox?.sandboxId);
-  const annotation = useVisibleAnnotation(sandbox);
-  const rowHeightPx = annotation
-    ? TIMELINE_CONSTANTS.ANNOTATED_ROW_HEIGHT_PX
-    : TIMELINE_CONSTANTS.ROW_HEIGHT_PX;
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -912,7 +901,7 @@ export function TimelineBar({
             onToggle?.();
           }
         }}
-        style={{ height: `${rowHeightPx}px` }}
+        style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
         {(selected || hoverCardOpen) && (
@@ -954,22 +943,17 @@ export function TimelineBar({
           <BarIconComponent icon={effectiveIcon} className="text-subtle ml-px" status={status} />
 
           {/* Name + actions wrapper */}
-          <div
-            className={cn(
-              'flex min-w-0 flex-1',
-              annotation ? 'flex-col items-stretch gap-0.5' : 'items-center'
-            )}
-          >
+          <div className="flex min-w-0 flex-1 items-center">
             {/* Name */}
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
                 barStyle.textColor ?? 'text-basis',
-                !effectiveIcon && 'pl-1.5',
-                annotation && 'flex-none'
+                !effectiveIcon && 'pl-1.5'
               )}
             >
               {groupKind && <GroupKindTag kind={groupKind} className="mr-1.5" />}
+              <SandboxBadge sandbox={sandbox} />
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
@@ -990,10 +974,6 @@ export function TimelineBar({
                 </Tooltip>
               )}
             </span>
-
-            {annotation && (
-              <SandboxAnnotation sandbox={annotation} className={cn(!effectiveIcon && 'pl-1.5')} />
-            )}
 
             {/* Actions slot */}
             {actions}
@@ -1039,7 +1019,6 @@ export function TimelineBar({
               }}
             />
           )}
-          <MachineHighlight sandboxId={machineId} />
 
           {/* Bar container, centered vertically */}
           <div className="absolute inset-y-0 flex w-full items-center">
@@ -1093,14 +1072,14 @@ export function TimelineBar({
           className="bg-canvasMuted absolute w-px"
           style={{
             left: `${indentPx + 8}px`,
-            top: `${rowHeightPx}px`,
+            top: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px`,
             bottom: 0,
           }}
         />
       )}
 
       {/* Children (expanded content) */}
-      {expanded && <MachineScope value={machineId}>{children}</MachineScope>}
+      {expanded && <SandboxScope sandbox={sandbox}>{children}</SandboxScope>}
     </div>
   );
 }

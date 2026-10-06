@@ -1,5 +1,5 @@
 /**
- * A small uppercase tag naming what a row is, like JOB, MACHINE or AGENT.
+ * A small uppercase tag naming what a row is, like JOB, AGENT or TOOL.
  */
 
 import { cn } from '../utils/classNames';

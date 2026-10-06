@@ -13,7 +13,7 @@ import { useCallback, useMemo, useState, type JSX, type ReactNode } from 'react'
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
-import { MachineHighlightProvider } from './SandboxAnnotation';
+import { SandboxNumbersProvider } from './SandboxBadge';
 import { TimelineBar } from './TimelineBar';
 import type {
   BarSegment,
@@ -998,7 +998,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
       />
 
       {/* Step bars */}
-      <MachineHighlightProvider bars={bars}>
+      <SandboxNumbersProvider bars={bars}>
         {bars.map((bar) => (
           <TimelineBarRenderer
             key={bar.id}
@@ -1017,7 +1017,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
             actions={bar.isRoot ? expandCollapseActions : undefined}
           />
         ))}
-      </MachineHighlightProvider>
+      </SandboxNumbersProvider>
     </div>
   );
 }

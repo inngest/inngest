@@ -8,7 +8,7 @@ import { max, min } from 'date-fns';
 
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { KindInngestExperiment } from '../../generated';
-import { sandboxBarData } from '../SandboxAnnotation';
+import { sandboxBarData } from '../SandboxBadge';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
