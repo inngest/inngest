@@ -161,18 +161,7 @@ type GenericOpts struct {
 
 func (r *GenericOpts) UnmarshalAny(a any) error {
 	opts := GenericOpts{}
-	var mappedByt []byte
-	switch typ := a.(type) {
-	case []byte:
-		mappedByt = typ
-	default:
-		byt, err := json.Marshal(a)
-		if err != nil {
-			return err
-		}
-		mappedByt = byt
-	}
-	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+	if err := unmarshalOpts(a, &opts); err != nil {
 		return err
 	}
 
@@ -184,7 +173,7 @@ func (r *GenericOpts) UnmarshalAny(a any) error {
 // sent, such as stackLine and parallelMode.
 func (g *GeneratorOpcode) SetOpt(key string, value any) error {
 	var opts map[string]any
-	if err := g.unmarshalOpts(&opts); err != nil {
+	if err := unmarshalOpts(g.Opts, &opts); err != nil {
 		return err
 	}
 	if opts == nil {
@@ -202,7 +191,7 @@ func (g GeneratorOpcode) SpanPath() []meta.SpanPathElement {
 	var opts struct {
 		Span []meta.SpanPathElement `json:"span"`
 	}
-	if err := g.unmarshalOpts(&opts); err != nil {
+	if err := unmarshalOpts(g.Opts, &opts); err != nil {
 		return nil
 	}
 	return opts.Span
@@ -214,17 +203,18 @@ func (g GeneratorOpcode) Origin() string {
 	var opts struct {
 		Origin string `json:"origin"`
 	}
-	if err := g.unmarshalOpts(&opts); err != nil {
+	if err := unmarshalOpts(g.Opts, &opts); err != nil {
 		return ""
 	}
 	return opts.Origin
 }
 
-func (g GeneratorOpcode) unmarshalOpts(v any) error {
-	byt, ok := g.Opts.([]byte)
+// unmarshalOpts decodes opts, raw JSON or already decoded, into v.
+func unmarshalOpts(opts any, v any) error {
+	byt, ok := opts.([]byte)
 	if !ok {
 		var err error
-		if byt, err = json.Marshal(g.Opts); err != nil {
+		if byt, err = json.Marshal(opts); err != nil {
 			return err
 		}
 	}

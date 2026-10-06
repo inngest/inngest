@@ -410,7 +410,7 @@ func TestSleepStepSpanRefResolve(t *testing.T) {
 	})
 }
 
-func TestGeneratorAttrsSpanPath(t *testing.T) {
+func TestGeneratorAttrsSpanPathAndOrigin(t *testing.T) {
 	extract := func(op *state.GeneratorOpcode) *meta.ExtractedValues {
 		attrs := map[string]any{}
 		for _, kv := range GeneratorAttrs(op).Serialize() {
@@ -421,29 +421,14 @@ func TestGeneratorAttrsSpanPath(t *testing.T) {
 		return values
 	}
 
-	// Any opcode, sleeps included, records its span path.
-	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}, {ID: "search", Name: "search tool"}}
-	sleep := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{"span": path}})
+	// Any opcode, sleeps included, records its span path and origin.
+	origin := "@inngest/ci@0.1.0"
+	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}, {ID: "search", Name: "search tool", Origin: origin}}
+	sleep := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{"span": path, "origin": origin}})
 	require.Equal(t, &path, sleep.StepSpanPath)
+	require.Equal(t, origin, *sleep.StepOrigin)
 
 	run := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeStepRun})
 	require.Nil(t, run.StepSpanPath)
 	require.Nil(t, run.StepOrigin)
-}
-
-func TestGeneratorAttrsOrigin(t *testing.T) {
-	op := &state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{
-		"origin": "@inngest/ci@0.1.0",
-		"span":   []meta.SpanPathElement{{ID: "ci", Name: "CI", Origin: "@inngest/ci@0.1.0"}},
-	}}
-	attrs := map[string]any{}
-	for _, kv := range GeneratorAttrs(op).Serialize() {
-		attrs[string(kv.Key)] = kv.Value.AsInterface()
-	}
-	values, err := meta.ExtractTypedValues(context.Background(), attrs)
-	require.NoError(t, err)
-
-	require.Equal(t, "@inngest/ci@0.1.0", attrs["_inngest.step.origin"])
-	require.Equal(t, "@inngest/ci@0.1.0", *values.StepOrigin)
-	require.Equal(t, "@inngest/ci@0.1.0", (*values.StepSpanPath)[0].Origin)
 }
