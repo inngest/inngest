@@ -1798,6 +1798,32 @@ describe('traceConversion', () => {
       }
     });
 
+    it("places a statement by its steps' starts, not a failed step's queue time", () => {
+      // A real CI run: the start failed as ambiguous (no opcode) and carried
+      // the run's queue time; CI reconciled it and carried on
+      const steps = ciTestSteps();
+      const start = steps[0]!;
+      steps[0] = {
+        ...start,
+        stepOp: null,
+        status: 'FAILED',
+        queuedAt: '2026-10-01T12:00:00.000Z',
+      } as Trace;
+      const notify = createTrace({
+        spanID: 'notify',
+        stepID: 'notify',
+        name: 'notify',
+        attempts: 0,
+        queuedAt: '2026-10-01T12:00:10.000Z',
+        startedAt: '2026-10-01T12:00:10.000Z',
+      });
+      const root = traceRollup(createTrace({ isRoot: true, childrenSpans: [...steps, notify] }));
+
+      expect(root.childrenSpans?.map((c) => c.name)).toEqual(['notify', TEST_NAME]);
+      expect(root.childrenSpans![1]!.queuedAt).toBe('2026-10-01T12:00:38.000Z');
+      expect(phaseSummary(root, TEST_NAME)?.[0]?.start).toBe('2026-10-01T12:00:38.000Z');
+    });
+
     it('leaves runs without sandbox metadata exactly as before', () => {
       const plain = createTrace({
         isRoot: true,

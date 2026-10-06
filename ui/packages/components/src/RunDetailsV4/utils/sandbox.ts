@@ -23,8 +23,18 @@ function sandboxEntries(traces: Trace[]): SandboxMetadata[] {
   });
 }
 
+/**
+ * When a member step began: its start, else its queue time. A step that fails
+ * before reporting an opcode (like CI's ambiguous process start, which it then
+ * reconciles) can carry the run's queue time as its own, so its queue time
+ * would pull the statement's row back to the start of the run.
+ */
+function memberStart(trace: Trace): string {
+  return trace.startedAt ?? trace.queuedAt;
+}
+
 function queuedAtMs(trace: Trace): number {
-  return new Date(trace.queuedAt).getTime();
+  return new Date(memberStart(trace)).getTime();
 }
 
 function latestEndedAt(traces: Trace[]): string | null {
@@ -99,9 +109,9 @@ function rollupSandboxStatement(statementID: string, members: Trace[]): Trace {
     stepID: statement?.stepID ?? first.stepID,
     stepOp: statement?.stepOp ?? 'RUN',
     stepType: statement?.stepType,
-    queuedAt: first.queuedAt,
-    scheduledAt: first.scheduledAt,
-    startedAt: first.startedAt,
+    queuedAt: memberStart(first),
+    scheduledAt: memberStart(first),
+    startedAt: memberStart(first),
     endedAt,
     status: endedAt ? last.status : 'RUNNING',
     outputID: result.outputID,
@@ -251,7 +261,7 @@ function statementPhases(
         continue;
       }
 
-      const startTime = new Date(member.queuedAt);
+      const startTime = new Date(memberStart(member));
       if (previous) {
         previous.endTime = startTime;
       }

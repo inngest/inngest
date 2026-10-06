@@ -71,7 +71,7 @@ export function sandboxStep({
     scheduledAt: at(start),
     spanID: `span-${spanCounter}`,
     stepID,
-    startedAt: at(start + 0.05),
+    startedAt: at(start),
     status,
     stepInfo: isSleep ? { sleepUntil: end === null ? at(start + 30) : at(end) } : { type: null },
     stepOp,
