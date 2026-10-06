@@ -15,6 +15,7 @@ export type SpanMetadataKind =
   | typeof KindInngestResponseHeaders
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
+  | typeof KindInngestSandbox
   | typeof KindInngestWarnings
   | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
@@ -22,6 +23,74 @@ export type SpanMetadataKind =
 //////////
 // source: types_gen.go
 
+/**
+ * From sandbox.go
+ */
+export const KindInngestSandbox = 'inngest.sandbox';
+/**
+ * From sandbox.go
+ * SandboxMetadata describes a step that acted on an Inngest sandbox, so trace
+ * UIs and APIs can present it as a sandbox action instead of a plain step.
+ * It is step scoped. Each step attempt emits exactly one entry, carrying the
+ * attempt's full value set. Entries for the same span and kind are folded as
+ * merge patches (see Op), which never clear a key a later entry omits, so an
+ * entry must never be a partial update that relies on an earlier one.
+ * Values stay flat: scalars and short string arrays only, no nested objects,
+ * so they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
+ */
+export interface SandboxMetadata {
+  /**
+   * Version of this shape. Currently 1.
+   */
+  version: number /* int */;
+  /**
+   * Action is the sandbox API operation this step performed, like "create",
+   * "exec", "snapshot.create" or "snapshot.waitUntilReady".
+   */
+  action: string;
+  /**
+   * Method is the SDK method the user called, like "create",
+   * "commands.run" or "snapshot".
+   */
+  method: string;
+  /**
+   * SandboxID and SandboxName identify the machine this step acted on, or
+   * created. Every step on the same machine shares the ID, and it's the key
+   * to group by: a machine may have been created, and may be destroyed,
+   * outside this run. A failed create has only the name.
+   */
+  sandbox_id?: string;
+  sandbox_name?: string;
+  /**
+   * SourceSnapshotID is the snapshot a created sandbox was cloned from.
+   */
+  source_snapshot_id?: string;
+  /**
+   * Command is the argv a command or process ran. CommandDisplay is the
+   * command as the user wrote it, when they passed a shell string.
+   * CommandTruncated is true when either was cut short to keep metadata
+   * small.
+   */
+  command?: string[];
+  command_display?: string;
+  command_truncated?: boolean;
+  cwd?: string;
+  process_id?: string;
+  process_state?: string;
+  exit_code?: number /* int */;
+  termination_signal?: number /* int */;
+  /**
+   * OutputTruncated is true when a captured command's stdout/stderr was cut
+   * to fit in the step's output.
+   */
+  output_truncated?: boolean;
+  snapshot_id?: string;
+  snapshot_status?: string;
+  /**
+   * ErrorCode is the sandbox API's error code when the step failed.
+   */
+  error_code?: string;
+}
 /**
  * From score.go
  */
