@@ -17,13 +17,26 @@ outermost first, in `opts.span`. Steps outside any group have no `span` key.
 (CI uses `job`; agents `agent` and `tool`). It's left
 out when not given.
 
+**Origin.** A step or group that a library created on the user's behalf names
+that library as `"<package>@<version>"`, such as `"@inngest/ci@0.1.0"` or
+`"inngest@3.44.0"`. An opcode carries its step's origin in `opts.origin`;
+a path element may carry its group's as `origin`:
+
+```json
+"opts": { "origin": "@inngest/ci@0.1.0", "span": [{ "id": "base", "name": "base", "kind": "job" }, { "id": "test", "name": "test", "origin": "@inngest/ci@0.1.0" }] }
+```
+
+The user's own steps and groups have no origin.
+
 The same path is the same group: opening a group with an ID its parent has
 already used re-enters it (a background process's later calls, for example).
 Distinct groups need distinct IDs, chosen by the caller.
 
 **Executor.** `generatorAttrs` copies the path onto the step span as
-`_inngest.step.span_path`, a JSON array of `{id, name, kind?}`
-(`GeneratorOpcode.SpanPath()`, `meta.Attrs.StepSpanPath`). It runs for every
+`_inngest.step.span_path`, a JSON array of `{id, name, kind?, origin?}`
+(`GeneratorOpcode.SpanPath()`, `meta.Attrs.StepSpanPath`), and `opts.origin`
+onto `_inngest.step.origin` (`GeneratorOpcode.Origin()`,
+`meta.Attrs.StepOrigin`). It runs for every
 opcode type and on both checkpoint paths, so sleeps and waits are grouped too.
 
 **API.** The trace loader (`pkg/coreapi/graph/loaders/span_groups.go`) makes
@@ -40,6 +53,7 @@ under virtual spans, one per path prefix:
 | `name` | the last path element's name |
 | `stepType` | `SPAN_GROUP` (`stepOp`, `stepID`, `outputID` are null) |
 | `groupKind` | the last path element's `kind`, or null without one (always null for steps) |
+| `origin` | the last path element's `origin`, or null without one |
 | `queuedAt`, `startedAt` | the earliest of its children's |
 | `endedAt` | the latest of its children's, or null while any child is running |
 | `status` | `RUNNING` while any child is, otherwise the status of the child that ended last |
@@ -56,6 +70,10 @@ GraphQL, the REST v2 trace, the CLI and MCP share this converter. The REST
 for groups, and a `groupKind` field (`group_kind`), absent when null.
 It is `groupKind`, not `spanKind`, because `UserlandSpan.spanKind` already
 means the OpenTelemetry span kind.
+
+A step's `RunTraceSpan.origin` is its `_inngest.step.origin`, read from its
+execution like its path; groups take theirs from the table above. REST
+`TraceSpan.origin` carries the same value, absent when null.
 
 **Rerun.** Rerunning a group reruns from its earliest-queued step: the UI sends
 that step's `stepID`. Group span IDs are virtual and never sent.
@@ -92,6 +110,14 @@ the `sandbox_name`, else the `sandbox_id`.
   nearest row above it that has one. Under `[JOB] S1 base`, rows on S1 show
   nothing; under `[JOB] S2 e2e`, a step on the API sandbox shows `S3`.
 
+**Origin.** A row whose origin's package is `inngest` or an `@inngest/*`
+package (`isInngestOrigin` in `utils/origin.ts`; the package is the origin
+without a trailing `@<version>`, so scoped names work) is Inngest's own work,
+not the user's. It dims: `text-light` name and duration, and the bar and its
+segments at half opacity, so the user's rows stand out. A failed row is never
+dimmed. Kind tags and sandbox badges are unchanged. The step panel shows
+"Added by `<origin>`" for any row with an origin.
+
 Row status already shows success or failure, so there's no exit badge. The
 full sandbox details, command included, are in the step panel's metadata view.
 
@@ -109,8 +135,8 @@ user called, like `commands.run`), and the optional flat fields `sandbox_id`,
   → userland. Deeper nesting is cut off. Returning spans as a flat list with
   parent IDs would remove the cap.
 - **Dashboard codegen.** `ui/apps/dashboard/src/gql/*` were patched by script
-  for `groupKind` (the documents deep-equal the parsed queries), as its codegen
-  needs the cloud schema. Run the real codegen to confirm.
+  for `groupKind` and `origin` (the documents deep-equal the parsed queries), as
+  its codegen needs the cloud schema. Run the real codegen to confirm.
 - **Flat loader.** The cloud's flat-span loader (`convertFlatSpanToGQL`) needs
   the same post-pass, and planned steps there get no path until they finish,
   because `OnStepScheduled` receives no opcode.
@@ -126,3 +152,10 @@ From the hand-built fixture
 
 - Collapsed: ![](lean-collapsed.png)
 - Both jobs and the retried `test` group expanded: ![](lean-expanded.png)
+
+Origins, in dark mode (CI's own rows and the snapshot's are dimmed; the failed
+`Attempt 1` is not):
+
+- Collapsed: ![](origin-collapsed.png)
+- Expanded: ![](origin-expanded.png)
+- An internal step selected, "Added by @inngest/ci@0.1.0": ![](origin-selected.png)
