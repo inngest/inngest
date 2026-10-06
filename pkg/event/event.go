@@ -141,6 +141,9 @@ func (e Event) Validate(ctx context.Context) error {
 	if e.Name == "" {
 		return errors.New("event name is empty")
 	}
+	if strings.ContainsRune(e.Name, '\x00') {
+		return errors.New("event name contains a NUL character")
+	}
 
 	if e.Timestamp != 0 {
 		// Convert milliseconds to nanosecond precision
