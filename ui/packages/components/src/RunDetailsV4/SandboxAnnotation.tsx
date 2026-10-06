@@ -23,11 +23,12 @@ import type { SandboxBarData } from './TimelineBar.types';
 import { statementVerb } from './utils/sandbox';
 
 // Theme-aware chart colours, skipping green and red so a machine never reads
-// as a status. Ordered so neighbours differ most: purple, orange, blue, yellow.
+// as a status. Ordered so neighbours differ in both themes: amber, violet,
+// orange, blue (amber and orange are never adjacent).
 const MACHINE_COLORS = [
   '--color-chart-line-4',
-  '--color-chart-line-2',
   '--color-chart-line-5',
+  '--color-chart-line-2',
   '--color-chart-line-3',
 ];
 
