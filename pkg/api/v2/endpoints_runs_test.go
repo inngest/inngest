@@ -321,6 +321,7 @@ func TestToTraceSpan(t *testing.T) {
 		EndedAt:   &endedAt,
 		StepOp:    &stepOp,
 		StepID:    &stepID,
+		StepType:  "RUN",
 		Metadata: []*models.SpanMetadata{
 			nil,
 			{
@@ -336,6 +337,7 @@ func TestToTraceSpan(t *testing.T) {
 				Name:     "Child",
 				Status:   models.RunTraceSpanStatusRunning,
 				QueuedAt: startedAt,
+				StepType: "SPAN_GROUP",
 			},
 		},
 	}, true)
@@ -346,6 +348,7 @@ func TestToTraceSpan(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, result.Status)
 	require.Equal(t, apiv2.TraceStepOp_TRACE_STEP_OP_RUN, *result.StepOp)
 	require.Equal(t, stepID, *result.StepId)
+	require.Equal(t, "RUN", *result.StepType)
 	require.Equal(t, uint64(123), *result.DurationMs)
 	require.Equal(t, startedAt.Add(-time.Second), result.QueuedAt.AsTime())
 	require.Equal(t, startedAt, result.StartedAt.AsTime())
@@ -359,6 +362,7 @@ func TestToTraceSpan(t *testing.T) {
 	require.Equal(t, updatedAt, result.Metadata[0].UpdatedAt.AsTime())
 	require.Len(t, result.Children, 1)
 	require.Equal(t, "child", result.Children[0].Id)
+	require.Equal(t, "SPAN_GROUP", *result.Children[0].StepType)
 }
 
 func TestToTraceSpanOmitsOutputWithoutOutputID(t *testing.T) {
@@ -372,6 +376,7 @@ func TestToTraceSpanOmitsOutputWithoutOutputID(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, result.Input)
 	require.Nil(t, result.Output)
+	require.Nil(t, result.StepType)
 }
 
 func TestToTraceSpanPropagatesOutputErrors(t *testing.T) {

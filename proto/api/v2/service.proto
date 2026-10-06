@@ -2766,6 +2766,9 @@ message TraceSpan {
   optional google.protobuf.Struct output = 11;
   repeated TraceSpanMetadata metadata = 12;
   repeated TraceSpan children = 13;
+  // The kind of step this span is, such as "RUN" or "SLEEP". "SPAN_GROUP"
+  // marks a virtual span grouping the steps called inside an SDK span group.
+  optional string step_type = 14;
 }
 
 message FunctionTrace {

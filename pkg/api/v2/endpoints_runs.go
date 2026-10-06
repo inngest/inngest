@@ -735,6 +735,10 @@ func toTraceSpan(ctx context.Context, reader FunctionTraceReader, span *models.R
 		result.StepId = span.StepID
 	}
 
+	if span.StepType != "" {
+		result.StepType = &span.StepType
+	}
+
 	if span.StartedAt != nil {
 		result.StartedAt = timestamppb.New(*span.StartedAt)
 	}
