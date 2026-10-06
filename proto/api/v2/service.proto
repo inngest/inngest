@@ -1277,7 +1277,10 @@ service V2 {
   }
 
   rpc CreateSandboxSnapshot(CreateSandboxSnapshotRequest) returns (CreateSandboxSnapshotResponse) {
-    option (google.api.http) = { post: "/sandboxes/{sandbox_id}/snapshots" };
+    option (google.api.http) = {
+      post: "/sandboxes/{sandbox_id}/snapshots"
+      body: "*"
+    };
     option (authz) = {
       require_authz: true
       permission: "sandboxes:write:create_snapshot"
