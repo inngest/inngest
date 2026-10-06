@@ -44,6 +44,7 @@ import {
   MachineScope,
   SandboxAnnotation,
   useRowMachineId,
+  useVisibleAnnotation,
 } from './SandboxAnnotation';
 import { SpanKindTag } from './SpanKindTag';
 import type {
@@ -867,7 +868,8 @@ export function TimelineBar({
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const machineId = useRowMachineId(sandbox?.sandboxId);
-  const rowHeightPx = sandbox
+  const annotation = useVisibleAnnotation(sandbox);
+  const rowHeightPx = annotation
     ? TIMELINE_CONSTANTS.ANNOTATED_ROW_HEIGHT_PX
     : TIMELINE_CONSTANTS.ROW_HEIGHT_PX;
   const barStyle = getBarStyle(style);
@@ -955,7 +957,7 @@ export function TimelineBar({
           <div
             className={cn(
               'flex min-w-0 flex-1',
-              sandbox ? 'flex-col items-stretch gap-0.5' : 'items-center'
+              annotation ? 'flex-col items-stretch gap-0.5' : 'items-center'
             )}
           >
             {/* Name */}
@@ -964,7 +966,7 @@ export function TimelineBar({
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
                 barStyle.textColor ?? 'text-basis',
                 !effectiveIcon && 'pl-1.5',
-                sandbox && 'flex-none'
+                annotation && 'flex-none'
               )}
             >
               {spanKind && <SpanKindTag kind={spanKind} className="mr-1.5" />}
@@ -989,8 +991,8 @@ export function TimelineBar({
               )}
             </span>
 
-            {sandbox && (
-              <SandboxAnnotation sandbox={sandbox} className={cn(!effectiveIcon && 'pl-1.5')} />
+            {annotation && (
+              <SandboxAnnotation sandbox={annotation} className={cn(!effectiveIcon && 'pl-1.5')} />
             )}
 
             {/* Actions slot */}

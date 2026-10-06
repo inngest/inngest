@@ -154,6 +154,20 @@ export function useRowMachineId(ownId?: string): string | undefined {
   return ownId ?? inherited;
 }
 
+/**
+ * The part of a row's sandbox annotation worth showing. A machine the row
+ * above already shows is left out, so a job's rows don't all repeat it.
+ */
+export function useVisibleAnnotation(sandbox?: SandboxBarData): SandboxBarData | undefined {
+  const inherited = useContext(RowMachineContext);
+  if (!sandbox) return undefined;
+
+  const sandboxId = sandbox.sandboxId === inherited ? undefined : sandbox.sandboxId;
+  if (!sandboxId && !sandbox.command) return undefined;
+
+  return { ...sandbox, sandboxId };
+}
+
 /** Dotted background in the machine's colour while its rows are highlighted */
 export function MachineHighlight({ sandboxId }: { sandboxId?: string }) {
   const { machineIds, pinnedId, previewId } = useContext(MachineHighlightContext);

@@ -1,9 +1,14 @@
 import type { ReactNode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
-import { sandboxBarData, shortMachineLabel } from './SandboxAnnotation';
+import {
+  MachineScope,
+  sandboxBarData,
+  shortMachineLabel,
+  useVisibleAnnotation,
+} from './SandboxAnnotation';
 import { Timeline } from './Timeline';
 import { traceWalk } from './runDetailsUtils';
 import type { Trace } from './types';
@@ -119,5 +124,26 @@ describe('machine highlight', () => {
 
     fireEvent.mouseLeave(machineTagFor('machine'));
     expect(screen.queryByTestId('machine-highlight')).toBeNull();
+  });
+});
+
+describe('useVisibleAnnotation', () => {
+  const visible = (sandbox: Parameters<typeof useVisibleAnnotation>[0], parent?: string) =>
+    renderHook(() => useVisibleAnnotation(sandbox), {
+      wrapper: ({ children }) => <MachineScope value={parent}>{children}</MachineScope>,
+    }).result.current;
+
+  it('leaves out a machine the row above already shows', () => {
+    expect(visible({ sandboxId: 'a', machineLabel: 'a' }, 'a')).toBeUndefined();
+    expect(visible({ sandboxId: 'a', machineLabel: 'a', command: 'ls' }, 'a')).toEqual({
+      sandboxId: undefined,
+      machineLabel: 'a',
+      command: 'ls',
+    });
+  });
+
+  it('shows a machine that differs from the row above', () => {
+    expect(visible({ sandboxId: 'b', machineLabel: 'b' }, 'a')?.sandboxId).toBe('b');
+    expect(visible({ sandboxId: 'b', machineLabel: 'b' })?.sandboxId).toBe('b');
   });
 });
