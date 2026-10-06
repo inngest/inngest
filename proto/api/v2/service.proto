@@ -2769,6 +2769,9 @@ message TraceSpan {
   // The kind of step this span is, such as "RUN" or "SLEEP". "SPAN_GROUP"
   // marks a virtual span grouping the steps called inside an SDK span group.
   optional string step_type = 14;
+  // The kind its caller gave a span group, such as "job" or "agent". Absent
+  // for steps and for groups without one.
+  optional string span_kind = 15;
 }
 
 message FunctionTrace {

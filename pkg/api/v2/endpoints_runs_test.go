@@ -338,6 +338,7 @@ func TestToTraceSpan(t *testing.T) {
 				Status:   models.RunTraceSpanStatusRunning,
 				QueuedAt: startedAt,
 				StepType: "SPAN_GROUP",
+				SpanKind: new("job"),
 			},
 		},
 	}, true)
@@ -363,6 +364,8 @@ func TestToTraceSpan(t *testing.T) {
 	require.Len(t, result.Children, 1)
 	require.Equal(t, "child", result.Children[0].Id)
 	require.Equal(t, "SPAN_GROUP", *result.Children[0].StepType)
+	require.Equal(t, "job", *result.Children[0].SpanKind)
+	require.Nil(t, result.SpanKind)
 }
 
 func TestToTraceSpanOmitsOutputWithoutOutputID(t *testing.T) {
