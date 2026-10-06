@@ -195,6 +195,96 @@ func TestHandleUnknownCall(t *testing.T) {
 	}
 }
 
+func TestNegatedPresence(t *testing.T) {
+	ctx := context.Background()
+	input := func(data map[string]interface{}) map[string]interface{} {
+		return map[string]interface{}{"event": map[string]interface{}{"data": data}}
+	}
+
+	tests := []struct {
+		name       string
+		expression string
+		data       map[string]interface{}
+		expected   bool
+	}{
+		{
+			name:       "missing field matches",
+			expression: `!has(event.data.missing)`,
+			data:       map[string]interface{}{},
+			expected:   true,
+		},
+		{
+			name:       "missing parent is not present",
+			expression: `has(event.data.user.active)`,
+			data:       map[string]interface{}{},
+			expected:   false,
+		},
+		{
+			name:       "negated presence with missing parent matches",
+			expression: `!has(event.data.user.active)`,
+			data:       map[string]interface{}{},
+			expected:   true,
+		},
+		{
+			name:       "list parent does not make invalid presence match",
+			expression: `!has(event.data.user.active)`,
+			data:       map[string]interface{}{"user": []interface{}{}},
+			expected:   false,
+		},
+		{
+			name:       "out of bounds parent does not make invalid presence match",
+			expression: `!has(event.data.items[0].name)`,
+			data:       map[string]interface{}{"items": []interface{}{}},
+			expected:   false,
+		},
+		{
+			name:       "direct negation of missing field remains false",
+			expression: `!event.data.missing`,
+			data:       map[string]interface{}{},
+			expected:   false,
+		},
+		{
+			name:       "runtime type error remains false",
+			expression: `!event.data.value.matches("x")`,
+			data:       map[string]interface{}{"value": 1},
+			expected:   false,
+		},
+		{
+			name:       "OR with absent parent matches",
+			expression: `!has(event.data.user) || event.data.user.active == true`,
+			data:       map[string]interface{}{},
+			expected:   true,
+		},
+		{
+			name:       "OR with present parent and missing child does not match",
+			expression: `!has(event.data.user) || event.data.user.active == true`,
+			data:       map[string]interface{}{"user": map[string]interface{}{}},
+			expected:   false,
+		},
+		{
+			name:       "AND with absent parent matches",
+			expression: `!has(event.data.user) && event.data.user.active == null`,
+			data:       map[string]interface{}{},
+			expected:   true,
+		},
+		{
+			name:       "AND with present parent and missing child does not match",
+			expression: `!has(event.data.user) && event.data.user.active == null`,
+			data:       map[string]interface{}{"user": map[string]interface{}{}},
+			expected:   false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.NoError(t, Validate(ctx, nil, test.expression))
+			matched, err := EvaluateBoolean(ctx, test.expression, input(test.data))
+			require.NoError(t, err)
+			require.Equal(t, test.expected, matched)
+		})
+	}
+}
+
 // TestNullTypeHandling tests the NullType path in unknownDecorator
 // (argTypes.Exists(types.NullType) && argTypes.ArgLen() == 2),
 // which coerces null to a zero value for ordered comparisons.

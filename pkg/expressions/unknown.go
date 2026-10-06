@@ -18,10 +18,14 @@ import (
 // in a runtimeUnknownCall.  The actual type-dispatch logic (unknown/null/coercion handling)
 // runs at eval time instead of plan time, which means the cel.Program can be built once and
 // cached for the lifetime of the expression rather than rebuilt on every evaluation.
-func unknownDecorator() interpreter.InterpretableDecorator {
+func unknownDecorator(presenceTestIDs map[int64]struct{}) interpreter.InterpretableDecorator {
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
-		if wrapConditionalCondition(i) {
+		_, isPresenceTest := presenceTestIDs[i.ID()]
+		if wrapConditionalCondition(i) && !isPresenceTest {
 			return i, nil
+		}
+		if isPresenceTest {
+			return &evalPresenceTest{Interpretable: i}, nil
 		}
 
 		// Handle logical OR/AND nodes.  CEL represents || and && as special
@@ -42,6 +46,42 @@ func unknownDecorator() interpreter.InterpretableDecorator {
 
 		return &runtimeUnknownCall{InterpretableCall: call}, nil
 	}
+}
+
+// evalPresenceTest evaluates a presence test against concrete input data so
+// that an unknown descendant does not make an existing parent appear absent.
+type evalPresenceTest struct {
+	interpreter.Interpretable
+}
+
+func (e *evalPresenceTest) Eval(ctx interpreter.Activation) ref.Val {
+	result := e.Interpretable.Eval(activationWithoutUnknowns{Activation: ctx})
+	// Missing ancestors error before CEL reaches the test-only qualifier.
+	// If the path cannot be traversed, the tested field is not present.
+	if types.IsError(result) && isMissingPathError(result) {
+		return types.False
+	}
+	return result
+}
+
+func isMissingPathError(value ref.Val) bool {
+	err, ok := value.(error)
+	if !ok {
+		return false
+	}
+	return strings.HasPrefix(err.Error(), "no such key:") ||
+		strings.HasPrefix(err.Error(), "no such attribute(s):")
+}
+
+type activationWithoutUnknowns struct {
+	interpreter.Activation
+}
+
+func (a activationWithoutUnknowns) Parent() interpreter.Activation {
+	if parent := a.Activation.Parent(); parent != nil {
+		return activationWithoutUnknowns{Activation: parent}
+	}
+	return nil
 }
 
 func wrapConditionalCondition(i interpreter.Interpretable) bool {
