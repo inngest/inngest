@@ -436,3 +436,10 @@ func TestGeneratorOpcode_SpanPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "fn.ts:1", *stack)
 }
+
+func TestGeneratorOpcode_Origin(t *testing.T) {
+	assert.Equal(t, "@inngest/ci@0.1.0", GeneratorOpcode{Opts: []byte(`{"origin":"@inngest/ci@0.1.0"}`)}.Origin())
+	assert.Equal(t, "inngest@3.44.0", GeneratorOpcode{Opts: map[string]any{"origin": "inngest@3.44.0"}}.Origin())
+	assert.Equal(t, "", GeneratorOpcode{}.Origin())
+	assert.Equal(t, "", GeneratorOpcode{Opts: map[string]any{"origin": 1}}.Origin())
+}

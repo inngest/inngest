@@ -428,4 +428,22 @@ func TestGeneratorAttrsSpanPath(t *testing.T) {
 
 	run := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeStepRun})
 	require.Nil(t, run.StepSpanPath)
+	require.Nil(t, run.StepOrigin)
+}
+
+func TestGeneratorAttrsOrigin(t *testing.T) {
+	op := &state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{
+		"origin": "@inngest/ci@0.1.0",
+		"span":   []meta.SpanPathElement{{ID: "ci", Name: "CI", Origin: "@inngest/ci@0.1.0"}},
+	}}
+	attrs := map[string]any{}
+	for _, kv := range GeneratorAttrs(op).Serialize() {
+		attrs[string(kv.Key)] = kv.Value.AsInterface()
+	}
+	values, err := meta.ExtractTypedValues(context.Background(), attrs)
+	require.NoError(t, err)
+
+	require.Equal(t, "@inngest/ci@0.1.0", attrs["_inngest.step.origin"])
+	require.Equal(t, "@inngest/ci@0.1.0", *values.StepOrigin)
+	require.Equal(t, "@inngest/ci@0.1.0", (*values.StepSpanPath)[0].Origin)
 }

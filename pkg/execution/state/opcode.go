@@ -208,6 +208,18 @@ func (g GeneratorOpcode) SpanPath() []meta.SpanPathElement {
 	return opts.Span
 }
 
+// Origin returns the library that created this step on the user's behalf, as
+// "<package>@<version>", or "" if the user's own code did.
+func (g GeneratorOpcode) Origin() string {
+	var opts struct {
+		Origin string `json:"origin"`
+	}
+	if err := g.unmarshalOpts(&opts); err != nil {
+		return ""
+	}
+	return opts.Origin
+}
+
 func (g GeneratorOpcode) unmarshalOpts(v any) error {
 	byt, ok := g.Opts.([]byte)
 	if !ok {

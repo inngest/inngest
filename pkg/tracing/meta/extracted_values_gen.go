@@ -67,6 +67,7 @@ type ExtractedValues struct {
 	StepCodeLocation *string
 	StepType *enums.StepType
 	StepSpanPath *[]SpanPathElement
+	StepOrigin *string
 	StepInput *string
 	StepOutput *string
 	StepOutputRef *string

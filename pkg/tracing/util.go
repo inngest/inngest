@@ -225,6 +225,10 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepSpanPath, &path)
 	}
 
+	if origin := op.Origin(); origin != "" {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOrigin, &origin)
+	}
+
 	switch op.Op {
 	case enums.OpcodeAIGateway:
 		{
