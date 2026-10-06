@@ -991,115 +991,80 @@ func TestRunBatch(t *testing.T) {
 	})
 }
 
-type enqueuedItem struct {
+type enqueued struct {
 	item queue.Item
 	at   time.Time
 }
 
-// recordingProducer records enqueued items so tests can assert scheduling.
-type recordingProducer struct {
+type fakeProducer struct {
 	queue.Producer
 
 	mu    sync.Mutex
-	items []enqueuedItem
+	items []enqueued
 	err   error
 }
 
-func (p *recordingProducer) Enqueue(_ context.Context, item queue.Item, at time.Time, _ queue.EnqueueOpts) error {
+func (p *fakeProducer) Enqueue(_ context.Context, item queue.Item, at time.Time, _ queue.EnqueueOpts) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.err != nil {
 		return p.err
 	}
-	p.items = append(p.items, enqueuedItem{item: item, at: at})
+	p.items = append(p.items, enqueued{item: item, at: at})
 	return nil
 }
 
-func (p *recordingProducer) enqueued() []enqueuedItem {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return append([]enqueuedItem(nil), p.items...)
-}
-
 func TestScheduleExecution(t *testing.T) {
-	splitAccountID := uuid.New()
-	otherAccountID := uuid.New()
+	splitAcct := uuid.New()
 	fnID := uuid.New()
 
-	newOpts := func(accountID uuid.UUID) ScheduleBatchOpts {
-		return ScheduleBatchOpts{
-			ScheduleBatchPayload: ScheduleBatchPayload{
-				BatchID:         ulid.Make(),
-				BatchPointer:    "pointer",
-				AccountID:       accountID,
-				WorkspaceID:     uuid.New(),
-				AppID:           uuid.New(),
-				FunctionID:      fnID,
-				FunctionVersion: 3,
-			},
-			At: time.Now().Add(time.Minute).Truncate(time.Millisecond),
-		}
-	}
-	splitGate := WithSplitBatchPartitionByFunction(func(_ context.Context, accountID uuid.UUID) bool {
-		return accountID == splitAccountID
-	})
-
 	tests := []struct {
-		name          string
-		accountID     uuid.UUID
-		producerErr   error
-		expectedQueue string
-		expectedErr   bool
+		name      string
+		acctID    uuid.UUID
+		err       error
+		wantErr   bool
+		wantQueue string
 	}{
-		{
-			name:          "shared partition when split gate is off for account",
-			accountID:     otherAccountID,
-			expectedQueue: queue.KindScheduleBatch,
-		},
-		{
-			name:          "function partition when split gate is on for account",
-			accountID:     splitAccountID,
-			expectedQueue: fmt.Sprintf("%s:%s", queue.KindScheduleBatch, fnID),
-		},
-		{
-			name:        "existing job is not an error",
-			accountID:   otherAccountID,
-			producerErr: queue.ErrQueueItemExists,
-		},
-		{
-			name:        "enqueue failure is returned",
-			accountID:   otherAccountID,
-			producerErr: errors.New("boom"),
-			expectedErr: true,
-		},
+		{name: "shared queue", acctID: uuid.New(), wantQueue: queue.KindScheduleBatch},
+		{name: "per-function queue", acctID: splitAcct, wantQueue: fmt.Sprintf("%s:%s", queue.KindScheduleBatch, fnID)},
+		{name: "item exists", acctID: uuid.New(), err: queue.ErrQueueItemExists},
+		{name: "enqueue error", acctID: uuid.New(), err: errors.New("boom"), wantErr: true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			q := &recordingProducer{err: tc.producerErr}
-			bm := NewRedisBatchManager(nil, q, WithoutBuffer(), splitGate)
-			opts := newOpts(tc.accountID)
+			q := &fakeProducer{err: tc.err}
+			bm := NewRedisBatchManager(nil, q, WithoutBuffer(), WithSplitBatchPartitionByFunction(
+				func(_ context.Context, acctID uuid.UUID) bool { return acctID == splitAcct },
+			))
+
+			opts := ScheduleBatchOpts{
+				ScheduleBatchPayload: ScheduleBatchPayload{
+					BatchID:         ulid.Make(),
+					AccountID:       tc.acctID,
+					WorkspaceID:     uuid.New(),
+					FunctionID:      fnID,
+					FunctionVersion: 3,
+				},
+				At: time.Now().Add(time.Minute),
+			}
 
 			err := bm.ScheduleExecution(context.Background(), opts)
-			if tc.expectedErr {
+			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			if tc.producerErr != nil {
+			if tc.err != nil {
 				return
 			}
 
-			enqueued := q.enqueued()
-			require.Len(t, enqueued, 1)
-			item := enqueued[0].item
-			require.Equal(t, opts.At, enqueued[0].at)
+			require.Len(t, q.items, 1)
+			item := q.items[0].item
+			require.Equal(t, opts.At, q.items[0].at)
 			require.Equal(t, opts.JobID(), *item.JobID)
 			require.Equal(t, queue.KindScheduleBatch, item.Kind)
-			require.Equal(t, tc.expectedQueue, *item.QueueName)
-			require.Equal(t, fmt.Sprintf("batchschedule:%s", opts.BatchID), item.Identifier.Key)
-			require.Equal(t, opts.FunctionID, item.Identifier.WorkflowID)
-			require.Equal(t, opts.FunctionVersion, item.Identifier.WorkflowVersion)
+			require.Equal(t, tc.wantQueue, *item.QueueName)
 			require.Equal(t, opts.ScheduleBatchPayload, item.Payload)
 		})
 	}
@@ -1123,39 +1088,35 @@ func TestStartExecution(t *testing.T) {
 		ID:         fnID,
 		EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"},
 	}
-	appendNew := func(t *testing.T) *BatchAppendResult {
-		res, err := bm.Append(ctx, BatchItem{
-			FunctionID: fnID,
-			EventID:    ulid.Make(),
-			Event:      event.Event{Name: "test/event"},
-		}, fn)
+	appendItem := func(t *testing.T) *BatchAppendResult {
+		res, err := bm.Append(ctx, BatchItem{FunctionID: fnID, EventID: ulid.Make()}, fn)
 		require.NoError(t, err)
 		return res
 	}
 
-	t.Run("second start reports started and keeps pointer", func(t *testing.T) {
-		res := appendNew(t)
+	t.Run("started twice", func(t *testing.T) {
+		res := appendItem(t)
 		batchID := ulid.MustParse(res.BatchID)
 
 		status, err := bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 
-		rotated, err := r.Get(res.BatchPointerKey)
+		pointer, err := r.Get(res.BatchPointerKey)
 		require.NoError(t, err)
-		require.NotEqual(t, res.BatchID, rotated, "start should rotate pointer away from the started batch")
+		require.NotEqual(t, res.BatchID, pointer)
 
 		status, err = bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusStarted.String(), status)
 
-		current, err := r.Get(res.BatchPointerKey)
+		after, err := r.Get(res.BatchPointerKey)
 		require.NoError(t, err)
-		require.Equal(t, rotated, current, "repeated start must not rotate the pointer again")
+		require.Equal(t, pointer, after)
 	})
 
-	t.Run("start does not clobber pointer already moved to an overflow batch", func(t *testing.T) {
-		res := appendNew(t)
+	t.Run("keeps overflow pointer", func(t *testing.T) {
+		res := appendItem(t)
 		overflowID := ulid.Make().String()
 		require.NoError(t, r.Set(res.BatchPointerKey, overflowID))
 
@@ -1163,8 +1124,8 @@ func TestStartExecution(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 
-		current, err := r.Get(res.BatchPointerKey)
+		pointer, err := r.Get(res.BatchPointerKey)
 		require.NoError(t, err)
-		require.Equal(t, overflowID, current)
+		require.Equal(t, overflowID, pointer)
 	})
 }

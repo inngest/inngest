@@ -23,8 +23,7 @@ import (
 func NewValkeyClient(addr, username, password string, cluster bool) (rueidis.Client, error) {
 	var dialFn func(context.Context, string, *net.Dialer, *tls.Config) (net.Conn, error)
 	if cluster {
-		// The test cluster is a single node that announces its in-container port,
-		// so route every cluster address back to the mapped host address.
+		// Single-node cluster announces its container port; always dial the mapped one.
 		dialFn = func(ctx context.Context, _ string, d *net.Dialer, _ *tls.Config) (net.Conn, error) {
 			return d.DialContext(ctx, "tcp", addr)
 		}
@@ -514,8 +513,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 					}
 				}
 
-				// Slot assignment is applied asynchronously; commands fail with
-				// CLUSTERDOWN until the node reports a healthy cluster.
+				// Commands return CLUSTERDOWN until the slot assignment settles.
 				require.Eventually(t, func() bool {
 					info, err := rc.Do(ctx, rc.B().ClusterInfo().Build()).ToString()
 					return err == nil && strings.Contains(info, "cluster_state:ok")

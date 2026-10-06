@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,20 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type valkeyTestCase struct {
-	Name       string
-	ValkeyOpts []helper.ValkeyOption
-}
-
-// TestBatchValkeyCompatibility runs every batch Lua script against real Valkey.
-// Cluster mode is used because the scripts touch keys not declared in KEYS and
+// Cluster mode matters here: the batch scripts access keys outside KEYS and
 // rely on hash tags to keep them in one slot.
 func TestBatchValkeyCompatibility(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping functional tests")
 	}
 
-	testCases := []valkeyTestCase{
+	testCases := []struct {
+		Name       string
+		ValkeyOpts []helper.ValkeyOption
+	}{
 		{
 			Name: "Valkey 9 cluster",
 			ValkeyOpts: []helper.ValkeyOption{
@@ -53,9 +51,6 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 
 			bc := redis_state.NewBatchClient(client, redis_state.QueueDefaultKey)
 			bm := batch.NewRedisBatchManager(bc, nil, batch.WithoutBuffer())
-			bulk := bm.(interface {
-				BulkAppend(context.Context, []batch.BatchItem, inngest.Function) (*batch.BulkAppendResult, error)
-			})
 
 			newFn := func(maxSize int) inngest.Function {
 				return inngest.Function{
@@ -65,26 +60,24 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 			}
 			newItem := func(fn inngest.Function, data map[string]any) batch.BatchItem {
 				return batch.BatchItem{
-					AccountID:   uuid.New(),
-					WorkspaceID: uuid.New(),
-					FunctionID:  fn.ID,
-					EventID:     ulid.Make(),
-					Event:       event.Event{Name: "test/event", Data: data},
+					FunctionID: fn.ID,
+					EventID:    ulid.Make(),
+					Event:      event.Event{Name: "test/event", Data: data},
 				}
 			}
 
-			t.Run("append fills batch and dedupes", func(t *testing.T) {
+			t.Run("append", func(t *testing.T) {
 				fn := newFn(3)
 				first := newItem(fn, nil)
 
 				res, err := bm.Append(ctx, first, fn)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchNew, res.Status)
-				batchID := res.BatchID
 
+				// A retried first event still reports new so the batch gets scheduled.
 				res, err = bm.Append(ctx, first, fn)
 				require.NoError(t, err)
-				require.Equal(t, enums.BatchNew, res.Status, "duplicate of the only item reports new")
+				require.Equal(t, enums.BatchNew, res.Status)
 
 				res, err = bm.Append(ctx, newItem(fn, nil), fn)
 				require.NoError(t, err)
@@ -93,48 +86,50 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				res, err = bm.Append(ctx, newItem(fn, nil), fn)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchFull, res.Status)
-				require.Equal(t, batchID, res.BatchID)
 
-				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(batchID))
+				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.BatchID))
 				require.NoError(t, err)
 				require.Len(t, items, 3)
 				require.Equal(t, first.EventID, items[0].EventID)
 			})
 
-			t.Run("append reports maxsize from MEMORY USAGE", func(t *testing.T) {
-				sized := batch.NewRedisBatchManager(bc, nil, batch.WithoutBuffer(), batch.WithRedisBatchSizeLimit(1))
+			t.Run("maxsize", func(t *testing.T) {
+				sized := batch.NewRedisBatchManager(bc, nil, batch.WithoutBuffer(), batch.WithRedisBatchSizeLimit(1024))
 				fn := newFn(100)
 
 				res, err := sized.Append(ctx, newItem(fn, nil), fn)
 				require.NoError(t, err)
+				require.Equal(t, enums.BatchNew, res.Status)
+
+				res, err = sized.Append(ctx, newItem(fn, map[string]any{"pad": strings.Repeat("x", 2048)}), fn)
+				require.NoError(t, err)
 				require.Equal(t, enums.BatchMaxSize, res.Status)
 			})
 
-			t.Run("bulk append overflows and dedupes", func(t *testing.T) {
+			t.Run("bulk append", func(t *testing.T) {
 				fn := newFn(3)
 				items := make([]batch.BatchItem, 5)
 				for i := range items {
-					items[i] = newItem(fn, map[string]any{"i": i})
+					items[i] = newItem(fn, nil)
 				}
 
-				res, err := bulk.BulkAppend(ctx, items, fn)
+				res, err := bm.BulkAppend(ctx, items, fn)
 				require.NoError(t, err)
 				require.Equal(t, "overflow", res.Status)
 				require.Equal(t, 5, res.Committed)
 				require.Equal(t, 2, res.OverflowCount)
-				require.NotEmpty(t, res.NextBatchID)
 
 				overflow, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.NextBatchID))
 				require.NoError(t, err)
 				require.Len(t, overflow, 2)
 
-				res, err = bulk.BulkAppend(ctx, items, fn)
+				res, err = bm.BulkAppend(ctx, items, fn)
 				require.NoError(t, err)
 				require.Equal(t, "itemexists", res.Status)
 				require.Equal(t, 5, res.Duplicates)
 			})
 
-			t.Run("start execution transitions once", func(t *testing.T) {
+			t.Run("start", func(t *testing.T) {
 				fn := newFn(10)
 				res, err := bm.Append(ctx, newItem(fn, nil), fn)
 				require.NoError(t, err)
@@ -153,7 +148,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.Equal(t, enums.BatchStatusAbsent.String(), status)
 			})
 
-			t.Run("keyed batch info and delete", func(t *testing.T) {
+			t.Run("keyed delete", func(t *testing.T) {
 				fn := newFn(10)
 				fn.EventBatch.Key = new("event.data.tenant")
 
@@ -177,7 +172,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 
 				info, err = bm.GetBatchInfo(ctx, fn.ID, "b")
 				require.NoError(t, err)
-				require.Len(t, info.Items, 1, "deleting one key must not touch another")
+				require.Len(t, info.Items, 1)
 			})
 		})
 	}

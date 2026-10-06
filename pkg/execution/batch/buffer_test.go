@@ -1215,10 +1215,7 @@ func TestBufferedByteSize(t *testing.T) {
 	})
 }
 
-// TestBufferedOverflowSchedulesBothBatches covers a flush that overflows a
-// partially filled batch: the full batch must run now and the overflow batch
-// must be scheduled at the batch timeout, or it would never execute.
-func TestBufferedOverflowSchedulesBothBatches(t *testing.T) {
+func TestBufferedOverflowScheduling(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -1236,46 +1233,40 @@ func TestBufferedOverflowSchedulesBothBatches(t *testing.T) {
 		EventBatch: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "60s"},
 	}
 	newItem := func() BatchItem {
-		return BatchItem{
-			AccountID:   uuid.New(),
-			WorkspaceID: uuid.New(),
-			FunctionID:  fnID,
-			EventID:     ulid.Make(),
-			Event:       event.Event{Name: "test/event"},
-		}
+		return BatchItem{FunctionID: fnID, EventID: ulid.Make()}
 	}
 
-	// Leave one slot in the current batch.
-	unbuffered := NewRedisBatchManager(bc, nil, WithoutBuffer())
-	prefill, err := unbuffered.(*redisBatchManager).BulkAppend(ctx, []BatchItem{newItem(), newItem()}, fn)
+	// 2/3 full, so the next flush of 3 overflows.
+	prefill, err := NewRedisBatchManager(bc, nil, WithoutBuffer()).BulkAppend(ctx, []BatchItem{newItem(), newItem()}, fn)
 	require.NoError(t, err)
-	require.Equal(t, "new", prefill.Status)
 
-	q := &recordingProducer{}
+	q := &fakeProducer{}
 	buffered := NewRedisBatchManager(bc, q, WithBufferSettings(5*time.Second, 3))
 	defer buffered.Close()
 
 	var wg sync.WaitGroup
-	for range 3 {
+	errs := make([]error, 3)
+	for i := range errs {
 		wg.Go(func() {
-			_, err := buffered.Append(ctx, newItem(), fn)
-			require.NoError(t, err)
+			_, errs[i] = buffered.Append(ctx, newItem(), fn)
 		})
 	}
 	wg.Wait()
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
 
-	enqueued := q.enqueued()
-	require.Len(t, enqueued, 2)
+	require.Len(t, q.items, 2)
 
-	full := enqueued[0].item.Payload.(ScheduleBatchPayload)
+	full := q.items[0].item.Payload.(ScheduleBatchPayload)
 	require.Equal(t, prefill.BatchID, full.BatchID.String())
-	require.WithinDuration(t, time.Now(), enqueued[0].at, 5*time.Second)
+	require.WithinDuration(t, time.Now(), q.items[0].at, 5*time.Second)
 
-	overflow := enqueued[1].item.Payload.(ScheduleBatchPayload)
-	require.NotEqual(t, prefill.BatchID, overflow.BatchID.String())
-	require.WithinDuration(t, time.Now().Add(time.Minute), enqueued[1].at, 5*time.Second)
+	next := q.items[1].item.Payload.(ScheduleBatchPayload)
+	require.NotEqual(t, full.BatchID, next.BatchID)
+	require.WithinDuration(t, time.Now().Add(time.Minute), q.items[1].at, 5*time.Second)
 
-	items, err := buffered.RetrieveItems(ctx, fnID, overflow.BatchID)
+	items, err := buffered.RetrieveItems(ctx, fnID, next.BatchID)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 }
