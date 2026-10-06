@@ -17,7 +17,9 @@ const T0 = Date.parse('2026-10-01T12:00:00.000Z');
 
 export const BUILD_SANDBOX_ID = '7f3a2c1e-4b5d-4e6f-8a9b-0c1d2e3f4a5b';
 export const E2E_SANDBOX_ID = '91c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
-export const TEST_STATEMENT_ID = 'c0ffee000000000000000000000000000000test';
+// sha1("test"): a CI command has no step of its own, so its statement_id
+// isn't any step's ID
+export const TEST_STATEMENT_ID = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3';
 export const SNAPSHOT_STATEMENT_ID = 'c0ffee00000000000000000000000000snapshot';
 
 function at(seconds: number): string {
@@ -100,67 +102,82 @@ function testStep(action: string, extra: Partial<SandboxMetadata> = {}): Partial
   };
 }
 
-/** The CI `test` command's steps (start, sleeps, polls, output) */
-export function ciTestSteps(): Trace[] {
-  const process = { process_id: 'proc-test-1' };
+/**
+ * One attempt of the CI `test` command (start, sleeps, polls, output),
+ * starting `offset` seconds after the default and exiting with `exitCode`.
+ * A retry shares the statement_id; only the step names say which attempt.
+ */
+export function ciTestSteps({
+  offset = 0,
+  exitCode = 0,
+  attempt,
+}: { offset?: number; exitCode?: number; attempt?: number } = {}): Trace[] {
+  const process = { process_id: `proc-test-${attempt ?? 1}` };
+  const label = attempt ? `test #attempt-${attempt}` : 'test';
+  const id = (suffix: string) => `a1${attempt ?? 0}-${suffix}`;
+  const t = (seconds: number) => seconds + offset;
   return [
     sandboxStep({
-      name: 'test › start',
-      stepID: 'a1000000000000000000000000000000000start',
-      start: 38,
-      end: 38.5,
+      name: `${label} › start`,
+      stepID: id('start'),
+      start: t(38),
+      end: t(38.5),
       sandbox: testStep('process.start', { ...process, process_state: 'RUNNING' }),
     }),
     sandboxStep({
-      name: 'test › wait #1',
-      stepID: 'a10000000000000000000000000000000wait01',
-      start: 38.5,
-      end: 53.5,
+      name: `${label} › wait #1`,
+      stepID: id('wait01'),
+      start: t(38.5),
+      end: t(53.5),
       stepOp: 'SLEEP',
       sandbox: testStep('sleep'),
     }),
     sandboxStep({
-      name: 'test › check #1',
-      stepID: 'a1000000000000000000000000000000check01',
-      start: 53.6,
-      end: 54,
+      name: `${label} › check #1`,
+      stepID: id('check01'),
+      start: t(53.6),
+      end: t(54),
       sandbox: testStep('process.get', { ...process, process_state: 'RUNNING' }),
     }),
     sandboxStep({
-      name: 'test › wait #2',
-      stepID: 'a10000000000000000000000000000000wait02',
-      start: 54,
-      end: 84,
+      name: `${label} › wait #2`,
+      stepID: id('wait02'),
+      start: t(54),
+      end: t(84),
       stepOp: 'SLEEP',
       sandbox: testStep('sleep'),
     }),
     sandboxStep({
-      name: 'test › check #2',
-      stepID: 'a1000000000000000000000000000000check02',
-      start: 84.1,
-      end: 84.5,
+      name: `${label} › check #2`,
+      stepID: id('check02'),
+      start: t(84.1),
+      end: t(84.5),
       sandbox: testStep('process.get', { ...process, process_state: 'RUNNING' }),
     }),
     sandboxStep({
-      name: 'test › wait #3',
-      stepID: 'a10000000000000000000000000000000wait03',
-      start: 84.5,
-      end: 114.5,
+      name: `${label} › wait #3`,
+      stepID: id('wait03'),
+      start: t(84.5),
+      end: t(114.5),
       stepOp: 'SLEEP',
       sandbox: testStep('sleep'),
     }),
     sandboxStep({
-      name: 'test › check #3',
-      stepID: 'a1000000000000000000000000000000check03',
-      start: 114.6,
-      end: 115.1,
-      sandbox: testStep('process.get', { ...process, process_state: 'EXITED', exit_code: 0 }),
+      name: `${label} › check #3`,
+      stepID: id('check03'),
+      start: t(114.6),
+      end: t(115.1),
+      sandbox: testStep('process.get', {
+        ...process,
+        process_state: 'EXITED',
+        exit_code: exitCode,
+      }),
     }),
     sandboxStep({
-      name: 'test › output',
-      stepID: 'a100000000000000000000000000000000output',
-      start: 115.2,
-      end: 122.2,
+      name: `${label} › output`,
+      stepID: id('output'),
+      start: t(115.2),
+      end: t(122.2),
       sandbox: testStep('process.output', process),
     }),
   ];

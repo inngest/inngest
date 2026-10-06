@@ -283,6 +283,8 @@ export interface SandboxPhaseData {
   label: string;
   /** Waiting on the machine (drawn hollow) rather than doing work */
   waiting: boolean;
+  /** Part of an earlier attempt that failed (drawn in the failed colour) */
+  failed?: boolean;
   startTime: Date;
   /** Null while this is the current state of a statement still in progress */
   endTime: Date | null;

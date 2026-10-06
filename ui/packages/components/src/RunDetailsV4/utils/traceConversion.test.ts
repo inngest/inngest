@@ -1477,7 +1477,7 @@ describe('traceConversion', () => {
       // Internal steps are states of the row, not sub-rows
       expect(test.childrenSpans).toEqual([]);
       // The step panel shows the command's output, with its command and exit code
-      expect(test.outputID).toBe('output-a100000000000000000000000000000000output-0');
+      expect(test.outputID).toBe('output-a10-output-0');
       expect(getSandboxMetadata(test)).toMatchObject({
         action: 'process.output',
         command_display: 'pnpm test',
@@ -1577,7 +1577,7 @@ describe('traceConversion', () => {
       expect(snapshot.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
     });
 
-    it('hides retries of an internal step inside the row', () => {
+    it('hides step-level retries of an internal step inside the row', () => {
       const steps = ciTestSteps();
       const check = steps[2]!;
       const retriedCheck = { ...check, spanID: 'check-retry', attempts: 1 };
@@ -1604,6 +1604,35 @@ describe('traceConversion', () => {
       const phases = barsOf(root)[0]?.sandbox?.phases;
       expect(phases?.map((p) => p.label)).toEqual(['Starting', 'Running']);
       expect(phases?.[1]?.endTime).toBeNull();
+    });
+
+    it('draws a retried CI command on one row, the failed attempt first', () => {
+      const steps = [
+        ...ciTestSteps({ attempt: 1, exitCode: 1 }),
+        ...ciTestSteps({ attempt: 2, offset: 100 }),
+      ];
+      const root = traceRollup(createTrace({ isRoot: true, childrenSpans: steps }));
+
+      expect(root.childrenSpans).toHaveLength(1);
+      const test = root.childrenSpans![0]!;
+      expect(test.name).toBe('test');
+      expect(test.sandboxMembers).toHaveLength(16);
+      expect(test.childrenSpans).toEqual([]);
+      expect(test.status).toBe('COMPLETED');
+      expect(test.outputID).toBe('output-a12-output-0');
+
+      const bar = barsOf(root)[0]!;
+      expect(bar.sandbox?.exitCode).toBe(0);
+      expect(bar.sandbox?.phases?.map((p) => [p.label, p.failed])).toEqual([
+        ['Attempt 1: Starting', true],
+        ['Attempt 1: Running', true],
+        ['Attempt 1: Collecting output', true],
+        ['Attempt 2: Starting', false],
+        ['Attempt 2: Running', false],
+        ['Attempt 2: Collecting output', false],
+      ]);
+      // Attempt 1's output state ends where attempt 2 starts
+      expect(bar.sandbox?.phases?.[2]?.endTime?.toISOString()).toBe('2026-10-01T12:02:18.000Z');
     });
 
     it('marks a statement failed when its last step failed', () => {

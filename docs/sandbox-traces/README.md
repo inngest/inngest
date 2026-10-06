@@ -221,6 +221,14 @@ state took. Selecting the row shows the statement's result: the last step's
 output, with the command and exit code. Retries of the statement step expand
 as attempts, the same as any step; retries of an internal step don't show.
 
+A retried CI command (`X #attempt-1`, `X #attempt-2`) shares one
+`statement_id` and has no statement step, so its attempts stay on the one row:
+each `process.start` opens an attempt, an earlier attempt that failed (a failed
+step or a non-zero exit code) is drawn in the failed colour, and the hover card
+labels states by attempt. If attempts need to expand like step retries, the
+metadata would need a `statement_attempt` field; the UI never reads attempts
+from step names.
+
 ![C. Statement rows own their internal steps](./expanded.png)
 
 The mock above predates this decision: it expands into one sub-row per

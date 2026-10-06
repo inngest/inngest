@@ -177,6 +177,33 @@ function phaseOf(member: Trace, statement: string): Phase {
 }
 
 /**
+ * Split a statement's steps into attempts. A retried CI command reuses one
+ * `statement_id` and the metadata carries no attempt number, so each attempt
+ * is recognised by the process start that opens it.
+ */
+function splitAttempts(members: Trace[]): Trace[][] {
+  const attempts: Trace[][] = [];
+  for (const member of members) {
+    const opensAttempt = getSandboxMetadata(member)?.action.endsWith('.start');
+    const current = attempts[attempts.length - 1];
+    if (!current || (opensAttempt && current.length > 0)) {
+      attempts.push([member]);
+    } else {
+      current.push(member);
+    }
+  }
+  return attempts;
+}
+
+/** Whether an attempt ended badly: a failed step or a non-zero exit code */
+function attemptFailed(attempt: Trace[]): boolean {
+  const exitCode = sandboxEntries(attempt)
+    .reverse()
+    .find((md) => md.exit_code !== undefined)?.exit_code;
+  return attempt.some((m) => m.status === 'FAILED') || (exitCode !== undefined && exitCode !== 0);
+}
+
+/**
  * The states a statement moved through, from its member steps in time order.
  * Consecutive members in the same state merge, and each state runs until the
  * next one starts, so the states cover the whole row with no gaps.
@@ -186,20 +213,36 @@ function statementPhases(
   statement: string,
   endedAt: string | null
 ): SandboxPhaseData[] {
+  const attempts = splitAttempts(members);
   const phases: SandboxPhaseData[] = [];
-  for (const member of members) {
-    const phase = phaseOf(member, statement);
-    const previous = phases[phases.length - 1];
-    if (previous?.key === phase.key) {
-      continue;
-    }
 
-    const startTime = new Date(member.queuedAt);
-    if (previous) {
-      previous.endTime = startTime;
+  attempts.forEach((attempt, i) => {
+    const isLast = i === attempts.length - 1;
+    const failed = !isLast && attemptFailed(attempt);
+    const prefix = attempts.length > 1 ? `Attempt ${i + 1}: ` : '';
+
+    for (const member of attempt) {
+      const phase = phaseOf(member, statement);
+      const key = `${i}-${phase.key}`;
+      const previous = phases[phases.length - 1];
+      if (previous?.key === key) {
+        continue;
+      }
+
+      const startTime = new Date(member.queuedAt);
+      if (previous) {
+        previous.endTime = startTime;
+      }
+      phases.push({
+        ...phase,
+        key,
+        label: prefix + phase.label,
+        failed,
+        startTime,
+        endTime: null,
+      });
     }
-    phases.push({ ...phase, startTime, endTime: null });
-  }
+  });
 
   const final = phases[phases.length - 1];
   if (final) {

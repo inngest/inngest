@@ -325,7 +325,7 @@ function generateSandboxPhaseSegments(bar: TimelineBarData): BarSegment[] | unde
       startPercent: (phaseStartMs / totalMs) * 100,
       widthPercent: (Math.max(0, phaseEndMs - phaseStartMs) / totalMs) * 100,
       style: phase.waiting ? 'sandbox.waiting' : 'sandbox.active',
-      status: bar.status,
+      status: phase.failed ? 'FAILED' : bar.status,
     };
   });
 }
