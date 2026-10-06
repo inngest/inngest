@@ -395,40 +395,24 @@ func TestInvokeFunctionOptsPreservesSessionNulls(t *testing.T) {
 }
 
 func TestGeneratorOpcode_SetOpt(t *testing.T) {
-	// waitForEvent interpolates `if` in place; the SDK's other opts must
-	// survive so the pause and history keep them.
-	op := GeneratorOpcode{
-		Op: enums.OpcodeWaitForEvent,
-		Opts: map[string]any{
-			"event":        "user.updated",
-			"if":           "async.data.id == event.data.id",
-			"timeout":      "1h",
+	// Interpolating a waitForEvent `if` must keep the SDK's other opts.
+	raw := `{"if":"async.data.id == event.data.id","stackLine":"fn.ts:12","parallelMode":"race"}`
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
+
+	for _, opts := range []any{[]byte(raw), decoded} {
+		op := GeneratorOpcode{Op: enums.OpcodeWaitForEvent, Opts: opts}
+		require.NoError(t, op.SetOpt("if", "async.data.id == 'u_1'"))
+		assert.Equal(t, map[string]any{
+			"if":           "async.data.id == 'u_1'",
 			"stackLine":    "fn.ts:12",
 			"parallelMode": "race",
-		},
+		}, op.Opts)
 	}
 
-	require.NoError(t, op.SetOpt("if", "async.data.id == 'u_1'"))
-
-	opts, err := op.WaitForEventOpts()
-	require.NoError(t, err)
-	assert.Equal(t, "async.data.id == 'u_1'", *opts.If)
-	assert.Equal(t, "user.updated", opts.Event)
-	assert.Equal(t, "1h", opts.Timeout)
-	assert.Equal(t, enums.ParallelModeRace, op.ParallelMode())
-	stack, err := op.StackLine()
-	require.NoError(t, err)
-	assert.Equal(t, "fn.ts:12", *stack)
-
-	t.Run("raw and empty opts", func(t *testing.T) {
-		raw := GeneratorOpcode{Opts: []byte(`{"stackLine":"a.ts:1"}`)}
-		require.NoError(t, raw.SetOpt("if", "true"))
-		assert.Equal(t, map[string]any{"stackLine": "a.ts:1", "if": "true"}, raw.Opts)
-
-		empty := GeneratorOpcode{}
-		require.NoError(t, empty.SetOpt("if", "true"))
-		assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
-	})
+	empty := GeneratorOpcode{}
+	require.NoError(t, empty.SetOpt("if", "true"))
+	assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
 }
 
 func TestGeneratorOpcode_SpanPath(t *testing.T) {
@@ -436,33 +420,19 @@ func TestGeneratorOpcode_SpanPath(t *testing.T) {
 		{ID: "agent", Name: "Research agent"},
 		{ID: "search", Name: "search tool"},
 	}
+	raw := `{"stackLine":"fn.ts:1","span":[{"id":"agent","name":"Research agent"},{"id":"search","name":"search tool"}]}`
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
 
-	t.Run("decoded opts", func(t *testing.T) {
-		op := GeneratorOpcode{Opts: map[string]any{
-			"stackLine": "fn.ts:1",
-			"span": []any{
-				map[string]any{"id": "agent", "name": "Research agent"},
-				map[string]any{"id": "search", "name": "search tool"},
-			},
-		}}
-		assert.Equal(t, path, op.SpanPath())
-	})
+	assert.Equal(t, path, GeneratorOpcode{Opts: []byte(raw)}.SpanPath())
+	assert.Equal(t, path, GeneratorOpcode{Opts: decoded}.SpanPath())
+	assert.Nil(t, GeneratorOpcode{}.SpanPath())
+	assert.Nil(t, GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1"}}.SpanPath())
 
-	t.Run("raw opts", func(t *testing.T) {
-		op := GeneratorOpcode{Opts: []byte(`{"span":[{"id":"agent","name":"Research agent"},{"id":"search","name":"search tool"}]}`)}
-		assert.Equal(t, path, op.SpanPath())
-	})
-
-	t.Run("no span", func(t *testing.T) {
-		assert.Nil(t, GeneratorOpcode{}.SpanPath())
-		assert.Nil(t, GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1"}}.SpanPath())
-	})
-
-	t.Run("malformed span doesn't break other opts", func(t *testing.T) {
-		op := GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1", "span": "nope"}}
-		assert.Nil(t, op.SpanPath())
-		stack, err := op.StackLine()
-		require.NoError(t, err)
-		assert.Equal(t, "fn.ts:1", *stack)
-	})
+	// A malformed span is dropped without breaking the other opts.
+	malformed := GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1", "span": "nope"}}
+	assert.Nil(t, malformed.SpanPath())
+	stack, err := malformed.StackLine()
+	require.NoError(t, err)
+	assert.Equal(t, "fn.ts:1", *stack)
 }

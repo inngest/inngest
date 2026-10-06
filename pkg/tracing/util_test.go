@@ -421,24 +421,11 @@ func TestGeneratorAttrsSpanPath(t *testing.T) {
 		return values
 	}
 
-	t.Run("records the span path for any opcode", func(t *testing.T) {
-		values := extract(&state.GeneratorOpcode{
-			ID: "step-1",
-			Op: enums.OpcodeSleep,
-			Opts: map[string]any{"span": []any{
-				map[string]any{"id": "agent", "name": "Research agent"},
-				map[string]any{"id": "search", "name": "search tool"},
-			}},
-		})
-		require.NotNil(t, values.StepSpanPath)
-		require.Equal(t, []meta.SpanPathElement{
-			{ID: "agent", Name: "Research agent"},
-			{ID: "search", Name: "search tool"},
-		}, *values.StepSpanPath)
-	})
+	// Any opcode, sleeps included, records its span path.
+	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent"}, {ID: "search", Name: "search tool"}}
+	sleep := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{"span": path}})
+	require.Equal(t, &path, sleep.StepSpanPath)
 
-	t.Run("omits the attribute outside any span", func(t *testing.T) {
-		values := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeStepRun})
-		require.Nil(t, values.StepSpanPath)
-	})
+	run := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeStepRun})
+	require.Nil(t, run.StepSpanPath)
 }
