@@ -11,15 +11,19 @@ the steps, and the UI renders the tree it's given.
 outermost first, in `opts.span`. Steps outside any group have no `span` key.
 
 ```json
-"opts": { "span": [{ "id": "agent", "name": "Research agent" }, { "id": "search", "name": "search tool" }] }
+"opts": { "span": [{ "id": "agent", "name": "Research agent", "kind": "agent" }, { "id": "search", "name": "search tool", "kind": "tool" }] }
 ```
+
+`kind` is optional: a short free-form word the caller picks for the group
+(CI uses `job`, `machine` and `cmd`; agents `agent` and `tool`). It's left
+out when not given.
 
 The same path is the same group: opening a group with an ID its parent has
 already used re-enters it (a background process's later calls, for example).
 Distinct groups need distinct IDs, chosen by the caller.
 
 **Executor.** `generatorAttrs` copies the path onto the step span as
-`_inngest.step.span_path`, a JSON array of `{id, name}`
+`_inngest.step.span_path`, a JSON array of `{id, name, kind?}`
 (`GeneratorOpcode.SpanPath()`, `meta.Attrs.StepSpanPath`). It runs for every
 opcode type and on both checkpoint paths, so sleeps and waits are grouped too.
 
@@ -36,6 +40,7 @@ under virtual spans, one per path prefix:
 | `spanID` | `span:` + 16 hex chars of a SHA-256 over the path's IDs |
 | `name` | the last path element's name |
 | `stepType` | `SPAN_GROUP` (`stepOp`, `stepID`, `outputID` are null) |
+| `spanKind` | the last path element's `kind`, or null without one (always null for steps) |
 | `queuedAt`, `startedAt` | the earliest of its children's |
 | `endedAt` | the latest of its children's, or null while any child is running |
 | `status` | `RUNNING` while any child is, otherwise the status of the child that ended last |
@@ -49,7 +54,7 @@ unchanged.
 
 GraphQL, the REST v2 trace, the CLI and MCP share this converter. The REST
 `TraceSpan` has a `stepType` field (`step_type` in the proto), `SPAN_GROUP`
-for groups.
+for groups, and a `spanKind` field (`span_kind`), absent when null.
 
 **Rerun.** Rerunning a group reruns from its earliest-queued step: the UI sends
 that step's `stepID`. Group span IDs are virtual and never sent.
@@ -66,15 +71,19 @@ that step's `stepID`. Group span IDs are virtual and never sent.
   Expanded, its own bar hides like any expanded parent.
 - The hover lists the direct children and their durations.
 - The step panel for a group offers "Rerun from start of span".
+- A group with a `spanKind` shows it upper-cased as a small tag before its
+  name (`SpanKindTag.tsx`, `bg-info text-info`): `[JOB] e2e`,
+  `[AGENT] Research agent`. The kind is shown as given, with no mapping.
 
-**Sandbox chips** (`RunDetailsV4/SandboxAnnotation.tsx`, kept separate so they
-are easy to drop). Steps with `inngest.sandbox` metadata show the command, a
-machine chip (coloured by first appearance in the run, middle-truncated with
-the full name in its tooltip). Row status already shows success or failure, so
-there's no exit badge. A group shows the chip when its sandbox steps share one
-`sandbox_id` (steps that name no machine don't count). Clicking a chip pins a
-dotted highlight on every row of that machine, hovering previews it, and Escape
-clears it.
+**Sandbox machines** (`RunDetailsV4/SandboxAnnotation.tsx`, kept separate so
+they are easy to drop). Steps with `inngest.sandbox` metadata show the command
+and a `[MACHINE] <name>` tag (the same kind tag, then `sandbox_name` or
+`sandbox_id`, middle-truncated with the full name in its tooltip). Row status
+already shows success or failure, so there's no exit badge. A group shows the
+MACHINE tag when its sandbox steps share one `sandbox_id` (steps that name no
+machine don't count). Clicking the tag pins a dotted highlight on every row of
+that machine, hovering previews it, and Escape clears it. Each machine keeps a
+colour, by first appearance in the run, for its highlight dots only.
 
 `inngest.sandbox` values: `version`, `action`, `method` (the SDK method the
 user called, like `commands.run`), and the optional flat fields `sandbox_id`,
@@ -89,6 +98,9 @@ user called, like `commands.run`), and the optional flat fields `sandbox_id`,
   of `childrenSpans`: run → group → group → group → step → attempt → userland
   → userland. Deeper nesting is cut off. Returning spans as a flat list with
   parent IDs would remove the cap.
+- **Dashboard codegen.** `ui/apps/dashboard/src/gql/*` were patched by script
+  for `spanKind` (the documents deep-equal the parsed queries), as its codegen
+  needs the cloud schema. Run the real codegen to confirm.
 - **Flat loader.** The cloud's flat-span loader (`convertFlatSpanToGQL`) needs
   the same post-pass, and planned steps there get no path until they finish,
   because `OnStepScheduled` receives no opcode.
@@ -105,3 +117,6 @@ From the hand-built fixture
 - Collapsed groups: ![](fixture-collapsed.png)
 - A nested agent group expanded: ![](fixture-expanded.png)
 - A machine pinned: ![](fixture-pinned-machine.png)
+- Kind tags, collapsed: ![](kinds-collapsed.png)
+- Kind tags, expanded: ![](kinds-expanded.png)
+- Kind tags, a machine pinned: ![](kinds-pinned-machine.png)
