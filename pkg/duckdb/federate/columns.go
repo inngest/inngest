@@ -58,39 +58,27 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int, kind deltaKind) (d
 }
 
 // deltaColumnsUsed works out which delta columns the query reads, by
-// planning it against empty stand-ins: each needed table's delta becomes a
-// one-row, all-NULL TEMP table with every delta column, and EXPLAIN shows
-// which columns DuckDB projects from it (filters pushed into the scan count
-// too). The macros' own reads (raw_runs' collapse, for one) are included
-// because they're part of the planned query.
+// planning it with each source as its lake table alone, unbounded:
+// everything above a source's UNION reads its lake and delta sides alike, so
+// the delta needs exactly the columns the plan reads from the lake table
+// (projected, or named in a filter pushed into the scan). The macros' own
+// reads (raw_runs' collapse, for one) are included because they're part of
+// the planned query.
 //
-// A table maps to nil when its stand-in's scan can't be found in the plan:
-// stream every column. That covers a table the query never reads, too: a
-// missing scan can't be told apart from one an optimization removed, so it
-// stays conservative.
-func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Table, seq int64) (map[Table][]Column, error) {
+// A table maps to nil when the plan has no scan of its lake table: stream
+// every column. That covers a table the query never reads, too: a missing
+// scan can't be told apart from one an optimization removed, so it stays
+// conservative.
+func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Table) (map[Table][]Column, error) {
 	if len(needed) == 0 {
 		return nil, nil
 	}
-	stubs := map[Table]string{}
-	defer func() {
-		for _, name := range stubs {
-			_, _ = conn.ExecContext(context.Background(), "DROP TABLE IF EXISTS temp.main."+quoteIdent(name)+";")
-		}
-	}()
-	for _, t := range needed {
-		name := fmt.Sprintf("__delta_%s_%d_plan", t, seq)
-		if err := createStub(ctx, conn, name, DeltaColumns(t), true); err != nil {
-			return nil, err
-		}
-		stubs[t] = name
-	}
-	sqlText, args, err := assemble(q, needed, stubs, nil, nil)
+	sqlText, args, err := assemble(q, needed, map[Table]string{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	// With statistics, the planner can see the stand-in's all-NULL row can't
-	// pass a filter and replace its scan with an empty result, hiding the
+	// With statistics, the planner can see a lake table (or its pruned
+	// files) is empty and replace the scan with an empty result, hiding the
 	// columns. Planning without those optimizations keeps the scan.
 	if _, err := conn.ExecContext(ctx, "SET disabled_optimizers = 'statistics_propagation,empty_result_pullup';"); err != nil {
 		return nil, nil
@@ -104,7 +92,7 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 
 	out := map[Table][]Column{}
 	for _, t := range needed {
-		names, found := scanColumns(plan, stubs[t], DeltaColumns(t))
+		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t))
 		if !found || len(names) == 0 {
 			out[t] = nil
 			continue
@@ -118,27 +106,6 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 		out[t] = cols
 	}
 	return out, nil
-}
-
-// createStub creates TEMP table name with cols, holding one all-NULL row if
-// withRow (so the planner can't treat it as empty and drop its scan).
-func createStub(ctx context.Context, conn *sql.Conn, name string, cols []Column, withRow bool) error {
-	defs := make([]string, len(cols))
-	for i, c := range cols {
-		defs[i] = quoteIdent(c.Name) + " " + c.Type.DuckDBType()
-	}
-	stmt := fmt.Sprintf("CREATE OR REPLACE TEMP TABLE %s (%s);", quoteIdent(name), strings.Join(defs, ", "))
-	if withRow {
-		nulls := make([]string, len(cols))
-		for i := range nulls {
-			nulls[i] = "NULL"
-		}
-		stmt += fmt.Sprintf(" INSERT INTO %s VALUES (%s);", quoteIdent(name), strings.Join(nulls, ", "))
-	}
-	if _, err := conn.ExecContext(ctx, stmt); err != nil {
-		return fmt.Errorf("federate: creating %s: %w", name, err)
-	}
-	return nil
 }
 
 type planNode struct {
@@ -210,8 +177,8 @@ func scanColumns(plan []planNode, table string, cols []Column) (map[string]bool,
 	return names, found
 }
 
-// tableIs reports whether a plan's table reference ("temp".main.x) names
-// table.
+// tableIs reports whether a plan's table reference (bare, or qualified as
+// catalog.schema.x) names table.
 func tableIs(ref, table string) bool {
 	ref = strings.ReplaceAll(ref, `"`, "")
 	return ref == table || strings.HasSuffix(ref, "."+table)

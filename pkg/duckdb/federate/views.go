@@ -55,7 +55,9 @@ type sourceSpec struct {
 	// Watermark bounds the lake side, bucket_at <= W; the delta holds the
 	// rest (bucket_at > W).
 	Watermark time.Time
-	// Delta is the delta's streamed CTE.
+	// Delta is the delta's streamed CTE. Empty, the source is the lake
+	// table alone and unbounded: the stand-in deltaColumnsUsed plans with,
+	// whose scan then reads only what the query does.
 	Delta string
 	// DeltaColumns, when set, are the only physical columns Delta carries:
 	// the ones the query reads (see deltaColumnsUsed). Every other column is
@@ -94,6 +96,10 @@ func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
 	if !spec.AllTenants {
 		filter = "account_id = ?::UUID AND env_id = ?::UUID AND " + filter
 		args = append([]any{spec.AccountID.String(), spec.EnvID.String()}, args...)
+	}
+	if spec.Delta == "" {
+		return CTEDef{SQL: fmt.Sprintf("%s AS (\n  SELECT %s\n  FROM %s\n)",
+			quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name))}, nil
 	}
 	sql := fmt.Sprintf(`%s AS (
   SELECT %s
