@@ -20,9 +20,10 @@ const SpanGroupStepType = "SPAN_GROUP"
 func groupBySpanPath(run *models.RunTraceSpan) {
 	groups := map[string]*models.RunTraceSpan{}
 	var created []*models.RunTraceSpan
-	var top []*models.RunTraceSpan
+	children := run.ChildrenSpans
+	run.ChildrenSpans = nil
 
-	for _, child := range run.ChildrenSpans {
+	for _, child := range children {
 		parent := run
 		for i := range child.SpanPath {
 			id := spanGroupID(child.SpanPath[:i+1])
@@ -40,22 +41,15 @@ func groupBySpanPath(run *models.RunTraceSpan) {
 				}
 				groups[id] = group
 				created = append(created, group)
-
-				if parent == run {
-					top = append(top, group)
-				} else {
-					parent.ChildrenSpans = append(parent.ChildrenSpans, group)
-				}
+				parent.ChildrenSpans = append(parent.ChildrenSpans, group)
 			}
 			parent = group
 		}
 
-		if parent == run {
-			top = append(top, child)
-		} else {
+		if parent != run {
 			child.ParentSpanID = &parent.SpanID
-			parent.ChildrenSpans = append(parent.ChildrenSpans, child)
 		}
+		parent.ChildrenSpans = append(parent.ChildrenSpans, child)
 	}
 
 	// Groups are created before their subgroups, so finishing them in reverse
@@ -63,8 +57,6 @@ func groupBySpanPath(run *models.RunTraceSpan) {
 	for _, group := range slices.Backward(created) {
 		finishSpanGroup(group)
 	}
-
-	run.ChildrenSpans = top
 }
 
 // finishSpanGroup orders a group's children and derives its timing and status

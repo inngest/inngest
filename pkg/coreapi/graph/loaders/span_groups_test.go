@@ -82,11 +82,11 @@ func TestGroupBySpanPath(t *testing.T) {
 		}
 	})
 
-	t.Run("nests steps by path", func(t *testing.T) {
+	t.Run("nests steps by path, sorted by queue time", func(t *testing.T) {
 		result := convertGroupedRun(t,
 			groupedStep("plan", 0, 1, completed, agent),
-			groupedStep("query", 1, 1, completed, agent, search),
 			groupedStep("retry-query", 2, 1, completed, agent, search),
+			groupedStep("query", 1, 1, completed, agent, search),
 			groupedStep("after", 3, 1, completed),
 		)
 
@@ -130,15 +130,6 @@ func TestGroupBySpanPath(t *testing.T) {
 
 		require.Equal(t, []string{"search tool", "Research agent"}, childNames(result))
 		assert.NotEqual(t, result.ChildrenSpans[0].SpanID, result.ChildrenSpans[1].ChildrenSpans[0].SpanID)
-	})
-
-	t.Run("children are sorted by queue time", func(t *testing.T) {
-		result := convertGroupedRun(t,
-			groupedStep("second", 5, 1, completed, agent),
-			groupedStep("first", 1, 1, completed, agent),
-		)
-
-		assert.Equal(t, []string{"first", "second"}, childNames(result.ChildrenSpans[0]))
 	})
 
 	t.Run("timing spans the children and status is the last to end", func(t *testing.T) {
