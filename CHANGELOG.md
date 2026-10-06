@@ -2,12 +2,73 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.46.0] - 2026-10-06
+
+### 🚀 Features
+
+- *(api)* Add sandbox secret name arrays (#4864)
+- *(queue)* Support pooled role leases (#4896)
+- *(queue)* Support dynamic partition peek limits per shard (#4877)
+- *(dashboard)* Add REST backed run lists (using backend traces v2) (#4890)
+- *(dashboard)* Manage sandbox secrets in the sidebar (#4876)
+- *(tracing)* Include custom concurrency keys in spans (#4915)
+- *(api)* Add async checkpoint routing hook (#4925)
+- *(execution)* Add SyncLifecycleListeners & supporting logic (#4879)
+- *(dashboard)* Add api keys with permissions (#4891)
+- *(queue)* Accept bounded direct item hints (#4918)
+- *(dashboard)* Link progressive searches to Insights (#4949)
+- *(dashboard)* Link Insights resource IDs (#4951)
+- *(dev)* Connect local workflows to Cloud sandboxes (#4886)
+
+### 🐛 Bug Fixes
+
+- *(api)* Preserve run list timestamps (#4887)
+- *(dashboard)* Resolve failed boolean flags to ready on error (#4900)
+- *(ui)* Require registered client feature flags (#4904)
+- *(dashboard)* Fix UI for progressive CEL search status (#4913)
+- *(queue)* Notify shards after capacity release (#4914)
+- *(jank)* Remove code block title scrollbar (#4920)
+- *(dashboard)* Switch function runs from nested route to /v2/runs (#4922)
+- *(mcp)* Document cursor static mcp client config (#4916)
+- *(queue)* Prevent key queue step backlog overcounting (#4937)
+- *(queue)* Guard key queue backlog metric counting against no progress (#4945)
+- *(queue)* Drain archived connect queues (#4950)
+- *(queue)* Preserve hint receivers and in-flight leases (#4948)
+- Page crash locally on refresh because of cjs import (#4678)
+- *(realtime)* Bound publishing and protect authorization tokens (#4944)
+- *(executor)* Retry sleep completion saves (#4960)
+
+### 🚜 Refactor
+
+- *(dashboard)* Omit unused deferred parent run IDs (#4888)
+- *(ui)* Use shared relative time helper (#4919)
+- *(api-docs)* Clean up generation and deployment (#4931)
+
+### ⚡ Performance
+
+- *(queue)* Reduce Redis work during enqueue and dequeue (#4955)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(dashboard)* Run Vitest tests and align UI on Node 22 (#4902)
+- *(ci)* Pin GitHub Actions to commit SHAs (#4932)
+- *(dashboard)* Make runs list REST + v2 traces backed only and v2 traces only for every other runs data (#4928)
+- *(queue)* Set Scope.EnvID from Item if Item.Identifier is not available (#4954)
+
+### 🛡️ Security
+
+- *(ui)* Bump TanStack Start to 1.168.60 for CVE-2026-102989 (#4956)
+
 ## [v1.45.1] - 2026-09-17
 
 ### 🐛 Bug Fixes
 
 - *(cli)* Better message when cli is unauthed (#4883)
 - *(queue)* Drop permanently unroutable items (#4878)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.45.1 (#4884)
 
 ## [v1.45.0] - 2026-09-17
 
