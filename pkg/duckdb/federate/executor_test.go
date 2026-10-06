@@ -82,25 +82,12 @@ func newFixture(t *testing.T) *fixture {
 		from: base.Add(-time.Hour), to: base.Add(time.Hour), base: base,
 		streamer: &fakeStreamer{rows: map[Table][]map[string]any{}},
 	}
-	f.exec = &Executor{DB: db, Delta: f.streamer, Ingester: QuackIngester{}}
+	f.exec = &Executor{DB: db, Delta: f.streamer}
 	return f
 }
 
-// forModes runs fn once per delta ingestion mode: TEMP tables, and streamed
-// MATERIALIZED CTEs.
-func forModes(t *testing.T, fn func(t *testing.T, f *fixture)) {
-	for _, streaming := range []bool{false, true} {
-		name := "temp"
-		if streaming {
-			name = "streaming"
-		}
-		t.Run(name, func(t *testing.T) {
-			f := newFixture(t)
-			f.exec.Streaming = streaming
-			fn(t, f)
-		})
-	}
-}
+// withFixture runs fn with a fresh fixture.
+func withFixture(t *testing.T, fn func(t *testing.T, f *fixture)) { fn(t, newFixture(t)) }
 
 // startedAt is when a run row says the run started: never for a queued row,
 // as the listener writes them.
@@ -166,7 +153,7 @@ func (f *fixture) query(t *testing.T, tables []Table, preds map[Table][]Predicat
 }
 
 func TestExecutorRunsUnion(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
 		done := q.Add(time.Minute)
 
@@ -200,7 +187,7 @@ func TestExecutorRunsUnion(t *testing.T) {
 // in-flight runs is forwarded and exact: a run finished in the delta isn't
 // a false match, and the lake's finished runs don't match.
 func TestExecutorForwardsStatusPredicates(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
 		done := q.Add(time.Minute)
 		f.lakeRun(t, f.account, "run-C", "Completed", q, &done)
@@ -221,7 +208,7 @@ func TestExecutorForwardsStatusPredicates(t *testing.T) {
 }
 
 func TestExecutorSpansUnionLakeAndDelta(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
 		insertLakeSpan := func(spanID, attrs string) {
 			_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.run_trace_spans
@@ -247,7 +234,7 @@ func TestExecutorSpansUnionLakeAndDelta(t *testing.T) {
 }
 
 func TestExecutorEventsUnionLakeAndDelta(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
 		insertLakeEvent := func(account uuid.UUID, id string, receivedAt time.Time) {
 			_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.events
@@ -270,8 +257,8 @@ func TestExecutorEventsUnionLakeAndDelta(t *testing.T) {
 	})
 }
 
-func TestExecutorDropsTempTablesAndRejectsOverCap(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+func TestExecutorRejectsOverCap(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
 		for i := range 3 {
 			f.deltaRun("run-"+string(rune('a'+i)), "Running", q, nil, "")
@@ -288,13 +275,8 @@ func TestExecutorDropsTempTablesAndRejectsOverCap(t *testing.T) {
 			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 10,
 			SQL: `SELECT run_id FROM runs`,
 		})
-		require.NoError(t, err)
+		require.NoError(t, err, "the connection is usable after a failed query")
 		require.NoError(t, rows.Close())
-
-		var n int
-		require.NoError(t, f.db.QueryRowContext(context.Background(),
-			`SELECT count(*) FROM duckdb_tables() WHERE temporary AND table_name LIKE '__delta_%'`).Scan(&n))
-		require.Zero(t, n, "delta TEMP tables should be dropped when a query closes")
 	})
 }
 
@@ -302,7 +284,7 @@ func TestExecutorDropsTempTablesAndRejectsOverCap(t *testing.T) {
 // with just the columns the planned query reads: the query's own, those its
 // filters read, and what the views need (raw_runs' collapse for runs).
 func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		names := func(cols []Column) []string {
 			var out []string
 			for _, c := range cols {
@@ -338,7 +320,7 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 // its own error, not the streamed deltas' cancellation ("context canceled")
 // that its failure causes.
 func TestExecutorReportsTheQueryError(t *testing.T) {
-	forModes(t, func(t *testing.T, f *fixture) {
+	withFixture(t, func(t *testing.T, f *fixture) {
 		_, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.base,

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,17 @@ func newTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestQuackIngesterLoadsEveryTypeIntoTempTable(t *testing.T) {
+// streamDelta runs query over a delta streamed from r as the CTE "delta",
+// as the executor reads one.
+func streamDelta(t *testing.T, conn *sql.Conn, r BatchReader, rowCap int, query string) (*sql.Rows, error) {
+	t.Helper()
+	st, def, err := deltaStream("t", r, rowCap)
+	require.NoError(t, err)
+	def = strings.Replace(def, quoteIdent(deltaCTEName("t")), "delta", 1)
+	return conn.QueryContext(driver.WithQuackStreams(context.Background(), st), "WITH "+def+" "+query)
+}
+
+func TestDeltaStreamCarriesEveryType(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
@@ -60,33 +71,37 @@ func TestQuackIngesterLoadsEveryTypeIntoTempTable(t *testing.T) {
 		{id.String()}, {nil}, {nil}, {nil}, {nil}, {nil}, {nil},
 	}}
 
-	n, err := QuackIngester{}.Ingest(ctx, conn, "delta_t", NewSliceReader(schema, b1, b2), 0)
+	rows, err := streamDelta(t, conn, NewSliceReader(schema, b1, b2), 0, `SELECT id::VARCHAR, name, attrs->>'k', ts, ok, n, tags::VARCHAR,
+		name IS NULL AND attrs IS NULL AND ts IS NULL AND ok IS NULL AND n IS NULL AND tags IS NULL
+		FROM delta ORDER BY name NULLS LAST`)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), n)
+	defer rows.Close()
 
-	// The same connection sees the TEMP table.
-	row := conn.QueryRowContext(ctx, `SELECT id::VARCHAR, name, attrs->>'k', ts, ok, n, tags::VARCHAR
-		FROM delta_t WHERE name = 'a';`)
-	var gotID, gotName, gotK, gotTags string
-	var gotTS time.Time
-	var gotOK bool
-	var gotN int64
-	require.NoError(t, row.Scan(&gotID, &gotName, &gotK, &gotTS, &gotOK, &gotN, &gotTags))
+	var gotID string
+	var gotName, gotK, gotTags sql.NullString
+	var gotTS sql.NullTime
+	var gotOK, allNull sql.NullBool
+	var gotN sql.NullInt64
+	require.True(t, rows.Next())
+	require.NoError(t, rows.Scan(&gotID, &gotName, &gotK, &gotTS, &gotOK, &gotN, &gotTags, &allNull))
 	require.Equal(t, id.String(), gotID)
-	require.Equal(t, "a", gotName)
-	require.Equal(t, "1", gotK)
-	require.True(t, ts.Equal(gotTS), "got %v want %v", gotTS, ts)
-	require.True(t, gotOK)
-	require.Equal(t, int64(42), gotN)
-	require.Equal(t, "[x, 'y,z']", gotTags)
+	require.Equal(t, "a", gotName.String)
+	require.Equal(t, "1", gotK.String)
+	require.True(t, ts.Equal(gotTS.Time), "got %v want %v", gotTS.Time, ts)
+	require.True(t, gotOK.Bool)
+	require.Equal(t, int64(42), gotN.Int64)
+	require.Equal(t, "[x, 'y,z']", gotTags.String)
+	require.False(t, allNull.Bool)
 
-	var nulls int
-	require.NoError(t, conn.QueryRowContext(ctx, `SELECT count(*) FROM delta_t
-		WHERE name IS NULL AND attrs IS NULL AND ts IS NULL AND ok IS NULL AND n IS NULL AND tags IS NULL;`).Scan(&nulls))
-	require.Equal(t, 1, nulls)
+	require.True(t, rows.Next())
+	require.NoError(t, rows.Scan(&gotID, &gotName, &gotK, &gotTS, &gotOK, &gotN, &gotTags, &allNull))
+	require.Equal(t, id.String(), gotID, "a UUID given as text")
+	require.True(t, allNull.Bool, "NULLs of every type")
+	require.False(t, rows.Next())
+	require.NoError(t, rows.Err())
 }
 
-func TestQuackIngesterEnforcesRowCap(t *testing.T) {
+func TestDeltaStreamEnforcesRowCap(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
@@ -95,7 +110,13 @@ func TestQuackIngesterEnforcesRowCap(t *testing.T) {
 
 	schema := []Column{{"name", schema.TypeVarchar}}
 	b := &Batch{Schema: schema, Columns: [][]any{{"a", "b", "c"}}}
-	_, err = QuackIngester{}.Ingest(ctx, conn, "delta_cap", NewSliceReader(schema, b), 2)
+	rows, err := streamDelta(t, conn, NewSliceReader(schema, b), 2, "SELECT * FROM delta")
+	if err == nil {
+		for rows.Next() {
+		}
+		err = rows.Err()
+		_ = rows.Close()
+	}
 	require.True(t, errors.Is(err, ErrRowCapExceeded), "got %v", err)
 }
 

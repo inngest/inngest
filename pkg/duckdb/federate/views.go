@@ -45,7 +45,7 @@ func (s LakeSource) table(name string) string {
 }
 
 // sourceSpec is what one physical source CTE needs: tenant, run-time
-// bound, the lake, and the relation the delta was ingested into.
+// bound, the lake, and the relation the delta streams through.
 type sourceSpec struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID
@@ -55,7 +55,7 @@ type sourceSpec struct {
 	// Watermark bounds the lake side, bucket_at <= W; the delta holds the
 	// rest (bucket_at > W).
 	Watermark time.Time
-	// Delta is the delta relation's name (TEMP table or streamed CTE).
+	// Delta is the delta's streamed CTE.
 	Delta string
 	// DeltaColumns, when set, are the only physical columns Delta carries:
 	// the ones the query reads (see deltaColumnsUsed). Every other column is

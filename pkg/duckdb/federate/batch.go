@@ -1,8 +1,8 @@
 // Package federate answers queries over the union of an account's lake
 // tables and the not-yet-exported delta held in a buffer database (ClickHouse
-// in Cloud). The delta is streamed in as batches (DeltaStreamer), ingested
-// into per-connection TEMP tables (Ingester), and unioned with the lake by
-// logical views (views.go) that apply the latest-wins / is_final rules.
+// in Cloud). The delta is streamed in as batches (DeltaStreamer), straight
+// into the query over quack, and unioned with the lake by logical views
+// (views.go) that apply the latest-wins / is_final rules.
 //
 // The batch type here is deliberately tiny and dependency-free: OSS carries
 // no Arrow dependency. A streamer backed by an Arrow source (e.g. ClickHouse
