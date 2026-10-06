@@ -65,6 +65,8 @@ type RunTraceSpan struct {
 	// Internal fields not exposed over GraphQL.
 	SpanTypeName string
 	Omit         bool
+	// SpanPath is the step's span path, used to nest it under span groups.
+	SpanPath []meta.SpanPathElement
 }
 
 func RunTraceEnded(s RunTraceSpanStatus) bool {

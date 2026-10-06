@@ -224,6 +224,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.CustomConcurrencyKeys = *span.Attributes.CustomConcurrencyKeys
 	}
 
+	if span.Attributes.StepSpanPath != nil {
+		gqlSpan.SpanPath = *span.Attributes.StepSpanPath
+	}
+
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
 		gqlSpan.SkipReason = &reason
@@ -435,6 +439,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					if child.StepID != nil && *child.StepID != "" {
 						gqlSpan.StepID = child.StepID
 					}
+					if child.SpanPath != nil {
+						gqlSpan.SpanPath = child.SpanPath
+					}
 					if child.StepInfo != nil {
 						gqlSpan.StepInfo = child.StepInfo
 					}
@@ -500,6 +507,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
 			}
+
+			groupBySpanPath(gqlSpan)
 		}
 
 		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
