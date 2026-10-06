@@ -68,6 +68,8 @@ const traceDetailsFragment = graphql(`
   }
 `);
 
+// Deep enough for three levels of span groups:
+// run → group → group → group → step → attempt → userland → userland.
 const query = graphql(`
   query GetRunTrace($envID: ID!, $runID: String!, $preview: Boolean) {
     workspace(id: $envID) {
@@ -92,6 +94,15 @@ const query = graphql(`
                 ...TraceDetails
                 childrenSpans {
                   ...TraceDetails
+                  childrenSpans {
+                    ...TraceDetails
+                    childrenSpans {
+                      ...TraceDetails
+                      childrenSpans {
+                        ...TraceDetails
+                      }
+                    }
+                  }
                 }
               }
             }
