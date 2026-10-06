@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { sandboxBarData, shortMachineLabel } from './SandboxAnnotation';
 import { Timeline } from './Timeline';
+import { traceWalk } from './runDetailsUtils';
 import type { Trace } from './types';
-import { fixtureMachines, stepSpansTrace } from './utils/stepSpans.fixture';
+import { MACHINE_A, stepSpansTrace } from './utils/stepSpans.fixture';
 import { traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 vi.mock('../Button', () => ({
@@ -22,19 +23,17 @@ afterEach(() => {
 });
 
 const child = (name: string): Trace => {
-  const found: Trace[] = [];
-  const visit = (t: Trace) => {
-    if (t.name === name) found.push(t);
-    t.childrenSpans?.forEach(visit);
-  };
-  visit(stepSpansTrace);
-  return found[0]!;
+  let found: Trace | undefined;
+  traceWalk(stepSpansTrace, (t) => {
+    if (!found && t.name === name) found = t;
+  });
+  return found!;
 };
 
 describe('sandboxBarData', () => {
   it('describes a sandbox step', () => {
     expect(sandboxBarData(child('setup'))).toEqual({
-      sandboxId: fixtureMachines.a,
+      sandboxId: MACHINE_A.sandbox_id,
       machineLabel: 'ci-01JB7Q2XKZ-base',
       command: 'pnpm install --frozen-lockfile',
       exitCode: 0,
@@ -48,7 +47,7 @@ describe('sandboxBarData', () => {
 
   it("gives a group its shared machine and its last step's exit code", () => {
     expect(sandboxBarData(child('test'))).toEqual({
-      sandboxId: fixtureMachines.a,
+      sandboxId: MACHINE_A.sandbox_id,
       machineLabel: 'ci-01JB7Q2XKZ-base',
       exitCode: 0,
     });
@@ -56,7 +55,7 @@ describe('sandboxBarData', () => {
   });
 
   it("doesn't let steps that name no machine hide a group's machine", () => {
-    expect(sandboxBarData(child('snapshot'))?.sandboxId).toBe(fixtureMachines.a);
+    expect(sandboxBarData(child('snapshot'))?.sandboxId).toBe(MACHINE_A.sandbox_id);
   });
 
   it('shows no machine for a group spanning two machines', () => {

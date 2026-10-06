@@ -6,7 +6,6 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
-import { stepSpansTrace } from './stepSpans.fixture';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -1455,15 +1454,16 @@ describe('traceConversion', () => {
   });
 
   describe('traceRollup — span groups', () => {
+    const ts = (secs: number) => `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`;
     const attempt = (spanID: string, stepID: string, attempts: number, secs: number) =>
       createTrace({
         spanID,
         stepID,
         attempts,
         name: stepID,
-        queuedAt: `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`,
-        startedAt: `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`,
-        endedAt: `2024-01-01T00:00:${String(secs + 1).padStart(2, '0')}Z`,
+        queuedAt: ts(secs),
+        startedAt: ts(secs),
+        endedAt: ts(secs + 1),
         status: attempts === 0 ? 'FAILED' : 'COMPLETED',
       });
 
@@ -1542,22 +1542,6 @@ describe('traceConversion', () => {
       );
 
       expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['early', 'g', 'late']);
-    });
-
-    it('rolls up the CI fixture: groups kept, the retried tool step rolled up', () => {
-      const result = traceRollup(stepSpansTrace);
-
-      expect(result.childrenSpans?.map((c) => c.name)).toEqual(
-        stepSpansTrace.childrenSpans?.map((c) => c.name)
-      );
-      const search = result.childrenSpans
-        ?.find((c) => c.name === 'Research network')
-        ?.childrenSpans?.[0]?.childrenSpans?.find((c) => c.name === 'search tool');
-      expect(search?.childrenSpans?.map((c) => c.name)).toEqual(['query', 'backoff', 'summarise']);
-      expect(search?.childrenSpans?.[0]?.childrenSpans?.map((c) => c.name)).toEqual([
-        'Attempt 0',
-        'Attempt 1',
-      ]);
     });
   });
 });

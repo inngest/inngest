@@ -17,9 +17,7 @@ import type { Trace } from '../types';
 const RUN_START = Date.parse('2026-10-01T12:00:00Z');
 const at = (secs: number) => new Date(RUN_START + secs * 1000).toISOString();
 
-const ENDED = ['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED'];
-
-const MACHINE_A = { sandbox_id: 'sb_0a1f', sandbox_name: 'ci-01JB7Q2XKZ-base' };
+export const MACHINE_A = { sandbox_id: 'sb_0a1f', sandbox_name: 'ci-01JB7Q2XKZ-base' };
 const MACHINE_B = { sandbox_id: 'sb_7c3e', sandbox_name: 'ci-01JB7Q2XKZ-e2e' };
 
 type StepOptions = {
@@ -81,7 +79,6 @@ const exec = (
 /** A group as the loader builds it: children by queue time, times and status from them */
 function group(id: string, name: string, children: Trace[]): Trace {
   const sorted = [...children].sort((a, b) => Date.parse(a.queuedAt) - Date.parse(b.queuedAt));
-  const running = sorted.some((c) => !ENDED.includes(c.status));
   const last = sorted.reduce((a, b) =>
     Date.parse(b.endedAt ?? '') > Date.parse(a.endedAt ?? '') ? b : a
   );
@@ -89,7 +86,7 @@ function group(id: string, name: string, children: Trace[]): Trace {
   return {
     attempts: null,
     childrenSpans: sorted,
-    endedAt: running ? null : last.endedAt,
+    endedAt: last.endedAt,
     isRoot: false,
     isUserland: false,
     name,
@@ -98,7 +95,7 @@ function group(id: string, name: string, children: Trace[]): Trace {
     scheduledAt: null,
     startedAt: sorted[0]!.startedAt,
     spanID: `span:${id}`,
-    status: running ? 'RUNNING' : last.status,
+    status: last.status,
     stepID: null,
     stepInfo: null,
     stepOp: null,
@@ -185,5 +182,3 @@ export const stepSpansTrace: Trace = {
   userlandSpan: null,
   metadata: [],
 };
-
-export const fixtureMachines = { a: MACHINE_A.sandbox_id, b: MACHINE_B.sandbox_id };
