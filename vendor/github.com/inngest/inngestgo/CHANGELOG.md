@@ -1,3 +1,43 @@
+## [v0.16.5] - 2026-10-02
+
+### ⚙️ Miscellaneous Tasks
+
+- *(stephttp)* Remove err from start
+## [v0.16.4] - 2026-10-02
+
+### 🚀 Features
+
+- *(stephttp)* Add Start(), for durable endpoints without middleware (#264)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.16.4 (#265)
+## [v0.16.3] - 2026-10-01
+
+### 🚀 Features
+
+- *(stephttp)* Re-introduce middleware in a nicer way (#262)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V0.16.3 (#263)
+## [v0.16.2] - 2026-10-01
+
+### 🚀 Features
+
+- *(stephttp)* Checkpoint runs in background on success (#257)
+- *(stephttp)* Configuration change (#259)
+
+### 🐛 Bug Fixes
+
+- *(stephttp)* Durable endpoints improvements (#258)
+- *(realtime)* Pass the caller's context to publish requests (#255)
+- *(stephttp)* Content types, response limiting
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix changelog validation (#246)
+- *(release)* V0.16.2 (#253)
 ## [v0.16.1] - 2026-08-28
 
 ### 🐛 Bug Fixes
@@ -8,6 +48,7 @@
 ### ⚙️ Miscellaneous Tasks
 
 - *(connect)* Adding tests for lease nack (#248)
+- *(release)* V0.16.1 (#249)
 ## [v0.16.0] - 2026-07-20
 
 ### 🚀 Features
