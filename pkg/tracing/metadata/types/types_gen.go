@@ -9,42 +9,30 @@ const (
 )
 
 // From sandbox.go
-// SandboxMetadata describes a step that acted on an Inngest sandbox, so trace
-// UIs and APIs can present it as a sandbox action instead of a plain step.
-//
-// It is step scoped. Each step attempt emits exactly one entry, carrying the
-// attempt's full value set. Entries for the same span and kind are folded as
-// merge patches (see Op), which never clear a key a later entry omits, so an
-// entry must never be a partial update that relies on an earlier one.
-//
-// Values stay flat: scalars and short string arrays only, no nested objects,
-// so they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
+// SandboxMetadata describes a step that acted on an Inngest sandbox. The SDK
+// emits it, one entry per step attempt with the attempt's full value set, as
+// merges never clear a key. Values stay flat (scalars and string arrays) so
+// they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
 type SandboxMetadata struct {
 	// Version of this shape. Currently 1.
 	Version int `json:"version"`
 
-	// Action is the sandbox API operation this step performed, like "create",
-	// "exec", "snapshot.create" or "snapshot.waitUntilReady".
+	// Action is the sandbox API operation, like "exec" or "snapshot.create".
 	Action string `json:"action"`
 
-	// Method is the SDK method the user called, like "create",
-	// "commands.run" or "snapshot".
+	// Method is the SDK method the user called, like "commands.run".
 	Method string `json:"method"`
 
-	// SandboxID and SandboxName identify the machine this step acted on, or
-	// created. Every step on the same machine shares the ID, and it's the key
-	// to group by: a machine may have been created, and may be destroyed,
-	// outside this run. A failed create has only the name.
+	// SandboxID identifies the machine and is shared by every step on it. A
+	// failed create has only the name.
 	SandboxID   string `json:"sandbox_id,omitempty"`
 	SandboxName string `json:"sandbox_name,omitempty"`
 
 	// SourceSnapshotID is the snapshot a created sandbox was cloned from.
 	SourceSnapshotID string `json:"source_snapshot_id,omitempty"`
 
-	// Command is the argv a command or process ran. CommandDisplay is the
-	// command as the user wrote it, when they passed a shell string.
-	// CommandTruncated is true when either was cut short to keep metadata
-	// small.
+	// Command is the argv that ran; CommandDisplay is the shell string the user
+	// wrote, if any. CommandTruncated is true when either was cut short.
 	Command          []string `json:"command,omitempty"`
 	CommandDisplay   string   `json:"command_display,omitempty"`
 	CommandTruncated bool     `json:"command_truncated,omitempty"`
@@ -55,8 +43,7 @@ type SandboxMetadata struct {
 	ExitCode          *int   `json:"exit_code,omitempty"`
 	TerminationSignal *int   `json:"termination_signal,omitempty"`
 
-	// OutputTruncated is true when a captured command's stdout/stderr was cut
-	// to fit in the step's output.
+	// OutputTruncated is true when captured stdout/stderr was cut short.
 	OutputTruncated bool `json:"output_truncated,omitempty"`
 
 	SnapshotID     string `json:"snapshot_id,omitempty"`

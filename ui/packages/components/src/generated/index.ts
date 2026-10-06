@@ -29,14 +29,10 @@ export type SpanMetadataKind =
 export const KindInngestSandbox = 'inngest.sandbox';
 /**
  * From sandbox.go
- * SandboxMetadata describes a step that acted on an Inngest sandbox, so trace
- * UIs and APIs can present it as a sandbox action instead of a plain step.
- * It is step scoped. Each step attempt emits exactly one entry, carrying the
- * attempt's full value set. Entries for the same span and kind are folded as
- * merge patches (see Op), which never clear a key a later entry omits, so an
- * entry must never be a partial update that relies on an earlier one.
- * Values stay flat: scalars and short string arrays only, no nested objects,
- * so they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
+ * SandboxMetadata describes a step that acted on an Inngest sandbox. The SDK
+ * emits it, one entry per step attempt with the attempt's full value set, as
+ * merges never clear a key. Values stay flat (scalars and string arrays) so
+ * they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
  */
 export interface SandboxMetadata {
   /**
@@ -44,20 +40,16 @@ export interface SandboxMetadata {
    */
   version: number /* int */;
   /**
-   * Action is the sandbox API operation this step performed, like "create",
-   * "exec", "snapshot.create" or "snapshot.waitUntilReady".
+   * Action is the sandbox API operation, like "exec" or "snapshot.create".
    */
   action: string;
   /**
-   * Method is the SDK method the user called, like "create",
-   * "commands.run" or "snapshot".
+   * Method is the SDK method the user called, like "commands.run".
    */
   method: string;
   /**
-   * SandboxID and SandboxName identify the machine this step acted on, or
-   * created. Every step on the same machine shares the ID, and it's the key
-   * to group by: a machine may have been created, and may be destroyed,
-   * outside this run. A failed create has only the name.
+   * SandboxID identifies the machine and is shared by every step on it. A
+   * failed create has only the name.
    */
   sandbox_id?: string;
   sandbox_name?: string;
@@ -66,10 +58,8 @@ export interface SandboxMetadata {
    */
   source_snapshot_id?: string;
   /**
-   * Command is the argv a command or process ran. CommandDisplay is the
-   * command as the user wrote it, when they passed a shell string.
-   * CommandTruncated is true when either was cut short to keep metadata
-   * small.
+   * Command is the argv that ran; CommandDisplay is the shell string the user
+   * wrote, if any. CommandTruncated is true when either was cut short.
    */
   command?: string[];
   command_display?: string;
@@ -80,8 +70,7 @@ export interface SandboxMetadata {
   exit_code?: number /* int */;
   termination_signal?: number /* int */;
   /**
-   * OutputTruncated is true when a captured command's stdout/stderr was cut
-   * to fit in the step's output.
+   * OutputTruncated is true when captured stdout/stderr was cut short.
    */
   output_truncated?: boolean;
   snapshot_id?: string;
