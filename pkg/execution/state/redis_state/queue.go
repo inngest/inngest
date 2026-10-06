@@ -1687,11 +1687,19 @@ func (q *queue) AccountPeek(ctx context.Context, sequential bool, until time.Tim
 		items[i] = parsed
 	}
 
+	// Look up each account's priority concurrently. The lookups are independent
+	// and can each wait on a remote cache; done one after another, they stall
+	// the scan loop while many accounts have work due, such as at a cron herd.
 	weights := make([]float64, len(items))
+	eg := errgroup.Group{}
+	eg.SetLimit(int(osqueue.AccountPeekMax))
 	for i := range items {
-		accountPriority := q.AccountPriorityFinder(ctx, items[i])
-		weights[i] = float64(10 - accountPriority)
+		eg.Go(func() error {
+			weights[i] = float64(10 - q.AccountPriorityFinder(ctx, items[i]))
+			return nil
+		})
 	}
+	_ = eg.Wait()
 
 	// Some scanners run sequentially, ensuring we always work on the accounts with
 	// the oldest run at times in order, no matter the priority.

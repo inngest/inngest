@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -3379,4 +3380,63 @@ func TestRemoveQueueItemCleansStatusIndexes(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})
+}
+
+func TestAccountPeekLooksUpPrioritiesConcurrently(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	const (
+		accounts = 10
+		lookup   = 50 * time.Millisecond
+	)
+	var inFlight, maxInFlight atomic.Int32
+	_, shard := newQueue(
+		t,
+		rc,
+		osqueue.WithAccountPriorityFinder(func(ctx context.Context, accountID uuid.UUID) uint {
+			n := inFlight.Add(1)
+			for {
+				m := maxInFlight.Load()
+				if n <= m || maxInFlight.CompareAndSwap(m, n) {
+					break
+				}
+			}
+			time.Sleep(lookup)
+			inFlight.Add(-1)
+			return osqueue.PriorityDefault
+		}),
+	)
+	ctx := context.Background()
+
+	now := time.Now().Truncate(time.Second).UTC()
+	want := map[uuid.UUID]bool{}
+	for range accounts {
+		acct, fn := uuid.New(), uuid.New()
+		want[acct] = true
+		_, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+			FunctionID: fn,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{WorkflowID: fn, AccountID: acct},
+			},
+		}, now, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	start := time.Now()
+	peeked, err := shard.AccountPeek(ctx, false, now.Add(time.Minute), osqueue.AccountPeekMax)
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+
+	require.Len(t, peeked, accounts)
+	for _, acct := range peeked {
+		require.True(t, want[acct], "unexpected account %s", acct)
+	}
+	require.Greater(t, maxInFlight.Load(), int32(1), "priority lookups should overlap")
+	require.Less(t, elapsed, accounts*lookup/2, "lookups one after another would take %s", accounts*lookup)
 }
