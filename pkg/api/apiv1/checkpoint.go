@@ -178,6 +178,10 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 		WorkspaceID: auth.WorkspaceID(),
 		Event:       runEvent(*input),
 	}
+	if err := evt.Event.Validate(ctx); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusBadRequest, "Invalid event"))
+		return
+	}
 
 	// Publish the event in a goroutine to lower latency in the API.  This is, while extremely important for
 	// o11y, actually not required to have the function continue to execute.
