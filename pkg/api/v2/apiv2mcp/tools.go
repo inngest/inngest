@@ -52,18 +52,12 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 		description = endpoint.Summary
 	}
 
-	readOnly := endpoint.HTTPMethod == http.MethodGet
 	return &mcp.Tool{
 		Name:        endpoint.ToolName,
 		Title:       endpoint.Summary,
 		Description: description,
 		InputSchema: inputSchema(endpoint, includeEnv),
-		Annotations: &mcp.ToolAnnotations{
-			ReadOnlyHint:    readOnly,
-			DestructiveHint: new(!readOnly),
-			IdempotentHint:  readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete,
-			OpenWorldHint:   new(false),
-		},
+		Annotations: toolAnnotations(endpoint.MethodName),
 	}
 }
 
