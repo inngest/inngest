@@ -8,6 +8,7 @@ import { TableFilter } from '@inngest/components/Table';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
+import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import {
   FunctionRunTimeField,
   isFunctionRunStatus,
@@ -433,15 +434,27 @@ export function RunsPage({
                 <p className="text-subtle text-sm">Search your runs by using a CEL query</p>
                 <Pill kind="primary">Beta</Pill>
               </div>
-              <Button
-                appearance="outlined"
-                label="Read the docs"
-                icon={<RiArrowRightUpLine />}
-                iconSide="right"
-                size="small"
-                target="_blank"
-                href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
-              />
+              <div className="flex items-center gap-2">
+                {progressiveSearch?.insightsHref ? (
+                  <Button
+                    appearance="outlined"
+                    label="Search with Insights"
+                    icon={<InsightsIcon />}
+                    iconSide="left"
+                    size="small"
+                    href={progressiveSearch.insightsHref}
+                  />
+                ) : null}
+                <Button
+                  appearance="outlined"
+                  label="Read the docs"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="right"
+                  size="small"
+                  target="_blank"
+                  href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
+                />
+              </div>
             </div>
             <CodeSearch
               onSearch={onSearchChange}
