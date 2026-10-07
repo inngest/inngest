@@ -413,3 +413,11 @@ func TestGeneratorOpcode_SetOpt(t *testing.T) {
 	require.NoError(t, empty.SetOpt("if", "true"))
 	assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
 }
+
+func TestGenericOptsMalformedSpanKeepsStackLine(t *testing.T) {
+	var opts GenericOpts
+	require.NoError(t, opts.UnmarshalAny([]byte(`{"stackLine":"fn.ts:1","span":"nope","origin":1}`)))
+	assert.Equal(t, "fn.ts:1", opts.StackLine)
+	assert.Empty(t, opts.Span.Value)
+	assert.Empty(t, opts.Origin.Value)
+}

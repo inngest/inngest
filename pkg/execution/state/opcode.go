@@ -158,10 +158,10 @@ func (g GeneratorOpcode) IsError() bool {
 type GenericOpts struct {
 	StackLine string `json:"stackLine,omitempty,omitzero"`
 	// Span lists the span groups the SDK called the step in, outermost first.
-	Span []meta.SpanPathElement `json:"span,omitempty"`
+	Span lenient[[]meta.SpanPathElement] `json:"span,omitempty"`
 	// Origin is the library that created the step on the user's behalf, as
 	// "<package>@<version>".
-	Origin string `json:"origin,omitempty"`
+	Origin lenient[string] `json:"origin,omitempty"`
 }
 
 func (r *GenericOpts) UnmarshalAny(a any) error {
@@ -750,4 +750,18 @@ func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
 	}
 
 	return mode
+}
+
+// lenient decodes to its zero value, rather than failing the whole decode, when
+// the SDK sends a value of the wrong shape.
+type lenient[T any] struct {
+	Value T
+}
+
+func (l *lenient[T]) UnmarshalJSON(byt []byte) error {
+	if err := json.Unmarshal(byt, &l.Value); err != nil {
+		var zero T
+		l.Value = zero
+	}
+	return nil
 }

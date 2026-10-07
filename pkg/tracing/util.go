@@ -205,11 +205,11 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		if opts.StackLine != "" {
 			meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, &opts.StackLine)
 		}
-		if len(opts.Span) > 0 {
-			meta.AddAttr(rawAttrs, meta.Attrs.StepSpanPath, &opts.Span)
+		if len(opts.Span.Value) > 0 {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepSpanPath, &opts.Span.Value)
 		}
-		if opts.Origin != "" {
-			meta.AddAttr(rawAttrs, meta.Attrs.StepOrigin, &opts.Origin)
+		if opts.Origin.Value != "" {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepOrigin, &opts.Origin.Value)
 		}
 	}
 
