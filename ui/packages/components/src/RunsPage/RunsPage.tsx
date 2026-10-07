@@ -498,8 +498,6 @@ export function RunsPage({
               ) : null}
               {progressiveSearch.phase !== 'searching' && progressiveSearch.insightsHref ? (
                 <Button
-                  appearance="outlined"
-                  kind="secondary"
                   label="Search with Insights instead"
                   icon={<RiArrowRightUpLine />}
                   iconSide="left"
