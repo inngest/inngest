@@ -2673,7 +2673,7 @@ message FunctionRun {
   reserved "has_ai";
   RunDeferredFrom deferred_from = 13 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "The function that deferred this run. Present when requested with include=deferred_from."
+      description: "The function that deferred this run. Present when requested with include=deferredFrom."
     }
   ];
 }
@@ -3884,7 +3884,11 @@ message SessionRun {
 }
 
 message ListRunsRequest {
-  optional bool include_output = 1;
+  optional bool include_output = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether to include run output. Prefer include=output for run lists."
+    }
+  ];
   optional string cursor = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
@@ -3945,7 +3949,9 @@ message ListRunsRequest {
   ];
   repeated string include = 13 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional run expansions. Supported values: deferred_from."
+      description: "Optional run expansions selected by their lowerCamelCase API names."
+      enum: "output"
+      enum: "deferredFrom"
     }
   ];
 }
@@ -3953,7 +3959,11 @@ message ListRunsRequest {
 message ListFunctionRunsRequest {
   string app_id = 1;
   string function_id = 2;
-  optional bool include_output = 3;
+  optional bool include_output = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether to include run output. Prefer include=output for run lists."
+    }
+  ];
   optional string cursor = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
@@ -4004,7 +4014,9 @@ message ListFunctionRunsRequest {
   ];
   repeated string include = 13 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional run expansions. Supported values: deferred_from."
+      description: "Optional run expansions selected by their lowerCamelCase API names."
+      enum: "output"
+      enum: "deferredFrom"
     }
   ];
 }

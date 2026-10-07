@@ -594,6 +594,7 @@ func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {
 		"--time-field", "queuedAt",
 		"--order", "DESC",
 		"--limit", "20",
+		"--include", "output",
 	})
 
 	require.NoError(t, err)
@@ -603,6 +604,7 @@ func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {
 	require.Equal(t, "queuedAt", gotQuery.Get("timeField"))
 	require.Equal(t, "DESC", gotQuery.Get("order"))
 	require.Equal(t, "20", gotQuery.Get("limit"))
+	require.Equal(t, []string{"output"}, gotQuery["include"])
 }
 
 func TestParseTimestamp(t *testing.T) {

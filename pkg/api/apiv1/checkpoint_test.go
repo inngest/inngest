@@ -266,6 +266,31 @@ func (f noopFunctionCreator) UpsertFunction(ctx context.Context, params cqrs.Ups
 	return &cqrs.Function{ID: params.ID}, nil
 }
 
+func TestCheckpointAPI_CheckpointNewRun_RejectsInvalidEvent(t *testing.T) {
+	api := &checkpointAPI{
+		Opts: Opts{AuthFinder: apiv1auth.NilAuthFinder},
+	}
+	body, err := json.Marshal(CheckpointNewRunRequest{
+		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+		Event: inngestgo.GenericEvent[NewAPIRunData]{
+			Name: "app/user\x00.created",
+			Data: NewAPIRunData{
+				Domain: "https://example.com",
+				Method: http.MethodPost,
+				Path:   "/api/test",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	api.CheckpointNewRun(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "Invalid event")
+}
+
 func TestCheckpointAPI_CheckpointNewRun_ScheduleErrors(t *testing.T) {
 	tests := []struct {
 		name       string
