@@ -837,6 +837,83 @@ func TestV2AdapterLoadMetadataPersistsSizeFields(t *testing.T) {
 	assert.Equal(t, 1, md.Metrics.StepCount, "StepCount must reflect memoized steps")
 }
 
+func TestV2AdapterScheduledAt(t *testing.T) {
+	scheduledAt := time.Now().Add(time.Hour).Truncate(time.Millisecond)
+
+	tests := []struct {
+		name        string
+		scheduledAt time.Time
+		// legacy removes the field from the metadata hash, as for state
+		// written before scheduled_at existed.
+		legacy   bool
+		expected time.Time
+	}{
+		{name: "set", scheduledAt: scheduledAt, expected: scheduledAt},
+		{name: "unset"},
+		{name: "legacy state without field", scheduledAt: scheduledAt, legacy: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			svc, mr := mustV2Service(t, ctx)
+
+			event, err := json.Marshal(map[string]any{"name": "scheduled.test"})
+			require.NoError(t, err)
+
+			id := statev2.ID{
+				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				FunctionID: uuid.New(),
+				Tenant: statev2.Tenant{
+					AccountID: uuid.New(),
+					EnvID:     uuid.New(),
+					AppID:     uuid.New(),
+				},
+			}
+			_, err = svc.Create(ctx, statev2.CreateState{
+				Metadata: statev2.Metadata{
+					ID: id,
+					Config: *statev2.InitConfig(&statev2.Config{
+						SpanID:      "scheduled-span",
+						Idempotency: "scheduled-" + id.RunID.String(),
+						ScheduledAt: tc.scheduledAt,
+					}),
+				},
+				Events: []json.RawMessage{event},
+			})
+			require.NoError(t, err)
+
+			if tc.legacy {
+				var removed int
+				for _, k := range mr.Keys() {
+					if strings.HasSuffix(k, ":metadata:"+id.RunID.String()) {
+						require.NotEmpty(t, mr.HGet(k, "schat"))
+						mr.HDel(k, "schat")
+						removed++
+					}
+				}
+				require.Equal(t, 1, removed, "expected to remove schat from the metadata hash")
+			}
+
+			md, err := svc.LoadMetadata(ctx, id)
+			require.NoError(t, err)
+			assert.True(t, tc.expected.Equal(md.Config.ScheduledAt), "expected %s, got %s", tc.expected, md.Config.ScheduledAt)
+			assert.Equal(t, tc.expected.IsZero(), md.Config.ScheduledAt.IsZero())
+
+			// Migrate must carry the field across clusters.
+			dstSvc, _ := mustV2Service(t, ctx)
+			require.NoError(t, dstSvc.Migrate(ctx, statev2.MigrateState{
+				Metadata: md,
+				Events:   []json.RawMessage{event},
+				Stack:    md.Stack,
+			}))
+			dstMD, err := dstSvc.LoadMetadata(ctx, id)
+			require.NoError(t, err)
+			assert.True(t, tc.expected.Equal(dstMD.Config.ScheduledAt), "expected %s, got %s", tc.expected, dstMD.Config.ScheduledAt)
+		})
+	}
+}
+
 func TestV2AdapterMigrate(t *testing.T) {
 	ctx := context.Background()
 	srcSvc, srcMR := mustV2Service(t, ctx)

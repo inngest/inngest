@@ -1,10 +1,13 @@
 package helper
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +21,16 @@ import (
 
 // NewValkeyClient initializes a new valkey client (using redis protocol)
 func NewValkeyClient(addr, username, password string, cluster bool) (rueidis.Client, error) {
+	var dialFn func(context.Context, string, *net.Dialer, *tls.Config) (net.Conn, error)
+	if cluster {
+		// Single-node cluster announces its container port; always dial the mapped one.
+		dialFn = func(ctx context.Context, _ string, d *net.Dialer, _ *tls.Config) (net.Conn, error) {
+			return d.DialContext(ctx, "tcp", addr)
+		}
+	}
+
 	return rueidis.NewClient(rueidis.ClientOption{
+		DialCtxFn:         dialFn,
 		InitAddress:       []string{addr},
 		Username:          username,
 		Password:          password,
@@ -454,6 +466,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 		ContainerRequest: req,
 		Started:          true,
 	})
+	testcontainers.CleanupContainer(t, container)
 	require.NoError(t, err)
 
 	// Get the mapped port for external access
@@ -499,6 +512,20 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 						rc.Close()
 						return nil, fmt.Errorf("failed to initialize cluster slots: %w", err)
 					}
+				}
+
+				// Commands return CLUSTERDOWN until the slot assignment settles.
+				deadline := time.Now().Add(10 * time.Second)
+				for {
+					info, err := rc.Do(ctx, rc.B().ClusterInfo().Build()).ToString()
+					if err == nil && strings.Contains(info, "cluster_state:ok") {
+						break
+					}
+					if time.Now().After(deadline) {
+						rc.Close()
+						return nil, fmt.Errorf("valkey cluster not ready: %v", err)
+					}
+					<-time.After(100 * time.Millisecond)
 				}
 			}
 

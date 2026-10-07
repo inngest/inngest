@@ -95,6 +95,31 @@ func TestConfigProtoRoundTrip_EmptySemaphores(t *testing.T) {
 	assert.Nil(t, roundTripped.Semaphores)
 }
 
+func TestConfigProtoRoundTrip_ScheduledAt(t *testing.T) {
+	tests := []struct {
+		name        string
+		scheduledAt time.Time
+	}{
+		{name: "set", scheduledAt: time.Date(2026, 1, 15, 11, 0, 0, 0, time.UTC)},
+		// State written before scheduled_at existed has no proto field, and
+		// must read back as zero rather than the Unix epoch.
+		{name: "unset"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pbCfg, err := ConfigToProto(*InitConfig(&Config{ScheduledAt: tc.scheduledAt}))
+			require.NoError(t, err)
+			assert.Equal(t, tc.scheduledAt.IsZero(), pbCfg.ScheduledAt == nil)
+
+			roundTripped, err := ConfigFromProto(pbCfg)
+			require.NoError(t, err)
+			assert.True(t, tc.scheduledAt.Equal(roundTripped.ScheduledAt))
+			assert.Equal(t, tc.scheduledAt.IsZero(), roundTripped.ScheduledAt.IsZero())
+		})
+	}
+}
+
 func TestMetadataProtoRoundTrip(t *testing.T) {
 	functionID := uuid.New()
 	accountID := uuid.New()

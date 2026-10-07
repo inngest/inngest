@@ -107,6 +107,39 @@ func TestUnmarshalJSON(t *testing.T) {
 	})
 }
 
+func TestEventValidateName(t *testing.T) {
+	tests := []struct {
+		name      string
+		eventName string
+		wantErr   string
+	}{
+		{
+			name:      "valid",
+			eventName: "app/user.created",
+		},
+		{
+			name:    "empty",
+			wantErr: "event name is empty",
+		},
+		{
+			name:      "embedded NUL",
+			eventName: "app/user\x00.created",
+			wantErr:   "event name contains a NUL character",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := (Event{Name: tt.eventName}).Validate(t.Context())
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestEventValidateSessions(t *testing.T) {
 	t.Run("allows valid sessions", func(t *testing.T) {
 		evt := Event{

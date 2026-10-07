@@ -243,6 +243,13 @@ func fieldSchema(field protoreflect.FieldDescriptor, seen map[protoreflect.FullN
 	if field.IsList() && !field.IsMap() {
 		schema = map[string]any{"type": "array", "items": schema}
 	}
+	if values := apiv2endpoint.FieldEnum(field); len(values) > 0 {
+		target := schema
+		if items, ok := schema["items"].(map[string]any); ok {
+			target = items
+		}
+		target["enum"] = values
+	}
 	if description := apiv2endpoint.FieldDescription(field); description != "" {
 		schema["description"] = description
 	}

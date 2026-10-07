@@ -1214,3 +1214,59 @@ func TestBufferedByteSize(t *testing.T) {
 		require.Zero(t, buffered.(*redisBatchManager).buffer.totalPendingBytes.Load())
 	})
 }
+
+func TestBufferedOverflowScheduling(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+
+	fnID := uuid.New()
+	fn := inngest.Function{
+		ID:         fnID,
+		EventBatch: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "60s"},
+	}
+	newItem := func() BatchItem {
+		return BatchItem{FunctionID: fnID, EventID: ulid.Make()}
+	}
+
+	// 2/3 full, so the next flush of 3 overflows.
+	prefill, err := NewRedisBatchManager(bc, nil, WithoutBuffer()).BulkAppend(ctx, []BatchItem{newItem(), newItem()}, fn)
+	require.NoError(t, err)
+
+	q := &fakeProducer{}
+	buffered := NewRedisBatchManager(bc, q, WithBufferSettings(5*time.Second, 3))
+	defer buffered.Close()
+
+	var wg sync.WaitGroup
+	errs := make([]error, 3)
+	for i := range errs {
+		wg.Go(func() {
+			_, errs[i] = buffered.Append(ctx, newItem(), fn)
+		})
+	}
+	wg.Wait()
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
+
+	require.Len(t, q.items, 2)
+
+	full := q.items[0].item.Payload.(ScheduleBatchPayload)
+	require.Equal(t, prefill.BatchID, full.BatchID.String())
+	require.WithinDuration(t, time.Now(), q.items[0].at, 5*time.Second)
+
+	next := q.items[1].item.Payload.(ScheduleBatchPayload)
+	require.NotEqual(t, full.BatchID, next.BatchID)
+	require.WithinDuration(t, time.Now().Add(time.Minute), q.items[1].at, 5*time.Second)
+
+	items, err := buffered.RetrieveItems(ctx, fnID, next.BatchID)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+}
