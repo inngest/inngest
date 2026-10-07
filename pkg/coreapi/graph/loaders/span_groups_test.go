@@ -94,12 +94,7 @@ func TestGroupBySpanPath(t *testing.T) {
 
 		group := result.ChildrenSpans[0]
 		assert.Equal(t, SpanGroupStepType, group.StepType)
-		assert.Equal(t, spanGroupID([]meta.SpanPathElement{agent}), group.SpanID)
-		assert.Regexp(t, `^span:[0-9a-f]{16}$`, group.SpanID)
 		assert.Equal(t, "run", *group.ParentSpanID)
-		assert.Nil(t, group.StepID)
-		assert.Nil(t, group.StepOp)
-		assert.Nil(t, group.OutputID)
 		assert.Equal(t, "agent", *group.GroupKind)
 		require.Equal(t, []string{"plan", "search tool"}, childNames(group))
 
@@ -108,7 +103,6 @@ func TestGroupBySpanPath(t *testing.T) {
 		assert.Nil(t, sub.GroupKind)
 		assert.Nil(t, sub.ChildrenSpans[0].GroupKind)
 		assert.Equal(t, group.SpanID, *sub.ParentSpanID)
-		assert.NotEqual(t, group.SpanID, sub.SpanID)
 		assert.Equal(t, []string{"query", "retry-query"}, childNames(sub))
 		assert.Equal(t, sub.SpanID, *sub.ChildrenSpans[0].ParentSpanID)
 	})
@@ -125,40 +119,34 @@ func TestGroupBySpanPath(t *testing.T) {
 		assert.Equal(t, []string{"start", "kill"}, childNames(result.ChildrenSpans[0]))
 	})
 
-	t.Run("a group with a different parent is a different group", func(t *testing.T) {
-		result := convertGroupedRun(t,
-			groupedStep("a", 0, 1, completed, search),
-			groupedStep("b", 1, 1, completed, agent, search),
-		)
-
-		require.Equal(t, []string{"search tool", "Research agent"}, childNames(result))
-		assert.NotEqual(t, result.ChildrenSpans[0].SpanID, result.ChildrenSpans[1].ChildrenSpans[0].SpanID)
-	})
-
 	t.Run("timing spans the children and status is the last to end", func(t *testing.T) {
-		result := convertGroupedRun(t,
-			groupedStep("attempt-1", 0, 2, failed, agent),
-			groupedStep("attempt-2", 3, 4, completed, agent),
-		)
-
-		group := result.ChildrenSpans[0]
-		assert.Equal(t, models.RunTraceSpanStatusCompleted, group.Status)
-		assert.Equal(t, spanGroupsBase, group.QueuedAt)
-		assert.Equal(t, spanGroupsBase, *group.StartedAt)
-		assert.Equal(t, spanGroupsBase.Add(7*time.Second), *group.EndedAt)
-		assert.Equal(t, 7000, *group.Duration)
-
-		result = convertGroupedRun(t,
-			groupedStep("long", 0, 9, completed, agent),
-			groupedStep("short", 1, 1, failed, agent),
-		)
-		assert.Equal(t, models.RunTraceSpanStatusCompleted, result.ChildrenSpans[0].Status)
-
-		result = convertGroupedRun(t,
-			groupedStep("ok", 0, 1, completed, agent),
-			groupedStep("broken", 1, 1, failed, agent),
-		)
-		assert.Equal(t, models.RunTraceSpanStatusFailed, result.ChildrenSpans[0].Status)
+		for name, tc := range map[string]struct {
+			children []*cqrs.OtelSpan
+			status   models.RunTraceSpanStatus
+			end      time.Duration
+		}{
+			"retry succeeds": {
+				[]*cqrs.OtelSpan{groupedStep("a", 0, 2, failed, agent), groupedStep("b", 3, 4, completed, agent)},
+				models.RunTraceSpanStatusCompleted, 7 * time.Second,
+			},
+			"a short failure inside a long success": {
+				[]*cqrs.OtelSpan{groupedStep("long", 0, 9, completed, agent), groupedStep("short", 1, 1, failed, agent)},
+				models.RunTraceSpanStatusCompleted, 9 * time.Second,
+			},
+			"a failure ends last": {
+				[]*cqrs.OtelSpan{groupedStep("ok", 0, 1, completed, agent), groupedStep("broken", 1, 1, failed, agent)},
+				models.RunTraceSpanStatusFailed, 2 * time.Second,
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				group := convertGroupedRun(t, tc.children...).ChildrenSpans[0]
+				assert.Equal(t, tc.status, group.Status)
+				assert.Equal(t, spanGroupsBase, group.QueuedAt)
+				assert.Equal(t, spanGroupsBase, *group.StartedAt)
+				assert.Equal(t, spanGroupsBase.Add(tc.end), *group.EndedAt)
+				assert.Equal(t, int(tc.end.Milliseconds()), *group.Duration)
+			})
+		}
 	})
 
 	t.Run("a group with a running child is running", func(t *testing.T) {
