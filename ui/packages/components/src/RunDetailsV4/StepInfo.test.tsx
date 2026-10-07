@@ -394,12 +394,12 @@ describe('Rerun from step visibility', () => {
     expect(screen.queryByText('Rerun from step')).toBeNull();
   });
 
-  it('reruns a span group from its earliest-queued step', () => {
+  it('reruns a span group from its first step', () => {
     const group = (spanID: string, childrenSpans: Trace[]) =>
       makeTrace({ spanID, stepID: null, stepOp: null, stepType: 'SPAN_GROUP', childrenSpans });
     const trace = group('span:outer', [
-      makeTrace({ stepID: 'later', queuedAt: '2024-01-01T00:00:05Z' }),
       group('span:inner', [makeTrace({ stepID: 'first', queuedAt: '2024-01-01T00:00:01Z' })]),
+      makeTrace({ stepID: 'later', queuedAt: '2024-01-01T00:00:05Z' }),
     ]);
 
     renderStepInfo(trace);

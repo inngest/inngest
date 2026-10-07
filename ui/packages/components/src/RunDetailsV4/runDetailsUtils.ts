@@ -60,17 +60,12 @@ export function traceWalk(trace: Trace, fn: (trace: Trace) => void) {
 }
 
 /**
- * The stepID of a span group's earliest-queued step, which is where rerunning
- * the group starts. A group's own span ID is virtual, so it can't be rerun.
+ * The stepID of the first step in a span group. The API orders a group's
+ * children by queue time, so that is the step the group starts with. A
+ * group's own span ID is virtual, so it can't be rerun.
  */
-export function firstStepID(group: Trace): string | undefined {
-  let first: Trace | undefined;
-  traceWalk(group, (trace) => {
-    if (trace.stepID && (!first || Date.parse(trace.queuedAt) < Date.parse(first.queuedAt))) {
-      first = trace;
-    }
-  });
-  return first?.stepID ?? undefined;
+export function firstStepID(trace: Trace): string | undefined {
+  return trace.stepID ?? trace.childrenSpans?.map(firstStepID).find(Boolean) ?? undefined;
 }
 
 export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
