@@ -11,7 +11,13 @@ import {
   backgroundColor,
 } from '@/utils/tailwind';
 
-type MarkAreaBound = { xAxis: string };
+type MarkAreaBound = { xAxis: string | number };
+
+function formatCompact(value: number): string {
+  if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(2))}m`;
+  if (value >= 1000) return `${Number((value / 1000).toFixed(2))}k`;
+  return value.toString();
+}
 
 /**
  * Transforms raw time series data into chart-compatible format.
@@ -65,6 +71,11 @@ export function createChartOptions(
     transformChartData(data, includedCountLimit);
 
   const hasLimit = Number.isFinite(includedCountLimit);
+  const limitAxisMax = ({ max }: { max: number }) => {
+    if (max >= includedCountLimit) return undefined;
+    const magnitude = 10 ** Math.floor(Math.log10(includedCountLimit));
+    return Math.ceil((includedCountLimit * 1.1) / magnitude) * magnitude;
+  };
 
   const limitMarkLine = hasLimit
     ? {
@@ -88,15 +99,15 @@ export function createChartOptions(
           animation: false,
           silent: true,
           itemStyle: {
-            color: resolveColor(backgroundColor.error, dark, '#FEF4F3'),
-            opacity: 0.4,
+            color: resolveColor(colors.tertiary['moderate'], dark, '#F54A3F'),
+            opacity: 0.12,
           },
           data: [
             // Omitting yAxis bounds spans the full plot height.
-            [{ xAxis: categories[limitCrossoverIndex] }, { xAxis: 'max' }] as [
-              MarkAreaBound,
-              MarkAreaBound,
-            ],
+            [
+              { xAxis: categories[limitCrossoverIndex] },
+              { xAxis: Infinity },
+            ] as [MarkAreaBound, MarkAreaBound],
           ],
         }
       : undefined;
@@ -131,7 +142,7 @@ export function createChartOptions(
       data: categories,
       boundaryGap: true,
       axisTick: {
-        alignWithLabel: true,
+        interval: 0,
         length: 2,
         lineStyle: {
           color: resolveColor(borderColor.contrast, dark, '#242424'),
@@ -162,20 +173,14 @@ export function createChartOptions(
     yAxis: {
       // Mark lines do not contribute to the automatic axis range.
       max: hasLimit
-        ? ({ max }) => Math.ceil((Math.max(max, includedCountLimit) * 11) / 10)
+        ? (limitAxisMax as (extent: { max: number }) => number)
         : undefined,
       axisLabel: {
         fontSize: 10,
         fontWeight: 400,
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         verticalAlign: 'bottom',
-        formatter: function (value: number) {
-          if (value >= 1000) {
-            return `${value / 1000}k`;
-          }
-
-          return value.toString();
-        },
+        formatter: formatCompact,
       },
       splitLine: {
         lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
@@ -197,6 +202,7 @@ export function createChartOptions(
           color: resolveColor(CHART_COLORS[2], dark, '#9CD2FF'),
         },
         barWidth: '98%',
+        markArea: overLimitMarkArea,
       },
       {
         name: datasetNames.cumulativeCount,
@@ -211,7 +217,6 @@ export function createChartOptions(
           color: resolveColor(CHART_COLORS[3], dark, '#FCC43F'),
         },
         markLine: limitMarkLine,
-        markArea: overLimitMarkArea,
       },
     ],
   };
