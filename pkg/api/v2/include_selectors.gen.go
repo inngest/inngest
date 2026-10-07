@@ -28,8 +28,18 @@ var listFunctionRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[strin
 	"output":        ListFunctionRunsIncludeOutput,
 })
 
+// ParseListFunctionRunsInclude parses a canonical selector or its snake_case compatibility alias.
+func ParseListFunctionRunsInclude(value string) (ListFunctionRunsInclude, error) {
+	return listFunctionRunsIncludeSelector.Parse(value)
+}
+
 var listRunsIncludeSelector = apiv2endpoint.NewIncludeSelector(map[string]ListRunsInclude{
 	"deferredFrom":  ListRunsIncludeDeferredFrom,
 	"deferred_from": ListRunsIncludeDeferredFrom,
 	"output":        ListRunsIncludeOutput,
 })
+
+// ParseListRunsInclude parses a canonical selector or its snake_case compatibility alias.
+func ParseListRunsInclude(value string) (ListRunsInclude, error) {
+	return listRunsIncludeSelector.Parse(value)
+}
