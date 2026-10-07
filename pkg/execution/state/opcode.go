@@ -157,6 +157,11 @@ func (g GeneratorOpcode) IsError() bool {
 
 type GenericOpts struct {
 	StackLine string `json:"stackLine,omitempty,omitzero"`
+	// Span lists the span groups the SDK called the step in, outermost first.
+	Span []meta.SpanPathElement `json:"span,omitempty"`
+	// Origin is the library that created the step on the user's behalf, as
+	// "<package>@<version>".
+	Origin string `json:"origin,omitempty"`
 }
 
 func (r *GenericOpts) UnmarshalAny(a any) error {
@@ -183,30 +188,6 @@ func (g *GeneratorOpcode) SetOpt(key string, value any) error {
 	opts[key] = value
 	g.Opts = opts
 	return nil
-}
-
-// SpanPath returns the span groups the SDK called this step in, outermost
-// first, or nil if it's in none.
-func (g GeneratorOpcode) SpanPath() []meta.SpanPathElement {
-	var opts struct {
-		Span []meta.SpanPathElement `json:"span"`
-	}
-	if err := unmarshalOpts(g.Opts, &opts); err != nil {
-		return nil
-	}
-	return opts.Span
-}
-
-// Origin returns the library that created this step on the user's behalf, as
-// "<package>@<version>", or "" if the user's own code did.
-func (g GeneratorOpcode) Origin() string {
-	var opts struct {
-		Origin string `json:"origin"`
-	}
-	if err := unmarshalOpts(g.Opts, &opts); err != nil {
-		return ""
-	}
-	return opts.Origin
 }
 
 // unmarshalOpts decodes opts, raw JSON or already decoded, into v.

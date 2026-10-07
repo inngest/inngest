@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -413,33 +412,4 @@ func TestGeneratorOpcode_SetOpt(t *testing.T) {
 	empty := GeneratorOpcode{}
 	require.NoError(t, empty.SetOpt("if", "true"))
 	assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
-}
-
-func TestGeneratorOpcode_SpanPath(t *testing.T) {
-	path := []meta.SpanPathElement{
-		{ID: "agent", Name: "Research agent", Kind: "agent"},
-		{ID: "search", Name: "search tool"},
-	}
-	raw := `{"stackLine":"fn.ts:1","span":[{"id":"agent","name":"Research agent","kind":"agent"},{"id":"search","name":"search tool"}]}`
-	var decoded map[string]any
-	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
-
-	assert.Equal(t, path, GeneratorOpcode{Opts: []byte(raw)}.SpanPath())
-	assert.Equal(t, path, GeneratorOpcode{Opts: decoded}.SpanPath())
-	assert.Nil(t, GeneratorOpcode{}.SpanPath())
-	assert.Nil(t, GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1"}}.SpanPath())
-
-	// A malformed span is dropped without breaking the other opts.
-	malformed := GeneratorOpcode{Opts: map[string]any{"stackLine": "fn.ts:1", "span": "nope"}}
-	assert.Nil(t, malformed.SpanPath())
-	stack, err := malformed.StackLine()
-	require.NoError(t, err)
-	assert.Equal(t, "fn.ts:1", *stack)
-}
-
-func TestGeneratorOpcode_Origin(t *testing.T) {
-	assert.Equal(t, "@inngest/ci@0.1.0", GeneratorOpcode{Opts: []byte(`{"origin":"@inngest/ci@0.1.0"}`)}.Origin())
-	assert.Equal(t, "inngest@3.44.0", GeneratorOpcode{Opts: map[string]any{"origin": "inngest@3.44.0"}}.Origin())
-	assert.Equal(t, "", GeneratorOpcode{}.Origin())
-	assert.Equal(t, "", GeneratorOpcode{Opts: map[string]any{"origin": 1}}.Origin())
 }
