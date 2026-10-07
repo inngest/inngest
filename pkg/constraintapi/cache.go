@@ -50,6 +50,21 @@ type constraintCacheItem struct {
 	addedAt time.Time
 }
 
+type skipCacheLookupKey struct{}
+
+// WithoutLimitingConstraintCacheLookup marks ctx so that Acquire is not
+// answered from cached exhaustion. Use it when the caller knows capacity was
+// released after an entry could have been cached, such as a queue pass woken
+// by a capacity release. Exhausted results are still cached.
+func WithoutLimitingConstraintCacheLookup(ctx context.Context) context.Context {
+	return context.WithValue(ctx, skipCacheLookupKey{}, true)
+}
+
+func skipsLimitingConstraintCacheLookup(ctx context.Context) bool {
+	skip, _ := ctx.Value(skipCacheLookupKey{}).(bool)
+	return skip
+}
+
 type ConstraintCacheOption func(c *constraintCache)
 
 func WithConstraintCacheClock(clock clockwork.Clock) ConstraintCacheOption {
@@ -116,8 +131,24 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 	recentlyLimited := make([]ConstraintItem, 0)
 	var retryAfter time.Time
 
+	lookup := req.Constraints
+	if skipsLimitingConstraintCacheLookup(ctx) {
+		// The caller was woken because capacity was just released, which a
+		// cached exhaustion would not reflect. Ask the manager instead; its
+		// result still refreshes the cache below.
+		lookup = nil
+		metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, 0, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":              "skipped_release",
+				"source_location": req.Source.Location.String(),
+				"source_service":  req.Source.Service.String(),
+			},
+		})
+	}
+
 	// Return immediately on first cache hit since any exhausted constraint blocks the request
-	for _, ci := range req.Constraints {
+	for _, ci := range lookup {
 		// Skip constraints that don't pass the filter
 		if l.shouldCache != nil && !l.shouldCache(ci) {
 			continue

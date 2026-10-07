@@ -1253,6 +1253,68 @@ func TestCache(t *testing.T) {
 					"RequestTime == zero must use the cache (manager not called)")
 			},
 		},
+		{
+			name: "should skip the cache lookup for a caller woken by a capacity release",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				}
+				config := ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: ConcurrencyConfig{
+						AccountConcurrency: 1,
+					},
+				}
+				acquire := func(ctx context.Context, key string) *CapacityAcquireResponse {
+					res, err := deps.cache.Acquire(ctx, &CapacityAcquireRequest{
+						AccountID:            accountID,
+						EnvID:                envID,
+						FunctionID:           fnID,
+						Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+						IdempotencyKey:       "acq-" + key,
+						Configuration:        config,
+						Constraints:          []ConstraintItem{accountConcurrency},
+						Amount:               1,
+						LeaseIdempotencyKeys: []string{"item-" + key},
+						CurrentTime:          deps.clock.Now(),
+						Duration:             3 * time.Second,
+						MaximumLifetime:      time.Minute,
+					})
+					require.NoError(t, err)
+					return res
+				}
+
+				// Take the only slot, which caches the exhausted constraint.
+				held := acquire(ctx, "held")
+				require.Len(t, held.Leases, 1)
+				require.Len(t, deps.lifecycles.AcquireCalls, 1)
+
+				// Free the slot. The cache still says the constraint is exhausted.
+				_, err := deps.cache.Release(ctx, &CapacityReleaseRequest{
+					AccountID:      accountID,
+					IdempotencyKey: "release-held",
+					LeaseID:        held.Leases[0].LeaseID,
+					Source:         LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+				})
+				require.NoError(t, err)
+
+				res := acquire(ctx, "cached")
+				require.Len(t, res.Leases, 0, "a normal caller is answered from the stale cache entry")
+				require.Len(t, deps.lifecycles.AcquireCalls, 1)
+
+				res = acquire(WithoutLimitingConstraintCacheLookup(ctx), "woken")
+				require.Len(t, res.Leases, 1, "a caller woken by the release reaches the manager and gets the slot")
+				require.Len(t, deps.lifecycles.AcquireCalls, 2)
+
+				// The woken caller's result exhausted the constraint again and refreshed the cache.
+				res = acquire(ctx, "after")
+				require.Len(t, res.Leases, 0)
+				require.Len(t, deps.lifecycles.AcquireCalls, 2)
+			},
+		},
 	}
 
 	for _, tc := range cases {
