@@ -13,6 +13,14 @@ import {
 
 type MarkAreaBound = { xAxis: string | number };
 
+function formatOrdinalDay(value: string | number | Date): string {
+  const day = new Date(value).getUTCDate();
+  const suffixes = ['th', 'st', 'nd', 'rd'];
+  const suffix =
+    suffixes[day % 10 <= 3 && Math.floor(day / 10) !== 1 ? day % 10 : 0];
+  return `${day}${suffix}`;
+}
+
 function formatCompact(value: number): string {
   if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(2))}m`;
   if (value >= 1000) return `${Number((value / 1000).toFixed(2))}k`;
@@ -159,14 +167,15 @@ export function createChartOptions(
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         margin: 10,
         interval: 1, // Show day 1, 3, 5...
-        formatter: function (value: string) {
-          const day = new Date(value).getUTCDate(); // Extract day in UTC
-          const suffixes = ['th', 'st', 'nd', 'rd'];
-          const suffix =
-            suffixes[
-              day % 10 <= 3 && Math.floor(day / 10) !== 1 ? day % 10 : 0
-            ];
-          return `${day}${suffix}`;
+        formatter: formatOrdinalDay,
+      },
+      axisPointer: {
+        label: {
+          formatter: ({ value }: { value: string | number | Date }) =>
+            `${new Date(value).toLocaleString('en-US', {
+              month: 'short',
+              timeZone: 'UTC',
+            })} ${formatOrdinalDay(value)}`,
         },
       },
     },

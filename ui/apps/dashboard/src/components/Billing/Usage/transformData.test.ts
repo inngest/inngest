@@ -37,6 +37,15 @@ function getMarkAreaBounds(options: Options) {
   return data as [MarkAreaBound, MarkAreaBound];
 }
 
+function getTooltipHeaderFormatter(options: Options) {
+  const axis = options.xAxis;
+  const label = Array.isArray(axis) ? undefined : axis?.axisPointer?.label;
+  if (!label || typeof label.formatter !== 'function') {
+    throw new Error('Expected a tooltip header formatter');
+  }
+  return label.formatter;
+}
+
 type MarkAreaBound = { xAxis: string | number };
 
 const days = (values: number[]) =>
@@ -99,6 +108,19 @@ describe('createChartOptions', () => {
     const options = createChartOptions(days([value]), Infinity, 'execution');
 
     expect(getAxisLabelFormatter(options)(value, 0)).toBe(expected);
+  });
+
+  it('labels the tooltip header with the month and ordinal day', () => {
+    const options = createChartOptions(days([1]), Infinity, 'execution');
+
+    expect(
+      getTooltipHeaderFormatter(options)({
+        value: '2026-09-17T00:00:00.000Z',
+        axisDimension: 'x',
+        axisIndex: 0,
+        seriesData: [],
+      }),
+    ).toBe('Sep 17th');
   });
 
   it('preserves automatic scaling without limit markers for unlimited plans', () => {
