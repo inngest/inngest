@@ -5,7 +5,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { SandboxBarData } from './SandboxBadge';
+import type { SandboxBarData } from './utils/sandboxes';
 
 // ============================================================================
 // Core Component Types
@@ -46,10 +46,7 @@ export type BarStyleKey =
   | 'step.sleep'
   | 'step.waitForEvent'
   | 'step.invoke'
-  // Span groups: the group row, and a collapsed group's segments (solid for
-  // work, hollow for sleeps and waits)
   | 'span.group'
-  | 'span.group.wait'
   // Timing categories
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
@@ -125,9 +122,6 @@ export interface BarSegment {
 
   /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
   status?: string;
-
-  /** Draw the segment faded, for work Inngest added inside a collapsed group */
-  dimmed?: boolean;
 }
 
 /**
@@ -245,8 +239,8 @@ export interface TimelineBarProps {
   /** A span group's kind, shown as a tag before its name */
   groupKind?: string;
 
-  /** The library that created this row; Inngest's own rows are dimmed */
-  origin?: string;
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**
@@ -309,9 +303,6 @@ export interface TimelineBarData {
   /** Nested child bars */
   children?: TimelineBarData[];
 
-  /** Whether this is a sleep or wait, drawn hollow in a collapsed span group */
-  isWait?: boolean;
-
   /** Timing breakdown data (for expandable bars) */
   timingBreakdown?: TimingBreakdownData;
 
@@ -354,8 +345,8 @@ export interface TimelineBarData {
   /** A span group's kind, as its caller named it */
   groupKind?: string;
 
-  /** The library that created this step or span group, as `<package>@<version>` */
-  origin?: string;
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**

@@ -63,11 +63,17 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.name).toBe('Run');
     });
 
-    it('passes a span’s origin through to its bar', () => {
-      const trace = createTrace({ isRoot: true, origin: '@inngest/ci@0.1.0' });
+    it.each([
+      ['inngest@3.44.0', 'COMPLETED', true],
+      ['@inngest/ci@0.1.0', 'RUNNING', true],
+      ['@inngest/ci@0.1.0', 'FAILED', false],
+      ['@acme/inngest@1.0.0', 'COMPLETED', false],
+      [null, 'COMPLETED', false],
+    ])('dims a row from origin %s with status %s: %s', (origin, status, dimmed) => {
+      const trace = createTrace({ isRoot: true, origin, status });
       const result = traceToTimelineData(trace, { runID: 'run-1' });
 
-      expect(result.bars[0]?.origin).toBe('@inngest/ci@0.1.0');
+      expect(result.bars[0]?.dimmed).toBe(dimmed);
     });
 
     it('sets isRoot to true on root bar', () => {
@@ -215,7 +221,6 @@ describe('traceConversion', () => {
       expect(group?.style).toBe('span.group');
       expect(group?.timingBreakdown).toBeUndefined();
       expect(group?.inngestBreakdown).toBeUndefined();
-      expect(group?.children?.map((c) => c.isWait)).toEqual([undefined, true]);
     });
   });
 

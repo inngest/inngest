@@ -32,15 +32,9 @@ import { formatVariantWeight } from '../Experiments/format';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
 import { formatScoreValue } from '../RunDetails/ScoresAttrs';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import {
-  getStatusBackgroundClass,
-  getStatusBorderClass,
-  getStatusTextClass,
-} from '../Status/statusClasses';
+import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
 import { cn } from '../utils/classNames';
-import { GroupKindTag } from './GroupKindTag';
-import { SandboxBadge, SandboxScope } from './SandboxBadge';
 import type {
   BarHeight,
   BarIcon,
@@ -54,7 +48,6 @@ import type {
 } from './TimelineBar.types';
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
-import { isDimmed } from './utils/origin';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 // ============================================================================
@@ -177,11 +170,6 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   },
   'span.group': {
     barColor: 'bg-status-completed',
-    statusBased: true,
-  },
-  'span.group.wait': {
-    barColor: 'bg-status-completed',
-    outlined: true,
     statusBased: true,
   },
   default: {
@@ -758,29 +746,19 @@ const VisualBar = memo(function VisualBar({
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
           const segmentColor = getBarColor(segment.style, segment.status);
           const isOutlined = segmentStyle.outlined;
-          // A status-based outline takes the status colour (span group waits)
-          const statusOutline =
-            isOutlined && segmentStyle.statusBased && segment.status
-              ? getStatusBorderClass(segment.status)
-              : undefined;
           return (
             <div
               key={segment.id}
-              data-segment-style={segment.style}
               className={cn(
                 'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,
-                isOutlined ? 'bg-canvasBase' : segmentColor,
-                statusOutline && `border ${statusOutline}`,
-                segment.dimmed && 'opacity-50'
+                isOutlined ? 'bg-canvasBase' : segmentColor
               )}
               style={{
                 left: `${segment.transformedStart}%`,
                 width: `${segment.transformedWidth}%`,
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-                ...(statusOutline
-                  ? {}
-                  : isOutlined
+                ...(isOutlined
                   ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
                   : segmentPattern),
               }}
@@ -861,14 +839,9 @@ export function TimelineBar({
   scores,
   sandbox,
   groupKind,
-  origin,
+  dimmed,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
-
-  // Rows Inngest's libraries added recede so the user's own stand out; a
-  // failure never does.
-  const dimmed = isDimmed(origin, status);
-
   const barStyle = getBarStyle(style);
   const effectiveIcon = icon ?? barStyle.icon ?? getRootIcon(style, status);
 
@@ -960,8 +933,23 @@ export function TimelineBar({
                 !effectiveIcon && 'pl-1.5'
               )}
             >
-              {groupKind && <GroupKindTag kind={groupKind} className="mr-1.5" />}
-              <SandboxBadge sandbox={sandbox} />
+              {groupKind && (
+                <span
+                  data-testid="group-kind-tag"
+                  className="bg-info text-info mr-1.5 inline-block shrink-0 rounded px-1.5 align-middle font-sans text-[0.66rem] font-semibold uppercase leading-4 tracking-[0.04em]"
+                >
+                  {groupKind}
+                </span>
+              )}
+              {sandbox?.badge && (
+                <span
+                  data-testid="sandbox-badge"
+                  title={sandbox.label}
+                  className="text-light mr-1.5 align-middle font-mono text-[11px]"
+                >
+                  {sandbox.badge}
+                </span>
+              )}
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
@@ -1090,7 +1078,7 @@ export function TimelineBar({
       )}
 
       {/* Children (expanded content) */}
-      {expanded && <SandboxScope sandbox={sandbox}>{children}</SandboxScope>}
+      {expanded && children}
     </div>
   );
 }

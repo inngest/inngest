@@ -8,7 +8,6 @@ import { max, min } from 'date-fns';
 
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { KindInngestExperiment } from '../../generated';
-import { sandboxBarData } from '../SandboxBadge';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
@@ -28,6 +27,7 @@ import {
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
+import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -41,8 +41,14 @@ function isNonStepSpan(trace: Trace): boolean {
   return !trace.stepOp && !trace.stepType;
 }
 
-/** Step ops that wait rather than run, drawn hollow in a collapsed span group */
-const WAIT_OPS = new Set(['SLEEP', 'WAIT_FOR_EVENT', 'WAIT_FOR_SIGNAL']);
+/**
+ * Whether Inngest's own libraries (`inngest` or any `@inngest/*` package)
+ * created this row, rather than the user's code. An origin is
+ * `<package>@<version>`.
+ */
+function isInngestOrigin(origin: string | null | undefined): boolean {
+  return /^(inngest|@inngest\/[^@]+)(@|$)/.test(origin ?? '');
+}
 
 /**
  * Get the display name for a span
@@ -296,7 +302,6 @@ function traceToBarData(
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
-    isWait: WAIT_OPS.has(trace.stepOp ?? '') || undefined,
     children: tracesToBarData(
       trace.childrenSpans,
       orgName,
@@ -315,7 +320,7 @@ function traceToBarData(
     scores: getScores(trace.metadata),
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
-    origin: trace.origin ?? undefined,
+    dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
   };
 }
 
@@ -708,6 +713,7 @@ export function traceToTimelineData(
   // Include the root bar in the rendered bars so users can click it
   // to return to the TopInfo view (Input/Function Payload)
   const bars = [rootBar];
+  badgeSandboxes(bars);
 
   return {
     minTime,
