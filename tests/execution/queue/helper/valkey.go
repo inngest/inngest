@@ -466,6 +466,7 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 		ContainerRequest: req,
 		Started:          true,
 	})
+	testcontainers.CleanupContainer(t, container)
 	require.NoError(t, err)
 
 	// Get the mapped port for external access
@@ -514,10 +515,18 @@ func StartValkey(t *testing.T, opts ...ValkeyOption) (*ValkeyContainer, error) {
 				}
 
 				// Commands return CLUSTERDOWN until the slot assignment settles.
-				require.Eventually(t, func() bool {
+				deadline := time.Now().Add(10 * time.Second)
+				for {
 					info, err := rc.Do(ctx, rc.B().ClusterInfo().Build()).ToString()
-					return err == nil && strings.Contains(info, "cluster_state:ok")
-				}, 10*time.Second, 100*time.Millisecond, "valkey cluster did not become ready")
+					if err == nil && strings.Contains(info, "cluster_state:ok") {
+						break
+					}
+					if time.Now().After(deadline) {
+						rc.Close()
+						return nil, fmt.Errorf("valkey cluster not ready: %v", err)
+					}
+					<-time.After(100 * time.Millisecond)
+				}
 			}
 
 			rc.Close()
