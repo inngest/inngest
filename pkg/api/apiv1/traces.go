@@ -140,6 +140,8 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		if msg == "" {
 			msg = "extended trace bytes cap exceeded for current billing period"
 		}
+		// Larger than any SDK's OTLP export timeout, so clients drop instead of retrying.
+		w.Header().Set("Retry-After", "60")
 		respondError(w, r, http.StatusTooManyRequests, msg)
 		return
 	}
