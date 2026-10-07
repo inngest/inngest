@@ -455,3 +455,43 @@ func TestRefreshUsesExistingAuthManager(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &stored))
 	require.NotContains(t, string(data), "refreshed-access")
 }
+
+func TestPlanAccessDenialPromptsUpgrade(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		message string
+		upgrade bool
+	}{
+		{name: "plan without sandboxes", message: sandboxAccessDeniedMessage, upgrade: true},
+		{name: "missing token permission", message: "Forbidden"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			denied := true
+			b, _ := testBridge(t, func(w http.ResponseWriter, r *http.Request) {
+				if denied {
+					writeError(w, http.StatusForbidden, "access_denied", test.message)
+					return
+				}
+				w.WriteHeader(201)
+				fmt.Fprintf(w, `{"data":{"id":%q,"status":"RUNNING"}}`, sandboxID)
+			})
+
+			w := request(b, "POST", "/v2/sandboxes")
+			require.Equal(t, http.StatusForbidden, w.Code)
+			require.Contains(t, w.Body.String(), "access_denied")
+			status := request(b, "GET", "/dev/cloud/status").Body.String()
+			if test.upgrade {
+				require.Contains(t, w.Body.String(), upgradeRequiredMessage)
+				require.Contains(t, status, `"upgradeUrl":"`+upgradeURL+`"`)
+			} else {
+				require.Contains(t, w.Body.String(), test.message)
+				require.NotContains(t, status, "upgradeUrl")
+			}
+
+			// A later successful command clears the prompt.
+			denied = false
+			require.Equal(t, 201, request(b, "POST", "/v2/sandboxes").Code)
+			require.NotContains(t, request(b, "GET", "/dev/cloud/status").Body.String(), "upgradeUrl")
+		})
+	}
+}

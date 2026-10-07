@@ -29,12 +29,24 @@ import (
 
 const loginRequiredMessage = "Run `inngest login` to use Cloud sandboxes from the dev server"
 
+const (
+	// sandboxAccessDeniedMessage is Cloud's 403 message for accounts whose plan
+	// does not grant sandbox access. It is matched exactly so other access
+	// denials, such as missing token permissions, are passed through unchanged.
+	sandboxAccessDeniedMessage = "Sandbox access is not enabled for this account"
+	upgradeURL                 = "https://app.inngest.com/billing/plans?ref=dev-server"
+	upgradeRequiredMessage     = "Cloud sandboxes require a paid plan. Upgrade at " + upgradeURL
+)
+
 type status struct {
 	AccountName     string   `json:"accountName,omitempty"`
 	EnvironmentName string   `json:"environmentName,omitempty"`
 	EnvironmentID   string   `json:"environmentId,omitempty"`
 	SandboxIDs      []string `json:"sandboxIds"`
 	Warning         string   `json:"warning,omitempty"`
+	// UpgradeURL is set after Cloud rejects a sandbox request because the
+	// account's plan does not include sandboxes.
+	UpgradeURL string `json:"upgradeUrl,omitempty"`
 }
 
 type Bridge struct {
@@ -48,6 +60,9 @@ type Bridge struct {
 
 	mu      sync.Mutex
 	warning string
+	// upgradeRequired records, per Cloud identity, that the last sandbox
+	// request was rejected for lack of a paid plan.
+	upgradeRequired map[string]bool
 	// The journal contains resource IDs only, partitioned by Cloud identity.
 	// It survives dev-server restarts independently of local run persistence.
 	sandboxes map[string][]string
@@ -81,8 +96,9 @@ func New(ctx context.Context, port int) (*Bridge, error) {
 	b := &Bridge{
 		ctx: ctx, auth: manager,
 		resource: resource, port: fmt.Sprint(port),
-		statePath: filepath.Join(dir, "dev-sandboxes", fmt.Sprintf("%x.json", sha256.Sum256([]byte(project)))),
-		transport: http.DefaultTransport.(*http.Transport).Clone(),
+		statePath:       filepath.Join(dir, "dev-sandboxes", fmt.Sprintf("%x.json", sha256.Sum256([]byte(project)))),
+		transport:       http.DefaultTransport.(*http.Transport).Clone(),
+		upgradeRequired: map[string]bool{},
 	}
 	b.sandboxes, err = b.loadJournal()
 	if err != nil {
@@ -145,11 +161,16 @@ func (b *Bridge) getStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	writeData(w, status{
+	identity := b.identity(metadata)
+	result := status{
 		AccountName: metadata.AccountName, EnvironmentName: metadata.WorkspaceName,
 		EnvironmentID: *metadata.WorkspaceID, Warning: b.warning,
-		SandboxIDs: append([]string{}, b.sandboxes[b.identity(metadata)]...),
-	})
+		SandboxIDs: append([]string{}, b.sandboxes[identity]...),
+	}
+	if b.upgradeRequired[identity] {
+		result.UpgradeURL = upgradeURL
+	}
+	writeData(w, result)
 }
 
 func (b *Bridge) accessToken(w http.ResponseWriter, r *http.Request) (string, *cliauth.Metadata) {
@@ -199,6 +220,18 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 			if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 				return errors.New("sandbox API redirects are not supported")
 			}
+			if resp.StatusCode == http.StatusForbidden {
+				upgrade, err := rewriteUpgradeRequired(resp)
+				if err != nil {
+					return err
+				}
+				if upgrade {
+					b.setUpgradeRequired(metadata, true)
+				}
+			} else if r.Method != http.MethodGet && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				// A successful command means the account has access again.
+				b.setUpgradeRequired(metadata, false)
+			}
 			// Raw file and NDJSON responses are untouched. Only small create
 			// responses need inspection to remember this project's resources.
 			if r.Method == http.MethodPost && path == "/sandboxes" && resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -240,6 +273,51 @@ func (b *Bridge) proxy(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+func (b *Bridge) setUpgradeRequired(metadata *cliauth.Metadata, required bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if required {
+		b.upgradeRequired[b.identity(metadata)] = true
+	} else {
+		delete(b.upgradeRequired, b.identity(metadata))
+	}
+}
+
+// rewriteUpgradeRequired replaces Cloud's plan-access denial with a message
+// that tells the caller how to upgrade. The error code is unchanged so SDK
+// error handling is unaffected. Other 403 responses are restored as-is.
+func rewriteUpgradeRequired(resp *http.Response) (bool, error) {
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if err != nil {
+		return false, err
+	}
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{io.MultiReader(bytes.NewReader(data), resp.Body), resp.Body}
+	var body struct {
+		Errors []struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(data, &body) != nil || len(body.Errors) != 1 || body.Errors[0].Message != sandboxAccessDeniedMessage {
+		return false, nil
+	}
+	_ = resp.Body.Close()
+	rewritten, err := json.Marshal(map[string]any{"errors": []map[string]string{{
+		"code": body.Errors[0].Code, "message": upgradeRequiredMessage,
+	}}})
+	if err != nil {
+		return false, err
+	}
+	resp.Body = io.NopCloser(bytes.NewReader(rewritten))
+	resp.ContentLength = int64(len(rewritten))
+	resp.Header.Set("Content-Length", fmt.Sprint(len(rewritten)))
+	resp.Header.Del("Content-Encoding")
+	return true, nil
 }
 
 func (b *Bridge) remember(metadata *cliauth.Metadata, id string, remove bool) {

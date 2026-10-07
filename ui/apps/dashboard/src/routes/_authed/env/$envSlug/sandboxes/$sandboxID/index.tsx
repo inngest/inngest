@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
 import { SandboxDetail } from '@/components/Sandboxes/SandboxDetail';
-import { getSandboxAPIEnabled } from '@/queries/server/featureFlags';
+import { getSandboxesEnabled } from '@/queries/server/entitlements';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute(
@@ -9,7 +9,7 @@ export const Route = createFileRoute(
 )({
   component: SandboxDetailRoute,
   loader: async ({ params }) => {
-    if (!(await getSandboxAPIEnabled())) {
+    if (!(await getSandboxesEnabled())) {
       throw redirect({
         to: pathCreator.sandboxes({ envSlug: params.envSlug }),
       });
