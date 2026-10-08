@@ -274,6 +274,30 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
+func TestDeprecatedEndpointFlagsAreHidden(t *testing.T) {
+	var trace endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "get-function-trace" {
+			trace = ep
+			break
+		}
+	}
+	require.NotEmpty(t, trace.name)
+
+	flags := endpointFlags(trace)
+	byName := map[string]cli.Flag{}
+	for _, flag := range flags {
+		byName[flag.Names()[0]] = flag
+	}
+
+	legacy, ok := byName["include-output"].(*cli.BoolFlag)
+	require.True(t, ok)
+	require.True(t, legacy.Hidden)
+	canonical, ok := byName["include"].(*cli.StringSliceFlag)
+	require.True(t, ok)
+	require.False(t, canonical.Hidden)
+}
+
 func TestRerunFromStepFlagsDescribeSimpleShape(t *testing.T) {
 	var rerun endpoint
 	for _, ep := range discoverEndpoints() {

@@ -933,8 +933,8 @@ optional run fields with `include=output&include=deferredFrom`. A selector may
 expand one or more response fields according to its endpoint's semantics.
 Parsers also accept generated snake_case aliases, such as
 `include=deferred_from`, for compatibility, but API documentation and generated
-examples use the lowerCamelCase spelling. The legacy `includeOutput=true` query
-parameter also remains supported on run list endpoints, but new clients should
+examples use the lowerCamelCase spelling. The deprecated `includeOutput=true`
+query parameter remains supported for compatibility, but new clients should
 use `include=output`.
 
 ## Standard Parameter Patterns
