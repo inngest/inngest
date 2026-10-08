@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestWriteSandboxFileDataUsesNumericBytesWritten(t *testing.T) {
@@ -25,8 +24,8 @@ func TestSandboxImagePresence(t *testing.T) {
 	}{
 		{"omitted", `{}`, nil},
 		{"null is unset in protobuf JSON", `{"image":null}`, nil},
-		{"explicit empty is present for validation", `{"image":""}`, proto.String("")},
-		{"selected image", `{"image":"inngest/base:latest"}`, proto.String("inngest/base:latest")},
+		{"explicit empty is present for validation", `{"image":""}`, new("")},
+		{"selected image", `{"image":"inngest/base:latest"}`, new("inngest/base:latest")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			request := &CreateSandboxRequest{}
