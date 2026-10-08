@@ -10,13 +10,13 @@
 
 import { memo, useMemo, useState, type CSSProperties, type JSX } from 'react';
 import {
-  RiAlertFill,
   RiArrowRightFill,
   RiArrowRightLine,
   RiArrowRightSFill,
   RiBuilding2Line,
   RiCheckboxCircleFill,
   RiCloseCircleFill,
+  RiErrorWarningFill,
   RiFlashlightLine,
   RiFlaskLine,
   RiFunctionLine,
@@ -664,11 +664,13 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
           data-testid="warning-icon"
           role="img"
           aria-label={`Warning: ${summary}`}
-          className="ml-1 inline-flex shrink-0 cursor-help align-middle"
+          tabIndex={0}
+          className="focus-visible:ring-primary-subtle ml-1 flex shrink-0 cursor-help rounded-sm focus-visible:outline-none focus-visible:ring"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
         >
-          <RiAlertFill className="text-warning h-3.5 w-3.5" />
+          <RiErrorWarningFill aria-hidden="true" className="text-warning h-3.5 w-3.5" />
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
@@ -958,7 +960,6 @@ export function TimelineBar({
               )}
             >
               {displayName}
-              {warnings && warnings.length > 0 && <WarningIcon warnings={warnings} />}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -978,6 +979,8 @@ export function TimelineBar({
                 </Tooltip>
               )}
             </span>
+
+            {warnings && warnings.length > 0 && <WarningIcon warnings={warnings} />}
 
             {/* Actions slot */}
             {actions}

@@ -482,6 +482,61 @@ describe('traceConversion', () => {
     });
   });
 
+  describe('warnings', () => {
+    const warningsMd = (message: string): NonNullable<Trace['metadata']> => {
+      return [
+        {
+          scope: 'step',
+          kind: 'inngest.warnings',
+          updatedAt: '2024-01-01T00:00:03Z',
+          values: { w: message },
+        },
+      ] as NonNullable<Trace['metadata']>;
+    };
+
+    it('exposes inngest.warnings metadata as bar.warnings', () => {
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1', metadata: warningsMd('careful') })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toEqual([{ key: 'w', message: 'careful' }]);
+    });
+
+    it('leaves bar.warnings undefined without the metadata', () => {
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1' })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toBeUndefined();
+    });
+
+    it('carries the last attempt warnings on a rolled-up step', () => {
+      const attempt0 = createTrace({
+        spanID: 'a0',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:00Z',
+        metadata: warningsMd('first attempt'),
+      });
+      const attempt1 = createTrace({
+        spanID: 'a1',
+        stepID: 'step-1',
+        attempts: 1,
+        queuedAt: '2024-01-01T00:00:02Z',
+        metadata: warningsMd('last attempt'),
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [attempt0, attempt1] });
+      const result = traceToTimelineData(traceRollup(root), { runID: 'run-1' });
+
+      const rollupBar = result.bars[0]?.children?.[0];
+      expect(rollupBar?.warnings).toEqual([{ key: 'w', message: 'last attempt' }]);
+    });
+  });
+
   describe('traceRollup', () => {
     it('passes single-attempt steps through unchanged, sorted by queuedAt', () => {
       const step1 = createTrace({

@@ -434,3 +434,24 @@ describe('Step warnings callout', () => {
     expect(screen.queryByTestId('step-warnings')).toBeNull();
   });
 });
+
+describe('Step warnings and the Metadata tab', () => {
+  const md = (kind: string): NonNullable<Trace['metadata']>[number] => {
+    return {
+      scope: 'step',
+      kind,
+      updatedAt: '2026-01-01T00:00:02Z',
+      values: { a: 'b' },
+    } as NonNullable<Trace['metadata']>[number];
+  };
+
+  it('does not count inngest.warnings as metadata (empty state still shows)', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warnings')] }));
+    expect(screen.getByText('No output available')).toBeTruthy();
+  });
+
+  it('counts other metadata alongside warnings (no empty state)', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warnings'), md('userland.x')] }));
+    expect(screen.queryByText('No output available')).toBeNull();
+  });
+});

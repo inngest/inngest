@@ -471,7 +471,7 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     debugSessionID: last.debugSessionID,
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
-    metadata: last.metadata,
+    metadata: last.metadata, // warnings, like scores, come from the last attempt
     userlandSpan: null,
   };
 }

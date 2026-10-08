@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { TimelineBar } from './TimelineBar';
@@ -15,6 +15,15 @@ import { TimelineBar } from './TimelineBar';
 function Wrapper({ children }: { children: ReactNode }) {
   return <TooltipProvider>{children}</TooltipProvider>;
 }
+
+// jsdom doesn't provide ResizeObserver, which Radix tooltips use when open
+beforeAll(() => {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
 
 afterEach(() => {
   cleanup();
@@ -351,5 +360,34 @@ describe('TimelineBar warning icon', () => {
     expect(screen.getByTestId('warning-icon').getAttribute('aria-label')).toBe(
       'Warning: 2 warnings'
     );
+  });
+});
+
+describe('TimelineBar warning icon placement and access', () => {
+  const props = {
+    name: 'A very long step name that would be truncated with an ellipsis',
+    duration: 1234,
+    startPercent: 10,
+    widthPercent: 25,
+    depth: 0,
+    leftWidth: 40,
+    style: 'step.run' as const,
+    warnings: [{ key: 'k', message: 'build it earlier' }],
+  };
+
+  it('is not inside the truncating name span', () => {
+    render(<TimelineBar {...props} />, { wrapper: Wrapper });
+    const icon = screen.getByTestId('warning-icon');
+    expect(icon.closest('.text-ellipsis')).toBeNull();
+  });
+
+  it('is focusable and shows its tooltip on focus', async () => {
+    render(<TimelineBar {...props} />, { wrapper: Wrapper });
+    const icon = screen.getByTestId('warning-icon');
+    expect(icon.getAttribute('tabindex')).toBe('0');
+    expect(icon.getAttribute('aria-label')).toBe('Warning: build it earlier');
+
+    fireEvent.focus(icon);
+    expect((await screen.findAllByText('build it earlier')).length).toBeGreaterThan(0);
   });
 });

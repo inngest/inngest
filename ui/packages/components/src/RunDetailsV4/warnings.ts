@@ -12,17 +12,39 @@ export type StepWarning = {
   message: string;
 };
 
-/** Collects warnings from every `inngest.warnings` entry, sorted by key. Later entries win on duplicate keys. */
+/**
+ * Collects warnings from every `inngest.warnings` entry, sorted by key.
+ * Entries merge oldest `updatedAt` first so newer values win on duplicate
+ * keys. Non-string and blank values are skipped; messages are trimmed.
+ */
 export function getStepWarnings(metadata?: SpanMetadata[]): StepWarning[] {
   const byKey = new Map<string, string>();
 
-  for (const md of metadata ?? []) {
-    if (md.kind !== 'inngest.warnings') {
-      continue;
-    }
+  const entries = (metadata ?? [])
+    .filter((md) => {
+      return md.kind === 'inngest.warnings';
+    })
+    .map((md, index) => {
+      return { md, index, time: Date.parse(md.updatedAt ?? '') };
+    })
+    .sort((a, b) => {
+      // Empty or unparseable timestamps sort first, keeping input order among ties
+      const aTime = Number.isNaN(a.time) ? -Infinity : a.time;
+      const bTime = Number.isNaN(b.time) ? -Infinity : b.time;
+      if (aTime === bTime) {
+        return a.index - b.index;
+      }
 
+      return aTime < bTime ? -1 : 1;
+    });
+
+  for (const { md } of entries) {
     for (const [key, value] of Object.entries(md.values ?? {})) {
-      const message = typeof value === 'string' ? value : String(value ?? '');
+      if (typeof value !== 'string') {
+        continue;
+      }
+
+      const message = value.trim();
       if (message === '') {
         continue;
       }

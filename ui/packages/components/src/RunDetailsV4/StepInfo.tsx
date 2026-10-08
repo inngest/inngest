@@ -251,6 +251,7 @@ export const StepInfo = ({
     ? trace.metadata?.filter(
         (md) =>
           md.kind !== 'inngest.response_headers' &&
+          md.kind !== 'inngest.warnings' &&
           !isScoreMetadata(md) &&
           !isExperimentMetadata(md)
       ) ?? []
@@ -402,9 +403,9 @@ export const StepInfo = ({
             <p className="text-sm font-medium">
               {warnings.length === 1 ? 'Warning' : `${warnings.length} warnings`}
             </p>
-            <ul className="mt-1 list-none space-y-1 text-sm">
+            <ul className="mt-1 max-h-40 list-none space-y-1 overflow-y-auto text-sm">
               {warnings.map(({ key, message }) => (
-                <li key={key} title={key}>
+                <li key={key} title={key} className="break-words">
                   {message}
                 </li>
               ))}

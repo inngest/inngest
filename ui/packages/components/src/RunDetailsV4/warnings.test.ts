@@ -47,3 +47,38 @@ describe('summarizeWarnings', () => {
     ).toBe('2 warnings');
   });
 });
+
+describe('getStepWarnings ordering and malformed values', () => {
+  const at = (updatedAt: string, values: Record<string, unknown>): SpanMetadata => {
+    return { scope: 'step', kind: 'inngest.warnings', updatedAt, values } as SpanMetadata;
+  };
+
+  it('lets the newest updatedAt win regardless of input order', () => {
+    expect(
+      getStepWarnings([
+        at('2024-01-02T00:00:00Z', { a: 'newer' }),
+        at('2024-01-01T00:00:00Z', { a: 'older' }),
+      ])
+    ).toEqual([{ key: 'a', message: 'newer' }]);
+  });
+
+  it('treats an empty updatedAt as oldest', () => {
+    expect(
+      getStepWarnings([at('2024-01-01T00:00:00Z', { a: 'dated' }), at('', { a: 'undated' })])
+    ).toEqual([{ key: 'a', message: 'dated' }]);
+  });
+
+  it('skips numbers, null, objects and whitespace-only strings, and trims messages', () => {
+    expect(
+      getStepWarnings([
+        warningsMd({
+          num: 5,
+          nil: null,
+          obj: { x: 1 },
+          blank: '   ',
+          padded: '  hello  ',
+        }),
+      ])
+    ).toEqual([{ key: 'padded', message: 'hello' }]);
+  });
+});
