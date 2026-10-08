@@ -151,10 +151,15 @@ message SandboxSnapshot {
   google.protobuf.Timestamp updated_at = 10;
   google.protobuf.Timestamp expires_at = 11;
   optional string error = 12;
+  optional string name = 13;
 }
 
 message CreateSandboxSnapshotRequest {
   string sandbox_id = 1;
+  // Unique in the environment among snapshots that are creating, or ready and
+  // not expired. A name held by such a snapshot is rejected with
+  // sandbox_snapshot_name_taken; any other snapshot's name can be reused.
+  optional string name = 2;
 }
 
 message CreateSandboxSnapshotResponse {
@@ -165,6 +170,8 @@ message CreateSandboxSnapshotResponse {
 message ListSandboxSnapshotsRequest {
   optional string cursor = 1;
   optional int32 limit = 2;
+  // Only snapshots with exactly this name, newest first.
+  optional string name = 3;
 }
 
 message ListSandboxSnapshotsResponse {

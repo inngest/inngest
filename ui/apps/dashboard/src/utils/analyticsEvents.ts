@@ -73,12 +73,11 @@ type AnalyticsEventName =
   | 'Empty State Docs Link Opened'
   | 'Empty State Example Copied'
   | 'Empty State Prompt Copied'
+  | 'Empty State Upgrade Clicked'
   | 'Empty State Viewed'
   | 'List Viewed'
   | 'Opened In Insights'
-  | 'Scoring Weight Updated'
-  | 'Waitlist Form Submitted'
-  | 'Waitlist Joined';
+  | 'Scoring Weight Updated';
 
 type AnalyticsEventProperties = Record<
   string,
@@ -255,6 +254,14 @@ export function trackEmptyStateExampleCopied({
   track('Empty State Example Copied', feature);
 }
 
+type EmptyStateUpgradeClickedArgs = { feature: AnalyticsFeature };
+
+export function trackEmptyStateUpgradeClicked({
+  feature,
+}: EmptyStateUpgradeClickedArgs) {
+  track('Empty State Upgrade Clicked', feature);
+}
+
 type EmptyStateDocsLinkOpenedArgs = { feature: AnalyticsFeature };
 
 export function trackEmptyStateDocsLinkOpened({
@@ -334,27 +341,4 @@ type DocsLinkOpenedArgs = { feature: AnalyticsFeature };
 
 export function trackDocsLinkOpened({ feature }: DocsLinkOpenedArgs) {
   track('Docs Link Opened', feature);
-}
-
-type WaitlistJoinedArgs = { feature: AnalyticsFeature };
-
-export function trackWaitlistJoined({ feature }: WaitlistJoinedArgs) {
-  track('Waitlist Joined', feature);
-}
-
-type WaitlistFormSubmittedArgs = {
-  feature: AnalyticsFeature;
-  canContact: boolean;
-  message: string;
-};
-
-export function trackWaitlistFormSubmitted({
-  feature,
-  canContact,
-  message,
-}: WaitlistFormSubmittedArgs) {
-  track('Waitlist Form Submitted', feature, {
-    can_contact: canContact,
-    message: message,
-  });
 }

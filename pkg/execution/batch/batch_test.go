@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -984,5 +988,144 @@ func TestRunBatch(t *testing.T) {
 		require.False(t, result.Scheduled)
 		require.Equal(t, "", result.BatchID)
 		require.Equal(t, 0, result.ItemCount)
+	})
+}
+
+type enqueued struct {
+	item queue.Item
+	at   time.Time
+}
+
+type fakeProducer struct {
+	queue.Producer
+
+	mu    sync.Mutex
+	items []enqueued
+	err   error
+}
+
+func (p *fakeProducer) Enqueue(_ context.Context, item queue.Item, at time.Time, _ queue.EnqueueOpts) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.err != nil {
+		return p.err
+	}
+	p.items = append(p.items, enqueued{item: item, at: at})
+	return nil
+}
+
+func TestScheduleExecution(t *testing.T) {
+	splitAcct := uuid.New()
+	fnID := uuid.New()
+
+	tests := []struct {
+		name      string
+		acctID    uuid.UUID
+		err       error
+		wantErr   bool
+		wantQueue string
+	}{
+		{name: "shared queue", acctID: uuid.New(), wantQueue: queue.KindScheduleBatch},
+		{name: "per-function queue", acctID: splitAcct, wantQueue: fmt.Sprintf("%s:%s", queue.KindScheduleBatch, fnID)},
+		{name: "item exists", acctID: uuid.New(), err: queue.ErrQueueItemExists},
+		{name: "enqueue error", acctID: uuid.New(), err: errors.New("boom"), wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			q := &fakeProducer{err: tc.err}
+			bm := NewRedisBatchManager(nil, q, WithoutBuffer(), WithSplitBatchPartitionByFunction(
+				func(_ context.Context, acctID uuid.UUID) bool { return acctID == splitAcct },
+			))
+
+			opts := ScheduleBatchOpts{
+				ScheduleBatchPayload: ScheduleBatchPayload{
+					BatchID:         ulid.Make(),
+					AccountID:       tc.acctID,
+					WorkspaceID:     uuid.New(),
+					FunctionID:      fnID,
+					FunctionVersion: 3,
+				},
+				At: time.Now().Add(time.Minute),
+			}
+
+			err := bm.ScheduleExecution(context.Background(), opts)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tc.err != nil {
+				return
+			}
+
+			require.Len(t, q.items, 1)
+			item := q.items[0].item
+			require.Equal(t, opts.At, q.items[0].at)
+			require.Equal(t, opts.JobID(), *item.JobID)
+			require.Equal(t, queue.KindScheduleBatch, item.Kind)
+			require.Equal(t, tc.wantQueue, *item.QueueName)
+			require.Equal(t, opts.ScheduleBatchPayload, item.Payload)
+		})
+	}
+}
+
+func TestStartExecution(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
+
+	fnID := uuid.New()
+	fn := inngest.Function{
+		ID:         fnID,
+		EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"},
+	}
+	appendItem := func(t *testing.T) *BatchAppendResult {
+		res, err := bm.Append(ctx, BatchItem{FunctionID: fnID, EventID: ulid.Make()}, fn)
+		require.NoError(t, err)
+		return res
+	}
+
+	t.Run("started twice", func(t *testing.T) {
+		res := appendItem(t)
+		batchID := ulid.MustParse(res.BatchID)
+
+		status, err := bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
+
+		pointer, err := r.Get(res.BatchPointerKey)
+		require.NoError(t, err)
+		require.NotEqual(t, res.BatchID, pointer)
+
+		status, err = bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusStarted.String(), status)
+
+		after, err := r.Get(res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, pointer, after)
+	})
+
+	t.Run("keeps overflow pointer", func(t *testing.T) {
+		res := appendItem(t)
+		overflowID := ulid.Make().String()
+		require.NoError(t, r.Set(res.BatchPointerKey, overflowID))
+
+		status, err := bm.StartExecution(ctx, fnID, ulid.MustParse(res.BatchID), res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
+
+		pointer, err := r.Get(res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, overflowID, pointer)
 	})
 }

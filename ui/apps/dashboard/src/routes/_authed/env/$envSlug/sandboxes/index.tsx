@@ -5,23 +5,23 @@ import SandboxesEmptyState from '@/components/Sandboxes/SandboxesEmptyState';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { SandboxesLayout } from '@/components/Sandboxes/SandboxesLayout';
 import { SandboxesList } from '@/components/Sandboxes/SandboxesList';
-import { getSandboxAPIEnabled } from '@/queries/server/featureFlags';
+import { getSandboxesEnabled } from '@/queries/server/entitlements';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/sandboxes/')({
   component: SandboxesPage,
   loader: async () => ({
-    sandboxAPIEnabled: await getSandboxAPIEnabled(),
+    sandboxesEnabled: await getSandboxesEnabled(),
   }),
 });
 
 function SandboxesPage() {
-  const { sandboxAPIEnabled } = Route.useLoaderData();
+  const { sandboxesEnabled } = Route.useLoaderData();
   const environment = useEnvironment();
 
   return (
     <>
       <Header breadcrumb={[{ text: 'Sandboxes' }]} />
-      {sandboxAPIEnabled ? (
+      {sandboxesEnabled ? (
         <SandboxesLayout key={environment.id}>
           <SandboxesList />
         </SandboxesLayout>

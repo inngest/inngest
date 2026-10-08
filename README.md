@@ -91,10 +91,11 @@ inngest login
 inngest dev
 ```
 
-Select a single existing Cloud development environment during login. That
-environment needs sandbox access and a default VPC; branch-child environments
-without a VPC are not supported. No deployed Cloud app is required. To change
-environments, run `inngest login --force`.
+Select a single existing Cloud development environment during login. Cloud
+sandboxes require a paid plan; on other plans, sandbox requests are rejected with
+a link to upgrade. The environment also needs a default VPC; branch-child
+environments without a VPC are not supported. No deployed Cloud app is required.
+To change environments, run `inngest login --force`.
 
 Use `inngest.sandboxes` normally, or `step.sandbox` with `sandboxMiddleware`.
 No sandbox token or signing key is needed in your local application. Set

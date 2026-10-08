@@ -1405,7 +1405,7 @@ func local_request_V2_ResumeSandbox_0(ctx context.Context, marshaler runtime.Mar
 	return msg, metadata, err
 }
 
-var filter_V2_CreateSandboxSnapshot_0 = &utilities.DoubleArray{Encoding: map[string]int{"sandbox_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+var filter_V2_CreateSandboxSnapshot_0 = &utilities.DoubleArray{Encoding: map[string]int{"sandbox_id": 0}, Base: []int{1, 2, 0, 0}, Check: []int{0, 1, 1, 2}}
 
 func request_V2_CreateSandboxSnapshot_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -1413,8 +1413,8 @@ func request_V2_CreateSandboxSnapshot_0(ctx context.Context, marshaler runtime.M
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	if req.Body != nil && req.Body != http.NoBody && req.ContentLength != 0 && !runtime.HTTPPathLengthFallback(req.Context()) {
-		return nil, metadata, status.Error(codes.InvalidArgument, "request body is not allowed for this HTTP binding")
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
@@ -1446,8 +1446,8 @@ func local_request_V2_CreateSandboxSnapshot_0(ctx context.Context, marshaler run
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	if req.Body != nil && req.Body != http.NoBody && req.ContentLength != 0 && !runtime.HTTPPathLengthFallback(req.Context()) {
-		return nil, metadata, status.Error(codes.InvalidArgument, "request body is not allowed for this HTTP binding")
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	val, ok := pathParams["sandbox_id"]
 	if !ok {

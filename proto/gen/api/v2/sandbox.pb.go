@@ -1182,6 +1182,7 @@ type SandboxSnapshot struct {
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
 	Error           *string                `protobuf:"bytes,12,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	Name            *string                `protobuf:"bytes,13,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1300,9 +1301,20 @@ func (x *SandboxSnapshot) GetError() string {
 	return ""
 }
 
+func (x *SandboxSnapshot) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
 type CreateSandboxSnapshotRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	// Unique in the environment among snapshots that are creating, or ready and
+	// not expired. A name held by such a snapshot is rejected with
+	// sandbox_snapshot_name_taken; any other snapshot's name can be reused.
+	Name          *string `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1340,6 +1352,13 @@ func (*CreateSandboxSnapshotRequest) Descriptor() ([]byte, []int) {
 func (x *CreateSandboxSnapshotRequest) GetSandboxId() string {
 	if x != nil {
 		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *CreateSandboxSnapshotRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
 	}
 	return ""
 }
@@ -1397,9 +1416,11 @@ func (x *CreateSandboxSnapshotResponse) GetMetadata() *SandboxResponseMetadata {
 }
 
 type ListSandboxSnapshotsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
-	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Cursor *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit  *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	// Only snapshots with exactly this name, newest first.
+	Name          *string `protobuf:"bytes,3,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1446,6 +1467,13 @@ func (x *ListSandboxSnapshotsRequest) GetLimit() int32 {
 		return *x.Limit
 	}
 	return 0
+}
+
+func (x *ListSandboxSnapshotsRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
 }
 
 type ListSandboxSnapshotsResponse struct {
@@ -3270,7 +3298,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\"y\n" +
 	"\x15ResumeSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x12;\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\xcd\x04\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\xef\x04\n" +
 	"\x0fSandboxSnapshot\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
 	"\x0fsource_image_id\x18\x02 \x01(\tR\rsourceImageId\x125\n" +
@@ -3287,20 +3315,26 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\n" +
 	"expires_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x19\n" +
-	"\x05error\x18\f \x01(\tH\x01R\x05error\x88\x01\x01B\x13\n" +
+	"\x05error\x18\f \x01(\tH\x01R\x05error\x88\x01\x01\x12\x17\n" +
+	"\x04name\x18\r \x01(\tH\x02R\x04name\x88\x01\x01B\x13\n" +
 	"\x11_compatibility_idB\b\n" +
-	"\x06_error\"=\n" +
+	"\x06_errorB\a\n" +
+	"\x05_name\"_\n" +
 	"\x1cCreateSandboxSnapshotRequest\x12\x1d\n" +
 	"\n" +
-	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\"\x89\x01\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
+	"\x05_name\"\x89\x01\n" +
 	"\x1dCreateSandboxSnapshotResponse\x12+\n" +
 	"\x04data\x18\x01 \x01(\v2\x17.api.v2.SandboxSnapshotR\x04data\x12;\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"j\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\x8c\x01\n" +
 	"\x1bListSandboxSnapshotsRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
-	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01\x12\x17\n" +
+	"\x04name\x18\x03 \x01(\tH\x02R\x04name\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
-	"\x06_limit\"\xb1\x01\n" +
+	"\x06_limitB\a\n" +
+	"\x05_name\"\xb1\x01\n" +
 	"\x1cListSandboxSnapshotsResponse\x12+\n" +
 	"\x04data\x18\x01 \x03(\v2\x17.api.v2.SandboxSnapshotR\x04data\x12;\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\x12'\n" +
@@ -3642,6 +3676,7 @@ func file_api_v2_sandbox_proto_init() {
 	file_api_v2_sandbox_proto_msgTypes[7].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[8].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[16].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[17].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[19].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[25].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[26].OneofWrappers = []any{}

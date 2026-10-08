@@ -916,9 +916,9 @@ DELETE /v2/runs/run_abc123           *# Cancel run → 200 OK, 404 Not Found*
 
 ## Query Parameter Naming Conventions
 
-### snake_case for URL params
+### lowerCamelCase for URL params
 
-All query parameters use camelCase. This is consistent with the json body params:
+All query parameters use lowerCamelCase. This is consistent with the JSON body fields:
 
 ```bash
 # ✅ Correct: camelCase parameters
@@ -927,6 +927,15 @@ GET /v2/functions?functionId=user-signup&isEnabled=true&createdAfter=2025-08-01T
 # ❌ Avoid: snake_case or inconsistent naming
 GET /v2/functions?function_id=user-signup&is_enabled=true&created_after=2025-08-01T00:00:00Z
 ```
+
+String include selectors use lowerCamelCase API names. For example, request
+optional run fields with `include=output&include=deferredFrom`. A selector may
+expand one or more response fields according to its endpoint's semantics.
+Parsers also accept generated snake_case aliases, such as
+`include=deferred_from`, for compatibility, but API documentation and generated
+examples use the lowerCamelCase spelling. The deprecated `includeOutput=true`
+query parameter remains supported for compatibility, but new clients should
+use `include=output`.
 
 ## Standard Parameter Patterns
 
@@ -1045,7 +1054,7 @@ HTTP/1.1 400 Bad Request
 ### Date Format Errors
 
 ```bash
-GET /v2/runs?started_after=invalid-date
+GET /v2/runs?from=invalid-date
 
 HTTP/1.1 400 Bad Request
 {
@@ -1357,7 +1366,7 @@ The API supports varying levels of precision:
 ```bash
 # Boolean filters (case insensitive)
 GET /v2/functions?enabled=true
-GET /v2/runs?has_errors=false
+GET /v2/runs?isDeferred=false
 ```
 
 ### Naming Patterns

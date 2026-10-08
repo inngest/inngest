@@ -74,6 +74,23 @@ func TestInputSchema(t *testing.T) {
 	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
 }
 
+func TestInputSchemaUsesOpenAPIEnumValues(t *testing.T) {
+	schema := InputSchema(endpointByMethod(t, "ListRuns"))
+	properties := schema["properties"].(map[string]any)
+	include := properties["include"].(map[string]any)
+	items := include["items"].(map[string]any)
+	require.Equal(t, []string{"output", "deferredFrom"}, items["enum"])
+	require.NotContains(t, items["enum"], "deferred_from")
+}
+
+func TestInputSchemaMarksDeprecatedFields(t *testing.T) {
+	endpoint := endpointByMethod(t, "GetFunctionTrace")
+	properties := InputSchema(endpoint)["properties"].(map[string]any)
+
+	require.Equal(t, true, properties["includeOutput"].(map[string]any)["deprecated"])
+	require.NotContains(t, properties["include"].(map[string]any), "deprecated")
+}
+
 func TestToolAnnotations(t *testing.T) {
 	for _, tt := range []struct {
 		method      string

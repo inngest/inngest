@@ -12,6 +12,7 @@ import {
   type PermissionGroup,
   type PermissionLevel,
 } from '@/components/OAuth/PermissionPicker';
+import { SandboxUpgradeNotice } from '@/components/Sandboxes/SandboxUpgradeNotice';
 import { useEnvironments } from '@/queries/environments';
 import { credentialEnvironmentOptions } from '@/components/OAuth/credentialEnvironments';
 import {
@@ -390,6 +391,10 @@ function OAuthAuthorizationForm({
             {details.user_code}
           </code>
         </div>
+      )}
+
+      {details.flow === 'device' && (
+        <SandboxUpgradeNotice refSource="app-cli-login" />
       )}
 
       <CredentialForm
