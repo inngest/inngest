@@ -10,6 +10,7 @@
 
 import { memo, useMemo, useState, type CSSProperties, type JSX } from 'react';
 import {
+  RiAlertFill,
   RiArrowRightFill,
   RiArrowRightLine,
   RiArrowRightSFill,
@@ -49,6 +50,7 @@ import type {
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
 import { TIMELINE_CONSTANTS } from './utils/timing';
+import { summarizeWarnings, type StepWarning } from './warnings';
 
 // ============================================================================
 // Style Configurations
@@ -648,6 +650,34 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
   );
 }
 
+/**
+ * Warning icon shown beside a step name when the step carries `inngest.warnings`
+ * metadata. The tooltip shows the message, or a count when there are several.
+ */
+function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
+  const summary = summarizeWarnings(warnings);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          data-testid="warning-icon"
+          role="img"
+          aria-label={`Warning: ${summary}`}
+          className="ml-1 inline-flex shrink-0 cursor-help align-middle"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <RiAlertFill className="text-warning h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
+        {summary}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
@@ -833,6 +863,7 @@ export function TimelineBar({
   insideExperiment,
   experimentMetadata,
   scores,
+  warnings,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -927,6 +958,7 @@ export function TimelineBar({
               )}
             >
               {displayName}
+              {warnings && warnings.length > 0 && <WarningIcon warnings={warnings} />}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
                   <TooltipTrigger asChild>

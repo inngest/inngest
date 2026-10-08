@@ -412,3 +412,25 @@ describe('Debug Run ID', () => {
     expect(document.querySelector('[data-label="Debug Run ID"]')).toBeNull();
   });
 });
+
+describe('Step warnings callout', () => {
+  const warningsMetadata = (values: Record<string, string>) =>
+    [
+      { scope: 'step', kind: 'inngest.warnings', updatedAt: '2026-01-01T00:00:02Z', values },
+    ] as Trace['metadata'];
+
+  it('shows each inngest.warnings message', () => {
+    renderStepInfo(
+      makeTrace({ metadata: warningsMetadata({ a: 'build ahead of time', b: 'other' }) })
+    );
+    const callout = screen.getByTestId('step-warnings');
+    expect(callout.textContent).toContain('2 warnings');
+    expect(callout.textContent).toContain('build ahead of time');
+    expect(callout.textContent).toContain('other');
+  });
+
+  it('is hidden without warnings metadata', () => {
+    renderStepInfo(makeTrace());
+    expect(screen.queryByTestId('step-warnings')).toBeNull();
+  });
+});

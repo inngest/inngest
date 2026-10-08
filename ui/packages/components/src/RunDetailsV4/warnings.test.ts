@@ -1,0 +1,49 @@
+import { describe, expect, it } from 'vitest';
+
+import type { SpanMetadata } from './types';
+import { getStepWarnings, summarizeWarnings } from './warnings';
+
+const warningsMd = (values: Record<string, unknown>): SpanMetadata =>
+  ({
+    scope: 'step',
+    kind: 'inngest.warnings',
+    updatedAt: '2024-01-01T00:00:00Z',
+    values,
+  } as SpanMetadata);
+
+describe('getStepWarnings', () => {
+  it('returns nothing without warnings metadata', () => {
+    expect(getStepWarnings(undefined)).toEqual([]);
+    expect(
+      getStepWarnings([
+        { scope: 'step', kind: 'userland.x', updatedAt: '', values: { a: 'b' } } as SpanMetadata,
+      ])
+    ).toEqual([]);
+  });
+
+  it('flattens, sorts by key, and drops empty messages', () => {
+    expect(getStepWarnings([warningsMd({ b: 'second', a: 'first', c: '' })])).toEqual([
+      { key: 'a', message: 'first' },
+      { key: 'b', message: 'second' },
+    ]);
+  });
+
+  it('merges multiple entries with later ones winning', () => {
+    expect(getStepWarnings([warningsMd({ a: 'old' }), warningsMd({ a: 'new', b: 'x' })])).toEqual([
+      { key: 'a', message: 'new' },
+      { key: 'b', message: 'x' },
+    ]);
+  });
+});
+
+describe('summarizeWarnings', () => {
+  it('uses the message for one warning and a count for many', () => {
+    expect(summarizeWarnings([{ key: 'a', message: 'hello' }])).toBe('hello');
+    expect(
+      summarizeWarnings([
+        { key: 'a', message: 'x' },
+        { key: 'b', message: 'y' },
+      ])
+    ).toBe('2 warnings');
+  });
+});

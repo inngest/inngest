@@ -5,6 +5,8 @@
 
 import type { ReactNode } from 'react';
 
+import type { StepWarning } from './warnings';
+
 // ============================================================================
 // Core Component Types
 // ============================================================================
@@ -229,6 +231,9 @@ export interface TimelineBarProps {
 
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
+
+  /** Messages from `inngest.warnings` metadata (shows a warning icon beside the name) */
+  warnings?: StepWarning[];
 }
 
 /**
@@ -326,6 +331,9 @@ export interface TimelineBarData {
 
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
+
+  /** Messages from `inngest.warnings` metadata */
+  warnings?: StepWarning[];
 }
 
 /**

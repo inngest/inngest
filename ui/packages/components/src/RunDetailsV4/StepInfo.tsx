@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { looksLikeAIOutput } from '../AI/utils';
+import { Alert } from '../Alert';
 import { Button } from '../Button/Button';
 import {
   CodeElement,
@@ -41,6 +42,7 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
+import { getStepWarnings } from './warnings';
 
 const STEP_OP_LABELS: Record<string, string> = {
   RUN: 'step.run',
@@ -254,6 +256,8 @@ export const StepInfo = ({
       ) ?? []
     : [];
 
+  const warnings = getStepWarnings(trace.metadata);
+
   const scoreMetadataList = trace.metadata?.filter(isScoreMetadata) ?? [];
 
   const experimentMetadataList = metadataIsEnabled
@@ -389,6 +393,23 @@ export const StepInfo = ({
               <IDElement>{trace.debugRunID}</IDElement>
             </ElementWrapper>
           )}
+        </div>
+      )}
+
+      {expanded && warnings.length > 0 && (
+        <div className="px-4" data-testid="step-warnings">
+          <Alert severity="warning">
+            <p className="text-sm font-medium">
+              {warnings.length === 1 ? 'Warning' : `${warnings.length} warnings`}
+            </p>
+            <ul className="mt-1 list-none space-y-1 text-sm">
+              {warnings.map(({ key, message }) => (
+                <li key={key} title={key}>
+                  {message}
+                </li>
+              ))}
+            </ul>
+          </Alert>
         </div>
       )}
 

@@ -26,6 +26,7 @@ import {
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
+import { getStepWarnings, type StepWarning } from '../warnings';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -227,6 +228,13 @@ function getScores(metadata?: SpanMetadata[]): ScoreBadgeData[] | undefined {
   return scores.length > 0 ? scores : undefined;
 }
 
+/** Warning messages for a span, or undefined when it has none. */
+function getWarnings(metadata?: SpanMetadata[]): StepWarning[] | undefined {
+  const warnings = getStepWarnings(metadata);
+
+  return warnings.length > 0 ? warnings : undefined;
+}
+
 /**
  * Convert a single Trace to TimelineBarData
  */
@@ -305,6 +313,7 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
     scores: getScores(trace.metadata),
+    warnings: getWarnings(trace.metadata),
   };
 }
 

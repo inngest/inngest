@@ -308,3 +308,48 @@ describe('TimelineBar', () => {
     });
   });
 });
+
+describe('TimelineBar warning icon', () => {
+  const defaultProps = {
+    name: 'Test Step',
+    duration: 1234,
+    startPercent: 10,
+    widthPercent: 25,
+    depth: 0,
+    leftWidth: 40,
+    style: 'step.run' as const,
+  };
+
+  it('renders no icon without warnings', () => {
+    render(<TimelineBar {...defaultProps} />, { wrapper: Wrapper });
+    expect(screen.queryByTestId('warning-icon')).toBeNull();
+  });
+
+  it('renders an accessible icon carrying the message', () => {
+    render(
+      <TimelineBar {...defaultProps} warnings={[{ key: 'k', message: 'build it earlier' }]} />,
+      {
+        wrapper: Wrapper,
+      }
+    );
+    expect(screen.getByTestId('warning-icon').getAttribute('aria-label')).toBe(
+      'Warning: build it earlier'
+    );
+  });
+
+  it('summarizes multiple warnings as a count', () => {
+    render(
+      <TimelineBar
+        {...defaultProps}
+        warnings={[
+          { key: 'a', message: 'x' },
+          { key: 'b', message: 'y' },
+        ]}
+      />,
+      { wrapper: Wrapper }
+    );
+    expect(screen.getByTestId('warning-icon').getAttribute('aria-label')).toBe(
+      'Warning: 2 warnings'
+    );
+  });
+});
