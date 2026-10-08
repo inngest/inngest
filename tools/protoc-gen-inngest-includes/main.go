@@ -201,6 +201,11 @@ func emitSelectors(g *protogen.GeneratedFile, specs []selectorSpec) error {
 		}
 		g.P("})")
 		g.P()
+		g.P("// Parse", spec.typeName, " parses a canonical selector or its snake_case compatibility alias.")
+		g.P("func Parse", spec.typeName, "(value string) (", spec.typeName, ", error) {")
+		g.P("return ", lowerFirst(spec.method), "IncludeSelector.Parse(value)")
+		g.P("}")
+		g.P()
 	}
 	return nil
 }

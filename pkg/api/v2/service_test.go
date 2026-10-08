@@ -1317,16 +1317,16 @@ func TestListRunsIncludeFromAPI(t *testing.T) {
 		"output":        ListRunsIncludeOutput,
 	} {
 		t.Run(value, func(t *testing.T) {
-			got, err := listRunsIncludeSelector.Parse(value)
+			got, err := ParseListRunsInclude(value)
 			require.NoError(t, err)
 			require.Equal(t, expected, got)
 		})
 	}
 
-	_, err := listRunsIncludeSelector.Parse("unknown")
+	_, err := ParseListRunsInclude("unknown")
 	require.ErrorContains(t, err, `unsupported include value "unknown"`)
 
-	_, err = listRunsIncludeSelector.Parse("id")
+	_, err = ParseListRunsInclude("id")
 	require.ErrorContains(t, err, `unsupported include value "id"`)
 }
 
