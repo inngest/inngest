@@ -512,7 +512,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				gqlSpan.Duration = &dur
 			}
 
-			groupBySpanPath(gqlSpan)
+			GroupBySpanPath(gqlSpan)
 		}
 
 		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery

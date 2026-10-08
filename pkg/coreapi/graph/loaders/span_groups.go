@@ -12,11 +12,11 @@ import (
 // an SDK called inside a span group.
 const SpanGroupStepType = "SPAN_GROUP"
 
-// groupBySpanPath nests the run's step spans under virtual span groups, one
+// GroupBySpanPath nests the run's step spans under virtual span groups, one
 // per prefix of each step's span path, so the same path always lands in the
 // same group. Steps without a path stay where they are, and a top-level group
 // takes the place of its first step.
-func groupBySpanPath(run *models.RunTraceSpan) {
+func GroupBySpanPath(run *models.RunTraceSpan) {
 	groups := map[string]*models.RunTraceSpan{}
 	children := run.ChildrenSpans
 	run.ChildrenSpans = nil
