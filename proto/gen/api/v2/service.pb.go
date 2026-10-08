@@ -9872,7 +9872,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x88\xbd\x01\n" +
+	"\x04INFO\x10\x032\x8b\xbd\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10207,13 +10207,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x10Resume a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16sandboxes:write:resume\x82\xd3\xe4\x93\x02 \"\x1e/sandboxes/{sandbox_id}/resume\x12\xf8\x01\n" +
-	"\x15CreateSandboxSnapshot\x12$.api.v2.CreateSandboxSnapshotRequest\x1a%.api.v2.CreateSandboxSnapshotResponse\"\x91\x01\x92A>\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16sandboxes:write:resume\x82\xd3\xe4\x93\x02 \"\x1e/sandboxes/{sandbox_id}/resume\x12\xfb\x01\n" +
+	"\x15CreateSandboxSnapshot\x12$.api.v2.CreateSandboxSnapshotRequest\x1a%.api.v2.CreateSandboxSnapshotResponse\"\x94\x01\x92A>\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x19Create a sandbox snapshotb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18#\b\x01\x12\x1fsandboxes:write:create_snapshot\x82\xd3\xe4\x93\x02#\"!/sandboxes/{sandbox_id}/snapshots\x12\xd8\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18#\b\x01\x12\x1fsandboxes:write:create_snapshot\x82\xd3\xe4\x93\x02&:\x01*\"!/sandboxes/{sandbox_id}/snapshots\x12\xd8\x01\n" +
 	"\x14ListSandboxSnapshots\x12#.api.v2.ListSandboxSnapshotsRequest\x1a$.api.v2.ListSandboxSnapshotsResponse\"u\x92A;\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x16List sandbox snapshotsb\x10\n" +
