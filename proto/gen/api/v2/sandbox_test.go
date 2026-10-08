@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestWriteSandboxFileDataUsesNumericBytesWritten(t *testing.T) {
@@ -14,6 +15,30 @@ func TestWriteSandboxFileDataUsesNumericBytesWritten(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, `{"path":"/tmp/message.txt","bytesWritten":5}`, string(encoded))
+}
+
+func TestSandboxImagePresence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		json string
+		want *string
+	}{
+		{"omitted", `{}`, nil},
+		{"null is unset in protobuf JSON", `{"image":null}`, nil},
+		{"explicit empty is present for validation", `{"image":""}`, proto.String("")},
+		{"selected image", `{"image":"inngest/base:latest"}`, proto.String("inngest/base:latest")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := &CreateSandboxRequest{}
+			require.NoError(t, protojson.Unmarshal([]byte(tc.json), request))
+			require.Equal(t, tc.want, request.Image)
+			encoded, err := protojson.Marshal(request)
+			require.NoError(t, err)
+			roundTrip := &CreateSandboxRequest{}
+			require.NoError(t, protojson.Unmarshal(encoded, roundTrip))
+			require.Equal(t, tc.want, roundTrip.Image)
+		})
+	}
 }
 
 func TestSandboxSnapshotUsesStringStoredBytes(t *testing.T) {
