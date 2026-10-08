@@ -50,6 +50,10 @@ func TestEmitSelectorsGeneratesIndependentTypes(t *testing.T) {
 	require.Contains(t, string(content), "type GetTraceInclude uint8")
 	require.Contains(t, string(content), "map[string]ListRunsInclude")
 	require.Contains(t, string(content), "map[string]GetTraceInclude")
+	require.Contains(t, string(content), "func ParseListRunsInclude(value string) (ListRunsInclude, error)")
+	require.Contains(t, string(content), "return listRunsIncludeSelector.Parse(value)")
+	require.Contains(t, string(content), "func ParseGetTraceInclude(value string) (GetTraceInclude, error)")
+	require.Contains(t, string(content), "return getTraceIncludeSelector.Parse(value)")
 }
 
 func TestGoName(t *testing.T) {

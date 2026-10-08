@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi2"
+	"github.com/getkin/kin-openapi/openapi2conv"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
@@ -172,6 +174,56 @@ func TestApplyExamplesRejectsInvalidReferences(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRemoveDeprecatedQueryParameters(t *testing.T) {
+	var v2Doc openapi2.T
+	err := json.Unmarshal([]byte(`{
+  "swagger": "2.0",
+  "info": {"title": "test", "version": "1.0"},
+  "paths": {
+    "/widgets/{widgetId}": {
+      "parameters": [
+        {"name": "widgetId", "in": "path", "required": true, "type": "string", "deprecated": true},
+        {"name": "legacyPathQuery", "in": "query", "type": "string", "deprecated": true}
+      ],
+      "get": {
+        "parameters": [
+          {"name": "includeOutput", "in": "query", "type": "boolean", "deprecated": true},
+          {"name": "include", "in": "query", "type": "string"}
+        ],
+        "responses": {"200": {"description": "OK"}}
+      }
+    }
+  }
+}`), &v2Doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	removeDeprecatedQueryParameters(&v2Doc)
+
+	v3Doc, err := openapi2conv.ToV3(&v2Doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathItem := v3Doc.Paths.Find("/widgets/{widgetId}")
+	if pathItem == nil || pathItem.Get == nil {
+		t.Fatal("converted document is missing GET /widgets/{widgetId}")
+	}
+	assertParameterNames(t, []string{"widgetId"}, pathItem.Parameters)
+	assertParameterNames(t, []string{"include"}, pathItem.Get.Parameters)
+}
+
+func assertParameterNames(t *testing.T, expected []string, parameters openapi3.Parameters) {
+	t.Helper()
+	actual := make([]string, 0, len(parameters))
+	for _, parameter := range parameters {
+		if parameter != nil && parameter.Value != nil {
+			actual = append(actual, parameter.Value.Name)
+		}
+	}
+	assertEqual(t, expected, actual)
 }
 
 func writeExamplesFile(t *testing.T, examples string) (string, string) {

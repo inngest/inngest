@@ -67,6 +67,7 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		// Remove internal schema-only paths used only to force schema generation
 		removeInternalPaths(&v2Doc)
 		removeInternalOperations(&v2Doc)
+		removeDeprecatedQueryParameters(&v2Doc)
 
 		// Convert to OpenAPI v3
 		v3Doc, err := openapi2conv.ToV3(&v2Doc)
@@ -225,6 +226,43 @@ func hasTag(op *openapi2.Operation, tag string) bool {
 		}
 	}
 	return false
+}
+
+// removeDeprecatedQueryParameters keeps deprecated protobuf fields available
+// to generated clients and the HTTP gateway without advertising them in the
+// public OpenAPI document.
+// TODO: Move this policy to the native OpenAPI v3 generation path once the
+// pinned grpc-gateway supports v3 output, using Parameter.Deprecated directly.
+func removeDeprecatedQueryParameters(doc *openapi2.T) {
+	if doc.Paths == nil {
+		return
+	}
+
+	for _, pathItem := range doc.Paths {
+		if pathItem == nil {
+			continue
+		}
+		pathItem.Parameters = filterDeprecatedQueryParameters(pathItem.Parameters)
+		for _, operation := range pathItem.Operations() {
+			operation.Parameters = filterDeprecatedQueryParameters(operation.Parameters)
+		}
+	}
+}
+
+func filterDeprecatedQueryParameters(parameters openapi2.Parameters) openapi2.Parameters {
+	filtered := parameters[:0]
+	for _, parameter := range parameters {
+		if parameter == nil {
+			filtered = append(filtered, parameter)
+			continue
+		}
+		deprecated, _ := parameter.Extensions["deprecated"].(bool)
+		if parameter.In == "query" && deprecated {
+			continue
+		}
+		filtered = append(filtered, parameter)
+	}
+	return filtered
 }
 
 // hasCustomStatusCodes checks if an operation has custom success status codes (2xx, non-200)

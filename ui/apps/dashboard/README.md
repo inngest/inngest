@@ -93,8 +93,9 @@ you can sign in using these credentials:
 ### Sandbox Secrets
 
 The `/env/$envSlug/sandboxes` page uses the shared right helper panel for secret
-management, behind the existing `sandbox_api` flag. Organization admins can list,
-create, replace and delete secrets for the selected environment. This requires
+management. Accounts whose plan does not grant sandbox access see an upgrade
+prompt instead. Organization admins can list, create, replace and delete secrets
+for the selected environment. This requires
 the Cloud API's `envSecrets`, `createEnvSecret`, `updateEnvSecretValue` and
 `archiveEnvSecret` GraphQL fields and configured secret storage. The browser
 uses the existing authenticated GraphQL client; it never accesses KMS directly.

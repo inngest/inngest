@@ -28,3 +28,25 @@ export const MetricsEntitlements = createServerFn({
 
   return response.account.entitlements;
 });
+
+const sandboxEntitlementsDocument = graphql(`
+  query SandboxEntitlements {
+    account {
+      id
+      entitlements: ents {
+        sandboxes {
+          enabled
+        }
+      }
+    }
+  }
+`);
+
+// Whether the account's current plan grants sandbox access.
+export const getSandboxesEnabled = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  const response = await graphqlAPI.request(sandboxEntitlementsDocument);
+
+  return response.account.entitlements.sandboxes.enabled;
+});

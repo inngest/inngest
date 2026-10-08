@@ -57,7 +57,16 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
 
-	includeOutput := req.GetIncludeOutput()
+	includeOutput, _, err := runIncludesFromAPI(
+		getFunctionRunIncludeSelector,
+		req.GetIncludeOutput(),
+		req.GetInclude(),
+		GetFunctionRunIncludeOutput,
+		nil,
+	)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
 	run, err := s.runs.GetRun(ctx, runID, GetRunOpts{
 		IncludeOutput: includeOutput,
 	})
@@ -212,11 +221,21 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
+	includeOutput, _, err := runIncludesFromAPI(
+		getEventRunsIncludeSelector,
+		req.GetIncludeOutput(),
+		req.GetInclude(),
+		GetEventRunsIncludeOutput,
+		nil,
+	)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
 	result, err := s.runs.GetRuns(ctx, GetRunsOpts{
 		EventID:       eventID,
 		Cursor:        cursor,
 		Limit:         limit,
-		IncludeOutput: req.GetIncludeOutput(),
+		IncludeOutput: includeOutput,
 	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch event runs")
@@ -336,22 +355,15 @@ func listRunsOpts[T comparable](
 	if err != nil {
 		return GetRunsOpts{}, err
 	}
-	includeOutput := req.GetIncludeOutput()
-	var include []RunListInclude
-	for _, value := range req.GetInclude() {
-		parsed, err := selector.Parse(value)
-		if err != nil {
-			return GetRunsOpts{}, err
-		}
-		if parsed == outputValue {
-			includeOutput = true
-			continue
-		}
-		providerInclude, ok := providerIncludes[parsed]
-		if !ok {
-			return GetRunsOpts{}, fmt.Errorf("unsupported include value %q", value)
-		}
-		include = append(include, providerInclude)
+	includeOutput, include, err := runIncludesFromAPI(
+		selector,
+		req.GetIncludeOutput(),
+		req.GetInclude(),
+		outputValue,
+		providerIncludes,
+	)
+	if err != nil {
+		return GetRunsOpts{}, err
 	}
 
 	return GetRunsOpts{
@@ -369,6 +381,33 @@ func listRunsOpts[T comparable](
 		CEL:           req.GetQuery(),
 		Include:       include,
 	}, nil
+}
+
+func runIncludesFromAPI[T comparable](
+	selector apiv2endpoint.IncludeSelector[T],
+	legacyOutput bool,
+	values []string,
+	outputValue T,
+	providerIncludes map[T]RunListInclude,
+) (bool, []RunListInclude, error) {
+	includeOutput := legacyOutput
+	var include []RunListInclude
+	for _, value := range values {
+		parsed, err := selector.Parse(value)
+		if err != nil {
+			return false, nil, err
+		}
+		if parsed == outputValue {
+			includeOutput = true
+			continue
+		}
+		providerInclude, ok := providerIncludes[parsed]
+		if !ok {
+			return false, nil, fmt.Errorf("unsupported include value %q", value)
+		}
+		include = append(include, providerInclude)
+	}
+	return includeOutput, include, nil
 }
 
 func listRunsPageOpts(cursor string, requestedLimit int32) (string, int, error) {
@@ -541,13 +580,23 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
+	includeOutput, _, err := runIncludesFromAPI(
+		getFunctionTraceIncludeSelector,
+		req.GetIncludeOutput(),
+		req.GetInclude(),
+		GetFunctionTraceIncludeOutput,
+		nil,
+	)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
 
 	rootSpan, err := s.traces.GetSpansByRunID(ctx, runID)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Trace not found")
 	}
 
-	trace, err := toFunctionTrace(ctx, s.traces, rootSpan, req.GetIncludeOutput())
+	trace, err := toFunctionTrace(ctx, s.traces, rootSpan, includeOutput)
 	if err != nil {
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to build trace response")
 	}

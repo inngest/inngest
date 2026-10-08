@@ -86,7 +86,8 @@ The API follows the v2 specification with:
 cd proto && protoc --proto_path=. --proto_path=third_party \
     --openapiv2_out=../docs/openapi/v2 \
     --openapiv2_opt=allow_delete_body=true \
-    --openapiv2_opt=json_names_for_fields=false \
+    --openapiv2_opt=enable_field_deprecation=true \
+    --openapiv2_opt=json_names_for_fields=true \
     api/v2/service.proto
 ```
 
@@ -98,6 +99,7 @@ The custom converter (`tools/convert-openapi/`) provides:
 - **Smart 200 response handling**: Preserves 200 for endpoints without custom success codes
 - **Multi-server configuration**: Converts v2 basePath to v3 servers array
 - **Error schema generation**: Ensures proper error response schemas
+- **Deprecated query parameter removal**: Keeps compatibility fields out of the public specification
 
 **Usage:**
 ```bash

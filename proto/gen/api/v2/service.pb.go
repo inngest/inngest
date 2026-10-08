@@ -2212,9 +2212,11 @@ func (x *FunctionRun) GetDeferredFrom() *RunDeferredFrom {
 }
 
 type GetFunctionRunRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	RunId string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// Deprecated: Marked as deprecated in api/v2/service.proto.
+	IncludeOutput *bool    `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Include       []string `protobuf:"bytes,3,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2256,11 +2258,19 @@ func (x *GetFunctionRunRequest) GetRunId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in api/v2/service.proto.
 func (x *GetFunctionRunRequest) GetIncludeOutput() bool {
 	if x != nil && x.IncludeOutput != nil {
 		return *x.IncludeOutput
 	}
 	return false
+}
+
+func (x *GetFunctionRunRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetFunctionRunResponse struct {
@@ -2316,11 +2326,13 @@ func (x *GetFunctionRunResponse) GetMetadata() *ResponseMetadata {
 }
 
 type GetEventRunsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
-	Cursor        *string                `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
-	Limit         *int32                 `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	EventId string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	// Deprecated: Marked as deprecated in api/v2/service.proto.
+	IncludeOutput *bool    `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Cursor        *string  `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32   `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	Include       []string `protobuf:"bytes,5,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2362,6 +2374,7 @@ func (x *GetEventRunsRequest) GetEventId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in api/v2/service.proto.
 func (x *GetEventRunsRequest) GetIncludeOutput() bool {
 	if x != nil && x.IncludeOutput != nil {
 		return *x.IncludeOutput
@@ -2381,6 +2394,13 @@ func (x *GetEventRunsRequest) GetLimit() int32 {
 		return *x.Limit
 	}
 	return 0
+}
+
+func (x *GetEventRunsRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetEventRunsResponse struct {
@@ -2934,9 +2954,11 @@ func (x *FunctionTrace) GetRootSpan() *TraceSpan {
 }
 
 type GetFunctionTraceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	RunId string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// Deprecated: Marked as deprecated in api/v2/service.proto.
+	IncludeOutput *bool    `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Include       []string `protobuf:"bytes,3,rep,name=include,proto3" json:"include,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2978,11 +3000,19 @@ func (x *GetFunctionTraceRequest) GetRunId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in api/v2/service.proto.
 func (x *GetFunctionTraceRequest) GetIncludeOutput() bool {
 	if x != nil && x.IncludeOutput != nil {
 		return *x.IncludeOutput
 	}
 	return false
+}
+
+func (x *GetFunctionTraceRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
 }
 
 type GetFunctionTraceResponse struct {
@@ -8418,7 +8448,8 @@ func (x *SessionRun) GetEndedAt() *timestamppb.Timestamp {
 }
 
 type ListRunsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: Marked as deprecated in api/v2/service.proto.
 	IncludeOutput *bool                  `protobuf:"varint,1,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
 	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
 	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
@@ -8466,6 +8497,7 @@ func (*ListRunsRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{126}
 }
 
+// Deprecated: Marked as deprecated in api/v2/service.proto.
 func (x *ListRunsRequest) GetIncludeOutput() bool {
 	if x != nil && x.IncludeOutput != nil {
 		return *x.IncludeOutput
@@ -8558,9 +8590,10 @@ func (x *ListRunsRequest) GetInclude() []string {
 }
 
 type ListFunctionRunsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
-	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	AppId      string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// Deprecated: Marked as deprecated in api/v2/service.proto.
 	IncludeOutput *bool                  `protobuf:"varint,3,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
 	Cursor        *string                `protobuf:"bytes,4,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
 	Limit         *int32                 `protobuf:"varint,5,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
@@ -8620,6 +8653,7 @@ func (x *ListFunctionRunsRequest) GetFunctionId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in api/v2/service.proto.
 func (x *ListFunctionRunsRequest) GetIncludeOutput() bool {
 	if x != nil && x.IncludeOutput != nil {
 		return *x.IncludeOutput
@@ -9162,19 +9196,21 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\t_ended_atB\x0e\n" +
 	"\f_duration_msB\t\n" +
 	"\a_outputB\x0e\n" +
-	"\f_is_deferredJ\x04\b\f\x10\rR\x06has_ai\"m\n" +
+	"\f_is_deferredJ\x04\b\f\x10\rR\x06has_ai\"\x82\x02\n" +
 	"\x15GetFunctionRunRequest\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12R\n" +
+	"\x0einclude_output\x18\x02 \x01(\bB&\x92A!2\x1fDeprecated. Use include=output.\x18\x01H\x00R\rincludeOutput\x88\x01\x01\x12k\n" +
+	"\ainclude\x18\x03 \x03(\tBQ\x92AN2COptional run expansions selected by their lowerCamelCase API names.\xf2\x02\x06outputR\aincludeB\x11\n" +
 	"\x0f_include_output\"w\n" +
 	"\x16GetFunctionRunResponse\x12'\n" +
 	"\x04data\x18\x01 \x01(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa9\x02\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xbe\x03\n" +
 	"\x13GetEventRunsRequest\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12R\n" +
+	"\x0einclude_output\x18\x02 \x01(\bB&\x92A!2\x1fDeprecated. Use include=output.\x18\x01H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x03 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12W\n" +
-	"\x05limit\x18\x04 \x01(\x05B<\x92A923Number of runs to return per page (min: 1, max: 40):\x0220H\x02R\x05limit\x88\x01\x01B\x11\n" +
+	"\x05limit\x18\x04 \x01(\x05B<\x92A923Number of runs to return per page (min: 1, max: 40):\x0220H\x02R\x05limit\x88\x01\x01\x12k\n" +
+	"\ainclude\x18\x05 \x03(\tBQ\x92AN2COptional run expansions selected by their lowerCamelCase API names.\xf2\x02\x06outputR\aincludeB\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x97\x01\n" +
@@ -9241,10 +9277,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\a_origin\"V\n" +
 	"\rFunctionTrace\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12.\n" +
-	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"o\n" +
+	"\troot_span\x18\x02 \x01(\v2\x11.api.v2.TraceSpanR\brootSpan\"\x86\x02\n" +
 	"\x17GetFunctionTraceRequest\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12*\n" +
-	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01B\x11\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12R\n" +
+	"\x0einclude_output\x18\x02 \x01(\bB&\x92A!2\x1fDeprecated. Use include=output.\x18\x01H\x00R\rincludeOutput\x88\x01\x01\x12m\n" +
+	"\ainclude\x18\x03 \x03(\tBS\x92AP2EOptional trace expansions selected by their lowerCamelCase API names.\xf2\x02\x06outputR\aincludeB\x11\n" +
 	"\x0f_include_output\"{\n" +
 	"\x18GetFunctionTraceResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.FunctionTraceR\x04data\x124\n" +
@@ -9734,9 +9771,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xbb\v\n" +
-	"\x0fListRunsRequest\x12t\n" +
-	"\x0einclude_output\x18\x01 \x01(\bBH\x92AE2CWhether to include run output. Prefer include=output for run lists.H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\t_ended_at\"\x99\v\n" +
+	"\x0fListRunsRequest\x12R\n" +
+	"\x0einclude_output\x18\x01 \x01(\bB&\x92A!2\x1fDeprecated. Use include=output.\x18\x01H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
 	"\x05limit\x18\x03 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
 	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
@@ -9759,12 +9796,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
 	"\f_is_deferredB\b\n" +
-	"\x06_query\"\x8c\v\n" +
+	"\x06_query\"\xea\n" +
+	"\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
-	"functionId\x12t\n" +
-	"\x0einclude_output\x18\x03 \x01(\bBH\x92AE2CWhether to include run output. Prefer include=output for run lists.H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"functionId\x12R\n" +
+	"\x0einclude_output\x18\x03 \x01(\bB&\x92A!2\x1fDeprecated. Use include=output.\x18\x01H\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x04 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
 	"\x05limit\x18\x05 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
 	"\x04from\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
@@ -9872,7 +9910,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x88\xbd\x01\n" +
+	"\x04INFO\x10\x032\x8b\xbd\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10207,13 +10245,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x10Resume a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16sandboxes:write:resume\x82\xd3\xe4\x93\x02 \"\x1e/sandboxes/{sandbox_id}/resume\x12\xf8\x01\n" +
-	"\x15CreateSandboxSnapshot\x12$.api.v2.CreateSandboxSnapshotRequest\x1a%.api.v2.CreateSandboxSnapshotResponse\"\x91\x01\x92A>\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16sandboxes:write:resume\x82\xd3\xe4\x93\x02 \"\x1e/sandboxes/{sandbox_id}/resume\x12\xfb\x01\n" +
+	"\x15CreateSandboxSnapshot\x12$.api.v2.CreateSandboxSnapshotRequest\x1a%.api.v2.CreateSandboxSnapshotResponse\"\x94\x01\x92A>\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x19Create a sandbox snapshotb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18#\b\x01\x12\x1fsandboxes:write:create_snapshot\x82\xd3\xe4\x93\x02#\"!/sandboxes/{sandbox_id}/snapshots\x12\xd8\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18#\b\x01\x12\x1fsandboxes:write:create_snapshot\x82\xd3\xe4\x93\x02&:\x01*\"!/sandboxes/{sandbox_id}/snapshots\x12\xd8\x01\n" +
 	"\x14ListSandboxSnapshots\x12#.api.v2.ListSandboxSnapshotsRequest\x1a$.api.v2.ListSandboxSnapshotsResponse\"u\x92A;\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x16List sandbox snapshotsb\x10\n" +
