@@ -3,6 +3,14 @@
 
 package types
 
+// From kind.go
+// Scores & warnings get one kind per score name / warning code so each can be
+// replaced on its own (IE `inngest.score.<name>`, `inngest.warning.<code>`).
+const KindPrefixInngestScore = "inngest.score."
+
+// From kind.go
+const KindPrefixInngestWarning = "inngest.warning."
+
 // From score.go
 const (
 	KindInngestScore = "inngest.score"

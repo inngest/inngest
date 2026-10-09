@@ -11,7 +11,7 @@ import {
   TimeElement,
 } from '../DetailsCard/Element';
 import { RerunModal as NewRerunModal, RerunModal } from '../Rerun/RerunModal';
-import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
+import { ScoresAttrs, isScoreKind } from '../RunDetails/ScoresAttrs';
 import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
@@ -149,8 +149,8 @@ export const StepInfo = ({
 
   const { booleanFlag } = useBooleanFlag();
   const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
-  const scoreMetadata = trace.metadata?.filter((md) => md.kind === 'inngest.score') ?? [];
-  const nonScoreMetadata = trace.metadata?.filter((md) => md.kind !== 'inngest.score') ?? [];
+  const scoreMetadata = trace.metadata?.filter((md) => isScoreKind(md.kind)) ?? [];
+  const nonScoreMetadata = trace.metadata?.filter((md) => !isScoreKind(md.kind)) ?? [];
   const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   useEffect(() => {
