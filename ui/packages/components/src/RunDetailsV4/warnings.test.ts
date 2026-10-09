@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type SpanMetadata } from './types';
+import { isWarningMetadata, type SpanMetadata } from './types';
 import { getStepWarnings, summarizeWarnings } from './warnings';
 
 const warningsMd = (values: Record<string, unknown>): SpanMetadata =>
@@ -157,5 +157,18 @@ describe('getStepWarnings with both storage forms', () => {
         { scope: 'step', kind: 'userland.warning.a', updatedAt: '', values: { a: 'x' } },
       ] as SpanMetadata[])
     ).toEqual([]);
+  });
+});
+
+describe('isWarningMetadata', () => {
+  const withKind = (kind: string): SpanMetadata =>
+    ({ scope: 'step', kind, updatedAt: '', values: {} } as SpanMetadata);
+
+  it('matches both forms and nothing else', () => {
+    expect(isWarningMetadata(withKind('inngest.warnings'))).toBe(true);
+    expect(isWarningMetadata(withKind('inngest.warning.dynamic_step'))).toBe(true);
+    expect(isWarningMetadata(withKind('inngest.warningsfoo'))).toBe(false);
+    expect(isWarningMetadata(withKind('inngest.warning'))).toBe(false);
+    expect(isWarningMetadata(withKind('userland.warnings'))).toBe(false);
   });
 });

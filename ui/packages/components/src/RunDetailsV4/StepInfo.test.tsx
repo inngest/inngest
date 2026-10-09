@@ -433,19 +433,6 @@ describe('Debug Run ID', () => {
   });
 });
 
-describe('Added by', () => {
-  it('names the library that added the step', () => {
-    renderStepInfo(makeTrace({ origin: '@inngest/ci@0.1.0' }));
-    const wrapper = document.querySelector('[data-label="Added by"]');
-    expect(wrapper!.textContent).toBe('@inngest/ci@0.1.0');
-  });
-
-  it('is hidden for the user’s own steps', () => {
-    renderStepInfo(makeTrace({ origin: null }));
-    expect(document.querySelector('[data-label="Added by"]')).toBeNull();
-  });
-});
-
 describe('Step warnings callout', () => {
   const warningsMetadata = (values: Record<string, string>) =>
     [

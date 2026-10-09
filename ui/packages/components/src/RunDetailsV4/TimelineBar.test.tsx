@@ -318,33 +318,6 @@ describe('TimelineBar', () => {
   });
 });
 
-describe('TimelineBar dimmed', () => {
-  const props = {
-    name: 'create sandbox',
-    duration: 1234,
-    startPercent: 10,
-    widthPercent: 25,
-    depth: 0,
-    leftWidth: 40,
-    style: 'step.run' as const,
-  };
-
-  it('fades the name, duration and bar', () => {
-    render(<TimelineBar {...props} dimmed />, { wrapper: Wrapper });
-
-    expect(screen.getByText('create sandbox').className).toContain('text-light');
-    expect(screen.getByText('1.234s').className).toContain('text-light');
-    expect(screen.getByTestId('timeline-bar-track').className).toContain('opacity-50');
-  });
-
-  it('draws a row at full strength by default', () => {
-    render(<TimelineBar {...props} />, { wrapper: Wrapper });
-
-    expect(screen.getByText('create sandbox').className).not.toContain('text-light');
-    expect(screen.getByTestId('timeline-bar-track').className).not.toContain('opacity-50');
-  });
-});
-
 describe('TimelineBar warning icon', () => {
   const defaultProps = {
     name: 'Test Step',

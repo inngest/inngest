@@ -28,7 +28,6 @@ import {
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
-import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { getStepWarnings, type StepWarning } from '../warnings';
 import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { TIMELINE_CONSTANTS } from './timing';
@@ -343,9 +342,6 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
     scores: getScores(trace.metadata),
-    sandbox: sandboxBarData(trace),
-    groupKind: trace.groupKind ?? undefined,
-    dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
     warnings: getWarnings(trace.metadata),
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
@@ -519,7 +515,6 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     debugSessionID: last.debugSessionID,
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
-    origin: last.origin,
     metadata: rolledUpMetadata(attempts, last), // scores from the last attempt, warnings from all
     origin: last.origin,
     userlandSpan: null,
@@ -582,7 +577,6 @@ function rollupFinalization(
     debugRunID: last.debugRunID,
     debugSessionID: last.debugSessionID,
     childrenSpans: toAttemptChildren(attempts),
-    origin: last.origin,
     metadata: rolledUpMetadata(attempts, last),
     origin: last.origin,
     stepInfo: null,
