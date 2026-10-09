@@ -676,7 +676,9 @@ type RunTraceSpanResponseInfo {
 
 type SpanMetadata {
   scope: SpanMetadataScope!
+  "The kind, with or without its userland/inngest prefix depending on the trace store; isUser disambiguates."
   kind: SpanMetadataKind!
+  isUser: Boolean!
   values: SpanMetadataValues!
   updatedAt: Time!
 }

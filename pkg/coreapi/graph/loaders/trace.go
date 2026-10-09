@@ -586,14 +586,24 @@ func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*mode
 		gqlSpan.EndedAt = nil
 	}
 
-	for _, md := range span.Metadata {
-		gqlSpan.Metadata = append(gqlSpan.Metadata, &models.SpanMetadata{
+	gqlSpan.Metadata = append(gqlSpan.Metadata, spanMetadataToGQL(span.Metadata)...)
+
+	return gqlSpan, nil
+}
+
+// spanMetadataToGQL maps a span's metadata to GQL as-is. Kinds keep whatever
+// prefix the store returned (full on the cqrs path, stripped on DuckDB's), so
+// IsUser is what tells a user kind from an internal one w/ the same name.
+func spanMetadataToGQL(mds []*cqrs.SpanMetadata) []*models.SpanMetadata {
+	out := make([]*models.SpanMetadata, 0, len(mds))
+	for _, md := range mds {
+		out = append(out, &models.SpanMetadata{
 			Kind:      md.Kind,
+			IsUser:    md.IsUser,
 			Scope:     md.Scope,
 			Values:    md.Values,
 			UpdatedAt: md.UpdatedAt,
 		})
 	}
-
-	return gqlSpan, nil
+	return out
 }
