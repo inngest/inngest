@@ -27,6 +27,7 @@ packages:
         | typeof KindInngestResponseHeaders
         | typeof KindInngestTiming
         | typeof KindInngestExperiment
+        | typeof KindInngestSandbox
         | SpanMetadataKindInngestWarnings
         | SpanMetadataKindInngestScore
         | SpanMetadataKindUserland;

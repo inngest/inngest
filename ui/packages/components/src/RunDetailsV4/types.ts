@@ -1,6 +1,7 @@
 import { isScoreKind } from '../RunDetails/ScoresAttrs';
 import {
   KindInngestAISummary,
+  KindInngestSandbox,
   KindInngestWarnings,
   KindPrefixInngestWarning,
   type AIMetadata,
@@ -9,6 +10,7 @@ import {
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   type SpanMetadataKindInngestWarnings as GeneratedSpanMetadataKindInngestWarnings,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
+  type SandboxMetadata,
   type Warnings,
 } from '../generated/index';
 
@@ -29,6 +31,10 @@ export type Trace = {
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
   stepOp?: string | null;
   stepType?: string | null;
+  /** A span group's kind, as its caller named it, like `job` or `agent` */
+  groupKind?: string | null;
+  /** The library that created this step or span group, as `<package>@<version>` */
+  origin?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
   debugRunID?: string | null;
@@ -60,6 +66,7 @@ export type SpanMetadata =
   | SpanMetadataInngestHTTPTiming
   | SpanMetadataInngestTiming
   | SpanMetadataInngestResponseHeaders
+  | SpanMetadataInngestSandbox
   | SpanMetadataInngestScore
   | SpanMetadataInngestWarnings
   | SpanMetadataUserland
@@ -149,6 +156,13 @@ export type SpanMetadataInngestWarnings = {
   kind: SpanMetadataKindInngestWarnings;
   updatedAt: string;
   values: Warnings;
+};
+
+export type SpanMetadataInngestSandbox = {
+  scope: SpanMetadataScope;
+  kind: typeof KindInngestSandbox;
+  updatedAt: string;
+  values: SandboxMetadata;
 };
 
 export type SpanMetadataInngestScore = {
@@ -260,6 +274,10 @@ export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInnges
   return md.kind === 'inngest.experiment';
 }
 
+export function isSandboxMetadata(md: SpanMetadata): md is SpanMetadataInngestSandbox {
+  return md.kind === KindInngestSandbox;
+}
+
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
   return isScoreKind(md.kind);
 }
@@ -276,4 +294,12 @@ export function isWarningMetadata(md: SpanMetadata): md is SpanMetadataInngestWa
 
 export function isAISummaryMetadata(md: SpanMetadata): md is SpanMetadataInngestAISummary {
   return md.kind === KindInngestAISummary;
+}
+
+/**
+ * Whether a span is a virtual span group: the steps an SDK called inside a
+ * span, nested by the API.
+ */
+export function isSpanGroup(trace: Pick<Trace, 'stepType'>): boolean {
+  return trace.stepType === 'SPAN_GROUP';
 }

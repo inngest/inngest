@@ -20,12 +20,14 @@ import { traceWalk } from '../runDetailsUtils';
 import {
   isExperimentMetadata,
   isScoreMetadata,
+  isSpanGroup,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
+import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -37,6 +39,15 @@ function isStepRunSpan(trace: Trace): boolean {
 
 function isNonStepSpan(trace: Trace): boolean {
   return !trace.stepOp && !trace.stepType;
+}
+
+/**
+ * Whether Inngest's own libraries (`inngest` or any `@inngest/*` package)
+ * created this row, rather than the user's code. An origin is
+ * `<package>@<version>`.
+ */
+function isInngestOrigin(origin: string | null | undefined): boolean {
+  return /^(inngest|@inngest\/[^@]+)(@|$)/.test(origin ?? '');
 }
 
 /**
@@ -72,6 +83,8 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
       return 'step.waitForEvent';
     case 'INVOKE':
       return 'step.invoke';
+    case 'SPAN_GROUP':
+      return 'span.group';
     default:
       return 'step.run';
   }
@@ -305,6 +318,9 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
     scores: getScores(trace.metadata),
+    sandbox: sandboxBarData(trace),
+    groupKind: trace.groupKind ?? undefined,
+    dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
   };
 }
 
@@ -327,8 +343,6 @@ type RollupGroups = {
   ungroupedFinalizations: Trace[];
   /** attempt spans of the trailing group that never matched a step, if any */
   finalizationAttempts: Map<number, Trace> | null;
-  /** step span with the latest endedAt; finalization can't start before it ends */
-  lastStep: Trace | null;
 };
 
 /**
@@ -352,8 +366,6 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
   const steps = new Map<string, Map<number, Trace>>();
   const ungroupedFinalizations: Trace[] = [];
   const groupedSpans = new Map<string, Map<number, Trace>>();
-  let lastStepEndedAt: Date | null = null;
-  let lastStep: Trace | null = null;
   let finalSpan: Trace | null = null;
 
   for (const child of children) {
@@ -381,12 +393,6 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
       stepOrder.push(child.stepID);
     }
 
-    const endedAt = toMaybeDate(child.endedAt);
-    if (!lastStepEndedAt || (endedAt && endedAt > lastStepEndedAt)) {
-      lastStepEndedAt = endedAt;
-      lastStep = child;
-    }
-
     const attempts = steps.get(child.stepID) ?? new Map<number, Trace>();
     if (child.groupID) {
       // Associate any other spans with the same groupID (IE network failures/similar) with this step
@@ -403,7 +409,29 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
     ? groupedSpans.get(finalSpan.groupID) ?? null
     : null;
 
-  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
+  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts };
+}
+
+/**
+ * The latest end time across these spans and everything nested under them
+ * (span groups, step attempts), or null if none of it has ended. Unfinished
+ * work has no end yet, so it never pulls the result earlier or to zero.
+ */
+function latestEnd(spans: Trace[] | undefined): string | null {
+  let latest: string | null = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
+
+  for (const span of spans ?? []) {
+    for (const candidate of [span.endedAt, latestEnd(span.childrenSpans)]) {
+      const ms = candidate ? new Date(candidate).getTime() : Number.NaN;
+      if (ms > latestMs) {
+        latest = candidate ?? null;
+        latestMs = ms;
+      }
+    }
+  }
+
+  return latest;
 }
 
 /** First (lowest attempt number) and last (highest) attempt spans of a group */
@@ -463,6 +491,7 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
     metadata: last.metadata,
+    origin: last.origin,
     userlandSpan: null,
   };
 }
@@ -492,9 +521,11 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
  * "Finalization", matching the pre-existing default and avoiding label
  * flicker for groups that aren't cleanly resolved as failures.
  */
-function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
+function rollupFinalization(
+  attempts: Map<number, Trace>,
+  notBefore: string | null | undefined
+): Trace {
   const { first, last } = attemptBounds(attempts);
-  const notBefore = lastStep?.endedAt;
   const name = last.status === 'FAILED' ? 'Function error' : 'Finalization';
 
   if (attempts.size === 1) {
@@ -522,6 +553,7 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
     debugSessionID: last.debugSessionID,
     childrenSpans: toAttemptChildren(attempts),
     metadata: last.metadata,
+    origin: last.origin,
     stepInfo: null,
     userlandSpan: null,
   };
@@ -542,11 +574,23 @@ export function traceRollup(root: Trace): Trace {
   // branch). The helpers below rename/reshape spans in place, which is safe
   // precisely because they only ever see this clone.
   root = structuredClone(root);
+  root.childrenSpans = rollupChildren(root.childrenSpans ?? []);
+  return root;
+}
 
-  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
-    collectRollupGroups(root.childrenSpans ?? []);
+/**
+ * Roll up one level of a trace: the run's children, or a span group's, whose
+ * steps retry as separate spans just like the run's do.
+ */
+function rollupChildren(children: Trace[]): Trace[] {
+  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts } = collectRollupGroups(
+    children.filter((child) => !isSpanGroup(child))
+  );
 
-  const rolledUpRunChildren: Trace[] = [];
+  const rolledUpRunChildren = children.filter(isSpanGroup);
+  for (const group of rolledUpRunChildren) {
+    group.childrenSpans = rollupChildren(group.childrenSpans ?? []);
+  }
 
   for (const stepID of stepOrder) {
     const attempts = steps.get(stepID);
@@ -558,7 +602,9 @@ export function traceRollup(root: Trace): Trace {
 
   let finalization: Trace | null = null;
   if (finalizationAttempts) {
-    finalization = rollupFinalization(finalizationAttempts, lastStep);
+    // Finalization can't start before any step work ends, however deeply a
+    // span group nests it
+    finalization = rollupFinalization(finalizationAttempts, latestEnd(rolledUpRunChildren));
     rolledUpRunChildren.push(finalization);
   }
 
@@ -574,9 +620,17 @@ export function traceRollup(root: Trace): Trace {
 
   const sortingKey = (trace: Trace) =>
     toMaybeDate(trace.queuedAt)?.getTime() ?? toMaybeDate(trace.startedAt)?.getTime() ?? 0;
-  root.childrenSpans = rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
+  return rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
+}
 
-  return root;
+/**
+ * Replace each span group with the steps inside it, at any depth, so a group
+ * counts only its steps' time and not the gaps between them.
+ */
+function withoutSpanGroups(bars: TimelineBarData[]): TimelineBarData[] {
+  return bars.flatMap((bar) => {
+    return bar.style === 'span.group' ? withoutSpanGroups(bar.children ?? []) : [bar];
+  });
 }
 
 /**
@@ -623,11 +677,12 @@ export function traceToTimelineData(
   // Sum execution time from all step children, and attribute the rest to Inngest overhead.
   // For children without a timingBreakdown (sleep, waitForEvent, invoke, etc.),
   // use their wall-clock duration as execution time so it isn't misattributed as overhead.
+  const steps = withoutSpanGroups(rootBar.children ?? []);
   if (rootBar.endTime) {
     const runDurationMs = rootBar.endTime.getTime() - rootBar.startTime.getTime();
     if (runDurationMs > 0) {
       let totalExecutionMs = 0;
-      for (const child of rootBar.children ?? []) {
+      for (const child of steps) {
         if (child.timingBreakdown) {
           totalExecutionMs += child.timingBreakdown.executionMs;
         } else if (child.endTime) {
@@ -656,7 +711,7 @@ export function traceToTimelineData(
 
     // Finalization: time after last step ended until run ended
     let lastStepEndedAtMs = 0;
-    for (const child of rootBar.children ?? []) {
+    for (const child of steps) {
       if (child.endTime) {
         lastStepEndedAtMs = Math.max(lastStepEndedAtMs, child.endTime.getTime());
       }
@@ -677,6 +732,7 @@ export function traceToTimelineData(
   // Include the root bar in the rendered bars so users can click it
   // to return to the TopInfo view (Input/Function Payload)
   const bars = [rootBar];
+  badgeSandboxes(bars);
 
   return {
     minTime,

@@ -5,6 +5,8 @@
 
 import type { ReactNode } from 'react';
 
+import type { SandboxBarData } from './utils/sandboxes';
+
 // ============================================================================
 // Core Component Types
 // ============================================================================
@@ -44,6 +46,7 @@ export type BarStyleKey =
   | 'step.sleep'
   | 'step.waitForEvent'
   | 'step.invoke'
+  | 'span.group'
   // Timing categories
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
@@ -229,6 +232,15 @@ export interface TimelineBarProps {
 
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
+
+  /** The sandbox this row ran on (shows an `S1` badge before its name) */
+  sandbox?: SandboxBarData;
+
+  /** A span group's kind, shown as a tag before its name */
+  groupKind?: string;
+
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**
@@ -326,6 +338,15 @@ export interface TimelineBarData {
 
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
+
+  /** The sandbox this row ran on, from `inngest.sandbox` metadata */
+  sandbox?: SandboxBarData;
+
+  /** A span group's kind, as its caller named it */
+  groupKind?: string;
+
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**

@@ -200,9 +200,17 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.Attr(meta.Attrs.StepName, &stepName),
 	)
 
-	// Try get stack line
-	if stack, err := op.StackLine(); err == nil && stack != nil && *stack != "" {
-		meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, stack)
+	var opts state.GenericOpts
+	if err := opts.UnmarshalAny(op.Opts); err == nil {
+		if opts.StackLine != "" {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, &opts.StackLine)
+		}
+		if len(opts.Span.Value) > 0 {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepSpanPath, &opts.Span.Value)
+		}
+		if opts.Origin.Value != "" {
+			meta.AddAttr(rawAttrs, meta.Attrs.StepOrigin, &opts.Origin.Value)
+		}
 	}
 
 	// Always try to capture input

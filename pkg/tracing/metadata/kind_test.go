@@ -47,6 +47,11 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name:    "inngest.sandbox is allowed",
+			kind:    KindInngestSandbox,
+			wantErr: nil,
+		},
+		{
 			name:    "bare inngest.score is allowed",
 			kind:    KindInngestScore,
 			wantErr: nil,

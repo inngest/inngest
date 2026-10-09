@@ -5731,9 +5731,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		}
 		expr = &interpolated
 
-		// Update the generator to use the interpolated data, ensuring history is updated.
-		opts.If = expr
-		gen.Opts = opts
+		// Update the generator to use the interpolated data, ensuring history
+		// is updated. Only `if` changes, so the SDK's other opts survive.
+		if err := gen.SetOpt("if", interpolated); err != nil {
+			return fmt.Errorf("error updating wait for event opts: %w", err)
+		}
 	}
 
 	opcode := gen.Op.String()

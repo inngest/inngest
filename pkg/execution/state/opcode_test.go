@@ -392,3 +392,32 @@ func TestInvokeFunctionOptsPreservesSessionNulls(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratorOpcode_SetOpt(t *testing.T) {
+	// Interpolating a waitForEvent `if` must keep the SDK's other opts.
+	raw := `{"if":"async.data.id == event.data.id","stackLine":"fn.ts:12","parallelMode":"race"}`
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
+
+	for _, opts := range []any{[]byte(raw), decoded} {
+		op := GeneratorOpcode{Op: enums.OpcodeWaitForEvent, Opts: opts}
+		require.NoError(t, op.SetOpt("if", "async.data.id == 'u_1'"))
+		assert.Equal(t, map[string]any{
+			"if":           "async.data.id == 'u_1'",
+			"stackLine":    "fn.ts:12",
+			"parallelMode": "race",
+		}, op.Opts)
+	}
+
+	empty := GeneratorOpcode{}
+	require.NoError(t, empty.SetOpt("if", "true"))
+	assert.Equal(t, map[string]any{"if": "true"}, empty.Opts)
+}
+
+func TestGenericOptsMalformedSpanKeepsStackLine(t *testing.T) {
+	var opts GenericOpts
+	require.NoError(t, opts.UnmarshalAny([]byte(`{"stackLine":"fn.ts:1","span":"nope","origin":1}`)))
+	assert.Equal(t, "fn.ts:1", opts.StackLine)
+	assert.Empty(t, opts.Span.Value)
+	assert.Empty(t, opts.Origin.Value)
+}

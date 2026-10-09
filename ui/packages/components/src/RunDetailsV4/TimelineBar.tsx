@@ -168,6 +168,10 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'uppercase',
     statusBased: true,
   },
+  'span.group': {
+    barColor: 'bg-status-completed',
+    statusBased: true,
+  },
   default: {
     barColor: 'bg-surfaceMuted',
     statusBased: true,
@@ -833,6 +837,9 @@ export function TimelineBar({
   insideExperiment,
   experimentMetadata,
   scores,
+  sandbox,
+  groupKind,
+  dimmed,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -922,10 +929,27 @@ export function TimelineBar({
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-                barStyle.textColor ?? 'text-basis',
+                dimmed ? 'text-light' : barStyle.textColor ?? 'text-basis',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
+              {groupKind && (
+                <span
+                  data-testid="group-kind-tag"
+                  className="bg-info text-info mr-1.5 inline-block shrink-0 rounded px-1.5 align-middle font-sans text-[0.66rem] font-semibold uppercase leading-4 tracking-[0.04em]"
+                >
+                  {groupKind}
+                </span>
+              )}
+              {sandbox?.badge && (
+                <span
+                  data-testid="sandbox-badge"
+                  title={sandbox.label}
+                  className="text-light mr-1.5 align-middle font-mono text-[11px]"
+                >
+                  {sandbox.badge}
+                </span>
+              )}
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
@@ -955,7 +979,7 @@ export function TimelineBar({
           <span
             className={cn(
               'shrink-0 text-xs font-medium tabular-nums',
-              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+              dimmed ? 'text-light' : barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
             )}
           >
             {formatDuration(duration)}
@@ -993,7 +1017,10 @@ export function TimelineBar({
           )}
 
           {/* Bar container, centered vertically */}
-          <div className="absolute inset-y-0 flex w-full items-center">
+          <div
+            data-testid="timeline-bar-track"
+            className={cn('absolute inset-y-0 flex w-full items-center', dimmed && 'opacity-50')}
+          >
             {transformed && (
               <>
                 <VisualBar
