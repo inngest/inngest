@@ -163,7 +163,7 @@ func TestInsightsRunsMacroIsolatesByEnv(t *testing.T) {
 	require.Equal(t, []string{"run-a"}, runIDs)
 }
 
-func TestInsightsRunsMacroMergesRunScopedMetadata(t *testing.T) {
+func TestInsightsRunsMacroCollectsRunScopedMetadataByKind(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 	accountID, envID := uuid.New(), uuid.New()
