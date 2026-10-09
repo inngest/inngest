@@ -202,19 +202,6 @@ func unmarshalOpts(opts any, v any) error {
 	return json.Unmarshal(byt, v)
 }
 
-func (g GeneratorOpcode) StackLine() (*string, error) {
-	opts := &GenericOpts{}
-	if err := opts.UnmarshalAny(g.Opts); err != nil {
-		return nil, err
-	}
-
-	if opts.StackLine == "" {
-		return nil, nil
-	}
-
-	return &opts.StackLine, nil
-}
-
 // Returns, if any, the type of a StepRun operation.
 func (g GeneratorOpcode) RunType() string {
 	opts, err := g.RunOpts()
