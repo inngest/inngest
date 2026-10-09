@@ -9,11 +9,13 @@ export function APIKeyPanel({
   children,
   onClose,
   saving = false,
+  closeLabel = 'Close API key panel',
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   saving?: boolean;
+  closeLabel?: string;
 }) {
   const closeButton = useRef<HTMLButtonElement>(null);
 
@@ -34,7 +36,7 @@ export function APIKeyPanel({
               appearance="ghost"
               size="small"
               icon={<RiCloseLine />}
-              aria-label="Close API key panel"
+              aria-label={closeLabel}
               disabled={saving}
               onClick={onClose}
             />
