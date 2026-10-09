@@ -5635,6 +5635,12 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	if span != nil {
 		_ = span.Send()
+
+		// Attach step metadata to the invoke span now, at planning time. The
+		// invoke span's ID is random rather than the deterministic finalized
+		// step ID, so metadata must parent on the span's own ref (the same
+		// ref that is stored on the pause and updated on resolve).
+		e.handleGeneratorMetadataOnSpan(ctx, runCtx, &gen, span.Ref)
 	}
 
 	// Attach the v2 invoke span ref to the invocation event so the invoked
@@ -6458,6 +6464,30 @@ func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution
 		// For now, we hardcode extra metadata to be step attempt-scoped, as that's the only place we use it and it makes the most sense for it to be tied to the specific attempt that emitted it.
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata.extra", ex, enums.MetadataScopeStepAttempt, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator extra metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
+		}
+	}
+}
+
+// handleGeneratorMetadataOnSpan is handleGeneratorMetadata for ops whose step
+// span is not the deterministic finalized step span (e.g. step.invoke, whose
+// planned span has a random ID). Step and step-attempt scoped metadata is
+// parented on stepSpan; run and request scoped metadata behave as usual.
+func (e *executor) handleGeneratorMetadataOnSpan(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, stepSpan *meta.SpanReference) {
+	for _, md := range gen.Metadata {
+		var err error
+
+		switch md.Scope {
+		case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
+			attrs := tracing.GeneratorAttrs(gen)
+			attempt := runCtx.AttemptCount()
+			meta.AddAttr(attrs, meta.Attrs.StepAttempt, &attempt)
+			_, err = e.createMetadataSpanOnParent(ctx, runCtx, "executor.handleGeneratorMetadataOnSpan", md, md.Scope, stepSpan, attrs)
+		default:
+			_, err = e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadataOnSpan", md, md.Scope, gen)
+		}
+
+		if err != nil {
+			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}
 	}
 }
