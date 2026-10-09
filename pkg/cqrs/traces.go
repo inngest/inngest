@@ -354,8 +354,12 @@ type SpanLink struct {
 }
 
 type SpanMetadata struct {
-	Scope     metadata.Scope  `json:"scope"`
+	Scope metadata.Scope `json:"scope"`
+	// Kind is the full kind (e.g. "userland.foo") on the cqrs read path, but
+	// stripped of its userland/inngest prefix (e.g. "foo") when read from
+	// DuckDB's inngest.run_metadata. IsUser tells the two apart either way.
 	Kind      metadata.Kind   `json:"kind"`
+	IsUser    bool            `json:"is_user"`
 	Values    metadata.Values `json:"values"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }

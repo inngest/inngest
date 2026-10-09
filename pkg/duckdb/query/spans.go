@@ -39,7 +39,7 @@ const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_ti
 func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	query := fmt.Sprintf(
 		`WITH latest_metadata AS (
-		   SELECT %s, m.scope, m.kind, m.values, m.created_at
+		   SELECT %s, m.scope, m.kind, m.is_user, m.values, m.created_at
 		   FROM %s.run_trace_spans s
 		   LEFT JOIN %s.run_metadata m
 		    ON m.account_id = s.account_id AND m.env_id = s.env_id
@@ -52,7 +52,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		 )
 		 SELECT
 		   %s,
-		   list({'scope': scope, 'kind': kind, 'values': values, 'created_at': created_at})
+		   list({'scope': scope, 'kind': kind, 'is_user': is_user, 'values': values, 'created_at': created_at})
 		     FILTER (WHERE kind IS NOT NULL) AS metadata
 		 FROM latest_metadata
 		 GROUP BY %s
@@ -314,7 +314,7 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 }
 
 // scanSpanMetadata decodes GetSpansByRunID's aggregated
-// LIST(STRUCT(scope, kind, values, created_at)) metadata column. Both
+// LIST(STRUCT(scope, kind, is_user, values, created_at)) metadata column. Both
 // transports decode a DuckDB LIST/STRUCT the same way any other JSON value
 // decodes -- a []any of map[string]any, not a native Go struct -- so this
 // reads exactly like asMap/asJSON's handling of any other JSON-typed
@@ -352,6 +352,11 @@ func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
 			return nil, err
 		}
 
+		isUser, err := asNullableBool(entry["is_user"], "metadata.is_user")
+		if err != nil {
+			return nil, err
+		}
+
 		updatedAt, err := asTimestamp(entry["created_at"], "metadata.created_at")
 		if err != nil {
 			return nil, err
@@ -373,6 +378,7 @@ func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
 		out = append(out, &cqrs.SpanMetadata{
 			Scope:     scope,
 			Kind:      metadata.Kind(kind),
+			IsUser:    isUser,
 			Values:    mv,
 			UpdatedAt: updatedAt,
 		})
