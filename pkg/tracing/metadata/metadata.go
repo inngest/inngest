@@ -68,6 +68,8 @@ func (m *Values) FromStruct(v any) error {
 	return json.Unmarshal(data, m)
 }
 
+// Combine folds o into m. New writes are always set, the other ops are
+// legacy but still need folding for stored metadata.
 func (m Values) Combine(o Values, op enums.MetadataOpcode) error {
 	switch op {
 	case enums.MetadataOpcodeMerge:
