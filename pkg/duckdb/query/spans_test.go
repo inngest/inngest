@@ -89,6 +89,62 @@ func TestGetSpansByRunIDAttachesMetadataViaJoin(t *testing.T) {
 	require.JSONEq(t, `4`, string(child.Metadata[0].Values["v"]))
 }
 
+// TestGetSpansByRunIDAgreesWithMetadataRollup seeds one fixture and checks
+// GetSpansByRunID and inngest.run_metadata_rollup pick the same row per
+// kind: a later emission that drops a key, a null value, a created_at tie,
+// and user/internal kinds w/ the same prefix-stripped name.
+func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
+
+	seed := func(kind string, isUser bool, values string, createdAt time.Time) {
+		seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "run", kind, isUser, values, createdAt)
+	}
+	seed("dropped", true, `{"x": 1, "y": 2}`, now)
+	seed("dropped", true, `{"x": null}`, now.Add(time.Second))
+	seed("tied", true, `{"v": 2}`, now)
+	seed("tied", true, `{"v": 1}`, now)
+	seed("shared", true, `{"user": true}`, now)
+	seed("shared", false, `{"internal": true}`, now)
+
+	root, err := m.GetSpansByRunID(ctx, runID)
+	require.NoError(t, err)
+
+	// GetSpansByRunID doesn't return is_user, so split by values shape.
+	spans := map[bool]map[string]any{true: {}, false: {}}
+	for _, md := range root.Metadata {
+		byt, err := json.Marshal(md.Values)
+		require.NoError(t, err)
+		var values map[string]any
+		require.NoError(t, json.Unmarshal(byt, &values))
+		_, internal := values["internal"]
+		spans[!internal][string(md.Kind)] = values
+	}
+
+	var user, internal any
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT user_metadata, internal_metadata FROM inngest.run_metadata_rollup WHERE run_id = ? AND span_id = ?;`,
+		runID.String(), "root-span",
+	).Scan(&user, &internal))
+
+	require.Equal(t, map[string]any{
+		"dropped": map[string]any{"x": nil},
+		"tied":    map[string]any{"v": float64(2)},
+		"shared":  map[string]any{"user": true},
+	}, user)
+	require.Equal(t, map[string]any{"shared": map[string]any{"internal": true}}, internal)
+	require.Equal(t, user, spans[true])
+	require.Equal(t, internal, spans[false])
+}
+
 func TestGetSpansByRunIDBuildsTreeFromFlatRows(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
