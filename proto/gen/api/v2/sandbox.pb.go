@@ -1311,9 +1311,11 @@ func (x *SandboxSnapshot) GetName() string {
 type CreateSandboxSnapshotRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	SandboxId string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
-	// Unique in the environment among snapshots that are creating, or ready and
-	// not expired. A name held by such a snapshot is rejected with
-	// sandbox_snapshot_name_taken; any other snapshot's name can be reused.
+	// Unique in the environment among snapshots that are creating, deleting, or
+	// ready and not expired. A name held by such a snapshot is rejected with
+	// sandbox_snapshot_name_taken; any other snapshot's name can be reused. A
+	// delete that fails restores the snapshot, so its name stays held until the
+	// delete finishes.
 	Name          *string `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
