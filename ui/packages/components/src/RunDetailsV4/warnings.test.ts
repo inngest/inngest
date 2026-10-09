@@ -161,11 +161,14 @@ describe('getStepWarnings with both storage forms', () => {
 });
 
 describe('isWarningMetadata', () => {
+  const withKind = (kind: string): SpanMetadata =>
+    ({ scope: 'step', kind, updatedAt: '', values: {} } as SpanMetadata);
+
   it('matches both forms and nothing else', () => {
-    expect(isWarningMetadata({ kind: 'inngest.warnings' })).toBe(true);
-    expect(isWarningMetadata({ kind: 'inngest.warning.dynamic_step' })).toBe(true);
-    expect(isWarningMetadata({ kind: 'inngest.warningsfoo' })).toBe(false);
-    expect(isWarningMetadata({ kind: 'inngest.warning' })).toBe(false);
-    expect(isWarningMetadata({ kind: 'userland.warnings' })).toBe(false);
+    expect(isWarningMetadata(withKind('inngest.warnings'))).toBe(true);
+    expect(isWarningMetadata(withKind('inngest.warning.dynamic_step'))).toBe(true);
+    expect(isWarningMetadata(withKind('inngest.warningsfoo'))).toBe(false);
+    expect(isWarningMetadata(withKind('inngest.warning'))).toBe(false);
+    expect(isWarningMetadata(withKind('userland.warnings'))).toBe(false);
   });
 });
