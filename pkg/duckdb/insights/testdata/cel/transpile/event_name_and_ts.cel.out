@@ -1,0 +1,14 @@
+INPUT
+event.name == "test/hello" && event.ts > 1727291508963
+
+EVENT SQL
+(((x::JSON->>?) = ?) AND (TRY_CAST((x::JSON->>?) AS DOUBLE) > ?))
+
+EVENT ARGS
+[$.name test/hello $.ts 1727291508963]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]
