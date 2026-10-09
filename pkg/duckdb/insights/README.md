@@ -44,9 +44,9 @@ underlying physical table directly:
 
 | Logical table | What it is |
 |---|---|
-| `runs` | One row per `run_id` (latest state), plus merged run-scoped metadata as `metadata`/`inngest` |
+| `runs` | One row per `run_id` (latest state), plus run-scoped metadata (latest emission per `kind`) as `metadata`/`inngest` |
 | `events` | Ingested events |
-| `metadata` | One row per `(run_id, span_id)`, with every emission merged per `kind` into `user_metadata`/`internal_metadata` |
+| `metadata` | One row per `(run_id, span_id)`, with the latest emission of each `kind` in `metadata`/`inngest` |
 | `extended_trace_spans` | SDK-emitted (userland) extended trace spans |
 | `steps` | One row per step, latest attempt only |
 | `step_attempts` | One row per step *attempt* — every retry, not just the latest |

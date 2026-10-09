@@ -1,6 +1,24 @@
 -- +goose Up
 
+-- inngest.run_metadata_rollup is one row per (run_id, span_id) with the
+-- latest emission of each kind as user_metadata/internal_metadata (kind ->
+-- values). Every metadata write is a full replace of its kind, so there's no
+-- merging: an older emission's keys don't survive a newer one, and a null
+-- value is kept as null rather than deleting its key the way
+-- json_merge_patch (RFC 7386) would. kind is stored without its
+-- userland/inngest prefix, so is_user is part of the collapse key or a user
+-- "foo" and an internal "foo" would clobber each other. Ties on created_at
+-- fall back to the values text so the winner is deterministic;
+-- pkg/duckdb/query's GetSpansByRunID collapses with the same ordering.
 CREATE VIEW inngest.run_metadata_rollup AS
+WITH latest AS (
+  SELECT *
+  FROM inngest.run_metadata
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY account_id, env_id, run_id, span_id, is_user, kind
+    ORDER BY created_at DESC, CAST(values AS VARCHAR) DESC NULLS LAST
+  ) = 1
+)
 SELECT
   account_id,
   env_id,
@@ -11,9 +29,9 @@ SELECT
   max(step_id) as step_id,
   max(step_index) as step_index,
   max(step_attempt) as step_attempt,
-  reduce(coalesce(list(json_object(kind, values) ORDER BY created_at) FILTER (is_user), []), lambda a,b: json_merge_patch(a,b), '{}') as user_metadata,
-  reduce(coalesce(list(json_object(kind, values) ORDER BY created_at) FILTER (NOT is_user), []), lambda a,b: json_merge_patch(a,b), '{}') as internal_metadata,
-FROM run_metadata
+  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values} ORDER BY kind) FILTER (is_user))), json_object()) as user_metadata,
+  COALESCE(to_json(map_from_entries(list({'k': kind, 'v': values} ORDER BY kind) FILTER (NOT is_user))), json_object()) as internal_metadata,
+FROM latest
 GROUP BY account_id, env_id, run_id, span_id
 ;
 
