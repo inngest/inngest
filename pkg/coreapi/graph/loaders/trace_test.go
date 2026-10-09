@@ -77,7 +77,7 @@ func TestConvertRunSpanToGQL_CustomConcurrencyKeys(t *testing.T) {
 		Attributes:  &meta.ExtractedValues{CustomConcurrencyKeys: &keys},
 	}
 
-	result, err := (&traceReader{}).convertRunSpanToGQL(context.Background(), span)
+	result, err := convertDynamicRunSpanToGQL(context.Background(), span)
 	require.NoError(t, err)
 	assert.Equal(t, keys, result.CustomConcurrencyKeys)
 }
