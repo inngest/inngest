@@ -46,6 +46,71 @@ describe('scoreRows', () => {
 
     expect(rows).toEqual([{ name: 'relevance', value: 0.9, updatedAt: '2026-06-23T00:00:09Z' }]);
   });
+
+  it('reads per name score kinds, w/ the name taken from the kind', () => {
+    const rows = scoreRows([
+      { kind: 'inngest.score.accuracy', updatedAt: 't', values: { value: 0.95 } },
+      { kind: 'inngest.score.latency.p99', updatedAt: 't', values: { value: 120 } },
+    ]);
+
+    expect(rows).toEqual([
+      { name: 'accuracy', value: 0.95, updatedAt: 't' },
+      { name: 'latency.p99', value: 120, updatedAt: 't' },
+    ]);
+  });
+
+  it('drops per name score kinds w/o a valid value', () => {
+    const rows = scoreRows([
+      { kind: 'inngest.score.ok', updatedAt: 't', values: { value: true } },
+      { kind: 'inngest.score.str', updatedAt: 't', values: { value: 'x' } },
+      { kind: 'inngest.score.nested', updatedAt: 't', values: { nested: { value: 1 } } },
+      { kind: 'inngest.score.', updatedAt: 't', values: { value: 1 } },
+    ]);
+
+    expect(rows.map((r) => r.name)).toEqual(['ok']);
+  });
+
+  it('merges all score shapes, keeping the latest write per name', () => {
+    const trace = {
+      metadata: [
+        // pre #4482: per name kind
+        {
+          kind: 'inngest.score.accuracy',
+          updatedAt: '2026-06-23T00:00:01Z',
+          values: { value: 0.5 },
+        },
+        // legacy shared kind
+        {
+          kind: 'inngest.score',
+          updatedAt: '2026-06-23T00:00:02Z',
+          values: { accuracy: { value: 0.7 }, relevance: { value: 0.8 } },
+        },
+      ],
+      childrenSpans: [
+        {
+          metadata: [
+            // per name kind going forward
+            {
+              kind: 'inngest.score.relevance',
+              updatedAt: '2026-06-23T00:00:03Z',
+              values: { value: 0.9 },
+            },
+            {
+              kind: 'inngest.score.passed',
+              updatedAt: '2026-06-23T00:00:03Z',
+              values: { value: true },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(scoreRows(collectScoreMetadata(trace))).toEqual([
+      { name: 'accuracy', value: 0.7, updatedAt: '2026-06-23T00:00:02Z' },
+      { name: 'passed', value: true, updatedAt: '2026-06-23T00:00:03Z' },
+      { name: 'relevance', value: 0.9, updatedAt: '2026-06-23T00:00:03Z' },
+    ]);
+  });
 });
 
 describe('collectScoreMetadata', () => {
@@ -59,5 +124,18 @@ describe('collectScoreMetadata', () => {
     };
 
     expect(collectScoreMetadata(trace)).toHaveLength(2);
+  });
+
+  it('collects per name score kinds and skips look alike kinds', () => {
+    const trace = {
+      metadata: [
+        { kind: 'inngest.score.a', updatedAt: 't', values: { value: 1 } },
+        { kind: 'inngest.score.', updatedAt: 't', values: { value: 1 } },
+        { kind: 'inngest.scores', updatedAt: 't', values: {} },
+        { kind: 'userland.score.a', updatedAt: 't', values: { value: 1 } },
+      ],
+    };
+
+    expect(collectScoreMetadata(trace).map((md) => md.kind)).toEqual(['inngest.score.a']);
   });
 });
