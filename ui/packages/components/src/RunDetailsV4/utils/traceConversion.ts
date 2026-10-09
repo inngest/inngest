@@ -30,6 +30,7 @@ import {
 } from '../types';
 import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { getStepWarnings, type StepWarning } from '../warnings';
+import { badgeSandboxes, sandboxBarData } from './sandboxes';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -346,6 +347,9 @@ function traceToBarData(
     groupKind: trace.groupKind ?? undefined,
     dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
     warnings: getWarnings(trace.metadata),
+    sandbox: sandboxBarData(trace),
+    groupKind: trace.groupKind ?? undefined,
+    dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
   };
 }
 
@@ -517,6 +521,7 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     childrenSpans: toAttemptChildren(attempts),
     origin: last.origin,
     metadata: rolledUpMetadata(attempts, last), // scores from the last attempt, warnings from all
+    origin: last.origin,
     userlandSpan: null,
   };
 }
@@ -579,6 +584,7 @@ function rollupFinalization(
     childrenSpans: toAttemptChildren(attempts),
     origin: last.origin,
     metadata: rolledUpMetadata(attempts, last),
+    origin: last.origin,
     stepInfo: null,
     userlandSpan: null,
   };

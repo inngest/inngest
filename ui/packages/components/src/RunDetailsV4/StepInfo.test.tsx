@@ -513,3 +513,16 @@ describe('Step warnings and the Metadata tab', () => {
     expect(screen.queryByText('No output available')).toBeNull();
   });
 });
+
+describe('Added by', () => {
+  it('names the library that added the step', () => {
+    renderStepInfo(makeTrace({ origin: '@inngest/ci@0.1.0' }));
+    const wrapper = document.querySelector('[data-label="Added by"]');
+    expect(wrapper!.textContent).toBe('@inngest/ci@0.1.0');
+  });
+
+  it('is hidden for the user’s own steps', () => {
+    renderStepInfo(makeTrace({ origin: null }));
+    expect(document.querySelector('[data-label="Added by"]')).toBeNull();
+  });
+});

@@ -879,6 +879,9 @@ export function TimelineBar({
   groupKind,
   dimmed,
   warnings,
+  sandbox,
+  groupKind,
+  dimmed,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);

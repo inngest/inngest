@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import type { SandboxBarData } from './utils/sandboxes';
 import type { StepWarning } from './warnings';
+import type { SandboxBarData } from './utils/sandboxes';
 
 // ============================================================================
 // Core Component Types
@@ -245,6 +246,14 @@ export interface TimelineBarProps {
   dimmed?: boolean;
   /** Messages from warning metadata (`inngest.warnings` or `inngest.warning.<code>`) (shows a warning icon beside the name) */
   warnings?: StepWarning[];
+  /** The sandbox this row ran on (shows an `S1` badge before its name) */
+  sandbox?: SandboxBarData;
+
+  /** A span group's kind, shown as a tag before its name */
+  groupKind?: string;
+
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**
@@ -354,6 +363,14 @@ export interface TimelineBarData {
   dimmed?: boolean;
   /** Messages from warning metadata (`inngest.warnings` or `inngest.warning.<code>`) */
   warnings?: StepWarning[];
+  /** The sandbox this row ran on, from `inngest.sandbox` metadata */
+  sandbox?: SandboxBarData;
+
+  /** A span group's kind, as its caller named it */
+  groupKind?: string;
+
+  /** Draw the row faded: Inngest's own libraries added it and it didn't fail */
+  dimmed?: boolean;
 }
 
 /**
