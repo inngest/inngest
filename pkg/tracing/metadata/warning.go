@@ -3,8 +3,6 @@ package metadata
 import (
 	"encoding/json"
 	"errors"
-
-	"github.com/inngest/inngest/pkg/enums"
 )
 
 //tygo:generate
@@ -38,10 +36,6 @@ type Warnings map[string]error
 
 func (wm Warnings) Kind() Kind {
 	return KindInngestWarnings
-}
-
-func (wm Warnings) Op() enums.MetadataOpcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (wm Warnings) Serialize() (Values, error) {

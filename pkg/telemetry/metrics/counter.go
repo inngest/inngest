@@ -789,6 +789,17 @@ func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+// IncrMetadataNonSetOpsTotal records a metadata write that came in w/ an op
+// other than set. Every metadata span is written as a set regardless.
+func IncrMetadataNonSetOpsTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_non_set_ops_total",
+		Description: "Total number of metadata writes received w/ an op other than set",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,

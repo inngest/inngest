@@ -2,7 +2,6 @@ package extractors
 
 import (
 	"github.com/inngest/go-httpstat"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 )
@@ -32,10 +31,6 @@ type TimingMetadata struct {
 
 func (m TimingMetadata) Kind() metadata.Kind {
 	return KindInngestTiming
-}
-
-func (m TimingMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (m TimingMetadata) Serialize() (metadata.Values, error) {

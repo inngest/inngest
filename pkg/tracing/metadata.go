@@ -3,9 +3,11 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -44,12 +46,35 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 		return nil, fmt.Errorf("failed to serialize metadata: %w", err)
 	}
 
-	return CreateMetadataSpanFromValues(ctx, tracerProvider, parent, location, pkgName, stateMetadata, spanMetadata.Kind(), spanMetadata.Op(), values, scope, opts...)
+	return CreateMetadataSpanFromValues(ctx, tracerProvider, parent, location, pkgName, stateMetadata, spanMetadata.Kind(), incomingOp(spanMetadata), values, scope, opts...)
+}
+
+// incomingOp returns the op an SDK sent w/ md. Only SDK updates carry one,
+// metadata the server builds itself is always a set.
+func incomingOp(md metadata.Structured) metadata.Opcode {
+	if u, ok := md.(interface{ Op() metadata.Opcode }); ok {
+		return u.Op()
+	}
+	return enums.MetadataOpcodeSet
 }
 
 // CreateMetadataSpanFromValues creates a metadata span from pre-serialized values,
 // avoiding redundant serialization when the caller has already called Serialize.
-func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+//
+// Every metadata span is written as a set (a full replace of its (span, kind)),
+// regardless of incomingOp. incomingOp is whatever op the writer sent and is
+// only recorded in metrics, so older SDKs that send merge keep working.
+func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, incomingOp metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+	if incomingOp != enums.MetadataOpcodeSet {
+		metrics.IncrMetadataNonSetOpsTotal(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": metadataKindTag(kind),
+				"op":   incomingOp.String(),
+			},
+		})
+	}
+
 	// Every metadata span, regardless of caller, passes through here — so
 	// this is the single chokepoint to backfill EstimatedCost for
 	// "inngest.ai" metadata that arrived without one (e.g. submitted
@@ -78,7 +103,7 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		}
 	}
 
-	attrs := RawMetadataAttrs(kind, values, op)
+	attrs := RawMetadataAttrs(kind, values)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
 	cfg := MetadataSpanConfig{
@@ -88,15 +113,10 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		opt(&cfg)
 	}
 
-	kindTag := kind.String()
-	if kind.IsUser() {
-		kindTag = fmt.Sprintf("%s*", metadata.KindPrefixUserland)
-	}
-
 	metrics.IncrMetadataSpansTotal(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"kind": kindTag,
+			"kind": metadataKindTag(kind),
 		},
 	})
 	ref, err := tracerProvider.CreateSpan(
@@ -211,8 +231,26 @@ func buildSyncMetadataEntry(attrs *meta.SerializableAttrs, parent *meta.SpanRefe
 	return entry, true
 }
 
-func RawMetadataAttrs(kind metadata.Kind, values metadata.Values, op metadata.Opcode) *meta.SerializableAttrs {
+// metadataKindTag collapses kinds w/ a user or per name suffix so they don't
+// blow up the metric tag cardinality.
+func metadataKindTag(kind metadata.Kind) string {
+	switch {
+	case kind.IsUser():
+		return metadata.KindPrefixUserland + "*"
+	case strings.HasPrefix(kind.String(), metadata.KindPrefixInngestScore):
+		return metadata.KindPrefixInngestScore + "*"
+	case strings.HasPrefix(kind.String(), metadata.KindPrefixInngestWarning):
+		return metadata.KindPrefixInngestWarning + "*"
+	default:
+		return kind.String()
+	}
+}
+
+// RawMetadataAttrs builds the metadata span attrs. The op is always set, see
+// CreateMetadataSpanFromValues.
+func RawMetadataAttrs(kind metadata.Kind, values metadata.Values) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
+	op := enums.MetadataOpcodeSet
 
 	meta.AddAttr(rawAttrs, meta.Attrs.MetadataKind, &kind)
 	meta.AddAttr(rawAttrs, meta.Attrs.Metadata, &values)
@@ -227,7 +265,7 @@ func MetadataAttrs(metadata metadata.Structured) (*meta.SerializableAttrs, error
 		return nil, err
 	}
 
-	return RawMetadataAttrs(metadata.Kind(), rawMetadata, metadata.Op()), nil
+	return RawMetadataAttrs(metadata.Kind(), rawMetadata), nil
 }
 
 func MetadataSpanIDSeed(parentID string, kind metadata.Kind) []byte {

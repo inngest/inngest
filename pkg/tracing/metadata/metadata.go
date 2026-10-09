@@ -24,11 +24,11 @@ type Opcode = enums.MetadataOpcode
 
 type Scope = enums.MetadataScope
 
+// Structured is metadata the server writes. It has no op since every metadata
+// span is written as a set (IE a full replace of its kind on its span).
 type Structured interface {
 	Kind() Kind
 	Serialize() (Values, error)
-
-	Op() enums.MetadataOpcode
 }
 
 type Values map[string]json.RawMessage
@@ -132,6 +132,8 @@ func (m Update) Kind() Kind {
 	return m.RawUpdate.Kind
 }
 
+// Op is the op the SDK sent. It's only kept for metrics, the update is still
+// written as a set.
 func (m Update) Op() Opcode {
 	return m.RawUpdate.Op
 }
