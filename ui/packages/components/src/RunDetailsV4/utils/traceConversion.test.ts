@@ -1748,6 +1748,21 @@ describe('traceConversion', () => {
           endedAt: to === null ? null : ts(to),
         });
 
+      // A step nobody awaited, still unfinished when the function returned:
+      // it keeps its pending status and never gets an end time
+      const unawaited = (
+        spanID: string,
+        status: 'QUEUED' | 'WAITING',
+        from: number,
+        stepOp = 'RUN'
+      ) => {
+        return createTrace({
+          ...work(spanID, from, null),
+          stepOp,
+          status,
+        });
+      };
+
       // A group ending at `to`, however its children end
       const endingAt = (to: number | null, trace: Trace): Trace => {
         trace.endedAt = to === null ? null : ts(to);
@@ -1864,6 +1879,37 @@ describe('traceConversion', () => {
         {
           name: 'an empty group with an end counts',
           children: () => [endingAt(8, group('g', []))],
+          expected: [8, 8],
+        },
+        // Unawaited steps, as the Dev Server records them: when the function
+        // returns, a step that never ran stays QUEUED and a sleep stays
+        // WAITING, both with no end time. Nothing stamps them cancelled or
+        // closes them at run end, so they never pull finalization later.
+        {
+          name: 'unawaited: a queued step that never ran has no end and is ignored',
+          children: () => [unawaited('u1', 'QUEUED', 0)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: a sleep still waiting at run end is ignored',
+          children: () => [unawaited('u1', 'WAITING', 0, 'SLEEP'), work('s1', 0, 4)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: only the awaited work moves finalization',
+          children: () => [unawaited('u1', 'QUEUED', 0), work('s1', 0, 9)],
+          expected: [9, 9],
+        },
+        {
+          name: 'unawaited: a step that completed before finalization leaves it alone',
+          children: () => [work('u1', 0, 4), work('s1', 0, 2)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: inside a group, only the finished work counts',
+          children: () => [
+            endingAt(null, group('g', [work('c1', 1, 8), unawaited('u1', 'WAITING', 2, 'SLEEP')])),
+          ],
           expected: [8, 8],
         },
       ];
