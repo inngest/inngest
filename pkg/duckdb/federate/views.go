@@ -63,6 +63,32 @@ type sourceSpec struct {
 	// the ones the query reads (see deltaColumnsUsed). Every other column is
 	// a typed NULL on the delta side, so the source keeps the table's shape.
 	DeltaColumns map[string]bool
+	// TopN, if set, keeps the lake side to its first rows (Query.TopN), its
+	// predicates applied exactly.
+	TopN *topNSpec
+}
+
+// collapses are the tables whose views collapse rows (raw_runs keeps each
+// run's latest): DuckDB can't push a top-n through that window, so their
+// lake side is cut to its own first rows. Other tables' lake sides are
+// left whole: DuckDB applies the query's own top-n to the plain union, and
+// cutting the lake side first only cost time (a benchmark's small-tenant
+// events list: 23ms against 32ms).
+var collapses = map[Table]bool{TableRuns: true}
+
+// topNSpec is a table's TopN and the predicates its lake side applies.
+type topNSpec struct {
+	TopN
+	Predicates []Predicate
+}
+
+// topNOf is t's top-n spec in q, if q pushes one.
+func topNOf(q Query, t Table) *topNSpec {
+	tn, ok := q.TopN[t]
+	if !ok {
+		return nil
+	}
+	return &topNSpec{TopN: tn, Predicates: q.Predicates[t]}
 }
 
 // sourceTimeColumn is the column bounding a physical table's run-time range.
@@ -101,14 +127,21 @@ func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
 		return CTEDef{SQL: fmt.Sprintf("%s AS (\n  SELECT %s\n  FROM %s\n)",
 			quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name))}, nil
 	}
+	lakeSide := fmt.Sprintf("SELECT %s\n  FROM %s WHERE %s", strings.Join(lake, ", "), spec.Lake.table(phys.Name), filter)
+	if spec.TopN != nil && collapses[t] {
+		where, whereArgs, err := predicatesSQL(t, spec.TopN.Predicates)
+		if err != nil {
+			return CTEDef{}, err
+		}
+		lakeSide = fmt.Sprintf("(%s AND %s\n  ORDER BY %s LIMIT %d)", lakeSide, where, orderSQL(spec.TopN.OrderBy, quoteIdent), spec.TopN.Limit)
+		args = append(args, whereArgs...)
+	}
 	sql := fmt.Sprintf(`%s AS (
-  SELECT %s
-  FROM %s WHERE %s
+  %s
   UNION ALL
   SELECT %s
   FROM %s
-)`, quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name), filter,
-		strings.Join(delta, ", "), quoteIdent(spec.Delta))
+)`, quoteIdent(SourceName(t)), lakeSide, strings.Join(delta, ", "), quoteIdent(spec.Delta))
 	return CTEDef{SQL: sql, Args: args}, nil
 }
 
