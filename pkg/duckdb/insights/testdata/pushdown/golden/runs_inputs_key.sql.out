@@ -1,0 +1,13 @@
+{
+  "description": "inputs is forwarded, but the buffer stores it as an array, so its streamer can't apply a key filter on it.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "inputs-\u003e\u003e'name' = 'app/evt'",
+        "physical": "runs.inputs-\u003e\u003e'name' = 'app/evt'",
+        "pushed": true
+      }
+    ]
+  }
+}

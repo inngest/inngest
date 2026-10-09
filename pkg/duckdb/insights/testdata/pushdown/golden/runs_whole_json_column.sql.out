@@ -1,0 +1,4 @@
+{
+  "description": "Comparing a whole JSON column isn't a key filter: not pushed.",
+  "mode": "product"
+}

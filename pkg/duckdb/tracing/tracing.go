@@ -320,7 +320,8 @@ SELECT
   attributes."_inngest.defer.parent_fn_slug" IS NOT NULL AS is_deferred,
   attributes."_inngest.defer.parent_fn_slug"::VARCHAR AS defer_parent_fn_slug,
   COALESCE(TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]), []::VARCHAR[]) AS defer_parent_run_ids,
-  trace_id
+  trace_id,
+  bucket_at
 FROM inngest.run_trace_spans
 WHERE span_id IN (%s)
 AND name IN ('executor.run', 'executor.run.queued', 'executor.run.started');`,

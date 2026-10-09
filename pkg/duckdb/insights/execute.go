@@ -131,7 +131,13 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 
 	ctx = driver.WithMaxResultBytes(ctx, maxResultBytes)
 
-	if err := checkRenderedSQL(ctx, db, tr.SQL); err != nil {
+	cat := tr.cat
+	if cat.tables == nil {
+		cat = productCatalog // a hand-built result (tests)
+	}
+	// Only this mode's table macros pass: product queries can't reach the
+	// raw (cross-tenant) ones.
+	if err := checkRenderedSQL(ctx, db, tr.SQL, cat); err != nil {
 		return nil, &ExecutionError{Err: limitError(ctx, err), Start: tr.Start, End: tr.End}
 	}
 

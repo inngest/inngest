@@ -1,0 +1,23 @@
+{
+  "description": "Raw mode: physical columns directly, tenants included.",
+  "mode": "raw",
+  "tables": {
+    "runs": [
+      {
+        "logical": "account_id = '00000000-0000-4000-a000-000000000000'",
+        "physical": "runs.account_id = '00000000-0000-4000-a000-000000000000'",
+        "pushed": true
+      },
+      {
+        "logical": "status IN ('Completed', 'Failed')",
+        "physical": "runs.status IN ('Completed', 'Failed')",
+        "pushed": true
+      },
+      {
+        "logical": "function_slug = 'my-fn'",
+        "physical": "runs.function_slug = 'my-fn'",
+        "pushed": true
+      }
+    ]
+  }
+}

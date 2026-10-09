@@ -16,9 +16,15 @@ import (
 // need to call resolveScope a second time, plus every non-fatal Diagnostic
 // (e.g. a function called with too few arguments) noted along the way. See
 // validateWithCTEs for CTEs.
-func validate(stmt *parser.SelectStatement) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
+func validate(stmt *parser.SelectStatement, cat catalog) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
 	var diags []Diagnostic
-	scope, ctes, err := validateWithCTEs(stmt, nil, nil, &diags)
+	// The catalog's tables are the root of the CTE chain every scope
+	// resolves names through.
+	root := make(map[string]logicalTable, len(cat.tables))
+	for name, tbl := range cat.tables {
+		root[name] = tbl
+	}
+	scope, ctes, err := validateWithCTEs(stmt, root, nil, &diags)
 	return scope, ctes, diags, err
 }
 

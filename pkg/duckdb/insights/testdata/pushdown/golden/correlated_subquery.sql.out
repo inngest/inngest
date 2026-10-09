@@ -1,0 +1,13 @@
+{
+  "description": "A correlated reference to the outer query isn't a literal comparison.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "name = 'x'",
+        "physical": "events.event_name = 'x'",
+        "pushed": true
+      }
+    ]
+  }
+}

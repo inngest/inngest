@@ -1,0 +1,4 @@
+{
+  "description": "A cast on the literal isn't extracted either.",
+  "mode": "product"
+}

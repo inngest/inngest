@@ -26,12 +26,17 @@ GROUP BY account_id, env_id, run_id, span_id
 -- query should see or filter on directly) are excluded from every
 -- projection outright rather than merely left unfiltered.
 
--- inngest.insights_runs(p_account_id, p_env_id) collapses inngest.runs to
--- one row per run_id -- the same latest-row-wins pattern
--- pkg/cqrs/duckdbquery's latestRunsCTE uses (pkg/cqrs/duckdbquery/runs.go),
--- exposed as a macro instead of reimplemented ad hoc. QUALIFY filters on
--- the window function directly, no subquery wrapper needed.
-CREATE MACRO inngest.insights_runs(p_account_id, p_env_id) AS TABLE
+-- The insights_* macros over the run tables read their physical sources by
+-- name (query_table), defaulting to the lake tables, so a federated executor
+-- can pass lake-plus-buffer relations (e.g. a CTE) instead and reuse each
+-- logical table's one definition: its projection, its joins and its
+-- collapse. DuckDB plans query_table over a named table like a direct scan:
+-- filters and projections still push into it. The runs collapse itself is
+-- raw_runs (000001_baseline.sql).
+
+-- inngest.insights_runs(p_account_id, p_env_id) projects raw_runs (one row
+-- per run_id) for one tenant, joined to its run-scoped metadata.
+CREATE MACRO inngest.insights_runs(p_account_id, p_env_id, p_runs := 'inngest.runs', p_metadata := 'inngest.run_metadata_rollup') AS TABLE
 SELECT
   r.run_id,
   r.queued_at,
@@ -51,16 +56,13 @@ SELECT
   r.defer_parent_run_ids,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
-FROM inngest.runs r
-LEFT JOIN inngest.run_metadata_rollup rmp ON r.account_id = rmp.account_id AND r.env_id = rmp.env_id AND r.run_id = rmp.run_id AND rmp.scope = 'run'
-WHERE r.account_id = p_account_id AND r.env_id = p_env_id
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY r.run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC
-) = 1;
+FROM inngest.raw_runs(p_runs := p_runs) r
+LEFT JOIN query_table(p_metadata) rmp ON r.account_id = rmp.account_id AND r.env_id = rmp.env_id AND r.run_id = rmp.run_id AND rmp.scope = 'run'
+WHERE r.account_id = p_account_id AND r.env_id = p_env_id;
 
 -- Direct passthrough macros -- see docs/plans/010-duckdb-insights-query-layer.md's
 -- Logical tables and views table.
-CREATE MACRO inngest.insights_events(p_account_id, p_env_id) AS TABLE
+CREATE MACRO inngest.insights_events(p_account_id, p_env_id, p_events := 'inngest.events') AS TABLE
 SELECT
     event_id as id,
     event_name as name,
@@ -69,7 +71,7 @@ SELECT
     event_ts as ts,
     event_meta as meta,
     received_at,
-FROM inngest.events
+FROM query_table(p_events)
 WHERE account_id = p_account_id AND env_id = p_env_id;
 
 CREATE MACRO inngest.insights_metadata(p_account_id, p_env_id) AS TABLE
@@ -92,7 +94,7 @@ WHERE account_id = p_account_id AND env_id = p_env_id;
 -- run_trace_spans (which also holds executor.run/executor.step/etc.
 -- lifecycle spans, exposed separately via insights_steps/
 -- insights_step_attempts below).
-CREATE MACRO inngest.insights_extended_trace_spans(p_account_id, p_env_id) AS TABLE
+CREATE MACRO inngest.insights_extended_trace_spans(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata_rollup') AS TABLE
 SELECT
   rts.run_id,
   rts.run_queued_at,
@@ -107,8 +109,8 @@ SELECT
   rts.attributes,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
-FROM inngest.run_trace_spans rts
-LEFT JOIN inngest.run_metadata_rollup rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'extended_trace'
+FROM query_table(p_spans) rts
+LEFT JOIN query_table(p_metadata) rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'extended_trace'
 WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id AND name = 'sdk.extended_trace';
 
 -- inngest.insights_step_attempts(p_account_id, p_env_id) unpacks the
@@ -132,7 +134,7 @@ WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id AND name = 'sdk.ex
 -- inngest.run_trace_spans already carries them as real typed columns
 -- (see 007's flat-span finding), so this view just passes them through
 -- like insights_extended_trace_spans does.
-CREATE MACRO inngest.insights_step_attempts(p_account_id, p_env_id) AS TABLE
+CREATE MACRO inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata_rollup') AS TABLE
 SELECT
   rts.run_id as run_id,
   rts.run_queued_at as run_queued_at,
@@ -155,8 +157,8 @@ SELECT
   rts.attributes."_inngest.dynamic.status"::VARCHAR AS status,
   COALESCE(rmp.user_metadata, json_object()) AS metadata,
   COALESCE(rmp.internal_metadata, json_object()) AS inngest
-FROM inngest.run_trace_spans rts
-LEFT JOIN inngest.run_metadata_rollup rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'step'
+FROM query_table(p_spans) rts
+LEFT JOIN query_table(p_metadata) rmp ON rts.account_id = rmp.account_id AND rts.env_id = rmp.env_id AND rts.run_id = rmp.run_id AND rts.span_id = rmp.span_id AND rmp.scope = 'step'
 WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
   AND rts.name IN ('executor.step', 'executor.step.discovery', 'executor.step.pause_started', 'executor.step.planned');
 
@@ -165,9 +167,9 @@ WHERE rts.account_id = p_account_id AND rts.env_id = p_env_id
 -- highest step_attempt, tie-broken by start_time -- mirroring the
 -- reference pkg/insights' steps/step_attempts split (docs/plans/010's
 -- Logical tables and views table).
-CREATE MACRO inngest.insights_steps(p_account_id, p_env_id) AS TABLE
+CREATE MACRO inngest.insights_steps(p_account_id, p_env_id, p_spans := 'inngest.run_trace_spans', p_metadata := 'inngest.run_metadata_rollup') AS TABLE
 SELECT *
-FROM inngest.insights_step_attempts(p_account_id, p_env_id)
+FROM inngest.insights_step_attempts(p_account_id, p_env_id, p_spans := p_spans, p_metadata := p_metadata)
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY run_id, step_id ORDER BY COALESCE(step_attempt, 0) DESC, start_time DESC
 ) = 1;

@@ -1,0 +1,13 @@
+{
+  "description": "A non-terminal status is pushed: the runs delta filters each run's latest row, after its collapse.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status = 'Running'",
+        "physical": "runs.status = 'Running'",
+        "pushed": true
+      }
+    ]
+  }
+}

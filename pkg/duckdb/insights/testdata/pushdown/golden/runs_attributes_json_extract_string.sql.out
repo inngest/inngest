@@ -1,0 +1,13 @@
+{
+  "description": "json_extract_string is the same key extraction as -\u003e\u003e.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "attributes-\u003e\u003e'_inngest.event.trigger.name' IN ('a', 'b')",
+        "physical": "runs.attributes-\u003e\u003e'_inngest.event.trigger.name' IN ('a', 'b')",
+        "pushed": true
+      }
+    ]
+  }
+}
