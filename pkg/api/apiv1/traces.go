@@ -419,10 +419,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		l := l.With("step_metadata", true)
 		md, err := a.opts.MetadataOpts.SpanExtractor.ExtractSpanMetadata(ctx, s)
 		if err != nil {
-			warnings := metadata.ExtractWarnings(err)
-			if len(warnings) > 0 {
-				md = append(md, warnings)
-			}
+			md = append(md, metadata.ExtractWarnings(err).Structured()...)
 		}
 
 		for _, m := range md {

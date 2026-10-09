@@ -3,6 +3,8 @@ package metadata
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 )
 
 //tygo:generate
@@ -34,17 +36,32 @@ func (e *WarningError) Error() string {
 //tygo:generate
 type Warnings map[string]error
 
-func (wm Warnings) Kind() Kind {
-	return KindInngestWarnings
+// Structured returns one metadata write per warning, ordered by code.
+func (wm Warnings) Structured() []Structured {
+	ret := make([]Structured, 0, len(wm))
+	for _, code := range slices.Sorted(maps.Keys(wm)) {
+		ret = append(ret, Warning{Code: code, Err: wm[code]})
+	}
+	return ret
 }
 
-func (wm Warnings) Serialize() (Values, error) {
-	ret := make(Values)
-	for key, warning := range wm {
-		ret[key], _ = json.Marshal(warning.Error())
-	}
+// Warning is a single warning, written under its own inngest.warning.<code>
+// kind w/ {"<code>": message} so it doesn't replace other warnings.
+type Warning struct {
+	Code string
+	Err  error
+}
 
-	return ret, nil
+func (w Warning) Kind() Kind {
+	return WarningKind(w.Code)
+}
+
+func (w Warning) Serialize() (Values, error) {
+	msg, err := json.Marshal(w.Err.Error())
+	if err != nil {
+		return nil, err
+	}
+	return Values{w.Code: msg}, nil
 }
 
 func ExtractWarnings(err error) Warnings {
@@ -77,10 +94,5 @@ func extractWarnings(err error) []*WarningError {
 }
 
 func WithWarnings(md []Structured, err error) []Structured {
-	warnings := ExtractWarnings(err)
-	if len(warnings) != 0 {
-		md = append(md, warnings)
-	}
-
-	return md
+	return append(md, ExtractWarnings(err).Structured()...)
 }
