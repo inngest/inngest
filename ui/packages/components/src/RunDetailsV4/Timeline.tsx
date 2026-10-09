@@ -608,6 +608,7 @@ function TimelineBarRenderer({
       insideExperiment={insideExperiment}
       experimentMetadata={bar.experimentMetadata}
       scores={bar.scores}
+      warnings={bar.warnings}
       sandbox={bar.sandbox}
       groupKind={bar.groupKind}
       dimmed={bar.dimmed}

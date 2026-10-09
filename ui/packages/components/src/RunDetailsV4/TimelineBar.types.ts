@@ -5,6 +5,7 @@
 
 import type { ReactNode } from 'react';
 
+import type { StepWarning } from './warnings';
 import type { SandboxBarData } from './utils/sandboxes';
 
 // ============================================================================
@@ -233,6 +234,8 @@ export interface TimelineBarProps {
   /** Scores recorded on this span (shows badge with hover card) */
   scores?: ScoreBadgeData[];
 
+  /** Messages from warning metadata (`inngest.warnings` or `inngest.warning.<code>`) (shows a warning icon beside the name) */
+  warnings?: StepWarning[];
   /** The sandbox this row ran on (shows an `S1` badge before its name) */
   sandbox?: SandboxBarData;
 
@@ -339,6 +342,8 @@ export interface TimelineBarData {
   /** Scores recorded on this span */
   scores?: ScoreBadgeData[];
 
+  /** Messages from warning metadata (`inngest.warnings` or `inngest.warning.<code>`) */
+  warnings?: StepWarning[];
   /** The sandbox this row ran on, from `inngest.sandbox` metadata */
   sandbox?: SandboxBarData;
 
