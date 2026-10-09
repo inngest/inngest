@@ -12,6 +12,18 @@ const (
 	KindInngestWarnings Kind = "inngest.warnings"
 )
 
+// WarningKind returns the per code warning kind, IE inngest.warning.<code>.
+func WarningKind(code string) Kind {
+	return Kind(KindPrefixInngestWarning + code)
+}
+
+// WarningCode returns the warning code of a per code warning kind. It's false
+// for the bare inngest.warnings kind, which keys its warnings by code in the
+// values.
+func (k Kind) WarningCode() (string, bool) {
+	return k.trimPrefix(KindPrefixInngestWarning)
+}
+
 type WarningError struct {
 	Key string
 	Err error

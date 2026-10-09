@@ -159,9 +159,13 @@ func (m Update) ValidateAllowed() error {
 		return err
 	}
 
-	switch m.Kind() {
-	case KindInngestScore:
+	if m.Kind() == KindInngestScore {
 		if err := validateNamedScoreValue(m.Values); err != nil {
+			return err
+		}
+	}
+	if name, ok := m.Kind().ScoreName(); ok {
+		if err := validateScoreKindValues(name, m.Values); err != nil {
 			return err
 		}
 	}
