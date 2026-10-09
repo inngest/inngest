@@ -75,21 +75,41 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		})
 	}
 
-	// Every metadata span, regardless of caller, passes through here — so
-	// this is the single chokepoint to backfill EstimatedCost for
-	// "inngest.ai" metadata that arrived without one (e.g. submitted
-	// directly via inngest.metadata.update or the AddRunMetadata API,
-	// bypassing the AIMetadata-producing extractors). A no-op when
-	// EstimatedCost is already set.
-	if kind == extractors.KindInngestAI {
-		extractors.BackfillEstimatedCostInValues(values)
+	// Legacy multi key score/warning writes are split into one span per
+	// score/warning so a set of one doesn't replace the others.
+	writes, split := metadata.SplitLegacy(kind, values)
+	if split {
+		metrics.IncrMetadataLegacySplitsTotal(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"kind": kind.String(),
+			},
+		})
+	} else {
+		writes = []metadata.KindValues{{Kind: kind, Values: values}}
 	}
 
-	spanSize := values.Size()
+	sizes := make([]int, len(writes))
+	totalSize := 0
+	for i, w := range writes {
+		// Every metadata span, regardless of caller, passes through here -- so
+		// this is the single chokepoint to backfill EstimatedCost for
+		// "inngest.ai" metadata that arrived without one (e.g. submitted
+		// directly via inngest.metadata.update or the AddRunMetadata API,
+		// bypassing the AIMetadata-producing extractors). A no-op when
+		// EstimatedCost is already set.
+		if w.Kind == extractors.KindInngestAI {
+			extractors.BackfillEstimatedCostInValues(w.Values)
+		}
 
-	// Per-span size limit
-	if spanSize > consts.MaxMetadataSpanSize {
-		return nil, metadata.ErrMetadataSpanTooLarge
+		sizes[i] = w.Values.Size()
+
+		// Per-span size limit, checked for every split span before any is
+		// created so a split write is all or nothing.
+		if sizes[i] > consts.MaxMetadataSpanSize {
+			return nil, metadata.ErrMetadataSpanTooLarge
+		}
+		totalSize += sizes[i]
 	}
 
 	// Per-run cumulative size limit. Skip when stateMetadata is nil.
@@ -98,11 +118,37 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 	// counter under a mutex, which is safe for concurrent access from
 	// parallel step handlers (handleGeneratorGroup).
 	if stateMetadata != nil {
-		if !stateMetadata.Metrics.TryAddMetadataSize(spanSize, consts.MaxRunMetadataSize) {
+		if !stateMetadata.Metrics.TryAddMetadataSize(totalSize, consts.MaxRunMetadataSize) {
 			return nil, metadata.ErrRunMetadataSizeExceeded
 		}
 	}
 
+	// A split write returns the ref of its last span. A legacy write w/ no
+	// keys has nothing to write and returns a nil ref.
+	var ref *meta.SpanReference
+	for i, w := range writes {
+		var err error
+		ref, err = createMetadataSpan(ctx, tracerProvider, parent, location, pkgName, stateMetadata, w.Kind, w.Values, scope, opts...)
+		if err != nil {
+			// Roll back the optimistic size increment for the spans that
+			// weren't created.
+			if stateMetadata != nil {
+				unwritten := 0
+				for _, size := range sizes[i:] {
+					unwritten += size
+				}
+				stateMetadata.Metrics.RollbackMetadataSize(unwritten)
+			}
+			return nil, err
+		}
+	}
+
+	return ref, nil
+}
+
+// createMetadataSpan creates a single metadata span & notifies the sync
+// listeners. Size limits are already checked by CreateMetadataSpanFromValues.
+func createMetadataSpan(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
 	attrs := RawMetadataAttrs(kind, values)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
@@ -134,10 +180,6 @@ func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProv
 		},
 	)
 	if err != nil {
-		// Roll back the optimistic size increment on span creation failure.
-		if stateMetadata != nil {
-			stateMetadata.Metrics.RollbackMetadataSize(spanSize)
-		}
 		return nil, err
 	}
 
