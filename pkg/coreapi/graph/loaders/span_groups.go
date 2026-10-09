@@ -85,9 +85,10 @@ func pathIDs(path []meta.SpanPathElement) []string {
 }
 
 // finishSpanGroup orders a group's children, subgroups first finished, and
-// derives its timing and status from them: it runs from its first child's
-// start to its last child's end, and takes the status of the child that ended
-// last, or is running while any child is.
+// derives its timing and status from them: it's queued when its first child
+// was, starts when its earliest child started (parallel children can wait for
+// different amounts of time), ends with its last child, and takes the status
+// of the child that ended last, or is running while any child is.
 func finishSpanGroup(group *models.RunTraceSpan) {
 	for _, child := range group.ChildrenSpans {
 		if child.StepType == SpanGroupStepType {
@@ -99,9 +100,13 @@ func finishSpanGroup(group *models.RunTraceSpan) {
 		return a.QueuedAt.Compare(b.QueuedAt)
 	})
 
-	first := group.ChildrenSpans[0]
-	group.QueuedAt = first.QueuedAt
-	group.StartedAt = first.StartedAt
+	group.QueuedAt = group.ChildrenSpans[0].QueuedAt
+	group.StartedAt = nil
+	for _, child := range group.ChildrenSpans {
+		if child.StartedAt != nil && (group.StartedAt == nil || child.StartedAt.Before(*group.StartedAt)) {
+			group.StartedAt = child.StartedAt
+		}
+	}
 
 	var last *models.RunTraceSpan
 	for _, child := range group.ChildrenSpans {

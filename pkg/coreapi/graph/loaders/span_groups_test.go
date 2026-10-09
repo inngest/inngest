@@ -222,3 +222,29 @@ func TestGroupBySpanPath(t *testing.T) {
 		assert.Nil(t, sub.ChildrenSpans[1].Origin)
 	})
 }
+
+func TestSpanGroupStartsAtEarliestChildStart(t *testing.T) {
+	completed := enums.StepStatusCompleted
+	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
+
+	// Queued first but waited ten seconds to start, while the next one queued
+	// a second later and started a second after that.
+	slow := groupedStep("slow", 0, 2, completed, agent)
+	slow.Attributes.StartedAt = new(spanGroupsBase.Add(10 * time.Second))
+	slow.Attributes.EndedAt = new(spanGroupsBase.Add(12 * time.Second))
+
+	quick := groupedStep("quick", 1, 1, completed, agent)
+	quick.Attributes.StartedAt = new(spanGroupsBase.Add(2 * time.Second))
+	quick.Attributes.EndedAt = new(spanGroupsBase.Add(3 * time.Second))
+
+	result := convertGroupedRun(t, slow, quick)
+
+	require.Len(t, result.ChildrenSpans, 1)
+	group := result.ChildrenSpans[0]
+
+	assert.Equal(t, spanGroupsBase, group.QueuedAt)
+	require.NotNil(t, group.StartedAt)
+	assert.Equal(t, spanGroupsBase.Add(2*time.Second), *group.StartedAt)
+	require.NotNil(t, group.Duration)
+	assert.Equal(t, 10_000, *group.Duration)
+}
