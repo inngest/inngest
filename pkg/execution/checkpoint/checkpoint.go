@@ -870,7 +870,7 @@ func (c checkpointer) processMetadata(
 				Update: metadata.Update{
 					RawUpdate: metadata.RawUpdate{
 						Kind:   expMd.Kind(),
-						Op:     expMd.Op(),
+						Op:     enums.MetadataOpcodeSet,
 						Values: values,
 					},
 				},

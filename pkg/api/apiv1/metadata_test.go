@@ -6,9 +6,12 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -42,6 +45,14 @@ type metadataTracerProvider struct {
 	wantID  statev2.ID
 	called  bool
 	updated []*tracing.UpdateSpanOptions
+	written []writtenMetadata
+}
+
+// writtenMetadata is the kind, op & values of a created metadata span.
+type writtenMetadata struct {
+	Kind   metadata.Kind
+	Op     metadata.Opcode
+	Values metadata.Values
 }
 
 type metadataStateLoader struct {
@@ -65,6 +76,14 @@ func (p *metadataTracerProvider) CreateSpan(_ context.Context, _ string, opts *t
 		_ = opts.Metadata.Config.DebugRunID()
 		_ = opts.Metadata.Config.DebugSessionID()
 	})
+
+	kind, _ := meta.GetAttr(opts.Attributes, meta.Attrs.MetadataKind)
+	op, _ := meta.GetAttr(opts.Attributes, meta.Attrs.MetadataOp)
+	values, _ := meta.GetAttr(opts.Attributes, meta.Attrs.Metadata)
+	require.NotNil(p.t, kind)
+	require.NotNil(p.t, op)
+	require.NotNil(p.t, values)
+	p.written = append(p.written, writtenMetadata{Kind: *kind, Op: *op, Values: *values})
 
 	return &meta.SpanReference{}, nil
 }
@@ -532,4 +551,135 @@ func TestAddRunMetadataLegacyPathRequiresTraceReader(t *testing.T) {
 	require.ErrorAs(t, err, &publicErr)
 	require.Equal(t, http.StatusBadRequest, publicErr.Status)
 	require.Equal(t, "trace reader not provided, aborting legacy metadata retrieval", publicErr.Message)
+}
+
+// TestAddRunMetadataHTTPSplitsLegacyScores posts the legacy score shape older
+// SDKs send (several names under inngest.score w/ op merge) and checks it 200s
+// & gets written as one set per score name.
+func TestAddRunMetadataHTTPSplitsLegacyScores(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := newRunID()
+	wantID := statev2.ID{
+		RunID:      runID,
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AppID:     uuid.New(),
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
+	r := router{API: &API{opts: Opts{
+		AuthFinder: apiv1auth.NilAuthFinder,
+		MetadataOpts: MetadataOpts{
+			Flag: func(context.Context, uuid.UUID) bool { return true },
+		},
+		State: metadataStateLoader{loadMetadata: func(context.Context, statev2.ID) (statev2.Metadata, error) {
+			return statev2.Metadata{ID: wantID}, nil
+		}},
+		TracerProvider: tp,
+	}}}
+
+	body := `{
+		"target": {"run_id": "` + runID.String() + `"},
+		"metadata": [{
+			"kind": "inngest.score",
+			"op": "merge",
+			"values": {"accuracy": {"value": 0.95}, "passed": {"value": true}}
+		}]
+	}`
+	req := httptest.NewRequest(http.MethodPost, "/runs/"+runID.String()+"/metadata", strings.NewReader(body))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("runID", runID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+
+	r.addRunMetadata(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Equal(t, []writtenMetadata{
+		{Kind: "inngest.score.accuracy", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"value": json.RawMessage(`0.95`)}},
+		{Kind: "inngest.score.passed", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"value": json.RawMessage(`true`)}},
+	}, tp.written)
+}
+
+// failingMetadataTracerProvider fails the failOn'th CreateSpan call.
+type failingMetadataTracerProvider struct {
+	*metadataTracerProvider
+	failOn int
+	calls  int
+}
+
+func (p *failingMetadataTracerProvider) CreateSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+	p.calls++
+	if p.calls == p.failOn {
+		return nil, errors.New("create span failed")
+	}
+	return p.metadataTracerProvider.CreateSpan(ctx, name, opts)
+}
+
+// sizeRecordingState records persisted metadata size deltas.
+type sizeRecordingState struct {
+	metadataStateLoader
+	deltas []int
+}
+
+func (s *sizeRecordingState) IncrementMetadataSize(_ context.Context, _ statev2.ID, delta int) error {
+	s.deltas = append(s.deltas, delta)
+	return nil
+}
+
+// TestAddRunMetadataPersistsSizeOfPartialSplitWrite verifies that when a
+// legacy score update is split and a later split span fails, the size of the
+// spans already written is still persisted to the state store.
+func TestAddRunMetadataPersistsSizeOfPartialSplitWrite(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := newRunID()
+	wantID := statev2.ID{
+		RunID:      runID,
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AppID:     uuid.New(),
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	tp := &failingMetadataTracerProvider{
+		metadataTracerProvider: &metadataTracerProvider{t: t, wantID: wantID},
+		failOn:                 2,
+	}
+	state := &sizeRecordingState{metadataStateLoader: metadataStateLoader{
+		loadMetadata: func(_ context.Context, _ statev2.ID) (statev2.Metadata, error) {
+			return statev2.Metadata{ID: wantID}, nil
+		},
+	}}
+	r := router{API: &API{opts: Opts{State: state, TracerProvider: tp}}}
+
+	// Legacy score shape w/ 2 names, split into 2 spans in key order: "a"
+	// is written, "b" fails.
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind: metadata.KindInngestScore,
+			Op:   enums.MetadataOpcodeMerge,
+			Values: metadata.Values{
+				"a": json.RawMessage(`{"value":1}`),
+				"b": json.RawMessage(`{"value":2}`),
+			},
+		}}},
+	})
+	require.Error(t, err)
+
+	require.Len(t, tp.written, 1)
+	require.Equal(t, metadata.ScoreKind("a"), tp.written[0].Kind)
+
+	written := metadata.Values{"value": json.RawMessage(`1`)}.Size()
+	require.Equal(t, []int{written}, state.deltas)
 }

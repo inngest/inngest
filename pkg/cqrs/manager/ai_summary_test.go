@@ -309,7 +309,7 @@ func aiMetadataAttributes(t *testing.T, scope metadata.Scope, values map[string]
 	var v metadata.Values
 	require.NoError(t, v.FromStruct(values))
 
-	attrs := tracing.RawMetadataAttrs(extractors.KindInngestAI, v, enums.MetadataOpcodeMerge)
+	attrs := tracing.RawMetadataAttrs(extractors.KindInngestAI, v)
 	meta.AddAttr(attrs, meta.Attrs.MetadataScope, &scope)
 
 	out := map[string]any{}

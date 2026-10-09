@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -22,10 +21,6 @@ type ResponseHeaderMetadata map[string]string
 
 func (m ResponseHeaderMetadata) Kind() metadata.Kind {
 	return KindInngestResponseHeaders
-}
-
-func (m ResponseHeaderMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (m ResponseHeaderMetadata) Serialize() (metadata.Values, error) {

@@ -581,3 +581,262 @@ func TestCreateMetadataSpanFromValues_TracerFailureSkipsListeners(t *testing.T) 
 	require.Nil(t, ref)
 	require.Empty(t, rec.entries)
 }
+
+// capturingTracerProvider records the attrs of every created span.
+type capturingTracerProvider struct {
+	TracerProvider
+	attrs []*meta.SerializableAttrs
+}
+
+func (c *capturingTracerProvider) CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
+	c.attrs = append(c.attrs, opts.Attributes)
+	return c.TracerProvider.CreateSpan(ctx, name, opts)
+}
+
+func newCapturingTracerProvider() *capturingTracerProvider {
+	return &capturingTracerProvider{TracerProvider: NewNoopTracerProvider()}
+}
+
+// capturedMetadata is the kind, op & values written to a captured span.
+type capturedMetadata struct {
+	Kind   metadata.Kind
+	Op     metadata.Opcode
+	Values metadata.Values
+}
+
+func (c *capturingTracerProvider) metadata(t *testing.T) []capturedMetadata {
+	t.Helper()
+
+	ret := make([]capturedMetadata, 0, len(c.attrs))
+	for _, attrs := range c.attrs {
+		kind, ok := meta.GetAttr(attrs, meta.Attrs.MetadataKind)
+		require.True(t, ok)
+		op, ok := meta.GetAttr(attrs, meta.Attrs.MetadataOp)
+		require.True(t, ok)
+		values, ok := meta.GetAttr(attrs, meta.Attrs.Metadata)
+		require.True(t, ok)
+		ret = append(ret, capturedMetadata{Kind: *kind, Op: *op, Values: *values})
+	}
+	return ret
+}
+
+func TestCreateMetadataSpanFromValues_AlwaysWritesSet(t *testing.T) {
+	for _, op := range enums.MetadataOpcodeValues() {
+		t.Run(op.String(), func(t *testing.T) {
+			tp := newCapturingTracerProvider()
+			values := metadata.Values{"foo": json.RawMessage(`"bar"`)}
+
+			ref, err := CreateMetadataSpanFromValues(
+				context.Background(), tp, &meta.SpanReference{},
+				"test.location", "test", nil,
+				"userland.thing", op, values, enums.MetadataScopeStep,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, ref)
+			require.Equal(t, []capturedMetadata{
+				{Kind: "userland.thing", Op: enums.MetadataOpcodeSet, Values: values},
+			}, tp.metadata(t))
+		})
+	}
+}
+
+func TestCreateMetadataSpan_AlwaysWritesSet(t *testing.T) {
+	tp := newCapturingTracerProvider()
+	md := &mockStructured{kind: "test.kind", values: metadata.Values{"foo": json.RawMessage(`1`)}}
+
+	_, err := CreateMetadataSpan(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil, md, enums.MetadataScopeStep,
+	)
+	require.NoError(t, err)
+	got := tp.metadata(t)
+	require.Len(t, got, 1)
+	require.Equal(t, enums.MetadataOpcodeSet, got[0].Op)
+}
+
+func TestIncomingOp(t *testing.T) {
+	require.Equal(t, enums.MetadataOpcodeMerge, incomingOp(metadata.Update{RawUpdate: metadata.RawUpdate{Op: enums.MetadataOpcodeMerge}}))
+	require.Equal(t, enums.MetadataOpcodeDelete, incomingOp(metadata.ScopedUpdate{Update: metadata.Update{RawUpdate: metadata.RawUpdate{Op: enums.MetadataOpcodeDelete}}}))
+	require.Equal(t, enums.MetadataOpcodeSet, incomingOp(structuredWithoutOp{}))
+}
+
+// structuredWithoutOp is server built metadata, which has no op.
+type structuredWithoutOp struct{}
+
+func (structuredWithoutOp) Kind() metadata.Kind                 { return "inngest.test" }
+func (structuredWithoutOp) Serialize() (metadata.Values, error) { return metadata.Values{}, nil }
+
+func TestMetadataKindTag(t *testing.T) {
+	tests := map[metadata.Kind]string{
+		"userland.foo":                 "userland.*",
+		"inngest.score.accuracy":       "inngest.score.*",
+		"inngest.warning.size":         "inngest.warning.*",
+		metadata.KindInngestScore:      "inngest.score",
+		metadata.KindInngestWarnings:   "inngest.warnings",
+		metadata.KindInngestExperiment: "inngest.experiment",
+	}
+	for kind, want := range tests {
+		require.Equal(t, want, metadataKindTag(kind), kind)
+	}
+}
+
+func TestCreateMetadataSpanFromValues_SplitsLegacyScores(t *testing.T) {
+	tp := newCapturingTracerProvider()
+	rec := &recordingMetadataListener{}
+	stateMd := &statev2.Metadata{ID: statev2.ID{RunID: ulid.MustNew(ulid.Now(), rand.Reader)}}
+
+	values := metadata.Values{
+		"accuracy": json.RawMessage(`{"value":0.95}`),
+		"passed":   json.RawMessage(`{"value":true}`),
+	}
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+		WithMetadataSyncListeners(rec),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, ref)
+
+	require.Equal(t, []capturedMetadata{
+		{Kind: "inngest.score.accuracy", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"value": json.RawMessage(`0.95`)}},
+		{Kind: "inngest.score.passed", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"value": json.RawMessage(`true`)}},
+	}, tp.metadata(t))
+
+	// The sync listeners fire once per split span.
+	require.Len(t, rec.entries, 2)
+	require.Equal(t, metadata.Kind("inngest.score.accuracy"), rec.entries[0].Kind)
+	require.Equal(t, metadata.Kind("inngest.score.passed"), rec.entries[1].Kind)
+
+	// The cumulative size counts every split span.
+	require.Equal(t, len("value")*2+len("0.95")+len("true"), stateMd.Metrics.MetadataSize)
+}
+
+func TestCreateMetadataSpanFromValues_SplitsLegacyWarnings(t *testing.T) {
+	tp := newCapturingTracerProvider()
+
+	values := metadata.Values{
+		"size": json.RawMessage(`"too big"`),
+		"auth": json.RawMessage(`"nope"`),
+	}
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		metadata.KindInngestWarnings, enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, []capturedMetadata{
+		{Kind: "inngest.warning.auth", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"auth": json.RawMessage(`"nope"`)}},
+		{Kind: "inngest.warning.size", Op: enums.MetadataOpcodeSet, Values: metadata.Values{"size": json.RawMessage(`"too big"`)}},
+	}, tp.metadata(t))
+}
+
+func TestCreateMetadataSpanFromValues_SplitSpanSizeLimit(t *testing.T) {
+	// 2 scores that are each under the per span limit, but over it together.
+	half := consts.MaxMetadataSpanSize/2 + 100
+	pad := strings.Repeat("x", half)
+	values := metadata.Values{
+		"a": json.RawMessage(`{"value":"` + pad + `"}`),
+		"b": json.RawMessage(`{"value":"` + pad + `"}`),
+	}
+	require.Greater(t, values.Size(), consts.MaxMetadataSpanSize)
+
+	tp := newCapturingTracerProvider()
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+	)
+	require.NoError(t, err)
+	require.Len(t, tp.metadata(t), 2)
+
+	// A single split span over the limit fails the whole write.
+	values["c"] = json.RawMessage(`{"value":"` + strings.Repeat("x", consts.MaxMetadataSpanSize) + `"}`)
+	tp = newCapturingTracerProvider()
+	_, err = CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+	)
+	require.ErrorIs(t, err, metadata.ErrMetadataSpanTooLarge)
+	require.Empty(t, tp.attrs)
+}
+
+func TestCreateMetadataSpanFromValues_SplitCumulativeLimit(t *testing.T) {
+	values := metadata.Values{
+		"a": json.RawMessage(`{"value":1}`),
+		"b": json.RawMessage(`{"value":2}`),
+	}
+	// Each split span is {"value": n}, IE 6 bytes. Leave room for only one.
+	initialSize := consts.MaxRunMetadataSize - 6
+	stateMd := &statev2.Metadata{
+		Metrics: statev2.RunMetrics{
+			MetadataSize:       initialSize,
+			MetadataSizeLoaded: initialSize,
+		},
+	}
+
+	tp := newCapturingTracerProvider()
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+	)
+	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
+	require.Empty(t, tp.attrs)
+	require.Equal(t, initialSize, stateMd.Metrics.MetadataSize)
+
+	delete(values, "b")
+	_, err = CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+	)
+	require.NoError(t, err)
+	require.Equal(t, consts.MaxRunMetadataSize, stateMd.Metrics.MetadataSize)
+}
+
+func TestCreateMetadataSpanFromValues_SplitRollsBackUnwrittenSpans(t *testing.T) {
+	tp := &failAfterTracerProvider{TracerProvider: NewNoopTracerProvider(), ok: 1}
+	stateMd := &statev2.Metadata{}
+
+	values := metadata.Values{
+		"a": json.RawMessage(`{"value":1}`),
+		"b": json.RawMessage(`{"value":2}`),
+	}
+	_, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", stateMd,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, values, enums.MetadataScopeRun,
+	)
+	require.Error(t, err)
+	// Only the first span was created, so only its size is kept.
+	require.Equal(t, 6, stateMd.Metrics.MetadataSize)
+}
+
+func TestCreateMetadataSpanFromValues_EmptyLegacyWriteIsNoop(t *testing.T) {
+	tp := newCapturingTracerProvider()
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		metadata.KindInngestScore, enums.MetadataOpcodeMerge, metadata.Values{}, enums.MetadataScopeRun,
+	)
+	require.NoError(t, err)
+	require.Nil(t, ref)
+	require.Empty(t, tp.attrs)
+}
+
+// failAfterTracerProvider creates ok spans, then fails every CreateSpan call.
+type failAfterTracerProvider struct {
+	TracerProvider
+	ok int
+}
+
+func (f *failAfterTracerProvider) CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
+	if f.ok == 0 {
+		return nil, errors.New("tracer backend unavailable")
+	}
+	f.ok--
+	return f.TracerProvider.CreateSpan(ctx, name, opts)
+}

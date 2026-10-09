@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -77,4 +78,36 @@ func TestExtractWarnings(t *testing.T) {
 		require.Len(t, warnings, 1)
 	})
 
+}
+
+func TestWarningsStructured(t *testing.T) {
+	warnings := ExtractWarnings(errors.Join(
+		&WarningError{Key: "size", Err: errors.New("too big")},
+		&WarningError{Key: "auth", Err: errors.New("nope")},
+	))
+
+	md := warnings.Structured()
+	require.Len(t, md, 2)
+
+	require.Equal(t, Kind("inngest.warning.auth"), md[0].Kind())
+	values, err := md[0].Serialize()
+	require.NoError(t, err)
+	require.Equal(t, Values{"auth": json.RawMessage(`"nope"`)}, values)
+
+	require.Equal(t, Kind("inngest.warning.size"), md[1].Kind())
+	values, err = md[1].Serialize()
+	require.NoError(t, err)
+	require.Equal(t, Values{"size": json.RawMessage(`"too big"`)}, values)
+
+	require.Empty(t, Warnings(nil).Structured())
+}
+
+func TestWithWarnings(t *testing.T) {
+	existing := []Structured{Warning{Code: "other", Err: io.EOF}}
+
+	require.Equal(t, existing, WithWarnings(existing, nil))
+
+	md := WithWarnings(existing, &WarningError{Key: "size", Err: io.EOF})
+	require.Len(t, md, 2)
+	require.Equal(t, Kind("inngest.warning.size"), md[1].Kind())
 }

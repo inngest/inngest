@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
@@ -367,14 +369,26 @@ func TestCreateScore(t *testing.T) {
 func TestScoreMetadataUpdate(t *testing.T) {
 	update, err := ScoreMetadataUpdate("accuracy", 0.95)
 	require.NoError(t, err)
-	require.Equal(t, metadata.KindInngestScore, update.Kind())
-	require.Equal(t, enums.MetadataOpcodeMerge, update.Op())
-	require.Equal(t, metadata.Values{"accuracy": json.RawMessage(`{"value":0.95}`)}, update.RawUpdate.Values)
+	require.Equal(t, metadata.Kind("inngest.score.accuracy"), update.Kind())
+	require.Equal(t, enums.MetadataOpcodeSet, update.Op())
+	require.Equal(t, metadata.Values{"value": json.RawMessage(`0.95`)}, update.RawUpdate.Values)
 
 	update, err = ScoreMetadataUpdate("passed", true)
 	require.NoError(t, err)
-	require.Equal(t, metadata.KindInngestScore, update.Kind())
-	require.Equal(t, metadata.Values{"passed": json.RawMessage(`{"value":true}`)}, update.RawUpdate.Values)
+	require.Equal(t, metadata.Kind("inngest.score.passed"), update.Kind())
+	require.Equal(t, metadata.Values{"value": json.RawMessage(`true`)}, update.RawUpdate.Values)
+
+	// Score names w/ dots & spaces stay a single kind suffix.
+	update, err = ScoreMetadataUpdate("latency p99.9", 12.5)
+	require.NoError(t, err)
+	require.Equal(t, metadata.Kind("inngest.score.latency p99.9"), update.Kind())
+	name, ok := update.Kind().ScoreName()
+	require.True(t, ok)
+	require.Equal(t, "latency p99.9", name)
+
+	// A max length score name still fits in its kind.
+	_, err = ScoreMetadataUpdate(strings.Repeat("a", metadata.MaxScoreNameByteLength), 1.0)
+	require.NoError(t, err)
 
 	_, err = ScoreMetadataUpdate("bad'name", 1.0)
 	require.Error(t, err)
@@ -391,7 +405,7 @@ func TestScoreExperimentMetadataUpdate(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, metadata.KindInngestExperiment, update.Kind())
-	require.Equal(t, enums.MetadataOpcodeMerge, update.Op())
+	require.Equal(t, enums.MetadataOpcodeSet, update.Op())
 	require.Equal(t, metadata.Values{
 		"name":    json.RawMessage(`"model-routing"`),
 		"variant": json.RawMessage(`"baseline"`),
@@ -610,4 +624,67 @@ func (f *fakeScoreIncrementingRunService) IncrementMetadataSize(ctx context.Cont
 	f.incrementID = id
 	f.incrementDelta += delta
 	return nil
+}
+
+// kindTracerProvider records the metadata kind & op of every created span.
+type kindTracerProvider struct {
+	tracing.TracerProvider
+	kinds []metadata.Kind
+	ops   []metadata.Opcode
+}
+
+func (p *kindTracerProvider) CreateSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+	if kind, ok := meta.GetAttr(opts.Attributes, meta.Attrs.MetadataKind); ok && kind != nil {
+		p.kinds = append(p.kinds, *kind)
+	}
+	if op, ok := meta.GetAttr(opts.Attributes, meta.Attrs.MetadataOp); ok && op != nil {
+		p.ops = append(p.ops, *op)
+	}
+	return p.TracerProvider.CreateSpan(ctx, name, opts)
+}
+
+func TestStateScoreProviderWritesPerNameScoreKinds(t *testing.T) {
+	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
+	accountID := uuid.New()
+	envID := uuid.New()
+	tp := &kindTracerProvider{TracerProvider: tracing.NewNoopTracerProvider()}
+
+	provider := NewStateScoreProvider(StateScoreProviderOptions{
+		State: &fakeScoreIncrementingRunService{
+			metadata: statev2.Metadata{
+				ID: statev2.ID{
+					RunID:  runID,
+					Tenant: statev2.Tenant{AccountID: accountID, EnvID: envID},
+				},
+			},
+		},
+		TracerProvider: tp,
+		Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
+			return accountID, envID, nil
+		},
+	})
+
+	err := provider.CreateScores(context.Background(), CreateScoresParams{
+		RunID: runID,
+		Scores: []ScoreInput{
+			testScoreInput(t, ScoreInput{Name: "accuracy", Value: 1.0}),
+			testScoreInput(t, ScoreInput{
+				Name:       "passed",
+				Value:      true,
+				Experiment: &ScoreExperimentInput{ExperimentName: "model-routing", Variant: "baseline"},
+			}),
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []metadata.Kind{
+		"inngest.score.accuracy",
+		metadata.KindInngestExperiment,
+		"inngest.score.passed",
+	}, tp.kinds)
+	require.Equal(t, []metadata.Opcode{
+		enums.MetadataOpcodeSet,
+		enums.MetadataOpcodeSet,
+		enums.MetadataOpcodeSet,
+	}, tp.ops)
 }
