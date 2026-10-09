@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { isScoreMetadata, isWarningMetadata, type SpanMetadata } from './types';
+import {
+  isAISummaryMetadata,
+  isExperimentMetadata,
+  isScoreMetadata,
+  isWarningMetadata,
+  type SpanMetadata,
+} from './types';
 
 describe('isScoreMetadata', () => {
   it('matches the constant inngest.score kind', () => {
@@ -66,4 +72,28 @@ describe('isWarningMetadata', () => {
       expect(isWarningMetadata(md)).toBe(false);
     }
   );
+});
+
+// The DuckDB read path strips kinds of their prefix and sends isUser instead.
+describe('metadata guards w/ prefix-stripped kinds', () => {
+  const md = (kind: string, isUser: boolean) =>
+    ({ scope: 'run', kind, isUser, updatedAt: 't', values: {} } as unknown as SpanMetadata);
+
+  it.each([
+    ['score', isScoreMetadata],
+    ['score.accuracy', isScoreMetadata],
+    ['experiment', isExperimentMetadata],
+    ['warnings', isWarningMetadata],
+    ['warning.sdk.size', isWarningMetadata],
+    ['ai.summary', isAISummaryMetadata],
+  ])('matches internal %s but not the user kind of the same name', (kind, guard) => {
+    expect(guard(md(kind, false))).toBe(true);
+    expect(guard(md(kind, true))).toBe(false);
+  });
+
+  it('still matches full kinds that also carry isUser', () => {
+    expect(isScoreMetadata(md('inngest.score', false))).toBe(true);
+    expect(isExperimentMetadata(md('inngest.experiment', false))).toBe(true);
+    expect(isScoreMetadata(md('userland.score', true))).toBe(false);
+  });
 });

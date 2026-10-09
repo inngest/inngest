@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { Trace } from '../types';
+import type { SpanMetadata, Trace } from '../types';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -874,6 +874,31 @@ describe('traceConversion', () => {
         { name: 'passed', value: true },
       ]);
       expect(result.bars[0]?.children?.[1]?.scores).toBeUndefined();
+    });
+
+    it('attaches scores from prefix-stripped kinds, skipping user kinds', () => {
+      const trace = createTrace({
+        isRoot: true,
+        metadata: [
+          {
+            scope: 'run',
+            kind: 'score.relevance',
+            isUser: false,
+            updatedAt: '2024-01-01T00:00:05Z',
+            values: { value: 0.5 },
+          },
+          {
+            scope: 'run',
+            kind: 'score.relevance',
+            isUser: true,
+            updatedAt: '2024-01-01T00:00:06Z',
+            values: { value: 1 },
+          },
+        ] as unknown as SpanMetadata[],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.scores).toEqual([{ name: 'relevance', value: 0.5 }]);
     });
 
     it('preserves spanID as bar id', () => {
