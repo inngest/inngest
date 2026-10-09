@@ -4,6 +4,7 @@ import { isMenuItemActive } from '@inngest/components/Menu/isMenuItemActive';
 
 import {
   billingCycleDaysRemaining,
+  boundCurrentConcurrency,
   buildTopFunctionRows,
   calculateUsageShare,
   daysUntil,
@@ -117,6 +118,50 @@ describe('infra dashboard formatters', () => {
     expect(isEnterprisePlanName('Legacy ENTERPRISE Plus')).toBe(true);
     expect(isEnterprisePlanName('Pro')).toBe(false);
     expect(isEnterprisePlanName(null)).toBe(false);
+  });
+});
+
+describe('boundCurrentConcurrency', () => {
+  it.each([
+    {
+      name: 'preserves usage below the account limit',
+      current: 80,
+      accountLimit: 100,
+      globalLimit: 100_000,
+      expected: 80,
+    },
+    {
+      name: 'allows burst usage up to three times the account limit',
+      current: 250,
+      accountLimit: 100,
+      globalLimit: 100_000,
+      expected: 250,
+    },
+    {
+      name: 'bounds usage at three times the account limit',
+      current: 350,
+      accountLimit: 100,
+      globalLimit: 100_000,
+      expected: 300,
+    },
+    {
+      name: 'bounds usage at the global limit when it is lower',
+      current: 120_000,
+      accountLimit: 50_000,
+      globalLimit: 100_000,
+      expected: 100_000,
+    },
+    {
+      name: 'bounds negative metric values at zero',
+      current: -1,
+      accountLimit: 100,
+      globalLimit: 100_000,
+      expected: 0,
+    },
+  ])('$name', ({ current, accountLimit, globalLimit, expected }) => {
+    expect(boundCurrentConcurrency(current, accountLimit, globalLimit)).toBe(
+      expected,
+    );
   });
 });
 
