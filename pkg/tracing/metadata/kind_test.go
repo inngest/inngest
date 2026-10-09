@@ -57,8 +57,58 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name:    "inngest.score.<name> with simple suffix is not allowed",
+			name:    "inngest.score.<name> is allowed",
 			kind:    "inngest.score.accuracy",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> w/ dots in the name is allowed",
+			kind:    "inngest.score.latency.p99",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score. w/ empty name is rejected",
+			kind:    KindPrefixInngestScore,
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.score.<name> w/ a max length name fits",
+			kind:    ScoreKind(strings.Repeat("a", MaxScoreNameByteLength)),
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.score.<name> over the max name length is too long",
+			kind:    ScoreKind(strings.Repeat("a", MaxScoreNameByteLength+1)),
+			wantErr: ErrKindTooLong,
+		},
+		{
+			name:    "inngest.warning.<code> is allowed",
+			kind:    "inngest.warning.metadata_size_exceeded",
+			wantErr: nil,
+		},
+		{
+			name:    "inngest.warning. w/ empty code is rejected",
+			kind:    KindPrefixInngestWarning,
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.warning w/o the trailing dot is rejected",
+			kind:    "inngest.warning",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.warning.<code> over the max kind length is too long",
+			kind:    WarningKind(strings.Repeat("a", MaxKindLength-len(KindPrefixInngestWarning)+1)),
+			wantErr: ErrKindTooLong,
+		},
+		{
+			name:    "inngest.scores.<name> is rejected",
+			kind:    "inngest.scores.accuracy",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.warnings.<code> is rejected",
+			kind:    "inngest.warnings.code",
 			wantErr: ErrKindNotAllowed,
 		},
 		{
@@ -129,6 +179,72 @@ func TestKind_Validate(t *testing.T) {
 		t.Parallel()
 		k := Kind(strings.Repeat("a", MaxKindLength+1))
 		require.ErrorIs(t, k.Validate(), ErrKindTooLong)
+	})
+}
+
+func TestKind_ScoreName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		kind     Kind
+		wantName string
+		wantOK   bool
+	}{
+		{name: "per name score kind", kind: "inngest.score.accuracy", wantName: "accuracy", wantOK: true},
+		{name: "name w/ dots", kind: "inngest.score.a.b", wantName: "a.b", wantOK: true},
+		{name: "bare inngest.score", kind: KindInngestScore, wantOK: false},
+		{name: "empty name", kind: "inngest.score.", wantOK: false},
+		{name: "warning kind", kind: "inngest.warning.code", wantOK: false},
+		{name: "userland kind", kind: "userland.score.accuracy", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			name, ok := tt.kind.ScoreName()
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantName, name)
+		})
+	}
+
+	t.Run("round trips w/ ScoreKind", func(t *testing.T) {
+		t.Parallel()
+		name, ok := ScoreKind("click-through rate").ScoreName()
+		assert.True(t, ok)
+		assert.Equal(t, "click-through rate", name)
+	})
+}
+
+func TestKind_WarningCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		kind     Kind
+		wantCode string
+		wantOK   bool
+	}{
+		{name: "per code warning kind", kind: "inngest.warning.size", wantCode: "size", wantOK: true},
+		{name: "bare inngest.warnings", kind: KindInngestWarnings, wantOK: false},
+		{name: "empty code", kind: "inngest.warning.", wantOK: false},
+		{name: "score kind", kind: "inngest.score.accuracy", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			code, ok := tt.kind.WarningCode()
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantCode, code)
+		})
+	}
+
+	t.Run("round trips w/ WarningKind", func(t *testing.T) {
+		t.Parallel()
+		code, ok := WarningKind("size").WarningCode()
+		assert.True(t, ok)
+		assert.Equal(t, "size", code)
 	})
 }
 

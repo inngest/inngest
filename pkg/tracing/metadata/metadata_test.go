@@ -210,6 +210,140 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
+			name: "per name score kind w/ numeric value is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"value": json.RawMessage(`0.95`)},
+			}},
+		},
+		{
+			name: "per name score kind w/ boolean value is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("passed"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`false`)},
+			}},
+		},
+		{
+			name: "per name score kind w/ a max length name is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind(strings.Repeat("a", MaxScoreNameByteLength)),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`1`)},
+			}},
+		},
+		{
+			name: "per name score kind w/ arbitrary name is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("click-through rate (variant A)"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`0.23`)},
+			}},
+		},
+		{
+			name: "per name score kind w/ single quote in the name is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("name'with'quotes"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`0.5`)},
+			}},
+			wantErr:    ErrScoreNameInvalid,
+			wantErrMsg: "contains invalid characters",
+		},
+		{
+			name: "per name score kind w/ control character in the name is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("bad\nname"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`0.5`)},
+			}},
+			wantErr: ErrScoreNameInvalid,
+		},
+		{
+			name: "per name score kind over the name limit is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind(strings.Repeat("a", MaxScoreNameByteLength+1)),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`0.5`)},
+			}},
+			wantErr: ErrKindTooLong,
+		},
+		{
+			name: "per name score kind w/ empty name is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindPrefixInngestScore,
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`0.5`)},
+			}},
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name: "per name score kind w/ legacy named shape is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"accuracy": json.RawMessage(`{"value":0.95}`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per name score kind w/ value object is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`{"value":0.95}`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per name score kind w/ extra keys alongside value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind: ScoreKind("accuracy"),
+				Op:   enums.MetadataOpcodeSet,
+				Values: Values{
+					"value": json.RawMessage(`0.95`),
+					"extra": json.RawMessage(`2`),
+				},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per name score kind w/ empty values is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per name score kind w/ null value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`null`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per name score kind w/ string value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   ScoreKind("accuracy"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"value": json.RawMessage(`"high"`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "per code warning kind is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   WarningKind("metadata_size_exceeded"),
+				Op:     enums.MetadataOpcodeSet,
+				Values: Values{"message": json.RawMessage(`"too big"`)},
+			}},
+		},
+		{
 			name: "non-score metadata keeps generic shape",
 			update: Update{RawUpdate: RawUpdate{
 				Kind:   "userland.score",

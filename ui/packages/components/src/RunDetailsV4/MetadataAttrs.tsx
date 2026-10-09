@@ -10,6 +10,7 @@ const inngestKindLabels: Record<string, string> = {
   response_headers: 'Response Headers',
   score: 'Scores',
   usage: 'Run Usage',
+  warning: 'Warnings',
   warnings: 'Warnings',
 };
 

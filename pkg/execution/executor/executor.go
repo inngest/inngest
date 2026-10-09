@@ -6435,6 +6435,19 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 
 func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
+		// gen.Metadata is SDK-supplied, so it gets the same reserved-kind and
+		// score value checks as checkpoints and the metadata API. extra is
+		// server-generated and may use kinds SDKs cannot set.
+		if err := md.ValidateAllowed(); err != nil {
+			e.log.Warn("invalid metadata in generator opcode",
+				"error", err,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"step_id", sanitizeLogValue(gen.ID),
+				"metadata_kind", sanitizeLogValue(md.Kind().String()),
+			)
+			continue
+		}
+
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}

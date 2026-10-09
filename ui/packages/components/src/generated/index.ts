@@ -4,9 +4,16 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
-// The score kind is the constant `inngest.score`; user-supplied score
-// names are the keys of the values map, not a kind suffix.
-export type SpanMetadataKindInngestScore = typeof KindInngestScore;
+// Scores are either one kind per name (`inngest.score.<name>` w/
+// `{value}`) or the legacy `inngest.score` kind keyed by score name.
+export type SpanMetadataKindInngestScore =
+  | typeof KindInngestScore
+  | `${typeof KindPrefixInngestScore}${string}`;
+// Warnings are either one kind per code (`inngest.warning.<code>`) or
+// the legacy `inngest.warnings` kind keyed by code.
+export type SpanMetadataKindInngestWarnings =
+  | typeof KindInngestWarnings
+  | `${typeof KindPrefixInngestWarning}${string}`;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestAISummary
@@ -16,13 +23,23 @@ export type SpanMetadataKind =
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
   | typeof KindInngestSandbox
-  | typeof KindInngestWarnings
+  | SpanMetadataKindInngestWarnings
   | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
 
 //////////
 // source: types_gen.go
 
+/**
+ * From kind.go
+ * Scores & warnings get one kind per score name / warning code so each can be
+ * replaced on its own (IE `inngest.score.<name>`, `inngest.warning.<code>`).
+ */
+export const KindPrefixInngestScore = 'inngest.score.';
+/**
+ * From kind.go
+ */
+export const KindPrefixInngestWarning = 'inngest.warning.';
 /**
  * From sandbox.go
  */

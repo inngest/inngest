@@ -1,11 +1,14 @@
+import { isScoreKind } from '../RunDetails/ScoresAttrs';
 import {
   KindInngestAISummary,
   KindInngestSandbox,
-  KindInngestScore,
+  KindInngestWarnings,
+  KindPrefixInngestWarning,
   type AIMetadata,
   type AISummaryMetadata,
   type SpanMetadataKind as GeneratedSpanMetadataKind,
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
+  type SpanMetadataKindInngestWarnings as GeneratedSpanMetadataKindInngestWarnings,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
   type SandboxMetadata,
   type Warnings,
@@ -48,6 +51,8 @@ export type ResponseInfo = {
 export type SpanMetadataKind = GeneratedSpanMetadataKind;
 
 export type SpanMetadataKindInngestScore = GeneratedSpanMetadataKindInngestScore;
+
+export type SpanMetadataKindInngestWarnings = GeneratedSpanMetadataKindInngestWarnings;
 
 export type SpanMetadataKindUserland = GeneratedSpanMetadataKindUserland;
 
@@ -148,7 +153,7 @@ export type SpanMetadataInngestResponseHeaders = {
 
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
-  kind: 'inngest.warnings';
+  kind: SpanMetadataKindInngestWarnings;
   updatedAt: string;
   values: Warnings;
 };
@@ -164,8 +169,10 @@ export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindInngestScore;
   updatedAt: string;
-  // Map of user-supplied score name to its value.
-  values: Record<string, { value: number | boolean }>;
+  // `inngest.score.<name>` holds the score's `{value}`, the legacy
+  // `inngest.score` maps each score name to its `{value}`. Read these through
+  // scoreRows, which handles both.
+  values: { value: number | boolean } | Record<string, { value: number | boolean }>;
 };
 
 export type SpanMetadataUserland = {
@@ -272,7 +279,17 @@ export function isSandboxMetadata(md: SpanMetadata): md is SpanMetadataInngestSa
 }
 
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
-  return md.kind === KindInngestScore;
+  return isScoreKind(md.kind);
+}
+
+// Matches the legacy `inngest.warnings` kind (a map of code to message) and per
+// code `inngest.warning.<code>` kinds.
+export function isWarningMetadata(md: SpanMetadata): md is SpanMetadataInngestWarnings {
+  return (
+    md.kind === KindInngestWarnings ||
+    (md.kind.startsWith(KindPrefixInngestWarning) &&
+      md.kind.length > KindPrefixInngestWarning.length)
+  );
 }
 
 export function isAISummaryMetadata(md: SpanMetadata): md is SpanMetadataInngestAISummary {

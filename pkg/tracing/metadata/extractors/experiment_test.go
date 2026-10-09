@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,7 +68,6 @@ func TestExperimentMetadataExtractor_FullSpan(t *testing.T) {
 	require.Len(t, md, 1, "Expected exactly one metadata item")
 
 	assert.Equal(t, metadata.Kind("inngest.experiment"), md[0].Kind())
-	assert.Equal(t, enums.MetadataOpcodeMerge, md[0].Op())
 
 	// Verify the extracted data content via Serialize
 	raw, err := md[0].Serialize()

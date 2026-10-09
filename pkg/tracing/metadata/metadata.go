@@ -24,11 +24,11 @@ type Opcode = enums.MetadataOpcode
 
 type Scope = enums.MetadataScope
 
+// Structured is metadata the server writes. It has no op since every metadata
+// span is written as a set (IE a full replace of its kind on its span).
 type Structured interface {
 	Kind() Kind
 	Serialize() (Values, error)
-
-	Op() enums.MetadataOpcode
 }
 
 type Values map[string]json.RawMessage
@@ -68,6 +68,8 @@ func (m *Values) FromStruct(v any) error {
 	return json.Unmarshal(data, m)
 }
 
+// Combine folds o into m. New writes are always set, the other ops are
+// legacy but still need folding for stored metadata.
 func (m Values) Combine(o Values, op enums.MetadataOpcode) error {
 	switch op {
 	case enums.MetadataOpcodeMerge:
@@ -132,6 +134,8 @@ func (m Update) Kind() Kind {
 	return m.RawUpdate.Kind
 }
 
+// Op is the op the SDK sent. It's only kept for metrics, the update is still
+// written as a set.
 func (m Update) Op() Opcode {
 	return m.RawUpdate.Op
 }
@@ -159,9 +163,13 @@ func (m Update) ValidateAllowed() error {
 		return err
 	}
 
-	switch m.Kind() {
-	case KindInngestScore:
+	if m.Kind() == KindInngestScore {
 		if err := validateNamedScoreValue(m.Values); err != nil {
+			return err
+		}
+	}
+	if name, ok := m.Kind().ScoreName(); ok {
+		if err := validateScoreKindValues(name, m.Values); err != nil {
 			return err
 		}
 	}

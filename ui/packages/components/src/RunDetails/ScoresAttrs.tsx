@@ -1,5 +1,5 @@
 import { TimeElement } from '../DetailsCard/Element';
-import { KindInngestScore } from '../generated';
+import { KindInngestScore, KindPrefixInngestScore } from '../generated';
 
 type ScoreMetadata = {
   kind: string;
@@ -23,9 +23,32 @@ type ScoreTrace = {
   childrenSpans?: ScoreTrace[];
 };
 
+// Scores come in two kind shapes:
+// - `inngest.score.<name>` w/ `{value}` (pre #4482, and per name kinds going
+//   forward)
+// - `inngest.score` w/ `{"<name>": {value}}` (the legacy shared kind)
+export function isScoreKind(kind: string): boolean {
+  return (
+    kind === KindInngestScore ||
+    (kind.startsWith(KindPrefixInngestScore) && kind.length > KindPrefixInngestScore.length)
+  );
+}
+
+// Normalizes either score kind shape to (name, raw value) pairs so readers
+// don't care which one was written.
+function scoreEntries(md: ScoreMetadata): [string, unknown][] {
+  if (md.kind === KindInngestScore) {
+    return Object.entries(md.values);
+  }
+  if (isScoreKind(md.kind)) {
+    return [[md.kind.slice(KindPrefixInngestScore.length), md.values]];
+  }
+  return [];
+}
+
 export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   // Run views need child spans because scores attach where they are emitted.
-  const metadata = trace?.metadata?.filter((md) => md.kind === KindInngestScore) ?? [];
+  const metadata = trace?.metadata?.filter((md) => isScoreKind(md.kind)) ?? [];
   const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
 
   return [...metadata, ...childMetadata];
@@ -52,7 +75,7 @@ export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   const latest = new Map<string, ScoreRow>();
 
   for (const md of metadata) {
-    for (const [name, raw] of Object.entries(md.values)) {
+    for (const [name, raw] of scoreEntries(md)) {
       if (!isScoreValue(raw)) {
         continue;
       }

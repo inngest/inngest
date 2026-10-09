@@ -3,7 +3,6 @@ package extractors
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -27,10 +26,6 @@ type HTTPMetadata struct {
 
 func (m HTTPMetadata) Kind() metadata.Kind {
 	return KindInngestHTTP
-}
-
-func (m HTTPMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (m HTTPMetadata) Serialize() (metadata.Values, error) {

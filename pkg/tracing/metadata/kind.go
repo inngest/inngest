@@ -19,6 +19,15 @@ const (
 	KindPrefixUserland = "userland."
 )
 
+// Scores & warnings get one kind per score name / warning code so each can be
+// replaced on its own (IE `inngest.score.<name>`, `inngest.warning.<code>`).
+//
+//tygo:generate
+const KindPrefixInngestScore = "inngest.score."
+
+//tygo:generate
+const KindPrefixInngestWarning = "inngest.warning."
+
 const (
 	KindInngestExperiment Kind = "inngest.experiment"
 )
@@ -46,8 +55,16 @@ func (k Kind) IsUser() bool {
 	return strings.HasPrefix(string(k), KindPrefixUserland)
 }
 
+// MaxScoreKindLength fits a max length score name after the score prefix, so
+// a name the SDK accepts never makes its kind too long.
+const MaxScoreKindLength = len(KindPrefixInngestScore) + MaxScoreNameByteLength
+
 func (k Kind) Validate() error {
-	if len(k) > MaxKindLength {
+	maxLength := MaxKindLength
+	if strings.HasPrefix(string(k), KindPrefixInngestScore) {
+		maxLength = MaxScoreKindLength
+	}
+	if len(k) > maxLength {
 		return ErrKindTooLong
 	}
 
@@ -56,9 +73,10 @@ func (k Kind) Validate() error {
 
 // allowedInngestKinds is the set of inngest-prefixed metadata kinds that SDK
 // clients are permitted to set. Any inngest.* kind not in this set is rejected
-// to prevent spoofing of internal metadata. The score kind is the bare
-// constant inngest.score; the user-supplied score name is a key in the values
-// map, not a kind suffix.
+// to prevent spoofing of internal metadata. Per name score & warning kinds
+// (inngest.score.<name>, inngest.warning.<code>) are accepted by prefix in
+// ValidateAllowed. The bare inngest.score & inngest.warnings kinds hold several
+// names/codes in their values map and stay allowed for older SDKs.
 //
 // Synthetic read-time kinds (inngest.usage, inngest.ai.summary) stay off the
 // allowlist so no stored entry of either kind can exist: the AI summary read
@@ -77,9 +95,8 @@ var allowedInngestKinds = map[Kind]bool{
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
 // prefix, that it belongs to the allowlist. Userland kinds pass without
-// restriction. The score kind inngest.score is allowlisted like the others;
-// the user-supplied score name is a key in the values map (validated by
-// validateScoreName), not a kind suffix.
+// restriction. Per name score & warning kinds pass w/ any non empty suffix;
+// the score name suffix is checked by validateScoreName along w/ the values.
 func (k Kind) ValidateAllowed() error {
 	if err := k.Validate(); err != nil {
 		return err
@@ -90,5 +107,21 @@ func (k Kind) ValidateAllowed() error {
 	if allowedInngestKinds[k] {
 		return nil
 	}
+	if _, ok := k.ScoreName(); ok {
+		return nil
+	}
+	if _, ok := k.WarningCode(); ok {
+		return nil
+	}
 	return ErrKindNotAllowed
+}
+
+// trimPrefix returns the kind w/o prefix, or false if the kind doesn't have
+// the prefix or nothing follows it.
+func (k Kind) trimPrefix(prefix string) (string, bool) {
+	suffix, ok := strings.CutPrefix(string(k), prefix)
+	if !ok || suffix == "" {
+		return "", false
+	}
+	return suffix, true
 }
