@@ -278,6 +278,15 @@ export function isSandboxMetadata(md: SpanMetadata): md is SpanMetadataInngestSa
   return md.kind === KindInngestSandbox;
 }
 
+/**
+ * True for both warning storage forms: the legacy merged `inngest.warnings`
+ * and the per-code `inngest.warning.<code>`. Unrelated kinds such as
+ * `inngest.warningsfoo` do not match.
+ */
+export function isWarningMetadata(md: { kind: string }): boolean {
+  return md.kind === 'inngest.warnings' || md.kind.startsWith('inngest.warning.');
+}
+
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
   return isScoreKind(md.kind);
 }

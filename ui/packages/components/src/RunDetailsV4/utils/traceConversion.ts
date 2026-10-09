@@ -22,12 +22,14 @@ import {
   isScoreMetadata,
   isSpanGroup,
   isStepInfoRun,
+  isWarningMetadata,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
   type SpanMetadataInngestTiming,
   type Trace,
 } from '../types';
 import { badgeSandboxes, sandboxBarData } from './sandboxes';
+import { getStepWarnings, type StepWarning } from '../warnings';
 import { TIMELINE_CONSTANTS } from './timing';
 
 /**
@@ -240,6 +242,28 @@ function getScores(metadata?: SpanMetadata[]): ScoreBadgeData[] | undefined {
   return scores.length > 0 ? scores : undefined;
 }
 
+/** Warning messages for a span, or undefined when it has none. */
+function getWarnings(metadata?: SpanMetadata[]): StepWarning[] | undefined {
+  const warnings = getStepWarnings(metadata);
+
+  return warnings.length > 0 ? warnings : undefined;
+}
+
+/**
+ * A rolled-up span's metadata: the last attempt's, plus the `inngest.warnings`
+ * of earlier attempts, so a warning isn't hidden in a collapsed attempt when a
+ * retry succeeds without one. Newer warnings still win on the same key.
+ */
+function rolledUpMetadata(attempts: Map<number, Trace>, last: Trace): SpanMetadata[] | undefined {
+  const earlier = [...attempts.values()]
+    .filter((attempt) => attempt !== last)
+    .flatMap((attempt) => {
+      return (attempt.metadata ?? []).filter((md) => isWarningMetadata(md));
+    });
+
+  return earlier.length > 0 ? [...earlier, ...(last.metadata ?? [])] : last.metadata;
+}
+
 /**
  * Convert a single Trace to TimelineBarData
  */
@@ -321,6 +345,7 @@ function traceToBarData(
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
     dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
+    warnings: getWarnings(trace.metadata),
   };
 }
 
@@ -490,8 +515,8 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     debugSessionID: last.debugSessionID,
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
-    metadata: last.metadata,
     origin: last.origin,
+    metadata: rolledUpMetadata(attempts, last), // scores from the last attempt, warnings from all
     userlandSpan: null,
   };
 }
@@ -552,8 +577,8 @@ function rollupFinalization(
     debugRunID: last.debugRunID,
     debugSessionID: last.debugSessionID,
     childrenSpans: toAttemptChildren(attempts),
-    metadata: last.metadata,
     origin: last.origin,
+    metadata: rolledUpMetadata(attempts, last),
     stepInfo: null,
     userlandSpan: null,
   };

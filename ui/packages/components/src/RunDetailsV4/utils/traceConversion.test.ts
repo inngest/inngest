@@ -552,6 +552,110 @@ describe('traceConversion', () => {
     });
   });
 
+  describe('warnings', () => {
+    const warningsMd = (message: string): NonNullable<Trace['metadata']> => {
+      return [
+        {
+          scope: 'step',
+          kind: 'inngest.warnings',
+          updatedAt: '2024-01-01T00:00:03Z',
+          values: { w: message },
+        },
+      ] as NonNullable<Trace['metadata']>;
+    };
+
+    it('exposes inngest.warnings metadata as bar.warnings', () => {
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1', metadata: warningsMd('careful') })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toEqual([{ key: 'w', message: 'careful' }]);
+    });
+
+    it('exposes per-code inngest.warning.<code> metadata as bar.warnings (icon source)', () => {
+      const perCode = [
+        {
+          scope: 'step',
+          kind: 'inngest.warning.dynamic_step',
+          updatedAt: '2024-01-01T00:00:03Z',
+          values: { dynamic_step: 'per-code message' },
+        },
+        {
+          scope: 'step',
+          kind: 'inngest.warnings',
+          updatedAt: '2024-01-01T00:00:01Z',
+          values: { legacy_code: 'legacy message' },
+        },
+      ] as NonNullable<Trace['metadata']>;
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1', metadata: perCode })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toEqual([
+        { key: 'dynamic_step', message: 'per-code message' },
+        { key: 'legacy_code', message: 'legacy message' },
+      ]);
+    });
+
+    it('leaves bar.warnings undefined without the metadata', () => {
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1' })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toBeUndefined();
+    });
+
+    it('carries the last attempt warnings on a rolled-up step', () => {
+      const attempt0 = createTrace({
+        spanID: 'a0',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:00Z',
+        metadata: warningsMd('first attempt'),
+      });
+      const attempt1 = createTrace({
+        spanID: 'a1',
+        stepID: 'step-1',
+        attempts: 1,
+        queuedAt: '2024-01-01T00:00:02Z',
+        metadata: warningsMd('last attempt'),
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [attempt0, attempt1] });
+      const result = traceToTimelineData(traceRollup(root), { runID: 'run-1' });
+
+      const rollupBar = result.bars[0]?.children?.[0];
+      expect(rollupBar?.warnings).toEqual([{ key: 'w', message: 'last attempt' }]);
+    });
+
+    it("keeps an earlier attempt's warning when the retry that succeeds has none", () => {
+      const attempt0 = createTrace({
+        spanID: 'a0',
+        stepID: 'step-1',
+        attempts: 0,
+        status: 'FAILED',
+        queuedAt: '2024-01-01T00:00:00Z',
+        metadata: warningsMd('built while this job waited'),
+      });
+      const attempt1 = createTrace({
+        spanID: 'a1',
+        stepID: 'step-1',
+        attempts: 1,
+        queuedAt: '2024-01-01T00:00:02Z',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [attempt0, attempt1] });
+      const result = traceToTimelineData(traceRollup(root), { runID: 'run-1' });
+
+      const rollupBar = result.bars[0]?.children?.[0];
+      expect(rollupBar?.warnings).toEqual([{ key: 'w', message: 'built while this job waited' }]);
+    });
+  });
+
   describe('traceRollup', () => {
     it('passes single-attempt steps through unchanged, sorted by queuedAt', () => {
       const step1 = createTrace({
