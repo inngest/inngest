@@ -651,7 +651,7 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
 }
 
 /**
- * Warning icon shown beside a step name when the step carries `inngest.warnings`
+ * Warning icon shown beside a step name when the step carries warning
  * metadata. The tooltip lists every message, and a click selects the row like
  * anywhere else on it, so the details panel shows them too.
  */

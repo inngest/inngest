@@ -429,6 +429,26 @@ describe('Step warnings callout', () => {
     expect(callout.textContent).toContain('other');
   });
 
+  it('shows per-code inngest.warning.<code> messages alongside the legacy form', () => {
+    renderStepInfo(
+      makeTrace({
+        metadata: [
+          ...(warningsMetadata({ a: 'legacy a' }) ?? []),
+          {
+            scope: 'step',
+            kind: 'inngest.warning.b',
+            updatedAt: '2026-01-01T00:00:03Z',
+            values: { b: 'per-code b' },
+          },
+        ] as Trace['metadata'],
+      })
+    );
+    const callout = screen.getByTestId('step-warnings');
+    expect(callout.textContent).toContain('2 warnings');
+    expect(callout.textContent).toContain('legacy a');
+    expect(callout.textContent).toContain('per-code b');
+  });
+
   it('is hidden without warnings metadata', () => {
     renderStepInfo(makeTrace());
     expect(screen.queryByTestId('step-warnings')).toBeNull();
@@ -447,6 +467,11 @@ describe('Step warnings and the Metadata tab', () => {
 
   it('does not count inngest.warnings as metadata (empty state still shows)', () => {
     renderStepInfo(makeTrace({ metadata: [md('inngest.warnings')] }));
+    expect(screen.getByText('No output available')).toBeTruthy();
+  });
+
+  it('does not count inngest.warning.<code> as metadata', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warning.dynamic_step')] }));
     expect(screen.getByText('No output available')).toBeTruthy();
   });
 

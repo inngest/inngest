@@ -21,6 +21,7 @@ import {
   isExperimentMetadata,
   isScoreMetadata,
   isStepInfoRun,
+  isWarningMetadata,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
   type SpanMetadataInngestTiming,
@@ -244,7 +245,7 @@ function rolledUpMetadata(attempts: Map<number, Trace>, last: Trace): SpanMetada
   const earlier = [...attempts.values()]
     .filter((attempt) => attempt !== last)
     .flatMap((attempt) => {
-      return (attempt.metadata ?? []).filter((md) => md.kind === 'inngest.warnings');
+      return (attempt.metadata ?? []).filter((md) => isWarningMetadata(md));
     });
 
   return earlier.length > 0 ? [...earlier, ...(last.metadata ?? [])] : last.metadata;

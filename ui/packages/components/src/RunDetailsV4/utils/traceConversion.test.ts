@@ -504,6 +504,33 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.children?.[0]?.warnings).toEqual([{ key: 'w', message: 'careful' }]);
     });
 
+    it('exposes per-code inngest.warning.<code> metadata as bar.warnings (icon source)', () => {
+      const perCode = [
+        {
+          scope: 'step',
+          kind: 'inngest.warning.dynamic_step',
+          updatedAt: '2024-01-01T00:00:03Z',
+          values: { dynamic_step: 'per-code message' },
+        },
+        {
+          scope: 'step',
+          kind: 'inngest.warnings',
+          updatedAt: '2024-01-01T00:00:01Z',
+          values: { legacy_code: 'legacy message' },
+        },
+      ] as NonNullable<Trace['metadata']>;
+      const root = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ spanID: 'c1', metadata: perCode })],
+      });
+      const result = traceToTimelineData(root, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.warnings).toEqual([
+        { key: 'dynamic_step', message: 'per-code message' },
+        { key: 'legacy_code', message: 'legacy message' },
+      ]);
+    });
+
     it('leaves bar.warnings undefined without the metadata', () => {
       const root = createTrace({
         isRoot: true,

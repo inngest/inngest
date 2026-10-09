@@ -1,11 +1,13 @@
 /**
  * @module
- * Extracts `inngest.warnings` span metadata (a flat map of key to message)
- * into a list the trace UI can render. Library-agnostic: any step carrying the
- * kind gets the same treatment.
+ * Extracts warning span metadata into a list the trace UI can render. Handles
+ * both storage forms, which can coexist in one trace: the legacy merged
+ * `inngest.warnings` (code to message map) and the per-code
+ * `inngest.warning.<code>` (values keyed by the code). Library-agnostic: any
+ * step carrying either kind gets the same treatment.
  */
 
-import type { SpanMetadata } from './types';
+import { isWarningMetadata, type SpanMetadata } from './types';
 
 export type StepWarning = {
   key: string;
@@ -13,26 +15,29 @@ export type StepWarning = {
 };
 
 /**
- * Collects warnings from every `inngest.warnings` entry, sorted by key.
+ * Collects warnings from every warning entry (either form), sorted by key.
  * Entries merge oldest `updatedAt` first so newer values win on duplicate
- * keys. Non-string and blank values are skipped; messages are trimmed.
+ * keys; on equal or missing times the per-code form wins over the legacy one.
+ * Non-string and blank values are skipped; messages are trimmed.
  */
 export function getStepWarnings(metadata?: SpanMetadata[]): StepWarning[] {
   const byKey = new Map<string, string>();
 
   const entries = (metadata ?? [])
     .filter((md) => {
-      return md.kind === 'inngest.warnings';
+      return isWarningMetadata(md);
     })
     .map((md, index) => {
-      return { md, index, time: Date.parse(md.updatedAt ?? '') };
+      const rank = md.kind === 'inngest.warnings' ? 0 : 1;
+
+      return { md, index, rank, time: Date.parse(md.updatedAt ?? '') };
     })
     .sort((a, b) => {
       // Empty or unparseable timestamps sort first, keeping input order among ties
       const aTime = Number.isNaN(a.time) ? -Infinity : a.time;
       const bTime = Number.isNaN(b.time) ? -Infinity : b.time;
       if (aTime === bTime) {
-        return a.index - b.index;
+        return a.rank - b.rank || a.index - b.index;
       }
 
       return aTime < bTime ? -1 : 1;

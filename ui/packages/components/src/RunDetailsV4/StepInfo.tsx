@@ -36,6 +36,7 @@ import {
   isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
+  isWarningMetadata,
   type SpanMetadataScope,
   type StepInfoInvoke,
   type StepInfoSignal,
@@ -251,7 +252,7 @@ export const StepInfo = ({
     ? trace.metadata?.filter(
         (md) =>
           md.kind !== 'inngest.response_headers' &&
-          md.kind !== 'inngest.warnings' &&
+          !isWarningMetadata(md) &&
           !isScoreMetadata(md) &&
           !isExperimentMetadata(md)
       ) ?? []
