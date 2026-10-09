@@ -407,6 +407,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     stepID
     stepOp
     stepType
+    groupKind
+    origin
     stepInfo {
       __typename
       ... on InvokeStepInfo {
@@ -443,6 +445,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
   }
 `;
 
+// Deep enough for three levels of span groups:
+// run → group → group → group → step → attempt → userland → userland.
 export const GET_RUN = gql`
   query GetRun($runID: String!) {
     run(runID: $runID) {
@@ -466,6 +470,15 @@ export const GET_RUN = gql`
               ...TraceDetails
               childrenSpans {
                 ...TraceDetails
+                childrenSpans {
+                  ...TraceDetails
+                  childrenSpans {
+                    ...TraceDetails
+                    childrenSpans {
+                      ...TraceDetails
+                    }
+                  }
+                }
               }
             }
           }

@@ -61,7 +61,7 @@ func TestHandleGeneratorMetadata_ValidatesSDKMetadata(t *testing.T) {
 		},
 		{
 			name:    "valid score is written",
-			update:  stepMetadataUpdate(metadata.KindInngestScore, metadata.Values{"accuracy": json.RawMessage(`{"value":0.9}`)}),
+			update:  stepMetadataUpdate("inngest.score.accuracy", metadata.Values{"value": json.RawMessage(`0.9`)}),
 			written: true,
 		},
 		{
@@ -70,7 +70,7 @@ func TestHandleGeneratorMetadata_ValidatesSDKMetadata(t *testing.T) {
 		},
 		{
 			name:   "invalid score value is dropped",
-			update: stepMetadataUpdate(metadata.KindInngestScore, metadata.Values{"accuracy": json.RawMessage(`{"value":"high"}`)}),
+			update: stepMetadataUpdate("inngest.score.accuracy", metadata.Values{"value": json.RawMessage(`"high"`)}),
 		},
 	}
 

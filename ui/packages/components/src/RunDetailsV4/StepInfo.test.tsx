@@ -64,8 +64,12 @@ vi.mock('../Time', () => ({
 }));
 
 vi.mock('../Rerun/RerunModal', () => ({
-  RerunModal: ({ editableInput }: { editableInput?: boolean }) => (
-    <div data-input-editable={String(editableInput)} data-testid="mock-rerun-modal" />
+  RerunModal: ({ editableInput, stepID }: { editableInput?: boolean; stepID: string }) => (
+    <div
+      data-input-editable={String(editableInput)}
+      data-step-id={stepID}
+      data-testid="mock-rerun-modal"
+    />
   ),
 }));
 
@@ -389,6 +393,22 @@ describe('Rerun from step visibility', () => {
     renderStepInfo(trace);
     expect(screen.queryByText('Rerun from step')).toBeNull();
   });
+
+  it('reruns a span group from its first step', () => {
+    const group = (spanID: string, childrenSpans: Trace[]) =>
+      makeTrace({ spanID, stepID: null, stepOp: null, stepType: 'SPAN_GROUP', childrenSpans });
+    const trace = group('span:outer', [
+      group('span:inner', [makeTrace({ stepID: 'first', queuedAt: '2024-01-01T00:00:01Z' })]),
+      makeTrace({ stepID: 'later', queuedAt: '2024-01-01T00:00:05Z' }),
+    ]);
+
+    renderStepInfo(trace);
+
+    expect(screen.queryByText('Rerun from start of span')).toBeTruthy();
+    const modal = screen.getByTestId('mock-rerun-modal');
+    expect(modal.getAttribute('data-step-id')).toBe('first');
+    expect(modal.getAttribute('data-input-editable')).toBe('false');
+  });
 });
 
 describe('Debug Run ID', () => {
@@ -478,5 +498,18 @@ describe('Step warnings and the Metadata tab', () => {
   it('counts other metadata alongside warnings (no empty state)', () => {
     renderStepInfo(makeTrace({ metadata: [md('inngest.warnings'), md('userland.x')] }));
     expect(screen.queryByText('No output available')).toBeNull();
+  });
+});
+
+describe('Added by', () => {
+  it('names the library that added the step', () => {
+    renderStepInfo(makeTrace({ origin: '@inngest/ci@0.1.0' }));
+    const wrapper = document.querySelector('[data-label="Added by"]');
+    expect(wrapper!.textContent).toBe('@inngest/ci@0.1.0');
+  });
+
+  it('is hidden for the user’s own steps', () => {
+    renderStepInfo(makeTrace({ origin: null }));
+    expect(document.querySelector('[data-label="Added by"]')).toBeNull();
   });
 });

@@ -1,12 +1,15 @@
 package tracing
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -405,4 +408,27 @@ func TestSleepStepSpanRefResolve(t *testing.T) {
 		item := &queue.Item{Kind: queue.KindSleep, Payload: queue.PayloadEdge{Edge: inngest.Edge{Outgoing: ""}}}
 		assert.Nil(t, SleepStepSpanRefResolve(item, runID))
 	})
+}
+
+func TestGeneratorAttrsSpanPathAndOrigin(t *testing.T) {
+	extract := func(op *state.GeneratorOpcode) *meta.ExtractedValues {
+		attrs := map[string]any{}
+		for _, kv := range GeneratorAttrs(op).Serialize() {
+			attrs[string(kv.Key)] = kv.Value.AsInterface()
+		}
+		values, err := meta.ExtractTypedValues(context.Background(), attrs)
+		require.NoError(t, err)
+		return values
+	}
+
+	// Any opcode, sleeps included, records its span path and origin.
+	origin := "@inngest/ci@0.1.0"
+	path := []meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}, {ID: "search", Name: "search tool", Origin: origin}}
+	sleep := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeSleep, Opts: map[string]any{"span": path, "origin": origin}})
+	require.Equal(t, &path, sleep.StepSpanPath)
+	require.Equal(t, origin, *sleep.StepOrigin)
+
+	run := extract(&state.GeneratorOpcode{ID: "step-1", Op: enums.OpcodeStepRun})
+	require.Nil(t, run.StepSpanPath)
+	require.Nil(t, run.StepOrigin)
 }

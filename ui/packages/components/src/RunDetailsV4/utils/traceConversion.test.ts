@@ -63,6 +63,19 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.name).toBe('Run');
     });
 
+    it.each([
+      ['inngest@3.44.0', 'COMPLETED', true],
+      ['@inngest/ci@0.1.0', 'RUNNING', true],
+      ['@inngest/ci@0.1.0', 'FAILED', false],
+      ['@acme/inngest@1.0.0', 'COMPLETED', false],
+      [null, 'COMPLETED', false],
+    ])('dims a row from origin %s with status %s: %s', (origin, status, dimmed) => {
+      const trace = createTrace({ isRoot: true, origin, status });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.dimmed).toBe(dimmed);
+    });
+
     it('sets isRoot to true on root bar', () => {
       const trace = createTrace({ isRoot: true });
       const result = traceToTimelineData(trace, { runID: 'run-1' });
@@ -186,6 +199,29 @@ describe('traceConversion', () => {
 
       expect(result.bars[0]?.children?.[0]?.style).toBe('step.sleep');
     });
+
+    it('gives span groups their own style, with no timing breakdown', () => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [
+          createTrace({
+            spanID: 'group',
+            stepID: null,
+            stepOp: null,
+            stepType: 'SPAN_GROUP',
+            childrenSpans: [
+              createTrace({ spanID: 'run' }),
+              createTrace({ spanID: 'wait', stepOp: 'WAIT_FOR_SIGNAL' }),
+            ],
+          }),
+        ],
+      });
+      const group = traceToTimelineData(trace, { runID: 'run-1' }).bars[0]?.children?.[0];
+
+      expect(group?.style).toBe('span.group');
+      expect(group?.timingBreakdown).toBeUndefined();
+      expect(group?.inngestBreakdown).toBeUndefined();
+    });
   });
 
   describe('timing breakdown', () => {
@@ -276,6 +312,40 @@ describe('traceConversion', () => {
       // inngest overhead = 71s total - 61s execution = 10s (not 70s!)
       expect(rootBar?.timingBreakdown?.inngestMs).toBe(10000);
       expect(rootBar?.timingBreakdown?.totalMs).toBe(71000);
+    });
+
+    it("counts only span groups' step execution in root bar execution time", () => {
+      const group = (childrenSpans: Trace[]) => {
+        return createTrace({ stepID: null, stepOp: null, stepType: 'SPAN_GROUP', childrenSpans });
+      };
+      const trace = createTrace({
+        isRoot: true,
+        queuedAt: '2024-01-01T00:00:00Z',
+        startedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:00:20Z',
+        childrenSpans: [
+          group([
+            createTrace({
+              queuedAt: '2024-01-01T00:00:01Z',
+              startedAt: '2024-01-01T00:00:02Z',
+              endedAt: '2024-01-01T00:00:03Z',
+            }),
+            group([
+              createTrace({
+                queuedAt: '2024-01-01T00:00:10Z',
+                startedAt: '2024-01-01T00:00:11Z',
+                endedAt: '2024-01-01T00:00:13Z',
+              }),
+            ]),
+          ]),
+        ],
+      });
+      const rootBar = traceToTimelineData(trace, { runID: 'run-1' }).bars[0];
+
+      // 1s + 2s of steps, not the group's 12s wall clock
+      expect(rootBar?.timingBreakdown?.executionMs).toBe(3000);
+      expect(rootBar?.timingBreakdown?.inngestMs).toBe(17000);
+      expect(rootBar?.runInngestBreakdown?.finalizationMs).toBe(7000);
     });
 
     it('prefers metadata timing over timestamp-based calculation', () => {
@@ -652,6 +722,44 @@ describe('traceConversion', () => {
       // Attempts are renamed and nested in order
       expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
       expect(rollup?.childrenSpans?.map((c) => c.spanID)).toEqual(['a0', 'a1']);
+    });
+
+    it("keeps a retried step's origin, so a library's step stays dimmed and credited", () => {
+      const origin = '@inngest/ci@0.1.0';
+
+      const attempts = [0, 1].map((attempt) => {
+        return createTrace({
+          spanID: `a${attempt}`,
+          stepID: 'step-1',
+          attempts: attempt,
+          origin,
+          status: attempt === 0 ? 'FAILED' : 'COMPLETED',
+        });
+      });
+
+      const fin = [0, 1].map((attempt) => {
+        return createTrace({
+          spanID: `fin-${attempt}`,
+          stepID: null,
+          groupID: 'g-final',
+          attempts: attempt,
+          outputID: 'out-fin',
+          origin,
+          queuedAt: '2024-01-01T00:00:11Z',
+          endedAt: '2024-01-01T00:00:12Z',
+        });
+      });
+
+      const root = createTrace({ isRoot: true, childrenSpans: [...attempts, ...fin] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['step-1-rollup', 'final-rollup']);
+      expect(result.childrenSpans?.map((c) => c.origin)).toEqual([origin, origin]);
+
+      const timeline = traceToTimelineData(result, { runID: 'run-1' });
+
+      expect(timeline.bars[0]?.children?.[0]?.dimmed).toBe(true);
     });
 
     it('adopts grouped no-step spans as attempts of the step sharing their groupID', () => {
@@ -1530,6 +1638,327 @@ describe('traceConversion', () => {
       // this is what the memoized render does across re-renders/polls.
       const second = traceRollup(root);
       expect(childNames(second)).toEqual(childNames(first));
+    });
+  });
+
+  describe('traceRollup — span groups', () => {
+    const ts = (secs: number) => `2024-01-01T00:00:${String(secs).padStart(2, '0')}Z`;
+    const attempt = (spanID: string, stepID: string, attempts: number, secs: number) =>
+      createTrace({
+        spanID,
+        stepID,
+        attempts,
+        name: stepID,
+        queuedAt: ts(secs),
+        startedAt: ts(secs),
+        endedAt: ts(secs + 1),
+        status: attempts === 0 ? 'FAILED' : 'COMPLETED',
+      });
+
+    const group = (spanID: string, childrenSpans: Trace[]) =>
+      createTrace({
+        spanID,
+        name: spanID,
+        stepID: null,
+        stepOp: null,
+        stepType: 'SPAN_GROUP',
+        queuedAt: childrenSpans[0]?.queuedAt ?? ts(0),
+        // The server ends a group with its last child
+        endedAt: childrenSpans[childrenSpans.length - 1]?.endedAt ?? null,
+        childrenSpans,
+      });
+
+    // A retried step, an ordinary step and a trailing finalization
+    const runChildren = () => [
+      attempt('a0', 'retried', 0, 1),
+      attempt('a1', 'retried', 1, 3),
+      attempt('b0', 'plain', 0, 5),
+      createTrace({
+        spanID: 'final',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-final',
+        attempts: 0,
+        outputID: 'o-final',
+        queuedAt: '2024-01-01T00:00:08Z',
+      }),
+    ];
+
+    it('leaves the rest of the run exactly as it is without groups', () => {
+      const without = traceRollup(createTrace({ isRoot: true, childrenSpans: runChildren() }));
+      const withGroup = traceRollup(
+        createTrace({
+          isRoot: true,
+          // Grouped work that ends before the run's last step does
+          childrenSpans: [...runChildren(), group('g', [attempt('c0', 'grouped', 0, 4)])],
+        })
+      );
+
+      expect(withGroup.childrenSpans?.filter((c) => c.spanID !== 'g')).toEqual(
+        without.childrenSpans
+      );
+    });
+
+    it('keeps groups and rolls up retries inside them, at any depth', () => {
+      const steps = () => [attempt('a0', 'retried', 0, 1), attempt('a1', 'retried', 1, 3)];
+      const atRoot = traceRollup(createTrace({ isRoot: true, childrenSpans: steps() }));
+      const nested = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: [group('outer', [group('inner', steps())])],
+        })
+      );
+
+      const outer = nested.childrenSpans?.[0];
+      expect(outer?.spanID).toBe('outer');
+      const inner = outer?.childrenSpans?.[0];
+      expect(inner?.spanID).toBe('inner');
+      expect(inner?.childrenSpans).toEqual(atRoot.childrenSpans);
+      expect(inner?.childrenSpans?.[0]?.childrenSpans?.map((c) => c.name)).toEqual([
+        'Attempt 0',
+        'Attempt 1',
+      ]);
+    });
+
+    it('orders groups among the steps by queue time', () => {
+      const result = traceRollup(
+        createTrace({
+          isRoot: true,
+          childrenSpans: [
+            attempt('late', 'late', 1, 9),
+            group('g', [attempt('c0', 'grouped', 1, 4)]),
+            attempt('early', 'early', 1, 1),
+          ],
+        })
+      );
+
+      expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['early', 'g', 'late']);
+    });
+
+    describe('finalization start', () => {
+      // A step's span; `to` of null is a step that hasn't ended
+      const work = (spanID: string, from: number, to: number | null, attempts = 0) =>
+        createTrace({
+          spanID,
+          stepID: spanID,
+          attempts,
+          name: spanID,
+          queuedAt: ts(from),
+          startedAt: ts(from),
+          endedAt: to === null ? null : ts(to),
+        });
+
+      // A step nobody awaited, still unfinished when the function returned:
+      // it keeps its pending status and never gets an end time
+      const unawaited = (
+        spanID: string,
+        status: 'QUEUED' | 'WAITING',
+        from: number,
+        stepOp = 'RUN'
+      ) => {
+        return createTrace({
+          ...work(spanID, from, null),
+          stepOp,
+          status,
+        });
+      };
+
+      // A group ending at `to`, however its children end
+      const endingAt = (to: number | null, trace: Trace): Trace => {
+        trace.endedAt = to === null ? null : ts(to);
+
+        return trace;
+      };
+
+      // Queued at 5s and started at 6s, while the work above is still going
+      const finalization = () =>
+        createTrace({
+          spanID: 'fin',
+          stepID: null,
+          stepOp: null,
+          groupID: 'g-final',
+          attempts: 0,
+          outputID: 'o-final',
+          queuedAt: ts(5),
+          startedAt: ts(6),
+          endedAt: ts(20),
+        });
+
+      const cases: {
+        name: string;
+        children: () => Trace[];
+        /** Seconds the finalization is expected to queue and start at */
+        expected: [number, number];
+      }[] = [
+        {
+          name: 'no groups: waits for the last step',
+          children: () => [work('s1', 0, 2), work('s2', 3, 9)],
+          expected: [9, 9],
+        },
+        {
+          name: 'no groups: leaves a finalization that starts after the last step alone',
+          children: () => [work('s1', 0, 4)],
+          expected: [5, 6],
+        },
+        {
+          name: 'mixed: ungrouped last step ends after the grouped work',
+          children: () => [work('s1', 0, 9), group('g', [work('c1', 3, 6)])],
+          expected: [9, 9],
+        },
+        {
+          name: 'mixed: ungrouped last step ends before the grouped work',
+          children: () => [work('s1', 0, 2), group('g', [work('c1', 3, 10)])],
+          expected: [10, 10],
+        },
+        {
+          name: 'all steps grouped: one group',
+          children: () => [group('g', [work('c1', 3, 10)])],
+          expected: [10, 10],
+        },
+        {
+          name: 'all steps grouped: sibling groups, the latest end wins',
+          children: () => [
+            group('g1', [work('c1', 1, 10)]),
+            group('g2', [work('c2', 2, 12)]),
+            group('g3', [work('c3', 3, 7)]),
+          ],
+          expected: [12, 12],
+        },
+        {
+          name: 'all steps grouped: a group listed first can end last',
+          children: () => [group('g1', [work('c1', 1, 12)]), group('g2', [work('c2', 2, 7)])],
+          expected: [12, 12],
+        },
+        {
+          name: 'nested groups: the deepest step ends latest',
+          children: () => [
+            endingAt(
+              8,
+              group('outer', [
+                work('c1', 1, 4),
+                endingAt(6, group('inner', [work('c2', 2, 5), work('c3', 3, 10)])),
+              ])
+            ),
+          ],
+          expected: [10, 10],
+        },
+        {
+          name: 'a group ending later than its children counts as work',
+          children: () => [endingAt(11, group('g', [work('c1', 3, 8)]))],
+          expected: [11, 11],
+        },
+        {
+          name: 'in progress: a child that has not ended is ignored, not treated as the start of time',
+          children: () => [endingAt(null, group('g', [work('c1', 1, 8), work('c2', 2, null)]))],
+          expected: [8, 8],
+        },
+        {
+          name: 'in progress: nothing has ended, so the finalization is untouched',
+          children: () => [endingAt(null, group('g', [work('c1', 1, null)]))],
+          expected: [5, 6],
+        },
+        {
+          name: 'retries in a group: a failed attempt ending latest counts',
+          children: () => [
+            endingAt(
+              8,
+              group('g', [
+                // The rollup ends with attempt 1, but attempt 0 ended later
+                work('c1', 2, 9, 0),
+                work('c1', 3, 7, 1),
+              ])
+            ),
+          ],
+          expected: [9, 9],
+        },
+        {
+          name: 'an empty group with no end is ignored',
+          children: () => [endingAt(null, group('g', [])), work('s1', 0, 4)],
+          expected: [5, 6],
+        },
+        {
+          name: 'an empty group with an end counts',
+          children: () => [endingAt(8, group('g', []))],
+          expected: [8, 8],
+        },
+        // Unawaited steps, as the Dev Server records them: when the function
+        // returns, a step that never ran stays QUEUED and a sleep stays
+        // WAITING, both with no end time. Nothing stamps them cancelled or
+        // closes them at run end, so they never pull finalization later.
+        {
+          name: 'unawaited: a queued step that never ran has no end and is ignored',
+          children: () => [unawaited('u1', 'QUEUED', 0)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: a sleep still waiting at run end is ignored',
+          children: () => [unawaited('u1', 'WAITING', 0, 'SLEEP'), work('s1', 0, 4)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: only the awaited work moves finalization',
+          children: () => [unawaited('u1', 'QUEUED', 0), work('s1', 0, 9)],
+          expected: [9, 9],
+        },
+        {
+          name: 'unawaited: a step that completed before finalization leaves it alone',
+          children: () => [work('u1', 0, 4), work('s1', 0, 2)],
+          expected: [5, 6],
+        },
+        {
+          name: 'unawaited: inside a group, only the finished work counts',
+          children: () => [
+            endingAt(null, group('g', [work('c1', 1, 8), unawaited('u1', 'WAITING', 2, 'SLEEP')])),
+          ],
+          expected: [8, 8],
+        },
+      ];
+
+      it.each(cases)('$name', ({ children, expected }) => {
+        const result = traceRollup(
+          createTrace({ isRoot: true, childrenSpans: [...children(), finalization()] })
+        );
+        const fin = result.childrenSpans?.find((c) => c.spanID === 'fin');
+
+        expect(fin?.name).toBe('Finalization');
+        expect(fin?.queuedAt).toBe(ts(expected[0]));
+        expect(fin?.startedAt).toBe(ts(expected[1]));
+        expect(fin?.endedAt).toBe(ts(20));
+      });
+
+      it('clamps every attempt of a multi-attempt finalization to grouped work', () => {
+        const attempts = [0, 1].map((n) => {
+          return createTrace({
+            spanID: `fin-${n}`,
+            stepID: null,
+            stepOp: null,
+            groupID: 'g-final',
+            attempts: n,
+            outputID: 'o-final',
+            queuedAt: ts(5 + n),
+            startedAt: ts(6 + n),
+            endedAt: ts(20),
+          });
+        });
+        const result = traceRollup(
+          createTrace({
+            isRoot: true,
+            childrenSpans: [group('g', [work('c1', 3, 10)]), ...attempts],
+          })
+        );
+        const fin = result.childrenSpans?.find((c) => c.spanID === 'final-rollup');
+
+        expect(fin?.queuedAt).toBe(ts(10));
+        expect(fin?.startedAt).toBe(ts(10));
+      });
+
+      it('has no finalization to place when the run has none', () => {
+        const result = traceRollup(
+          createTrace({ isRoot: true, childrenSpans: [group('g', [work('c1', 3, 10)])] })
+        );
+
+        expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['g']);
+      });
     });
   });
 });

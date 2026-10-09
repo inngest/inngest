@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -156,22 +157,16 @@ func (g GeneratorOpcode) IsError() bool {
 
 type GenericOpts struct {
 	StackLine string `json:"stackLine,omitempty,omitzero"`
+	// Span lists the span groups the SDK called the step in, outermost first.
+	Span lenient[[]meta.SpanPathElement] `json:"span,omitempty"`
+	// Origin is the library that created the step on the user's behalf, as
+	// "<package>@<version>".
+	Origin lenient[string] `json:"origin,omitempty"`
 }
 
 func (r *GenericOpts) UnmarshalAny(a any) error {
 	opts := GenericOpts{}
-	var mappedByt []byte
-	switch typ := a.(type) {
-	case []byte:
-		mappedByt = typ
-	default:
-		byt, err := json.Marshal(a)
-		if err != nil {
-			return err
-		}
-		mappedByt = byt
-	}
-	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+	if err := unmarshalOpts(a, &opts); err != nil {
 		return err
 	}
 
@@ -179,17 +174,32 @@ func (r *GenericOpts) UnmarshalAny(a any) error {
 	return nil
 }
 
-func (g GeneratorOpcode) StackLine() (*string, error) {
-	opts := &GenericOpts{}
-	if err := opts.UnmarshalAny(g.Opts); err != nil {
-		return nil, err
+// SetOpt sets one key in the opcode's opts, keeping every other key the SDK
+// sent, such as stackLine and parallelMode.
+func (g *GeneratorOpcode) SetOpt(key string, value any) error {
+	var opts map[string]any
+	if err := unmarshalOpts(g.Opts, &opts); err != nil {
+		return err
+	}
+	if opts == nil {
+		opts = map[string]any{}
 	}
 
-	if opts.StackLine == "" {
-		return nil, nil
-	}
+	opts[key] = value
+	g.Opts = opts
+	return nil
+}
 
-	return &opts.StackLine, nil
+// unmarshalOpts decodes opts, raw JSON or already decoded, into v.
+func unmarshalOpts(opts any, v any) error {
+	byt, ok := opts.([]byte)
+	if !ok {
+		var err error
+		if byt, err = json.Marshal(opts); err != nil {
+			return err
+		}
+	}
+	return json.Unmarshal(byt, v)
 }
 
 // Returns, if any, the type of a StepRun operation.
@@ -727,4 +737,18 @@ func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
 	}
 
 	return mode
+}
+
+// lenient decodes to its zero value, rather than failing the whole decode, when
+// the SDK sends a value of the wrong shape.
+type lenient[T any] struct {
+	Value T
+}
+
+func (l *lenient[T]) UnmarshalJSON(byt []byte) error {
+	if err := json.Unmarshal(byt, &l.Value); err != nil {
+		var zero T
+		l.Value = zero
+	}
+	return nil
 }
