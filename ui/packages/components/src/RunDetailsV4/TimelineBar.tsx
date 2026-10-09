@@ -652,7 +652,8 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
 
 /**
  * Warning icon shown beside a step name when the step carries `inngest.warnings`
- * metadata. The tooltip shows the message, or a count when there are several.
+ * metadata. The tooltip lists every message, and a click selects the row like
+ * anywhere else on it, so the details panel shows them too.
  */
 function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
   const summary = summarizeWarnings(warnings);
@@ -666,15 +667,20 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
           aria-label={`Warning: ${summary}`}
           tabIndex={0}
           className="focus-visible:ring-primary-subtle ml-1 flex shrink-0 cursor-help rounded-sm focus-visible:outline-none focus-visible:ring"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
         >
           <RiErrorWarningFill aria-hidden="true" className="text-warning h-3.5 w-3.5" />
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
-        {summary}
+        {warnings.length === 1 ? (
+          summary
+        ) : (
+          <ul className="list-disc space-y-1 pl-4">
+            {warnings.map((warning) => {
+              return <li key={warning.key}>{warning.message}</li>;
+            })}
+          </ul>
+        )}
       </TooltipContent>
     </Tooltip>
   );

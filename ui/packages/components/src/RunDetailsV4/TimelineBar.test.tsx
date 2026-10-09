@@ -390,4 +390,31 @@ describe('TimelineBar warning icon placement and access', () => {
     fireEvent.focus(icon);
     expect((await screen.findAllByText('build it earlier')).length).toBeGreaterThan(0);
   });
+
+  it('selects the row when clicked', () => {
+    const onClick = vi.fn();
+    render(<TimelineBar {...props} onClick={onClick} />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId('warning-icon'));
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('lists every message in its tooltip', async () => {
+    render(
+      <TimelineBar
+        {...props}
+        warnings={[
+          { key: 'a', message: 'first warning' },
+          { key: 'b', message: 'second warning' },
+        ]}
+      />,
+      { wrapper: Wrapper }
+    );
+
+    fireEvent.focus(screen.getByTestId('warning-icon'));
+
+    expect((await screen.findAllByText('first warning')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('second warning')).length).toBeGreaterThan(0);
+  });
 });
