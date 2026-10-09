@@ -77,9 +77,13 @@ func TestConvertRunSpanToGQL_CustomConcurrencyKeys(t *testing.T) {
 		Attributes:  &meta.ExtractedValues{CustomConcurrencyKeys: &keys},
 	}
 
-	result, err := convertDynamicRunSpanToGQL(context.Background(), span)
-	require.NoError(t, err)
-	assert.Equal(t, keys, result.CustomConcurrencyKeys)
+	for name, convert := range runConverters {
+		t.Run(name, func(t *testing.T) {
+			result, err := convert(context.Background(), span)
+			require.NoError(t, err)
+			assert.Equal(t, keys, result.CustomConcurrencyKeys)
+		})
+	}
 }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {

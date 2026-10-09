@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -294,4 +296,58 @@ func TestGetSpanOutputRequiresRunIDAndSpanID(t *testing.T) {
 	m := Wrap(nil, db).(*Manager)
 	_, err := m.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{})
 	require.Error(t, err)
+}
+
+// TestRunTraceGroupsStepsBySpanPath loads a run whose steps carry span paths
+// (one on the step, one on its execution, as the executor writes them) from
+// DuckDB and converts it as the API does: the steps come back grouped.
+func TestRunTraceGroupsStepsBySpanPath(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	path, err := json.Marshal([]meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}})
+	require.NoError(t, err)
+	attrs := func(stepID string, queued time.Time, withPath bool) string {
+		a := map[string]any{
+			meta.Attrs.StepID.Key():   stepID,
+			meta.Attrs.StepName.Key(): stepID,
+			meta.Attrs.QueuedAt.Key(): queued.UnixMilli(),
+		}
+		if withPath {
+			a[meta.Attrs.StepSpanPath.Key()] = string(path)
+			a[meta.Attrs.StepOrigin.Key()] = "inngest@3.44.0"
+		}
+		out, err := json.Marshal(a)
+		require.NoError(t, err)
+		return string(out)
+	}
+
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "run", "", meta.SpanNameRun, now, now.Add(time.Second), "{}")
+	// A step whose path is on the step span.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "plan", "run", meta.SpanNameStep, now, now.Add(10*time.Millisecond), attrs("plan", now, true))
+	// A step whose path is only on its execution.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "search", "run", meta.SpanNameStep, now.Add(20*time.Millisecond), now.Add(30*time.Millisecond), attrs("search", now.Add(20*time.Millisecond), false))
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "search-exec", "search", meta.SpanNameExecution, now.Add(20*time.Millisecond), now.Add(30*time.Millisecond), attrs("search", now.Add(20*time.Millisecond), true))
+	// A step outside any group.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "after", "run", meta.SpanNameStep, now.Add(40*time.Millisecond), now.Add(50*time.Millisecond), attrs("after", now.Add(40*time.Millisecond), false))
+
+	root, err := m.GetSpansByRunID(ctx, runID)
+	require.NoError(t, err)
+	trace, err := loader.ConvertRunSpanFor(ctx, m, root)
+	require.NoError(t, err)
+
+	require.Len(t, trace.ChildrenSpans, 2)
+	group := trace.ChildrenSpans[0]
+	require.Equal(t, "Research agent", group.Name)
+	require.Equal(t, loader.SpanGroupStepType, group.StepType)
+	require.Len(t, group.ChildrenSpans, 2)
+	require.Equal(t, "plan", group.ChildrenSpans[0].Name)
+	require.Equal(t, "search", group.ChildrenSpans[1].Name)
+	require.Equal(t, "inngest@3.44.0", *group.ChildrenSpans[1].Origin)
+	require.Equal(t, "after", trace.ChildrenSpans[1].Name)
 }
