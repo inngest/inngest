@@ -210,7 +210,7 @@ func TestQueryInsights_RecoversPanics(t *testing.T) {
 		t.Cleanup(func() { executeInsights = orig })
 		executeInsights = func(context.Context, *sql.DB, *insights.TranspileResult) (*insights.Result, error) {
 			var m map[string]int
-			m["x"]++ // a real runtime panic, not just panic(...)
+			m["x"]++ //nolint:staticcheck // a real runtime panic, not just panic(...)
 			return nil, nil
 		}
 
