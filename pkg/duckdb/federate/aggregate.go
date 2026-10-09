@@ -436,11 +436,19 @@ func validateAggregate(q AggregateQuery) error {
 			return err
 		}
 	}
+	return validatePredicates(q.Table, q.Predicates, "aggregate")
+}
+
+// validatePredicates checks preds can be applied exactly on both sides, as
+// predicateSQL renders them for the lake: scalar columns, no JSON keys, and
+// operators both stores agree on. what names the caller, for errors.
+func validatePredicates(t Table, preds []Predicate, what string) error {
+	phys := Physical[t]
 	var check func(p Predicate) error
 	check = func(p Predicate) error {
 		if p.IsBool() {
 			if len(p.Args) == 0 || (p.Op == OpNot && len(p.Args) != 1) {
-				return fmt.Errorf("federate: aggregate: %s needs operands", p.Op)
+				return fmt.Errorf("federate: %s: %s needs operands", what, p.Op)
 			}
 			for _, a := range p.Args {
 				if err := check(a); err != nil {
@@ -449,33 +457,36 @@ func validateAggregate(q AggregateQuery) error {
 			}
 			return nil
 		}
-		c, err := column(p.Column)
-		if err != nil {
-			return err
+		c, ok := phys.Column(p.Column)
+		if !ok {
+			return fmt.Errorf("federate: %s: %s has no column %q", what, t, p.Column)
+		}
+		if !aggregatable[c.Type] {
+			return fmt.Errorf("federate: %s: column %q isn't a scalar", what, p.Column)
 		}
 		if p.Path != "" {
-			return fmt.Errorf("federate: aggregate: predicate on a key of %q isn't supported", p.Column)
+			return fmt.Errorf("federate: %s: predicate on a key of %q isn't supported", what, p.Column)
 		}
 		switch p.Op {
 		case OpEq, OpNeq:
 		case OpLt, OpLte, OpGt, OpGte:
 			if c.Type == schema.TypeUUID {
-				return fmt.Errorf("federate: aggregate: UUID column %q only takes =, != and IN", p.Column)
+				return fmt.Errorf("federate: %s: UUID column %q only takes =, != and IN", what, p.Column)
 			}
 		case OpIn:
 			if vals, ok := p.Value.([]any); !ok || len(vals) == 0 {
-				return fmt.Errorf("federate: aggregate: IN on %q needs a non-empty []any", p.Column)
+				return fmt.Errorf("federate: %s: IN on %q needs a non-empty []any", what, p.Column)
 			}
 		case OpLike:
 			if _, ok := p.Value.(string); !ok || c.Type != schema.TypeVarchar {
-				return fmt.Errorf("federate: aggregate: LIKE on %q needs a string column and pattern", p.Column)
+				return fmt.Errorf("federate: %s: LIKE on %q needs a string column and pattern", what, p.Column)
 			}
 		default:
-			return fmt.Errorf("federate: aggregate: unsupported operator %q", p.Op)
+			return fmt.Errorf("federate: %s: unsupported operator %q", what, p.Op)
 		}
 		return nil
 	}
-	for _, p := range q.Predicates {
+	for _, p := range preds {
 		if err := check(p); err != nil {
 			return err
 		}

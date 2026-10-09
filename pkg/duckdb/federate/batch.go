@@ -148,6 +148,11 @@ type DeltaRequest struct {
 	Predicates []Predicate
 	// RowCap bounds the delta; streaming more is an error, not truncation.
 	RowCap int
+	// OrderBy and Limit, if Limit is set, let the streamer return only the
+	// delta's first Limit rows by OrderBy (Query.TopN) — but only if it
+	// applies every predicate exactly. Otherwise it ignores them.
+	OrderBy []OrderKey
+	Limit   int
 }
 
 // DeltaStreamer returns the delta for one table.
