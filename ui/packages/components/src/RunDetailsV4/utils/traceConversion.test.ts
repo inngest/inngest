@@ -535,6 +535,28 @@ describe('traceConversion', () => {
       const rollupBar = result.bars[0]?.children?.[0];
       expect(rollupBar?.warnings).toEqual([{ key: 'w', message: 'last attempt' }]);
     });
+
+    it("keeps an earlier attempt's warning when the retry that succeeds has none", () => {
+      const attempt0 = createTrace({
+        spanID: 'a0',
+        stepID: 'step-1',
+        attempts: 0,
+        status: 'FAILED',
+        queuedAt: '2024-01-01T00:00:00Z',
+        metadata: warningsMd('built while this job waited'),
+      });
+      const attempt1 = createTrace({
+        spanID: 'a1',
+        stepID: 'step-1',
+        attempts: 1,
+        queuedAt: '2024-01-01T00:00:02Z',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [attempt0, attempt1] });
+      const result = traceToTimelineData(traceRollup(root), { runID: 'run-1' });
+
+      const rollupBar = result.bars[0]?.children?.[0];
+      expect(rollupBar?.warnings).toEqual([{ key: 'w', message: 'built while this job waited' }]);
+    });
   });
 
   describe('traceRollup', () => {

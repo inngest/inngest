@@ -236,6 +236,21 @@ function getWarnings(metadata?: SpanMetadata[]): StepWarning[] | undefined {
 }
 
 /**
+ * A rolled-up span's metadata: the last attempt's, plus the `inngest.warnings`
+ * of earlier attempts, so a warning isn't hidden in a collapsed attempt when a
+ * retry succeeds without one. Newer warnings still win on the same key.
+ */
+function rolledUpMetadata(attempts: Map<number, Trace>, last: Trace): SpanMetadata[] | undefined {
+  const earlier = [...attempts.values()]
+    .filter((attempt) => attempt !== last)
+    .flatMap((attempt) => {
+      return (attempt.metadata ?? []).filter((md) => md.kind === 'inngest.warnings');
+    });
+
+  return earlier.length > 0 ? [...earlier, ...(last.metadata ?? [])] : last.metadata;
+}
+
+/**
  * Convert a single Trace to TimelineBarData
  */
 function traceToBarData(
@@ -471,7 +486,7 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     debugSessionID: last.debugSessionID,
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
-    metadata: last.metadata, // warnings, like scores, come from the last attempt
+    metadata: rolledUpMetadata(attempts, last), // scores from the last attempt, warnings from all
     userlandSpan: null,
   };
 }
@@ -530,7 +545,7 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
     debugRunID: last.debugRunID,
     debugSessionID: last.debugSessionID,
     childrenSpans: toAttemptChildren(attempts),
-    metadata: last.metadata,
+    metadata: rolledUpMetadata(attempts, last),
     stepInfo: null,
     userlandSpan: null,
   };
