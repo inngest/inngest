@@ -1,0 +1,14 @@
+INPUT
+event.data.foo["x') OR 1=1 OR ('"] == "y" && event.data.vars.q == "z"
+
+EVENT SQL
+(((x::JSON->>?) = ?) AND ((x::JSON->>?) = ?))
+
+EVENT ARGS
+[$.data.foo."x') OR 1=1 OR ('" y $.data.vars.q z]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

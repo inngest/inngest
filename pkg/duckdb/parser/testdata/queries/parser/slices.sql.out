@@ -1,0 +1,45 @@
+-- SELECT x[2], x[2:], x[:], x[1:3] FROM t
+SelectStatement
+  SelectItem()
+    SliceExpr(stop=false,minus=false,step=false)
+      Ident(x)
+      Literal(1,2)
+  SelectItem()
+    SliceExpr(stop=true,minus=false,step=false)
+      Ident(x)
+      Literal(1,2)
+  SelectItem()
+    SliceExpr(stop=true,minus=false,step=false)
+      Ident(x)
+  SelectItem()
+    SliceExpr(stop=true,minus=false,step=false)
+      Ident(x)
+      Literal(1,1)
+      Literal(1,3)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT x[1:-], x[1:-:2], x[1:2:3], x[::2] FROM t;
+SelectStatement
+  SelectItem()
+    SliceExpr(stop=true,minus=true,step=false)
+      Ident(x)
+      Literal(1,1)
+  SelectItem()
+    SliceExpr(stop=true,minus=true,step=true)
+      Ident(x)
+      Literal(1,1)
+      Literal(1,2)
+  SelectItem()
+    SliceExpr(stop=true,minus=false,step=true)
+      Ident(x)
+      Literal(1,1)
+      Literal(1,2)
+      Literal(1,3)
+  SelectItem()
+    SliceExpr(stop=true,minus=false,step=true)
+      Ident(x)
+      Literal(1,2)
+  FromClause
+    BaseTableRef(t,alias=)
+
