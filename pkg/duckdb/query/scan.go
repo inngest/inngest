@@ -112,7 +112,7 @@ func asNullableTimestamp(v any, col string) (time.Time, error) {
 }
 
 // asNullableBool returns false (not an error) for a SQL NULL column. Its
-// only caller, is_deferred, is BOOLEAN NOT NULL DEFAULT FALSE so this
+// callers (is_deferred, run_metadata.is_user) are BOOLEAN NOT NULL so this
 // branch shouldn't be reachable in practice, but costs nothing to keep as a
 // defensive default rather than erroring on an unexpected NULL.
 func asNullableBool(v any, col string) (bool, error) {

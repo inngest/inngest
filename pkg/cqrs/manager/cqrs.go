@@ -843,6 +843,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 	}
 
+	ret.IsUser = ret.Kind.IsUser()
 	return ret, nil
 }
 

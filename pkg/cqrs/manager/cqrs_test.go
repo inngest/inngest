@@ -3670,3 +3670,27 @@ func TestRollupSpanMetadataFromFragmentsLegacyMergeThenSet(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, metadata.Values{"d": json.RawMessage(`5`)}, md.Values)
 }
+
+// TestRollupSpanMetadataFromFragmentsSetsIsUser checks IsUser follows the
+// fragments' kind prefix, so it agrees with DuckDB's stored is_user.
+func TestRollupSpanMetadataFromFragmentsSetsIsUser(t *testing.T) {
+	for kind, isUser := range map[string]bool{
+		"userland.score": true,
+		"inngest.score":  false,
+	} {
+		attrs, err := json.Marshal(map[string]any{
+			"_inngest.metadata.scope":  enums.MetadataScopeRun,
+			"_inngest.metadata.kind":   kind,
+			"_inngest.metadata.op":     enums.MetadataOpcodeSet,
+			"_inngest.metadata.values": `{"v":1}`,
+		})
+		require.NoError(t, err)
+
+		md, err := rollupSpanMetadataFromFragments(context.Background(), []map[string]any{
+			{"attributes": string(attrs)},
+		}, time.Now())
+		require.NoError(t, err)
+		require.Equal(t, metadata.Kind(kind), md.Kind)
+		require.Equal(t, isUser, md.IsUser, kind)
+	}
+}
