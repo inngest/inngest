@@ -70,8 +70,9 @@ const traceDetailsFragment = graphql(`
   }
 `);
 
-// Deep enough for three levels of span groups:
-// run → group → group → group → step → attempt → userland → userland.
+// Cloud caps query complexity at 300 and each level costs ~58, so this stops
+// at 5 levels. Deeper spans (extra machines, command retries, failed attempts
+// in CI traces) aren't shown until span children are loaded lazily.
 const query = graphql(`
   query GetRunTrace($envID: ID!, $runID: String!, $preview: Boolean) {
     workspace(id: $envID) {
@@ -96,15 +97,6 @@ const query = graphql(`
                 ...TraceDetails
                 childrenSpans {
                   ...TraceDetails
-                  childrenSpans {
-                    ...TraceDetails
-                    childrenSpans {
-                      ...TraceDetails
-                      childrenSpans {
-                        ...TraceDetails
-                      }
-                    }
-                  }
                 }
               }
             }
