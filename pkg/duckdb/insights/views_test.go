@@ -184,6 +184,76 @@ func TestInsightsRunsMacroMergesRunScopedMetadata(t *testing.T) {
 	require.Equal(t, map[string]any{"sys": map[string]any{"z": float64(3)}}, internal)
 }
 
+// rollupMetadata reads one span's user/internal metadata out of
+// inngest.insights_metadata.
+func rollupMetadata(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, spanID string) (user, internal any) {
+	t.Helper()
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT metadata, inngest FROM inngest.insights_metadata(?, ?) WHERE run_id = ? AND span_id = ?;",
+		accountID.String(), envID.String(), runID, spanID,
+	).Scan(&user, &internal))
+	return user, internal
+}
+
+// TestInsightsMetadataKeepsLatestEmissionPerKind proves the rollup takes the
+// latest row per kind as-is instead of json_merge_patch-ing every emission:
+// an older emission's keys don't survive, a null value isn't treated as a
+// delete, and user/internal kinds w/ the same (prefix-stripped) name stay
+// separate.
+func TestInsightsMetadataKeepsLatestEmissionPerKind(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	runID := "run-latest-metadata"
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	// The second emission of "a" drops "y" and nulls "x".
+	insertMetadataRow(t, db, accountID, envID, runID, "span", "a", true, `{"x": 1, "y": 2}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span", "a", true, `{"x": null}`, now.Add(time.Second))
+	insertMetadataRow(t, db, accountID, envID, runID, "span", "b", true, `{"z": [1, null]}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span", "a", false, `{"q": "internal"}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span", "sys", false, `{"n": null}`, now)
+	// Other spans and runs don't leak in.
+	insertMetadataRow(t, db, accountID, envID, runID, "other-span", "c", true, `{"v": 1}`, now)
+	insertMetadataRow(t, db, accountID, envID, "other-run", "span", "c", true, `{"v": 1}`, now)
+
+	user, internal := rollupMetadata(t, db, accountID, envID, runID, "span")
+	require.Equal(t, map[string]any{
+		"a": map[string]any{"x": nil},
+		"b": map[string]any{"z": []any{float64(1), nil}},
+	}, user)
+	require.Equal(t, map[string]any{
+		"a":   map[string]any{"q": "internal"},
+		"sys": map[string]any{"n": nil},
+	}, internal)
+
+	// A span w/ only user metadata still gets an empty internal object.
+	user, internal = rollupMetadata(t, db, accountID, envID, runID, "other-span")
+	require.Equal(t, map[string]any{"c": map[string]any{"v": float64(1)}}, user)
+	require.Equal(t, map[string]any{}, internal)
+}
+
+// TestInsightsMetadataBreaksTiesDeterministically proves two emissions of a
+// kind w/ the same created_at pick the same winner regardless of insertion
+// order.
+func TestInsightsMetadataBreaksTiesDeterministically(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	runID := "run-tied-metadata"
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	insertMetadataRow(t, db, accountID, envID, runID, "span-1", "k", true, `{"v": 1}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span-1", "k", true, `{"v": 2}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span-2", "k", true, `{"v": 2}`, now)
+	insertMetadataRow(t, db, accountID, envID, runID, "span-2", "k", true, `{"v": 1}`, now)
+
+	for _, spanID := range []string{"span-1", "span-2"} {
+		user, _ := rollupMetadata(t, db, accountID, envID, runID, spanID)
+		require.Equal(t, map[string]any{"k": map[string]any{"v": float64(2)}}, user, spanID)
+	}
+}
+
 func TestInsightsStepAttemptsFiltersToStepSpans(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
