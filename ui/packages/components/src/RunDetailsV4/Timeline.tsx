@@ -25,6 +25,7 @@ import type {
   TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
+import { collectAutoExpandedGroupIds } from './utils/groupExpansion';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
 // ============================================================================
@@ -861,25 +862,39 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 
-  // Initialize with root bars expanded by default
-  const [expandedBars, setExpandedBars] = useState<Set<string>>(() => new Set(rootBarIds));
+  // What the user chose per bar this session. Root bars start expanded and
+  // span groups start collapsed, except the ones holding a failed or running
+  // step, so a problem is visible without a click. A user's choice always wins
+  // over those defaults.
+  const [overrides, setOverrides] = useState<Map<string, boolean>>(() => new Map());
+  const autoExpandedGroupIds = useMemo(() => collectAutoExpandedGroupIds(bars), [bars]);
+  const expandedBars = useMemo(() => {
+    const expanded = new Set([...rootBarIds, ...autoExpandedGroupIds]);
+    for (const [id, isExpanded] of overrides) {
+      if (isExpanded) {
+        expanded.add(id);
+      } else {
+        expanded.delete(id);
+      }
+    }
+    return expanded;
+  }, [rootBarIds, autoExpandedGroupIds, overrides]);
   const [selectedStepId, setSelectedStepId] = useState<string | undefined>();
 
   // Timeline brush selection state (for zooming)
   const [viewStartOffset, setViewStartOffset] = useState(0);
   const [viewEndOffset, setViewEndOffset] = useState(100);
 
-  const handleToggleExpand = useCallback((barId: string) => {
-    setExpandedBars((prev) => {
-      const next = new Set(prev);
-      if (next.has(barId)) {
-        next.delete(barId);
-      } else {
-        next.add(barId);
-      }
-      return next;
-    });
-  }, []);
+  const handleToggleExpand = useCallback(
+    (barId: string) => {
+      setOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(barId, !expandedBars.has(barId));
+        return next;
+      });
+    },
+    [expandedBars]
+  );
 
   const handleSelectStep = useCallback(
     (stepId: string) => {
@@ -892,12 +907,12 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
   const expandableIds = useMemo(() => collectExpandableIds(bars), [bars]);
 
   const handleExpandAll = useCallback(() => {
-    setExpandedBars(new Set([...rootBarIds, ...expandableIds]));
-  }, [expandableIds, rootBarIds]);
+    setOverrides(new Map(expandableIds.map((id) => [id, true])));
+  }, [expandableIds]);
 
   const handleCollapseAll = useCallback(() => {
-    setExpandedBars(new Set(rootBarIds));
-  }, [rootBarIds]);
+    setOverrides(new Map(expandableIds.map((id) => [id, false])));
+  }, [expandableIds]);
 
   // Only offer each action when it would actually change something: expanding
   // requires a collapsed expandable bar, collapsing requires an expanded
