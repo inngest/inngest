@@ -48,7 +48,8 @@ func convertGroupedRun(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTrac
 		Children:    children,
 	}
 
-	result, err := ConvertRunSpan(context.Background(), run)
+	// A nil reader isn't flat: the tree conversion, which groups spans.
+	result, err := ConvertRunSpanFor(context.Background(), nil, run)
 	require.NoError(t, err)
 	return result
 }
