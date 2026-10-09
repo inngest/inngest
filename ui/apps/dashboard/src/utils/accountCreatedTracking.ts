@@ -24,8 +24,19 @@ type GTMWindow = Window & {
   google_tag_manager?: unknown;
 };
 
-export const normalizeEmail = (email: string): string =>
-  email.trim().toLowerCase();
+/**
+ * Normalizes an email the way Google's enhanced conversions expects before
+ * hashing: trim, lowercase, and for gmail.com / googlemail.com strip dots from
+ * the username (john.doe@gmail.com and johndoe@gmail.com are the same inbox).
+ */
+export const normalizeEmail = (email: string): string => {
+  const normalized = email.trim().toLowerCase();
+  const at = normalized.lastIndexOf('@');
+  if (at < 0) return normalized;
+  const domain = normalized.slice(at + 1);
+  if (domain !== 'gmail.com' && domain !== 'googlemail.com') return normalized;
+  return `${normalized.slice(0, at).replace(/\./g, '')}@${domain}`;
+};
 
 export const sha256Hex = async (value: string): Promise<string | undefined> => {
   const subtle = globalThis.crypto?.subtle;

@@ -41,6 +41,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('normalizeEmail gmail handling', () => {
+  it.each([
+    ['John.Doe@Gmail.com', 'johndoe@gmail.com'],
+    [' j.o.h.n@googlemail.com ', 'john@googlemail.com'],
+    ['pat.holcomb@inngest.com', 'pat.holcomb@inngest.com'],
+    ['first.last@notgmail.com', 'first.last@notgmail.com'],
+    ['not.an.email', 'not.an.email'],
+  ])('normalizes %s', (input, expected) => {
+    expect(normalizeEmail(input)).toBe(expected);
+  });
+});
+
 describe('sha256Hex', () => {
   it('normalizes emails before hashing', () => {
     expect(normalizeEmail('  Pat@Example.COM ')).toBe('pat@example.com');

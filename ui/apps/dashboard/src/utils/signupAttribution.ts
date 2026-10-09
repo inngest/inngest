@@ -144,13 +144,23 @@ export const parseGaSessionId = (
   return undefined;
 };
 
-/** Conversion Linker cookies (`_gcl_aw`, `_gcl_gb`) are `GCL.<unix seconds>.<click ID>`. */
+/**
+ * Conversion Linker cookies (`_gcl_aw`, `_gcl_gb`) are `GCL.<unix seconds>.<click ID>`.
+ * The timestamp is dropped (not the click ID) when it can't be a valid Date, so
+ * a malformed cookie can never make `toISOString()` throw and break the auth forms.
+ */
 export const parseGclCookie = (
   value: string | undefined,
-): { clickId: string; clickedAtMs: number } | undefined => {
+): { clickId: string; clickedAtMs?: number } | undefined => {
   const match = value?.match(/^GCL\.(\d+)\.(.+)$/);
   if (!match || !CLICK_ID_PATTERN.test(match[2])) return undefined;
-  return { clickId: match[2], clickedAtMs: Number(match[1]) * 1000 };
+  const clickedAtMs = Number(match[1]) * 1000;
+  return {
+    clickId: match[2],
+    clickedAtMs: Number.isNaN(new Date(clickedAtMs).getTime())
+      ? undefined
+      : clickedAtMs,
+  };
 };
 
 /**
@@ -190,7 +200,9 @@ export const getGoogleAttribution = (): Record<string, string> => {
     );
     if (times.length > 0) clickedAtMs = Math.max(...times);
   }
-  if (clickedAtMs) attribution.clickTs = new Date(clickedAtMs).toISOString();
+  if (clickedAtMs && !Number.isNaN(new Date(clickedAtMs).getTime())) {
+    attribution.clickTs = new Date(clickedAtMs).toISOString();
+  }
 
   return attribution;
 };

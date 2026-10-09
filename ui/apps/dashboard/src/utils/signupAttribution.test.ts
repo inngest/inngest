@@ -249,6 +249,13 @@ describe('parseGclCookie', () => {
     });
   });
 
+  it('keeps the click ID but drops an out-of-range click time', () => {
+    expect(parseGclCookie('GCL.99999999999999999999.abc123')).toEqual({
+      clickId: 'abc123',
+      clickedAtMs: undefined,
+    });
+  });
+
   it.each([undefined, '', 'GCL.abc.xyz', 'GCL.1790347814.', 'GCL.1.bad id'])(
     'ignores %s',
     (cookie) => {
@@ -263,6 +270,11 @@ describe('getGoogleAttribution', () => {
 
   it('returns nothing without cookies or a browser', () => {
     expect(getGoogleAttribution()).toEqual({});
+  });
+
+  it('does not throw on a malformed Conversion Linker timestamp', () => {
+    setCookie('_gcl_aw=GCL.99999999999999999999.gclid_from_cookie');
+    expect(getGoogleAttribution()).toEqual({ gclid: 'gclid_from_cookie' });
   });
 
   it('reads GA IDs and Conversion Linker click IDs from cookies', () => {
