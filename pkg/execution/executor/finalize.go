@@ -620,6 +620,20 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		}
 	}
 
+	// Resolve every caller that joined this run via singleton join mode. The
+	// events carry the joiners' correlation IDs, so the fast-resume below
+	// and the event stream resume them like any other finished invoke.
+	if opts.Metadata.Config.SingletonJoin() {
+		joined, err := e.completeSingletonJoin(ctx, opts, *base)
+		if err != nil {
+			return err
+		}
+		if len(joined) > 0 {
+			isInvoke = true
+			freshEvents = append(freshEvents, joined...)
+		}
+	}
+
 	// For each event, if this has a correlation ID attempt to resume
 	// the invoke parent within a goroutine.
 	//

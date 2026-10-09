@@ -257,6 +257,14 @@ func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, scope 
 	return nil, nil
 }
 
+func (m *mockShardForIterator) SingletonJoin(ctx context.Context, scope Scope, activeRunID ulid.ULID, member string, ttl time.Duration) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockShardForIterator) SingletonJoinComplete(ctx context.Context, scope Scope, activeRunID ulid.ULID, payload []byte, ttl time.Duration) ([]string, error) {
+	return nil, nil
+}
+
 func (m *mockShardForIterator) DebounceCreate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	return nil, nil
 }

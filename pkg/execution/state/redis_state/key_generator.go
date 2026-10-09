@@ -245,6 +245,10 @@ type QueueKeyGenerator interface {
 	SingletonKey(s *osqueue.Singleton) string
 	// SingletonRunKey returns the singleton run id key that stores the singleton key for a given run.
 	SingletonRunKey(r string) string
+	// SingletonJoinKey returns the set of invoke correlation IDs waiting on an active singleton run.
+	SingletonJoinKey(runID string) string
+	// SingletonJoinDoneKey returns the key holding the completion payload of an active singleton run that finished.
+	SingletonJoinDoneKey(runID string) string
 
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
@@ -312,6 +316,14 @@ func (u queueKeyGenerator) SingletonKey(s *osqueue.Singleton) string {
 
 func (u queueKeyGenerator) SingletonRunKey(runID string) string {
 	return fmt.Sprintf("{%s}:singleton-run:%s", u.queueDefaultKey, runID)
+}
+
+func (u queueKeyGenerator) SingletonJoinKey(runID string) string {
+	return fmt.Sprintf("{%s}:singleton-join:%s", u.queueDefaultKey, runID)
+}
+
+func (u queueKeyGenerator) SingletonJoinDoneKey(runID string) string {
+	return fmt.Sprintf("{%s}:singleton-join-done:%s", u.queueDefaultKey, runID)
 }
 
 func (u queueKeyGenerator) PartitionMeta(id string) string {

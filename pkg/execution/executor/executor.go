@@ -1512,9 +1512,19 @@ func (e *executor) schedule(
 					// Mark as singleton skip - will be handled after span creation
 					skipReason = enums.SkipReasonSingleton
 					singletonSkipRunID = singletonRunID
+
+					if req.Function.Singleton.Mode == enums.SingletonModeJoin {
+						if err := e.joinSingletonRun(ctx, req, *singletonRunID); err != nil {
+							return nil, nil, err
+						}
+					}
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
+			if req.Function.Singleton.Mode == enums.SingletonModeJoin {
+				// Finalize must resolve any callers that join this run.
+				metadata.Config.SetSingletonJoin(true)
+			}
 		case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
 			// Ignore singleton expressions if we cannot evaluate them
 			l.Warn("error evaluating singleton expression", "error", err)
@@ -1907,6 +1917,12 @@ func (e *executor) schedule(
 		deleteErr := e.smv2.Delete(context.Background(), sv2.IDFromV1(stv1ID))
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
+		}
+		if singletonConfig != nil && req.Function.Singleton.Mode == enums.SingletonModeJoin {
+			// Lost the atomic race for the singleton lock: join whichever run won.
+			if err := e.joinAfterSingletonConflict(ctx, req, singletonConfig.Key); err != nil {
+				return nil, nil, err
+			}
 		}
 		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 

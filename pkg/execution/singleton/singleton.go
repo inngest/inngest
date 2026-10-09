@@ -3,6 +3,7 @@ package singleton
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -20,6 +21,15 @@ var (
 
 type Singleton interface {
 	HandleSingleton(ctx context.Context, scope queue.Scope, key string, c inngest.Singleton) (*ulid.ULID, error)
+
+	// Join registers waiter (an invoke correlation ID) on the active singleton
+	// run. If the run already completed, the completion payload is returned and
+	// the waiter is not registered.
+	Join(ctx context.Context, scope queue.Scope, activeRunID ulid.ULID, waiter string, ttl time.Duration) ([]byte, error)
+
+	// Complete records the active run's completion payload and returns all
+	// registered waiters.
+	Complete(ctx context.Context, scope queue.Scope, activeRunID ulid.ULID, payload []byte, ttl time.Duration) ([]string, error)
 }
 
 func New(ctx context.Context, shards queue.ShardRegistry) Singleton {
@@ -36,6 +46,24 @@ func (s *store) HandleSingleton(ctx context.Context, scope queue.Scope, key stri
 	}
 
 	return singleton(ctx, s.shards, scope, key, cfg)
+}
+
+func (s *store) Join(ctx context.Context, scope queue.Scope, activeRunID ulid.ULID, waiter string, ttl time.Duration) ([]byte, error) {
+	shard, err := s.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return shard.SingletonJoin(ctx, scope, activeRunID, waiter, ttl)
+}
+
+func (s *store) Complete(ctx context.Context, scope queue.Scope, activeRunID ulid.ULID, payload []byte, ttl time.Duration) ([]string, error) {
+	shard, err := s.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return shard.SingletonJoinComplete(ctx, scope, activeRunID, payload, ttl)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -75,7 +103,7 @@ func singleton(ctx context.Context, shards queue.ShardRegistry, scope queue.Scop
 		return nil, err
 	}
 	switch s.Mode {
-	case enums.SingletonModeSkip:
+	case enums.SingletonModeSkip, enums.SingletonModeJoin:
 		return shard.SingletonGetRunID(ctx, scope, key)
 	case enums.SingletonModeCancel:
 		return shard.SingletonReleaseRunID(ctx, scope, key)
