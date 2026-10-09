@@ -180,18 +180,19 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, ec.MaxAttempts)
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
 
-				// Some steps "start" as soon as they are queued
-				startWhenQueued := ec.QueueKind == queue.KindSleep
-				if !startWhenQueued {
-					for _, attr := range s.Attributes() {
-						if string(attr.Key) == meta.Attrs.StepOp.Key() {
-							if attr.Value.Type() == attribute.STRING && attr.Value.AsString() == enums.OpcodeWaitForEvent.String() {
-								startWhenQueued = true
-								break
-							}
-						}
+				var stepOp string
+				for _, attr := range s.Attributes() {
+					if string(attr.Key) == meta.Attrs.StepOp.Key() && attr.Value.Type() == attribute.STRING {
+						stepOp = attr.Value.AsString()
+						break
 					}
 				}
+
+				// Some steps "start" as soon as they are queued. Only the
+				// sleep's own span does: other steps run while resuming a
+				// sleep keep the start their SDK reported.
+				startWhenQueued := stepOp == enums.OpcodeWaitForEvent.String() ||
+					(ec.QueueKind == queue.KindSleep && stepOp == enums.OpcodeSleep.String())
 
 				if startWhenQueued {
 					meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
