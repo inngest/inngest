@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 )
 
@@ -19,10 +18,6 @@ type UsageMetadata struct {
 
 func (m UsageMetadata) Kind() metadata.Kind {
 	return KindInngestUsage
-}
-
-func (m UsageMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (m UsageMetadata) Serialize() (metadata.Values, error) {

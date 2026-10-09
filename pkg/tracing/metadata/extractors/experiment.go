@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -26,10 +25,6 @@ type ExperimentMetadata struct {
 
 func (ms ExperimentMetadata) Kind() metadata.Kind {
 	return KindInngestExperiment
-}
-
-func (ms ExperimentMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (ms ExperimentMetadata) Serialize() (metadata.Values, error) {

@@ -17,6 +17,7 @@ import (
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -3634,4 +3635,38 @@ func TestCQRSGetSpansByRunIDsAndNameNoCrossRunBleed(t *testing.T) {
 	groupA := spansByRun[runA]
 	require.Len(t, groupA, 1, "run A's single dynamic_span_id should collapse into one merged span")
 	assert.Equal(t, enums.StepStatusCompleted, groupA[0].Status, "the EXTEND follow-up's status must be merged onto the named row")
+}
+
+// TestRollupSpanMetadataFromFragmentsLegacyMergeThenSet covers a run that
+// straddles the deploy where every write became a set: older merge fragments
+// for a (span, kind) followed by a set fold to the set value.
+func TestRollupSpanMetadataFromFragmentsLegacyMergeThenSet(t *testing.T) {
+	fragment := func(op enums.MetadataOpcode, values string) map[string]any {
+		attrs, err := json.Marshal(map[string]any{
+			"_inngest.metadata.scope":  enums.MetadataScopeRun,
+			"_inngest.metadata.kind":   "userland.thing",
+			"_inngest.metadata.op":     op,
+			"_inngest.metadata.values": values,
+		})
+		require.NoError(t, err)
+		return map[string]any{"attributes": string(attrs)}
+	}
+
+	md, err := rollupSpanMetadataFromFragments(context.Background(), []map[string]any{
+		fragment(enums.MetadataOpcodeMerge, `{"a":1,"b":2}`),
+		fragment(enums.MetadataOpcodeMerge, `{"b":3}`),
+		fragment(enums.MetadataOpcodeSet, `{"c":4}`),
+	}, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, metadata.Kind("userland.thing"), md.Kind)
+	require.Equal(t, metadata.Values{"c": json.RawMessage(`4`)}, md.Values)
+
+	// The latest of several sets wins.
+	md, err = rollupSpanMetadataFromFragments(context.Background(), []map[string]any{
+		fragment(enums.MetadataOpcodeMerge, `{"a":1}`),
+		fragment(enums.MetadataOpcodeSet, `{"c":4}`),
+		fragment(enums.MetadataOpcodeSet, `{"d":5}`),
+	}, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, metadata.Values{"d": json.RawMessage(`5`)}, md.Values)
 }

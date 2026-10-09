@@ -27,7 +27,9 @@ export type SpanMetadataKind =
   | `inngest.http`
   | `inngest.ai`
   | `inngest.score`
+  | `inngest.score.${string}`
   | `inngest.warnings`
+  | `inngest.warning.${string}`
   | SpanMetadataKindUserland;
 
 export type SpanMetadataKindUserland = `userland.${string}`;
@@ -67,14 +69,14 @@ export type SpanMetadataInngestHTTP = {
 
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
-  kind: 'inngest.warnings';
+  kind: 'inngest.warnings' | `inngest.warning.${string}`;
   updatedAt: string;
   values: Record<string, string>;
 };
 
 export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
-  kind: 'inngest.score';
+  kind: 'inngest.score' | `inngest.score.${string}`;
   updatedAt: string;
   values: Record<string, number | boolean>;
 };
