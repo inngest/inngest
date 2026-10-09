@@ -6497,6 +6497,12 @@ func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext
 	queuedAt = item.EnqueuedAt
 	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
 
+	// A sleep item is enqueued when the sleep begins, but steps run while
+	// resuming it can only be queued once the sleep has ended.
+	if item.Kind == queue.KindSleep {
+		queuedAt = scheduledAt
+	}
+
 	if gen != nil {
 		startedAt = gen.Timing.Start()
 		endedAt = gen.Timing.End()
