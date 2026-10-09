@@ -396,6 +396,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     metadata {
       scope
       kind
+      isUser
       values
       updatedAt
     }

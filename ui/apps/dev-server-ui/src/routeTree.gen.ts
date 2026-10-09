@@ -9,61 +9,36 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/_dashboard'
 import { Route as DashboardFunctionsRouteRouteImport } from './routes/_dashboard/functions/route'
-import { Route as DashboardSandboxesIndexRouteImport } from './routes/_dashboard/sandboxes/index'
-import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
-import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
-import { Route as DashboardEventsIndexRouteImport } from './routes/_dashboard/events/index'
-import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/event/index'
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
-import { Route as DashboardMcpSetupIndexRouteImport } from './routes/_dashboard/mcp/setup/index'
-import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
-import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
-import { Route as DashboardAiScoresIndexRouteImport } from './routes/_dashboard/ai/scores/index'
+import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/event/index'
+import { Route as DashboardEventsIndexRouteImport } from './routes/_dashboard/events/index'
+import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
+import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs/index'
+import { Route as DashboardSandboxesIndexRouteImport } from './routes/_dashboard/sandboxes/index'
 import { Route as DashboardAiExperimentsIndexRouteImport } from './routes/_dashboard/ai/experiments/index'
-import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
+import { Route as DashboardAiScoresIndexRouteImport } from './routes/_dashboard/ai/scores/index'
 import { Route as DashboardAppsOnboardingChooseFrameworkRouteImport } from './routes/_dashboard/apps/_onboarding/choose-framework'
+import { Route as DashboardAppsOnboardingChooseTemplateRouteImport } from './routes/_dashboard/apps/_onboarding/choose-template'
+import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
+import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
+import { Route as DashboardMcpSetupIndexRouteImport } from './routes/_dashboard/mcp/setup/index'
 
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/_dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/_dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardFunctionsRouteRoute = DashboardFunctionsRouteRouteImport.update({
   id: '/functions',
   path: '/functions',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSandboxesIndexRoute = DashboardSandboxesIndexRouteImport.update({
-  id: '/sandboxes/',
-  path: '/sandboxes/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
-  id: '/runs/',
-  path: '/runs/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardRunIndexRoute = DashboardRunIndexRouteImport.update({
-  id: '/run/',
-  path: '/run/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardEventsIndexRoute = DashboardEventsIndexRouteImport.update({
-  id: '/events/',
-  path: '/events/',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardEventIndexRoute = DashboardEventIndexRouteImport.update({
-  id: '/event/',
-  path: '/event/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardAppsIndexRoute = DashboardAppsIndexRouteImport.update({
@@ -77,25 +52,29 @@ const DashboardAppsOnboardingRouteRoute =
     path: '/apps',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardMcpSetupIndexRoute = DashboardMcpSetupIndexRouteImport.update({
-  id: '/mcp/setup/',
-  path: '/mcp/setup/',
+const DashboardEventIndexRoute = DashboardEventIndexRouteImport.update({
+  id: '/event/',
+  path: '/event/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardFunctionsConfigIndexRoute =
-  DashboardFunctionsConfigIndexRouteImport.update({
-    id: '/config/',
-    path: '/config/',
-    getParentRoute: () => DashboardFunctionsRouteRoute,
-  } as any)
-const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
-  id: '/apps/app/',
-  path: '/apps/app/',
+const DashboardEventsIndexRoute = DashboardEventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardAiScoresIndexRoute = DashboardAiScoresIndexRouteImport.update({
-  id: '/ai/scores/',
-  path: '/ai/scores/',
+const DashboardRunIndexRoute = DashboardRunIndexRouteImport.update({
+  id: '/run/',
+  path: '/run/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRunsIndexRoute = DashboardRunsIndexRouteImport.update({
+  id: '/runs/',
+  path: '/runs/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSandboxesIndexRoute = DashboardSandboxesIndexRouteImport.update({
+  id: '/sandboxes/',
+  path: '/sandboxes/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardAiExperimentsIndexRoute =
@@ -104,18 +83,39 @@ const DashboardAiExperimentsIndexRoute =
     path: '/ai/experiments/',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardAppsOnboardingChooseTemplateRoute =
-  DashboardAppsOnboardingChooseTemplateRouteImport.update({
-    id: '/choose-template',
-    path: '/choose-template',
-    getParentRoute: () => DashboardAppsOnboardingRouteRoute,
-  } as any)
+const DashboardAiScoresIndexRoute = DashboardAiScoresIndexRouteImport.update({
+  id: '/ai/scores/',
+  path: '/ai/scores/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardAppsOnboardingChooseFrameworkRoute =
   DashboardAppsOnboardingChooseFrameworkRouteImport.update({
     id: '/choose-framework',
     path: '/choose-framework',
     getParentRoute: () => DashboardAppsOnboardingRouteRoute,
   } as any)
+const DashboardAppsOnboardingChooseTemplateRoute =
+  DashboardAppsOnboardingChooseTemplateRouteImport.update({
+    id: '/choose-template',
+    path: '/choose-template',
+    getParentRoute: () => DashboardAppsOnboardingRouteRoute,
+  } as any)
+const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
+  id: '/apps/app/',
+  path: '/apps/app/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardFunctionsConfigIndexRoute =
+  DashboardFunctionsConfigIndexRouteImport.update({
+    id: '/config/',
+    path: '/config/',
+    getParentRoute: () => DashboardFunctionsRouteRoute,
+  } as any)
+const DashboardMcpSetupIndexRoute = DashboardMcpSetupIndexRouteImport.update({
+  id: '/mcp/setup/',
+  path: '/mcp/setup/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -236,13 +236,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_dashboard': {
-      id: '/_dashboard'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -250,46 +243,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard': {
+      id: '/_dashboard'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/functions': {
       id: '/_dashboard/functions'
       path: '/functions'
       fullPath: '/functions'
       preLoaderRoute: typeof DashboardFunctionsRouteRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/sandboxes/': {
-      id: '/_dashboard/sandboxes/'
-      path: '/sandboxes'
-      fullPath: '/sandboxes/'
-      preLoaderRoute: typeof DashboardSandboxesIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/runs/': {
-      id: '/_dashboard/runs/'
-      path: '/runs'
-      fullPath: '/runs/'
-      preLoaderRoute: typeof DashboardRunsIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/run/': {
-      id: '/_dashboard/run/'
-      path: '/run'
-      fullPath: '/run/'
-      preLoaderRoute: typeof DashboardRunIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/events/': {
-      id: '/_dashboard/events/'
-      path: '/events'
-      fullPath: '/events/'
-      preLoaderRoute: typeof DashboardEventsIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/event/': {
-      id: '/_dashboard/event/'
-      path: '/event'
-      fullPath: '/event/'
-      preLoaderRoute: typeof DashboardEventIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/apps/': {
@@ -306,32 +271,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAppsOnboardingRouteRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/mcp/setup/': {
-      id: '/_dashboard/mcp/setup/'
-      path: '/mcp/setup'
-      fullPath: '/mcp/setup/'
-      preLoaderRoute: typeof DashboardMcpSetupIndexRouteImport
+    '/_dashboard/event/': {
+      id: '/_dashboard/event/'
+      path: '/event'
+      fullPath: '/event/'
+      preLoaderRoute: typeof DashboardEventIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/functions/config/': {
-      id: '/_dashboard/functions/config/'
-      path: '/config'
-      fullPath: '/functions/config/'
-      preLoaderRoute: typeof DashboardFunctionsConfigIndexRouteImport
-      parentRoute: typeof DashboardFunctionsRouteRoute
-    }
-    '/_dashboard/apps/app/': {
-      id: '/_dashboard/apps/app/'
-      path: '/apps/app'
-      fullPath: '/apps/app/'
-      preLoaderRoute: typeof DashboardAppsAppIndexRouteImport
+    '/_dashboard/events/': {
+      id: '/_dashboard/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof DashboardEventsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/ai/scores/': {
-      id: '/_dashboard/ai/scores/'
-      path: '/ai/scores'
-      fullPath: '/ai/scores/'
-      preLoaderRoute: typeof DashboardAiScoresIndexRouteImport
+    '/_dashboard/run/': {
+      id: '/_dashboard/run/'
+      path: '/run'
+      fullPath: '/run/'
+      preLoaderRoute: typeof DashboardRunIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/runs/': {
+      id: '/_dashboard/runs/'
+      path: '/runs'
+      fullPath: '/runs/'
+      preLoaderRoute: typeof DashboardRunsIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/sandboxes/': {
+      id: '/_dashboard/sandboxes/'
+      path: '/sandboxes'
+      fullPath: '/sandboxes/'
+      preLoaderRoute: typeof DashboardSandboxesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/ai/experiments/': {
@@ -341,12 +313,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAiExperimentsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/apps/_onboarding/choose-template': {
-      id: '/_dashboard/apps/_onboarding/choose-template'
-      path: '/choose-template'
-      fullPath: '/apps/choose-template'
-      preLoaderRoute: typeof DashboardAppsOnboardingChooseTemplateRouteImport
-      parentRoute: typeof DashboardAppsOnboardingRouteRoute
+    '/_dashboard/ai/scores/': {
+      id: '/_dashboard/ai/scores/'
+      path: '/ai/scores'
+      fullPath: '/ai/scores/'
+      preLoaderRoute: typeof DashboardAiScoresIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/_dashboard/apps/_onboarding/choose-framework': {
       id: '/_dashboard/apps/_onboarding/choose-framework'
@@ -354,6 +326,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/apps/choose-framework'
       preLoaderRoute: typeof DashboardAppsOnboardingChooseFrameworkRouteImport
       parentRoute: typeof DashboardAppsOnboardingRouteRoute
+    }
+    '/_dashboard/apps/_onboarding/choose-template': {
+      id: '/_dashboard/apps/_onboarding/choose-template'
+      path: '/choose-template'
+      fullPath: '/apps/choose-template'
+      preLoaderRoute: typeof DashboardAppsOnboardingChooseTemplateRouteImport
+      parentRoute: typeof DashboardAppsOnboardingRouteRoute
+    }
+    '/_dashboard/apps/app/': {
+      id: '/_dashboard/apps/app/'
+      path: '/apps/app'
+      fullPath: '/apps/app/'
+      preLoaderRoute: typeof DashboardAppsAppIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/functions/config/': {
+      id: '/_dashboard/functions/config/'
+      path: '/config'
+      fullPath: '/functions/config/'
+      preLoaderRoute: typeof DashboardFunctionsConfigIndexRouteImport
+      parentRoute: typeof DashboardFunctionsRouteRoute
+    }
+    '/_dashboard/mcp/setup/': {
+      id: '/_dashboard/mcp/setup/'
+      path: '/mcp/setup'
+      fullPath: '/mcp/setup/'
+      preLoaderRoute: typeof DashboardMcpSetupIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
   }
 }
