@@ -51,6 +51,39 @@ jobs:
           git diff
           git diff --name-only --exit-code
 
+  # The unit test job above runs these packages too, but their DuckDB tests
+  # skip when no duckdb binary/extension is available, so it can pass without
+  # the real stack ever executing. This job installs the pinned binary and
+  # fails if any required smoke test skips.
+  duckdb-smoke:
+    name: "Test / DuckDB smoke (pinned binary, no skips)"
+    runs-on: depot-ubuntu-22.04-4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./go.mod
+
+      - name: Cache pinned DuckDB binary and extensions
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/duckdb-state/bin
+            ~/.duckdb/extensions
+          key: duckdb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pkg/duckdb/driver/pinned.go') }}
+
+      - name: Install pinned DuckDB binary
+        run: |
+          go run ./cmd duckdb download --state-dir "$RUNNER_TEMP/duckdb-state"
+          dirname "$(find "$RUNNER_TEMP/duckdb-state/bin" -type f -name duckdb)" >> "$GITHUB_PATH"
+
+      - name: Smoke
+        run: scripts/duckdb-smoke.sh -race
+
   test-linux-race:
     strategy:
       fail-fast: false
@@ -75,7 +108,7 @@ jobs:
       - name: Test
         run: |
           gotestsum --junitfile=junit.xml --format=standard-verbose -- \
-            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") \
+            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests" | grep -v "./cmd/duckdbbench") \
             -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
