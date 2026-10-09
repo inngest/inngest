@@ -620,6 +620,89 @@ describe('traceConversion', () => {
       expect(rollup?.childrenSpans?.map((c) => c.spanID)).toEqual(['a0', 'a1']);
     });
 
+    it("keeps a retried step's origin, so a library's step stays dimmed and credited", () => {
+      const origin = '@inngest/ci@0.1.0';
+
+      const attempts = [0, 1].map((attempt) => {
+        return createTrace({
+          spanID: `a${attempt}`,
+          stepID: 'step-1',
+          attempts: attempt,
+          origin,
+          status: attempt === 0 ? 'FAILED' : 'COMPLETED',
+        });
+      });
+
+      const fin = [0, 1].map((attempt) => {
+        return createTrace({
+          spanID: `fin-${attempt}`,
+          stepID: null,
+          groupID: 'g-final',
+          attempts: attempt,
+          outputID: 'out-fin',
+          origin,
+          queuedAt: '2024-01-01T00:00:11Z',
+          endedAt: '2024-01-01T00:00:12Z',
+        });
+      });
+
+      const root = createTrace({ isRoot: true, childrenSpans: [...attempts, ...fin] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['step-1-rollup', 'final-rollup']);
+      expect(result.childrenSpans?.map((c) => c.origin)).toEqual([origin, origin]);
+
+      const timeline = traceToTimelineData(result, { runID: 'run-1' });
+
+      expect(timeline.bars[0]?.children?.[0]?.dimmed).toBe(true);
+    });
+
+    it('clamps finalization to the end of grouped work, not only ungrouped steps', () => {
+      const before = createTrace({
+        spanID: 's1',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:02Z',
+      });
+      const grouped = createTrace({
+        spanID: 'g-step',
+        stepID: 'step-2',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:03Z',
+        endedAt: '2024-01-01T00:00:10Z',
+      });
+      const group = createTrace({
+        spanID: 'group-agent',
+        stepID: null,
+        stepOp: null,
+        stepType: 'SPAN_GROUP',
+        queuedAt: '2024-01-01T00:00:03Z',
+        endedAt: '2024-01-01T00:00:10Z',
+        childrenSpans: [grouped],
+      });
+      const fin = createTrace({
+        spanID: 'fin-0',
+        stepID: null,
+        groupID: 'g-final',
+        attempts: 0,
+        outputID: 'out-fin',
+        // Queued while the grouped step was still running
+        queuedAt: '2024-01-01T00:00:05Z',
+        startedAt: '2024-01-01T00:00:06Z',
+        endedAt: '2024-01-01T00:00:11Z',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [before, group, fin] });
+
+      const result = traceRollup(root);
+      const finalization = result.childrenSpans?.find((c) => c.spanID === 'fin-0');
+
+      expect(finalization?.name).toBe('Finalization');
+      expect(finalization?.queuedAt).toBe('2024-01-01T00:00:10Z');
+      expect(finalization?.startedAt).toBe('2024-01-01T00:00:10Z');
+    });
+
     it('adopts grouped no-step spans as attempts of the step sharing their groupID', () => {
       // e.g. a network failure: has an output but never resolved to a stepID
       const failure = createTrace({
@@ -1521,6 +1604,8 @@ describe('traceConversion', () => {
         stepOp: null,
         stepType: 'SPAN_GROUP',
         queuedAt: childrenSpans[0]!.queuedAt,
+        // The server ends a group with its last child
+        endedAt: childrenSpans[childrenSpans.length - 1]!.endedAt,
         childrenSpans,
       });
 
@@ -1545,7 +1630,8 @@ describe('traceConversion', () => {
       const withGroup = traceRollup(
         createTrace({
           isRoot: true,
-          childrenSpans: [...runChildren(), group('g', [attempt('c0', 'grouped', 0, 7)])],
+          // Grouped work that ends before the run's last step does
+          childrenSpans: [...runChildren(), group('g', [attempt('c0', 'grouped', 0, 4)])],
         })
       );
 

@@ -479,6 +479,7 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
     stepInfo: last.stepInfo,
     childrenSpans: toAttemptChildren(attempts),
     metadata: last.metadata,
+    origin: last.origin,
     userlandSpan: null,
   };
 }
@@ -508,9 +509,11 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
  * "Finalization", matching the pre-existing default and avoiding label
  * flicker for groups that aren't cleanly resolved as failures.
  */
-function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
+function rollupFinalization(
+  attempts: Map<number, Trace>,
+  notBefore: string | null | undefined
+): Trace {
   const { first, last } = attemptBounds(attempts);
-  const notBefore = lastStep?.endedAt;
   const name = last.status === 'FAILED' ? 'Function error' : 'Finalization';
 
   if (attempts.size === 1) {
@@ -538,6 +541,7 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
     debugSessionID: last.debugSessionID,
     childrenSpans: toAttemptChildren(attempts),
     metadata: last.metadata,
+    origin: last.origin,
     stepInfo: null,
     userlandSpan: null,
   };
@@ -585,7 +589,14 @@ function rollupChildren(children: Trace[]): Trace[] {
 
   let finalization: Trace | null = null;
   if (finalizationAttempts) {
-    finalization = rollupFinalization(finalizationAttempts, lastStep);
+    // Steps inside span groups end inside them, so the latest end of any
+    // group counts as much as the last ungrouped step's.
+    const notBefore = rolledUpRunChildren.reduce<string | null | undefined>(
+      (latest, child) => maxDateString(latest, child.endedAt),
+      lastStep?.endedAt
+    );
+
+    finalization = rollupFinalization(finalizationAttempts, notBefore);
     rolledUpRunChildren.push(finalization);
   }
 
