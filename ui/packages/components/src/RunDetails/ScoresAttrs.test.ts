@@ -138,4 +138,21 @@ describe('collectScoreMetadata', () => {
 
     expect(collectScoreMetadata(trace).map((md) => md.kind)).toEqual(['inngest.score.a']);
   });
+
+  it('collects prefix-stripped internal score kinds but not user ones', () => {
+    const trace = {
+      metadata: [
+        { kind: 'score.a', isUser: false, updatedAt: 't', values: { value: 1 } },
+        { kind: 'score', isUser: false, updatedAt: 't', values: { b: { value: 2 } } },
+        { kind: 'score.a', isUser: true, updatedAt: 't', values: { value: 3 } },
+      ],
+    };
+
+    const metadata = collectScoreMetadata(trace);
+    expect(metadata).toHaveLength(2);
+    expect(scoreRows(metadata)).toEqual([
+      { name: 'a', value: 1, updatedAt: 't' },
+      { name: 'b', value: 2, updatedAt: 't' },
+    ]);
+  });
 });

@@ -904,6 +904,7 @@ func toTraceSpanMetadata(metadata []*models.SpanMetadata) []*apiv2.TraceSpanMeta
 		result = append(result, &apiv2.TraceSpanMetadata{
 			Scope:     item.Scope.String(),
 			Kind:      item.Kind.String(),
+			IsUser:    item.IsUser,
 			Values:    toTraceSpanMetadataValues(item.Values),
 			UpdatedAt: timestamppb.New(item.UpdatedAt),
 		})

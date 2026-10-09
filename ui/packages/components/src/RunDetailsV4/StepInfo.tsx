@@ -14,6 +14,7 @@ import {
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
+import { hasMetadataKind } from '../RunDetailsShared/metadataKind';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -224,10 +225,10 @@ export const StepInfo = ({
 
   const showAINudge =
     Boolean(result?.data && looksLikeAIOutput(result.data)) &&
-    !trace.metadata?.some((md) => md.kind === KindInngestAI);
+    !trace.metadata?.some((md) => hasMetadataKind(md, KindInngestAI));
 
-  const responseHeaderMetadata = trace.metadata?.filter(
-    (md) => md.kind === 'inngest.response_headers'
+  const responseHeaderMetadata = trace.metadata?.filter((md) =>
+    hasMetadataKind(md, 'inngest.response_headers')
   );
 
   // TODO: remove metadata handling once all response header
@@ -256,7 +257,7 @@ export const StepInfo = ({
   const nonHeaderMetadata = metadataIsEnabled
     ? trace.metadata?.filter(
         (md) =>
-          md.kind !== 'inngest.response_headers' &&
+          !hasMetadataKind(md, 'inngest.response_headers') &&
           !isScoreMetadata(md) &&
           !isExperimentMetadata(md)
       ) ?? []

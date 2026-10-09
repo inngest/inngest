@@ -7,7 +7,7 @@ import { maxDateString, toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
-import { KindInngestExperiment } from '../../generated';
+import { hasMetadataKind } from '../../RunDetailsShared/metadataKind';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
@@ -122,7 +122,9 @@ function getTimingFromMetadata(
 ): { inngestMs: number; executionMs: number; totalMs: number } | null {
   if (!metadata) return null;
 
-  const timing = metadata.find((m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing');
+  const timing = metadata.find((m): m is SpanMetadataInngestTiming =>
+    hasMetadataKind(m, 'inngest.timing')
+  );
 
   if (!timing) return null;
 
@@ -158,8 +160,8 @@ function getInngestBreakdown(
   let queueDelayMs = 0;
   let systemLatencyMs = 0;
 
-  const timing = trace.metadata?.find(
-    (m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing'
+  const timing = trace.metadata?.find((m): m is SpanMetadataInngestTiming =>
+    hasMetadataKind(m, 'inngest.timing')
   );
   if (timing) {
     queueDelayMs = timing.values.queue_delay_ms ?? 0;
@@ -211,8 +213,8 @@ function tracesToBarData(
 function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdownData | null {
   if (!metadata) return null;
 
-  const httpTiming = metadata.find(
-    (m): m is SpanMetadataInngestHTTPTiming => m.kind === 'inngest.http.timing'
+  const httpTiming = metadata.find((m): m is SpanMetadataInngestHTTPTiming =>
+    hasMetadataKind(m, 'inngest.http.timing')
   );
 
   if (!httpTiming) return null;
@@ -282,7 +284,7 @@ function traceToBarData(
     : traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs;
 
   // Check if this step has experiment metadata
-  const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
+  const hasExperiment = trace.metadata?.some(isExperimentMetadata) ?? false;
 
   // Extract experiment metadata for hover card display
   const experimentMd = trace.metadata?.find(isExperimentMetadata);

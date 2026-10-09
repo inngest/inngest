@@ -2775,6 +2775,9 @@ message TraceSpanMetadata {
   string kind = 2;
   map<string, string> values = 3;
   google.protobuf.Timestamp updated_at = 4;
+  // Whether kind is user-defined. kind may be returned without its
+  // userland/inngest prefix, so this tells a user kind from an internal one.
+  bool is_user = 5;
 }
 
 message TraceSpan {
