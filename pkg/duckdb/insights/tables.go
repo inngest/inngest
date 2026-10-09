@@ -113,9 +113,9 @@ var logicalTables = map[string]logicalTable{
 			// metadata/inngest are the run-scoped metadata rollup joined
 			// onto insights_runs: metadata is caller (userland) emitted
 			// key->value data, inngest is Inngest's own internal metadata —
-			// both are a single merged JSON object per run (kind-namespaced,
-			// last-emission-wins via json_merge_patch), not the raw
-			// per-emission rows the metadata logical table exposes.
+			// both are a single JSON object per run of kind -> the latest
+			// emission's values for that kind, not the raw per-emission
+			// rows inngest.run_metadata holds.
 			"metadata": {colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded during the run."},
 			"inngest":  {colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
 		},
@@ -141,9 +141,10 @@ var logicalTables = map[string]logicalTable{
 		},
 	},
 	// metadata is backed by the run_metadata_rollup view: one row per
-	// (run_id, span_id), with every emission's values merged (by kind,
-	// last-emission-wins via json_merge_patch, ordered by created_at) into
-	// two JSON objects instead of exposing raw per-emission rows.
+	// (run_id, span_id), with the latest emission (by created_at) of each
+	// kind as kind -> values in two JSON objects instead of exposing raw
+	// per-emission rows. Each emission replaces its kind outright, nothing
+	// is merged across emissions.
 	"metadata": {
 		name:        "metadata",
 		view:        "insights_metadata",
