@@ -343,8 +343,6 @@ type RollupGroups = {
   ungroupedFinalizations: Trace[];
   /** attempt spans of the trailing group that never matched a step, if any */
   finalizationAttempts: Map<number, Trace> | null;
-  /** step span with the latest endedAt; finalization can't start before it ends */
-  lastStep: Trace | null;
 };
 
 /**
@@ -368,8 +366,6 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
   const steps = new Map<string, Map<number, Trace>>();
   const ungroupedFinalizations: Trace[] = [];
   const groupedSpans = new Map<string, Map<number, Trace>>();
-  let lastStepEndedAt: Date | null = null;
-  let lastStep: Trace | null = null;
   let finalSpan: Trace | null = null;
 
   for (const child of children) {
@@ -397,12 +393,6 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
       stepOrder.push(child.stepID);
     }
 
-    const endedAt = toMaybeDate(child.endedAt);
-    if (!lastStepEndedAt || (endedAt && endedAt > lastStepEndedAt)) {
-      lastStepEndedAt = endedAt;
-      lastStep = child;
-    }
-
     const attempts = steps.get(child.stepID) ?? new Map<number, Trace>();
     if (child.groupID) {
       // Associate any other spans with the same groupID (IE network failures/similar) with this step
@@ -419,7 +409,29 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
     ? groupedSpans.get(finalSpan.groupID) ?? null
     : null;
 
-  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
+  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts };
+}
+
+/**
+ * The latest end time across these spans and everything nested under them
+ * (span groups, step attempts), or null if none of it has ended. Unfinished
+ * work has no end yet, so it never pulls the result earlier or to zero.
+ */
+function latestEnd(spans: Trace[] | undefined): string | null {
+  let latest: string | null = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
+
+  for (const span of spans ?? []) {
+    for (const candidate of [span.endedAt, latestEnd(span.childrenSpans)]) {
+      const ms = candidate ? new Date(candidate).getTime() : Number.NaN;
+      if (ms > latestMs) {
+        latest = candidate ?? null;
+        latestMs = ms;
+      }
+    }
+  }
+
+  return latest;
 }
 
 /** First (lowest attempt number) and last (highest) attempt spans of a group */
@@ -571,8 +583,9 @@ export function traceRollup(root: Trace): Trace {
  * steps retry as separate spans just like the run's do.
  */
 function rollupChildren(children: Trace[]): Trace[] {
-  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
-    collectRollupGroups(children.filter((child) => !isSpanGroup(child)));
+  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts } = collectRollupGroups(
+    children.filter((child) => !isSpanGroup(child))
+  );
 
   const rolledUpRunChildren = children.filter(isSpanGroup);
   for (const group of rolledUpRunChildren) {
@@ -589,14 +602,9 @@ function rollupChildren(children: Trace[]): Trace[] {
 
   let finalization: Trace | null = null;
   if (finalizationAttempts) {
-    // Steps inside span groups end inside them, so the latest end of any
-    // group counts as much as the last ungrouped step's.
-    const notBefore = rolledUpRunChildren.reduce<string | null | undefined>(
-      (latest, child) => maxDateString(latest, child.endedAt),
-      lastStep?.endedAt
-    );
-
-    finalization = rollupFinalization(finalizationAttempts, notBefore);
+    // Finalization can't start before any step work ends, however deeply a
+    // span group nests it
+    finalization = rollupFinalization(finalizationAttempts, latestEnd(rolledUpRunChildren));
     rolledUpRunChildren.push(finalization);
   }
 
