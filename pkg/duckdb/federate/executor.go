@@ -49,6 +49,9 @@ type Query struct {
 	Predicates map[Table][]Predicate
 	// RowCap bounds each table's delta.
 	RowCap int
+	// TopN pushes the query's ORDER BY ... LIMIT into a table's source,
+	// when the query meets TopN's conditions.
+	TopN map[Table]TopN
 	// Select reads the logical tables by name (runs, spans), which the
 	// executor defines as CTEs ahead of its own WITH clause's; Args bind its
 	// '?' placeholders. Ignored when Render is set.
@@ -149,6 +152,12 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			Watermark: q.Watermark, RowCap: q.RowCap,
 		}
 		req.Predicates = q.Predicates[t]
+		if tn, ok := q.TopN[t]; ok {
+			if err := validateTopN(t, tn, req.Predicates); err != nil {
+				return fail(err)
+			}
+			req.OrderBy, req.Limit = tn.OrderBy, tn.Limit
+		}
 		if es, ok := e.Delta.(EncodedDeltaStreamer); ok {
 			r, err := es.StreamEncoded(ctx, req)
 			if err != nil {
@@ -213,6 +222,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		src, err := sourceCTE(t, sourceSpec{
 			AccountID: q.AccountID, EnvID: q.EnvID, AllTenants: q.AllTenants, From: q.From, To: q.To,
 			Lake: q.Lake, Watermark: q.Watermark, Delta: deltaRel[t], DeltaColumns: deltaCols[t],
+			TopN: topNOf(q, t),
 		})
 		if err != nil {
 			return nil, nil, err
