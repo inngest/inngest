@@ -2664,11 +2664,14 @@ func (x *RerunData) GetRunId() string {
 }
 
 type TraceSpanMetadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Scope         string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
-	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	Values        map[string]string      `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Scope     string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Kind      string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Values    map[string]string      `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Whether kind is user-defined. kind may be returned without its
+	// userland/inngest prefix, so this tells a user kind from an internal one.
+	IsUser        bool `protobuf:"varint,5,opt,name=is_user,json=isUser,proto3" json:"is_user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2729,6 +2732,13 @@ func (x *TraceSpanMetadata) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *TraceSpanMetadata) GetIsUser() bool {
+	if x != nil {
+		return x.IsUser
+	}
+	return false
 }
 
 type TraceSpan struct {
@@ -9231,13 +9241,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x11.api.v2.RerunDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"f\n" +
 	"\tRerunData\x12Y\n" +
-	"\x06run_id\x18\x01 \x01(\tBB\x92A?2\x1fNew run ID created by the rerunJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\"\xf2\x01\n" +
+	"\x06run_id\x18\x01 \x01(\tBB\x92A?2\x1fNew run ID created by the rerunJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\"\x8b\x02\n" +
 	"\x11TraceSpanMetadata\x12\x14\n" +
 	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12=\n" +
 	"\x06values\x18\x03 \x03(\v2%.api.v2.TraceSpanMetadata.ValuesEntryR\x06values\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x17\n" +
+	"\ais_user\x18\x05 \x01(\bR\x06isUser\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc0\x06\n" +
