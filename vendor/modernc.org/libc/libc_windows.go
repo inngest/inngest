@@ -7851,3 +7851,26 @@ func X_wstat32(tls *TLS, path, buffer uintptr) (r int32) {
 	}
 	return int32(r0)
 }
+
+func Xbsearch(tls *TLS, key uintptr, base uintptr, nel Tsize_t, width Tsize_t, cmp uintptr) uintptr {
+	if __ccgo_strace {
+		trc("tls=%v key=%v base=%v nel=%v width=%v cmp=%v, (%v:)", tls, key, base, nel, width, cmp, origin(2))
+	}
+	var try uintptr
+	var sign int32
+	for nel > 0 {
+		try = base + uintptr(width*(nel/2))
+		sign = (*struct {
+			f func(*TLS, uintptr, uintptr) int32
+		})(unsafe.Pointer(&struct{ uintptr }{cmp})).f(tls, key, try)
+		if sign < 0 {
+			nel /= 2
+		} else if sign > 0 {
+			base = try + uintptr(width)
+			nel -= nel/2 + 1
+		} else {
+			return try
+		}
+	}
+	return 0
+}
