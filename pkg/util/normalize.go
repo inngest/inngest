@@ -51,6 +51,10 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 		default:
 			if port == "" {
 				parsed.Host = host
+				if strings.Contains(host, ":") {
+					// IPv6 literals must stay bracketed in a URL host.
+					parsed.Host = "[" + host + "]"
+				}
 			}
 			return parsed.String()
 		}
