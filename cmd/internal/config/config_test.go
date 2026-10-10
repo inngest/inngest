@@ -797,17 +797,22 @@ invalid: yaml: content:
 	assert.Contains(t, err.Error(), "error parsing config file")
 }
 
-func TestIsLoopbackHost(t *testing.T) {
-	for host, want := range map[string]bool{
-		"":            false,
-		"0.0.0.0":     false,
-		"192.168.1.5": false,
-		"localhost":   false,
-		"127.0.0.1":   true,
-		"::1":         true,
-	} {
-		if got := IsLoopbackHost(host); got != want {
-			t.Errorf("IsLoopbackHost(%q) = %v, want %v", host, got, want)
+func TestConnectBindHost(t *testing.T) {
+	tests := []struct {
+		name, host, gateway, executor, want string
+	}{
+		{"no host", "", "127.0.0.1", "127.0.0.1", ""},
+		{"default loopback", "127.0.0.1", "127.0.0.1", "127.0.0.1", "127.0.0.1"},
+		{"other loopback", "127.0.0.2", "127.0.0.1", "127.0.0.1", ""},
+		{"other loopback advertised", "127.0.0.2", "127.0.0.2", "127.0.0.2", "127.0.0.2"},
+		{"only gateway advertised", "127.0.0.2", "127.0.0.2", "127.0.0.1", ""},
+		{"wildcard", "0.0.0.0", "127.0.0.1", "127.0.0.1", ""},
+		{"lan ip", "192.168.1.5", "127.0.0.1", "127.0.0.1", ""},
+		{"hostname", "localhost", "127.0.0.1", "127.0.0.1", ""},
+	}
+	for _, tt := range tests {
+		if got := ConnectBindHost(tt.host, tt.gateway, tt.executor); got != tt.want {
+			t.Errorf("%s: ConnectBindHost = %q, want %q", tt.name, got, tt.want)
 		}
 	}
 }
