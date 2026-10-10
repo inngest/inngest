@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"net"
+	"strconv"
 
 	"github.com/inngest/inngest/pkg/logger"
 )
@@ -15,6 +16,16 @@ type GRPCConfig struct {
 type ConnectGRPCConfig struct {
 	Gateway  GRPCConfig
 	Executor GRPCConfig
+
+	// BindHost is the host the connect listeners bind to. Empty binds to all
+	// interfaces.
+	BindHost string
+}
+
+// ListenAddr returns the address a connect listener should bind to for the
+// given port.
+func (c ConnectGRPCConfig) ListenAddr(port int) string {
+	return net.JoinHostPort(c.BindHost, strconv.Itoa(port))
 }
 
 // NewGRPCConfig creates a new GRPC configuration with proper IP parsing and error logging

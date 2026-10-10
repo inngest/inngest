@@ -277,6 +277,21 @@ func ValidateConnectGRPCIPs(gatewayIP, executorIP string) error {
 	return nil
 }
 
+// ConnectBindHost returns the host the connect listeners should bind to. It is
+// host only when host is a loopback IP that is also the advertised gateway and
+// executor gRPC IP, so the advertised addresses stay reachable. Otherwise it
+// is empty, which binds all interfaces.
+func ConnectBindHost(host, gatewayIP, executorIP string) string {
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return ""
+	}
+	if !ip.Equal(net.ParseIP(gatewayIP)) || !ip.Equal(net.ParseIP(executorIP)) {
+		return ""
+	}
+	return host
+}
+
 // GetStringSlice gets a string slice configuration value with proper priority
 func GetStringSlice(cmd *cli.Command, key string) []string {
 	// First check if CLI flag is explicitly set (highest priority)
