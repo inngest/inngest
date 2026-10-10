@@ -796,3 +796,18 @@ invalid: yaml: content:
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error parsing config file")
 }
+
+func TestIsLoopbackHost(t *testing.T) {
+	for host, want := range map[string]bool{
+		"":            false,
+		"0.0.0.0":     false,
+		"192.168.1.5": false,
+		"localhost":   false,
+		"127.0.0.1":   true,
+		"::1":         true,
+	} {
+		if got := IsLoopbackHost(host); got != want {
+			t.Errorf("IsLoopbackHost(%q) = %v, want %v", host, got, want)
+		}
+	}
+}

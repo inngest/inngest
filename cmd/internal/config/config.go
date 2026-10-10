@@ -277,6 +277,12 @@ func ValidateConnectGRPCIPs(gatewayIP, executorIP string) error {
 	return nil
 }
 
+// IsLoopbackHost reports whether host is a loopback IP address.
+func IsLoopbackHost(host string) bool {
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 // GetStringSlice gets a string slice configuration value with proper priority
 func GetStringSlice(cmd *cli.Command, key string) []string {
 	// First check if CLI flag is explicitly set (highest priority)

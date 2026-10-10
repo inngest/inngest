@@ -112,6 +112,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PostgresConnMaxLifetime: postgresConnMaxLifetime,
 		DebugAPIPort:            debugAPIPort,
 	}
+	// Keep the connect listeners on loopback when --host is loopback. Other
+	// hosts keep the wildcard bind, since the gRPC addresses advertised by
+	// default are 127.0.0.1.
+	if localconfig.IsLoopbackHost(host) {
+		opts.ConnectGRPCConfig.BindHost = host
+	}
 
 	l := logger.StdlibLogger(ctx)
 
