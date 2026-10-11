@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -127,4 +128,54 @@ func TestSeededSpanThenReuseContext(t *testing.T) {
 	require.NotEmpty(t, newTraceID)
 	require.NotEmpty(t, newDynamicSpanID)
 	require.NotEmpty(t, newTraceParent)
+}
+
+// TestNoTracerProviderLeakAcrossSpans is the regression test for issue #3892.
+// Previously otelTracerProvider.getTracer built a fresh sdktrace.NewTracerProvider
+// plus SimpleSpanProcessor plus executionProcessor on every CreateSpan / UpdateSpan,
+// and never called Shutdown on any of them. Under sustained traffic the Go runtime
+// could not reclaim them (RSS 500MB -> 10GB over 48h in the reporter cluster).
+//
+// This test proves two invariants of the fix:
+//
+//  1. NewOtelTracerProvider now builds the underlying sdktrace.TracerProvider ONCE
+//     and reuses the same trace.Tracer forever: the pointer returned by getTracer
+//     must be identical across many CreateSpan calls.
+//  2. Creating many spans does not leak goroutines. We take a goroutine snapshot
+//     before the loop, create 2000 spans, let the GC settle, and assert the delta
+//     is bounded (the pre-fix behaviour spawned one SimpleSpanProcessor goroutine
+//     per call = 2000+ goroutines).
+func TestNoTracerProviderLeakAcrossSpans(t *testing.T) {
+	ctx := t.Context()
+	tp := NewOtelTracerProvider(nil, time.Millisecond)
+
+	// Invariant 1: shared Tracer identity.
+	otp, ok := tp.(*otelTracerProvider)
+	require.True(t, ok, "NewOtelTracerProvider should return *otelTracerProvider")
+	first := otp.getTracer(nil)
+	second := otp.getTracer(nil)
+	require.Same(t, first, second, "getTracer must return the same Tracer instance across calls (issue #3892)")
+
+	// Invariant 2: no goroutine leak across many spans.
+	runtime.GC()
+	time.Sleep(50 * time.Millisecond)
+	baseline := runtime.NumGoroutine()
+
+	const spans = 2000
+	for i := 0; i < spans; i++ {
+		s, err := tp.CreateDroppableSpan(ctx, "leak-check", &CreateSpanOptions{})
+		require.NoError(t, err)
+		s.Drop()
+	}
+
+	runtime.GC()
+	time.Sleep(100 * time.Millisecond)
+	after := runtime.NumGoroutine()
+
+	// Pre-fix: expect ~2000 extra goroutines (one SimpleSpanProcessor per call).
+	// Post-fix: no new goroutines should be created per span. Allow a tiny slack
+	// for test-infra noise (<= 20).
+	require.LessOrEqual(t, after-baseline, 20,
+		"goroutine count grew by %d after %d spans; TracerProvider is still being rebuilt per span (issue #3892)",
+		after-baseline, spans)
 }

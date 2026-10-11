@@ -91,31 +91,61 @@ type UpdateSpanOptions struct {
 }
 
 // otelTracerProvider implements TracerProvider.
+//
+// Historical note (issue #3892): earlier revisions built a brand-new
+// sdktrace.NewTracerProvider + SimpleSpanProcessor + executionProcessor on
+// every CreateSpan / UpdateSpan call. None of them were ever Shutdown(),
+// so every tenant / run leaked one TracerProvider's worth of goroutines
+// and internal state. Under sustained traffic the Go runtime retained
+// gigabytes of these across days (RSS 500MB → 10GB over 48h in the
+// reporter's cluster).
+//
+// We now build the OTel TracerProvider ONCE in NewOtelTracerProvider and
+// reuse the same trace.Tracer forever. Per-span metadata is injected into
+// context via WithExecutionMetadata and read back by executionProcessor
+// in OnStart (standard OTel pattern for per-span attribute enrichment).
 type otelTracerProvider struct {
 	exp sdktrace.SpanExporter
 	bt  time.Duration
+
+	otelTP *sdktrace.TracerProvider
+	tracer trace.Tracer
 }
 
 func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration) TracerProvider {
-	return &otelTracerProvider{
+	tp := &otelTracerProvider{
 		exp: exp,
 		bt:  batchTimeout,
 	}
-}
-
-func (tp *otelTracerProvider) getTracer(md *statev2.Metadata) trace.Tracer {
-	base := sdktrace.NewSimpleSpanProcessor(tp.exp)
-
-	otelTP := sdktrace.NewTracerProvider(
-		sdktrace.WithSpanProcessor(newExecutionProcessor(md, base)),
+	base := sdktrace.NewSimpleSpanProcessor(exp)
+	tp.otelTP = sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(newExecutionProcessor(nil, base)),
 		sdktrace.WithIDGenerator(IDGenerator),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
-
-	return otelTP.Tracer(
+	tp.tracer = tp.otelTP.Tracer(
 		"inngest",
 		trace.WithInstrumentationVersion(version.Print()),
 	)
+	return tp
+}
+
+// Shutdown flushes the exporter and releases the underlying TracerProvider.
+// Call this during graceful shutdown so any pending spans are written and
+// the SpanProcessor's internal goroutines exit cleanly.
+func (tp *otelTracerProvider) Shutdown(ctx context.Context) error {
+	if tp.otelTP == nil {
+		return nil
+	}
+	return tp.otelTP.Shutdown(ctx)
+}
+
+// getTracer returns the single shared Tracer. The md argument is ignored
+// at this layer — it reaches executionProcessor.OnStart via the context
+// chain (see WithExecutionMetadata / tracer.go call sites). Kept for
+// signature stability with callers that still pass opts.Metadata.
+func (tp *otelTracerProvider) getTracer(_ *statev2.Metadata) trace.Tracer {
+	return tp.tracer
 }
 
 func (d *DroppableSpan) Drop() {
@@ -230,6 +260,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		})
 	}
 
+	// Inject per-span metadata into context so the shared executionProcessor
+	// can enrich this specific span with tenant attributes (issue #3892).
+	ctx = WithExecutionMetadata(ctx, opts.Metadata)
 	tracer := tp.getTracer(opts.Metadata)
 	ctx, span := tracer.Start(ctx, name, spanOptions...)
 
@@ -364,6 +397,9 @@ func (tp *otelTracerProvider) UpdateSpan(
 		opts.RawOtelSpanOptions...,
 	)
 
+	// Inject per-span metadata into context so the shared executionProcessor
+	// can enrich this specific span with tenant attributes (issue #3892).
+	ctx = WithExecutionMetadata(ctx, opts.Metadata)
 	tracer := tp.getTracer(opts.Metadata)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 

@@ -14,8 +14,10 @@ import (
 )
 
 type _spanCtxKeyT struct{}
+type _metadataCtxKeyT struct{}
 
 var _spanCtxKeyV _spanCtxKeyT
+var _metadataCtxKeyV _metadataCtxKeyT
 
 type ExecutionContext struct {
 	Identifier  statev2.ID
@@ -36,10 +38,38 @@ func WithExecutionContext(ctx context.Context, e ExecutionContext) context.Conte
 
 func mixinExecutonContext(input context.Context, with context.Context) context.Context {
 	ec := getExecutionContext(input)
-	return context.WithValue(with, _spanCtxKeyV, ec)
+	md := getExecutionMetadata(input)
+	with = context.WithValue(with, _spanCtxKeyV, ec)
+	if md != nil {
+		with = context.WithValue(with, _metadataCtxKeyV, md)
+	}
+	return with
+}
+
+// WithExecutionMetadata stores the per-span tenant metadata in context so
+// executionProcessor.OnStart can enrich the span with tenant / function /
+// batch / cron attributes without the TracerProvider having to be rebuilt
+// per span. Fixes the leak in #3892.
+func WithExecutionMetadata(ctx context.Context, md *statev2.Metadata) context.Context {
+	if md == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, _metadataCtxKeyV, md)
+}
+
+func getExecutionMetadata(ctx context.Context) *statev2.Metadata {
+	v := ctx.Value(_metadataCtxKeyV)
+	if v == nil {
+		return nil
+	}
+	md, _ := v.(*statev2.Metadata)
+	return md
 }
 
 type executionProcessor struct {
+	// md is a package-init fallback; the hot path reads from the span's
+	// context via getExecutionMetadata so a single shared TracerProvider
+	// can serve every tenant without leaking (issue #3892).
 	md   *statev2.Metadata
 	next sdktrace.SpanProcessor
 }
@@ -105,10 +135,18 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	rawAttrs := meta.NewAttrSet()
 	now := s.StartTime()
 
-	if p.md != nil {
-		AddMetadataTenantAttrs(rawAttrs, p.md.ID)
-		meta.AddAttr(rawAttrs, meta.Attrs.DebugRunID, p.md.Config.DebugRunID())
-		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, p.md.Config.DebugSessionID())
+	// Prefer per-span metadata from context so the TracerProvider can be a
+	// shared singleton (issue #3892). Fall back to the processor's own md
+	// for callers that haven't migrated yet.
+	md := getExecutionMetadata(parent)
+	if md == nil {
+		md = p.md
+	}
+
+	if md != nil {
+		AddMetadataTenantAttrs(rawAttrs, md.ID)
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugRunID, md.Config.DebugRunID())
+		meta.AddAttr(rawAttrs, meta.Attrs.DebugSessionID, md.Config.DebugSessionID())
 	}
 
 	ec := getExecutionContext(parent)
@@ -137,29 +175,29 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 			// The "queued at" time should always be the same time as the run ID.  This way,
 			// we ensure there's no drift between run ID creation time and the queued at time.
 			ts := now
-			if p.md != nil {
-				ts = p.md.ID.RunID.Timestamp()
+			if md != nil {
+				ts = md.ID.RunID.Timestamp()
 			}
 
 			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &ts)
 
-			if p.md != nil {
+			if md != nil {
 
-				eventIDs := make([]string, len(p.md.Config.EventIDs))
-				for i, id := range p.md.Config.EventIDs {
+				eventIDs := make([]string, len(md.Config.EventIDs))
+				for i, id := range md.Config.EventIDs {
 					eventIDs[i] = id.String()
 				}
 
-				meta.AddAttr(rawAttrs, meta.Attrs.FunctionVersion, &p.md.Config.FunctionVersion)
+				meta.AddAttr(rawAttrs, meta.Attrs.FunctionVersion, &md.Config.FunctionVersion)
 				meta.AddAttr(rawAttrs, meta.Attrs.EventIDs, &eventIDs)
 
-				if p.md.Config.CronSchedule() != nil {
-					meta.AddAttr(rawAttrs, meta.Attrs.CronSchedule, p.md.Config.CronSchedule())
+				if md.Config.CronSchedule() != nil {
+					meta.AddAttr(rawAttrs, meta.Attrs.CronSchedule, md.Config.CronSchedule())
 				}
 
-				if p.md.Config.BatchID != nil {
-					batchTS := time.UnixMilli(int64(p.md.Config.BatchID.Time()))
-					meta.AddAttr(rawAttrs, meta.Attrs.BatchID, p.md.Config.BatchID)
+				if md.Config.BatchID != nil {
+					batchTS := time.UnixMilli(int64(md.Config.BatchID.Time()))
+					meta.AddAttr(rawAttrs, meta.Attrs.BatchID, md.Config.BatchID)
 					meta.AddAttr(rawAttrs, meta.Attrs.BatchTimestamp, &batchTS)
 				}
 			}
