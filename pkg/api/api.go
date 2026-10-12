@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -290,10 +291,15 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		w.WriteHeader(400)
+		status := http.StatusBadRequest
+		if errors.Is(err, eventstream.ErrEventTooLarge) {
+			status = http.StatusRequestEntityTooLarge
+		}
+
+		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
 			IDs:    ids[0 : max+1],
-			Status: 400,
+			Status: status,
 			Error:  err.Error(),
 		})
 
