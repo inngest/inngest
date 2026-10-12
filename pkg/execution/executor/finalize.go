@@ -222,6 +222,70 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	return nil
 }
 
+// FinalizePermanentlyFailedRun fails the run of a job that the queue is about
+// to permanently fail.  If the executor didn't already finalize the run there's
+// nothing left in the queue to drive it, so it would otherwise stay Running
+// forever (eg. a system error on the last attempt of a fn w/ retries: 0).
+func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.Item, resp *state.DriverResponse, jobErr error) {
+	if resp != nil && resp.Final() {
+		// The executor already finalized the run w/ this response.
+		return
+	}
+	if errors.Is(jobErr, state.ErrFunctionCancelled) ||
+		errors.Is(jobErr, state.ErrRunNotFound) ||
+		errors.Is(jobErr, state.ErrEventNotFound) {
+		// The run was cancelled or its state is already gone.
+		return
+	}
+
+	l := logger.StdlibLogger(ctx)
+	id := sv2.IDFromV1(item.Identifier)
+
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
+		return
+	}
+	if err != nil {
+		l.ReportError(err, "error loading metadata to finalize permanently failed run")
+		return
+	}
+
+	// Load events before finalizing as Finalize deletes state.
+	evts, err := e.smv2.LoadEvents(ctx, id)
+	if err != nil {
+		l.Warn("error loading events to finalize permanently failed run", "error", err)
+	}
+
+	stdErr := state.StandardError{
+		Name:    state.InngestErrInternal,
+		Message: "The function run failed due to an internal error and could not continue.",
+	}
+	stdErr.Error = stdErr.String()
+	failed := state.DriverResponse{
+		Err:     &stdErr.Name,
+		Output:  stdErr.Serialize(execution.StateErrorKey),
+		NoRetry: true,
+	}
+
+	l.Warn("finalizing permanently failed run", "error", jobErr, "run_id", id.RunID)
+
+	if err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: md,
+		Response: execution.FinalizeResponse{
+			Type:           execution.FinalizeResponseDriver,
+			DriverResponse: failed,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: evts,
+			Reason:      "permanent-job-failure",
+		},
+	}); err != nil {
+		l.ReportError(err, "error finalizing permanently failed run")
+	}
+
+	e.RunFunctionFinishedLifecycle(ctx, md, item, evts, failed)
+}
+
 func (e *executor) finalizeMetricTags(ctx context.Context, status enums.StepStatus, opts execution.FinalizeOpts) map[string]any {
 	return map[string]any{
 		"account_plan": e.accountPlanMetricTag(ctx, opts),

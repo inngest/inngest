@@ -117,6 +117,11 @@ type Executor interface {
 
 	Finalize(ctx context.Context, opts FinalizeOpts) error
 
+	// FinalizePermanentlyFailedRun fails the run of a job that the queue is
+	// about to permanently fail, unless the executor already finalized it.
+	// Queue handlers call this once they've made their own retry decision.
+	FinalizePermanentlyFailedRun(ctx context.Context, item queue.Item, resp *state.DriverResponse, jobErr error)
+
 	// RunFunctionFinishedLifecycle fans OnFunctionFinished out to every
 	// registered LifecycleListener.
 	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
