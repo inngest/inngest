@@ -226,34 +226,49 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 // to permanently fail.  If the executor didn't already finalize the run there's
 // nothing left in the queue to drive it, so it would otherwise stay Running
 // forever (eg. a system error on the last attempt of a fn w/ retries: 0).
-func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.Item, resp *state.DriverResponse, jobErr error) {
+//
+// This returns an error if the run's state couldn't be loaded, in which case the
+// caller must keep the job queued instead of dropping it.  We never finalize w/o
+// the run's events if they still exist, as Finalize deletes state and builds the
+// function finished/failed events (and so failure handlers and invoke results)
+// from them.
+func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.Item, resp *state.DriverResponse, jobErr error) error {
 	if resp != nil && resp.Final() {
 		// The executor already finalized the run w/ this response.
-		return
+		return nil
 	}
-	if errors.Is(jobErr, state.ErrFunctionCancelled) ||
-		errors.Is(jobErr, state.ErrRunNotFound) ||
-		errors.Is(jobErr, state.ErrEventNotFound) {
+	if errors.Is(jobErr, state.ErrFunctionCancelled) || isRunStateGone(jobErr) {
 		// The run was cancelled or its state is already gone.
-		return
+		return nil
 	}
 
 	l := logger.StdlibLogger(ctx)
 	id := sv2.IDFromV1(item.Identifier)
+	retryConf := util.NewRetryConf(util.WithRetryConfRetryableErrors(func(err error) bool {
+		return !isRunStateGone(err)
+	}))
 
-	md, err := e.smv2.LoadMetadata(ctx, id)
-	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
-		return
+	md, err := util.WithRetry(ctx, "state.LoadMetadata", func(ctx context.Context) (sv2.Metadata, error) {
+		return e.smv2.LoadMetadata(ctx, id)
+	}, retryConf)
+	if isRunStateGone(err) {
+		return nil
 	}
 	if err != nil {
-		l.ReportError(err, "error loading metadata to finalize permanently failed run")
-		return
+		return fmt.Errorf("error loading metadata to finalize permanently failed run: %w", err)
 	}
 
 	// Load events before finalizing as Finalize deletes state.
-	evts, err := e.smv2.LoadEvents(ctx, id)
+	evts, err := util.WithRetry(ctx, "state.LoadEvents", func(ctx context.Context) ([]json.RawMessage, error) {
+		return e.smv2.LoadEvents(ctx, id)
+	}, retryConf)
+	if err != nil && !isRunStateGone(err) {
+		return fmt.Errorf("error loading events to finalize permanently failed run: %w", err)
+	}
 	if err != nil {
-		l.Warn("error loading events to finalize permanently failed run", "error", err)
+		// The metadata exists but the events are gone, so finalizing w/o them is
+		// the best we can do (as Cancel does).
+		l.Warn("finalizing permanently failed run w/o events", "error", err, "run_id", id.RunID)
 	}
 
 	stdErr := state.StandardError{
@@ -280,10 +295,19 @@ func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.
 			Reason:      "permanent-job-failure",
 		},
 	}); err != nil {
+		// State is deleted by this point so retrying the job can't help.
 		l.ReportError(err, "error finalizing permanently failed run")
 	}
 
 	e.RunFunctionFinishedLifecycle(ctx, md, item, evts, failed)
+	return nil
+}
+
+// isRunStateGone returns whether err means the run's state no longer exists.
+func isRunStateGone(err error) bool {
+	return errors.Is(err, state.ErrRunNotFound) ||
+		errors.Is(err, state.ErrEventNotFound) ||
+		errors.Is(err, sv2.ErrMetadataNotFound)
 }
 
 func (e *executor) finalizeMetricTags(ctx context.Context, status enums.StepStatus, opts execution.FinalizeOpts) map[string]any {
