@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -22,6 +24,7 @@ import (
 
 type failedRunService struct {
 	sv2.RunService
+	slug      string
 	mdErr     error
 	evtsErr   error
 	mdCalls   atomic.Int32
@@ -31,7 +34,25 @@ type failedRunService struct {
 
 func (r *failedRunService) LoadMetadata(_ context.Context, id sv2.ID, _ ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
 	r.mdCalls.Add(1)
-	return sv2.Metadata{ID: id, Config: *sv2.InitConfig(&sv2.Config{})}, r.mdErr
+	cfg := sv2.InitConfig(&sv2.Config{})
+	if r.slug != "" {
+		cfg.SetFunctionSlug(r.slug)
+	}
+	return sv2.Metadata{ID: id, Config: *cfg}, r.mdErr
+}
+
+type failedRunFunctionLoader struct {
+	slug  string
+	err   error
+	calls atomic.Int32
+}
+
+func (f *failedRunFunctionLoader) LoadFunction(context.Context, uuid.UUID, uuid.UUID) (*state.ExecutorFunction, error) {
+	f.calls.Add(1)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &state.ExecutorFunction{Function: &inngest.Function{Slug: f.slug}}, nil
 }
 
 func (r *failedRunService) LoadEvents(context.Context, sv2.ID) ([]json.RawMessage, error) {
@@ -74,9 +95,12 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 		jobErr       error
 		mdErr        error
 		evtsErr      error
+		noMDSlug     bool
+		loaderErr    error
 		wantErr      bool
 		wantFinalize bool
 		wantEvents   bool
+		wantSlug     string
 	}{
 		{
 			name: "system error after op response",
@@ -85,12 +109,33 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 			jobErr:       errors.New("error handling generator response: context canceled"),
 			wantFinalize: true,
 			wantEvents:   true,
+			wantSlug:     "app-fn",
 		},
 		{
 			name:         "system error w/o response",
 			jobErr:       errors.New("cannot load run events"),
 			wantFinalize: true,
 			wantEvents:   true,
+			wantSlug:     "app-fn",
+		},
+		{
+			// Older runs w/o a slug in their metadata load the function before
+			// state is deleted.
+			name:         "slug from function loader",
+			jobErr:       errors.New("context canceled"),
+			noMDSlug:     true,
+			wantFinalize: true,
+			wantEvents:   true,
+			wantSlug:     "loaded-fn",
+		},
+		{
+			// Finalizing w/o the slug would drop the function failed event, so
+			// the job must stay queued instead.
+			name:      "function load error",
+			jobErr:    errors.New("context canceled"),
+			noMDSlug:  true,
+			loaderErr: errors.New("db unavailable"),
+			wantErr:   true,
 		},
 		{
 			name:   "executor already finalized w/ final driver response",
@@ -103,11 +148,16 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 		},
 		{
 			name:   "run not found",
-			jobErr: state.ErrRunNotFound,
+			jobErr: fmt.Errorf("cannot load metadata to execute run: %w", state.ErrRunNotFound),
+			mdErr:  state.ErrRunNotFound,
 		},
 		{
-			name:   "event not found",
-			jobErr: state.ErrEventNotFound,
+			// Execute failing on missing events doesn't mean the metadata is
+			// gone too, so the run must still be finalized.
+			name:         "events missing but metadata exists",
+			jobErr:       fmt.Errorf("cannot load run events: %w", state.ErrEventNotFound),
+			evtsErr:      state.ErrEventNotFound,
+			wantFinalize: true,
 		},
 		{
 			name:   "state already deleted",
@@ -139,7 +189,13 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			runState := &failedRunService{mdErr: tc.mdErr, evtsErr: tc.evtsErr}
+			slug := "app-fn"
+			if tc.noMDSlug {
+				slug = ""
+			}
+			runState := &failedRunService{slug: slug, mdErr: tc.mdErr, evtsErr: tc.evtsErr}
+			loader := &failedRunFunctionLoader{slug: "loaded-fn", err: tc.loaderErr}
+			var published []event.Event
 			lifecycle := &recordingFinishLifecycle{finished: make(chan finishedRun, 1)}
 			e := &executor{
 				log:            logger.VoidLogger(),
@@ -147,6 +203,11 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 				shards:         missingShardRegistry{},
 				tracerProvider: tracing.NewOtelTracerProvider(nil, time.Millisecond),
 				lifecycles:     []execution.LifecycleListener{lifecycle},
+				fl:             loader,
+				finishHandler: func(_ context.Context, _ sv2.ID, evts []event.Event) error {
+					published = append(published, evts...)
+					return nil
+				},
 			}
 			item := queue.Item{Identifier: state.Identifier{
 				RunID:      ulid.Make(),
@@ -166,11 +227,31 @@ func TestFinalizePermanentlyFailedRun(t *testing.T) {
 			if tc.evtsErr != nil && !isRunStateGone(tc.evtsErr) {
 				require.Greater(t, runState.evtsCalls.Load(), int32(1), "events read must be retried")
 			}
+			if tc.loaderErr != nil {
+				require.Greater(t, loader.calls.Load(), int32(1), "function load must be retried")
+			}
+			if !tc.noMDSlug {
+				require.Zero(t, loader.calls.Load(), "slug must come from metadata")
+			}
 
 			if !tc.wantFinalize {
 				require.False(t, runState.deleted.Load())
 				require.Empty(t, lifecycle.finished)
+				require.Empty(t, published)
 				return
+			}
+
+			if tc.wantEvents {
+				// The function failed event drives onFailure handlers and invoke
+				// results, so it must be sent w/ the function's slug.
+				var failed *event.Event
+				for i := range published {
+					if published[i].Name == event.FnFailedName {
+						failed = &published[i]
+					}
+				}
+				require.NotNil(t, failed, "function failed event must be sent")
+				require.Equal(t, tc.wantSlug, failed.Data["function_id"])
 			}
 
 			require.True(t, runState.deleted.Load(), "run state must be deleted by Finalize")

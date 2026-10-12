@@ -227,8 +227,8 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 // nothing left in the queue to drive it, so it would otherwise stay Running
 // forever (eg. a system error on the last attempt of a fn w/ retries: 0).
 //
-// This returns an error if the run's state couldn't be loaded, in which case the
-// caller must keep the job queued instead of dropping it.  We never finalize w/o
+// This returns an error if the run's state or function couldn't be loaded, in
+// which case the caller must keep the job queued instead of dropping it.  We never finalize w/o
 // the run's events if they still exist, as Finalize deletes state and builds the
 // function finished/failed events (and so failure handlers and invoke results)
 // from them.
@@ -237,10 +237,12 @@ func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.
 		// The executor already finalized the run w/ this response.
 		return nil
 	}
-	if errors.Is(jobErr, state.ErrFunctionCancelled) || isRunStateGone(jobErr) {
-		// The run was cancelled or its state is already gone.
+	if errors.Is(jobErr, state.ErrFunctionCancelled) {
 		return nil
 	}
+	// NOTE: We don't skip based on jobErr being eg. ErrEventNotFound, as the
+	// run's metadata may still exist.  Loading the metadata below decides
+	// whether the run's state is actually gone.
 
 	l := logger.StdlibLogger(ctx)
 	id := sv2.IDFromV1(item.Identifier)
@@ -271,6 +273,21 @@ func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.
 		l.Warn("finalizing permanently failed run w/o events", "error", err, "run_id", id.RunID)
 	}
 
+	// Resolve the slug while the run's state still exists.  Finalize otherwise
+	// loads the function after deleting state, and if that fails no function
+	// failed event is sent and the job can't be retried.  Runs store the slug
+	// at schedule time, so the loader is only a fallback for older runs.
+	fnSlug := md.Config.FunctionSlug()
+	if fnSlug == "" {
+		fn, err := util.WithRetry(ctx, "LoadFunction", func(ctx context.Context) (*state.ExecutorFunction, error) {
+			return e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
+		}, util.NewRetryConf())
+		if err != nil {
+			return fmt.Errorf("error loading function to finalize permanently failed run: %w", err)
+		}
+		fnSlug = fn.Function.Slug
+	}
+
 	stdErr := state.StandardError{
 		Name:    state.InngestErrInternal,
 		Message: "The function run failed due to an internal error and could not continue.",
@@ -291,6 +308,7 @@ func (e *executor) FinalizePermanentlyFailedRun(ctx context.Context, item queue.
 			DriverResponse: failed,
 		},
 		Optional: execution.FinalizeOptional{
+			FnSlug:      fnSlug,
 			InputEvents: evts,
 			Reason:      "permanent-job-failure",
 		},
