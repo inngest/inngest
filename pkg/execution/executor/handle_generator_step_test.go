@@ -200,28 +200,39 @@ func (q *erroringQueue) Enqueue(_ context.Context, _ queue.Item, _ time.Time, _ 
 }
 
 // A failed discovery enqueue (eg. a canceled context while queue-proxy selects
-// a shard) must always be retried.  Otherwise functions w/ retries: 0 permanently
-// fail the edge job and the run strands as Running w/ no queue items.
+// a shard) must always be retried, even when the SDK asked for no retries (eg.
+// the Go SDK sets NoRetry for every OpcodeStepFailed).  Otherwise functions w/
+// retries: 0 permanently fail the edge job and the run strands as Running w/ no
+// queue items.
 func TestDiscoveryEnqueueFailureAlwaysRetries(t *testing.T) {
 	stepErr := state.UserError{Name: "Error", Message: "boom"}
+	retryAt := time.Now().Add(time.Minute)
 
 	tests := []struct {
 		name string
-		gen  state.GeneratorOpcode
-		run  func(e *executor, rc *mockRunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error
+		resp state.DriverResponse
 	}{
 		{
 			name: "step run",
-			gen:  state.GeneratorOpcode{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)},
-			run: func(e *executor, rc *mockRunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-				return e.handleGeneratorStep(context.Background(), rc, gen, edge)
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)}},
 			},
 		},
 		{
-			name: "step failed",
-			gen:  state.GeneratorOpcode{Op: enums.OpcodeStepFailed, ID: "step", Error: &stepErr},
-			run: func(e *executor, rc *mockRunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-				return e.handleStepFailed(context.Background(), rc, gen, edge)
+			name: "step run w/ retry at",
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				RetryAt:    &retryAt,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)}},
+			},
+		},
+		{
+			name: "step failed w/ no retry",
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				NoRetry:    true,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepFailed, ID: "step", Error: &stepErr}},
 			},
 		},
 	}
@@ -234,17 +245,22 @@ func TestDiscoveryEnqueueFailureAlwaysRetries(t *testing.T) {
 				log:            logger.From(context.Background()),
 				tracerProvider: tracing.NewNoopTracerProvider(),
 			}
-			rc := &mockRunContext{md: sv2.Metadata{
-				ID:     sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New()},
-				Config: *sv2.InitConfig(&sv2.Config{}),
-			}}
+			i := &runInstance{
+				md: sv2.Metadata{
+					ID:     sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New()},
+					Config: *sv2.InitConfig(&sv2.Config{}),
+				},
+				edge: inngest.Edge{Incoming: "step"},
+				item: queue.Item{Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}},
+			}
+			resp := tc.resp
 
-			err := tc.run(e, rc, tc.gen, queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}})
+			err := e.HandleGeneratorResponse(context.Background(), i, &resp)
 			require.Error(t, err)
 			require.ErrorContains(t, err, context.Canceled.Error())
 
-			// Wrapped the same way HandleGeneratorResponse wraps it, on the
-			// first and only attempt of a function w/ no retries.
+			// Wrapped the same way the executor wraps it, on the first and only
+			// attempt of a function w/ no retries.
 			wrapped := fmt.Errorf("error handling generator response: %w", err)
 			require.True(t, queue.IsAlwaysRetryable(wrapped))
 			require.True(t, queue.ShouldRetry(wrapped, 0, 1))

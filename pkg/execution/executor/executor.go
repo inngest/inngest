@@ -4051,6 +4051,13 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if errors.Is(err, state.ErrStateOverflowed) {
 			return err
 		}
+		// NoRetry/RetryAt are the SDK's preferences for the step, eg. the Go SDK
+		// sets NoRetry for every OpcodeStepFailed.  They must not hide system
+		// failures (eg. enqueueing the next discovery step) that always retry,
+		// as NeverRetryError would mask the retry marker and strand the run.
+		if queue.IsAlwaysRetryable(err) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
