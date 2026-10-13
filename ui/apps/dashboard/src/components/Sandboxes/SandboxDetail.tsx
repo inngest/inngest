@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Header } from '@inngest/components/Header/Header';
@@ -11,7 +12,12 @@ import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-import { compactSandboxID, formatTimeout, sandboxStatus } from './utils';
+import {
+  compactSandboxID,
+  formatTimeout,
+  isActiveSandboxStatus,
+  sandboxStatus,
+} from './utils';
 import { SandboxMetrics } from './SandboxMetrics';
 
 const SandboxDetailDocument = graphql(`
@@ -41,21 +47,34 @@ const SandboxDetailDocument = graphql(`
   }
 `);
 
+// Poll while the sandbox can still change status so the page follows it from
+// starting to running to stopped without a reload.
+const STATUS_POLL_MS = 5_000;
+
 export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
   const environment = useEnvironment();
   const { handleCopyClick, isCopying } = useCopyToClipboard();
+  const [isActive, setIsActive] = useState(false);
   const { data, error, isLoading, refetch } = useGraphQLQuery({
     query: SandboxDetailDocument,
     variables: { envSlug: environment.slug, sandboxID },
+    pollIntervalInMilliseconds: isActive ? STATUS_POLL_MS : undefined,
   });
   const sandbox = data?.envBySlug?.sandbox;
+  const sandboxIsActive = sandbox
+    ? isActiveSandboxStatus(sandbox.status)
+    : false;
+  useEffect(() => setIsActive(sandboxIsActive), [sandboxIsActive]);
 
-  if (!isLoading && !error && !sandbox) return <NotFound />;
+  // Polls report isLoading too; only the first fetch should show as loading.
+  const isInitialLoading = isLoading && !data;
+
+  if (!isInitialLoading && !error && !sandbox) return <NotFound />;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <Header
-        loading={isLoading}
+        loading={isInitialLoading}
         breadcrumb={[
           {
             text: 'Sandboxes',
@@ -74,7 +93,7 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
         }
       />
 
-      {error ? (
+      {error && !sandbox ? (
         <div className="p-6">
           <ErrorCard error={error} reset={() => refetch()} />
         </div>
@@ -98,7 +117,12 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
               </div>
             </div>
 
-            <SandboxMetrics key={sandbox.id} sandbox={sandbox} />
+            <SandboxMetrics
+              // Remount on status changes so a sandbox that stops while the
+              // page is open gets a fresh lifetime window.
+              key={`${sandbox.id}:${sandbox.status}`}
+              sandbox={sandbox}
+            />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <section>

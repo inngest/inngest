@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDuration, formatTimeout } from './utils';
+import { SandboxStatus } from '@/gql/graphql';
+
+import { formatDuration, formatTimeout, isActiveSandboxStatus } from './utils';
 
 describe('formatDuration', () => {
   it.each([
@@ -24,5 +26,18 @@ describe('formatTimeout', () => {
     [6 * 60 * 60, '6h'],
   ])('formats %d seconds as %s', (seconds, expected) => {
     expect(formatTimeout(seconds)).toBe(expected);
+  });
+});
+
+describe('isActiveSandboxStatus', () => {
+  it.each([
+    [SandboxStatus.Pending, true],
+    [SandboxStatus.Running, true],
+    [SandboxStatus.Stopping, true],
+    [SandboxStatus.Stopped, false],
+    [SandboxStatus.Failed, false],
+    [SandboxStatus.LaunchUnknown, false],
+  ])('treats %s as active: %s', (status, expected) => {
+    expect(isActiveSandboxStatus(status)).toBe(expected);
   });
 });

@@ -20,6 +20,14 @@ export function sandboxStatus(status: SandboxStatus): {
   }
 }
 
+export function isActiveSandboxStatus(status: SandboxStatus): boolean {
+  return (
+    status === SandboxStatus.Pending ||
+    status === SandboxStatus.Running ||
+    status === SandboxStatus.Stopping
+  );
+}
+
 export function formatMemory(memoryMB: number): string {
   if (memoryMB >= 1024 && memoryMB % 1024 === 0) {
     return `${memoryMB / 1024} GB`;
