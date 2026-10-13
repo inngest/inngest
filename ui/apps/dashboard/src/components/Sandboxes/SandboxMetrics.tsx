@@ -16,6 +16,8 @@ import { formatDuration, formatMemory } from './utils';
 
 const METRIC_LOOKBACK_MS = 10 * 60 * 1_000;
 const METRIC_REFRESH_MS = 5_000;
+// metrics.Granularity buckets windows shorter than 3 hours by the minute.
+const METRIC_BUCKET_MS = 60 * 1_000;
 
 const SandboxMetricsDocument = graphql(`
   query SandboxMetrics(
@@ -165,6 +167,7 @@ function LiveSandboxMetrics({ sandbox }: { sandbox: SandboxMetricsSandbox }) {
     data?.envBySlug ?? {},
     sandbox.vcpu,
     sandbox.memoryMB * 1024 * 1024,
+    { until, bucketMS: METRIC_BUCKET_MS },
   );
 
   return (

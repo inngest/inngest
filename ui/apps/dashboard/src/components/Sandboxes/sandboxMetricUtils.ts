@@ -16,10 +16,16 @@ export type SandboxMetricSeries = {
   memoryPeak?: MetricSeries | null;
 };
 
+/**
+ * Summarizes live usage. Each bucket holds its latest sample, so the newest
+ * bucket is still filling until its interval ends; CPU rates only use
+ * complete buckets, whose samples sit one bucket width apart.
+ */
 export function sandboxMetricStats(
   series: SandboxMetricSeries,
   vcpu: number,
   memoryBytes: number,
+  range: { until: Date; bucketMS: number },
 ): {
   cpu: { current: number; percent: number } | null;
   memory: {
@@ -33,6 +39,9 @@ export function sandboxMetricStats(
     sumMatchingCounters(
       series.cpuUserTime?.data ?? [],
       series.cpuSystemTime?.data ?? [],
+    ).filter(
+      (point) =>
+        Date.parse(point.bucket) + range.bucketMS <= range.until.getTime(),
     ),
     1 / 1_000_000,
   );

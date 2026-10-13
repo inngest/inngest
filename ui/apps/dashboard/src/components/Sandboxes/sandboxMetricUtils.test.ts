@@ -11,6 +11,7 @@ import {
 const first = '2026-08-25T12:00:00Z';
 const second = '2026-08-25T12:01:00Z';
 const third = '2026-08-25T12:02:00Z';
+const live = { until: new Date('2026-08-25T12:05:00Z'), bucketMS: 60_000 };
 
 describe('sandboxMetricStats', () => {
   it('derives current vCPU usage from cumulative counters', () => {
@@ -31,6 +32,7 @@ describe('sandboxMetricStats', () => {
       },
       2,
       400,
+      live,
     );
 
     expect(stats.cpu).toEqual({ current: 0.15, percent: 7.5 });
@@ -54,6 +56,7 @@ describe('sandboxMetricStats', () => {
       },
       1,
       400,
+      live,
     );
 
     expect(stats.memory).toEqual({
@@ -84,14 +87,41 @@ describe('sandboxMetricStats', () => {
       },
       1,
       400,
+      live,
     );
 
     expect(stats.cpu?.current).toBeCloseTo(0.00001);
     expect(stats.cpu?.percent).toBeCloseTo(0.001);
   });
 
+  it('ignores the bucket that is still filling', () => {
+    const stats = sandboxMetricStats(
+      {
+        cpuUserTime: {
+          data: [
+            { bucket: first, value: 0 },
+            { bucket: second, value: 30_000_000 },
+            { bucket: third, value: 35_000_000 },
+          ],
+        },
+        cpuSystemTime: {
+          data: [
+            { bucket: first, value: 0 },
+            { bucket: second, value: 0 },
+            { bucket: third, value: 0 },
+          ],
+        },
+      },
+      1,
+      400,
+      { until: new Date('2026-08-25T12:02:10Z'), bucketMS: 60_000 },
+    );
+
+    expect(stats.cpu).toEqual({ current: 0.5, percent: 50 });
+  });
+
   it('returns null stats when no series are present', () => {
-    expect(sandboxMetricStats({}, 1, 400)).toEqual({
+    expect(sandboxMetricStats({}, 1, 400, live)).toEqual({
       cpu: null,
       memory: null,
     });
