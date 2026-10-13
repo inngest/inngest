@@ -736,7 +736,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 				"swallowing idempotent step response",
 				"attempt", attempt,
 				"run_id", id.RunID,
-				"step_id", stepID,
+				"step_id", util.SanitizeLogField(stepID),
 			)
 			return hasPending, nil
 		}
@@ -755,7 +755,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 			"swallowing duplicate response",
 			"attempt", attempt,
 			"run_id", id.RunID,
-			"step_id", stepID,
+			"step_id", util.SanitizeLogField(stepID),
 		)
 		return false, nil
 	}
