@@ -43,6 +43,12 @@ type TracerProvider interface {
 	CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error)
 	CreateDroppableSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*DroppableSpan, error)
 	UpdateSpan(ctx context.Context, opts *UpdateSpanOptions) error
+	// Shutdown flushes the exporter and releases the underlying
+	// TracerProvider. Call it during process shutdown so pending spans are
+	// written and the SpanProcessor's internal goroutines exit cleanly.
+	// Safe to call on a nil receiver or an already-shutdown provider; the
+	// OTel SDK makes Shutdown idempotent.
+	Shutdown(ctx context.Context) error
 }
 
 type SpanDebugData struct {
@@ -130,11 +136,13 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 	return tp
 }
 
-// Shutdown flushes the exporter and releases the underlying TracerProvider.
-// Call this during graceful shutdown so any pending spans are written and
-// the SpanProcessor's internal goroutines exit cleanly.
+// Shutdown implements TracerProvider.Shutdown — flushes the exporter and
+// releases the underlying sdktrace.TracerProvider. Wired from the devserver's
+// defer block (devserver.go) so pending spans are written on process exit.
+// The underlying OTel SDK makes Shutdown idempotent, so repeated calls are
+// safe. Returns nil if the provider was never fully constructed.
 func (tp *otelTracerProvider) Shutdown(ctx context.Context) error {
-	if tp.otelTP == nil {
+	if tp == nil || tp.otelTP == nil {
 		return nil
 	}
 	return tp.otelTP.Shutdown(ctx)
