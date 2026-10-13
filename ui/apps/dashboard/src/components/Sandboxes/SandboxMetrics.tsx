@@ -158,6 +158,9 @@ function LiveSandboxMetrics({ sandbox }: { sandbox: SandboxMetricsSandbox }) {
       until: until.toISOString(),
     },
   });
+  // Each refresh moves the window, so isLoading is true while the previous
+  // readings are still on screen; only show the loading state before them.
+  const isInitialLoading = isLoading && !data;
   const stats = sandboxMetricStats(
     data?.envBySlug ?? {},
     sandbox.vcpu,
@@ -169,7 +172,7 @@ function LiveSandboxMetrics({ sandbox }: { sandbox: SandboxMetricsSandbox }) {
       caption={
         <span className="flex items-center gap-1.5">
           <span className="bg-status-running h-1.5 w-1.5 rounded-full" />
-          Live · last 10 minutes
+          Live · refreshes every {METRIC_REFRESH_MS / 1_000}s
         </span>
       }
       error={error}
@@ -177,14 +180,16 @@ function LiveSandboxMetrics({ sandbox }: { sandbox: SandboxMetricsSandbox }) {
     >
       <ResourceStatCard
         label="vCPU"
+        description="avg over last minute"
         current={stats.cpu?.current}
         limit={`${sandbox.vcpu} vCPU`}
         percent={stats.cpu?.percent}
         formatCurrent={formatVCPU}
-        isLoading={isLoading}
+        isLoading={isInitialLoading}
       />
       <ResourceStatCard
         label="RAM"
+        description="latest sample"
         current={stats.memory?.current}
         limit={formatMemory(sandbox.memoryMB)}
         percent={stats.memory?.percent}
@@ -192,10 +197,10 @@ function LiveSandboxMetrics({ sandbox }: { sandbox: SandboxMetricsSandbox }) {
         peakLabel={
           stats.memory?.peak == null
             ? undefined
-            : `${formatBytes(stats.memory.peak)} Peak`
+            : `${formatBytes(stats.memory.peak)} peak since start`
         }
         formatCurrent={formatBytes}
-        isLoading={isLoading}
+        isLoading={isInitialLoading}
       />
     </MetricsSection>
   );
@@ -325,6 +330,7 @@ function AllocatedStatCard({
 
 function ResourceStatCard({
   label,
+  description,
   current,
   limit,
   percent,
@@ -334,6 +340,7 @@ function ResourceStatCard({
   isLoading,
 }: {
   label: string;
+  description?: string;
   current?: number;
   limit: string;
   percent?: number;
@@ -348,7 +355,12 @@ function ResourceStatCard({
     <div className="border-muted bg-canvasBase min-h-[98px] rounded-lg border px-5 py-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-basis text-sm font-medium">{label}</div>
+          <div className="text-basis text-sm font-medium">
+            {label}
+            {description && (
+              <span className="text-light font-normal"> · {description}</span>
+            )}
+          </div>
           <div className="mt-0.5 flex items-end gap-0.5">
             <span className="text-subtle text-[32px] font-medium leading-10 tracking-tight">
               {isLoading || current === undefined
