@@ -98,11 +98,7 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
               </div>
             </div>
 
-            <SandboxMetrics
-              sandboxID={sandbox.id}
-              vcpu={sandbox.vcpu}
-              memoryMB={sandbox.memoryMB}
-            />
+            <SandboxMetrics sandbox={sandbox} />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <section>
@@ -207,7 +203,9 @@ function DetailRow({
     <div className="border-subtle grid grid-cols-[140px_minmax(0,1fr)] gap-3 border-b px-4 py-3 last:border-b-0">
       <span className="text-muted text-sm">{label}</span>
       <span
-        className={`text-basis min-w-0 break-words text-sm ${mono ? 'font-mono' : ''}`}
+        className={`text-basis min-w-0 break-words text-sm ${
+          mono ? 'font-mono' : ''
+        }`}
       >
         {value}
       </span>

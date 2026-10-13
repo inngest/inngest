@@ -1,3 +1,5 @@
+import { SandboxStatus } from '@/gql/graphql';
+
 type MetricPoint = {
   bucket: string;
   value?: number | null;
@@ -112,4 +114,114 @@ function hasMetricValue(
 function percentage(value: number, limit: number): number {
   if (limit <= 0) return 0;
   return Math.min(Math.max((value / limit) * 100, 0), 100);
+}
+
+// Sandbox metric points live in ClickHouse's compute_metric_points table,
+// which expires rows after 30 days.
+export const SANDBOX_METRICS_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
+
+// How far past a sandbox's end we look for its final samples.
+const LIFETIME_TAIL_MS = 60 * 1_000;
+
+export type SandboxMetricsWindow =
+  | { kind: 'live' }
+  | { kind: 'pending' }
+  | { kind: 'neverStarted' }
+  | { kind: 'expired'; startedAt: Date; endedAt: Date }
+  | {
+      kind: 'lifetime';
+      startedAt: Date;
+      endedAt: Date;
+      from: Date;
+      until: Date;
+    };
+
+/**
+ * Picks what the resource cards show for a sandbox: live usage while it runs,
+ * usage over its whole lifetime once it has ended, or an explanation when no
+ * usage can exist.
+ */
+export function sandboxMetricsWindow(
+  sandbox: {
+    status: SandboxStatus;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    failedAt?: string | null;
+    launchUnknownAt?: string | null;
+  },
+  now: Date,
+): SandboxMetricsWindow {
+  switch (sandbox.status) {
+    case SandboxStatus.Running:
+    case SandboxStatus.Stopping:
+      return { kind: 'live' };
+    case SandboxStatus.Pending:
+      return { kind: 'pending' };
+  }
+
+  if (!sandbox.startedAt) return { kind: 'neverStarted' };
+
+  const startedAt = new Date(sandbox.startedAt);
+  const end = sandbox.endedAt ?? sandbox.failedAt ?? sandbox.launchUnknownAt;
+  const endedAt = new Date(
+    Math.max(end ? Date.parse(end) : now.getTime(), startedAt.getTime()),
+  );
+
+  if (now.getTime() - endedAt.getTime() > SANDBOX_METRICS_RETENTION_MS) {
+    return { kind: 'expired', startedAt, endedAt };
+  }
+
+  const until = new Date(
+    Math.max(
+      Math.min(endedAt.getTime() + LIFETIME_TAIL_MS, now.getTime()),
+      startedAt.getTime() + 1_000,
+    ),
+  );
+  return { kind: 'lifetime', startedAt, endedAt, from: startedAt, until };
+}
+
+/**
+ * Summarizes usage over a sandbox's whole run. CPU counters are cumulative
+ * from launch, so the final reading divided by runtime is the average vCPU.
+ * memory.peak is a high-water mark, so its largest reading is the lifetime
+ * peak.
+ */
+export function sandboxLifetimeStats(
+  series: SandboxMetricSeries,
+  vcpu: number,
+  memoryBytes: number,
+  runtimeSeconds: number,
+): {
+  cpu: { average: number; percent: number } | null;
+  memory: { peak: number; percent: number } | null;
+} {
+  const cpuTotal = maxValue(
+    sumMatchingCounters(
+      series.cpuUserTime?.data ?? [],
+      series.cpuSystemTime?.data ?? [],
+    ),
+  );
+  const memoryPeak =
+    maxValue(series.memoryPeak?.data ?? []) ??
+    maxValue(series.memoryCurrent?.data ?? []);
+  const cpuAverage =
+    cpuTotal === null || runtimeSeconds <= 0
+      ? null
+      : cpuTotal / 1_000_000 / runtimeSeconds;
+
+  return {
+    cpu:
+      cpuAverage === null
+        ? null
+        : { average: cpuAverage, percent: percentage(cpuAverage, vcpu) },
+    memory:
+      memoryPeak === null
+        ? null
+        : { peak: memoryPeak, percent: percentage(memoryPeak, memoryBytes) },
+  };
+}
+
+function maxValue(points: MetricPoint[]): number | null {
+  const values = points.filter(hasMetricValue).map((point) => point.value);
+  return values.length ? Math.max(...values) : null;
 }
