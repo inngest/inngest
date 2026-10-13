@@ -301,3 +301,34 @@ func TestAIGatewayCoalesceJobID(t *testing.T) {
 	require.Len(t, q.enqueued, 1, "concurrent AIGateway completions must coalesce to a single discovery enqueue")
 	require.Equal(t, fmt.Sprintf("%s-%s-discover", runID, ck), *q.enqueued[0].JobID)
 }
+
+// TestAIGatewayIdempotentSave verifies that an unchanged re-save of the step output
+// (ErrIdempotentResponse) is treated as already saved rather than failing the step.
+func TestAIGatewayIdempotentSave(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+
+	q := &dedupeQueue{}
+	e := &executor{
+		smv2:           &stubRunServiceMD{saveStepErr: state.ErrIdempotentResponse},
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	rc := &mockRunContext{
+		md: sv2.Metadata{
+			ID:     sv2.ID{RunID: runID, FunctionID: uuid.New()},
+			Config: *sv2.InitConfig(&sv2.Config{}),
+		},
+		httpClient: &stubHTTPClient{statusCode: 200, body: json.RawMessage(`{"result":"ok"}`)},
+	}
+
+	gen := state.GeneratorOpcode{
+		Op:   enums.OpcodeAIGateway,
+		ID:   "infer",
+		Opts: json.RawMessage(`{"url":"","format":"openai-chat","body":{}}`),
+	}
+	err := e.handleGeneratorAIGateway(context.Background(), rc, gen, queue.PayloadEdge{Edge: inngest.Edge{Incoming: "trigger"}}, OpcodeGroup{})
+	require.NoError(t, err)
+	require.Len(t, q.enqueued, 1, "discovery must still be enqueued after an idempotent save")
+}

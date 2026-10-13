@@ -439,7 +439,7 @@ func TestV2Adapter(t *testing.T) {
 			assert.ErrorIs(t, err2, state.ErrDuplicateResponse)
 		})
 
-		t.Run("SaveStep with same data succeeds (idempotent)", func(t *testing.T) {
+		t.Run("SaveStep with same data returns ErrIdempotentResponse", func(t *testing.T) {
 			idempotentRunID := ulid.MustNew(ulid.Now(), rand.Reader)
 			idempotentKey := fmt.Sprintf("idempotent-key-%s", idempotentRunID.String())
 
@@ -476,9 +476,9 @@ func TestV2Adapter(t *testing.T) {
 			_, err1 := v2svc.SaveStep(ctx, createdState.Metadata.ID, stepID, stepData)
 			assert.NoError(t, err1)
 
-			// Save step second time with SAME data - should succeed (idempotent)
+			// Save step second time with SAME data - reports the unchanged re-save
 			_, err2 := v2svc.SaveStep(ctx, createdState.Metadata.ID, stepID, stepData)
-			assert.NoError(t, err2) // Should not error for idempotent responses
+			assert.ErrorIs(t, err2, statev2.ErrIdempotentResponse)
 		})
 	})
 }

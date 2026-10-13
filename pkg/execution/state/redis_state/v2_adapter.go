@@ -728,14 +728,21 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 
 	if errors.Is(err, statev1.ErrIdempotentResponse) {
 		// This step data for this step ID has already been saved exactly as before.
-		logger.StdlibLogger(ctx).Warn(
-			"swallowing idempotent step response",
-			"attempt", attempt,
-			"run_id", id.RunID,
-			"step_id", stepID,
-		)
 		// NOTE: hasPending should be accurate in this case.
-		return hasPending, nil
+		if attempt > 1 {
+			// Most likely our own first attempt landed despite the retry, same as
+			// the duplicate case below, so this is a new save.
+			logger.StdlibLogger(ctx).Warn(
+				"swallowing idempotent step response",
+				"attempt", attempt,
+				"run_id", id.RunID,
+				"step_id", stepID,
+			)
+			return hasPending, nil
+		}
+		// Return the error so callers can tell an unchanged re-save (eg. an SDK
+		// retrying a checkpoint) from a new one.
+		return hasPending, err
 	}
 
 	if errors.Is(err, statev1.ErrDuplicateResponse) && attempt > 1 {

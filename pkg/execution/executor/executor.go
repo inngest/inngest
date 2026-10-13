@@ -2110,7 +2110,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				AccountID: id.AccountID,
 			},
 		}, edge.Outgoing, []byte("null"))
-		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
+		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) && err != nil {
 			return nil, err
 		}
 		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
@@ -4555,7 +4555,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -5073,7 +5073,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -5250,7 +5250,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, resp.Body)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
