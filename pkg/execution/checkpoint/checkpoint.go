@@ -612,8 +612,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 			// Report usage for the step.  The executor only sees the final response of
 			// the request wrapping these checkpoints, so without this every step
-			// checkpointed here goes uncounted.  Duplicates `continue` above, so retried
-			// checkpoints aren't double counted.
+			// checkpointed here goes uncounted.  Duplicate and idempotent saves `continue`
+			// above, so retried checkpoints aren't double counted.
 			c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
 				EnvID:     input.EnvID,
