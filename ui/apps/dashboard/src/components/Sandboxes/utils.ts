@@ -12,7 +12,7 @@ export function sandboxStatus(status: SandboxStatus): {
     case SandboxStatus.Stopping:
       return { colorStatus: 'RUNNING', label: 'Stopping' };
     case SandboxStatus.Stopped:
-      return { colorStatus: 'COMPLETED', label: 'Stopped' };
+      return { colorStatus: 'CANCELLED', label: 'Stopped' };
     case SandboxStatus.Failed:
       return { colorStatus: 'FAILED', label: 'Failed' };
     case SandboxStatus.LaunchUnknown:
