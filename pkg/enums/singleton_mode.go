@@ -10,4 +10,10 @@ const (
 
 	// SingletonModeCancel cancels the currently running singleton instance and starts the new one.
 	SingletonModeCancel
+
+	// SingletonModeJoin skips the new run like SingletonModeSkip, but when the
+	// new run was triggered by step.invoke, the invoking run is resolved with
+	// the output (or error) of the active singleton run instead of waiting for
+	// its invoke to time out.
+	SingletonModeJoin
 )

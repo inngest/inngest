@@ -169,6 +169,17 @@ type SingletonOperations interface {
 	// SingletonReleaseRunID atomically gets and deletes the singleton lock
 	// for key, returning the released run ID or nil if no lock was held.
 	SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error)
+	// SingletonJoin atomically registers member as a waiter on the active run.
+	// If the active run has already completed (SingletonJoinComplete ran), the
+	// waiter is NOT registered and the completion payload is returned instead.
+	// Exactly one of "registered" or "payload != nil" holds. The waiter set
+	// expires after ttl.
+	SingletonJoin(ctx context.Context, scope Scope, activeRunID ulid.ULID, member string, ttl time.Duration) (payload []byte, err error)
+	// SingletonJoinComplete atomically stores the completion payload for the
+	// active run (so later joiners resolve from it) and returns every waiter
+	// registered so far. It is idempotent: calling it again returns the same
+	// waiters. All keys expire after ttl.
+	SingletonJoinComplete(ctx context.Context, scope Scope, activeRunID ulid.ULID, payload []byte, ttl time.Duration) (members []string, err error)
 }
 
 // DebounceUpdateStatus describes the outcome of DebounceUpdate.

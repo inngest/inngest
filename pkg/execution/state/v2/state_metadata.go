@@ -22,6 +22,7 @@ const (
 	fnslugKey         = "__fnslug"
 	traceLinkKey      = "__tracelink"
 	debounceKey       = "__debounce"
+	singletonJoinKey  = "__singleton_join"
 	evtmapKey         = "__evtmap"
 	debugSessionIDKey = "__debug_session_id"
 	debugRunIDKey     = "__debug_run_id"
@@ -329,6 +330,30 @@ func (c *Config) DebounceFlag() bool {
 	}
 
 	return false
+}
+
+// SetSingletonJoin marks the run as the target of singleton-join waiters, so
+// that finalization knows it must resolve them.
+func (c *Config) SetSingletonJoin(flag bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[singletonJoinKey] = flag
+}
+
+// SingletonJoin returns whether the run must resolve singleton-join waiters
+// when it finalizes.
+func (c *Config) SingletonJoin() bool {
+	if c.mu == nil {
+		return false
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	flag, _ := c.Context[singletonJoinKey].(bool)
+	return flag
 }
 
 func (c *Config) SetFunctionTrace(carrier *itrace.TraceCarrier) {

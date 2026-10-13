@@ -160,3 +160,11 @@ func (r *recordingSingletonManager) HandleSingleton(context.Context, queue.Scope
 	r.calls++
 	return nil, nil
 }
+
+func (r *recordingSingletonManager) Join(context.Context, queue.Scope, ulid.ULID, string, time.Duration) ([]byte, error) {
+	return nil, nil
+}
+
+func (r *recordingSingletonManager) Complete(context.Context, queue.Scope, ulid.ULID, []byte, time.Duration) ([]string, error) {
+	return nil, nil
+}
