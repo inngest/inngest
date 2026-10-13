@@ -98,7 +98,7 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
               </div>
             </div>
 
-            <SandboxMetrics sandbox={sandbox} />
+            <SandboxMetrics key={sandbox.id} sandbox={sandbox} />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <section>

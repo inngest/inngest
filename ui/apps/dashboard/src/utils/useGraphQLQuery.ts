@@ -114,11 +114,10 @@ export function useSkippableGraphQLQuery<
   }, [skip, res.fetching, pollIntervalInMilliseconds, executeQuery]);
 
   const refetch = useCallback(() => {
-    return () =>
-      executeQuery({
-        // Ignore cache
-        requestPolicy: 'network-only',
-      });
+    executeQuery({
+      // Ignore cache
+      requestPolicy: 'network-only',
+    });
   }, [executeQuery]);
 
   if (skip) {
