@@ -346,6 +346,14 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
 		if resp == nil || err != nil {
+			if !queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
+				// The queue is about to permanently fail this job.
+				if ferr := s.exec.FinalizePermanentlyFailedRun(ctx, item, resp, err); ferr != nil {
+					// Keep the job queued, otherwise nothing is left to drive
+					// the run.  This doesn't use up an attempt.
+					return false, queue.AlwaysRetryError(errors.Join(err, ferr))
+				}
+			}
 			return false, err
 		}
 

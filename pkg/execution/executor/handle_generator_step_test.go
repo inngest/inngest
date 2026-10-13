@@ -189,3 +189,81 @@ func TestHandleGeneratorStepEnqueuesDiscoveryOnDuplicate(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, q.enqueued, 1, "expected discovery enqueue despite duplicate save")
 }
+
+type erroringQueue struct {
+	queue.Queue
+	err error
+}
+
+func (q *erroringQueue) Enqueue(_ context.Context, _ queue.Item, _ time.Time, _ queue.EnqueueOpts) error {
+	return q.err
+}
+
+// A failed discovery enqueue (eg. a canceled context while queue-proxy selects
+// a shard) must always be retried, even when the SDK asked for no retries (eg.
+// the Go SDK sets NoRetry for every OpcodeStepFailed).  Otherwise functions w/
+// retries: 0 permanently fail the edge job and the run strands as Running w/ no
+// queue items.
+func TestDiscoveryEnqueueFailureAlwaysRetries(t *testing.T) {
+	stepErr := state.UserError{Name: "Error", Message: "boom"}
+	retryAt := time.Now().Add(time.Minute)
+
+	tests := []struct {
+		name string
+		resp state.DriverResponse
+	}{
+		{
+			name: "step run",
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)}},
+			},
+		},
+		{
+			name: "step run w/ retry at",
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				RetryAt:    &retryAt,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)}},
+			},
+		},
+		{
+			name: "step failed w/ no retry",
+			resp: state.DriverResponse{
+				StatusCode: 206,
+				NoRetry:    true,
+				Generator:  []*state.GeneratorOpcode{{Op: enums.OpcodeStepFailed, ID: "step", Error: &stepErr}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &executor{
+				smv2:           &stubRunService{},
+				queue:          &erroringQueue{err: context.Canceled},
+				log:            logger.From(context.Background()),
+				tracerProvider: tracing.NewNoopTracerProvider(),
+			}
+			i := &runInstance{
+				md: sv2.Metadata{
+					ID:     sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New()},
+					Config: *sv2.InitConfig(&sv2.Config{}),
+				},
+				edge: inngest.Edge{Incoming: "step"},
+				item: queue.Item{Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}},
+			}
+			resp := tc.resp
+
+			err := e.HandleGeneratorResponse(context.Background(), i, &resp)
+			require.Error(t, err)
+			require.ErrorContains(t, err, context.Canceled.Error())
+
+			// Wrapped the same way the executor wraps it, on the first and only
+			// attempt of a function w/ no retries.
+			wrapped := fmt.Errorf("error handling generator response: %w", err)
+			require.True(t, queue.IsAlwaysRetryable(wrapped))
+			require.True(t, queue.ShouldRetry(wrapped, 0, 1))
+		})
+	}
+}

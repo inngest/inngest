@@ -4051,6 +4051,13 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if errors.Is(err, state.ErrStateOverflowed) {
 			return err
 		}
+		// NoRetry/RetryAt are the SDK's preferences for the step, eg. the Go SDK
+		// sets NoRetry for every OpcodeStepFailed.  They must not hide system
+		// failures (eg. enqueueing the next discovery step) that always retry,
+		// as NeverRetryError would mask the retry marker and strand the run.
+		if queue.IsAlwaysRetryable(err) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
@@ -4271,7 +4278,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 
 			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
 
-			return err
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
@@ -4290,6 +4297,18 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	})
 
 	return nil
+}
+
+// retryableEnqueueError marks a failure to enqueue a run's next discovery item
+// as always retryable.  The step's output is already saved by this point, so
+// the failure is ours (eg. a canceled context while selecting a queue shard)
+// and must not consume the function's retry budget.  If it did, functions w/
+// low retry counts permanently fail the edge job and the run is left Running
+// w/ nothing in the queue.  Retrying is safe as discovery job IDs are
+// deterministic, so a retry after a partially successful enqueue dedupes via
+// ErrQueueItemExists.
+func retryableEnqueueError(err error) error {
+	return queue.AlwaysRetryError(fmt.Errorf("error enqueueing discovery step: %w", err))
 }
 
 // sanitizeLogValue strips CR/LF from a user-supplied string before logging
@@ -4609,6 +4628,11 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		if errors.Is(err, queue.ErrQueueItemExists) {
 			span.Drop()
 			return nil
+		}
+		if err != nil {
+			span.Drop()
+			logger.StdlibLogger(ctx).Error("error scheduling step failure queue item", "error", err)
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
