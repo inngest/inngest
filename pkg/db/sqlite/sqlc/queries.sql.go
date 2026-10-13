@@ -2666,8 +2666,14 @@ ON CONFLICT(id) DO UPDATE SET
     framework = excluded.framework,
     metadata = excluded.metadata,
     status = excluded.status,
-    error = excluded.error,
-    checksum = excluded.checksum,
+    error = CASE
+      WHEN excluded.name = '' AND apps.name <> '' THEN apps.error
+      ELSE excluded.error
+    END,
+    checksum = CASE
+      WHEN excluded.checksum = '' THEN apps.checksum
+      ELSE excluded.checksum
+    END,
     archived_at = NULL,
     "method" = excluded.method,
     app_version = excluded.app_version,

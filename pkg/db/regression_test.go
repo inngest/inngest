@@ -1061,8 +1061,72 @@ func TestUpsertAppPreservesNameOnEmptyClobber(t *testing.T) {
 	got, err := q.GetAppByID(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, "real-app", got.Name, "placeholder upsert must not blank a real name")
-	require.True(t, got.Error.Valid, "error should be set by the placeholder upsert")
-	require.Equal(t, "unreachable", got.Error.String)
+	require.False(t, got.Error.Valid, "placeholder upsert must not set an error on a named app")
+}
+
+// TestUpsertAppPreservesErrorOnEmptyClobber covers the -u startup upsert
+// (service.go:315) hitting a legacy row whose id is still sha1(URL). That
+// upsert sends name="" and error=unreachable with an empty checksum. On a
+// row that already has a name, the query must keep the stored error and
+// checksum so /fn/register can still short-circuit. A row whose name is
+// already empty is a real placeholder and must still take the error.
+func TestUpsertAppPreservesErrorOnEmptyClobber(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	t.Run("named row keeps error and checksum", func(t * testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          id,
+			Name:        "real-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "real-checksum",
+			Url:         "https://example.com/real",
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, "real-app", got.Name)
+		require.False(t, got.Error.Valid)
+		require.Equal(t, "real-checksum", got.Checksum)
+	})
+
+	t.Run("empty-name row still takes the unreachable error", func(t *testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.True(t, got.Error.Valid)
+		require.Equal(t, "unreachable", got.Error.String)
+	})
 }
 
 // TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop
