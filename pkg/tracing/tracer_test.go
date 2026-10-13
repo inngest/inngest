@@ -1,11 +1,17 @@
 package tracing
 
 import (
+	"context"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestDeterministicTraceID(t *testing.T) {
@@ -178,4 +184,77 @@ func TestNoTracerProviderLeakAcrossSpans(t *testing.T) {
 	require.LessOrEqual(t, after-baseline, 20,
 		"goroutine count grew by %d after %d spans; TracerProvider is still being rebuilt per span (issue #3892)",
 		after-baseline, spans)
+}
+
+// recordingExporter captures every ExportSpans batch for inspection.
+// Deliberately simple so the test can assert on span attributes.
+type recordingExporter struct {
+	mu   sync.Mutex
+	seen []sdktrace.ReadOnlySpan
+}
+
+func (e *recordingExporter) ExportSpans(_ context.Context, spans []sdktrace.ReadOnlySpan) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.seen = append(e.seen, spans...)
+	return nil
+}
+
+func (e *recordingExporter) Shutdown(_ context.Context) error { return nil }
+
+// TestMetadataFlowsViaContextAcrossRuns verifies the per-span metadata
+// pipeline rewritten for #3892. Before the fix each span had its own
+// executionProcessor that captured md on construction; after the fix a
+// single shared executionProcessor reads md from context on OnStart.
+// This test proves the shared processor still delivers the correct
+// per-run tenant attributes even when two different runs interleave.
+func TestMetadataFlowsViaContextAcrossRuns(t *testing.T) {
+	ctx := t.Context()
+	rec := &recordingExporter{}
+	// Short batch timeout so the batcher flushes within the test window.
+	tp := NewOtelTracerProvider(rec, 5*time.Millisecond)
+
+	mdA := &statev2.Metadata{}
+	mdA.ID.Tenant.AccountID = uuid.New()
+	mdA.ID.Tenant.EnvID = uuid.New()
+	mdA.ID.Tenant.AppID = uuid.New()
+
+	mdB := &statev2.Metadata{}
+	mdB.ID.Tenant.AccountID = uuid.New()
+	mdB.ID.Tenant.EnvID = uuid.New()
+	mdB.ID.Tenant.AppID = uuid.New()
+
+	// Interleave spans from two runs so the shared processor must distinguish
+	// them purely by context, not by any captured per-run state.
+	for i := 0; i < 10; i++ {
+		for _, md := range []*statev2.Metadata{mdA, mdB} {
+			_, err := tp.CreateSpan(ctx, "step", &CreateSpanOptions{Metadata: md})
+			require.NoError(t, err)
+		}
+	}
+
+	// Flush any batched spans before we read.
+	require.NoError(t, tp.Shutdown(ctx))
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	require.Equal(t, 20, len(rec.seen), "expected 20 recorded spans (10 per run)")
+
+	countA, countB := 0, 0
+	accountA := mdA.ID.Tenant.AccountID.String()
+	accountB := mdB.ID.Tenant.AccountID.String()
+	for _, span := range rec.seen {
+		for _, attr := range span.Attributes() {
+			if string(attr.Key) == meta.Attrs.AccountID.Key() {
+				switch attr.Value.AsString() {
+				case accountA:
+					countA++
+				case accountB:
+					countB++
+				}
+			}
+		}
+	}
+	require.Equal(t, 10, countA, "shared processor must enrich mdA spans with mdA attributes")
+	require.Equal(t, 10, countB, "shared processor must enrich mdB spans with mdB attributes")
 }

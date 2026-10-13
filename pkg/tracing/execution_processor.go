@@ -288,7 +288,9 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	}
 
 	s.SetAttributes(rawAttrs.Serialize()...)
-	p.next.OnStart(parent, s)
+	if p.next != nil {
+		p.next.OnStart(parent, s)
+	}
 }
 
 func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
@@ -302,13 +304,21 @@ func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 		}
 	}
 
-	p.next.OnEnd(s)
+	if p.next != nil {
+		p.next.OnEnd(s)
+	}
 }
 
 func (p *executionProcessor) Shutdown(ctx context.Context) error {
+	if p.next == nil {
+		return nil
+	}
 	return p.next.Shutdown(ctx)
 }
 
 func (p *executionProcessor) ForceFlush(ctx context.Context) error {
+	if p.next == nil {
+		return nil
+	}
 	return p.next.ForceFlush(ctx)
 }

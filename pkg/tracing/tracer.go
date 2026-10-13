@@ -123,7 +123,21 @@ func NewOtelTracerProvider(exp sdktrace.SpanExporter, batchTimeout time.Duration
 		exp: exp,
 		bt:  batchTimeout,
 	}
-	base := sdktrace.NewSimpleSpanProcessor(exp)
+	// BatchSpanProcessor instead of SimpleSpanProcessor so a slow exporter
+	// write (e.g. a slow Postgres InsertSpan from dbExporter) does not block
+	// unrelated runs trying to finish a span. SimpleSpanProcessor holds a
+	// single mutex across its synchronous export call; before this fix each
+	// span had its own processor, so writes were accidentally concurrent.
+	// With a shared TracerProvider (the fix for #3892) we must preserve that
+	// concurrency by moving to the batched/async processor. Timeout matches
+	// the original batchTimeout argument so callers see the same latency
+	// bound they configured. (Greptile P1 on PR #5004.)
+	var base sdktrace.SpanProcessor
+	if exp != nil {
+		base = sdktrace.NewBatchSpanProcessor(exp,
+			sdktrace.WithBatchTimeout(batchTimeout),
+		)
+	}
 	tp.otelTP = sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(newExecutionProcessor(nil, base)),
 		sdktrace.WithIDGenerator(IDGenerator),
