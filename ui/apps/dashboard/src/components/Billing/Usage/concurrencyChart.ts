@@ -197,7 +197,7 @@ export function createConcurrencyChartOptions(
         fontWeight: 500,
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         margin: 10,
-        formatter: '{MMM} {d}',
+        formatter: { day: '{MMM} {d}', hour: '{HH}:{mm}' },
       },
     },
     yAxis: {

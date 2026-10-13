@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
-import { Select } from '@inngest/components/Select/Select';
+import { Select, type Option } from '@inngest/components/Select/Select';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import Tabs from '@inngest/components/Tabs/Tabs';
 import { cn } from '@inngest/components/utils/classNames';
@@ -50,8 +50,11 @@ const GetAccountConcurrencyTimeSeriesDocument = graphql(`
 `);
 
 const ref = 'app-billing-usage-concurrency';
-const periodOption = { id: '30d', name: '30 days' };
-const periodDays = 30;
+const periodOptions = [
+  { id: '24h', name: '24 hours', hours: 24 },
+  { id: '7d', name: '7 days', hours: 7 * 24 },
+  { id: '30d', name: '30 days', hours: 30 * 24 },
+];
 
 function burstMultiplier(burstLimit: number, baseLimit?: number) {
   if (baseLimit && burstLimit % baseLimit === 0) {
@@ -94,11 +97,12 @@ export function AccountConcurrency({ baseLimit }: Props) {
       ? burstMultiplier(burstLimit, baseLimit)
       : undefined;
 
+  const [period, setPeriod] = useState(periodOptions[2]);
   const range = useMemo(() => {
     const to = new Date();
-    const from = new Date(to.getTime() - periodDays * 24 * 60 * 60 * 1000);
+    const from = new Date(to.getTime() - period.hours * 60 * 60 * 1000);
     return { from: from.toISOString(), to: to.toISOString() };
-  }, []);
+  }, [period]);
   const [{ data: seriesData, error: seriesError, fetching: seriesFetching }] =
     useQuery({
       query: GetAccountConcurrencyTimeSeriesDocument,
@@ -157,7 +161,7 @@ export function AccountConcurrency({ baseLimit }: Props) {
             title={
               <>
                 Peak concurrency{' '}
-                <span className="text-muted">[{periodOption.id}]</span>
+                <span className="text-muted">[{period.id}]</span>
               </>
             }
             loading={!series}
@@ -186,16 +190,24 @@ export function AccountConcurrency({ baseLimit }: Props) {
             </Tabs.List>
           </Tabs>
           <Select
-            disabled
-            onChange={() => {}}
+            onChange={(value: Option) =>
+              setPeriod(periodOptions.find((o) => o.id === value.id) ?? period)
+            }
             isLabelVisible
             label="Time"
             multiple={false}
-            value={periodOption}
+            value={period}
           >
             <Select.Button isLabelVisible size="small">
-              <div className="text-sm font-medium">{periodOption.name}</div>
+              <div className="text-sm font-medium">{period.name}</div>
             </Select.Button>
+            <Select.Options>
+              {periodOptions.map((option) => (
+                <Select.Option key={option.id} option={option}>
+                  {option.name}
+                </Select.Option>
+              ))}
+            </Select.Options>
           </Select>
         </div>
         <div className="mt-6">
