@@ -247,7 +247,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// A body that fails to parse stops the batch, since the events after it
 	// can't be read.
-	if err := eg.Wait(); err != nil {
+	if err := eg.Wait(); err != nil && firstErr == nil {
 		status, firstErr = http.StatusBadRequest, err
 	}
 

@@ -211,11 +211,20 @@ func TestReceiveEvent_Batch(t *testing.T) {
 	})
 
 	t.Run("undecodable event stops the batch", func(t *testing.T) {
-		w, resp, handled := postBatch(t, `[{"name": ""}, {"name": "a"}, {"name": "b", "data": "nope"}, {"name": "c"}]`, idFromName)
+		w, resp, handled := postBatch(t, `[{"name": "a"}, {"name": "b", "data": "nope"}, {"name": "c"}]`, idFromName)
 
 		require.Equal(t, http.StatusBadRequest, w.Code)
-		require.Equal(t, []string{"", "id-a", ""}, resp.IDs)
+		require.Equal(t, []string{"id-a", ""}, resp.IDs)
 		require.NotEmpty(t, resp.Error)
+		require.Equal(t, []string{"a"}, handled)
+	})
+
+	t.Run("undecodable event after a failure keeps the first failure", func(t *testing.T) {
+		w, resp, handled := postBatch(t, `[{"name": ""}, {"name": "a"}, {"name": "b", "data": "nope"}, {"name": "c"}]`, idFromName)
+
+		require.Equal(t, http.StatusNotAcceptable, w.Code)
+		require.Equal(t, []string{"", "id-a", ""}, resp.IDs)
+		require.Contains(t, resp.Error, "event name is empty")
 		require.Equal(t, []string{"a"}, handled)
 	})
 }
