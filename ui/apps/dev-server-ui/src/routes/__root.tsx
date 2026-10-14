@@ -53,7 +53,37 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
+// @monaco-editor/react's useMonaco() hook (used by SQLEditor's
+// useMonacoWithTheme) doesn't attach a .catch() to the cancelable promise
+// its own mount effect creates, unlike its <Editor> component (which
+// does) -- unmounting a useMonaco()-using component before the shared
+// Monaco script finishes loading always surfaces this exact shape as an
+// unhandled rejection. It's expected and harmless (loader.init()'s
+// underlying promise is a shared singleton -- one consumer canceling its
+// own wrapper doesn't affect any other's), and can't be fixed without
+// patching that library, so it's filtered globally here instead of
+// alarming users/monitoring for a library-internal non-issue.
+function isMonacoLoaderCancelation(reason: unknown): boolean {
+  return (
+    typeof reason === 'object' &&
+    reason !== null &&
+    (reason as Record<string, unknown>).type === 'cancelation' &&
+    (reason as Record<string, unknown>).msg === 'operation is manually canceled'
+  );
+}
+
 function RootComponent() {
+  React.useEffect(() => {
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      if (isMonacoLoaderCancelation(e.reason)) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () =>
+      window.removeEventListener('unhandledrejection', handleRejection);
+  }, []);
+
   return (
     <RootDocument>
       <StoreProvider>
