@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuPanelClassName,
@@ -37,6 +38,7 @@ export default function EnvSelectMenu({
   onSelect,
   className,
 }: EnvSelectMenuProps) {
+  const keyboardNavigation = useMenuInputModality();
   const [{ data: envs = [], error }] = useEnvironments();
   const [selection, setSelection] = useState<Environment | null>(null);
 
@@ -96,6 +98,7 @@ export default function EnvSelectMenu({
             </Listbox.Button>
 
             <Listbox.Options
+              data-keyboard-navigation={keyboardNavigation}
               className={cn(
                 menuPanelClassName,
                 'dropdown-focus absolute left-0.5 top-9 z-50 max-h-96 w-[250px] overflow-y-auto',

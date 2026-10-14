@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   menuItemClassName,
   menuPanelClassName,
@@ -7,6 +8,7 @@ import { Listbox } from '@headlessui/react';
 import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 
 export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">
@@ -14,6 +16,7 @@ export const ProfileMenu = ({ children }: React.PropsWithChildren) => {
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute -right-48 bottom-4 z-50 ml-8 w-[199px]',

@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuLabelClassName,
@@ -135,6 +136,7 @@ export default function EnvironmentSelectMenu({
   activeEnv,
   collapsed,
 }: EnvironmentSelectMenuProps) {
+  const keyboardNavigation = useMenuInputModality();
   const navigate = useNavigate();
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
   const [selected, setSelected] = useState<ListboxValue>(null);
@@ -214,6 +216,7 @@ export default function EnvironmentSelectMenu({
           </OptionalTooltip>
 
           <Listbox.Options
+            data-keyboard-navigation={keyboardNavigation}
             className={cn(
               menuPanelClassName,
               'dropdown-focus absolute top-10 z-50 max-h-[calc(100vh-8rem)] w-[250px] overflow-y-auto',

@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuPanelClassName,
@@ -14,6 +15,7 @@ import {
 } from '@remixicon/react';
 
 export const Help = ({ collapsed }: { collapsed: boolean }) => {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <Listbox.Button className="w-full ring-0">
@@ -25,6 +27,7 @@ export const Help = ({ collapsed }: { collapsed: boolean }) => {
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute -right-48 bottom-0 z-50 ml-8 w-[199px]',

@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuItemClassName,
@@ -28,6 +29,7 @@ type Props = React.PropsWithChildren<{
 }>;
 
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
+  const keyboardNavigation = useMenuInputModality();
   const navigate = useNavigate();
 
   return (
@@ -37,6 +39,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute -right-48 bottom-4 z-50 ml-8 w-[199px]',

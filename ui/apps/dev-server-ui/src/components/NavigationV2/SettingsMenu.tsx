@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   menuItemClassName,
   menuPanelClassName,
@@ -8,6 +9,7 @@ import ModeSwitch from '@inngest/components/ThemeMode/ModeSwitch';
 import { RiSettings3Line } from '@remixicon/react';
 
 export const SettingsMenu = () => {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <div className="relative flex">
@@ -18,6 +20,7 @@ export const SettingsMenu = () => {
           <RiSettings3Line className="h-[18px] w-[18px]" />
         </Listbox.Button>
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute right-0 top-full z-50 mt-2 w-[220px]',

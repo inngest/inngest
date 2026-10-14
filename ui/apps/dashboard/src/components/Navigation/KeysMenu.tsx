@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuPanelClassName,
@@ -18,6 +19,7 @@ export default function KeysMenu({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <Listbox.Button as="div" className="group">
@@ -31,6 +33,7 @@ export default function KeysMenu({
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute left-0 z-50 ml-1 w-[137px]',

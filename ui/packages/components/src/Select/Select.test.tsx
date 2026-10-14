@@ -77,6 +77,64 @@ it('filters case-insensitively and keeps hidden selections until Apply', async (
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
 });
 
+it('clears the keyboard row indicator on pointer movement while search stays focused', async () => {
+  const onFilterChange = vi.fn();
+  render(
+    <EntityFilter
+      type="app"
+      entities={options}
+      selectedEntities={[]}
+      onFilterChange={onFilterChange}
+    />
+  );
+  await open('app All');
+  const input = screen.getByPlaceholderText('Search for app');
+  input.focus();
+  fireEvent.keyDown(input, { key: 'ArrowDown' });
+  const listbox = screen.getByRole('listbox');
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('true');
+
+  const second = screen.getByRole('option', { name: 'Second option' });
+  fireEvent.pointerEnter(second, { clientX: 10, clientY: 10 });
+  fireEvent.pointerMove(second, { clientX: 20, clientY: 20 });
+  // Mouse events also exercise Headless UI's pointer tracker in jsdom.
+  fireEvent.mouseEnter(second, { clientX: 10, clientY: 10 });
+  fireEvent.mouseMove(second, { clientX: 20, clientY: 20 });
+  expect(second.getAttribute('data-headlessui-state')).toContain('active');
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('false');
+  expect(document.activeElement).toBe(input);
+  expect(onFilterChange).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(input, { key: 'ArrowUp' });
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('true');
+  expect(
+    screen.getByRole('option', { name: 'First option' }).getAttribute('data-headlessui-state')
+  ).toContain('active');
+  expect(onFilterChange).not.toHaveBeenCalled();
+});
+
+it('distinguishes hover from keyboard navigation in a non-searchable listbox', async () => {
+  render(
+    <Select label="Field" value={options[0]} onChange={vi.fn()}>
+      <Select.Button>Choose field</Select.Button>
+      <Select.Options>
+        {options.map((option) => (
+          <Select.Option key={option.id} option={option}>
+            {option.name}
+          </Select.Option>
+        ))}
+      </Select.Options>
+    </Select>
+  );
+  await open('Field Choose field');
+  const listbox = screen.getByRole('listbox');
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('true');
+  fireEvent.pointerMove(screen.getByRole('option', { name: 'Second option' }));
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('false');
+  fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+  expect(listbox.getAttribute('data-keyboard-navigation')).toBe('true');
+});
+
 it('stages Reset and commits the empty selection only on Apply', async () => {
   const onFilterChange = vi.fn();
   render(

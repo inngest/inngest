@@ -1,3 +1,4 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
 import {
   headlessMenuItemClassName,
   menuPanelClassName,
@@ -29,6 +30,7 @@ export const Help = ({
   collapsed: boolean;
   showWidget: () => void;
 }) => {
+  const keyboardNavigation = useMenuInputModality();
   const { nextStep, lastCompletedStep } = useOnboardingStep();
   const status = useSystemStatus();
 
@@ -43,6 +45,7 @@ export const Help = ({
       </Listbox.Button>
       <div className="relative">
         <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
           className={cn(
             menuPanelClassName,
             'dropdown-focus absolute -right-48 bottom-0 z-50 ml-8 w-[199px]',

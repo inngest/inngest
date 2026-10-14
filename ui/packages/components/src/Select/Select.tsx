@@ -10,6 +10,7 @@ import {
   menuPanelClassName,
   menuSearchClassName,
 } from '../DropdownMenu/menuStyles';
+import { useMenuInputModality } from '../DropdownMenu/useMenuInputModality';
 import { cn } from '../utils/classNames';
 
 type SelectProps = {
@@ -114,8 +115,12 @@ function Options({
   as: Component,
   className,
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
+  const keyboardNavigation = useMenuInputModality();
   return (
-    <Component className={cn('dropdown-focus absolute z-10 mt-2 min-w-max', className)}>
+    <Component
+      data-keyboard-navigation={keyboardNavigation}
+      className={cn('dropdown-focus absolute z-10 mt-2 min-w-max', className)}
+    >
       <div className={cn(menuPanelClassName, 'z-10')}>{children}</div>
     </Component>
   );
