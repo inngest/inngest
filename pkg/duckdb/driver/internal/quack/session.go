@@ -151,8 +151,15 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 	}
 	start := time.Now()
 
-	hdr, r, err := s.send(ctx, encodePrepareRequest(s.connectionID, sqlText, queryID))
+	// budget is the caller's result.WithMaxBytes limit, spent across the
+	// prepare response and every fetch response; 0 means unlimited.
+	budget := newResultBudget(ctx)
+
+	hdr, r, err := s.sendLimited(ctx, encodePrepareRequest(s.connectionID, sqlText, queryID), budget)
 	if err != nil {
+		if budget.exceeded(err) {
+			return nil, nil, nil, err
+		}
 		return nil, nil, nil, phaseErr("prepare", err)
 	}
 
@@ -192,8 +199,11 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 	fetchCols := result.NewColumns(cols)
 	for needsMoreFetch {
 		fetchPhase := fmt.Sprintf("fetch (result_uuid=%s batch_index=%d)", resultUUID, nextBatchIndex)
-		hdr, r, err := s.send(ctx, encodeFetchRequest(s.connectionID, resultUUID, nextBatchIndex))
+		hdr, r, err := s.sendLimited(ctx, encodeFetchRequest(s.connectionID, resultUUID, nextBatchIndex), budget)
 		if err != nil {
+			if budget.exceeded(err) {
+				return nil, nil, nil, err
+			}
 			return nil, nil, nil, phaseErr(fetchPhase, err)
 		}
 		if hdr.Type == msgErrorResponse {
@@ -280,6 +290,34 @@ func decodeStatementError(r *reader) error {
 // r positioned at the start of the response body object (see
 // decodeMessageHeader).
 func (s *Session) send(ctx context.Context, payload []byte) (messageHeader, *reader, error) {
+	return s.sendLimited(ctx, payload, nil)
+}
+
+// resultBudget tracks how many response-body bytes one Query may still read
+// under its caller's result.WithMaxBytes limit. A nil *resultBudget is
+// unlimited.
+type resultBudget struct {
+	max, remaining int64
+	err            error
+}
+
+func newResultBudget(ctx context.Context) *resultBudget {
+	max := result.MaxBytes(ctx)
+	if max <= 0 {
+		return nil
+	}
+	return &resultBudget{max: max, remaining: max}
+}
+
+// exceeded reports whether err is this budget running out.
+func (b *resultBudget) exceeded(err error) bool {
+	return b != nil && b.err != nil && err == b.err
+}
+
+// sendLimited is send, reading at most budget's remaining bytes of the
+// response body: past that, it stops reading (never buffering the rest) and
+// fails with result.TooLargeError.
+func (s *Session) sendLimited(ctx context.Context, payload []byte, budget *resultBudget) (messageHeader, *reader, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: building request: %w", err)
@@ -292,9 +330,21 @@ func (s *Session) send(ctx context.Context, payload []byte) (messageHeader, *rea
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	var body []byte
+	if budget == nil {
+		body, err = io.ReadAll(resp.Body)
+	} else {
+		body, err = io.ReadAll(io.LimitReader(resp.Body, budget.remaining+1))
+	}
 	if err != nil {
 		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: reading response body: %w", err)
+	}
+	if budget != nil {
+		if int64(len(body)) > budget.remaining {
+			budget.err = result.TooLargeError(budget.max)
+			return messageHeader{}, nil, budget.err
+		}
+		budget.remaining -= int64(len(body))
 	}
 	if resp.StatusCode != http.StatusOK {
 		return messageHeader{}, nil, fmt.Errorf("duckdb: quack: HTTP %d from %s: %s", resp.StatusCode, s.endpoint, body)

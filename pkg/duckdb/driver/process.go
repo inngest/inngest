@@ -81,6 +81,10 @@ type process struct {
 	// auth token instead of generating a random one per spawn — see
 	// Options.QuackServeToken.
 	quackServeToken string
+	// restrictExternalAccess, when true, turns off DuckDB's external access
+	// at the end of every spawn's bootstrap — see
+	// Options.RestrictExternalAccess and bootstrapSandboxLocked.
+	restrictExternalAccess bool
 
 	procCtx    context.Context
 	procCancel context.CancelFunc
@@ -312,6 +316,11 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	}
 
 	if err := p.startQuackLocked(ctx); err != nil {
+		return err
+	}
+
+	// Last: it forbids the INSTALL/LOAD/ATTACH the phases above rely on.
+	if err := p.bootstrapSandboxLocked(ctx); err != nil {
 		return err
 	}
 
@@ -1263,6 +1272,18 @@ type Options struct {
 	// already has this without any extra loading, so there is nothing to
 	// set here outside of this same self-built-binary scenario.
 	LocalExtensionPaths map[string]string
+
+	// RestrictExternalAccess, when true, turns off DuckDB's external access
+	// (enable_external_access=false) once every spawn's bootstrap is done,
+	// leaving only DuckLake's DataPath reachable (see sandboxStmts). Set it
+	// whenever the *sql.DB also runs user-supplied SQL (Insights), as
+	// defense in depth: a query that slips past the caller's own validation
+	// still can't read files (read_text, read_csv, glob), environment
+	// variables (getenv), or attach/copy anything. The setting is global to
+	// the subprocess, so it constrains every connection, not just the
+	// caller's; statements that need external access after bootstrap (a
+	// later INSTALL/LOAD/ATTACH) will fail.
+	RestrictExternalAccess bool
 }
 
 // Connector implements database/sql/driver.Connector over one supervised
@@ -1290,6 +1311,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			withAllowUnsignedExtensions(c.opts.AllowUnsignedExtensions),
 			withLocalExtensionPaths(c.opts.LocalExtensionPaths),
 			withQuackServeToken(c.opts.QuackServeToken),
+			withRestrictExternalAccess(c.opts.RestrictExternalAccess),
 		)
 		if err != nil {
 			return nil, err
