@@ -2465,7 +2465,10 @@ export type SandboxMetricsFilter = {
 export enum SandboxStatus {
   Failed = 'FAILED',
   LaunchUnknown = 'LAUNCH_UNKNOWN',
+  Paused = 'PAUSED',
+  Pausing = 'PAUSING',
   Pending = 'PENDING',
+  Resuming = 'RESUMING',
   Running = 'RUNNING',
   Stopped = 'STOPPED',
   Stopping = 'STOPPING'
