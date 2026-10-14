@@ -7,20 +7,13 @@ import Tabs from '@inngest/components/Tabs/Tabs';
 import { cn } from '@inngest/components/utils/classNames';
 import { useQuery } from 'urql';
 
-import { createConcurrencyChartOptions } from '@/components/Billing/Usage/concurrencyChart';
+import {
+  HOUR_MS,
+  createConcurrencyChartOptions,
+} from '@/components/Billing/Usage/concurrencyChart';
 import { graphql } from '@/gql';
 import { Route as BillingRoute } from '@/routes/_authed/billing/route';
 import { pathCreator } from '@/utils/urls';
-
-const GetBurstConcurrencyLimitDocument = graphql(`
-  query GetBurstConcurrencyLimit {
-    account {
-      burstConcurrency {
-        limit
-      }
-    }
-  }
-`);
 
 const GetAccountConcurrencyTimeSeriesDocument = graphql(`
   query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {
@@ -37,12 +30,6 @@ const GetAccountConcurrencyTimeSeriesDocument = graphql(`
           bucket
           value
         }
-        bursts {
-          startedAt
-          endedAt
-          peak
-          limitHits
-        }
       }
     }
   }
@@ -55,8 +42,8 @@ const periodOptions = [
   { id: '30d', name: '30 days', hours: 30 * 24 },
 ];
 
-function burstMultiplier(burstLimit: number, baseLimit?: number) {
-  if (baseLimit && burstLimit % baseLimit === 0) {
+function burstMultiplier(burstLimit: number, baseLimit: number) {
+  if (burstLimit % baseLimit === 0) {
     return `${baseLimit}*${burstLimit / baseLimit}`;
   }
   return undefined;
@@ -79,39 +66,30 @@ function Tile({ title, loading, children }: TileProps) {
   );
 }
 
-type Props = {
-  baseLimit?: number;
-};
-
-export function AccountConcurrency({ baseLimit }: Props) {
+export function AccountConcurrency() {
   const { profile } = BillingRoute.useLoaderData();
-  const [{ data: burstData, error: burstError }] = useQuery({
-    query: GetBurstConcurrencyLimitDocument,
-  });
-  const burstLimit = burstData?.account.burstConcurrency?.limit;
-
   const [period, setPeriod] = useState(periodOptions[2]);
   const range = useMemo(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - period.hours * 60 * 60 * 1000);
-    return { from: from.toISOString(), to: to.toISOString() };
+    const to = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+    return {
+      from: new Date(to - period.hours * HOUR_MS).toISOString(),
+      to: new Date(to).toISOString(),
+    };
   }, [period]);
-  const [{ data: seriesData, error: seriesError, fetching: seriesFetching }] =
-    useQuery({
-      query: GetAccountConcurrencyTimeSeriesDocument,
-      variables: range,
-      pause: burstLimit === undefined,
-    });
-  const series = seriesData?.account.concurrencyTimeSeries;
-  const chartOption = useMemo(
-    () => (series ? createConcurrencyChartOptions(series, range) : undefined),
-    [series, range],
-  );
+  const [{ data, error, fetching, operation }] = useQuery({
+    query: GetAccountConcurrencyTimeSeriesDocument,
+    variables: range,
+  });
+  const series = data?.account.concurrencyTimeSeries;
 
-  if (burstError || seriesError || burstLimit === undefined) {
+  if (error || !series || !operation || series.burstLimit == null) {
     return null;
   }
+  const { baseLimit, burstLimit } = series;
   const multiplier = burstMultiplier(burstLimit, baseLimit);
+  const fetchedRange = operation.variables;
+  const stale =
+    fetchedRange.from !== range.from || fetchedRange.to !== range.to;
 
   return (
     <div className="mt-10">
@@ -139,9 +117,7 @@ export function AccountConcurrency({ baseLimit }: Props) {
         </div>
       </div>
       <div className="mb-4 flex flex-wrap gap-4">
-        <Tile title="Account concurrency" loading={baseLimit === undefined}>
-          {baseLimit} steps
-        </Tile>
+        <Tile title="Account concurrency">{baseLimit} steps</Tile>
         <Tile title="Concurrency during burst">
           {burstLimit} steps
           {multiplier && (
@@ -154,16 +130,16 @@ export function AccountConcurrency({ baseLimit }: Props) {
               Peak concurrency <span className="text-muted">[{period.id}]</span>
             </>
           }
-          loading={!series}
+          loading={stale}
         >
           <span
             className={cn(
-              series?.limitHits.some((point) => (point.value ?? 0) > 0)
+              series.limitHits.some((point) => (point.value ?? 0) > 0)
                 ? 'text-error'
                 : 'text-basis',
             )}
           >
-            {series?.peak} steps
+            {series.peak} steps
           </span>
         </Tile>
       </div>
@@ -201,11 +177,9 @@ export function AccountConcurrency({ baseLimit }: Props) {
         </div>
         <div className="mt-6">
           <Chart
-            option={chartOption ?? {}}
-            settings={{ notMerge: true }}
-            theme="light"
+            option={createConcurrencyChartOptions(series, fetchedRange)}
             className="h-[384px] w-full"
-            loading={seriesFetching}
+            loading={fetching}
           />
         </div>
       </div>

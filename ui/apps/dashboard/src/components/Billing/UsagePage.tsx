@@ -26,9 +26,6 @@ const GetBillingInfoDocument = graphql(`
         runCount {
           limit
         }
-        concurrency {
-          limit
-        }
       }
       plan {
         slug
@@ -150,9 +147,7 @@ export const UsagePage = ({
           />
         </div>
       </div>
-      <AccountConcurrency
-        baseLimit={data?.account.entitlements.concurrency.limit}
-      />
+      <AccountConcurrency />
       <BurstConcurrency />
     </>
   );

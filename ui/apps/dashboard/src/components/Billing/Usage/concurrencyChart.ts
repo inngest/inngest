@@ -20,14 +20,8 @@ export type TimeRange = { from: string; to: string };
 type MarkAreaBound = { xAxis: number };
 type MarkAreaRange = [MarkAreaBound, MarkAreaBound];
 
-type TooltipParam = {
-  seriesName?: string;
-  marker?: string;
-  value?: unknown;
-};
-
-const HOUR_MS = 60 * 60 * 1000;
-const BAND_OPACITY = 0.15;
+export const HOUR_MS = 60 * 60 * 1000;
+const BAND_OPACITY = 0.3;
 
 const seriesNames = {
   concurrentSteps: 'Total concurrent steps',
@@ -36,16 +30,14 @@ const seriesNames = {
   limitHits: 'Concurrency hit',
 };
 
-export function mergeLimitHitRanges(
-  limitHits: ConcurrencyTimeSeries['limitHits'],
+export function mergeHourRanges(
+  points: ConcurrencyTimeSeries['buckets'],
+  predicate: (value: number) => boolean,
 ): MarkAreaRange[] {
-  const starts = limitHits
-    .filter((point) => (point.value ?? 0) > 0)
-    .map((point) => new Date(point.bucket).getTime())
-    .sort((a, b) => a - b);
-
   const ranges: MarkAreaRange[] = [];
-  for (const start of starts) {
+  for (const point of points) {
+    if (!predicate(point.value ?? 0)) continue;
+    const start = new Date(point.bucket).getTime();
     const current = ranges[ranges.length - 1];
     if (current && current[1].xAxis === start) {
       current[1] = { xAxis: start + HOUR_MS };
@@ -87,24 +79,6 @@ function markArea(data: MarkAreaRange[], color: string) {
   };
 }
 
-function formatTooltip(params: TooltipParam | TooltipParam[]) {
-  const rows = (Array.isArray(params) ? params : [params]).filter(
-    (param) =>
-      param.seriesName === seriesNames.concurrentSteps &&
-      Array.isArray(param.value),
-  );
-  const first = rows[0];
-  if (!first) return '';
-
-  const [bucket] = first.value as [number, number];
-  const time = formatInTimeZone(new Date(bucket), 'UTC', 'MMM d, HH:mm');
-  const lines = rows.map((param) => {
-    const [, value] = param.value as [number, number];
-    return `${param.marker ?? ''}${param.seriesName} <b>${value}</b>`;
-  });
-  return [`${time} UTC`, ...lines].join('<br/>');
-}
-
 export function createConcurrencyChartOptions(
   series: ConcurrencyTimeSeries,
   range: TimeRange,
@@ -113,23 +87,22 @@ export function createConcurrencyChartOptions(
 
   const points = series.buckets.map(
     (point) =>
-      [new Date(point.bucket).getTime(), point.value ?? 0] as [number, number],
+      [new Date(point.bucket).getTime() + HOUR_MS / 2, point.value ?? 0] as [
+        number,
+        number,
+      ],
   );
 
   const minBandMs =
     (new Date(range.to).getTime() - new Date(range.from).getTime()) / 300;
-  const burstRanges = series.bursts.map((burst) =>
-    widenRange(
-      [
-        { xAxis: new Date(burst.startedAt).getTime() },
-        { xAxis: new Date(burst.endedAt).getTime() },
-      ],
-      minBandMs,
-    ),
-  );
-  const limitHitRanges = mergeLimitHitRanges(series.limitHits).map((r) =>
-    widenRange(r, minBandMs),
-  );
+  const burstRanges = mergeHourRanges(
+    series.buckets,
+    (value) => value > series.baseLimit,
+  ).map((r) => widenRange(r, minBandMs));
+  const limitHitRanges = mergeHourRanges(
+    series.limitHits,
+    (value) => value > 0,
+  ).map((r) => widenRange(r, minBandMs));
 
   const limitColor = resolveColor(colors.tertiary['moderate'], dark, '#F54A3F');
   const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
@@ -149,8 +122,6 @@ export function createConcurrencyChartOptions(
       backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
       borderColor: resolveColor(borderColor.subtle, dark),
       textStyle: { color: resolveColor(textColor.basis, dark) },
-      formatter: (params) =>
-        formatTooltip(params as TooltipParam | TooltipParam[]),
     },
     legend: {
       type: 'scroll',
@@ -166,15 +137,8 @@ export function createConcurrencyChartOptions(
       data: [
         seriesNames.concurrentSteps,
         { name: seriesNames.limit, icon: 'path://M0,4 L10,4 L10,6 L0,6 Z' },
-        ...(series.burstLimit != null
-          ? [
-              {
-                name: seriesNames.bursts,
-                itemStyle: { opacity: BAND_OPACITY },
-              },
-            ]
-          : []),
-        { name: seriesNames.limitHits, itemStyle: { opacity: BAND_OPACITY } },
+        seriesNames.bursts,
+        seriesNames.limitHits,
       ],
     },
     xAxis: {
@@ -197,7 +161,13 @@ export function createConcurrencyChartOptions(
         fontWeight: 500,
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
         margin: 10,
-        formatter: { day: '{MMM} {d}', hour: '{HH}:{mm}' },
+        formatter: { month: '{MMM} {d}', day: '{MMM} {d}', hour: '{HH}:{mm}' },
+      },
+      axisPointer: {
+        label: {
+          formatter: ({ value }: { value: string | number | Date }) =>
+            `${formatInTimeZone(new Date(value), 'UTC', 'MMM d, HH:00')} UTC`,
+        },
       },
     },
     yAxis: {
@@ -246,20 +216,21 @@ export function createConcurrencyChartOptions(
         markArea: markArea(limitHitRanges, limitHitAreaColor),
       },
       {
+        name: seriesNames.concurrentSteps,
+        data: points,
+        type: 'line',
+        step: 'middle' as const,
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: stepsColor },
+        itemStyle: { color: stepsColor },
+        areaStyle: { color: stepsColor, opacity: 0.8 },
+      },
+      {
         name: seriesNames.limit,
         data: [],
         type: 'line',
         itemStyle: { color: limitColor },
         lineStyle: { color: limitColor },
-      },
-      {
-        name: seriesNames.concurrentSteps,
-        data: points,
-        type: 'line',
-        showSymbol: false,
-        lineStyle: { width: 1.5, color: stepsColor },
-        itemStyle: { color: stepsColor },
-        areaStyle: { color: stepsColor, opacity: 0.8 },
         markLine: {
           animation: false,
           silent: true,
