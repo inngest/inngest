@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Select, type Option } from '@inngest/components/Select/Select';
@@ -89,13 +88,7 @@ export function AccountConcurrency({ baseLimit }: Props) {
   const [{ data: burstData, error: burstError }] = useQuery({
     query: GetBurstConcurrencyLimitDocument,
   });
-  const burstLimit = burstError
-    ? undefined
-    : burstData?.account.burstConcurrency?.limit;
-  const multiplier =
-    burstLimit !== undefined
-      ? burstMultiplier(burstLimit, baseLimit)
-      : undefined;
+  const burstLimit = burstData?.account.burstConcurrency?.limit;
 
   const [period, setPeriod] = useState(periodOptions[2]);
   const range = useMemo(() => {
@@ -109,17 +102,16 @@ export function AccountConcurrency({ baseLimit }: Props) {
       variables: range,
       pause: burstLimit === undefined,
     });
-  const series = seriesError
-    ? undefined
-    : seriesData?.account.concurrencyTimeSeries;
+  const series = seriesData?.account.concurrencyTimeSeries;
   const chartOption = useMemo(
     () => (series ? createConcurrencyChartOptions(series, range) : undefined),
     [series, range],
   );
 
-  if (burstLimit === undefined) {
+  if (burstError || seriesError || burstLimit === undefined) {
     return null;
   }
+  const multiplier = burstMultiplier(burstLimit, baseLimit);
 
   return (
     <div className="mt-10">
@@ -156,27 +148,24 @@ export function AccountConcurrency({ baseLimit }: Props) {
             <span className="text-muted ml-2 text-xs">({multiplier})</span>
           )}
         </Tile>
-        {!seriesError && (
-          <Tile
-            title={
-              <>
-                Peak concurrency{' '}
-                <span className="text-muted">[{period.id}]</span>
-              </>
-            }
-            loading={!series}
+        <Tile
+          title={
+            <>
+              Peak concurrency <span className="text-muted">[{period.id}]</span>
+            </>
+          }
+          loading={!series}
+        >
+          <span
+            className={cn(
+              series?.limitHits.some((point) => (point.value ?? 0) > 0)
+                ? 'text-error'
+                : 'text-basis',
+            )}
           >
-            <span
-              className={cn(
-                series?.limitHits.some((point) => (point.value ?? 0) > 0)
-                  ? 'text-error'
-                  : 'text-basis',
-              )}
-            >
-              {series?.peak} steps
-            </span>
-          </Tile>
-        )}
+            {series?.peak} steps
+          </span>
+        </Tile>
       </div>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-center justify-between">
@@ -211,28 +200,13 @@ export function AccountConcurrency({ baseLimit }: Props) {
           </Select>
         </div>
         <div className="mt-6">
-          {seriesError ? (
-            <div className="flex h-full min-h-[384px] w-full items-center justify-center overflow-hidden">
-              <Alert severity="warning">
-                Failed to load concurrency data. Please{' '}
-                <Alert.Link
-                  severity="warning"
-                  href="https://support.inngest.com"
-                >
-                  contact support
-                </Alert.Link>{' '}
-                if this does not resolve.
-              </Alert>
-            </div>
-          ) : (
-            <Chart
-              option={chartOption ?? {}}
-              settings={{ notMerge: true }}
-              theme="light"
-              className="h-[384px] w-full"
-              loading={seriesFetching}
-            />
-          )}
+          <Chart
+            option={chartOption ?? {}}
+            settings={{ notMerge: true }}
+            theme="light"
+            className="h-[384px] w-full"
+            loading={seriesFetching}
+          />
         </div>
       </div>
     </div>

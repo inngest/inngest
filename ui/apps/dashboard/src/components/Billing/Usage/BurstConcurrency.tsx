@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
 import { defaultLinkStyles } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import ProgressBar from '@inngest/components/ProgressBar/ProgressBar';
@@ -68,23 +67,8 @@ export function BurstConcurrency() {
   const [showBreakdown, setShowBreakdown] = useState(true);
   const [{ data, error }] = useQuery({ query: GetBurstConcurrencyDocument });
 
-  if (error) {
-    return (
-      <div className="mt-10">
-        <h3 className="text-basis mb-3 text-xl">Concurrency burst</h3>
-        <Alert severity="warning">
-          Failed to load burst data. Please{' '}
-          <Alert.Link severity="warning" href="https://support.inngest.com">
-            contact support
-          </Alert.Link>{' '}
-          if this does not resolve.
-        </Alert>
-      </div>
-    );
-  }
-
   const burstConcurrency = data?.account.burstConcurrency;
-  if (!burstConcurrency) {
+  if (error || !burstConcurrency) {
     return null;
   }
 
