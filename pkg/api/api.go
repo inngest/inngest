@@ -198,13 +198,12 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	// Create a new trace that may have a link to a previous one
 	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 
-	// Parse and decode the whole batch before handling any events so that a
-	// malformed body rejects the entire batch, matching Cloud.
+	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
-	eg, egCtx := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return eventstream.ParseStream(
-			egCtx,
+			ctx,
 			r.Body,
 			stream,
 			consts.AbsoluteMaxEventSize,
@@ -212,49 +211,52 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		)
 	})
 
-	var evts []event.Event
+	// Handle every event even if some fail, matching Cloud. ids has one entry
+	// per event in the order they were sent, with "" for each event that
+	// failed, and the response reports the first failure.
+	var (
+		max      int
+		ids      = make([]string, consts.MaxEvents)
+		status   = http.StatusOK
+		firstErr error
+	)
 	eg.Go(func() error {
+		index := 0
 		for s := range stream {
+			index++
+			if max < s.N {
+				max = s.N
+			}
+
 			evt := event.Event{}
 			if err := json.Unmarshal(s.Item, &evt); err != nil {
 				return err
 			}
-			evts = append(evts, evt)
+
+			id, code, err := a.receiveOne(ctx, r, &evt, index)
+			if err != nil {
+				if firstErr == nil {
+					status, firstErr = code, err
+				}
+				continue
+			}
+			ids[s.N] = id
 		}
 		return nil
 	})
 
+	// A body that fails to parse stops the batch, since the events after it
+	// can't be read.
 	if err := eg.Wait(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-			IDs:    []string{},
-			Status: http.StatusBadRequest,
-			Error:  err.Error(),
-		})
-		return
+		status, firstErr = http.StatusBadRequest, err
 	}
 
-	// Handle every event even if some fail. ids has one entry per event in
-	// the order they were sent, with "" for each event that failed, and the
-	// response reports the first failure.
-	var (
-		ids      = make([]string, len(evts))
-		status   = http.StatusOK
-		firstErr error
-	)
-	for i := range evts {
-		id, code, err := a.receiveOne(ctx, r, &evts[i], i+1)
-		if err != nil {
-			if firstErr == nil {
-				status, firstErr = code, err
-			}
-			continue
-		}
-		ids[i] = id
+	if max+1 > len(ids) {
+		max = len(ids) - 1
 	}
 
 	resp := apiutil.EventAPIResponse{
-		IDs:    ids,
+		IDs:    ids[0 : max+1],
 		Status: status,
 	}
 	if firstErr != nil {
