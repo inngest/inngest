@@ -377,7 +377,8 @@ function ResourceStatCard({
           {percent === undefined ? '—' : formatPercent(percent)}
         </span>
       </div>
-      <div className="relative mt-1">
+      {/* The peak label is absolutely positioned, so reserve room for it below the bar. */}
+      <div className={`relative mt-1 ${peakLabel ? 'pb-5' : ''}`}>
         <div className="bg-canvasMuted h-1 overflow-hidden rounded-full">
           <div
             className="bg-contrast h-full rounded-full"
