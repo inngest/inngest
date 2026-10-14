@@ -38,7 +38,7 @@ export const RunsActionMenu = ({
         <DropdownMenuContent>
           <DropdownMenuItem className="hover:bg-canvasBase">
             <div className="flex flex-col">
-              <div className="text-basis text-sm">Auto Refresh</div>
+              <div className="text-basis text-[13px] leading-5">Auto Refresh</div>
               <div className="text-basis text-xs">
                 Refreshes data every {intervalSeconds} seconds
               </div>

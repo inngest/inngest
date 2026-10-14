@@ -1,3 +1,9 @@
+import {
+  headlessMenuItemClassName,
+  menuPanelClassName,
+  menuSeparatorClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import {
@@ -36,13 +42,18 @@ export const Help = ({
         />
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute -right-48 bottom-0 z-50 ml-8 w-[199px] gap-y-0.5 rounded border ring-0 focus:outline-none">
+        <Listbox.Options
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute -right-48 bottom-0 z-50 ml-8 w-[199px]',
+          )}
+        >
           <a
             href="https://www.inngest.com/docs?ref=support-center"
             target="_blank"
           >
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="docs"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -53,7 +64,7 @@ export const Help = ({
           </a>
           <a href="https://support.inngest.com" target="_blank">
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="support"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -64,7 +75,7 @@ export const Help = ({
           </a>
           <a href="https://www.inngest.com/discord" target="_blank">
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 my-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="discord"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -73,10 +84,10 @@ export const Help = ({
               </div>
             </Listbox.Option>
           </a>
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
           <a href="https://roadmap.inngest.com/roadmap" target="_blank">
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="roadmap"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -87,7 +98,7 @@ export const Help = ({
           </a>
           <a href="https://status.inngest.com" target="_blank">
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="status"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -101,7 +112,7 @@ export const Help = ({
           </a>
           <a href="https://www.inngest.com/changelog" target="_blank">
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="releaseNotes"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
@@ -110,7 +121,7 @@ export const Help = ({
               </div>
             </Listbox.Option>
           </a>
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
           <Link
             to={pathCreator.onboardingSteps({
               step: nextStep ? nextStep.name : lastCompletedStep?.name,
@@ -119,7 +130,7 @@ export const Help = ({
             onClick={() => showWidget()}
           >
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="onboardingGuide"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
