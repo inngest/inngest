@@ -9,6 +9,12 @@ export function sandboxStatus(status: SandboxStatus): {
       return { colorStatus: 'QUEUED', label: 'Starting' };
     case SandboxStatus.Running:
       return { colorStatus: 'RUNNING', label: 'Running' };
+    case SandboxStatus.Pausing:
+      return { colorStatus: 'RUNNING', label: 'Pausing' };
+    case SandboxStatus.Paused:
+      return { colorStatus: 'PAUSED', label: 'Paused' };
+    case SandboxStatus.Resuming:
+      return { colorStatus: 'QUEUED', label: 'Resuming' };
     case SandboxStatus.Stopping:
       return { colorStatus: 'RUNNING', label: 'Stopping' };
     case SandboxStatus.Stopped:
@@ -17,6 +23,9 @@ export function sandboxStatus(status: SandboxStatus): {
       return { colorStatus: 'FAILED', label: 'Failed' };
     case SandboxStatus.LaunchUnknown:
       return { colorStatus: 'UNKNOWN', label: 'Launch unknown' };
+    default:
+      // Statuses added to the API before the dashboard knows about them.
+      return { colorStatus: 'UNKNOWN', label: 'Unknown' };
   }
 }
 
