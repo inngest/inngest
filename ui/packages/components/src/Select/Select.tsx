@@ -1,9 +1,15 @@
 import { forwardRef } from 'react';
 import { Combobox, Listbox, type ComboboxInputProps } from '@headlessui/react';
-import { RiArrowDownSLine } from '@remixicon/react';
+import { RiArrowDownSLine, RiCheckLine, RiSearchLine } from '@remixicon/react';
 
 import { Button as InngestButton } from '../Button';
 import { Checkbox } from '../Checkbox';
+import {
+  headlessMenuItemClassName,
+  menuFooterClassName,
+  menuPanelClassName,
+  menuSearchClassName,
+} from '../DropdownMenu/menuStyles';
 import { cn } from '../utils/classNames';
 
 type SelectProps = {
@@ -109,10 +115,8 @@ function Options({
   className,
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
-    <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
-      <div className="border-subtle bg-surfaceBase shadow-primary z-10 overflow-hidden rounded border py-1">
-        {children}
-      </div>
+    <Component className={cn('dropdown-focus absolute z-10 mt-2 min-w-max', className)}>
+      <div className={cn(menuPanelClassName, 'z-10')}>{children}</div>
     </Component>
   );
 }
@@ -124,12 +128,20 @@ function Option({
 }: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className="ui-selected:text-secondary-intense ui-selected:font-medium ui-active:bg-canvasSubtle/50 text-basis ui-disabled:text-disabled ui-disabled:cursor-not-allowed flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
+      className={cn(headlessMenuItemClassName, 'justify-between')}
       key={option.id}
       value={option}
       disabled={option.disabled}
     >
-      {children}
+      {({ selected }: { selected: boolean }) => (
+        <>
+          <span className="min-w-0 flex-1">{children}</span>
+          <RiCheckLine
+            className={cn('text-success h-4 w-4 shrink-0', !selected && 'invisible')}
+            aria-hidden="true"
+          />
+        </>
+      )}
     </Component>
   );
 }
@@ -141,7 +153,7 @@ function CheckboxOption({
 }: React.PropsWithChildren<{ option: Option; as: React.ElementType }>) {
   return (
     <Component
-      className=" ui-active:bg-canvasSubtle/50 text-basis flex select-none items-center justify-between px-4 py-1.5 focus:outline-none"
+      className={cn(headlessMenuItemClassName, 'justify-between')}
       key={option.id}
       value={option}
     >
@@ -152,7 +164,7 @@ function CheckboxOption({
               id={option.id}
               checked={selected}
               disabled={option.disabled}
-              className="h-4 w-4"
+              className="bg-canvasBase data-[state=checked]:bg-primary-intense data-[state=checked]:border-primary-intense [&_svg]:text-onContrast h-4 w-4"
             />
             {children}
           </span>
@@ -174,12 +186,7 @@ function Footer({
   disabledApply?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        'border-subtle mt-1 flex items-center border-t px-2 pb-1 pt-2',
-        onReset ? 'justify-between' : 'justify-end'
-      )}
-    >
+    <div className={cn(menuFooterClassName, onReset ? 'justify-between' : 'justify-end')}>
       {onReset && (
         <InngestButton
           label="Reset"
@@ -263,9 +270,13 @@ export function SelectWithSearch({
 
 function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
-    <div className="mx-3 my-2">
+    <div className={cn(menuSearchClassName, 'relative')}>
+      <RiSearchLine
+        className="text-muted pointer-events-none absolute left-4 top-4 h-4 w-4"
+        aria-hidden="true"
+      />
       <Combobox.Input
-        className="border-subtle focus-visible:border-active text-basis bg-surfaceBase placeholder:text-disabled w-full rounded border px-2 py-1 text-sm outline-none focus-visible:outline-none focus-visible:ring-0"
+        className="border-muted focus-visible:border-active text-basis bg-canvasBase placeholder:text-muted h-8 w-full rounded border py-1 pl-8 pr-2 text-[13px] leading-5 outline-none"
         {...props}
       />
     </div>

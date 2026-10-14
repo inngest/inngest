@@ -9,6 +9,15 @@
 @tailwind utilities;
 
 @layer components {
+  /* Headless UI keeps focus on the listbox/input and uses an active descendant;
+     Radix focuses the item itself. Only keyboard focus gets the inset outline. */
+  .dropdown-item:focus-visible,
+  .dropdown-focus:focus-visible [data-headlessui-state~='active'],
+  .dropdown-focus:has(input:focus-visible) [data-headlessui-state~='active'] {
+    outline: 2px solid rgb(var(--color-border-active));
+    outline-offset: -2px;
+  }
+
   /* sign-in flow custom bg */
   .mesh-gradient {
     background-color: rgb(2, 2, 2);
@@ -78,7 +87,6 @@ input[type='number'] {
 .no-scrollbar {
   scrollbar-width: none;
 }
-
 
 /* Toasts */
 [data-sonner-toast] {
