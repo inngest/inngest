@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +39,6 @@ func TestResponseHeaderMetadataExtractor_FullHeaders(t *testing.T) {
 	require.Len(t, md, 1, "Expected exactly one metadata item")
 
 	assert.Equal(t, metadata.Kind("inngest.response_headers"), md[0].Kind())
-	assert.Equal(t, enums.MetadataOpcodeMerge, md[0].Op())
 
 	raw, err := md[0].Serialize()
 	require.NoError(t, err)
@@ -221,14 +219,14 @@ func TestNewResponseHeaderMetadataFromHTTPHeader_RedactsSensitiveHeaders(t *test
 	t.Parallel()
 
 	header := http.Header{
-		"Content-Type":    {"application/json"},
-		"Set-Cookie":      {"session=abc123"},
-		"Authorization":   {"Bearer secret-token"},
-		"X-Api-Key":       {"my-api-key"},
-		"Cookie":          {"session=abc123"},
+		"Content-Type":        {"application/json"},
+		"Set-Cookie":          {"session=abc123"},
+		"Authorization":       {"Bearer secret-token"},
+		"X-Api-Key":           {"my-api-key"},
+		"Cookie":              {"session=abc123"},
 		"Proxy-Authorization": {"Basic creds"},
-		"X-Forwarded-For": {"192.168.1.1"},
-		"Cache-Control":   {"no-cache"},
+		"X-Forwarded-For":     {"192.168.1.1"},
+		"Cache-Control":       {"no-cache"},
 	}
 
 	result := NewResponseHeaderMetadataFromHTTPHeader(header, 200)

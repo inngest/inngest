@@ -803,6 +803,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
+// rollupSpanMetadataFromFragments folds a (span, kind)'s metadata fragments in
+// order. New writes are always set (see tracing.CreateMetadataSpanFromValues),
+// so the latest fragment wins. The other ops are legacy, but stored fragments
+// still carry them so Combine keeps folding them.
 func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
 	ret := &cqrs.SpanMetadata{
 		Values:    metadata.Values{},

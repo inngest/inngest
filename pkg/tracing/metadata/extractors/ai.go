@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 )
@@ -60,10 +59,6 @@ type AIMetadata struct {
 
 func (ms AIMetadata) Kind() metadata.Kind {
 	return KindInngestAI
-}
-
-func (ms AIMetadata) Op() metadata.Opcode {
-	return enums.MetadataOpcodeMerge
 }
 
 func (ms AIMetadata) Serialize() (metadata.Values, error) {

@@ -48,6 +48,8 @@ type RunTraceSpan struct {
 	StepID                *string                     `json:"stepID,omitempty"`
 	StepInfo              StepInfo                    `json:"stepInfo,omitempty"`
 	StepType              string                      `json:"stepType"`
+	GroupKind             *string                     `json:"groupKind,omitempty"`
+	Origin                *string                     `json:"origin,omitempty"`
 	IsRoot                bool                        `json:"isRoot"`
 	ParentSpanID          *string                     `json:"parentSpanID,omitempty"`
 	ParentSpan            *RunTraceSpan               `json:"parentSpan,omitempty"`
@@ -65,6 +67,8 @@ type RunTraceSpan struct {
 	// Internal fields not exposed over GraphQL.
 	SpanTypeName string
 	Omit         bool
+	// SpanPath is the step's span path, used to nest it under span groups.
+	SpanPath []meta.SpanPathElement
 }
 
 func RunTraceEnded(s RunTraceSpanStatus) bool {

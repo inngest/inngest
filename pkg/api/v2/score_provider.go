@@ -31,7 +31,7 @@ type StateScoreProviderOptions struct {
 }
 
 // NewStateScoreProvider returns a ScoreProvider that records scores as
-// inngest.score metadata
+// inngest.score.<name> metadata
 func NewStateScoreProvider(opts StateScoreProviderOptions) ScoreProvider {
 	return &stateScoreProvider{
 		state:              opts.State,
@@ -140,22 +140,19 @@ func (s scoreAuth) WorkspaceID() uuid.UUID {
 }
 
 // ScoreMetadataUpdate builds and validates the metadata update for a named
-// score, applying the same rules as SDK score submission.
+// score, applying the same rules as SDK score submission. Each score gets its
+// own inngest.score.<name> kind so writing it doesn't replace other scores.
 func ScoreMetadataUpdate(name string, value any) (metadata.Update, error) {
-	raw, err := json.Marshal(struct {
-		Value any `json:"value"`
-	}{
-		Value: value,
-	})
+	raw, err := json.Marshal(value)
 	if err != nil {
 		return metadata.Update{}, err
 	}
 
 	update := metadata.Update{
 		RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore,
-			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{name: raw},
+			Kind:   metadata.ScoreKind(name),
+			Op:     enums.MetadataOpcodeSet,
+			Values: metadata.Values{"value": raw},
 		},
 	}
 	if err := update.ValidateAllowed(); err != nil {
@@ -178,7 +175,7 @@ func ScoreExperimentMetadataUpdate(experiment ScoreExperimentInput) (metadata.Up
 	update := metadata.Update{
 		RawUpdate: metadata.RawUpdate{
 			Kind: metadata.KindInngestExperiment,
-			Op:   enums.MetadataOpcodeMerge,
+			Op:   enums.MetadataOpcodeSet,
 			Values: metadata.Values{
 				"name":    name,
 				"variant": variant,

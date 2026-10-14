@@ -789,6 +789,17 @@ func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+// IncrMetadataNonSetOpsTotal records a metadata write that came in w/ an op
+// other than set. Every metadata span is written as a set regardless.
+func IncrMetadataNonSetOpsTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_non_set_ops_total",
+		Description: "Total number of metadata writes received w/ an op other than set",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -1086,6 +1097,17 @@ func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterO
 		PkgName:     opts.PkgName,
 		MetricName:  "defers_rejected_total",
 		Description: "Total number of defers soft-rejected at write time, tagged by reason",
+		Tags:        opts.Tags,
+	})
+}
+
+// IncrMetadataLegacySplitsTotal records a legacy multi key inngest.score or
+// inngest.warnings write that got split into one span per score/warning.
+func IncrMetadataLegacySplitsTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_legacy_splits_total",
+		Description: "Total number of legacy multi key score/warning metadata writes split into per name kinds",
 		Tags:        opts.Tags,
 	})
 }

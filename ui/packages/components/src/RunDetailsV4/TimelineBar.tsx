@@ -16,6 +16,7 @@ import {
   RiBuilding2Line,
   RiCheckboxCircleFill,
   RiCloseCircleFill,
+  RiErrorWarningFill,
   RiFlashlightLine,
   RiFlaskLine,
   RiFunctionLine,
@@ -49,6 +50,7 @@ import type {
 import { formatDuration } from './runDetailsUtils';
 import { formatLabel } from './utils/formatting';
 import { TIMELINE_CONSTANTS } from './utils/timing';
+import { summarizeWarnings, type StepWarning } from './warnings';
 
 // ============================================================================
 // Style Configurations
@@ -166,6 +168,10 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     barHeight: 'thin',
     pattern: 'dotted',
     labelFormat: 'uppercase',
+    statusBased: true,
+  },
+  'span.group': {
+    barColor: 'bg-status-completed',
     statusBased: true,
   },
   default: {
@@ -648,6 +654,42 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
   );
 }
 
+/**
+ * Warning icon shown beside a step name when the step carries warning
+ * metadata. The tooltip lists every message, and a click selects the row like
+ * anywhere else on it, so the details panel shows them too.
+ */
+function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
+  const summary = summarizeWarnings(warnings);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          data-testid="warning-icon"
+          role="img"
+          aria-label={`Warning: ${summary}`}
+          tabIndex={0}
+          className="focus-visible:ring-primary-subtle ml-1 flex shrink-0 cursor-help rounded-sm focus-visible:outline-none focus-visible:ring"
+        >
+          <RiErrorWarningFill aria-hidden="true" className="text-warning h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
+        {warnings.length === 1 ? (
+          summary
+        ) : (
+          <ul className="list-disc space-y-1 pl-4">
+            {warnings.map((warning) => {
+              return <li key={warning.key}>{warning.message}</li>;
+            })}
+          </ul>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
@@ -833,6 +875,10 @@ export function TimelineBar({
   insideExperiment,
   experimentMetadata,
   scores,
+  warnings,
+  sandbox,
+  groupKind,
+  dimmed,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -922,10 +968,27 @@ export function TimelineBar({
             <span
               className={cn(
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-                barStyle.textColor ?? 'text-basis',
+                dimmed ? 'text-light' : barStyle.textColor ?? 'text-basis',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
+              {groupKind && (
+                <span
+                  data-testid="group-kind-tag"
+                  className="bg-info text-info mr-1.5 inline-block shrink-0 rounded px-1.5 align-middle font-sans text-[0.66rem] font-semibold uppercase leading-4 tracking-[0.04em]"
+                >
+                  {groupKind}
+                </span>
+              )}
+              {sandbox?.badge && (
+                <span
+                  data-testid="sandbox-badge"
+                  title={sandbox.label}
+                  className="text-light mr-1.5 align-middle font-mono text-[11px]"
+                >
+                  {sandbox.badge}
+                </span>
+              )}
               {displayName}
               {(style === 'timing.inngest' || style === 'timing.server') && (
                 <Tooltip>
@@ -947,6 +1010,8 @@ export function TimelineBar({
               )}
             </span>
 
+            {warnings && warnings.length > 0 && <WarningIcon warnings={warnings} />}
+
             {/* Actions slot */}
             {actions}
           </div>
@@ -955,7 +1020,7 @@ export function TimelineBar({
           <span
             className={cn(
               'shrink-0 text-xs font-medium tabular-nums',
-              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+              dimmed ? 'text-light' : barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
             )}
           >
             {formatDuration(duration)}
@@ -993,7 +1058,10 @@ export function TimelineBar({
           )}
 
           {/* Bar container, centered vertically */}
-          <div className="absolute inset-y-0 flex w-full items-center">
+          <div
+            data-testid="timeline-bar-track"
+            className={cn('absolute inset-y-0 flex w-full items-center', dimmed && 'opacity-50')}
+          >
             {transformed && (
               <>
                 <VisualBar

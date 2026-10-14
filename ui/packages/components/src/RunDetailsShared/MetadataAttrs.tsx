@@ -7,6 +7,7 @@ const inngestKindLabels: Record<string, string> = {
   ai: 'AI Metadata',
   http: 'HTTP Metadata',
   score: 'Scores',
+  warning: 'Warnings',
   warnings: 'Warnings',
 };
 

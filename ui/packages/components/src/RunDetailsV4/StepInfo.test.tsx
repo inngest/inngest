@@ -64,8 +64,12 @@ vi.mock('../Time', () => ({
 }));
 
 vi.mock('../Rerun/RerunModal', () => ({
-  RerunModal: ({ editableInput }: { editableInput?: boolean }) => (
-    <div data-input-editable={String(editableInput)} data-testid="mock-rerun-modal" />
+  RerunModal: ({ editableInput, stepID }: { editableInput?: boolean; stepID: string }) => (
+    <div
+      data-input-editable={String(editableInput)}
+      data-step-id={stepID}
+      data-testid="mock-rerun-modal"
+    />
   ),
 }));
 
@@ -389,6 +393,22 @@ describe('Rerun from step visibility', () => {
     renderStepInfo(trace);
     expect(screen.queryByText('Rerun from step')).toBeNull();
   });
+
+  it('reruns a span group from its first step', () => {
+    const group = (spanID: string, childrenSpans: Trace[]) =>
+      makeTrace({ spanID, stepID: null, stepOp: null, stepType: 'SPAN_GROUP', childrenSpans });
+    const trace = group('span:outer', [
+      group('span:inner', [makeTrace({ stepID: 'first', queuedAt: '2024-01-01T00:00:01Z' })]),
+      makeTrace({ stepID: 'later', queuedAt: '2024-01-01T00:00:05Z' }),
+    ]);
+
+    renderStepInfo(trace);
+
+    expect(screen.queryByText('Rerun from start of span')).toBeTruthy();
+    const modal = screen.getByTestId('mock-rerun-modal');
+    expect(modal.getAttribute('data-step-id')).toBe('first');
+    expect(modal.getAttribute('data-input-editable')).toBe('false');
+  });
 });
 
 describe('Debug Run ID', () => {
@@ -410,5 +430,86 @@ describe('Debug Run ID', () => {
     const trace = makeTrace({ debugRunID: null });
     renderStepInfo(trace, { debug: true });
     expect(document.querySelector('[data-label="Debug Run ID"]')).toBeNull();
+  });
+});
+
+describe('Step warnings callout', () => {
+  const warningsMetadata = (values: Record<string, string>) =>
+    [
+      { scope: 'step', kind: 'inngest.warnings', updatedAt: '2026-01-01T00:00:02Z', values },
+    ] as Trace['metadata'];
+
+  it('shows each inngest.warnings message', () => {
+    renderStepInfo(
+      makeTrace({ metadata: warningsMetadata({ a: 'build ahead of time', b: 'other' }) })
+    );
+    const callout = screen.getByTestId('step-warnings');
+    expect(callout.textContent).toContain('2 warnings');
+    expect(callout.textContent).toContain('build ahead of time');
+    expect(callout.textContent).toContain('other');
+  });
+
+  it('shows per-code inngest.warning.<code> messages alongside the legacy form', () => {
+    renderStepInfo(
+      makeTrace({
+        metadata: [
+          ...(warningsMetadata({ a: 'legacy a' }) ?? []),
+          {
+            scope: 'step',
+            kind: 'inngest.warning.b',
+            updatedAt: '2026-01-01T00:00:03Z',
+            values: { b: 'per-code b' },
+          },
+        ] as Trace['metadata'],
+      })
+    );
+    const callout = screen.getByTestId('step-warnings');
+    expect(callout.textContent).toContain('2 warnings');
+    expect(callout.textContent).toContain('legacy a');
+    expect(callout.textContent).toContain('per-code b');
+  });
+
+  it('is hidden without warnings metadata', () => {
+    renderStepInfo(makeTrace());
+    expect(screen.queryByTestId('step-warnings')).toBeNull();
+  });
+});
+
+describe('Step warnings and the Metadata tab', () => {
+  const md = (kind: string): NonNullable<Trace['metadata']>[number] => {
+    return {
+      scope: 'step',
+      kind,
+      updatedAt: '2026-01-01T00:00:02Z',
+      values: { a: 'b' },
+    } as NonNullable<Trace['metadata']>[number];
+  };
+
+  it('does not count inngest.warnings as metadata (empty state still shows)', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warnings')] }));
+    expect(screen.getByText('No output available')).toBeTruthy();
+  });
+
+  it('does not count inngest.warning.<code> as metadata', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warning.dynamic_step')] }));
+    expect(screen.getByText('No output available')).toBeTruthy();
+  });
+
+  it('counts other metadata alongside warnings (no empty state)', () => {
+    renderStepInfo(makeTrace({ metadata: [md('inngest.warnings'), md('userland.x')] }));
+    expect(screen.queryByText('No output available')).toBeNull();
+  });
+});
+
+describe('Added by', () => {
+  it('names the library that added the step', () => {
+    renderStepInfo(makeTrace({ origin: '@inngest/ci@0.1.0' }));
+    const wrapper = document.querySelector('[data-label="Added by"]');
+    expect(wrapper!.textContent).toBe('@inngest/ci@0.1.0');
+  });
+
+  it('is hidden for the user’s own steps', () => {
+    renderStepInfo(makeTrace({ origin: null }));
+    expect(document.querySelector('[data-label="Added by"]')).toBeNull();
   });
 });

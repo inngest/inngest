@@ -4051,6 +4051,13 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if errors.Is(err, state.ErrStateOverflowed) {
 			return err
 		}
+		// NoRetry/RetryAt are the SDK's preferences for the step, eg. the Go SDK
+		// sets NoRetry for every OpcodeStepFailed.  They must not hide system
+		// failures (eg. enqueueing the next discovery step) that always retry,
+		// as NeverRetryError would mask the retry marker and strand the run.
+		if queue.IsAlwaysRetryable(err) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
@@ -4271,7 +4278,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 
 			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
 
-			return err
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
@@ -4290,6 +4297,18 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	})
 
 	return nil
+}
+
+// retryableEnqueueError marks a failure to enqueue a run's next discovery item
+// as always retryable.  The step's output is already saved by this point, so
+// the failure is ours (eg. a canceled context while selecting a queue shard)
+// and must not consume the function's retry budget.  If it did, functions w/
+// low retry counts permanently fail the edge job and the run is left Running
+// w/ nothing in the queue.  Retrying is safe as discovery job IDs are
+// deterministic, so a retry after a partially successful enqueue dedupes via
+// ErrQueueItemExists.
+func retryableEnqueueError(err error) error {
+	return queue.AlwaysRetryError(fmt.Errorf("error enqueueing discovery step: %w", err))
 }
 
 // sanitizeLogValue strips CR/LF from a user-supplied string before logging
@@ -4609,6 +4628,11 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		if errors.Is(err, queue.ErrQueueItemExists) {
 			span.Drop()
 			return nil
+		}
+		if err != nil {
+			span.Drop()
+			logger.StdlibLogger(ctx).Error("error scheduling step failure queue item", "error", err)
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
@@ -5731,9 +5755,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		}
 		expr = &interpolated
 
-		// Update the generator to use the interpolated data, ensuring history is updated.
-		opts.If = expr
-		gen.Opts = opts
+		// Update the generator to use the interpolated data, ensuring history
+		// is updated. Only `if` changes, so the SDK's other opts survive.
+		if err := gen.SetOpt("if", interpolated); err != nil {
+			return fmt.Errorf("error updating wait for event opts: %w", err)
+		}
 	}
 
 	opcode := gen.Op.String()
@@ -6433,6 +6459,19 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 
 func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
+		// gen.Metadata is SDK-supplied, so it gets the same reserved-kind and
+		// score value checks as checkpoints and the metadata API. extra is
+		// server-generated and may use kinds SDKs cannot set.
+		if err := md.ValidateAllowed(); err != nil {
+			e.log.Warn("invalid metadata in generator opcode",
+				"error", err,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"step_id", sanitizeLogValue(gen.ID),
+				"metadata_kind", sanitizeLogValue(md.Kind().String()),
+			)
+			continue
+		}
+
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}

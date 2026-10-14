@@ -66,6 +66,8 @@ type ExtractedValues struct {
 	StepMaxAttempts *int
 	StepCodeLocation *string
 	StepType *enums.StepType
+	StepSpanPath *[]SpanPathElement
+	StepOrigin *string
 	StepInput *string
 	StepOutput *string
 	StepOutputRef *string

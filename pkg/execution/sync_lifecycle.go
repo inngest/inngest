@@ -357,11 +357,10 @@ type SyncLifecycleListener interface {
 // Parent is the run/step/request span this metadata annotates -- its own
 // span ID (recoverable via tracing.SpanContextFromMetadata, the same helper
 // the real TracerProvider uses) is the join key onto
-// inngest.run_trace_spans.span_id. Op (metadata.Opcode --
-// merge/set/delete/add) is deliberately not carried here: this dual-write
-// path stores each emission as a standalone row and leaves later readers to
-// collapse to the latest one per (run_id, span_id, kind), rather than
-// replicating the production pipeline's per-key, op-aware fragment folding.
+// inngest.run_trace_spans.span_id. Op isn't carried here since every
+// metadata write is a set (see pkg/tracing.CreateMetadataSpanFromValues), so
+// each emission is the full value for its kind and readers can just collapse
+// to the latest one per (run_id, span_id, kind).
 type MetadataEntry struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID

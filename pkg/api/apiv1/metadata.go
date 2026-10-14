@@ -270,6 +270,14 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		spanOpts = append(spanOpts, tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...))
 	}
 
+	// Persist the cumulative size delta even when a write below fails: spans
+	// created before the failure (IE the first keys of a split legacy update)
+	// still count toward the run's quota. Only persist when we loaded from
+	// state, the fallback Metadata is request-local w/ no backing store.
+	if loadedFromState {
+		defer a.persistMetadataSizeDelta(ctx, stateMetadata, runID)
+	}
+
 	for _, md := range req.Metadata {
 		_, err := tracing.CreateMetadataSpan(
 			ctx,
@@ -293,21 +301,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			TargetSpan: parentSpanRef,
 		}); err != nil {
 			return err
-		}
-	}
-
-	// Persist the cumulative metadata size delta back to the state store.
-	// Only persist when we successfully loaded from state; the fallback
-	// Metadata is request-local and has no backing store to update.
-	if loadedFromState {
-		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
-			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateMetadata.ID, delta); err != nil {
-				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
-					"error", err,
-					"run_id", runID.String(),
-					"delta", delta,
-				)
-			}
 		}
 	}
 
@@ -441,6 +434,11 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		}
 	}
 
+	// See AddRunMetadata, persist the size delta even on a partial failure.
+	if loadedFromState {
+		defer a.persistMetadataSizeDelta(ctx, stateMetadata, runID)
+	}
+
 	for _, md := range req.Metadata {
 		_, err = tracing.CreateMetadataSpan(
 			ctx,
@@ -468,22 +466,24 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		}
 	}
 
-	// Persist the cumulative metadata size delta back to the state store.
-	// Only persist when we successfully loaded from state; the fallback
-	// Metadata is request-local and has no backing store to update.
-	if loadedFromState {
-		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
-			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
-				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
-					"error", err,
-					"run_id", runID.String(),
-					"delta", delta,
-				)
-			}
-		}
-	}
-
 	return nil
+}
+
+// persistMetadataSizeDelta writes the cumulative metadata size delta
+// accumulated on md back to the state store. Errors are logged, not returned:
+// the metadata spans are already written.
+func (a router) persistMetadataSizeDelta(ctx context.Context, md *statev2.Metadata, runID ulid.ULID) {
+	delta := md.Metrics.SwapMetadataSizeDelta()
+	if delta <= 0 {
+		return
+	}
+	if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, md.ID, delta); err != nil {
+		logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
+			"error", err,
+			"run_id", runID.String(),
+			"delta", delta,
+		)
+	}
 }
 
 func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {
