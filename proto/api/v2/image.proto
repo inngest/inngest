@@ -1,0 +1,55 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+// OCI defaults captured separately from a flattened docker export.
+message ImageConfig {
+  repeated string entrypoint = 1;
+  repeated string cmd = 2;
+  map<string,string> env = 3;
+  string user = 4;
+  string working_dir = 5;
+}
+
+message ImageBuild {
+  string id = 1;
+  string image_name = 2;
+  string tag = 3;
+  string architecture = 4;
+  // pending (uploading), uploaded (queued/processing), ready, or failed.
+  string status = 5;
+  string artifact_digest = 6;
+  string builder_sandbox_id = 7;
+  string error = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+}
+
+message CreateImageUploadRequest {
+  // A workspace-local name, without an account or inngest/ prefix.
+  string image_name = 1;
+  string tag = 2;
+  // Only linux/amd64 flattened docker-export tar.gz archives are supported.
+  string architecture = 3;
+  int64 upload_size_bytes = 4;
+  // Lowercase SHA256 of the compressed archive bytes.
+  string upload_sha256 = 5;
+  ImageConfig config = 6;
+}
+message CreateImageUploadResponse {
+  ImageBuild data = 1;
+  string upload_url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message CompleteImageUploadRequest { string build_id = 1; }
+message GetImageBuildRequest { string build_id = 1; }
+message CancelImageBuildRequest { string build_id = 1; }
+message ImageBuildResponse { ImageBuild data = 1; }
+message ListImageBuildsRequest {}
+message ListImageBuildsResponse {
+  // The most recent 100 builds in the selected workspace.
+  repeated ImageBuild data = 1;
+}

@@ -40,6 +40,11 @@ const (
 	V2_CancelRun_FullMethodName                  = "/api.v2.V2/CancelRun"
 	V2_GetApp_FullMethodName                     = "/api.v2.V2/GetApp"
 	V2_GetApps_FullMethodName                    = "/api.v2.V2/GetApps"
+	V2_CreateImageUpload_FullMethodName          = "/api.v2.V2/CreateImageUpload"
+	V2_CompleteImageUpload_FullMethodName        = "/api.v2.V2/CompleteImageUpload"
+	V2_GetImageBuild_FullMethodName              = "/api.v2.V2/GetImageBuild"
+	V2_ListImageBuilds_FullMethodName            = "/api.v2.V2/ListImageBuilds"
+	V2_CancelImageBuild_FullMethodName           = "/api.v2.V2/CancelImageBuild"
 	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
@@ -106,6 +111,11 @@ type V2Client interface {
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
 	GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc.CallOption) (*GetAppsResponse, error)
+	CreateImageUpload(ctx context.Context, in *CreateImageUploadRequest, opts ...grpc.CallOption) (*CreateImageUploadResponse, error)
+	CompleteImageUpload(ctx context.Context, in *CompleteImageUploadRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error)
+	GetImageBuild(ctx context.Context, in *GetImageBuildRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error)
+	ListImageBuilds(ctx context.Context, in *ListImageBuildsRequest, opts ...grpc.CallOption) (*ListImageBuildsResponse, error)
+	CancelImageBuild(ctx context.Context, in *CancelImageBuildRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
@@ -347,6 +357,56 @@ func (c *v2Client) GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetAppsResponse)
 	err := c.cc.Invoke(ctx, V2_GetApps_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateImageUpload(ctx context.Context, in *CreateImageUploadRequest, opts ...grpc.CallOption) (*CreateImageUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateImageUploadResponse)
+	err := c.cc.Invoke(ctx, V2_CreateImageUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CompleteImageUpload(ctx context.Context, in *CompleteImageUploadRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImageBuildResponse)
+	err := c.cc.Invoke(ctx, V2_CompleteImageUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetImageBuild(ctx context.Context, in *GetImageBuildRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImageBuildResponse)
+	err := c.cc.Invoke(ctx, V2_GetImageBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListImageBuilds(ctx context.Context, in *ListImageBuildsRequest, opts ...grpc.CallOption) (*ListImageBuildsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListImageBuildsResponse)
+	err := c.cc.Invoke(ctx, V2_ListImageBuilds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CancelImageBuild(ctx context.Context, in *CancelImageBuildRequest, opts ...grpc.CallOption) (*ImageBuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImageBuildResponse)
+	err := c.cc.Invoke(ctx, V2_CancelImageBuild_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -777,6 +837,11 @@ type V2Server interface {
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
 	GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error)
+	CreateImageUpload(context.Context, *CreateImageUploadRequest) (*CreateImageUploadResponse, error)
+	CompleteImageUpload(context.Context, *CompleteImageUploadRequest) (*ImageBuildResponse, error)
+	GetImageBuild(context.Context, *GetImageBuildRequest) (*ImageBuildResponse, error)
+	ListImageBuilds(context.Context, *ListImageBuildsRequest) (*ListImageBuildsResponse, error)
+	CancelImageBuild(context.Context, *CancelImageBuildRequest) (*ImageBuildResponse, error)
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
@@ -883,6 +948,21 @@ func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppRes
 }
 func (UnimplementedV2Server) GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApps not implemented")
+}
+func (UnimplementedV2Server) CreateImageUpload(context.Context, *CreateImageUploadRequest) (*CreateImageUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateImageUpload not implemented")
+}
+func (UnimplementedV2Server) CompleteImageUpload(context.Context, *CompleteImageUploadRequest) (*ImageBuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteImageUpload not implemented")
+}
+func (UnimplementedV2Server) GetImageBuild(context.Context, *GetImageBuildRequest) (*ImageBuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetImageBuild not implemented")
+}
+func (UnimplementedV2Server) ListImageBuilds(context.Context, *ListImageBuildsRequest) (*ListImageBuildsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListImageBuilds not implemented")
+}
+func (UnimplementedV2Server) CancelImageBuild(context.Context, *CancelImageBuildRequest) (*ImageBuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelImageBuild not implemented")
 }
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
@@ -1372,6 +1452,96 @@ func _V2_GetApps_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetApps(ctx, req.(*GetAppsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateImageUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateImageUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateImageUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateImageUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateImageUpload(ctx, req.(*CreateImageUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CompleteImageUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteImageUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CompleteImageUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CompleteImageUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CompleteImageUpload(ctx, req.(*CompleteImageUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetImageBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetImageBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetImageBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetImageBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetImageBuild(ctx, req.(*GetImageBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListImageBuilds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListImageBuildsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListImageBuilds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListImageBuilds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListImageBuilds(ctx, req.(*ListImageBuildsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CancelImageBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelImageBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CancelImageBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CancelImageBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CancelImageBuild(ctx, req.(*CancelImageBuildRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2107,6 +2277,26 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetApps",
 			Handler:    _V2_GetApps_Handler,
+		},
+		{
+			MethodName: "CreateImageUpload",
+			Handler:    _V2_CreateImageUpload_Handler,
+		},
+		{
+			MethodName: "CompleteImageUpload",
+			Handler:    _V2_CompleteImageUpload_Handler,
+		},
+		{
+			MethodName: "GetImageBuild",
+			Handler:    _V2_GetImageBuild_Handler,
+		},
+		{
+			MethodName: "ListImageBuilds",
+			Handler:    _V2_ListImageBuilds_Handler,
+		},
+		{
+			MethodName: "CancelImageBuild",
+			Handler:    _V2_CancelImageBuild_Handler,
 		},
 		{
 			MethodName: "CreateSandbox",

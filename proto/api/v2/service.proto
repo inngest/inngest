@@ -5,6 +5,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
+import "api/v2/image.proto";
 import "third_party/google/api/annotations.proto";
 import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
@@ -1156,6 +1157,53 @@ service V2 {
           value: {}
         }
       }
+    };
+  }
+
+  rpc CreateImageUpload(CreateImageUploadRequest) returns (CreateImageUploadResponse) {
+    option (google.api.http) = { post: "/image-uploads" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Prepare a workspace image upload"
+      description: "Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then complete the upload to start conversion. Requires image-build access."
+      tags: "Images" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CompleteImageUpload(CompleteImageUploadRequest) returns (ImageBuildResponse) {
+    option (google.api.http) = { post: "/image-uploads/{build_id}/complete" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Complete an image upload and start conversion"
+      tags: "Images" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetImageBuild(GetImageBuildRequest) returns (ImageBuildResponse) {
+    option (google.api.http) = { get: "/image-builds/{build_id}" };
+    option (authz) = { require_authz: true permission: "images:read:get" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get an image build"
+      tags: "Images" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListImageBuilds(ListImageBuildsRequest) returns (ListImageBuildsResponse) {
+    option (google.api.http) = { get: "/image-builds" };
+    option (authz) = { require_authz: true permission: "images:read:list" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List recent workspace image builds"
+      tags: "Images" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CancelImageBuild(CancelImageBuildRequest) returns (ImageBuildResponse) {
+    option (google.api.http) = { post: "/image-builds/{build_id}/cancel" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:cancel" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel an unfinished image build"
+      tags: "Images" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
 
