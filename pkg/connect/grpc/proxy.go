@@ -375,9 +375,20 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Forward message to the gateway if the request wasn't already running
 	var routedInstanceID string
 	if leaseID != nil {
+		// No worker received the request. Release the lease, or the executor's retry
+		// (same request ID) waits for it to expire before it can route the request.
+		releaseUnforwardedLease := func() {
+			if err := i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId); err != nil {
+				span.RecordError(err)
+				l.ReportError(err, "could not delete lease of unforwarded request")
+			}
+		}
+
 		// Determine the most suitable connection
 		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
+			releaseUnforwardedLease()
+
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "failed to route message")
 
@@ -406,6 +417,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			// Check if this is a capacity error, this will happen when two in parallel
 			// checked for worker capacity earlier but now one got to this point first
 			if errors.Is(err, state.ErrWorkerCapacityExceeded) {
+				releaseUnforwardedLease()
+
 				return nil, syscode.Error{
 					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
 					Message: "Assigned workers at capacity", // Assigned worker reached capacity before assigment

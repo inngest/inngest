@@ -732,6 +732,233 @@ func TestProxyGRPCNoHealthyConnection(t *testing.T) {
 	var sysErr syscode.Error
 	require.ErrorAs(t, err, &sysErr)
 	require.Equal(t, syscode.CodeConnectNoHealthyConnection, sysErr.Code)
+
+	leased, err := sm.IsRequestLeased(ctx, envID, reqID)
+	require.NoError(t, err)
+	require.False(t, leased, "a request that was never forwarded must not stay leased")
+}
+
+// TestProxyGRPCAllWorkersAtCapacity tests that a request rejected because all
+// workers are at capacity can be forwarded by the next attempt right away.
+func TestProxyGRPCAllWorkersAtCapacity(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	l := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sm := state.NewRedisConnectionStateManager(rc)
+	mockForwarder := &mockGatewayGRPCManager{}
+
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
+		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
+		StateManager: sm,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
+
+	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+	gwID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	reqID := "reqid-test"
+	instanceID := "test-worker"
+	appName := "test-app"
+	fnName := "test-fn"
+	fnSlug := "test-app-test-fn"
+	appVersion := "v1.1"
+
+	fns, err := json.Marshal([]sdk.SDKFunction{
+		{
+			Name: fnName,
+			Slug: fnSlug,
+			Triggers: []inngest.Trigger{
+				{
+					EventTrigger: &inngest.EventTrigger{
+						Event: "hello/world",
+					},
+				},
+			},
+			Steps: map[string]sdk.SDKStep{
+				"step": {
+					ID:   "step",
+					Name: fnName,
+					Runtime: map[string]any{
+						"url": fmt.Sprintf("ws://connect?fnId=%s&step=step", fnSlug),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	appConfig := &connectpb.AppConfiguration{
+		AppName:    appName,
+		AppVersion: &appVersion,
+		Functions:  fns,
+	}
+
+	caps, err := json.Marshal(sdk.Capabilities{
+		InBandSync: sdk.InBandSyncV1,
+		TrustProbe: sdk.TrustProbeV1,
+		Connect:    sdk.ConnectV1,
+	})
+	require.NoError(t, err)
+
+	reqData := &connectpb.WorkerConnectRequestData{
+		ConnectionId: connID.String(),
+		InstanceId:   instanceID,
+		Apps:         []*connectpb.AppConfiguration{appConfig},
+		SdkLanguage:  "test-sdk",
+		SdkVersion:   "test-version",
+		Capabilities: caps,
+		AuthData: &connectpb.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+	}
+
+	wg, err := state.NewWorkerGroupFromConnRequest(ctx, reqData, &auth.Response{
+		AccountID: accID,
+		EnvID:     envID,
+		Entitlements: auth.Entitlements{
+			ConnectionAllowed: true,
+			AppsPerConnection: 10,
+		},
+	},
+		appConfig,
+	)
+	require.NoError(t, err)
+
+	syncID := uuid.New()
+
+	wg.AppID = &appID
+	wg.SyncID = &syncID
+
+	err = sm.UpsertConnection(ctx, &state.Connection{
+		AccountID:    accID,
+		EnvID:        envID,
+		ConnectionId: connID,
+		WorkerIP:     "10.0.1.2",
+		Data: &connectpb.WorkerConnectRequestData{
+			ConnectionId: connID.String(),
+			InstanceId:   instanceID,
+			Apps:         []*connectpb.AppConfiguration{appConfig},
+		},
+		Groups: map[string]*state.WorkerGroup{
+			wg.Hash: wg,
+		},
+		GatewayId: gwID,
+	}, connectpb.ConnectionStatus_READY, time.Now())
+	require.NoError(t, err)
+
+	err = sm.UpsertGateway(ctx, &state.Gateway{
+		Id:                gwID,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          "gw-host",
+		IPAddress:         net.ParseIP("127.0.0.1"),
+	})
+	require.NoError(t, err)
+
+	// Fill the only worker slot with another request.
+	err = sm.SetWorkerTotalCapacity(ctx, envID, instanceID, 1)
+	require.NoError(t, err)
+	err = sm.AssignRequestToWorker(ctx, envID, instanceID, "reqid-other")
+	require.NoError(t, err)
+
+	proxyOpts := func() ProxyOpts {
+		return ProxyOpts{
+			AccountID: accID,
+			EnvID:     envID,
+			AppID:     appID,
+			Data: &connectpb.GatewayExecutorRequestData{
+				RequestId:      reqID,
+				AccountId:      accID.String(),
+				EnvId:          envID.String(),
+				AppId:          appID.String(),
+				AppName:        appName,
+				FunctionId:     fnID.String(),
+				FunctionSlug:   fnSlug,
+				StepId:         nil,
+				RequestPayload: []byte("request payload"),
+				SystemTraceCtx: nil,
+				UserTraceCtx:   nil,
+				RunId:          runID.String(),
+			},
+			logger: l,
+		}
+	}
+
+	resp, err := connector.Proxy(ctx, context.Background(), proxyOpts())
+	require.Nil(t, resp)
+	var sysErr syscode.Error
+	require.ErrorAs(t, err, &sysErr)
+	require.Equal(t, syscode.CodeConnectAllWorkersAtCapacity, sysErr.Code)
+	require.Empty(t, mockForwarder.getForwardCalls())
+
+	leased, err := sm.IsRequestLeased(ctx, envID, reqID)
+	require.NoError(t, err)
+	require.False(t, leased, "a request that was never forwarded must not stay leased")
+
+	// Free the slot. The executor retries with the same request ID, and the
+	// retry must be forwarded instead of waiting for a stale lease to expire.
+	err = sm.DeleteRequestFromWorker(ctx, envID, instanceID, "reqid-other")
+	require.NoError(t, err)
+
+	withTimeout, cancelRetry := context.WithTimeout(ctx, time.Minute)
+	defer cancelRetry()
+
+	respCh := make(chan *connectpb.SDKResponse, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		resp, err := connector.Proxy(withTimeout, context.Background(), proxyOpts())
+		if err != nil {
+			errCh <- err
+			return
+		}
+		respCh <- resp
+	}()
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		calls := mockForwarder.getForwardCalls()
+		require.Len(t, calls, 1, "expected the retry to be forwarded")
+		require.Equal(t, reqID, calls[0].data.RequestId)
+	}, 3*time.Second, 100*time.Millisecond)
+
+	mockForwarder.sendResponse(reqID, &connectpb.SDKResponse{
+		RequestId:      reqID,
+		AccountId:      accID.String(),
+		EnvId:          envID.String(),
+		AppId:          appID.String(),
+		Status:         connectpb.SDKResponseStatus_DONE,
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		RunId:          runID.String(),
+	})
+
+	select {
+	case r := <-respCh:
+		require.Equal(t, connectpb.SDKResponseStatus_DONE, r.Status)
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.Fail(t, "no response received")
+	}
 }
 
 // TestProxyGRPCForwardError tests error handling when forwarding fails
