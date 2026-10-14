@@ -377,8 +377,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	if leaseID != nil {
 		// No worker received the request. Release the lease, or the executor's retry
 		// (same request ID) waits for it to expire before it can route the request.
+		// Routing can end because ctx was canceled, so do not delete with ctx.
 		releaseUnforwardedLease := func() {
-			if err := i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId); err != nil {
+			cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancelCleanup()
+
+			if err := i.stateManager.DeleteLease(cleanupCtx, opts.EnvID, opts.Data.RequestId); err != nil {
 				span.RecordError(err)
 				l.ReportError(err, "could not delete lease of unforwarded request")
 			}
