@@ -66,22 +66,24 @@ if redis.call("EXISTS", idempotencyKey) ~= 0 and not is_normalize then
   return 1
 end
 
--- Make these a hash to save on memory usage
-if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
-  if is_normalize then
-    redis.call("HSET", queueKey, queueID, queueItem)
-  else
-    -- This already exists;  return an error.
-    return 1
-  end
+-- Preserve duplicate precedence without writing an item before singleton checks.
+if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
+  return 1
 end
 
 -- Check if the item is a singleton and if an existing item already exists
-if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then 
+if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
   if redis.call("EXISTS", singletonKey) ~= 0 then
     return 2
   end
 
+end
+
+-- The script is atomic: once both checks pass, write the item and its ownership.
+-- Normalization intentionally replaces the item and bypasses singleton checks.
+redis.call("HSET", queueKey, queueID, queueItem)
+
+if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
   -- Set the singleton key to the item ID
   redis.call("SET", singletonRunKey, singletonKey)
   redis.call("SET", singletonKey, runID)
