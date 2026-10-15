@@ -347,19 +347,36 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
-	itemsToRefill := make([]string, len(res.Leases))
-	itemCapacityLeases := make([]CapacityLease, len(res.Leases))
-	for i, l := range res.Leases {
+	itemsToRefill := make([]string, 0, len(res.Leases))
+	itemCapacityLeases := make([]CapacityLease, 0, len(res.Leases))
+	for _, l := range res.Leases {
 		// The capacity key includes the attempt, but the queue still uses the original item ID.
 		itemID, ok := itemIDsByLeaseKey[l.IdempotencyKey]
 		if !ok {
-			return nil, fmt.Errorf("unknown item key in backlog capacity lease: %q", l.IdempotencyKey)
+			// Keep usable grants and release any lease we cannot attach to an item.
+			log := logger.StdlibLogger(ctx)
+			log.Error("unknown item key in backlog capacity lease", "lease_id", l.LeaseID, "function_id", *shadowPart.FunctionID)
+			_, err := q.CapacityManager.Release(ctx, &constraintapi.CapacityReleaseRequest{
+				AccountID:      *shadowPart.AccountID,
+				IdempotencyKey: l.LeaseID.String(),
+				LeaseID:        l.LeaseID,
+				LeaseIssuedAt:  now,
+				Source: constraintapi.LeaseSource{
+					Service:           constraintapi.ServiceExecutor,
+					Location:          constraintapi.CallerLocationBacklogRefill,
+					RunProcessingMode: constraintapi.RunProcessingModeBackground,
+				},
+			})
+			if err != nil {
+				log.ReportError(err, "failed to release unmapped backlog capacity lease")
+			}
+			continue
 		}
-		itemsToRefill[i] = itemID
-		itemCapacityLeases[i] = CapacityLease{
+		itemsToRefill = append(itemsToRefill, itemID)
+		itemCapacityLeases = append(itemCapacityLeases, CapacityLease{
 			LeaseID:    l.LeaseID,
 			IssuedAtMS: now.UnixMilli(),
-		}
+		})
 	}
 
 	return &BacklogRefillConstraintCheckResult{

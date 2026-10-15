@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -17,6 +18,8 @@ import (
 )
 
 // Exercise both queue admission paths against the real capacity manager and Lua.
+// Ordinary dispatch is the regression; refill is a positive control that already
+// checks throttling because each refill operation has a fresh request key.
 func TestRetryThrottlePerAttempt(t *testing.T) {
 	for _, kq := range []bool{false, true} {
 		t.Run(fmt.Sprintf("key_queues_%v", kq), func(t *testing.T) {
@@ -131,4 +134,58 @@ func TestRetryThrottleRefillDispatch(t *testing.T) {
 			require.Nil(t, dispatch.CapacityLease, "a new execution attempt must not reuse the refill marker")
 		})
 	}
+}
+
+// A malformed grant must not strand grants for the other items in the batch.
+func TestBacklogRefillUnknownLeaseKey(t *testing.T) {
+	for _, allUnknown := range []bool{false, true} {
+		t.Run(fmt.Sprintf("all_unknown_%v", allUnknown), func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now()
+			accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+			unknownLease := constraintapi.CapacityLease{LeaseID: ulid.Make(), IdempotencyKey: "unknown"}
+			validLease := constraintapi.CapacityLease{LeaseID: ulid.Make(), IdempotencyKey: "item:attempt:1"}
+			cm := &refillResponseCapacityManager{leases: []constraintapi.CapacityLease{unknownLease}}
+			if !allUnknown {
+				cm.leases = append(cm.leases, validLease)
+			}
+			reg, err := NewSingleShardRegistry(&mockShardForIterator{name: "local"})
+			require.NoError(t, err)
+			q, err := New(ctx, "local", reg, WithCapacityManager(cm), WithAcquireCapacityLeaseOnBacklogRefill(true))
+			require.NoError(t, err)
+			res, err := q.BacklogRefillConstraintCheck(ctx,
+				&QueueShadowPartition{PartitionID: fnID.String(), AccountID: &accountID, EnvID: &envID, FunctionID: &fnID},
+				&QueueBacklog{ShadowPartitionID: fnID.String()},
+				PartitionConstraintConfig{Concurrency: PartitionConcurrency{AccountConcurrency: 2}},
+				[]*QueueItem{{ID: "item", Data: Item{Attempt: 1}}}, "refill", now, true)
+			require.NoError(t, err)
+			require.Len(t, cm.releases, 1)
+			require.Equal(t, unknownLease.LeaseID, cm.releases[0].LeaseID)
+			require.Equal(t, accountID, cm.releases[0].AccountID)
+			require.Equal(t, now, cm.releases[0].LeaseIssuedAt)
+			require.Equal(t, constraintapi.CallerLocationBacklogRefill, cm.releases[0].Source.Location)
+			if allUnknown {
+				require.Empty(t, res.ItemsToRefill)
+				require.Empty(t, res.ItemCapacityLeases)
+			} else {
+				require.Equal(t, []string{"item"}, res.ItemsToRefill)
+				require.Equal(t, []CapacityLease{{LeaseID: validLease.LeaseID, IssuedAtMS: now.UnixMilli()}}, res.ItemCapacityLeases)
+			}
+		})
+	}
+}
+
+type refillResponseCapacityManager struct {
+	constraintapi.CapacityManager
+	leases   []constraintapi.CapacityLease
+	releases []*constraintapi.CapacityReleaseRequest
+}
+
+func (m *refillResponseCapacityManager) Acquire(context.Context, *constraintapi.CapacityAcquireRequest) (*constraintapi.CapacityAcquireResponse, errs.InternalError) {
+	return &constraintapi.CapacityAcquireResponse{Leases: m.leases}, nil
+}
+
+func (m *refillResponseCapacityManager) Release(_ context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+	m.releases = append(m.releases, req)
+	return &constraintapi.CapacityReleaseResponse{}, nil
 }
