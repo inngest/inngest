@@ -5,7 +5,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import {
   RiArrowRightLine,
   RiErrorWarningFill,
-  RiRocketLine,
+  RiRocket2Line,
 } from '@remixicon/react';
 
 import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
@@ -53,7 +53,7 @@ export function ConcurrencyAlertCard({ collapsed }: { collapsed: boolean }) {
         text={boosted ? 'View usage' : 'Add concurrency'}
         icon={
           boosted ? (
-            <RiRocketLine
+            <RiRocket2Line
               className={cn('h-[18px] w-[18px]', boostedStyles.icon)}
             />
           ) : (
@@ -89,7 +89,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
       }
     >
       <div className="flex items-center gap-1">
-        <RiRocketLine className={cn('h-4 w-4 shrink-0', boostedStyles.icon)} />
+        <RiRocket2Line className={cn('h-4 w-4 shrink-0', boostedStyles.icon)} />
         <h2 className={cn('text-xs font-bold leading-4', boostedStyles.meta)}>
           Concurrency boosted!
         </h2>
@@ -107,12 +107,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
           value={alert.usedRatio}
         />
         {alert.minutesRemaining != null && (
-          <p
-            className={cn(
-              'mt-[3px] text-xs font-medium leading-4',
-              boostedStyles.meta,
-            )}
-          >
+          <p className={cn('mt-[3px] text-xs leading-4', boostedStyles.meta)}>
             {minutesLeftLabel(alert.minutesRemaining)} remaining this month
           </p>
         )}
@@ -153,7 +148,7 @@ function LimitedCard({ alert }: { alert: ConcurrencyAlert }) {
           value={1}
         />
         {formattedLimit != null && (
-          <p className="mt-[3px] text-xs font-medium leading-4">
+          <p className="mt-[3px] text-xs leading-4">
             {formattedLimit}/{formattedLimit} concurrent steps
           </p>
         )}
