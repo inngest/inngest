@@ -232,10 +232,8 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	keyQueuesEnabled bool,
 ) (*BacklogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
-	itemRunIDs := make(map[string]ulid.ULID)
 	for i, item := range items {
 		itemIDs[i] = item.ID
-		itemRunIDs[item.ID] = item.Data.Identifier.RunID
 	}
 
 	if !keyQueuesEnabled {
@@ -281,6 +279,16 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		}, nil
 	}
 
+	itemRunIDs := make(map[string]ulid.ULID, len(items))
+	leaseIdempotencyKeys := make([]string, len(items))
+	itemIDsByLeaseKey := make(map[string]string, len(items))
+	for i, item := range items {
+		leaseKey := itemConstraintIdempotencyKey(item)
+		leaseIdempotencyKeys[i] = leaseKey
+		itemIDsByLeaseKey[leaseKey] = item.ID
+		itemRunIDs[leaseKey] = item.Data.Identifier.RunID
+	}
+
 	var appID uuid.UUID
 	if len(items) > 0 {
 		appID = items[0].Data.Identifier.AppID
@@ -300,7 +308,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		Constraints:          constraintsToCheck,
 		Configuration:        ConstraintConfigFromConstraints(constraints),
 		Amount:               len(items),
-		LeaseIdempotencyKeys: itemIDs,
+		LeaseIdempotencyKeys: leaseIdempotencyKeys,
 		LeaseRunIDs:          itemRunIDs,
 		MaximumLifetime:      consts.MaxFunctionTimeout + 30*time.Minute,
 		Source: constraintapi.LeaseSource{
@@ -342,8 +350,12 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	itemsToRefill := make([]string, len(res.Leases))
 	itemCapacityLeases := make([]CapacityLease, len(res.Leases))
 	for i, l := range res.Leases {
-		// NOTE: This works because idempotency key == queue item ID
-		itemsToRefill[i] = l.IdempotencyKey
+		// The capacity key includes the attempt, but the queue still uses the original item ID.
+		itemID, ok := itemIDsByLeaseKey[l.IdempotencyKey]
+		if !ok {
+			return nil, fmt.Errorf("unknown item key in backlog capacity lease: %q", l.IdempotencyKey)
+		}
+		itemsToRefill[i] = itemID
 		itemCapacityLeases[i] = CapacityLease{
 			LeaseID:    l.LeaseID,
 			IssuedAtMS: now.UnixMilli(),
@@ -355,6 +367,17 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		ItemCapacityLeases: itemCapacityLeases,
 		LimitingConstraint: constraint,
 	}, nil
+}
+
+// itemConstraintIdempotencyKey keeps repeated acquisitions within one execution
+// attempt idempotent, while a new attempt must consume throttle capacity again.
+// Refill and item leasing must share this key to avoid charging twice at dispatch.
+func itemConstraintIdempotencyKey(item *QueueItem) string {
+	if item.Data.Attempt == 0 {
+		// Preserve markers already issued for first attempts during a rolling upgrade.
+		return item.ID
+	}
+	return fmt.Sprintf("%s:attempt:%d", item.ID, item.Data.Attempt)
 }
 
 // itemLeaseConstraintCheck determines whether the given queue item
@@ -402,7 +425,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	ctx, span := q.Options().ConditionalTracer.NewUserSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	defer span.End()
 
-	idempotencyKey := item.ID
+	idempotencyKey := itemConstraintIdempotencyKey(item)
 
 	var (
 		// a container for constraints that we'll check
@@ -547,12 +570,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}
 
 	res, err := q.CapacityManager.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
-		AccountID: *shadowPart.AccountID,
-		EnvID:     *shadowPart.EnvID,
-		AppID:     item.Data.Identifier.AppID,
-		// TODO: Double check if the item ID works for idempotency:
-		// - Consistent across the same attempt
-		// - Do we need to re-evaluate per retry?
+		AccountID:            *shadowPart.AccountID,
+		EnvID:                *shadowPart.EnvID,
+		AppID:                item.Data.Identifier.AppID,
 		IdempotencyKey:       idempotencyKey,
 		LeaseIdempotencyKeys: []string{idempotencyKey},
 		LeaseRunIDs: map[string]ulid.ULID{
