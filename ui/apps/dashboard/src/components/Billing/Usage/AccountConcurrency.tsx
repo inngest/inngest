@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Select, type Option } from '@inngest/components/Select/Select';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import Tabs from '@inngest/components/Tabs/Tabs';
 import { useQuery } from 'urql';
 
@@ -20,7 +19,6 @@ const GetAccountConcurrencyTimeSeriesDocument = graphql(`
       concurrencyTimeSeries(from: $from, to: $to) {
         baseLimit
         burstLimit
-        peak
         buckets {
           bucket
           value
@@ -50,17 +48,14 @@ function burstMultiplier(burstLimit: number, baseLimit: number) {
 
 type TileProps = {
   title: React.ReactNode;
-  loading?: boolean;
   children: React.ReactNode;
 };
 
-function Tile({ title, loading, children }: TileProps) {
+function Tile({ title, children }: TileProps) {
   return (
     <div className="bg-canvasBase border-subtle w-[245px] rounded-md border px-4 py-4">
       <p className="text-subtle text-sm">{title}</p>
-      <p className="text-basis mt-1 text-2xl">
-        {loading ? <Skeleton className="h-8 w-24" /> : children}
-      </p>
+      <p className="text-basis mt-1 text-2xl">{children}</p>
     </div>
   );
 }

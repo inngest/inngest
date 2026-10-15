@@ -55,7 +55,6 @@ describe('createConcurrencyChartOptions', () => {
     const series: ConcurrencyTimeSeries = {
       baseLimit: 5,
       burstLimit: 10,
-      peak: 0,
       buckets,
       limitHits: [],
     };
