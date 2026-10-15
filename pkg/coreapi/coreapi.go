@@ -108,9 +108,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		}
 		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: a.resolver}))
 
-		// TODO - Add option for enabling GraphQL Playground
-		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
-		a.Handle("/gql", srv)
+		a.With(o.AuthMiddleware).Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
+		a.With(o.AuthMiddleware).Handle("/gql", srv)
 	}
 
 	// V0 APIs
