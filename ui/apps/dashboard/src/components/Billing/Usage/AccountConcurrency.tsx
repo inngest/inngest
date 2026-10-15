@@ -124,24 +124,6 @@ export function AccountConcurrency() {
             <span className="text-muted ml-2 text-xs">({multiplier})</span>
           )}
         </Tile>
-        <Tile
-          title={
-            <>
-              Peak concurrency <span className="text-muted">[{period.id}]</span>
-            </>
-          }
-          loading={stale}
-        >
-          <span
-            className={cn(
-              series.limitHits.some((point) => (point.value ?? 0) > 0)
-                ? 'text-error'
-                : 'text-basis',
-            )}
-          >
-            {series.peak} steps
-          </span>
-        </Tile>
       </div>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-center justify-between">
