@@ -111,9 +111,11 @@ export const pathCreator = {
   billingUsage({
     dimension,
     previous,
+    ref,
   }: {
     dimension?: string;
     previous?: boolean;
+    ref?: string;
   } = {}) {
     let path = '/billing/usage';
     const query = new URLSearchParams();
@@ -122,6 +124,9 @@ export const pathCreator = {
     }
     if (previous) {
       query.set('previous', previous.toString());
+    }
+    if (ref) {
+      query.set('ref', ref);
     }
     if (query.toString()) {
       path += `?${query.toString()}`;
