@@ -25,8 +25,11 @@ const (
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
 
 	// ScheduleConstraintCheckIdempotencyTTL must outlast delivery retry backoff
-	// (up to 10 minutes in Cloud) so failed run creation can retry without
-	// consuming the function's rate limit again.
+	// so failed run creation can retry without consuming rate limits or throttles
+	// again. Cloud's 600s maximum_backoff is configured in the infra repository at
+	// prod/live/inngest/gcp/pubsub/inbound-events/terragrunt.hcl. Keep this window
+	// above that backoff when changing either setting; delivery can still be delayed
+	// beyond its configured backoff, so this is bounded protection, not a guarantee.
 	ScheduleConstraintCheckIdempotencyTTL = 30 * time.Minute
 )
 
@@ -106,9 +109,20 @@ func WithOperationIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	}
 }
 
+// WithConstraintCheckIdempotencyTTL overrides retry-marker retention for all
+// callers, including scheduling requests with rate-limit or throttle constraints.
+// Apply WithScheduleConstraintCheckIdempotencyTTL afterward to override only those requests.
 func WithConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.constraintCheckIdempotencyTTL = ttl
+		m.scheduleConstraintCheckIdempotencyTTL = ttl
+	}
+}
+
+// WithScheduleConstraintCheckIdempotencyTTL overrides retry-marker retention for
+// scheduling requests that include a rate-limit or throttle constraint.
+func WithScheduleConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
 		m.scheduleConstraintCheckIdempotencyTTL = ttl
 	}
 }

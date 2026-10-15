@@ -272,7 +272,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	operationIdempotencyPeriod := min(r.operationIdempotencyTTL, req.Duration)
 	constraintCheckIdempotencyTTL := r.constraintCheckIdempotencyTTL
 	if req.Source.Location == CallerLocationSchedule {
-		constraintCheckIdempotencyTTL = r.scheduleConstraintCheckIdempotencyTTL
+		for _, constraint := range sortedConstraints {
+			if constraint.Kind == ConstraintKindRateLimit || constraint.Kind == ConstraintKindThrottle {
+				constraintCheckIdempotencyTTL = r.scheduleConstraintCheckIdempotencyTTL
+				break
+			}
+		}
 	}
 
 	keys := []string{
