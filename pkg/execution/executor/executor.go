@@ -718,7 +718,7 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 		// Use the given idempotency key
 		key = *req.IdempotencyKey
 	}
-	if req.OriginalRunID != nil {
+	if req.OriginalRunID != nil && req.IdempotencyKey == nil {
 		// If this is a rerun then we want to use the run ID as the key. If we
 		// used the event or batch ID as the key then we wouldn't be able to
 		// rerun multiple times.

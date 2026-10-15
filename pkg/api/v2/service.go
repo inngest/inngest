@@ -11,6 +11,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
@@ -162,7 +163,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	authzPaths := base.BuildAuthzPathMap()
 
 	r := chi.NewRouter()
-	r.Use(SendEventBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
+	r.Use(RequestBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
 
 	// Add authentication middleware first
 	if httpOpts.AuthnMiddleware != nil {
@@ -175,35 +176,68 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Strip supported v2 prefixes and forward to gateway
+		// Authorization, request validation, and routing must use the same path.
 		originalPath := req.URL.Path
-		if after, ok := strings.CutPrefix(req.URL.Path, "/api/v2"); ok {
-			req.URL.Path = after
-		} else if after, ok := strings.CutPrefix(req.URL.Path, "/v2"); ok {
-			req.URL.Path = after
+		originalRawPath := req.URL.RawPath
+		req.URL.Path = normalizedV2Path(req.URL.Path)
+		if req.URL.RawPath != "" {
+			req.URL.RawPath = normalizedV2Path(req.URL.RawPath)
 		}
+		defer func() {
+			req.URL.Path = originalPath
+			req.URL.RawPath = originalRawPath
+		}()
 
 		// Apply authorization middleware if this path requires it
 		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
 			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
-				validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					gwmux.ServeHTTP(w, r)
-				}))
+				validationHandler := base.JSONTypeValidationMiddleware()(gwmux)
 				validationHandler.ServeHTTP(w, r)
 			}))
 			authzHandler.ServeHTTP(w, req)
 		} else {
 			// Add JSON validation for unprotected paths
-			validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
-			}))
+			validationHandler := base.JSONTypeValidationMiddleware()(gwmux)
 			validationHandler.ServeHTTP(w, req)
 		}
 
-		// Restore original path for logging
-		req.URL.Path = originalPath
 	}))
 
 	return r, nil
+}
+
+func normalizedV2Path(path string) string {
+	for _, prefix := range []string{"/api/v2", "/v2"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			path = strings.TrimPrefix(path, prefix)
+			break
+		}
+	}
+	path = strings.TrimRight(path, "/")
+	if path == "" {
+		return "/"
+	}
+	return path
+}
+
+// RequestBodyLimitMiddleware rejects oversized bodies before validation reads them.
+func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		type route struct{ method, path string }
+		limits := map[string]int64{"SendEvent": maxEventBytes}
+		handlers := map[route]http.Handler{}
+		for _, endpoint := range apiv2endpoint.Discover() {
+			if limit, ok := limits[endpoint.MethodName]; ok {
+				handlers[route{endpoint.HTTPMethod, endpoint.Path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+			}
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if limited, ok := handlers[route{r.Method, normalizedV2Path(r.URL.Path)}]; ok {
+				limited.ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
