@@ -96,6 +96,7 @@ func TestAcquireRetryMarkerTTL(t *testing.T) {
 		{"schedule with rate limit", ConstraintKindRateLimit, CallerLocationSchedule, 0, 30 * time.Minute},
 		{"schedule with throttle", ConstraintKindThrottle, CallerLocationSchedule, 0, 30 * time.Minute},
 		{"queue with rate limit", ConstraintKindRateLimit, CallerLocationItemLease, 0, 5 * time.Minute},
+		{"checkpoint with rate limit", ConstraintKindRateLimit, CallerLocationCheckpoint, 0, 5 * time.Minute},
 		{"schedule-only override", ConstraintKindRateLimit, CallerLocationSchedule, 20 * time.Minute, 20 * time.Minute},
 		{"schedule override leaves concurrency unchanged", ConstraintKindConcurrency, CallerLocationSchedule, 20 * time.Minute, 5 * time.Minute},
 	} {
@@ -123,6 +124,7 @@ func TestAcquireRetryMarkerTTL(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, res.Leases, 1)
 			// Use distinct request and lease keys so both Lua SET paths are checked.
+			require.NotEqual(t, req.IdempotencyKey, req.LeaseIdempotencyKeys[0])
 			for _, key := range []string{req.IdempotencyKey, req.LeaseIdempotencyKeys[0]} {
 				require.Equal(t, tc.want, redis.TTL(cm.keyConstraintCheckIdempotency(req.AccountID, key)))
 			}
