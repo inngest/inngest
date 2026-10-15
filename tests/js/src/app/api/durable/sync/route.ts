@@ -1,4 +1,4 @@
-import { inngestV4 } from "@/inngest/client_v4";
+import { inngestV4 } from "@/v4/client";
 
 export const POST = inngestV4.endpoint(async () => {
   return new Response(JSON.stringify({ hello: "world" }), {
