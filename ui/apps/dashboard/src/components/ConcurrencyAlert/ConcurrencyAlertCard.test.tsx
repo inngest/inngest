@@ -50,6 +50,9 @@ describe('ConcurrencyAlertCard', () => {
 
     expect(screen.queryByText('execution limit card')).toBeNull();
     expect(screen.getByText('Concurrency boosted!')).toBeTruthy();
+    expect(
+      screen.getByText(/boosted by 3x\. Add concurrency to avoid delays/),
+    ).toBeTruthy();
     expect(screen.getByText('42 mins remaining this month')).toBeTruthy();
     expect(
       screen.getByRole('link', { name: 'View usage' }).getAttribute('href'),
@@ -62,6 +65,9 @@ describe('ConcurrencyAlertCard', () => {
 
     expect(screen.queryByText('execution limit card')).toBeNull();
     expect(screen.getByText('Concurrency limit reached')).toBeTruthy();
+    expect(
+      screen.getByText(/Runs delayed due to your account hitting/),
+    ).toBeTruthy();
     expect(screen.getByText('1,500/1,500 concurrent steps')).toBeTruthy();
     expect(
       screen

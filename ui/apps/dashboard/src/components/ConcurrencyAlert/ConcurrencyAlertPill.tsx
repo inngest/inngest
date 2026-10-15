@@ -20,7 +20,11 @@ export function ConcurrencyAlertPill() {
     return (
       <AlertPill
         kind="boost"
-        icon={<RiFlashlightFill className="h-[18px] w-[18px]" />}
+        icon={
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[rgb(var(--color-carbon-0))]">
+            <RiFlashlightFill className="h-3 w-3 text-[rgb(var(--color-breeze-600))]" />
+          </span>
+        }
         action={
           alert.minutesRemaining != null && (
             <Link {...linkProps} className={linkClassName} iconAfter={arrow}>

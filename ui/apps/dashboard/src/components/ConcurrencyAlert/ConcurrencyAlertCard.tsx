@@ -5,12 +5,12 @@ import { cn } from '@inngest/components/utils/classNames';
 import {
   RiArrowRightLine,
   RiErrorWarningFill,
-  RiRocketFill,
+  RiRocketLine,
 } from '@remixicon/react';
 
 import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
 import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
-import { minutesLeftLabel } from './concurrencyAlert';
+import { BURST_MULTIPLIER, minutesLeftLabel } from './concurrencyAlert';
 import {
   useConcurrencyAlert,
   type ConcurrencyAlert,
@@ -25,7 +25,7 @@ const boostedStyles = {
   divider: 'border-[rgb(var(--color-carbon-600))]',
   meta: 'text-[rgb(var(--color-carbon-0))]',
   icon: 'text-[rgb(var(--color-breeze-500))]',
-  link: 'text-[rgb(var(--color-breeze-400))] decoration-[rgb(var(--color-breeze-400))] hover:decoration-[rgb(var(--color-breeze-400))]',
+  link: 'text-[rgb(var(--color-breeze-400))] hover:decoration-[rgb(var(--color-breeze-400))]',
   track: 'bg-[rgb(var(--color-carbon-700))]',
   bar: 'bg-gradient-to-r from-[rgb(var(--color-breeze-500))] to-[rgb(var(--color-breeze-300))]',
 };
@@ -53,7 +53,7 @@ export function ConcurrencyAlertCard({ collapsed }: { collapsed: boolean }) {
         text={boosted ? 'View usage' : 'Add concurrency'}
         icon={
           boosted ? (
-            <RiRocketFill
+            <RiRocketLine
               className={cn('h-[18px] w-[18px]', boostedStyles.icon)}
             />
           ) : (
@@ -89,11 +89,15 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
       }
     >
       <div className="flex items-center gap-1">
-        <RiRocketFill className={cn('h-4 w-4 shrink-0', boostedStyles.icon)} />
+        <RiRocketLine className={cn('h-4 w-4 shrink-0', boostedStyles.icon)} />
         <h2 className={cn('text-xs font-bold leading-4', boostedStyles.meta)}>
           Concurrency boosted!
         </h2>
       </div>
+      <p className="mt-1 text-xs font-medium leading-4">
+        Your account concurrency has been boosted by {BURST_MULTIPLIER}x. Add
+        concurrency to avoid delays after the boost ends.
+      </p>
       <div className="mt-2 pt-1">
         <ProgressBar
           className={boostedStyles.track}
@@ -105,7 +109,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
         {alert.minutesRemaining != null && (
           <p
             className={cn(
-              'mt-[3px] text-xs font-bold leading-4',
+              'mt-[3px] text-xs font-medium leading-4',
               boostedStyles.meta,
             )}
           >
@@ -136,6 +140,10 @@ function LimitedCard({ alert }: { alert: ConcurrencyAlert }) {
       }
     >
       <h2 className="text-xs font-bold leading-4">Concurrency limit reached</h2>
+      <p className="mt-1 text-xs font-medium leading-4">
+        Runs delayed due to your account hitting the concurrency limit. To speed
+        up processing, increase your concurrency.
+      </p>
       <div className="mt-2 pt-1">
         <ProgressBar
           indicatorClassName="bg-accent-xIntense"
@@ -145,7 +153,7 @@ function LimitedCard({ alert }: { alert: ConcurrencyAlert }) {
           value={1}
         />
         {formattedLimit != null && (
-          <p className="mt-[3px] text-xs font-bold leading-4">
+          <p className="mt-[3px] text-xs font-medium leading-4">
             {formattedLimit}/{formattedLimit} concurrent steps
           </p>
         )}
