@@ -10603,7 +10603,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xde\x06\x92A\xa7\x06\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x8b\a\x92A\xd4\x06\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10617,7 +10617,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tFunctions\x12\x1bInvoke and manage functionsj\x1d\n" +
 	"\x04Runs\x12\x15Inspect function runsj)\n" +
 	"\bInsights\x12\x1dQuery event and function dataj9\n" +
-	"\tSandboxes\x12,Create and manage isolated compute sandboxesj9\n" +
+	"\tSandboxes\x12,Create and manage isolated compute sandboxesj+\n" +
+	"\x06Images\x12!Upload and build workspace imagesj9\n" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
 	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
 	"\vPartner API\x12\x1aPartner account managementZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
