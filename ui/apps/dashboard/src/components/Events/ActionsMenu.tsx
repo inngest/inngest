@@ -33,7 +33,7 @@ export const ActionsMenu = ({ archive }: EventActions) => {
           )}
         >
           <Listbox.Option
-            className={cn(headlessMenuItemClassName)}
+            className={cn(headlessMenuItemClassName, 'p-0')}
             value="eventsActions"
           >
             <Button
@@ -43,7 +43,7 @@ export const ActionsMenu = ({ archive }: EventActions) => {
               icon={<RiArchive2Line className="h-4 w-4" />}
               iconSide="left"
               label={'Archive event'}
-              className="m-0 w-full justify-start"
+              className="m-0 w-full justify-start rounded px-2 text-[13px] leading-5 [&>span:first-child]:pr-2"
               onClick={archive}
             />
           </Listbox.Option>
