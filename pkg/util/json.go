@@ -2,13 +2,14 @@ package util
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 func EnsureJSON(v json.RawMessage) json.RawMessage {
 	if !json.Valid(v) {
-		// Wrap the output in quotes to make it valid JSON.
-		return json.RawMessage(fmt.Sprintf("%q", v))
+		// Encode the output as a JSON string to make it valid JSON. Go's %q
+		// can't be used here: it emits escapes such as \x1b that JSON rejects.
+		byt, _ := json.Marshal(string(v))
+		return byt
 	}
 	return v
 }
