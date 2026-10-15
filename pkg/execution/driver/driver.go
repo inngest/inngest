@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -260,7 +259,7 @@ func MarshalV1(
 
 	}
 
-	b, err := jcs.Transform(j)
+	b, err := canonicalize(j)
 	if err != nil {
 		return nil, fmt.Errorf("error transforming request with JCS: %w", err)
 	}
