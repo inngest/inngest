@@ -265,7 +265,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
         };
 
   return (
-    <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1500px] flex-col px-6">
+    <div className="bg-canvasBase mx-auto flex min-h-0 w-full max-w-[1500px] flex-1 flex-col px-6">
       {showEmptyState && <AIOverviewEmptyState compact className="mt-3" />}
       {error && <Error message="There was an error loading the AI Overview." />}
 
