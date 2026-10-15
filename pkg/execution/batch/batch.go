@@ -14,6 +14,42 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+type appendBatchIDsKey struct{}
+type batchClusterKey struct{}
+
+type appendBatchIDs struct {
+	new      ulid.ULID
+	overflow ulid.ULID
+}
+
+// WithAppendBatchIDs pins identifiers created by an Append or BulkAppend call.
+// A multi-backend router uses one context for every replica so that an empty
+// pointer and an overflow rotate to the same batch identity on every backend.
+// Zero IDs preserve the manager's normal random-ID behavior.
+func WithAppendBatchIDs(ctx context.Context, newID, overflowID ulid.ULID) context.Context {
+	return context.WithValue(ctx, appendBatchIDsKey{}, appendBatchIDs{
+		new:      newID,
+		overflow: overflowID,
+	})
+}
+
+func appendIDsFromContext(ctx context.Context) (newID, overflowID ulid.ULID) {
+	ids, _ := ctx.Value(appendBatchIDsKey{}).(appendBatchIDs)
+	return ids.new, ids.overflow
+}
+
+// WithBatchCluster pins a batch operation to the backend that owns its data.
+// Buffered scheduling copies this into its durable payload.
+func WithBatchCluster(ctx context.Context, cluster string) context.Context {
+	return context.WithValue(ctx, batchClusterKey{}, cluster)
+}
+
+// BatchCluster returns the backend selected by WithBatchCluster.
+func BatchCluster(ctx context.Context) string {
+	cluster, _ := ctx.Value(batchClusterKey{}).(string)
+	return cluster
+}
+
 // HashBatchKey hashes a batch key using SHA256 and encodes it as base64.
 // This is used to create a consistent key for batch pointers.
 func HashBatchKey(batchKey string) string {
@@ -118,11 +154,13 @@ type DeleteBatchResult struct {
 
 // RunBatchOpts contains options for running a batch immediately.
 type RunBatchOpts struct {
-	FunctionID  uuid.UUID
-	BatchKey    string
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       uuid.UUID
+	FunctionID      uuid.UUID
+	BatchKey        string
+	BatchCluster    string // backend that owns this batch.
+	BatchGeneration string // batch key namespace within the backend.
+	AccountID       uuid.UUID
+	WorkspaceID     uuid.UUID
+	AppID           uuid.UUID
 }
 
 // RunBatchResult contains information about a scheduled batch execution.
@@ -176,6 +214,8 @@ type BatchAppendResult struct {
 	Status          enums.Batch `json:"status"`
 	BatchID         string      `json:"batchID,omitempty"`
 	BatchPointerKey string      `json:"batchPointerKey"`
+	BatchCluster    string      `json:"batchCluster,omitempty"`
+	BatchGeneration string      `json:"batchGeneration,omitempty"`
 }
 
 type ScheduleBatchOpts struct {
@@ -191,6 +231,8 @@ func (o *ScheduleBatchOpts) JobID() string {
 type ScheduleBatchPayload struct {
 	BatchID                    ulid.ULID  `json:"batchID"`
 	BatchPointer               string     `json:"batchPointer"`
+	BatchCluster               string     `json:"batchCluster,omitempty"`    // empty for jobs created before function-level batch routing.
+	BatchGeneration            string     `json:"batchGeneration,omitempty"` // empty is the legacy generation-zero namespace.
 	AccountID                  uuid.UUID  `json:"acctID"`
 	WorkspaceID                uuid.UUID  `json:"wsID"`
 	AppID                      uuid.UUID  `json:"appID"`
