@@ -270,6 +270,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	operationIdempotencyKey := fmt.Sprintf("%s-%s", req.IdempotencyKey, fingerprint)
 	// The idempotency period must always be <= the lease duration, as we may return an expired lease otherwise.
 	operationIdempotencyPeriod := min(r.operationIdempotencyTTL, req.Duration)
+	constraintCheckIdempotencyTTL := r.constraintCheckIdempotencyTTL
+	if req.Source.Location == CallerLocationSchedule {
+		constraintCheckIdempotencyTTL = r.scheduleConstraintCheckIdempotencyTTL
+	}
 
 	keys := []string{
 		// The request state is persisted for consistent cleanup during Scavenge/Release operations
@@ -308,7 +312,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs,
 
 		int(operationIdempotencyPeriod.Seconds()),
-		int(r.constraintCheckIdempotencyTTL.Seconds()),
+		int(constraintCheckIdempotencyTTL.Seconds()),
 
 		enableDebugLogsVal,
 

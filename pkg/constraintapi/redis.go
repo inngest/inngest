@@ -23,6 +23,11 @@ const (
 	OperationIdempotencyTTL       = 5 * time.Second
 	CheckIdempotencyTTL           = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
+
+	// ScheduleConstraintCheckIdempotencyTTL must outlast delivery retry backoff
+	// (up to 10 minutes in Cloud) so failed run creation can retry without
+	// consuming the function's rate limit again.
+	ScheduleConstraintCheckIdempotencyTTL = 30 * time.Minute
 )
 
 var enableDebugLogs = false
@@ -51,9 +56,10 @@ type redisCapacityManager struct {
 
 	lifecycles []ConstraintAPILifecycleHooks
 
-	operationIdempotencyTTL       time.Duration
-	constraintCheckIdempotencyTTL time.Duration
-	checkIdempotencyTTL           time.Duration
+	operationIdempotencyTTL               time.Duration
+	constraintCheckIdempotencyTTL         time.Duration
+	scheduleConstraintCheckIdempotencyTTL time.Duration
+	checkIdempotencyTTL                   time.Duration
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -103,6 +109,7 @@ func WithOperationIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 func WithConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.constraintCheckIdempotencyTTL = ttl
+		m.scheduleConstraintCheckIdempotencyTTL = ttl
 	}
 }
 
@@ -128,9 +135,10 @@ func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
 	manager := &redisCapacityManager{
-		operationIdempotencyTTL:       OperationIdempotencyTTL,
-		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
-		checkIdempotencyTTL:           CheckIdempotencyTTL,
+		operationIdempotencyTTL:               OperationIdempotencyTTL,
+		constraintCheckIdempotencyTTL:         ConstraintCheckIdempotencyTTL,
+		scheduleConstraintCheckIdempotencyTTL: ScheduleConstraintCheckIdempotencyTTL,
+		checkIdempotencyTTL:                   CheckIdempotencyTTL,
 	}
 
 	for _, rcmo := range options {
