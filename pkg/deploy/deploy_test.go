@@ -67,4 +67,19 @@ func TestPing(t *testing.T) {
 		r.Equal("my-server-kind", reqHeader.Get("x-inngest-server-kind"))
 		r.NotEmpty(reqHeader.Get("x-inngest-signature"))
 	})
+
+	t.Run("400 with a null body returns an error", func(t *testing.T) {
+		ctx := context.Background()
+		r := require.New(t)
+
+		url, close, err := newFakeSDK(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("null"))
+		})
+		r.NoError(err)
+		defer close()
+
+		res := Ping(ctx, url, "my-server-kind", "deadbeef", true)
+		r.Error(res.Err)
+	})
 }
