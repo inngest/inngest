@@ -46,8 +46,8 @@ export function effectiveLimit({
 }: {
   state: ConcurrencyAlertState;
   burstLimit: number | undefined;
-  baseLimit: number;
-}): number {
+  baseLimit: number | undefined;
+}): number | undefined {
   return state === 'boosted' && burstLimit != null ? burstLimit : baseLimit;
 }
 
