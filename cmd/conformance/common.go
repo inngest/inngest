@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/inngest/inngest/pkg/cli/output"
+	clioutput "github.com/inngest/inngest/pkg/cli/output"
 	conf "github.com/inngest/inngest/pkg/conformance"
+	confoutput "github.com/inngest/inngest/pkg/conformance/output"
 	"github.com/inngest/inngest/pkg/conformance/runner/serve"
 	"github.com/urfave/cli/v3"
 )
@@ -154,7 +155,9 @@ func newServeRunner() *serve.Runner {
 	return serve.NewRunner(nil)
 }
 
-// renderReport prints a report using the Phase 2 terminal renderers.
+// renderReport prints a report using the selected output format.
+// JSON is the canonical machine-readable artifact; pretty is for local triage;
+// junit is for CI integration (GitHub Actions, Jenkins, etc.).
 func renderReport(report conf.Report, format conf.ReportFormat, forceJSON bool) error {
 	if forceJSON || format == conf.ReportFormatJSON {
 		byt, err := json.MarshalIndent(report, "", "  ")
@@ -167,9 +170,21 @@ func renderReport(report conf.Report, format conf.ReportFormat, forceJSON bool) 
 
 	switch format {
 	case "", conf.ReportFormatPretty:
-		return output.TextConformanceReport(report)
-	case conf.ReportFormatJUnit, conf.ReportFormatMarkdown:
+		return clioutput.TextConformanceReport(report)
+
+	case conf.ReportFormatJUnit:
+		// RenderJUnit lives in pkg/conformance/output to keep the CLI thin and
+		// allow unit tests without spinning up the full command tree.
+		byt, err := confoutput.RenderJUnit(report)
+		if err != nil {
+			return err
+		}
+		fmt.Print(string(byt))
+		return nil
+
+	case conf.ReportFormatMarkdown:
 		return fmt.Errorf("report format %q is not implemented yet", format)
+
 	default:
 		return fmt.Errorf("unknown report format %q", format)
 	}
@@ -185,7 +200,7 @@ func renderDoctor(checks []serve.Check, forceJSON bool) error {
 		return nil
 	}
 
-	return output.TextConformanceDoctor(checks)
+	return clioutput.TextConformanceDoctor(checks)
 }
 
 func runServe(ctx context.Context, plan conf.RunPlan, runtime conf.RuntimeConfig) (conf.Report, error) {
