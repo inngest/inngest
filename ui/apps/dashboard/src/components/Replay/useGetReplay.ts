@@ -1,4 +1,3 @@
-import { ReplayStatus } from '@inngest/components/types/replay';
 import { differenceInMilliseconds } from '@inngest/components/utils/date';
 import { useQuery } from '@tanstack/react-query';
 import { decodeTime } from 'ulid';
@@ -6,6 +5,8 @@ import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+
+import { getReplayStatus } from './getReplayStatus';
 
 const getReplayQuery = graphql(`
   query GetReplay($envID: ID!, $replayID: ID!) {
@@ -15,6 +16,7 @@ const getReplayQuery = graphql(`
         name
         createdAt
         endedAt
+        error
         functionRunsScheduledCount
         fromRange
         toRange
@@ -48,6 +50,8 @@ export function useGetReplay(replayID: string) {
 
       const baseReplay = {
         ...replay,
+        status: getReplayStatus(replay),
+        error: replay.error ?? undefined,
         createdAt: new Date(replay.createdAt),
         runsCount: replay.functionRunsScheduledCount,
         runsSkippedCount:
@@ -64,7 +68,6 @@ export function useGetReplay(replayID: string) {
       if (replay.endedAt) {
         return {
           ...baseReplay,
-          status: ReplayStatus.Ended,
           endedAt: new Date(replay.endedAt),
           duration: differenceInMilliseconds(
             new Date(replay.endedAt),
@@ -75,7 +78,6 @@ export function useGetReplay(replayID: string) {
 
       return {
         ...baseReplay,
-        status: ReplayStatus.Created,
         endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
         duration: undefined,
       };
@@ -95,6 +97,7 @@ const GetReplaysDocument = graphql(`
           name
           createdAt
           endedAt
+          error
           functionRunsScheduledCount
           functionRunsProcessedCount
         }
@@ -121,6 +124,8 @@ export function useGetReplays(functionSlug: string) {
         result.data?.environment.function?.replays.map((replay) => {
           const baseReplay = {
             ...replay,
+            status: getReplayStatus(replay),
+            error: replay.error ?? undefined,
             createdAt: new Date(replay.createdAt),
             runsCount: replay.functionRunsScheduledCount,
             runsSkippedCount:
@@ -131,7 +136,6 @@ export function useGetReplays(functionSlug: string) {
           if (replay.endedAt) {
             return {
               ...baseReplay,
-              status: ReplayStatus.Ended,
               endedAt: new Date(replay.endedAt),
               duration: differenceInMilliseconds(
                 new Date(replay.endedAt),
@@ -142,7 +146,6 @@ export function useGetReplays(functionSlug: string) {
 
           return {
             ...baseReplay,
-            status: ReplayStatus.Created,
             endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
           };
         }) ?? [];

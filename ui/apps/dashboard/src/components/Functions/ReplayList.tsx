@@ -28,12 +28,18 @@ const columns = [
     cell: (props) => {
       const status = props.getValue();
       return (
-        <StatusCell
-          status={status}
-          label={
-            status === ReplayStatus.Ended ? 'Queuing complete' : 'Queuing runs'
-          }
-        />
+        <div title={props.row.original.error}>
+          <StatusCell
+            status={status}
+            label={
+              status === ReplayStatus.Failed
+                ? 'Failed'
+                : status === ReplayStatus.Ended
+                ? 'Queuing complete'
+                : 'Queuing runs'
+            }
+          />
+        </div>
       );
     },
     enableSorting: false,
