@@ -59,11 +59,51 @@ export function niceCeiling(value: number): number {
   return Math.max(10, Math.ceil(raw / step) * step);
 }
 
-function widenRange(range: MarkAreaRange, minMs: number): MarkAreaRange {
-  const [start, end] = [range[0].xAxis, range[1].xAxis];
-  if (end - start >= minMs) return range;
-  const mid = (start + end) / 2;
-  return [{ xAxis: mid - minMs / 2 }, { xAxis: mid + minMs / 2 }];
+function widenRanges(
+  ranges: MarkAreaRange[],
+  range: TimeRange,
+): MarkAreaRange[] {
+  const from = new Date(range.from).getTime();
+  const to = new Date(range.to).getTime();
+  const minMs = (to - from) / 300;
+  const widened: MarkAreaRange[] = [];
+  for (const band of ranges) {
+    let start = band[0].xAxis;
+    let end = band[1].xAxis;
+    if (end - start < minMs) {
+      start = Math.min(Math.max((start + end - minMs) / 2, from), to - minMs);
+      end = start + minMs;
+    }
+    const last = widened[widened.length - 1];
+    if (last && start <= last[1].xAxis) {
+      widened[widened.length - 1] = [
+        last[0],
+        { xAxis: Math.max(last[1].xAxis, end) },
+      ];
+    } else {
+      widened.push([{ xAxis: start }, { xAxis: end }]);
+    }
+  }
+  return widened;
+}
+
+function limitLine(
+  baseLimit: number,
+  burstLimit: number,
+  burstRanges: MarkAreaRange[],
+  range: TimeRange,
+): [number, number][] {
+  const raised = burstRanges.flatMap(([start, end]): [number, number][] => [
+    [start.xAxis, baseLimit],
+    [start.xAxis, burstLimit],
+    [end.xAxis, burstLimit],
+    [end.xAxis, baseLimit],
+  ]);
+  return [
+    [new Date(range.from).getTime(), baseLimit],
+    ...raised,
+    [new Date(range.to).getTime(), baseLimit],
+  ];
 }
 
 function markArea(data: MarkAreaRange[], color: string) {
@@ -93,16 +133,14 @@ export function createConcurrencyChartOptions(
       ],
   );
 
-  const minBandMs =
-    (new Date(range.to).getTime() - new Date(range.from).getTime()) / 300;
-  const burstRanges = mergeHourRanges(
-    series.buckets,
-    (value) => value > series.baseLimit,
-  ).map((r) => widenRange(r, minBandMs));
-  const limitHitRanges = mergeHourRanges(
-    series.limitHits,
-    (value) => value > 0,
-  ).map((r) => widenRange(r, minBandMs));
+  const burstRanges = widenRanges(
+    mergeHourRanges(series.buckets, (value) => value > series.baseLimit),
+    range,
+  );
+  const limitHitRanges = widenRanges(
+    mergeHourRanges(series.limitHits, (value) => value > 0),
+    range,
+  );
 
   const limitColor = resolveColor(colors.tertiary['moderate'], dark, '#F54A3F');
   const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
@@ -203,7 +241,7 @@ export function createConcurrencyChartOptions(
         name: seriesNames.bursts,
         data: [],
         type: 'line',
-        itemStyle: { color: burstAreaColor },
+        itemStyle: { color: burstAreaColor, opacity: BAND_OPACITY },
         lineStyle: { color: burstAreaColor },
         markArea: markArea(burstRanges, burstAreaColor),
       },
@@ -211,7 +249,7 @@ export function createConcurrencyChartOptions(
         name: seriesNames.limitHits,
         data: [],
         type: 'line',
-        itemStyle: { color: limitHitAreaColor },
+        itemStyle: { color: limitHitAreaColor, opacity: BAND_OPACITY },
         lineStyle: { color: limitHitAreaColor },
         markArea: markArea(limitHitRanges, limitHitAreaColor),
       },
@@ -227,22 +265,18 @@ export function createConcurrencyChartOptions(
       },
       {
         name: seriesNames.limit,
-        data: [],
+        data: limitLine(
+          series.baseLimit,
+          series.burstLimit ?? series.baseLimit,
+          burstRanges,
+          range,
+        ),
         type: 'line',
+        showSymbol: false,
+        animation: false,
+        tooltip: { show: false },
         itemStyle: { color: limitColor },
-        lineStyle: { color: limitColor },
-        markLine: {
-          animation: false,
-          silent: true,
-          symbol: 'none' as const,
-          data: [{ yAxis: series.baseLimit }],
-          label: { show: false },
-          lineStyle: {
-            type: 'solid' as const,
-            width: 1,
-            color: limitColor,
-          },
-        },
+        lineStyle: { width: 1, color: limitColor },
       },
     ],
   };

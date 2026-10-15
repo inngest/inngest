@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeHourRanges, niceCeiling } from './concurrencyChart';
+import {
+  createConcurrencyChartOptions,
+  HOUR_MS,
+  mergeHourRanges,
+  niceCeiling,
+  type ConcurrencyTimeSeries,
+} from './concurrencyChart';
 
 const hour = (n: number) => `2026-09-01T${String(n).padStart(2, '0')}:00:00Z`;
 const ms = (iso: string) => new Date(iso).getTime();
@@ -33,5 +39,86 @@ describe('niceCeiling', () => {
     [5, 10],
   ])('rounds %d up to the clean tick ceiling %d', (value, expected) => {
     expect(niceCeiling(value)).toBe(expected);
+  });
+});
+
+describe('createConcurrencyChartOptions', () => {
+  const threeHourBandRangeHours = 300 * 3;
+  const at = (h: number) => ms(hour(0)) + h * HOUR_MS;
+  const burstsAt = (hours: number[]) =>
+    hours.map((h) => ({ bucket: new Date(at(h)).toISOString(), value: 8 }));
+
+  const limitSeriesData = (
+    buckets: ConcurrencyTimeSeries['buckets'],
+    rangeHours: number,
+  ) => {
+    const series: ConcurrencyTimeSeries = {
+      baseLimit: 5,
+      burstLimit: 10,
+      peak: 0,
+      buckets,
+      limitHits: [],
+    };
+    const range = {
+      from: hour(0),
+      to: new Date(at(rangeHours)).toISOString(),
+    };
+    const options = createConcurrencyChartOptions(series, range);
+    const seriesList = options.series as { name: string; data: unknown }[];
+    return seriesList.find((s) => s.name === 'Concurrency limit')?.data;
+  };
+
+  it('raises the limit line to the burst limit during a burst', () => {
+    const data = limitSeriesData(
+      [
+        { bucket: hour(1), value: 3 },
+        { bucket: hour(2), value: 8 },
+        { bucket: hour(3), value: 4 },
+      ],
+      24,
+    );
+
+    expect(data).toEqual([
+      [at(0), 5],
+      [at(2), 5],
+      [at(2), 10],
+      [at(3), 10],
+      [at(3), 5],
+      [at(24), 5],
+    ]);
+  });
+
+  it('raises the limit line once across bursts whose widened bands overlap', () => {
+    const data = limitSeriesData(burstsAt([5, 7]), threeHourBandRangeHours);
+
+    expect(data).toEqual([
+      [at(0), 5],
+      [at(4), 5],
+      [at(4), 10],
+      [at(9), 10],
+      [at(9), 5],
+      [at(threeHourBandRangeHours), 5],
+    ]);
+  });
+
+  it('keeps widened bursts at the range edges inside the range', () => {
+    const lastHour = threeHourBandRangeHours - 1;
+    const data = limitSeriesData(
+      burstsAt([0, lastHour]),
+      threeHourBandRangeHours,
+    );
+
+    expect(data).toEqual([
+      [at(0), 5],
+      [at(0), 5],
+      [at(0), 10],
+      [at(3), 10],
+      [at(3), 5],
+      [at(lastHour - 2), 5],
+      [at(lastHour - 2), 10],
+      [at(threeHourBandRangeHours), 10],
+      [at(threeHourBandRangeHours), 5],
+      [at(threeHourBandRangeHours), 5],
+    ]);
   });
 });

@@ -4,7 +4,6 @@ import { Chart } from '@inngest/components/Chart/Chart';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import Tabs from '@inngest/components/Tabs/Tabs';
-import { cn } from '@inngest/components/utils/classNames';
 import { useQuery } from 'urql';
 
 import {
@@ -88,8 +87,6 @@ export function AccountConcurrency() {
   const { baseLimit, burstLimit } = series;
   const multiplier = burstMultiplier(burstLimit, baseLimit);
   const fetchedRange = operation.variables;
-  const stale =
-    fetchedRange.from !== range.from || fetchedRange.to !== range.to;
 
   return (
     <div className="mt-10">
