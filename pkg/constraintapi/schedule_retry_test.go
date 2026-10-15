@@ -94,7 +94,7 @@ func TestAcquireRetryMarkerTTL(t *testing.T) {
 	}{
 		{"schedule with concurrency only", ConstraintKindConcurrency, CallerLocationSchedule, 0, 5 * time.Minute},
 		{"schedule with rate limit", ConstraintKindRateLimit, CallerLocationSchedule, 0, 30 * time.Minute},
-		{"schedule with throttle", ConstraintKindThrottle, CallerLocationSchedule, 0, 30 * time.Minute},
+		{"schedule with throttle keeps shorter protection", ConstraintKindThrottle, CallerLocationSchedule, 0, 5 * time.Minute},
 		{"queue with rate limit", ConstraintKindRateLimit, CallerLocationItemLease, 0, 5 * time.Minute},
 		{"checkpoint with rate limit", ConstraintKindRateLimit, CallerLocationCheckpoint, 0, 5 * time.Minute},
 		{"schedule-only override", ConstraintKindRateLimit, CallerLocationSchedule, 20 * time.Minute, 20 * time.Minute},
