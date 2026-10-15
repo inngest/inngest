@@ -50,10 +50,11 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 	longValue := strings.Repeat("é", maxConcurrencyTraceKeyChars+1)
 
 	tests := []struct {
-		name  string
-		keys  []state.CustomConcurrency
-		event json.RawMessage
-		want  []meta.CustomConcurrencyKey
+		name       string
+		keys       []state.CustomConcurrency
+		rawEvent   json.RawMessage
+		eventInput map[string]any
+		want       []meta.CustomConcurrencyKey
 	}{
 		{name: "no keys"},
 		{name: "one key", keys: []state.CustomConcurrency{validFn}, want: []meta.CustomConcurrencyKey{
@@ -64,10 +65,13 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 			{Scope: "env", Expression: envExpr, Value: "eu"},
 		}},
 		{name: "missing raw value", keys: []state.CustomConcurrency{missingValue}},
-		{name: "recover missing raw value", keys: []state.CustomConcurrency{missingValue}, event: rawEvent, want: []meta.CustomConcurrencyKey{
+		{name: "recover missing raw value", keys: []state.CustomConcurrency{missingValue}, rawEvent: rawEvent, want: []meta.CustomConcurrencyKey{
 			{Scope: "fn", Expression: fnExpr, Value: "customer-a"},
 		}},
-		{name: "reject mismatched event", keys: []state.CustomConcurrency{missingValue}, event: otherEvent},
+		{name: "recover missing value from decoded event", keys: []state.CustomConcurrency{missingValue}, eventInput: event.Event{Data: map[string]any{"customer": "customer-a"}}.Map(), want: []meta.CustomConcurrencyKey{
+			{Scope: "fn", Expression: fnExpr, Value: "customer-a"},
+		}},
+		{name: "reject mismatched event", keys: []state.CustomConcurrency{missingValue}, rawEvent: otherEvent},
 		{name: "changed expression", keys: []state.CustomConcurrency{wrongExpression}},
 		{name: "different scope", keys: []state.CustomConcurrency{wrongScope}},
 		{name: "malformed key", keys: []state.CustomConcurrency{{Key: "not-a-key", Hash: fnHash, UnhashedEvaluatedKeyValue: "customer-a"}}},
@@ -81,7 +85,10 @@ func TestCustomConcurrencyTraceKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, customConcurrencyTraceKeys(context.Background(), fn, tt.keys, tt.event))
+			require.Equal(t, tt.want, customConcurrencyTraceKeys(context.Background(), fn, tt.keys, concurrencyTraceEventInput{
+				decoded: tt.eventInput,
+				raw:     tt.rawEvent,
+			}))
 		})
 	}
 }
@@ -103,5 +110,5 @@ func TestCustomConcurrencyTraceKeysTruncatesExpression(t *testing.T) {
 		Expression:          strings.Repeat("x", maxConcurrencyTraceKeyChars),
 		Value:               "value",
 		ExpressionTruncated: true,
-	}}, customConcurrencyTraceKeys(context.Background(), fn, []state.CustomConcurrency{key}, nil))
+	}}, customConcurrencyTraceKeys(context.Background(), fn, []state.CustomConcurrency{key}, concurrencyTraceEventInput{}))
 }
