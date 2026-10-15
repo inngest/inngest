@@ -55,7 +55,7 @@ export function useGetReplay(replayID: string) {
         createdAt: new Date(replay.createdAt),
         runsCount: replay.functionRunsScheduledCount,
         runsSkippedCount:
-          replay.functionRunsScheduledCount - replay.functionRunsProcessedCount,
+          replay.functionRunsProcessedCount - replay.functionRunsScheduledCount,
         fromRange: replay.fromRange
           ? new Date(decodeTime(replay.fromRange))
           : undefined,
@@ -129,8 +129,8 @@ export function useGetReplays(functionSlug: string) {
             createdAt: new Date(replay.createdAt),
             runsCount: replay.functionRunsScheduledCount,
             runsSkippedCount:
-              replay.functionRunsScheduledCount -
-              replay.functionRunsProcessedCount,
+              replay.functionRunsProcessedCount -
+              replay.functionRunsScheduledCount,
           };
 
           if (replay.endedAt) {
