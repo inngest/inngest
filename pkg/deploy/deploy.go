@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -34,10 +35,19 @@ var (
 	DeployErrUnsupportedProtocol = fmt.Errorf("unsupported_protocol")
 
 	Client = http.Client{
-		Timeout:       10 * time.Second,
+		Timeout:       getPingTimeout(),
 		CheckRedirect: exechttp.CheckRedirect,
 	}
 )
+
+func getPingTimeout() time.Duration {
+	if timeoutStr := os.Getenv("INNGEST_DEPLOY_PING_TIMEOUT"); timeoutStr != "" {
+		if dur, err := time.ParseDuration(timeoutStr); err == nil && dur.Seconds() > 0 {
+			return dur
+		}
+	}
+	return 10 * time.Second
+}
 
 type pingResult struct {
 	Err error
