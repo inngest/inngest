@@ -2,7 +2,40 @@
 
 package enums
 
+import "fmt"
+
 type Opcode int
+
+// UnknownOpcodeError indicates the SDK returned an opcode this server version
+// doesn't recognize, which almost always means the server is older than the
+// SDK. Its message prompts a server upgrade rather than surfacing the opaque
+// decode error.
+type UnknownOpcodeError struct {
+	Opcode string
+}
+
+func (e *UnknownOpcodeError) Error() string {
+	return fmt.Sprintf(
+		"this Inngest server does not recognize the %q operation returned by the SDK. This usually means the server is older than the SDK; update your Inngest server to the latest version.",
+		e.Opcode,
+	)
+}
+
+// Retryable satisfies the execution queue's structural RetryableError interface
+// without importing it: version skew is deterministic, so retrying never helps.
+func (e *UnknownOpcodeError) Retryable() bool { return false }
+
+// ParseOpcode is like OpcodeString but distinguishes an otherwise valid opcode
+// name that this server version doesn't know about from a malformed value,
+// returning an *UnknownOpcodeError so callers can detect server/SDK version
+// skew.
+func ParseOpcode(s string) (Opcode, error) {
+	op, err := OpcodeString(s)
+	if err != nil {
+		return op, &UnknownOpcodeError{Opcode: s}
+	}
+	return op, nil
+}
 
 const (
 	// OpcodeNone represents the default opcode 0, which does nothing
