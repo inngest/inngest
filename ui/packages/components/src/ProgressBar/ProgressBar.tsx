@@ -7,6 +7,7 @@ export type ProgressBarProps = {
   value: number;
   overageAllowed?: boolean;
   className?: string;
+  indicatorClassName?: string;
   kind?: 'default' | 'error' | 'warning' | 'caution';
   size?: 'default' | 'small';
 };
@@ -16,6 +17,7 @@ const ProgressBar = ({
   value,
   overageAllowed,
   className,
+  indicatorClassName,
   kind = 'default',
   size = 'default',
 }: ProgressBarProps) => {
@@ -45,7 +47,8 @@ const ProgressBar = ({
           isOverTheLimit && !overageAllowed && 'bg-errorContrast',
           kind === 'error' && 'bg-tertiary-intense',
           kind === 'warning' && 'bg-accent-moderate',
-          kind === 'caution' && 'bg-accent-xSubtle'
+          kind === 'caution' && 'bg-accent-xSubtle',
+          indicatorClassName
         )}
         style={{ width: `${includedWidth}%` }}
       />
@@ -55,7 +58,8 @@ const ProgressBar = ({
           isOverTheLimit && !overageAllowed && 'bg-errorContrast',
           kind === 'error' && 'bg-tertiary-intense',
           kind === 'warning' && 'bg-accent-moderate',
-          kind === 'caution' && 'bg-accent-xSubtle'
+          kind === 'caution' && 'bg-accent-xSubtle',
+          indicatorClassName
         )}
         style={{ width: `${additionalWidth}%` }}
       />
