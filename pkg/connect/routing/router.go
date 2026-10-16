@@ -195,7 +195,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 			hasHealthyConnections = true
 		}
 
-		if conn.Status == connectpb.ConnectionStatus_DRAINING {
+		if conn.Status == connectpb.ConnectionStatus_DRAINING || res.isDraining {
 			hasDrainingConnections = true
 		}
 
@@ -338,6 +338,9 @@ type isHealthyRes struct {
 	shouldDeleteUnhealthyConnection bool
 	shouldDeleteUnhealthyGateway    bool
 	workerGroup                     *state.WorkerGroup
+	// isDraining marks a READY connection on a draining gateway, which no longer
+	// forwards new requests but stays in the store until the worker reconnects.
+	isDraining bool
 }
 
 func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log logger.Logger) isHealthyRes {
@@ -432,6 +435,12 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 				shouldDeleteUnhealthyConnection: true,
 				shouldDeleteUnhealthyGateway:    true,
 			}
+		}
+
+		// A draining gateway rejects new requests, so treat its connections as
+		// draining: GetRoute then waits for the worker's replacement connection.
+		if gw.Status == state.GatewayStatusDraining {
+			return isHealthyRes{isDraining: true}
 		}
 	}
 
