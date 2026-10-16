@@ -122,6 +122,8 @@ export type Account = {
   billingEmail: Scalars['String']['output'];
   /** Burst concurrency for the current period. Null when burst is off for the account. */
   burstConcurrency: Maybe<AccountBurstConcurrency>;
+  /** Recent account concurrency limit hits. Reads ClickHouse; select only where needed. */
+  concurrencyStatus: Maybe<AccountConcurrencyStatus>;
   /** Hourly account concurrency for hours overlapping [from, to), at most 30 days. Reads ClickHouse; select only where needed. */
   concurrencyTimeSeries: AccountConcurrencyTimeSeries;
   constraintAPIEnrolled: Scalars['Boolean']['output'];
@@ -200,6 +202,14 @@ export type AccountBurstConcurrency = {
   periodStart: Scalars['Time']['output'];
   /** Usage for the current period. Reads ClickHouse; select only where needed. */
   usage: BurstConcurrencyUsage;
+};
+
+export type AccountConcurrencyStatus = {
+  __typename?: 'AccountConcurrencyStatus';
+  /** Whether minutesWithHits is at least 3. */
+  limitReached: Scalars['Boolean']['output'];
+  /** Of the last 10 complete minutes, how many had attempts blocked by the account concurrency limit. */
+  minutesWithHits: Scalars['Int']['output'];
 };
 
 export type AccountConcurrencyTimeSeries = {
@@ -482,6 +492,8 @@ export enum BurstConcurrencyMode {
 
 export type BurstConcurrencyUsage = {
   __typename?: 'BurstConcurrencyUsage';
+  /** Whether the account ran above its base limit in the last 3 complete minutes. False when exhaustedAt is set. */
+  bursting: Scalars['Boolean']['output'];
   /** Bursts this period, oldest first. */
   bursts: Array<ConcurrencyBurst>;
   /** Budget minutes left this period. */
@@ -2330,21 +2342,12 @@ export type RunTraceSpan = {
   endedAt: Maybe<Scalars['Time']['output']>;
   functionID: Scalars['UUID']['output'];
   groupID: Maybe<Scalars['String']['output']>;
-  /**
-   * The kind of a step span group (for example `job` or `machine`), set by the
-   * SDK. Null for steps, and for groups without a kind.
-   */
   groupKind: Maybe<Scalars['String']['output']>;
   isPreview: Maybe<Scalars['Boolean']['output']>;
   isRoot: Scalars['Boolean']['output'];
   isUserland: Scalars['Boolean']['output'];
   metadata: Array<SpanMetadata>;
   name: Scalars['String']['output'];
-  /**
-   * The library that created this step or span on the user's behalf, as
-   * `package@version` (for example `@inngest/ci@0.1.0`). Null for the user's own
-   * steps.
-   */
   origin: Maybe<Scalars['String']['output']>;
   outputID: Maybe<Scalars['String']['output']>;
   parentSpanID: Maybe<Scalars['String']['output']>;
@@ -2871,6 +2874,7 @@ export type Usage = {
 export type UsageInput = {
   from?: InputMaybe<Scalars['Time']['input']>;
   period?: InputMaybe<Scalars['Period']['input']>;
+  /** @deprecated Field no longer supported */
   range?: InputMaybe<Scalars['Timerange']['input']>;
   to?: InputMaybe<Scalars['Time']['input']>;
 };
@@ -2998,6 +3002,7 @@ export type Workflow = {
   slug: Scalars['String']['output'];
   triggers: Array<FunctionTrigger>;
   url: Scalars['String']['output'];
+  /** @deprecated Field no longer supported */
   usage: Usage;
 };
 
@@ -3072,6 +3077,7 @@ export type Workspace = {
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
   eventV2: EventV2;
+  /** @deprecated Field no longer supported */
   events: PaginatedEvents;
   eventsV2: EventsConnection;
   functionCount: Scalars['Int']['output'];
@@ -3531,7 +3537,7 @@ export type GetBillingInfoQuery = { __typename?: 'Query', account: { __typename?
 export type ConcurrencyAlertCheckQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ConcurrencyAlertCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', marketplaceBillingURL: string | null, burstConcurrency: { __typename?: 'AccountBurstConcurrency', limit: number, budgetMinutes: number, exhaustedAt: string | null, usage: { __typename?: 'BurstConcurrencyUsage', minutesRemaining: number, bursts: Array<{ __typename?: 'ConcurrencyBurst', endedAt: string }> } } | null, entitlements: { __typename?: 'AccountEntitlements', concurrency: { __typename?: 'EntitlementConcurrencyValue', limit: number } } } };
+export type ConcurrencyAlertCheckQuery = { __typename?: 'Query', account: { __typename?: 'Account', marketplace: Marketplace | null, marketplaceBillingURL: string | null, plan: { __typename?: 'BillingPlan', isFree: boolean } | null, burstConcurrency: { __typename?: 'AccountBurstConcurrency', limit: number, budgetMinutes: number, usage: { __typename?: 'BurstConcurrencyUsage', minutesRemaining: number, bursting: boolean } } | null, concurrencyStatus: { __typename?: 'AccountConcurrencyStatus', limitReached: boolean } | null, entitlements: { __typename?: 'AccountEntitlements', concurrency: { __typename?: 'EntitlementConcurrencyValue', limit: number } } } };
 
 export type CreateEnvironmentMutationVariables = Exact<{
   name: Scalars['String']['input'];
@@ -4720,7 +4726,7 @@ export const GetBillableStepsDocument = {"kind":"Document","definitions":[{"kind
 export const GetBillableRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillableRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"month"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"year"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"usage"},"name":{"kind":"Name","value":"runCountTimeSeries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"timeOptions"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"month"},"value":{"kind":"Variable","name":{"kind":"Name","value":"month"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"year"},"value":{"kind":"Variable","name":{"kind":"Name","value":"year"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillableRunsQuery, GetBillableRunsQueryVariables>;
 export const GetBillableExecutionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillableExecutions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"month"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"year"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"usage"},"name":{"kind":"Name","value":"executionTimeSeries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"timeOptions"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"month"},"value":{"kind":"Variable","name":{"kind":"Name","value":"month"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"year"},"value":{"kind":"Variable","name":{"kind":"Name","value":"year"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillableExecutionsQuery, GetBillableExecutionsQueryVariables>;
 export const GetBillingInfoDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetBillingInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"executions"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"stepCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}},{"kind":"Field","name":{"kind":"Name","value":"runCount"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]} as unknown as DocumentNode<GetBillingInfoQuery, GetBillingInfoQueryVariables>;
-export const ConcurrencyAlertCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ConcurrencyAlertCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"marketplaceBillingURL"}},{"kind":"Field","name":{"kind":"Name","value":"burstConcurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"budgetMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"exhaustedAt"}},{"kind":"Field","name":{"kind":"Name","value":"usage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"minutesRemaining"}},{"kind":"Field","name":{"kind":"Name","value":"bursts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"endedAt"}}]}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"concurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ConcurrencyAlertCheckQuery, ConcurrencyAlertCheckQueryVariables>;
+export const ConcurrencyAlertCheckDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ConcurrencyAlertCheck"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"marketplace"}},{"kind":"Field","name":{"kind":"Name","value":"marketplaceBillingURL"}},{"kind":"Field","name":{"kind":"Name","value":"plan"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"isFree"}}]}},{"kind":"Field","name":{"kind":"Name","value":"burstConcurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}},{"kind":"Field","name":{"kind":"Name","value":"budgetMinutes"}},{"kind":"Field","name":{"kind":"Name","value":"usage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"minutesRemaining"}},{"kind":"Field","name":{"kind":"Name","value":"bursting"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"concurrencyStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limitReached"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"entitlements"},"name":{"kind":"Name","value":"ents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"concurrency"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ConcurrencyAlertCheckQuery, ConcurrencyAlertCheckQueryVariables>;
 export const CreateEnvironmentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateEnvironment"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createWorkspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
 export const EnableDatadogConnectionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"EnableDatadogConnection"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"organizationID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"enableDatadogConnection"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"organizationID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"organizationID"}}},{"kind":"Argument","name":{"kind":"Name","value":"envID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<EnableDatadogConnectionMutation, EnableDatadogConnectionMutationVariables>;
 export const FinishDatadogIntegrationDocumentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"FinishDatadogIntegrationDocument"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orgName"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"orgID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"authCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ddDomain"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"datadogOAuthCompleted"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orgName"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orgName"}}},{"kind":"Argument","name":{"kind":"Name","value":"orgID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"orgID"}}},{"kind":"Argument","name":{"kind":"Name","value":"authCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"authCode"}}},{"kind":"Argument","name":{"kind":"Name","value":"ddSite"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ddSite"}}},{"kind":"Argument","name":{"kind":"Name","value":"ddDomain"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ddDomain"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<FinishDatadogIntegrationDocumentMutation, FinishDatadogIntegrationDocumentMutationVariables>;

@@ -5,51 +5,8 @@ import {
   alertState,
   concurrencyLinkProps,
   effectiveLimit,
-  isBurstActive,
   usedRatio,
 } from './concurrencyAlert';
-
-// A real minute boundary: 2023-11-14T22:14:00.000Z.
-const minuteStart = 1_700_000_040_000;
-const now = minuteStart + 37_500;
-const iso = (ms: number) => new Date(ms).toISOString();
-const minutes = (n: number) => n * 60_000;
-
-describe('isBurstActive', () => {
-  it('is boosted while the latest burst is ongoing', () => {
-    const bursts = [
-      { endedAt: iso(minuteStart - minutes(30)) },
-      { endedAt: iso(minuteStart) },
-    ];
-    expect(isBurstActive({ bursts, exhaustedAt: null, now })).toBe(true);
-  });
-
-  it('is boosted when the open minute is counted', () => {
-    const bursts = [{ endedAt: iso(minuteStart + minutes(1)) }];
-    expect(isBurstActive({ bursts, exhaustedAt: null, now })).toBe(true);
-  });
-
-  it('is boosted at the edge of the lag window', () => {
-    const bursts = [{ endedAt: iso(minuteStart - minutes(2)) }];
-    expect(isBurstActive({ bursts, exhaustedAt: null, now })).toBe(true);
-  });
-
-  it('is not boosted once the burst ended beyond the lag window', () => {
-    const bursts = [{ endedAt: iso(minuteStart - minutes(3)) }];
-    expect(isBurstActive({ bursts, exhaustedAt: null, now })).toBe(false);
-  });
-
-  it('is not boosted once the budget is exhausted', () => {
-    const bursts = [{ endedAt: iso(minuteStart) }];
-    expect(isBurstActive({ bursts, exhaustedAt: iso(minuteStart), now })).toBe(
-      false,
-    );
-  });
-
-  it('is not boosted without bursts', () => {
-    expect(isBurstActive({ bursts: [], exhaustedAt: null, now })).toBe(false);
-  });
-});
 
 describe('alertState', () => {
   it('is limited when only pressured', () => {

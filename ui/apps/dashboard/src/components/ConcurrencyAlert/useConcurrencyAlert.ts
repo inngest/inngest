@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react';
 import { gql, useQuery, type TypedDocumentNode } from 'urql';
 
-import { useAccountConcurrencyPressure } from '../Runs/useAccountConcurrencyPressure';
 import {
   alertState,
   concurrencyLinkProps,
   effectiveLimit,
-  isBurstActive,
   usedRatio,
   type ConcurrencyAlertState,
   type ConcurrencyAlertSurface,
@@ -14,16 +11,18 @@ import {
 
 type ConcurrencyAlertCheckQuery = {
   account: {
+    marketplace: string | null;
     marketplaceBillingURL: string | null;
+    plan: { isFree: boolean } | null;
     burstConcurrency: {
       limit: number;
       budgetMinutes: number;
-      exhaustedAt: string | null;
       usage: {
         minutesRemaining: number;
-        bursts: Array<{ endedAt: string }>;
+        bursting: boolean;
       };
     } | null;
+    concurrencyStatus: { limitReached: boolean } | null;
     entitlements: { concurrency: { limit: number } };
   };
 };
@@ -34,17 +33,21 @@ const ConcurrencyAlertCheckDocument: TypedDocumentNode<
 > = gql`
   query ConcurrencyAlertCheck {
     account {
+      marketplace
       marketplaceBillingURL
+      plan {
+        isFree
+      }
       burstConcurrency {
         limit
         budgetMinutes
-        exhaustedAt
         usage {
           minutesRemaining
-          bursts {
-            endedAt
-          }
+          bursting
         }
+      }
+      concurrencyStatus {
+        limitReached
       }
       entitlements: ents {
         concurrency {
@@ -55,11 +58,6 @@ const ConcurrencyAlertCheckDocument: TypedDocumentNode<
   }
 `;
 
-// cache-first means every mount shares one result, so each result keeps the
-// time it first arrived. Otherwise a later mount would judge old bursts
-// against a newer clock and disagree with the pill.
-const receivedAt = new WeakMap<object, number>();
-
 export type ConcurrencyAlert = {
   state: ConcurrencyAlertState;
   limit: number | undefined;
@@ -69,38 +67,16 @@ export type ConcurrencyAlert = {
 };
 
 export function useConcurrencyAlert(): ConcurrencyAlert | null {
-  const [{ data, error, fetching }] = useQuery({
+  const [{ data }] = useQuery({
     query: ConcurrencyAlertCheckDocument,
     requestPolicy: 'cache-first',
   });
 
-  const [now, setNow] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!data) {
-      return;
-    }
-    const at = receivedAt.get(data) ?? Date.now();
-    receivedAt.set(data, at);
-    setNow(at);
-  }, [data]);
-
   const burst = data?.account.burstConcurrency;
-  const boosted =
-    burst != null &&
-    now != null &&
-    isBurstActive({
-      bursts: burst.usage.bursts,
-      exhaustedAt: burst.exhaustedAt,
-      now,
-    });
-
-  const burstSettled = now != null || (error != null && !fetching);
-
-  const { isPressured, isMarketplace, isFreePlan } =
-    useAccountConcurrencyPressure({ skip: !burstSettled || boosted });
-
-  const state = alertState({ boosted, pressured: isPressured });
+  const state = alertState({
+    boosted: burst?.usage.bursting ?? false,
+    pressured: data?.account.concurrencyStatus?.limitReached ?? false,
+  });
   if (!state) {
     return null;
   }
@@ -125,8 +101,8 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
       concurrencyLinkProps({
         state,
         surface,
-        isMarketplace,
-        isFreePlan,
+        isMarketplace: Boolean(data?.account.marketplace),
+        isFreePlan: data?.account.plan?.isFree,
         marketplaceBillingURL: data?.account.marketplaceBillingURL,
       }),
   };

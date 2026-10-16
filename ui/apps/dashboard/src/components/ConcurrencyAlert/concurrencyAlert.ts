@@ -1,30 +1,10 @@
 import { pathCreator } from '@/utils/urls';
-import { floorToMinute } from '../Runs/accountConcurrency';
 
 export const BURST_MULTIPLIER = 3;
-
-// Absorbs ingest lag between a burst minute and its ClickHouse row.
-export const BURST_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
 export type ConcurrencyAlertState = 'boosted' | 'limited';
 
 export type ConcurrencyAlertSurface = 'pill' | 'card' | 'card-collapsed';
-
-export function isBurstActive({
-  bursts,
-  exhaustedAt,
-  now,
-}: {
-  bursts: { endedAt: string }[];
-  exhaustedAt: string | null;
-  now: number;
-}): boolean {
-  if (exhaustedAt != null || bursts.length === 0) {
-    return false;
-  }
-  const lastEndedAt = Math.max(...bursts.map((b) => Date.parse(b.endedAt)));
-  return lastEndedAt >= floorToMinute(now) - BURST_ACTIVE_WINDOW_MS;
-}
 
 export function alertState({
   boosted,
