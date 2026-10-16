@@ -2,7 +2,11 @@
 import { cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useConcurrencyAlert } from './useConcurrencyAlert';
+import {
+  ConcurrencyBurstUsageDocument,
+  useConcurrencyAlert,
+  type ConcurrencyAlertCheckQuery,
+} from './useConcurrencyAlert';
 
 const mocks = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
@@ -27,7 +31,7 @@ function account({
       burstConcurrency: {
         limit: 300,
         budgetMinutes: 100,
-        usage: { minutesRemaining: 40, bursting },
+        bursting,
       },
       concurrencyStatus: {
         limitReached,
@@ -38,6 +42,18 @@ function account({
   };
 }
 
+const usage = {
+  account: { burstConcurrency: { usage: { minutesRemaining: 40 } } },
+};
+
+function mockQueries(data: ConcurrencyAlertCheckQuery | undefined) {
+  mocks.useQuery.mockImplementation(({ query }) =>
+    query === ConcurrencyBurstUsageDocument
+      ? [{ data: data?.account.burstConcurrency?.bursting ? usage : undefined }]
+      : [{ data }],
+  );
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -45,9 +61,7 @@ afterEach(() => {
 
 describe('useConcurrencyAlert', () => {
   it('reports boosted with the burst limit while bursting', () => {
-    mocks.useQuery.mockReturnValue([
-      { data: account({ bursting: true, limitReached: true }) },
-    ]);
+    mockQueries(account({ bursting: true, limitReached: true }));
 
     const { result } = renderHook(() => useConcurrencyAlert());
 
@@ -57,20 +71,22 @@ describe('useConcurrencyAlert', () => {
   });
 
   it('reports limited with the base limit when not bursting', () => {
-    mocks.useQuery.mockReturnValue([
-      { data: account({ bursting: false, limitReached: true }) },
-    ]);
+    mockQueries(account({ bursting: false, limitReached: true }));
 
     const { result } = renderHook(() => useConcurrencyAlert());
 
     expect(result.current?.state).toBe('limited');
     expect(result.current?.limit).toBe(100);
+    expect(mocks.useQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: ConcurrencyBurstUsageDocument,
+        pause: true,
+      }),
+    );
   });
 
   it('reports nothing when neither bursting nor limited', () => {
-    mocks.useQuery.mockReturnValue([
-      { data: account({ bursting: false, limitReached: false }) },
-    ]);
+    mockQueries(account({ bursting: false, limitReached: false }));
 
     const { result } = renderHook(() => useConcurrencyAlert());
 
@@ -79,9 +95,7 @@ describe('useConcurrencyAlert', () => {
 
   it('reports limited when burst is off for the account', () => {
     const data = account({ bursting: false, limitReached: true });
-    mocks.useQuery.mockReturnValue([
-      { data: { account: { ...data.account, burstConcurrency: null } } },
-    ]);
+    mockQueries({ account: { ...data.account, burstConcurrency: null } });
 
     const { result } = renderHook(() => useConcurrencyAlert());
 
@@ -91,7 +105,7 @@ describe('useConcurrencyAlert', () => {
   });
 
   it('reports nothing while the query is loading', () => {
-    mocks.useQuery.mockReturnValue([{ data: undefined }]);
+    mockQueries(undefined);
 
     const { result } = renderHook(() => useConcurrencyAlert());
 

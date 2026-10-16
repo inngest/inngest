@@ -9,7 +9,7 @@ import {
   type ConcurrencyAlertSurface,
 } from './concurrencyAlert';
 
-type ConcurrencyAlertCheckQuery = {
+export type ConcurrencyAlertCheckQuery = {
   account: {
     id: string;
     marketplace: string | null;
@@ -18,10 +18,7 @@ type ConcurrencyAlertCheckQuery = {
     burstConcurrency: {
       limit: number;
       budgetMinutes: number;
-      usage: {
-        minutesRemaining: number;
-        bursting: boolean;
-      };
+      bursting: boolean;
     } | null;
     concurrencyStatus: {
       limitReached: boolean;
@@ -46,10 +43,7 @@ export const ConcurrencyAlertCheckDocument: TypedDocumentNode<
       burstConcurrency {
         limit
         budgetMinutes
-        usage {
-          minutesRemaining
-          bursting
-        }
+        bursting
       }
       concurrencyStatus {
         limitReached
@@ -58,6 +52,27 @@ export const ConcurrencyAlertCheckDocument: TypedDocumentNode<
       entitlements: ents {
         concurrency {
           limit
+        }
+      }
+    }
+  }
+`;
+
+type ConcurrencyBurstUsageQuery = {
+  account: {
+    burstConcurrency: { usage: { minutesRemaining: number } } | null;
+  };
+};
+
+export const ConcurrencyBurstUsageDocument: TypedDocumentNode<
+  ConcurrencyBurstUsageQuery,
+  Record<string, never>
+> = gql`
+  query ConcurrencyBurstUsage {
+    account {
+      burstConcurrency {
+        usage {
+          minutesRemaining
         }
       }
     }
@@ -79,13 +94,23 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
   });
 
   const burst = data?.account.burstConcurrency;
+  const bursting = burst?.bursting ?? false;
+  const [{ data: usageData }] = useQuery({
+    query: ConcurrencyBurstUsageDocument,
+    requestPolicy: 'cache-first',
+    pause: !bursting,
+  });
+
   const state = alertState({
-    boosted: burst?.usage.bursting ?? false,
+    boosted: bursting,
     pressured: data?.account.concurrencyStatus?.limitReached ?? false,
   });
   if (!state) {
     return null;
   }
+
+  const minutesRemaining =
+    usageData?.account.burstConcurrency?.usage.minutesRemaining;
 
   const limit = effectiveLimit({
     state,
@@ -96,13 +121,11 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
   return {
     state,
     limit,
-    minutesRemaining: burst?.usage.minutesRemaining,
-    usedRatio: burst
-      ? usedRatio({
-          budgetMinutes: burst.budgetMinutes,
-          minutesRemaining: burst.usage.minutesRemaining,
-        })
-      : 0,
+    minutesRemaining,
+    usedRatio:
+      burst && minutesRemaining !== undefined
+        ? usedRatio({ budgetMinutes: burst.budgetMinutes, minutesRemaining })
+        : 0,
     linkProps: (surface) =>
       concurrencyLinkProps({
         state,
