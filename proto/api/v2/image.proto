@@ -1,0 +1,52 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+message Build {
+  string id = 1;
+  string name = 2;
+  string tag = 3;
+  string architecture = 4;
+  // pending (uploading), uploaded (queued/processing), ready, or failed.
+  string status = 5;
+  string artifact_digest = 6;
+  string builder_sandbox_id = 7;
+  string error = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+}
+
+message CreateBuildRequest {
+  // A workspace-local name, without an account or inngest/ prefix.
+  string name = 1;
+  string tag = 2;
+  // One linux/amd64 image from docker save, as tar or tar.gz.
+  string architecture = 3;
+  int64 upload_size_bytes = 4;
+  // Lowercase SHA256 of the uploaded archive bytes.
+  string upload_sha256 = 5;
+  // Runtime config is read from the image archive, never supplied separately.
+  reserved 6;
+  reserved "config";
+}
+message CreateBuildResponse {
+  Build data = 1;
+  string upload_url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+message CommitBuildRequest {
+  string build_id = 1;
+  // Must match the name used when creating the build.
+  string name = 2;
+}
+message GetBuildRequest { string build_id = 1; }
+message CancelBuildRequest { string build_id = 1; }
+message BuildResponse { Build data = 1; }
+message ListBuildsRequest {}
+message ListBuildsResponse {
+  // The most recent 100 builds in the selected workspace.
+  repeated Build data = 1;
+}
