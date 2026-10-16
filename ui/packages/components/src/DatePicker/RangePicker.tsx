@@ -4,9 +4,15 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { isBefore, type Duration } from 'date-fns';
 
 import { Button } from '../Button';
+import {
+  menuItemClassName,
+  menuPanelClassName,
+  menuSeparatorClassName,
+} from '../DropdownMenu/menuStyles';
 import { Input } from '../Forms/Input';
 import { Pill } from '../Pill';
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
+import { cn } from '../utils/classNames';
 import {
   DURATION_STRING_REGEX,
   durationToString,
@@ -238,10 +244,12 @@ export const RangePicker = ({
           </TriggerComponent>
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start" className="border-subtle shadow-primary">
+      <PopoverContent align="start" className={cn(menuPanelClassName, 'p-0')}>
         <div className="bg-canvasBase flex flex-row">
-          <div className={`${showAbsolute && 'min-h-[584px]'} border-subtle w-[250px] border-r`}>
-            <div className="px-3 py-2">
+          <div
+            className={cn('border-subtle w-[250px] p-1', showAbsolute && 'min-h-[584px] border-r')}
+          >
+            <div className="px-2 py-2">
               <Input
                 ref={durationRef}
                 type="text"
@@ -257,9 +265,11 @@ export const RangePicker = ({
               return (
                 <div
                   key={`duration-${i}`}
-                  className={`text-basis hover:bg-canvasMuted flex flex-row items-center justify-between px-4 py-2 text-sm ${
+                  className={cn(
+                    menuItemClassName,
+                    'hover:bg-canvasSubtle justify-between',
                     planValid ? 'cursor-pointer' : 'cursor-not-allowed'
-                  }`}
+                  )}
                   {...(planValid && {
                     onClick: () => {
                       setDisplayValue(<RelativeDisplay duration={k} />);
@@ -280,9 +290,12 @@ export const RangePicker = ({
             })}
             <div className="flex flex-col">
               <div
-                className={`border-muted text-basis hover:bg-canvasMuted flex cursor-pointer items-center justify-between border-t px-4 py-2 text-sm ${
-                  showAbsolute && 'bg-canvasMuted'
-                }`}
+                className={cn(
+                  menuItemClassName,
+                  menuSeparatorClassName,
+                  'hover:bg-canvasSubtle cursor-pointer justify-between rounded-none px-3',
+                  showAbsolute && 'bg-canvasSubtle'
+                )}
                 onClick={() => {
                   setShowAbsolute(!showAbsolute);
                   setDurationError('');
