@@ -10,7 +10,11 @@ import {
   type APICredential,
 } from './keyDisplay';
 
-export function APIKeyStatus({ apiKey }: { apiKey: APICredential }) {
+export function APIKeyStatus({
+  apiKey,
+}: {
+  apiKey: Pick<APICredential, 'revokedAt' | 'expiresAt'>;
+}) {
   const status = apiKeyStatus(apiKey);
   return (
     <Pill

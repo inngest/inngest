@@ -182,6 +182,13 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
         </DropdownMenuItem>
 
         <DropdownMenuItem
+          onSelect={() => navigate({ to: '/settings/oauth-sessions' })}
+        >
+          <RiKey2Line className={iconClassName} />
+          OAuth sessions
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
           onSelect={() => {
             showOnboardingWidget();
             navigate({ to: onboardingTo });
