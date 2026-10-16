@@ -6,6 +6,7 @@ import type { UsageDimension } from '@/components/Billing/Usage/types';
 type UsageSearchParams = {
   previous?: boolean;
   dimension?: UsageDimension;
+  ref?: string;
 };
 
 export const Route = createFileRoute('/_authed/billing/usage/')({
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/_authed/billing/usage/')({
     return {
       previous: search.previous === 'true' || search.previous === true,
       dimension: search.dimension as UsageDimension,
+      ref: typeof search.ref === 'string' ? search.ref : undefined,
     };
   },
 });
