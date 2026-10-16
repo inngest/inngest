@@ -10,7 +10,7 @@ function UnattachedSyncsLayout() {
     <>
       <Header breadcrumb={[{ text: 'Unattached Syncs', href: '/env' }]} />
 
-      <div className="no-scrollbar h-full overflow-y-scroll">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <Outlet />
       </div>
     </>

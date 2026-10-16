@@ -27,7 +27,7 @@ function ReplayDetailsPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 pb-4 pt-16">
       <div className="text-muted text-xs uppercase">Replay ID: {replayID}</div>
       {isLoading ? (
         <Skeleton className="mb-5 h-9 w-1/2 py-1" />

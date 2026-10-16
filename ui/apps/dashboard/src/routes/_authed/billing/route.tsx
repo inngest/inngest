@@ -51,9 +51,9 @@ function BillingLayout() {
         breadcrumb={[{ text: 'Billing', href: pathCreator.billing() }]}
         tabs={tabs}
       />
-      <div className="bg-canvasSubtle flex h-full flex-col">
+      <div className="bg-canvasSubtle no-scrollbar min-h-0 flex-1 overflow-y-auto">
         <MarketplaceAccessControl isMarketplace={profile.isMarketplace}>
-          <div className="no-scrollbar mx-auto w-full max-w-[1200px] overflow-y-scroll px-6 pb-16">
+          <div className="mx-auto w-full max-w-[1200px] px-6 pb-16">
             <PageTitle />
             <Outlet />
           </div>
