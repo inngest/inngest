@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/hkdf"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"time"
 
@@ -14,6 +16,33 @@ import (
 
 const wellKnownClaimIssuer = "connect.inngest.com"
 const wellKnownClaimAudience = "gateway.connect.inngest.com"
+
+const (
+	// sessionJwtSecretSalt and sessionJwtSecretInfo domain-separate the HKDF
+	// derivation below from any other use of the signing key.
+	sessionJwtSecretSalt = "inngest-connect-gateway-session-jwt"
+	sessionJwtSecretInfo = "v1"
+	sessionJwtSecretSize = 32
+)
+
+// DeriveSessionJwtSecret derives the HS256 secret used to mint and verify
+// connect gateway session tokens from the instance's signing key.
+//
+// The dev server wires both the session-token signer (POST /v0/connect/start,
+// which is authenticated with the signing key) and the gateway's token
+// verifier with the same secret, so clients that legitimately hold the
+// signing key always receive tokens minted from this derived secret, while
+// attackers who only know the public repo-wide dev constant cannot forge
+// tokens.
+func DeriveSessionJwtSecret(signingKey string) ([]byte, error) {
+	return hkdf.Key(
+		sha256.New,
+		[]byte(signingKey),
+		[]byte(sessionJwtSecretSalt),
+		sessionJwtSecretInfo,
+		sessionJwtSecretSize,
+	)
+}
 
 const DefaultExpiry = time.Minute * 5
 
