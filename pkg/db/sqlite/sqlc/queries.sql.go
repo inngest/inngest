@@ -2666,10 +2666,10 @@ ON CONFLICT(id) DO UPDATE SET
     -- these columns back. An archived row takes the incoming values; error
     -- and checksum below also drop so revival cannot short-circuit.
     sdk_language = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.sdk_language ELSE excluded.sdk_language END,
-    sdk_version = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.sdk_version ELSE excluded.sdk_version END,
-    framework = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.framework ELSE excluded.framework END,
-    metadata = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.metadata ELSE excluded.metadata END,
-    status = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.status ELSE excluded.status END,
+    sdk_version  = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.sdk_version ELSE excluded.sdk_version END,
+    framework    = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.framework ELSE excluded.framework END,
+    metadata     = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.metadata ELSE excluded.metadata END,
+    status       = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.status ELSE excluded.status END,
     error = CASE
       WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.error
       ELSE excluded.error
