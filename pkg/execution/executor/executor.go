@@ -1468,6 +1468,16 @@ func (e *executor) schedule(
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
+			// A scheduling retry may already own the singleton lock. Do not release
+			// or cancel that run before Create applies state idempotency below.
+			// Keep scheduling so a retry can still enqueue a previously created run.
+			var existing *sv2.IdempotencyEntry
+			if req.Function.Singleton.Mode == enums.SingletonModeCancel {
+				existing, err = e.smv2.LookupIdempotency(ctx, metadata.ID, key)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error checking singleton scheduling idempotency: %w", err)
+				}
+			}
 			// Attempt to early handle function singletons when in skip mode. Function runs may still
 			// fail to enqueue later when attempting to atomically acquire the function mutex.
 			//
@@ -1476,11 +1486,14 @@ func (e *executor) schedule(
 			// the lock becomes available to any competing run. If a faster run acquires it before
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
-			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, queue.Scope{
-				AccountID:  req.AccountID,
-				EnvID:      req.WorkspaceID,
-				FunctionID: req.Function.ID,
-			}, singletonKey, *req.Function.Singleton)
+			var singletonRunID *ulid.ULID
+			if existing == nil {
+				singletonRunID, err = e.singletonMgr.HandleSingleton(ctx, queue.Scope{
+					AccountID:  req.AccountID,
+					EnvID:      req.WorkspaceID,
+					FunctionID: req.Function.ID,
+				}, singletonKey, *req.Function.Singleton)
+			}
 			if err != nil {
 				return nil, nil, err
 			}
