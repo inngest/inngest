@@ -253,17 +253,6 @@ message ConsumePauseResponse {
   ConsumePauseResult result = 1;
 }
 
-message LookupIdempotencyRequest {
-  ID id = 1;
-  string key = 2;
-}
-
-message LookupIdempotencyResponse {
-  // Absent when the key has no stored run.
-  optional string run_id = 1;
-  bool is_tombstone = 2;
-}
-
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
@@ -283,5 +272,4 @@ service RunService {
   rpc LoadState(LoadStateRequest) returns (LoadStateResponse) {}
   rpc LoadDefers(LoadDefersRequest) returns (LoadDefersResponse) {}
   rpc LoadDefersMeta(LoadDefersMetaRequest) returns (LoadDefersMetaResponse) {}
-  rpc LookupIdempotency(LookupIdempotencyRequest) returns (LookupIdempotencyResponse) {}
 }

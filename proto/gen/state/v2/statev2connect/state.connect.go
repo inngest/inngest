@@ -69,9 +69,6 @@ const (
 	// RunServiceLoadDefersMetaProcedure is the fully-qualified name of the RunService's LoadDefersMeta
 	// RPC.
 	RunServiceLoadDefersMetaProcedure = "/state.v2.RunService/LoadDefersMeta"
-	// RunServiceLookupIdempotencyProcedure is the fully-qualified name of the RunService's
-	// LookupIdempotency RPC.
-	RunServiceLookupIdempotencyProcedure = "/state.v2.RunService/LookupIdempotency"
 )
 
 // RunServiceClient is a client for the state.v2.RunService service.
@@ -92,7 +89,6 @@ type RunServiceClient interface {
 	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 	LoadDefers(context.Context, *connect.Request[v2.LoadDefersRequest]) (*connect.Response[v2.LoadDefersResponse], error)
 	LoadDefersMeta(context.Context, *connect.Request[v2.LoadDefersMetaRequest]) (*connect.Response[v2.LoadDefersMetaResponse], error)
-	LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error)
 }
 
 // NewRunServiceClient constructs a client for the state.v2.RunService service. By default, it uses
@@ -202,12 +198,6 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("LoadDefersMeta")),
 			connect.WithClientOptions(opts...),
 		),
-		lookupIdempotency: connect.NewClient[v2.LookupIdempotencyRequest, v2.LookupIdempotencyResponse](
-			httpClient,
-			baseURL+RunServiceLookupIdempotencyProcedure,
-			connect.WithSchema(runServiceMethods.ByName("LookupIdempotency")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -229,7 +219,6 @@ type runServiceClient struct {
 	loadState         *connect.Client[v2.LoadStateRequest, v2.LoadStateResponse]
 	loadDefers        *connect.Client[v2.LoadDefersRequest, v2.LoadDefersResponse]
 	loadDefersMeta    *connect.Client[v2.LoadDefersMetaRequest, v2.LoadDefersMetaResponse]
-	lookupIdempotency *connect.Client[v2.LookupIdempotencyRequest, v2.LookupIdempotencyResponse]
 }
 
 // Create calls state.v2.RunService.Create.
@@ -312,11 +301,6 @@ func (c *runServiceClient) LoadDefersMeta(ctx context.Context, req *connect.Requ
 	return c.loadDefersMeta.CallUnary(ctx, req)
 }
 
-// LookupIdempotency calls state.v2.RunService.LookupIdempotency.
-func (c *runServiceClient) LookupIdempotency(ctx context.Context, req *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error) {
-	return c.lookupIdempotency.CallUnary(ctx, req)
-}
-
 // RunServiceHandler is an implementation of the state.v2.RunService service.
 type RunServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
@@ -335,7 +319,6 @@ type RunServiceHandler interface {
 	LoadState(context.Context, *connect.Request[v2.LoadStateRequest]) (*connect.Response[v2.LoadStateResponse], error)
 	LoadDefers(context.Context, *connect.Request[v2.LoadDefersRequest]) (*connect.Response[v2.LoadDefersResponse], error)
 	LoadDefersMeta(context.Context, *connect.Request[v2.LoadDefersMetaRequest]) (*connect.Response[v2.LoadDefersMetaResponse], error)
-	LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error)
 }
 
 // NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -441,12 +424,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("LoadDefersMeta")),
 		connect.WithHandlerOptions(opts...),
 	)
-	runServiceLookupIdempotencyHandler := connect.NewUnaryHandler(
-		RunServiceLookupIdempotencyProcedure,
-		svc.LookupIdempotency,
-		connect.WithSchema(runServiceMethods.ByName("LookupIdempotency")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/state.v2.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunServiceCreateProcedure:
@@ -481,8 +458,6 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceLoadDefersHandler.ServeHTTP(w, r)
 		case RunServiceLoadDefersMetaProcedure:
 			runServiceLoadDefersMetaHandler.ServeHTTP(w, r)
-		case RunServiceLookupIdempotencyProcedure:
-			runServiceLookupIdempotencyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -554,8 +529,4 @@ func (UnimplementedRunServiceHandler) LoadDefers(context.Context, *connect.Reque
 
 func (UnimplementedRunServiceHandler) LoadDefersMeta(context.Context, *connect.Request[v2.LoadDefersMetaRequest]) (*connect.Response[v2.LoadDefersMetaResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LoadDefersMeta is not implemented"))
-}
-
-func (UnimplementedRunServiceHandler) LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LookupIdempotency is not implemented"))
 }

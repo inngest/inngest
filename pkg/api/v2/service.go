@@ -214,7 +214,6 @@ func normalizedV2Path(path string) string {
 			break
 		}
 	}
-	path = strings.TrimRight(path, "/")
 	if path == "" {
 		return "/"
 	}
@@ -233,7 +232,7 @@ func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Han
 			}
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if limited, ok := handlers[route{r.Method, normalizedV2Path(r.URL.Path)}]; ok {
+			if limited, ok := handlers[route{r.Method, strings.TrimRight(normalizedV2Path(r.URL.Path), "/")}]; ok {
 				limited.ServeHTTP(w, r)
 				return
 			}

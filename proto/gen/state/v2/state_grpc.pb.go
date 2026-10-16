@@ -35,7 +35,6 @@ const (
 	RunService_LoadState_FullMethodName         = "/state.v2.RunService/LoadState"
 	RunService_LoadDefers_FullMethodName        = "/state.v2.RunService/LoadDefers"
 	RunService_LoadDefersMeta_FullMethodName    = "/state.v2.RunService/LoadDefersMeta"
-	RunService_LookupIdempotency_FullMethodName = "/state.v2.RunService/LookupIdempotency"
 )
 
 // RunServiceClient is the client API for RunService service.
@@ -58,7 +57,6 @@ type RunServiceClient interface {
 	LoadState(ctx context.Context, in *LoadStateRequest, opts ...grpc.CallOption) (*LoadStateResponse, error)
 	LoadDefers(ctx context.Context, in *LoadDefersRequest, opts ...grpc.CallOption) (*LoadDefersResponse, error)
 	LoadDefersMeta(ctx context.Context, in *LoadDefersMetaRequest, opts ...grpc.CallOption) (*LoadDefersMetaResponse, error)
-	LookupIdempotency(ctx context.Context, in *LookupIdempotencyRequest, opts ...grpc.CallOption) (*LookupIdempotencyResponse, error)
 }
 
 type runServiceClient struct {
@@ -229,16 +227,6 @@ func (c *runServiceClient) LoadDefersMeta(ctx context.Context, in *LoadDefersMet
 	return out, nil
 }
 
-func (c *runServiceClient) LookupIdempotency(ctx context.Context, in *LookupIdempotencyRequest, opts ...grpc.CallOption) (*LookupIdempotencyResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LookupIdempotencyResponse)
-	err := c.cc.Invoke(ctx, RunService_LookupIdempotency_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // RunServiceServer is the server API for RunService service.
 // All implementations must embed UnimplementedRunServiceServer
 // for forward compatibility.
@@ -259,7 +247,6 @@ type RunServiceServer interface {
 	LoadState(context.Context, *LoadStateRequest) (*LoadStateResponse, error)
 	LoadDefers(context.Context, *LoadDefersRequest) (*LoadDefersResponse, error)
 	LoadDefersMeta(context.Context, *LoadDefersMetaRequest) (*LoadDefersMetaResponse, error)
-	LookupIdempotency(context.Context, *LookupIdempotencyRequest) (*LookupIdempotencyResponse, error)
 	mustEmbedUnimplementedRunServiceServer()
 }
 
@@ -317,9 +304,6 @@ func (UnimplementedRunServiceServer) LoadDefers(context.Context, *LoadDefersRequ
 }
 func (UnimplementedRunServiceServer) LoadDefersMeta(context.Context, *LoadDefersMetaRequest) (*LoadDefersMetaResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadDefersMeta not implemented")
-}
-func (UnimplementedRunServiceServer) LookupIdempotency(context.Context, *LookupIdempotencyRequest) (*LookupIdempotencyResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method LookupIdempotency not implemented")
 }
 func (UnimplementedRunServiceServer) mustEmbedUnimplementedRunServiceServer() {}
 func (UnimplementedRunServiceServer) testEmbeddedByValue()                    {}
@@ -630,24 +614,6 @@ func _RunService_LoadDefersMeta_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RunService_LookupIdempotency_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LookupIdempotencyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RunServiceServer).LookupIdempotency(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RunService_LookupIdempotency_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RunServiceServer).LookupIdempotency(ctx, req.(*LookupIdempotencyRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // RunService_ServiceDesc is the grpc.ServiceDesc for RunService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -718,10 +684,6 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LoadDefersMeta",
 			Handler:    _RunService_LoadDefersMeta_Handler,
-		},
-		{
-			MethodName: "LookupIdempotency",
-			Handler:    _RunService_LookupIdempotency_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -2471,111 +2471,6 @@ func (x *ConsumePauseResponse) GetResult() *ConsumePauseResult {
 	return nil
 }
 
-type LookupIdempotencyRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LookupIdempotencyRequest) Reset() {
-	*x = LookupIdempotencyRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[44]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LookupIdempotencyRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LookupIdempotencyRequest) ProtoMessage() {}
-
-func (x *LookupIdempotencyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[44]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LookupIdempotencyRequest.ProtoReflect.Descriptor instead.
-func (*LookupIdempotencyRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{44}
-}
-
-func (x *LookupIdempotencyRequest) GetId() *ID {
-	if x != nil {
-		return x.Id
-	}
-	return nil
-}
-
-func (x *LookupIdempotencyRequest) GetKey() string {
-	if x != nil {
-		return x.Key
-	}
-	return ""
-}
-
-type LookupIdempotencyResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Absent when the key has no stored run.
-	RunId         *string `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3,oneof" json:"run_id,omitempty"`
-	IsTombstone   bool    `protobuf:"varint,2,opt,name=is_tombstone,json=isTombstone,proto3" json:"is_tombstone,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *LookupIdempotencyResponse) Reset() {
-	*x = LookupIdempotencyResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[45]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *LookupIdempotencyResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*LookupIdempotencyResponse) ProtoMessage() {}
-
-func (x *LookupIdempotencyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[45]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use LookupIdempotencyResponse.ProtoReflect.Descriptor instead.
-func (*LookupIdempotencyResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{45}
-}
-
-func (x *LookupIdempotencyResponse) GetRunId() string {
-	if x != nil && x.RunId != nil {
-		return *x.RunId
-	}
-	return ""
-}
-
-func (x *LookupIdempotencyResponse) GetIsTombstone() bool {
-	if x != nil {
-		return x.IsTombstone
-	}
-	return false
-}
-
 var File_state_v2_state_proto protoreflect.FileDescriptor
 
 const file_state_v2_state_proto_rawDesc = "" +
@@ -2760,21 +2655,13 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x05pause\x18\x01 \x01(\v2\x0f.state.v2.PauseR\x05pause\x12.\n" +
 	"\x04opts\x18\x02 \x01(\v2\x1a.state.v2.ConsumePauseOptsR\x04opts\"L\n" +
 	"\x14ConsumePauseResponse\x124\n" +
-	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result\"J\n" +
-	"\x18LookupIdempotencyRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"e\n" +
-	"\x19LookupIdempotencyResponse\x12\x1a\n" +
-	"\x06run_id\x18\x01 \x01(\tH\x00R\x05runId\x88\x01\x01\x12!\n" +
-	"\fis_tombstone\x18\x02 \x01(\bR\visTombstoneB\t\n" +
-	"\a_run_id*\x94\x01\n" +
+	"\x06result\x18\x01 \x01(\v2\x1c.state.v2.ConsumePauseResultR\x06result*\x94\x01\n" +
 	"\vDeferStatus\x12\x18\n" +
 	"\x14DEFER_STATUS_UNKNOWN\x10\x00\x12\x1a\n" +
 	"\x16DEFER_STATUS_SCHEDULED\x10\x01\x12\x1a\n" +
 	"\x16DEFER_STATUS_AFTER_RUN\x10\x02\x12\x18\n" +
 	"\x14DEFER_STATUS_ABORTED\x10\x03\x12\x19\n" +
-	"\x15DEFER_STATUS_REJECTED\x10\x042\xc5\n" +
-	"\n" +
+	"\x15DEFER_STATUS_REJECTED\x10\x042\xe5\t\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
@@ -2794,8 +2681,7 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\tLoadState\x12\x1a.state.v2.LoadStateRequest\x1a\x1b.state.v2.LoadStateResponse\"\x00\x12I\n" +
 	"\n" +
 	"LoadDefers\x12\x1b.state.v2.LoadDefersRequest\x1a\x1c.state.v2.LoadDefersResponse\"\x00\x12U\n" +
-	"\x0eLoadDefersMeta\x12\x1f.state.v2.LoadDefersMetaRequest\x1a .state.v2.LoadDefersMetaResponse\"\x00\x12^\n" +
-	"\x11LookupIdempotency\x12\".state.v2.LookupIdempotencyRequest\x1a#.state.v2.LookupIdempotencyResponse\"\x00B7Z5github.com/inngest/inngest/proto/gen/state/v2;statev2b\x06proto3"
+	"\x0eLoadDefersMeta\x12\x1f.state.v2.LoadDefersMetaRequest\x1a .state.v2.LoadDefersMetaResponse\"\x00B7Z5github.com/inngest/inngest/proto/gen/state/v2;statev2b\x06proto3"
 
 var (
 	file_state_v2_state_proto_rawDescOnce sync.Once
@@ -2810,7 +2696,7 @@ func file_state_v2_state_proto_rawDescGZIP() []byte {
 }
 
 var file_state_v2_state_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_state_v2_state_proto_goTypes = []any{
 	(DeferStatus)(0),                  // 0: state.v2.DeferStatus
 	(*Metadata)(nil),                  // 1: state.v2.Metadata
@@ -2857,42 +2743,40 @@ var file_state_v2_state_proto_goTypes = []any{
 	(*ConsumePauseResult)(nil),        // 42: state.v2.ConsumePauseResult
 	(*ConsumePauseRequest)(nil),       // 43: state.v2.ConsumePauseRequest
 	(*ConsumePauseResponse)(nil),      // 44: state.v2.ConsumePauseResponse
-	(*LookupIdempotencyRequest)(nil),  // 45: state.v2.LookupIdempotencyRequest
-	(*LookupIdempotencyResponse)(nil), // 46: state.v2.LookupIdempotencyResponse
-	nil,                               // 47: state.v2.CreateStateResponse.StepsEntry
-	nil,                               // 48: state.v2.LoadStepsResponse.StepsEntry
-	nil,                               // 49: state.v2.LoadStateResponse.StepsEntry
-	nil,                               // 50: state.v2.LoadDefersResponse.DefersEntry
-	nil,                               // 51: state.v2.LoadDefersMetaResponse.DefersEntry
-	(*timestamppb.Timestamp)(nil),     // 52: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 53: google.protobuf.Struct
+	nil,                               // 45: state.v2.CreateStateResponse.StepsEntry
+	nil,                               // 46: state.v2.LoadStepsResponse.StepsEntry
+	nil,                               // 47: state.v2.LoadStateResponse.StepsEntry
+	nil,                               // 48: state.v2.LoadDefersResponse.DefersEntry
+	nil,                               // 49: state.v2.LoadDefersMetaResponse.DefersEntry
+	(*timestamppb.Timestamp)(nil),     // 50: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 51: google.protobuf.Struct
 }
 var file_state_v2_state_proto_depIdxs = []int32{
 	2,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
 	3,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
 	5,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
 	6,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
-	52, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
+	50, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
 	4,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
-	53, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
-	52, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
+	51, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
+	50, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
 	1,  // 8: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
 	1,  // 9: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
-	47, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	45, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
 	2,  // 11: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
 	2,  // 12: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
 	1,  // 13: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
 	2,  // 14: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	52, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	50, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
 	2,  // 16: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
 	2,  // 17: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
 	2,  // 18: state.v2.ExistsRequest.id:type_name -> state.v2.ID
 	2,  // 19: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
 	2,  // 20: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	48, // 21: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	46, // 21: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
 	2,  // 22: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
 	1,  // 23: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	49, // 24: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	47, // 24: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
 	0,  // 25: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
 	0,  // 26: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
 	2,  // 27: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
@@ -2901,55 +2785,52 @@ var file_state_v2_state_proto_depIdxs = []int32{
 	0,  // 30: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
 	2,  // 31: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
 	2,  // 32: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
-	50, // 33: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
+	48, // 33: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
 	2,  // 34: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
-	51, // 35: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
+	49, // 35: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
 	39, // 36: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
 	40, // 37: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
 	41, // 38: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
 	42, // 39: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
-	2,  // 40: state.v2.LookupIdempotencyRequest.id:type_name -> state.v2.ID
-	27, // 41: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
-	28, // 42: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
-	7,  // 43: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	9,  // 44: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	19, // 45: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	13, // 46: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	15, // 47: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	17, // 48: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	43, // 49: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
-	29, // 50: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
-	31, // 51: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
-	33, // 52: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
-	11, // 53: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	21, // 54: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	23, // 55: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	25, // 56: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	35, // 57: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
-	37, // 58: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
-	45, // 59: state.v2.RunService.LookupIdempotency:input_type -> state.v2.LookupIdempotencyRequest
-	8,  // 60: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	10, // 61: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	20, // 62: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	14, // 63: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	16, // 64: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	18, // 65: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	44, // 66: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
-	30, // 67: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
-	32, // 68: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
-	34, // 69: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
-	12, // 70: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	22, // 71: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	24, // 72: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	26, // 73: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	36, // 74: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
-	38, // 75: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
-	46, // 76: state.v2.RunService.LookupIdempotency:output_type -> state.v2.LookupIdempotencyResponse
-	60, // [60:77] is the sub-list for method output_type
-	43, // [43:60] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	27, // 40: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
+	28, // 41: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
+	7,  // 42: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	9,  // 43: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	19, // 44: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	13, // 45: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	15, // 46: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	17, // 47: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	43, // 48: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
+	29, // 49: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
+	31, // 50: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
+	33, // 51: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
+	11, // 52: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	21, // 53: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	23, // 54: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	25, // 55: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	35, // 56: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
+	37, // 57: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
+	8,  // 58: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	10, // 59: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	20, // 60: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	14, // 61: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	16, // 62: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	18, // 63: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	44, // 64: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
+	30, // 65: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
+	32, // 66: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
+	34, // 67: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
+	12, // 68: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	22, // 69: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	24, // 70: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	26, // 71: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	36, // 72: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
+	38, // 73: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
+	58, // [58:74] is the sub-list for method output_type
+	42, // [42:58] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }
@@ -2958,14 +2839,13 @@ func file_state_v2_state_proto_init() {
 		return
 	}
 	file_state_v2_state_proto_msgTypes[2].OneofWrappers = []any{}
-	file_state_v2_state_proto_msgTypes[45].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_v2_state_proto_rawDesc), len(file_state_v2_state_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   51,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

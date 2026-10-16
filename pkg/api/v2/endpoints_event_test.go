@@ -369,3 +369,15 @@ func TestHTTPGateway_RequestBodyLimitsNormalizePaths(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPGateway_TrailingSlashRemainsNotFound(t *testing.T) {
+	sender := &testEventSender{}
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/events/", strings.NewReader(`{"name":"test/event"}`))
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+	require.Nil(t, sender.event)
+}
