@@ -1468,6 +1468,18 @@ func (e *executor) schedule(
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
+			singletonConfig = &queue.Singleton{Key: singletonKey}
+			if req.OriginalRunID != nil && req.IdempotencyKey != nil {
+				existing, err := e.smv2.LookupIdempotency(ctx, metadata.ID, key)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error looking up replay run: %w", err)
+				}
+				if existing != nil {
+					// A replay retry must not cancel or skip its own run. Continue
+					// through state creation and enqueue to recover partial scheduling.
+					break
+				}
+			}
 			// Attempt to early handle function singletons when in skip mode. Function runs may still
 			// fail to enqueue later when attempting to atomically acquire the function mutex.
 			//
@@ -1514,7 +1526,6 @@ func (e *executor) schedule(
 					singletonSkipRunID = singletonRunID
 				}
 			}
-			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
 			// Ignore singleton expressions if we cannot evaluate them
 			l.Warn("error evaluating singleton expression", "error", err)
