@@ -20,6 +20,7 @@ function account({
 }) {
   return {
     account: {
+      id: 'acct',
       marketplace: null,
       marketplaceBillingURL: null,
       plan: { isFree: false },
@@ -28,7 +29,10 @@ function account({
         budgetMinutes: 100,
         usage: { minutesRemaining: 40, bursting },
       },
-      concurrencyStatus: { limitReached },
+      concurrencyStatus: {
+        limitReached,
+        minutesWithHits: limitReached ? 3 : 0,
+      },
       entitlements: { concurrency: { limit: 100 } },
     },
   };

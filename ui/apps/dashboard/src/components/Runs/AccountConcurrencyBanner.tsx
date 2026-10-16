@@ -58,18 +58,10 @@ export function AccountConcurrencyBanner({ refreshNonce, scope }: Props) {
   // banner back until hydration so a previously-dismissed banner never flashes.
   const [isReady, setIsReady] = useState(false);
 
-  // Derived from state set by the effect below, so it's available before the
-  // hook call that needs it as `skip`. On the first render nothing is ready
-  // yet, which is exactly when we want the expensive query suppressed anyway.
   const isDismissed = isDismissalActive(dismissedAt, Date.now());
 
-  // Don't fetch an answer we can't act on: nothing before we know the dismissal
-  // state, and nothing for the 24h the banner stays dismissed.
   const { isPressured, minutesWithHits, accountID, isFreePlan, isMarketplace } =
-    useAccountConcurrencyPressure({
-      refreshNonce,
-      skip: !isReady || isDismissed,
-    });
+    useAccountConcurrencyPressure({ refreshNonce });
 
   const isVisible = isReady && isPressured && !isDismissed;
 

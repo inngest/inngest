@@ -11,6 +11,7 @@ import {
 
 type ConcurrencyAlertCheckQuery = {
   account: {
+    id: string;
     marketplace: string | null;
     marketplaceBillingURL: string | null;
     plan: { isFree: boolean } | null;
@@ -22,17 +23,21 @@ type ConcurrencyAlertCheckQuery = {
         bursting: boolean;
       };
     } | null;
-    concurrencyStatus: { limitReached: boolean } | null;
+    concurrencyStatus: {
+      limitReached: boolean;
+      minutesWithHits: number;
+    } | null;
     entitlements: { concurrency: { limit: number } };
   };
 };
 
-const ConcurrencyAlertCheckDocument: TypedDocumentNode<
+export const ConcurrencyAlertCheckDocument: TypedDocumentNode<
   ConcurrencyAlertCheckQuery,
   Record<string, never>
 > = gql`
   query ConcurrencyAlertCheck {
     account {
+      id
       marketplace
       marketplaceBillingURL
       plan {
@@ -48,6 +53,7 @@ const ConcurrencyAlertCheckDocument: TypedDocumentNode<
       }
       concurrencyStatus {
         limitReached
+        minutesWithHits
       }
       entitlements: ents {
         concurrency {
