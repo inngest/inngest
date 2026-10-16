@@ -27,6 +27,7 @@ type Service struct {
 	functions      FunctionProvider
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
+	replays        ReplayProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
@@ -45,6 +46,7 @@ type ServiceOptions struct {
 	Functions           FunctionProvider
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
+	Replays             ReplayProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
@@ -70,6 +72,7 @@ func NewService(opts ServiceOptions) *Service {
 		functions:      opts.Functions,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
+		replays:        opts.Replays,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
@@ -161,6 +164,10 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 
 	// Build map of paths that require authorization
 	authzPaths := base.BuildAuthzPathMap()
+	authzRoutes := chi.NewRouter()
+	for path := range authzPaths {
+		authzRoutes.Handle(path, gwmux)
+	}
 
 	r := chi.NewRouter()
 	r.Use(RequestBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
@@ -189,7 +196,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		}()
 
 		// Apply authorization middleware if this path requires it
-		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
+		if httpOpts.AuthzMiddleware != nil && authzRoutes.Match(chi.NewRouteContext(), req.Method, req.URL.EscapedPath()) {
 			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
 				validationHandler := base.JSONTypeValidationMiddleware()(gwmux)
@@ -224,15 +231,19 @@ func normalizedV2Path(path string) string {
 func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		type route struct{ method, path string }
-		limits := map[string]int64{"SendEvent": maxEventBytes}
+		limits := map[string]int64{"SendEvent": maxEventBytes, "CreateReplay": 64 << 10}
 		handlers := map[route]http.Handler{}
+		paths := chi.NewRouter()
 		for _, endpoint := range apiv2endpoint.Discover() {
 			if limit, ok := limits[endpoint.MethodName]; ok {
+				paths.Method(endpoint.HTTPMethod, endpoint.Path, next)
 				handlers[route{endpoint.HTTPMethod, endpoint.Path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
 			}
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if limited, ok := handlers[route{r.Method, strings.TrimRight(normalizedV2Path(r.URL.Path), "/")}]; ok {
+			rctx := chi.NewRouteContext()
+			if paths.Match(rctx, r.Method, strings.TrimRight(normalizedV2Path(r.URL.EscapedPath()), "/")) {
+				limited := handlers[route{r.Method, rctx.RoutePattern()}]
 				limited.ServeHTTP(w, r)
 				return
 			}

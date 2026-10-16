@@ -33,6 +33,57 @@ func TestRequest(t *testing.T) {
 	}, body)
 }
 
+func TestReplayTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "CreateReplay")
+	tool := Tool(endpoint)
+	require.Equal(t, "create_replay", tool.Name)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.True(t, *tool.Annotations.DestructiveHint)
+	schema := tool.InputSchema.(map[string]any)
+	require.ElementsMatch(t, []string{"appId", "name", "functionId", "from", "until", "statuses"}, schema["required"])
+	properties := schema["properties"].(map[string]any)
+	functionID := properties["functionId"].(map[string]any)
+	require.Equal(t, "string", functionID["type"])
+	statuses := properties["statuses"].(map[string]any)
+	require.Equal(t, "array", statuses["type"])
+	require.Equal(t, []string{"ALL", "COMPLETED", "FAILED", "CANCELLED", "SKIPPED_PAUSED"}, statuses["items"].(map[string]any)["enum"])
+	for _, field := range []string{"from", "until"} {
+		timestamp := properties[field].(map[string]any)
+		require.Equal(t, "string", timestamp["type"])
+		require.Equal(t, "date-time", timestamp["format"])
+	}
+
+	var gotMethod, gotPath, gotQuery, gotEnv string
+	var gotBody map[string]any
+	result, err := call(t.Context(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{
+			"env":"branch-a","appId":"my-app","name":"Replay orders","functionId":"orders-created",
+			"statuses":["FAILED","SKIPPED_PAUSED"],"from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z"
+		}`)},
+	}, endpoint, Options{
+		BasePath: "/v2", EnvHeader: "X-Inngest-Env",
+		Execute: func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+			gotMethod, gotPath, gotQuery = req.Method, req.URL.Path, req.URL.RawQuery
+			gotEnv = req.Header.Get("X-Inngest-Env")
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&gotBody))
+			return ToolResult(map[string]any{"id": "replay-id"}, "created replay"), nil
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, map[string]any{"id": "replay-id"}, result.StructuredContent)
+	require.Equal(t, http.MethodPost, gotMethod)
+	require.Equal(t, "/v2/apps/my-app/functions/orders-created/replays", gotPath)
+	require.Empty(t, gotQuery)
+	require.Equal(t, "branch-a", gotEnv)
+	require.Equal(t, map[string]any{
+		"name":     "Replay orders",
+		"statuses": []any{"FAILED", "SKIPPED_PAUSED"},
+		"from":     "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z",
+	}, gotBody)
+}
+
 func TestSendEventRequest(t *testing.T) {
 	endpoint := endpointByMethod(t, "SendEvent")
 	req, err := Request(context.Background(), endpoint, map[string]any{
