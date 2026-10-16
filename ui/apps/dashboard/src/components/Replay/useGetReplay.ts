@@ -54,6 +54,7 @@ export function useGetReplay(replayID: string) {
         error: replay.error ?? undefined,
         createdAt: new Date(replay.createdAt),
         runsCount: replay.functionRunsScheduledCount,
+        // Processed counts inspected candidates; scheduled is a subset, not completed executions.
         runsSkippedCount:
           replay.functionRunsProcessedCount - replay.functionRunsScheduledCount,
         fromRange: replay.fromRange

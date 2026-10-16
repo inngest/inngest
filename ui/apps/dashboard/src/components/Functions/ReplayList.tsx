@@ -28,7 +28,7 @@ const columns = [
     cell: (props) => {
       const status = props.getValue();
       return (
-        <div title={props.row.original.error}>
+        <div>
           <StatusCell
             status={status}
             label={
@@ -39,6 +39,11 @@ const columns = [
                 : 'Queuing runs'
             }
           />
+          {props.row.original.error && (
+            <p className="text-error mt-1 max-w-sm whitespace-normal text-xs">
+              {props.row.original.error}
+            </p>
+          )}
         </div>
       );
     },

@@ -36,7 +36,7 @@ function ReplayDetailsPage() {
         <div className="py-1 text-2xl">{replay?.name}</div>
       )}
       {replay && (
-        <div title={replay.error}>
+        <div>
           <StatusCell
             size="small"
             status={replay.status}
@@ -48,6 +48,9 @@ function ReplayDetailsPage() {
                 : 'Queuing runs'
             }
           />
+          {replay.error && (
+            <p className="text-error mt-2 text-sm">{replay.error}</p>
+          )}
         </div>
       )}
       <AppDetailsCard title="Replay information" className="mt-9">
