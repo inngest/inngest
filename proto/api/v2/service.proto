@@ -43,7 +43,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Runs"         description: "Inspect function runs" }
   tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
-  tags: { name: "Images"       description: "Upload and build workspace images" }
+  tags: { name: "Builds"       description: "Build images for sandboxes and compute" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
@@ -1161,49 +1161,49 @@ service V2 {
     };
   }
 
-  rpc CreateImageUpload(CreateImageUploadRequest) returns (CreateImageUploadResponse) {
-    option (google.api.http) = { post: "/image-uploads" body: "*" };
+  rpc CreateBuild(CreateBuildRequest) returns (CreateBuildResponse) {
+    option (google.api.http) = { post: "/builds/{name}" body: "*" };
     option (authz) = { require_authz: true permission: "images:write:create" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Prepare a workspace image upload"
-      description: "Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then complete the upload to start conversion. Requires image-build access."
-      tags: "Images" tags: "Beta"
+      summary: "Create a build"
+      description: "Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then commit the upload to start conversion. Requires image-build access."
+      tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
-  rpc CompleteImageUpload(CompleteImageUploadRequest) returns (ImageBuildResponse) {
-    option (google.api.http) = { post: "/image-uploads/{build_id}/complete" body: "*" };
+  rpc CommitBuild(CommitBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { post: "/builds/{name}/{build_id}/commit" body: "*" };
     option (authz) = { require_authz: true permission: "images:write:create" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Complete an image upload and start conversion"
-      tags: "Images" tags: "Beta"
+      summary: "Commit an upload and start the build"
+      tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
-  rpc GetImageBuild(GetImageBuildRequest) returns (ImageBuildResponse) {
-    option (google.api.http) = { get: "/image-builds/{build_id}" };
+  rpc GetBuild(GetBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { get: "/builds/{build_id}" };
     option (authz) = { require_authz: true permission: "images:read:get" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get an image build"
-      tags: "Images" tags: "Beta"
+      summary: "Get a build"
+      tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
-  rpc ListImageBuilds(ListImageBuildsRequest) returns (ListImageBuildsResponse) {
-    option (google.api.http) = { get: "/image-builds" };
+  rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse) {
+    option (google.api.http) = { get: "/builds" };
     option (authz) = { require_authz: true permission: "images:read:list" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List recent workspace image builds"
-      tags: "Images" tags: "Beta"
+      summary: "List recent workspace builds"
+      tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
-  rpc CancelImageBuild(CancelImageBuildRequest) returns (ImageBuildResponse) {
-    option (google.api.http) = { post: "/image-builds/{build_id}/cancel" body: "*" };
+  rpc CancelBuild(CancelBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { post: "/builds/{build_id}/cancel" body: "*" };
     option (authz) = { require_authz: true permission: "images:write:cancel" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Cancel an unfinished image build"
-      tags: "Images" tags: "Beta"
+      summary: "Cancel an unfinished build"
+      tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }

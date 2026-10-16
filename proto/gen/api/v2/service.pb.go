@@ -9910,7 +9910,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xd4\xc6\x01\n" +
+	"\x04INFO\x10\x032\xbb\xc5\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10206,37 +10206,38 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\bGet apps\x1agLists active apps in the authenticated environment. Set archived to true to list archived apps instead.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eapps:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xeb\x02\n" +
-	"\x11CreateImageUpload\x12 .api.v2.CreateImageUploadRequest\x1a!.api.v2.CreateImageUploadResponse\"\x90\x02\x92A\xd8\x01\n" +
-	"\x06Images\n" +
-	"\x04Beta\x12 Prepare a workspace image upload\x1a\x93\x01Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then complete the upload to start conversion. Requires image-build access.b\x10\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eapps:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xc5\x02\n" +
+	"\vCreateBuild\x12\x1a.api.v2.CreateBuildRequest\x1a\x1b.api.v2.CreateBuildResponse\"\xfc\x01\x92A\xc4\x01\n" +
+	"\x06Builds\n" +
+	"\x04Beta\x12\x0eCreate a build\x1a\x91\x01Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then commit the upload to start conversion. Requires image-build access.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/image-uploads\x12\xf2\x01\n" +
-	"\x13CompleteImageUpload\x12\".api.v2.CompleteImageUploadRequest\x1a\x1a.api.v2.ImageBuildResponse\"\x9a\x01\x92AO\n" +
-	"\x06Images\n" +
-	"\x04Beta\x12-Complete an image upload and start conversionb\x10\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/builds/{name}\x12\xd2\x01\n" +
+	"\vCommitBuild\x12\x1a.api.v2.CommitBuildRequest\x1a\x15.api.v2.BuildResponse\"\x8f\x01\x92AF\n" +
+	"\x06Builds\n" +
+	"\x04Beta\x12$Commit an upload and start the buildb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02':\x01*\"\"/image-uploads/{build_id}/complete\x12\xb9\x01\n" +
-	"\rGetImageBuild\x12\x1c.api.v2.GetImageBuildRequest\x1a\x1a.api.v2.ImageBuildResponse\"n\x92A4\n" +
-	"\x06Images\n" +
-	"\x04Beta\x12\x12Get an image buildb\x10\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02%:\x01*\" /builds/{name}/{build_id}/commit\x12\x9d\x01\n" +
+	"\bGetBuild\x12\x17.api.v2.GetBuildRequest\x1a\x15.api.v2.BuildResponse\"a\x92A-\n" +
+	"\x06Builds\n" +
+	"\x04Beta\x12\vGet a buildb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fimages:read:get\x82\xd3\xe4\x93\x02\x1a\x12\x18/image-builds/{build_id}\x12\xc8\x01\n" +
-	"\x0fListImageBuilds\x12\x1e.api.v2.ListImageBuildsRequest\x1a\x1f.api.v2.ListImageBuildsResponse\"t\x92AD\n" +
-	"\x06Images\n" +
-	"\x04Beta\x12\"List recent workspace image buildsb\x10\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fimages:read:get\x82\xd3\xe4\x93\x02\x14\x12\x12/builds/{build_id}\x12\xad\x01\n" +
+	"\n" +
+	"ListBuilds\x12\x19.api.v2.ListBuildsRequest\x1a\x1a.api.v2.ListBuildsResponse\"h\x92A>\n" +
+	"\x06Builds\n" +
+	"\x04Beta\x12\x1cList recent workspace buildsb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x14\b\x01\x12\x10images:read:list\x82\xd3\xe4\x93\x02\x0f\x12\r/image-builds\x12\xdc\x01\n" +
-	"\x10CancelImageBuild\x12\x1f.api.v2.CancelImageBuildRequest\x1a\x1a.api.v2.ImageBuildResponse\"\x8a\x01\x92AB\n" +
-	"\x06Images\n" +
-	"\x04Beta\x12 Cancel an unfinished image buildb\x10\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x14\b\x01\x12\x10images:read:list\x82\xd3\xe4\x93\x02\t\x12\a/builds\x12\xc0\x01\n" +
+	"\vCancelBuild\x12\x1a.api.v2.CancelBuildRequest\x1a\x15.api.v2.BuildResponse\"~\x92A<\n" +
+	"\x06Builds\n" +
+	"\x04Beta\x12\x1aCancel an unfinished buildb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:cancel\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/image-builds/{build_id}/cancel\x12\xb9\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:cancel\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/builds/{build_id}/cancel\x12\xb9\x01\n" +
 	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"k\x92A5\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x10Create a sandboxb\x10\n" +
@@ -10603,7 +10604,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x8b\a\x92A\xd4\x06\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eruns:read:list\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x90\a\x92A\xd9\x06\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10617,8 +10618,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tFunctions\x12\x1bInvoke and manage functionsj\x1d\n" +
 	"\x04Runs\x12\x15Inspect function runsj)\n" +
 	"\bInsights\x12\x1dQuery event and function dataj9\n" +
-	"\tSandboxes\x12,Create and manage isolated compute sandboxesj+\n" +
-	"\x06Images\x12!Upload and build workspace imagesj9\n" +
+	"\tSandboxes\x12,Create and manage isolated compute sandboxesj0\n" +
+	"\x06Builds\x12&Build images for sandboxes and computej9\n" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
 	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
 	"\vPartner API\x12\x1aPartner account managementZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
@@ -10788,11 +10789,11 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*structpb.Struct)(nil),                       // 147: google.protobuf.Struct
 	(*structpb.ListValue)(nil),                    // 148: google.protobuf.ListValue
 	(*structpb.Value)(nil),                        // 149: google.protobuf.Value
-	(*CreateImageUploadRequest)(nil),              // 150: api.v2.CreateImageUploadRequest
-	(*CompleteImageUploadRequest)(nil),            // 151: api.v2.CompleteImageUploadRequest
-	(*GetImageBuildRequest)(nil),                  // 152: api.v2.GetImageBuildRequest
-	(*ListImageBuildsRequest)(nil),                // 153: api.v2.ListImageBuildsRequest
-	(*CancelImageBuildRequest)(nil),               // 154: api.v2.CancelImageBuildRequest
+	(*CreateBuildRequest)(nil),                    // 150: api.v2.CreateBuildRequest
+	(*CommitBuildRequest)(nil),                    // 151: api.v2.CommitBuildRequest
+	(*GetBuildRequest)(nil),                       // 152: api.v2.GetBuildRequest
+	(*ListBuildsRequest)(nil),                     // 153: api.v2.ListBuildsRequest
+	(*CancelBuildRequest)(nil),                    // 154: api.v2.CancelBuildRequest
 	(*CreateSandboxRequest)(nil),                  // 155: api.v2.CreateSandboxRequest
 	(*ListSandboxesRequest)(nil),                  // 156: api.v2.ListSandboxesRequest
 	(*GetSandboxRequest)(nil),                     // 157: api.v2.GetSandboxRequest
@@ -10814,9 +10815,9 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*WaitSandboxProcessRequest)(nil),             // 173: api.v2.WaitSandboxProcessRequest
 	(*GetSandboxProcessOutputRequest)(nil),        // 174: api.v2.GetSandboxProcessOutputRequest
 	(*StreamSandboxProcessOutputRequest)(nil),     // 175: api.v2.StreamSandboxProcessOutputRequest
-	(*CreateImageUploadResponse)(nil),             // 176: api.v2.CreateImageUploadResponse
-	(*ImageBuildResponse)(nil),                    // 177: api.v2.ImageBuildResponse
-	(*ListImageBuildsResponse)(nil),               // 178: api.v2.ListImageBuildsResponse
+	(*CreateBuildResponse)(nil),                   // 176: api.v2.CreateBuildResponse
+	(*BuildResponse)(nil),                         // 177: api.v2.BuildResponse
+	(*ListBuildsResponse)(nil),                    // 178: api.v2.ListBuildsResponse
 	(*CreateSandboxResponse)(nil),                 // 179: api.v2.CreateSandboxResponse
 	(*ListSandboxesResponse)(nil),                 // 180: api.v2.ListSandboxesResponse
 	(*GetSandboxResponse)(nil),                    // 181: api.v2.GetSandboxResponse
@@ -11058,11 +11059,11 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	141, // 215: api.v2.V2.CancelRun:input_type -> api.v2.CancelRunRequest
 	54,  // 216: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
 	56,  // 217: api.v2.V2.GetApps:input_type -> api.v2.GetAppsRequest
-	150, // 218: api.v2.V2.CreateImageUpload:input_type -> api.v2.CreateImageUploadRequest
-	151, // 219: api.v2.V2.CompleteImageUpload:input_type -> api.v2.CompleteImageUploadRequest
-	152, // 220: api.v2.V2.GetImageBuild:input_type -> api.v2.GetImageBuildRequest
-	153, // 221: api.v2.V2.ListImageBuilds:input_type -> api.v2.ListImageBuildsRequest
-	154, // 222: api.v2.V2.CancelImageBuild:input_type -> api.v2.CancelImageBuildRequest
+	150, // 218: api.v2.V2.CreateBuild:input_type -> api.v2.CreateBuildRequest
+	151, // 219: api.v2.V2.CommitBuild:input_type -> api.v2.CommitBuildRequest
+	152, // 220: api.v2.V2.GetBuild:input_type -> api.v2.GetBuildRequest
+	153, // 221: api.v2.V2.ListBuilds:input_type -> api.v2.ListBuildsRequest
+	154, // 222: api.v2.V2.CancelBuild:input_type -> api.v2.CancelBuildRequest
 	155, // 223: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
 	156, // 224: api.v2.V2.ListSandboxes:input_type -> api.v2.ListSandboxesRequest
 	157, // 225: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
@@ -11120,11 +11121,11 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	142, // 277: api.v2.V2.CancelRun:output_type -> api.v2.CancelRunResponse
 	55,  // 278: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
 	57,  // 279: api.v2.V2.GetApps:output_type -> api.v2.GetAppsResponse
-	176, // 280: api.v2.V2.CreateImageUpload:output_type -> api.v2.CreateImageUploadResponse
-	177, // 281: api.v2.V2.CompleteImageUpload:output_type -> api.v2.ImageBuildResponse
-	177, // 282: api.v2.V2.GetImageBuild:output_type -> api.v2.ImageBuildResponse
-	178, // 283: api.v2.V2.ListImageBuilds:output_type -> api.v2.ListImageBuildsResponse
-	177, // 284: api.v2.V2.CancelImageBuild:output_type -> api.v2.ImageBuildResponse
+	176, // 280: api.v2.V2.CreateBuild:output_type -> api.v2.CreateBuildResponse
+	177, // 281: api.v2.V2.CommitBuild:output_type -> api.v2.BuildResponse
+	177, // 282: api.v2.V2.GetBuild:output_type -> api.v2.BuildResponse
+	178, // 283: api.v2.V2.ListBuilds:output_type -> api.v2.ListBuildsResponse
+	177, // 284: api.v2.V2.CancelBuild:output_type -> api.v2.BuildResponse
 	179, // 285: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
 	180, // 286: api.v2.V2.ListSandboxes:output_type -> api.v2.ListSandboxesResponse
 	181, // 287: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse

@@ -13,9 +13,9 @@ message ImageConfig {
   string working_dir = 5;
 }
 
-message ImageBuild {
+message Build {
   string id = 1;
-  string image_name = 2;
+  string name = 2;
   string tag = 3;
   string architecture = 4;
   // pending (uploading), uploaded (queued/processing), ready, or failed.
@@ -28,9 +28,9 @@ message ImageBuild {
   google.protobuf.Timestamp finished_at = 11;
 }
 
-message CreateImageUploadRequest {
+message CreateBuildRequest {
   // A workspace-local name, without an account or inngest/ prefix.
-  string image_name = 1;
+  string name = 1;
   string tag = 2;
   // Only linux/amd64 flattened docker-export tar.gz archives are supported.
   string architecture = 3;
@@ -39,17 +39,21 @@ message CreateImageUploadRequest {
   string upload_sha256 = 5;
   ImageConfig config = 6;
 }
-message CreateImageUploadResponse {
-  ImageBuild data = 1;
+message CreateBuildResponse {
+  Build data = 1;
   string upload_url = 2;
   google.protobuf.Timestamp expires_at = 3;
 }
-message CompleteImageUploadRequest { string build_id = 1; }
-message GetImageBuildRequest { string build_id = 1; }
-message CancelImageBuildRequest { string build_id = 1; }
-message ImageBuildResponse { ImageBuild data = 1; }
-message ListImageBuildsRequest {}
-message ListImageBuildsResponse {
+message CommitBuildRequest {
+  string build_id = 1;
+  // Must match the name used when creating the build.
+  string name = 2;
+}
+message GetBuildRequest { string build_id = 1; }
+message CancelBuildRequest { string build_id = 1; }
+message BuildResponse { Build data = 1; }
+message ListBuildsRequest {}
+message ListBuildsResponse {
   // The most recent 100 builds in the selected workspace.
-  repeated ImageBuild data = 1;
+  repeated Build data = 1;
 }

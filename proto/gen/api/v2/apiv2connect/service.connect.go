@@ -76,16 +76,16 @@ const (
 	V2GetAppProcedure = "/api.v2.V2/GetApp"
 	// V2GetAppsProcedure is the fully-qualified name of the V2's GetApps RPC.
 	V2GetAppsProcedure = "/api.v2.V2/GetApps"
-	// V2CreateImageUploadProcedure is the fully-qualified name of the V2's CreateImageUpload RPC.
-	V2CreateImageUploadProcedure = "/api.v2.V2/CreateImageUpload"
-	// V2CompleteImageUploadProcedure is the fully-qualified name of the V2's CompleteImageUpload RPC.
-	V2CompleteImageUploadProcedure = "/api.v2.V2/CompleteImageUpload"
-	// V2GetImageBuildProcedure is the fully-qualified name of the V2's GetImageBuild RPC.
-	V2GetImageBuildProcedure = "/api.v2.V2/GetImageBuild"
-	// V2ListImageBuildsProcedure is the fully-qualified name of the V2's ListImageBuilds RPC.
-	V2ListImageBuildsProcedure = "/api.v2.V2/ListImageBuilds"
-	// V2CancelImageBuildProcedure is the fully-qualified name of the V2's CancelImageBuild RPC.
-	V2CancelImageBuildProcedure = "/api.v2.V2/CancelImageBuild"
+	// V2CreateBuildProcedure is the fully-qualified name of the V2's CreateBuild RPC.
+	V2CreateBuildProcedure = "/api.v2.V2/CreateBuild"
+	// V2CommitBuildProcedure is the fully-qualified name of the V2's CommitBuild RPC.
+	V2CommitBuildProcedure = "/api.v2.V2/CommitBuild"
+	// V2GetBuildProcedure is the fully-qualified name of the V2's GetBuild RPC.
+	V2GetBuildProcedure = "/api.v2.V2/GetBuild"
+	// V2ListBuildsProcedure is the fully-qualified name of the V2's ListBuilds RPC.
+	V2ListBuildsProcedure = "/api.v2.V2/ListBuilds"
+	// V2CancelBuildProcedure is the fully-qualified name of the V2's CancelBuild RPC.
+	V2CancelBuildProcedure = "/api.v2.V2/CancelBuild"
 	// V2CreateSandboxProcedure is the fully-qualified name of the V2's CreateSandbox RPC.
 	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
 	// V2ListSandboxesProcedure is the fully-qualified name of the V2's ListSandboxes RPC.
@@ -192,11 +192,11 @@ type V2Client interface {
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	GetApps(context.Context, *connect.Request[v2.GetAppsRequest]) (*connect.Response[v2.GetAppsResponse], error)
-	CreateImageUpload(context.Context, *connect.Request[v2.CreateImageUploadRequest]) (*connect.Response[v2.CreateImageUploadResponse], error)
-	CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.ImageBuildResponse], error)
-	GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error)
-	ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error)
-	CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error)
+	CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error)
+	CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
+	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -367,34 +367,34 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetApps")),
 			connect.WithClientOptions(opts...),
 		),
-		createImageUpload: connect.NewClient[v2.CreateImageUploadRequest, v2.CreateImageUploadResponse](
+		createBuild: connect.NewClient[v2.CreateBuildRequest, v2.CreateBuildResponse](
 			httpClient,
-			baseURL+V2CreateImageUploadProcedure,
-			connect.WithSchema(v2Methods.ByName("CreateImageUpload")),
+			baseURL+V2CreateBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateBuild")),
 			connect.WithClientOptions(opts...),
 		),
-		completeImageUpload: connect.NewClient[v2.CompleteImageUploadRequest, v2.ImageBuildResponse](
+		commitBuild: connect.NewClient[v2.CommitBuildRequest, v2.BuildResponse](
 			httpClient,
-			baseURL+V2CompleteImageUploadProcedure,
-			connect.WithSchema(v2Methods.ByName("CompleteImageUpload")),
+			baseURL+V2CommitBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CommitBuild")),
 			connect.WithClientOptions(opts...),
 		),
-		getImageBuild: connect.NewClient[v2.GetImageBuildRequest, v2.ImageBuildResponse](
+		getBuild: connect.NewClient[v2.GetBuildRequest, v2.BuildResponse](
 			httpClient,
-			baseURL+V2GetImageBuildProcedure,
-			connect.WithSchema(v2Methods.ByName("GetImageBuild")),
+			baseURL+V2GetBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("GetBuild")),
 			connect.WithClientOptions(opts...),
 		),
-		listImageBuilds: connect.NewClient[v2.ListImageBuildsRequest, v2.ListImageBuildsResponse](
+		listBuilds: connect.NewClient[v2.ListBuildsRequest, v2.ListBuildsResponse](
 			httpClient,
-			baseURL+V2ListImageBuildsProcedure,
-			connect.WithSchema(v2Methods.ByName("ListImageBuilds")),
+			baseURL+V2ListBuildsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListBuilds")),
 			connect.WithClientOptions(opts...),
 		),
-		cancelImageBuild: connect.NewClient[v2.CancelImageBuildRequest, v2.ImageBuildResponse](
+		cancelBuild: connect.NewClient[v2.CancelBuildRequest, v2.BuildResponse](
 			httpClient,
-			baseURL+V2CancelImageBuildProcedure,
-			connect.WithSchema(v2Methods.ByName("CancelImageBuild")),
+			baseURL+V2CancelBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CancelBuild")),
 			connect.WithClientOptions(opts...),
 		),
 		createSandbox: connect.NewClient[v2.CreateSandboxRequest, v2.CreateSandboxResponse](
@@ -644,11 +644,11 @@ type v2Client struct {
 	cancelRun                  *connect.Client[v2.CancelRunRequest, v2.CancelRunResponse]
 	getApp                     *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
 	getApps                    *connect.Client[v2.GetAppsRequest, v2.GetAppsResponse]
-	createImageUpload          *connect.Client[v2.CreateImageUploadRequest, v2.CreateImageUploadResponse]
-	completeImageUpload        *connect.Client[v2.CompleteImageUploadRequest, v2.ImageBuildResponse]
-	getImageBuild              *connect.Client[v2.GetImageBuildRequest, v2.ImageBuildResponse]
-	listImageBuilds            *connect.Client[v2.ListImageBuildsRequest, v2.ListImageBuildsResponse]
-	cancelImageBuild           *connect.Client[v2.CancelImageBuildRequest, v2.ImageBuildResponse]
+	createBuild                *connect.Client[v2.CreateBuildRequest, v2.CreateBuildResponse]
+	commitBuild                *connect.Client[v2.CommitBuildRequest, v2.BuildResponse]
+	getBuild                   *connect.Client[v2.GetBuildRequest, v2.BuildResponse]
+	listBuilds                 *connect.Client[v2.ListBuildsRequest, v2.ListBuildsResponse]
+	cancelBuild                *connect.Client[v2.CancelBuildRequest, v2.BuildResponse]
 	createSandbox              *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
 	listSandboxes              *connect.Client[v2.ListSandboxesRequest, v2.ListSandboxesResponse]
 	getSandbox                 *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
@@ -788,29 +788,29 @@ func (c *v2Client) GetApps(ctx context.Context, req *connect.Request[v2.GetAppsR
 	return c.getApps.CallUnary(ctx, req)
 }
 
-// CreateImageUpload calls api.v2.V2.CreateImageUpload.
-func (c *v2Client) CreateImageUpload(ctx context.Context, req *connect.Request[v2.CreateImageUploadRequest]) (*connect.Response[v2.CreateImageUploadResponse], error) {
-	return c.createImageUpload.CallUnary(ctx, req)
+// CreateBuild calls api.v2.V2.CreateBuild.
+func (c *v2Client) CreateBuild(ctx context.Context, req *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error) {
+	return c.createBuild.CallUnary(ctx, req)
 }
 
-// CompleteImageUpload calls api.v2.V2.CompleteImageUpload.
-func (c *v2Client) CompleteImageUpload(ctx context.Context, req *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return c.completeImageUpload.CallUnary(ctx, req)
+// CommitBuild calls api.v2.V2.CommitBuild.
+func (c *v2Client) CommitBuild(ctx context.Context, req *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.commitBuild.CallUnary(ctx, req)
 }
 
-// GetImageBuild calls api.v2.V2.GetImageBuild.
-func (c *v2Client) GetImageBuild(ctx context.Context, req *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return c.getImageBuild.CallUnary(ctx, req)
+// GetBuild calls api.v2.V2.GetBuild.
+func (c *v2Client) GetBuild(ctx context.Context, req *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.getBuild.CallUnary(ctx, req)
 }
 
-// ListImageBuilds calls api.v2.V2.ListImageBuilds.
-func (c *v2Client) ListImageBuilds(ctx context.Context, req *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error) {
-	return c.listImageBuilds.CallUnary(ctx, req)
+// ListBuilds calls api.v2.V2.ListBuilds.
+func (c *v2Client) ListBuilds(ctx context.Context, req *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error) {
+	return c.listBuilds.CallUnary(ctx, req)
 }
 
-// CancelImageBuild calls api.v2.V2.CancelImageBuild.
-func (c *v2Client) CancelImageBuild(ctx context.Context, req *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return c.cancelImageBuild.CallUnary(ctx, req)
+// CancelBuild calls api.v2.V2.CancelBuild.
+func (c *v2Client) CancelBuild(ctx context.Context, req *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.cancelBuild.CallUnary(ctx, req)
 }
 
 // CreateSandbox calls api.v2.V2.CreateSandbox.
@@ -1023,11 +1023,11 @@ type V2Handler interface {
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	GetApps(context.Context, *connect.Request[v2.GetAppsRequest]) (*connect.Response[v2.GetAppsResponse], error)
-	CreateImageUpload(context.Context, *connect.Request[v2.CreateImageUploadRequest]) (*connect.Response[v2.CreateImageUploadResponse], error)
-	CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.ImageBuildResponse], error)
-	GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error)
-	ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error)
-	CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error)
+	CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error)
+	CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
+	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -1194,34 +1194,34 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetApps")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2CreateImageUploadHandler := connect.NewUnaryHandler(
-		V2CreateImageUploadProcedure,
-		svc.CreateImageUpload,
-		connect.WithSchema(v2Methods.ByName("CreateImageUpload")),
+	v2CreateBuildHandler := connect.NewUnaryHandler(
+		V2CreateBuildProcedure,
+		svc.CreateBuild,
+		connect.WithSchema(v2Methods.ByName("CreateBuild")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2CompleteImageUploadHandler := connect.NewUnaryHandler(
-		V2CompleteImageUploadProcedure,
-		svc.CompleteImageUpload,
-		connect.WithSchema(v2Methods.ByName("CompleteImageUpload")),
+	v2CommitBuildHandler := connect.NewUnaryHandler(
+		V2CommitBuildProcedure,
+		svc.CommitBuild,
+		connect.WithSchema(v2Methods.ByName("CommitBuild")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2GetImageBuildHandler := connect.NewUnaryHandler(
-		V2GetImageBuildProcedure,
-		svc.GetImageBuild,
-		connect.WithSchema(v2Methods.ByName("GetImageBuild")),
+	v2GetBuildHandler := connect.NewUnaryHandler(
+		V2GetBuildProcedure,
+		svc.GetBuild,
+		connect.WithSchema(v2Methods.ByName("GetBuild")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2ListImageBuildsHandler := connect.NewUnaryHandler(
-		V2ListImageBuildsProcedure,
-		svc.ListImageBuilds,
-		connect.WithSchema(v2Methods.ByName("ListImageBuilds")),
+	v2ListBuildsHandler := connect.NewUnaryHandler(
+		V2ListBuildsProcedure,
+		svc.ListBuilds,
+		connect.WithSchema(v2Methods.ByName("ListBuilds")),
 		connect.WithHandlerOptions(opts...),
 	)
-	v2CancelImageBuildHandler := connect.NewUnaryHandler(
-		V2CancelImageBuildProcedure,
-		svc.CancelImageBuild,
-		connect.WithSchema(v2Methods.ByName("CancelImageBuild")),
+	v2CancelBuildHandler := connect.NewUnaryHandler(
+		V2CancelBuildProcedure,
+		svc.CancelBuild,
+		connect.WithSchema(v2Methods.ByName("CancelBuild")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateSandboxHandler := connect.NewUnaryHandler(
@@ -1488,16 +1488,16 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetAppHandler.ServeHTTP(w, r)
 		case V2GetAppsProcedure:
 			v2GetAppsHandler.ServeHTTP(w, r)
-		case V2CreateImageUploadProcedure:
-			v2CreateImageUploadHandler.ServeHTTP(w, r)
-		case V2CompleteImageUploadProcedure:
-			v2CompleteImageUploadHandler.ServeHTTP(w, r)
-		case V2GetImageBuildProcedure:
-			v2GetImageBuildHandler.ServeHTTP(w, r)
-		case V2ListImageBuildsProcedure:
-			v2ListImageBuildsHandler.ServeHTTP(w, r)
-		case V2CancelImageBuildProcedure:
-			v2CancelImageBuildHandler.ServeHTTP(w, r)
+		case V2CreateBuildProcedure:
+			v2CreateBuildHandler.ServeHTTP(w, r)
+		case V2CommitBuildProcedure:
+			v2CommitBuildHandler.ServeHTTP(w, r)
+		case V2GetBuildProcedure:
+			v2GetBuildHandler.ServeHTTP(w, r)
+		case V2ListBuildsProcedure:
+			v2ListBuildsHandler.ServeHTTP(w, r)
+		case V2CancelBuildProcedure:
+			v2CancelBuildHandler.ServeHTTP(w, r)
 		case V2CreateSandboxProcedure:
 			v2CreateSandboxHandler.ServeHTTP(w, r)
 		case V2ListSandboxesProcedure:
@@ -1661,24 +1661,24 @@ func (UnimplementedV2Handler) GetApps(context.Context, *connect.Request[v2.GetAp
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetApps is not implemented"))
 }
 
-func (UnimplementedV2Handler) CreateImageUpload(context.Context, *connect.Request[v2.CreateImageUploadRequest]) (*connect.Response[v2.CreateImageUploadResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateImageUpload is not implemented"))
+func (UnimplementedV2Handler) CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateBuild is not implemented"))
 }
 
-func (UnimplementedV2Handler) CompleteImageUpload(context.Context, *connect.Request[v2.CompleteImageUploadRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CompleteImageUpload is not implemented"))
+func (UnimplementedV2Handler) CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CommitBuild is not implemented"))
 }
 
-func (UnimplementedV2Handler) GetImageBuild(context.Context, *connect.Request[v2.GetImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetImageBuild is not implemented"))
+func (UnimplementedV2Handler) GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetBuild is not implemented"))
 }
 
-func (UnimplementedV2Handler) ListImageBuilds(context.Context, *connect.Request[v2.ListImageBuildsRequest]) (*connect.Response[v2.ListImageBuildsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListImageBuilds is not implemented"))
+func (UnimplementedV2Handler) ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListBuilds is not implemented"))
 }
 
-func (UnimplementedV2Handler) CancelImageBuild(context.Context, *connect.Request[v2.CancelImageBuildRequest]) (*connect.Response[v2.ImageBuildResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelImageBuild is not implemented"))
+func (UnimplementedV2Handler) CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelBuild is not implemented"))
 }
 
 func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {

@@ -99,10 +99,10 @@ func (x *ImageConfig) GetWorkingDir() string {
 	return ""
 }
 
-type ImageBuild struct {
+type Build struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	ImageName    string                 `protobuf:"bytes,2,opt,name=image_name,json=imageName,proto3" json:"image_name,omitempty"`
+	Name         string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Tag          string                 `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
 	Architecture string                 `protobuf:"bytes,4,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	// pending (uploading), uploaded (queued/processing), ready, or failed.
@@ -117,20 +117,20 @@ type ImageBuild struct {
 	sizeCache        protoimpl.SizeCache
 }
 
-func (x *ImageBuild) Reset() {
-	*x = ImageBuild{}
+func (x *Build) Reset() {
+	*x = Build{}
 	mi := &file_api_v2_image_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ImageBuild) String() string {
+func (x *Build) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ImageBuild) ProtoMessage() {}
+func (*Build) ProtoMessage() {}
 
-func (x *ImageBuild) ProtoReflect() protoreflect.Message {
+func (x *Build) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -142,93 +142,93 @@ func (x *ImageBuild) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ImageBuild.ProtoReflect.Descriptor instead.
-func (*ImageBuild) Descriptor() ([]byte, []int) {
+// Deprecated: Use Build.ProtoReflect.Descriptor instead.
+func (*Build) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ImageBuild) GetId() string {
+func (x *Build) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetImageName() string {
+func (x *Build) GetName() string {
 	if x != nil {
-		return x.ImageName
+		return x.Name
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetTag() string {
+func (x *Build) GetTag() string {
 	if x != nil {
 		return x.Tag
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetArchitecture() string {
+func (x *Build) GetArchitecture() string {
 	if x != nil {
 		return x.Architecture
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetStatus() string {
+func (x *Build) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetArtifactDigest() string {
+func (x *Build) GetArtifactDigest() string {
 	if x != nil {
 		return x.ArtifactDigest
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetBuilderSandboxId() string {
+func (x *Build) GetBuilderSandboxId() string {
 	if x != nil {
 		return x.BuilderSandboxId
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetError() string {
+func (x *Build) GetError() string {
 	if x != nil {
 		return x.Error
 	}
 	return ""
 }
 
-func (x *ImageBuild) GetCreatedAt() *timestamppb.Timestamp {
+func (x *Build) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-func (x *ImageBuild) GetUpdatedAt() *timestamppb.Timestamp {
+func (x *Build) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
 	}
 	return nil
 }
 
-func (x *ImageBuild) GetFinishedAt() *timestamppb.Timestamp {
+func (x *Build) GetFinishedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.FinishedAt
 	}
 	return nil
 }
 
-type CreateImageUploadRequest struct {
+type CreateBuildRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A workspace-local name, without an account or inngest/ prefix.
-	ImageName string `protobuf:"bytes,1,opt,name=image_name,json=imageName,proto3" json:"image_name,omitempty"`
-	Tag       string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Tag  string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
 	// Only linux/amd64 flattened docker-export tar.gz archives are supported.
 	Architecture    string `protobuf:"bytes,3,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	UploadSizeBytes int64  `protobuf:"varint,4,opt,name=upload_size_bytes,json=uploadSizeBytes,proto3" json:"upload_size_bytes,omitempty"`
@@ -239,20 +239,20 @@ type CreateImageUploadRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateImageUploadRequest) Reset() {
-	*x = CreateImageUploadRequest{}
+func (x *CreateBuildRequest) Reset() {
+	*x = CreateBuildRequest{}
 	mi := &file_api_v2_image_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateImageUploadRequest) String() string {
+func (x *CreateBuildRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateImageUploadRequest) ProtoMessage() {}
+func (*CreateBuildRequest) ProtoMessage() {}
 
-func (x *CreateImageUploadRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateBuildRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -264,76 +264,76 @@ func (x *CreateImageUploadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateImageUploadRequest.ProtoReflect.Descriptor instead.
-func (*CreateImageUploadRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateBuildRequest.ProtoReflect.Descriptor instead.
+func (*CreateBuildRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *CreateImageUploadRequest) GetImageName() string {
+func (x *CreateBuildRequest) GetName() string {
 	if x != nil {
-		return x.ImageName
+		return x.Name
 	}
 	return ""
 }
 
-func (x *CreateImageUploadRequest) GetTag() string {
+func (x *CreateBuildRequest) GetTag() string {
 	if x != nil {
 		return x.Tag
 	}
 	return ""
 }
 
-func (x *CreateImageUploadRequest) GetArchitecture() string {
+func (x *CreateBuildRequest) GetArchitecture() string {
 	if x != nil {
 		return x.Architecture
 	}
 	return ""
 }
 
-func (x *CreateImageUploadRequest) GetUploadSizeBytes() int64 {
+func (x *CreateBuildRequest) GetUploadSizeBytes() int64 {
 	if x != nil {
 		return x.UploadSizeBytes
 	}
 	return 0
 }
 
-func (x *CreateImageUploadRequest) GetUploadSha256() string {
+func (x *CreateBuildRequest) GetUploadSha256() string {
 	if x != nil {
 		return x.UploadSha256
 	}
 	return ""
 }
 
-func (x *CreateImageUploadRequest) GetConfig() *ImageConfig {
+func (x *CreateBuildRequest) GetConfig() *ImageConfig {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-type CreateImageUploadResponse struct {
+type CreateBuildResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          *ImageBuild            `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Data          *Build                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	UploadUrl     string                 `protobuf:"bytes,2,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateImageUploadResponse) Reset() {
-	*x = CreateImageUploadResponse{}
+func (x *CreateBuildResponse) Reset() {
+	*x = CreateBuildResponse{}
 	mi := &file_api_v2_image_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateImageUploadResponse) String() string {
+func (x *CreateBuildResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateImageUploadResponse) ProtoMessage() {}
+func (*CreateBuildResponse) ProtoMessage() {}
 
-func (x *CreateImageUploadResponse) ProtoReflect() protoreflect.Message {
+func (x *CreateBuildResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -345,53 +345,55 @@ func (x *CreateImageUploadResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateImageUploadResponse.ProtoReflect.Descriptor instead.
-func (*CreateImageUploadResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateBuildResponse.ProtoReflect.Descriptor instead.
+func (*CreateBuildResponse) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *CreateImageUploadResponse) GetData() *ImageBuild {
+func (x *CreateBuildResponse) GetData() *Build {
 	if x != nil {
 		return x.Data
 	}
 	return nil
 }
 
-func (x *CreateImageUploadResponse) GetUploadUrl() string {
+func (x *CreateBuildResponse) GetUploadUrl() string {
 	if x != nil {
 		return x.UploadUrl
 	}
 	return ""
 }
 
-func (x *CreateImageUploadResponse) GetExpiresAt() *timestamppb.Timestamp {
+func (x *CreateBuildResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
 	}
 	return nil
 }
 
-type CompleteImageUploadRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BuildId       string                 `protobuf:"bytes,1,opt,name=build_id,json=buildId,proto3" json:"build_id,omitempty"`
+type CommitBuildRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	BuildId string                 `protobuf:"bytes,1,opt,name=build_id,json=buildId,proto3" json:"build_id,omitempty"`
+	// Must match the name used when creating the build.
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CompleteImageUploadRequest) Reset() {
-	*x = CompleteImageUploadRequest{}
+func (x *CommitBuildRequest) Reset() {
+	*x = CommitBuildRequest{}
 	mi := &file_api_v2_image_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CompleteImageUploadRequest) String() string {
+func (x *CommitBuildRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CompleteImageUploadRequest) ProtoMessage() {}
+func (*CommitBuildRequest) ProtoMessage() {}
 
-func (x *CompleteImageUploadRequest) ProtoReflect() protoreflect.Message {
+func (x *CommitBuildRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -403,39 +405,46 @@ func (x *CompleteImageUploadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CompleteImageUploadRequest.ProtoReflect.Descriptor instead.
-func (*CompleteImageUploadRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CommitBuildRequest.ProtoReflect.Descriptor instead.
+func (*CommitBuildRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CompleteImageUploadRequest) GetBuildId() string {
+func (x *CommitBuildRequest) GetBuildId() string {
 	if x != nil {
 		return x.BuildId
 	}
 	return ""
 }
 
-type GetImageBuildRequest struct {
+func (x *CommitBuildRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type GetBuildRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BuildId       string                 `protobuf:"bytes,1,opt,name=build_id,json=buildId,proto3" json:"build_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetImageBuildRequest) Reset() {
-	*x = GetImageBuildRequest{}
+func (x *GetBuildRequest) Reset() {
+	*x = GetBuildRequest{}
 	mi := &file_api_v2_image_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetImageBuildRequest) String() string {
+func (x *GetBuildRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetImageBuildRequest) ProtoMessage() {}
+func (*GetBuildRequest) ProtoMessage() {}
 
-func (x *GetImageBuildRequest) ProtoReflect() protoreflect.Message {
+func (x *GetBuildRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -447,39 +456,39 @@ func (x *GetImageBuildRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetImageBuildRequest.ProtoReflect.Descriptor instead.
-func (*GetImageBuildRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetBuildRequest.ProtoReflect.Descriptor instead.
+func (*GetBuildRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *GetImageBuildRequest) GetBuildId() string {
+func (x *GetBuildRequest) GetBuildId() string {
 	if x != nil {
 		return x.BuildId
 	}
 	return ""
 }
 
-type CancelImageBuildRequest struct {
+type CancelBuildRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BuildId       string                 `protobuf:"bytes,1,opt,name=build_id,json=buildId,proto3" json:"build_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CancelImageBuildRequest) Reset() {
-	*x = CancelImageBuildRequest{}
+func (x *CancelBuildRequest) Reset() {
+	*x = CancelBuildRequest{}
 	mi := &file_api_v2_image_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CancelImageBuildRequest) String() string {
+func (x *CancelBuildRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CancelImageBuildRequest) ProtoMessage() {}
+func (*CancelBuildRequest) ProtoMessage() {}
 
-func (x *CancelImageBuildRequest) ProtoReflect() protoreflect.Message {
+func (x *CancelBuildRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -491,39 +500,39 @@ func (x *CancelImageBuildRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CancelImageBuildRequest.ProtoReflect.Descriptor instead.
-func (*CancelImageBuildRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CancelBuildRequest.ProtoReflect.Descriptor instead.
+func (*CancelBuildRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *CancelImageBuildRequest) GetBuildId() string {
+func (x *CancelBuildRequest) GetBuildId() string {
 	if x != nil {
 		return x.BuildId
 	}
 	return ""
 }
 
-type ImageBuildResponse struct {
+type BuildResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          *ImageBuild            `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Data          *Build                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ImageBuildResponse) Reset() {
-	*x = ImageBuildResponse{}
+func (x *BuildResponse) Reset() {
+	*x = BuildResponse{}
 	mi := &file_api_v2_image_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ImageBuildResponse) String() string {
+func (x *BuildResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ImageBuildResponse) ProtoMessage() {}
+func (*BuildResponse) ProtoMessage() {}
 
-func (x *ImageBuildResponse) ProtoReflect() protoreflect.Message {
+func (x *BuildResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -535,38 +544,38 @@ func (x *ImageBuildResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ImageBuildResponse.ProtoReflect.Descriptor instead.
-func (*ImageBuildResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use BuildResponse.ProtoReflect.Descriptor instead.
+func (*BuildResponse) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *ImageBuildResponse) GetData() *ImageBuild {
+func (x *BuildResponse) GetData() *Build {
 	if x != nil {
 		return x.Data
 	}
 	return nil
 }
 
-type ListImageBuildsRequest struct {
+type ListBuildsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListImageBuildsRequest) Reset() {
-	*x = ListImageBuildsRequest{}
+func (x *ListBuildsRequest) Reset() {
+	*x = ListBuildsRequest{}
 	mi := &file_api_v2_image_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListImageBuildsRequest) String() string {
+func (x *ListBuildsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListImageBuildsRequest) ProtoMessage() {}
+func (*ListBuildsRequest) ProtoMessage() {}
 
-func (x *ListImageBuildsRequest) ProtoReflect() protoreflect.Message {
+func (x *ListBuildsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -578,33 +587,33 @@ func (x *ListImageBuildsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListImageBuildsRequest.ProtoReflect.Descriptor instead.
-func (*ListImageBuildsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListBuildsRequest.ProtoReflect.Descriptor instead.
+func (*ListBuildsRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{8}
 }
 
-type ListImageBuildsResponse struct {
+type ListBuildsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The most recent 100 builds in the selected workspace.
-	Data          []*ImageBuild `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Data          []*Build `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListImageBuildsResponse) Reset() {
-	*x = ListImageBuildsResponse{}
+func (x *ListBuildsResponse) Reset() {
+	*x = ListBuildsResponse{}
 	mi := &file_api_v2_image_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListImageBuildsResponse) String() string {
+func (x *ListBuildsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListImageBuildsResponse) ProtoMessage() {}
+func (*ListBuildsResponse) ProtoMessage() {}
 
-func (x *ListImageBuildsResponse) ProtoReflect() protoreflect.Message {
+func (x *ListBuildsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_api_v2_image_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -616,12 +625,12 @@ func (x *ListImageBuildsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListImageBuildsResponse.ProtoReflect.Descriptor instead.
-func (*ListImageBuildsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListBuildsResponse.ProtoReflect.Descriptor instead.
+func (*ListBuildsResponse) Descriptor() ([]byte, []int) {
 	return file_api_v2_image_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *ListImageBuildsResponse) GetData() []*ImageBuild {
+func (x *ListBuildsResponse) GetData() []*Build {
 	if x != nil {
 		return x.Data
 	}
@@ -644,12 +653,10 @@ const file_api_v2_image_proto_rawDesc = "" +
 	"workingDir\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa9\x03\n" +
-	"\n" +
-	"ImageBuild\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
-	"\n" +
-	"image_name\x18\x02 \x01(\tR\timageName\x12\x10\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x99\x03\n" +
+	"\x05Build\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
 	"\x03tag\x18\x03 \x01(\tR\x03tag\x12\"\n" +
 	"\farchitecture\x18\x04 \x01(\tR\farchitecture\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12'\n" +
@@ -662,32 +669,32 @@ const file_api_v2_image_proto_rawDesc = "" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12;\n" +
 	"\vfinished_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"finishedAt\"\xed\x01\n" +
-	"\x18CreateImageUploadRequest\x12\x1d\n" +
-	"\n" +
-	"image_name\x18\x01 \x01(\tR\timageName\x12\x10\n" +
+	"finishedAt\"\xdc\x01\n" +
+	"\x12CreateBuildRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03tag\x18\x02 \x01(\tR\x03tag\x12\"\n" +
 	"\farchitecture\x18\x03 \x01(\tR\farchitecture\x12*\n" +
 	"\x11upload_size_bytes\x18\x04 \x01(\x03R\x0fuploadSizeBytes\x12#\n" +
 	"\rupload_sha256\x18\x05 \x01(\tR\fuploadSha256\x12+\n" +
-	"\x06config\x18\x06 \x01(\v2\x13.api.v2.ImageConfigR\x06config\"\x9d\x01\n" +
-	"\x19CreateImageUploadResponse\x12&\n" +
-	"\x04data\x18\x01 \x01(\v2\x12.api.v2.ImageBuildR\x04data\x12\x1d\n" +
+	"\x06config\x18\x06 \x01(\v2\x13.api.v2.ImageConfigR\x06config\"\x92\x01\n" +
+	"\x13CreateBuildResponse\x12!\n" +
+	"\x04data\x18\x01 \x01(\v2\r.api.v2.BuildR\x04data\x12\x1d\n" +
 	"\n" +
 	"upload_url\x18\x02 \x01(\tR\tuploadUrl\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"7\n" +
-	"\x1aCompleteImageUploadRequest\x12\x19\n" +
-	"\bbuild_id\x18\x01 \x01(\tR\abuildId\"1\n" +
-	"\x14GetImageBuildRequest\x12\x19\n" +
-	"\bbuild_id\x18\x01 \x01(\tR\abuildId\"4\n" +
-	"\x17CancelImageBuildRequest\x12\x19\n" +
-	"\bbuild_id\x18\x01 \x01(\tR\abuildId\"<\n" +
-	"\x12ImageBuildResponse\x12&\n" +
-	"\x04data\x18\x01 \x01(\v2\x12.api.v2.ImageBuildR\x04data\"\x18\n" +
-	"\x16ListImageBuildsRequest\"A\n" +
-	"\x17ListImageBuildsResponse\x12&\n" +
-	"\x04data\x18\x01 \x03(\v2\x12.api.v2.ImageBuildR\x04dataB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"C\n" +
+	"\x12CommitBuildRequest\x12\x19\n" +
+	"\bbuild_id\x18\x01 \x01(\tR\abuildId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\",\n" +
+	"\x0fGetBuildRequest\x12\x19\n" +
+	"\bbuild_id\x18\x01 \x01(\tR\abuildId\"/\n" +
+	"\x12CancelBuildRequest\x12\x19\n" +
+	"\bbuild_id\x18\x01 \x01(\tR\abuildId\"2\n" +
+	"\rBuildResponse\x12!\n" +
+	"\x04data\x18\x01 \x01(\v2\r.api.v2.BuildR\x04data\"\x13\n" +
+	"\x11ListBuildsRequest\"7\n" +
+	"\x12ListBuildsResponse\x12!\n" +
+	"\x04data\x18\x01 \x03(\v2\r.api.v2.BuildR\x04dataB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
 	file_api_v2_image_proto_rawDescOnce sync.Once
@@ -703,29 +710,29 @@ func file_api_v2_image_proto_rawDescGZIP() []byte {
 
 var file_api_v2_image_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_api_v2_image_proto_goTypes = []any{
-	(*ImageConfig)(nil),                // 0: api.v2.ImageConfig
-	(*ImageBuild)(nil),                 // 1: api.v2.ImageBuild
-	(*CreateImageUploadRequest)(nil),   // 2: api.v2.CreateImageUploadRequest
-	(*CreateImageUploadResponse)(nil),  // 3: api.v2.CreateImageUploadResponse
-	(*CompleteImageUploadRequest)(nil), // 4: api.v2.CompleteImageUploadRequest
-	(*GetImageBuildRequest)(nil),       // 5: api.v2.GetImageBuildRequest
-	(*CancelImageBuildRequest)(nil),    // 6: api.v2.CancelImageBuildRequest
-	(*ImageBuildResponse)(nil),         // 7: api.v2.ImageBuildResponse
-	(*ListImageBuildsRequest)(nil),     // 8: api.v2.ListImageBuildsRequest
-	(*ListImageBuildsResponse)(nil),    // 9: api.v2.ListImageBuildsResponse
-	nil,                                // 10: api.v2.ImageConfig.EnvEntry
-	(*timestamppb.Timestamp)(nil),      // 11: google.protobuf.Timestamp
+	(*ImageConfig)(nil),           // 0: api.v2.ImageConfig
+	(*Build)(nil),                 // 1: api.v2.Build
+	(*CreateBuildRequest)(nil),    // 2: api.v2.CreateBuildRequest
+	(*CreateBuildResponse)(nil),   // 3: api.v2.CreateBuildResponse
+	(*CommitBuildRequest)(nil),    // 4: api.v2.CommitBuildRequest
+	(*GetBuildRequest)(nil),       // 5: api.v2.GetBuildRequest
+	(*CancelBuildRequest)(nil),    // 6: api.v2.CancelBuildRequest
+	(*BuildResponse)(nil),         // 7: api.v2.BuildResponse
+	(*ListBuildsRequest)(nil),     // 8: api.v2.ListBuildsRequest
+	(*ListBuildsResponse)(nil),    // 9: api.v2.ListBuildsResponse
+	nil,                           // 10: api.v2.ImageConfig.EnvEntry
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_api_v2_image_proto_depIdxs = []int32{
 	10, // 0: api.v2.ImageConfig.env:type_name -> api.v2.ImageConfig.EnvEntry
-	11, // 1: api.v2.ImageBuild.created_at:type_name -> google.protobuf.Timestamp
-	11, // 2: api.v2.ImageBuild.updated_at:type_name -> google.protobuf.Timestamp
-	11, // 3: api.v2.ImageBuild.finished_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: api.v2.CreateImageUploadRequest.config:type_name -> api.v2.ImageConfig
-	1,  // 5: api.v2.CreateImageUploadResponse.data:type_name -> api.v2.ImageBuild
-	11, // 6: api.v2.CreateImageUploadResponse.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 7: api.v2.ImageBuildResponse.data:type_name -> api.v2.ImageBuild
-	1,  // 8: api.v2.ListImageBuildsResponse.data:type_name -> api.v2.ImageBuild
+	11, // 1: api.v2.Build.created_at:type_name -> google.protobuf.Timestamp
+	11, // 2: api.v2.Build.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 3: api.v2.Build.finished_at:type_name -> google.protobuf.Timestamp
+	0,  // 4: api.v2.CreateBuildRequest.config:type_name -> api.v2.ImageConfig
+	1,  // 5: api.v2.CreateBuildResponse.data:type_name -> api.v2.Build
+	11, // 6: api.v2.CreateBuildResponse.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 7: api.v2.BuildResponse.data:type_name -> api.v2.Build
+	1,  // 8: api.v2.ListBuildsResponse.data:type_name -> api.v2.Build
 	9,  // [9:9] is the sub-list for method output_type
 	9,  // [9:9] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
