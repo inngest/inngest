@@ -4,15 +4,6 @@ package api.v2;
 import "google/protobuf/timestamp.proto";
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
 
-// OCI defaults captured separately from a flattened docker export.
-message ImageConfig {
-  repeated string entrypoint = 1;
-  repeated string cmd = 2;
-  map<string,string> env = 3;
-  string user = 4;
-  string working_dir = 5;
-}
-
 message Build {
   string id = 1;
   string name = 2;
@@ -32,12 +23,14 @@ message CreateBuildRequest {
   // A workspace-local name, without an account or inngest/ prefix.
   string name = 1;
   string tag = 2;
-  // Only linux/amd64 flattened docker-export tar.gz archives are supported.
+  // One linux/amd64 image from docker save, as tar or tar.gz.
   string architecture = 3;
   int64 upload_size_bytes = 4;
-  // Lowercase SHA256 of the compressed archive bytes.
+  // Lowercase SHA256 of the uploaded archive bytes.
   string upload_sha256 = 5;
-  ImageConfig config = 6;
+  // Runtime config is read from the image archive, never supplied separately.
+  reserved 6;
+  reserved "config";
 }
 message CreateBuildResponse {
   Build data = 1;

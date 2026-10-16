@@ -9910,7 +9910,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xbb\xc5\x01\n" +
+	"\x04INFO\x10\x032\xb6\xc5\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10206,10 +10206,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\bGet apps\x1agLists active apps in the authenticated environment. Set archived to true to list archived apps instead.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eapps:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xc5\x02\n" +
-	"\vCreateBuild\x12\x1a.api.v2.CreateBuildRequest\x1a\x1b.api.v2.CreateBuildResponse\"\xfc\x01\x92A\xc4\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\b\x01\x12\x0eapps:read:list\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xc0\x02\n" +
+	"\vCreateBuild\x12\x1a.api.v2.CreateBuildRequest\x1a\x1b.api.v2.CreateBuildResponse\"\xf7\x01\x92A\xbf\x01\n" +
 	"\x06Builds\n" +
-	"\x04Beta\x12\x0eCreate a build\x1a\x91\x01Upload a flattened linux/amd64 docker-export tar.gz to the returned URL, then commit the upload to start conversion. Requires image-build access.b\x10\n" +
+	"\x04Beta\x12\x0eCreate a build\x1a\x8c\x01Upload a linux/amd64 docker-save tar or tar.gz to the returned URL, then commit the upload to start conversion. Requires image-build access.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/builds/{name}\x12\xd2\x01\n" +

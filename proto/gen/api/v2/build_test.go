@@ -32,8 +32,8 @@ func TestBuildRoutePathParameters(t *testing.T) {
 		name, path, body string
 		commit           bool
 	}{
-		{"create", "/builds/python-tools", `{"tag":"latest","uploadSizeBytes":"123","config":{"cmd":["/bin/sleep","infinity"]}}`, false},
-		{"create path wins", "/builds/python-tools", `{"name":"other","tag":"latest","uploadSizeBytes":"123","config":{"cmd":["/bin/sleep","infinity"]}}`, false},
+		{"create", "/builds/python-tools", `{"tag":"latest","uploadSizeBytes":"123"}`, false},
+		{"create path wins", "/builds/python-tools", `{"name":"other","tag":"latest","uploadSizeBytes":"123"}`, false},
 		{"commit", "/builds/python-tools/build-id/commit", `{}`, true},
 		{"commit path wins", "/builds/python-tools/build-id/commit", `{"name":"other","buildId":"other-id"}`, true},
 	} {
@@ -55,7 +55,6 @@ func TestBuildRoutePathParameters(t *testing.T) {
 				require.Equal(t, "python-tools", s.created.Name)
 				require.Equal(t, "latest", s.created.Tag)
 				require.EqualValues(t, 123, s.created.UploadSizeBytes)
-				require.Equal(t, []string{"/bin/sleep", "infinity"}, s.created.Config.Cmd)
 			}
 		})
 	}
