@@ -1,6 +1,20 @@
 package devserver
 
-import "testing"
+import (
+	"context"
+	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
+	"github.com/stretchr/testify/require"
+)
 
 func TestShouldPollSDK(t *testing.T) {
 	tests := []struct {
@@ -23,4 +37,56 @@ func TestShouldPollSDK(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPollSDKs_FirstSyncPingsOnceUnderNoPoll exercises the real pollSDKs loop
+// (not just the extracted shouldPollSDK helper): a -u URL must still be
+// pinged once at startup under --no-poll, and never again once that first
+// sync lands, even though pollSDKs keeps looping.
+func TestPollSDKs_FirstSyncPingsOnceUnderNoPoll(t *testing.T) {
+	var hits atomic.Int32
+
+	ds := newTestDevServer(t)
+
+	var appID uuid.UUID
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		// A real SDK would call back into /fn/register on receiving this
+		// ping, which clears the placeholder error. Simulate that so the
+		// next pollSDKs iteration sees a healthy, errorless app.
+		_, _ = ds.Data.UpdateAppError(r.Context(), cqrs.UpdateAppErrorParams{
+			ID:    appID,
+			Error: sql.NullString{},
+		})
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	appID = inngest.DeterministicAppUUID(util.NormalizeAppURL(srv.URL, false))
+
+	ds.Opts = StartOpts{
+		URLs:         []string{srv.URL},
+		Poll:         false,
+		PollInterval: 0, // tight loop so several iterations run during the test
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		ds.pollSDKs(ctx)
+		close(done)
+	}()
+
+	require.Eventually(t, func() bool { return hits.Load() >= 1 }, 2*time.Second, 10*time.Millisecond,
+		"the -u URL must be pinged once at startup even under --no-poll")
+
+	// Let the tight loop (PollInterval=0) run many more iterations. A
+	// regression that keeps treating this as a first sync, or that never
+	// clears the saved error, would ping again on every one of them.
+	time.Sleep(150 * time.Millisecond)
+	cancel()
+	<-done
+
+	require.Equal(t, int32(1), hits.Load(),
+		"an app with no error must not be pinged again under --no-poll once its first sync has landed")
 }
