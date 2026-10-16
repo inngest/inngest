@@ -41,6 +41,9 @@ func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
 	if fnID, err := uuid.Parse(identifier); err == nil {
 		if fn, err := p.reader.GetFunctionByInternalUUID(ctx, fnID); err == nil {
+			if fn.EnvID != uuid.Nil && fn.EnvID != consts.DevServerEnvID {
+				return inngest.DeployedFunction{}, apiv2.ErrFunctionNotFound
+			}
 			return p.toDeployedFunction(ctx, fn)
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return inngest.DeployedFunction{}, err
@@ -53,6 +56,10 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	}
 	for _, fn := range fns {
 		if fn.Slug == identifier || fn.ID.String() == identifier {
+			// The single-tenant local store represents its environment as nil.
+			if fn.EnvID != uuid.Nil && fn.EnvID != consts.DevServerEnvID {
+				continue
+			}
 			return p.toDeployedFunction(ctx, fn)
 		}
 	}
@@ -64,7 +71,13 @@ func (p *cqrsFunctionProvider) GetFunctionByApp(ctx context.Context, appID strin
 	if err != nil {
 		return inngest.DeployedFunction{}, err
 	}
-	return p.findFunctionInApp(ctx, fns, appID, functionID)
+	local := make([]*cqrs.Function, 0, len(fns))
+	for _, fn := range fns {
+		if fn.EnvID == uuid.Nil || fn.EnvID == consts.DevServerEnvID {
+			local = append(local, fn)
+		}
+	}
+	return p.findFunctionInApp(ctx, local, appID, functionID)
 }
 
 func (p *cqrsFunctionProvider) GetFunctions(ctx context.Context, appID string, opts apiv2.GetFunctionsOpts) (*apiv2.GetFunctionsResult, error) {

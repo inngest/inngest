@@ -167,6 +167,27 @@ type GetRunsResult struct {
 	HasMore bool
 }
 
+type CreateReplayOpts struct {
+	AppID      string
+	Name       string
+	FunctionID string
+	From       time.Time
+	Until      time.Time
+	Statuses   []enums.ReplayRunStatus
+}
+
+type ReplayResult struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+type ReplayProvider interface {
+	// CreateReplay starts a replay for one function in the authenticated environment.
+	// Cloud uses the existing function replay worker. Local work is asynchronous,
+	// in memory, and lost on restart. Retrying creation creates another replay.
+	CreateReplay(ctx context.Context, opts CreateReplayOpts) (ReplayResult, error)
+}
+
 type RunProvider interface {
 	GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
