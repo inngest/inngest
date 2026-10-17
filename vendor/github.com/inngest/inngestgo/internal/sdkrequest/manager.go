@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -70,6 +71,12 @@ type InvocationManager interface {
 	// SigningKey returns the signing key used for this request.  This lets us
 	// retrieve creds for eg. publishing or API alls.
 	SigningKey() string
+	// SigningKeyFallback returns the fallback signing key for this request.
+	// API calls use it after the primary key is rejected.
+	SigningKeyFallback() string
+	// APIBaseURL returns the Inngest API URL for this request.  step tools
+	// that call the API, such as sandboxes, send requests to this URL.
+	APIBaseURL() string
 	// CallContext exposes the call context for middleware calls.
 	CallContext() middleware.CallContext
 	// StepMode returns how steps should be executed in this context
@@ -132,28 +139,28 @@ func NewManager(opts Opts) InvocationManager {
 		unseen.Add(k)
 	}
 
-	// If the step mode is StepModeYield but the function contains checkpoint config,
-	// enable checkpointing.
 	var checkpointConfig checkpoint.Config
-	if opts.Mode == StepModeYield && opts.Fn != nil && opts.Fn.Config().Checkpoint != nil {
+	if opts.Mode == StepModeYield && opts.Fn != nil && opts.Fn.Config().Checkpoint != nil && !opts.Fn.Config().Checkpoint.Disable {
 		opts.Mode = StepModeCheckpoint
 		checkpointConfig = *opts.Fn.Config().Checkpoint
 	}
 
 	return &requestCtxManager{
-		fn:         opts.Fn,
-		cancel:     opts.Cancel,
-		request:    opts.Request,
-		indexes:    map[string]int{},
-		l:          &sync.RWMutex{},
-		opsLock:    &sync.Mutex{},
-		signingKey: opts.SigningKey,
-		seen:       map[string]struct{}{},
-		seenLock:   &sync.RWMutex{},
-		unseen:     &unseen,
-		mw:         opts.Middleware,
-		mode:       opts.Mode,
-		t:          time.Now(),
+		fn:                 opts.Fn,
+		cancel:             opts.Cancel,
+		request:            opts.Request,
+		indexes:            map[string]int{},
+		l:                  &sync.RWMutex{},
+		opsLock:            &sync.Mutex{},
+		signingKey:         opts.SigningKey,
+		signingKeyFallback: opts.SigningKeyFallback,
+		apiBaseURL:         opts.APIBaseURL,
+		seen:               map[string]struct{}{},
+		seenLock:           &sync.RWMutex{},
+		unseen:             &unseen,
+		mw:                 opts.Middleware,
+		mode:               opts.Mode,
+		t:                  time.Now(),
 		checkpointer: checkpoint.New(checkpoint.Opts{
 			RunID:              opts.Request.CallCtx.RunID,
 			FnID:               opts.Request.CallCtx.FunctionID,
@@ -181,7 +188,11 @@ type requestCtxManager struct {
 
 	fn fn.ServableFunction
 	// key is the signing key
-	signingKey string
+	signingKey         string
+	signingKeyFallback string
+	// apiBaseURL is the Inngest API URL.  it is empty when the caller did not
+	// set one.
+	apiBaseURL string
 	// cancel ends the context and prevents any other tools from running.
 	cancel func()
 	// err stores the error from any step ran.
@@ -209,6 +220,8 @@ type requestCtxManager struct {
 	// checkpointer stores the reference to the invocation's checkpointer,
 	// allowing us to checkpoint step.runs and continue execution.,
 	checkpointer checkpoint.Checkpointer
+	// a failed background checkpoint leaves steps in the response buffer so the next step returns them before it runs user code.
+	checkpointFailed atomic.Bool
 
 	// t returns the time since the epoch since the request started.
 	t time.Time
@@ -216,6 +229,14 @@ type requestCtxManager struct {
 
 func (r *requestCtxManager) SigningKey() string {
 	return r.signingKey
+}
+
+func (r *requestCtxManager) SigningKeyFallback() string {
+	return r.signingKeyFallback
+}
+
+func (r *requestCtxManager) APIBaseURL() string {
+	return r.apiBaseURL
 }
 
 func (r *requestCtxManager) SetRequest(req *Request) {
@@ -255,6 +276,10 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 		r.ops = append(r.ops, op)
 	}
 	r.opsLock.Unlock()
+	if r.checkpointFailed.Load() {
+		r.cancel()
+		panic(ControlHijack{})
+	}
 
 	// If we're planning multiple steps, append and continue on without any hijacking
 	// in every case.  Without this, we won't continue to plan the next set of parallel
@@ -311,7 +336,12 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 				return
 			}
 			logger.Default().Warn("error checkpointing state, falling back to async response", "error", err)
+			r.checkpointFailed.Store(true)
 		})
+		if r.checkpointFailed.Load() {
+			r.cancel()
+			panic(ControlHijack{})
+		}
 	default:
 		// Do nothing else.
 	}
@@ -398,6 +428,11 @@ func (r *requestCtxManager) CloseCheckpointer() {
 }
 
 func (r *requestCtxManager) NewOp(op enums.Opcode, id string) UnhashedOp {
+	if r.checkpointFailed.Load() {
+		r.cancel()
+		panic(ControlHijack{})
+	}
+
 	r.l.Lock()
 	defer r.l.Unlock()
 
