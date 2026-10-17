@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"io"
+	"log/slog"
 	"net"
 	"net/url"
 	"time"
@@ -346,17 +347,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				stopBackground()
 				return errGatewayDraining
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
-				// Handle invoke in a non-blocking way to allow for other messages to be processed
-				msgCopy := connectproto.ConnectMessage{
-					Kind: msg.Kind,
-				}
-				if len(msg.Payload) > 0 {
-					msgCopy.Payload = append([]byte(nil), msg.Payload...)
-				}
-				h.workerPool.Add(workerPoolMsg{
-					msg:          &msgCopy,
-					preparedConn: preparedConn,
-				})
+				h.receiveExecutorRequest(l, preparedConn, &msg)
 			case connectproto.GatewayMessageType_GATEWAY_HEARTBEAT:
 				select {
 				case heartbeatReceived <- struct{}{}:
@@ -491,6 +482,29 @@ func (h *connectHandler) startConnectionFunc() func(context.Context, connectionE
 		return h.startConnection
 	}
 	return h.connect
+}
+
+// receiveExecutorRequest decodes and admits a request on the read loop, then
+// hands it to the worker pool.  a request that fails to decode or is not
+// admitted gets no ACK, so the gateway waits for the ACK until it times out.
+func (h *connectHandler) receiveExecutorRequest(l *slog.Logger, preparedConn *connection, msg *connectproto.ConnectMessage) {
+	req := &connectproto.GatewayExecutorRequestData{}
+	if err := proto.Unmarshal(msg.Payload, req); err != nil {
+		// TODO Should we send this back to the gateway?
+		l.Error("error decoding gateway request data", "error", err)
+		return
+	}
+
+	if err := h.handler.Admit(req); err != nil {
+		l.Error("failed to handle sdk request", "err", err, "request_id", req.RequestId, "run_id", req.RunId)
+		return
+	}
+
+	// Handle invoke in a non-blocking way to allow for other messages to be processed
+	h.workerPool.Add(workerPoolMsg{
+		req:          req,
+		preparedConn: preparedConn,
+	})
 }
 
 func (h *connectHandler) handleMessageReplyAck(msg *connectproto.ConnectMessage) error {

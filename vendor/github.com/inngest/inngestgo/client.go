@@ -48,8 +48,9 @@ type Client interface {
 type ClientOpts struct {
 	AppID string
 
-	// Checkpoint is the default checkpoint configuration for all functions
-	// created with this client.
+	// Checkpoint sets the default for functions created with this client.  nil
+	// uses safe checkpointing.  set Disable to true to disable checkpointing,
+	// forcing a new request for each step.
 	Checkpoint *checkpoint.Config
 
 	// HTTPClient is the HTTP client used to send events.

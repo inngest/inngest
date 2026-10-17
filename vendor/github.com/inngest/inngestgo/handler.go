@@ -877,6 +877,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			resp, ops, err := invoke(
 				r.Context(),
 				h.client,
+				h.GetAPIBaseURL(),
 				mw,
 				fn,
 				h.GetSigningKey(),
@@ -910,6 +911,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		resp, ops, invokeErr = invoke(
 			r.Context(),
 			h.client,
+			h.GetAPIBaseURL(),
 			mw,
 			fn,
 			h.GetSigningKey(),
@@ -1253,6 +1255,7 @@ type StreamResponse struct {
 func invoke(
 	ctx context.Context,
 	client Client,
+	apiBaseURL string,
 	mw *middleware.MiddlewareManager,
 	sf ServableFunction,
 	signingKey string,
@@ -1288,7 +1291,7 @@ func invoke(
 		SigningKey:         signingKey,
 		SigningKeyFallback: signingKeyFallback,
 		Mode:               sdkrequest.StepModeYield,
-		APIBaseURL:         env.APIServerURL(client.Options().APIBaseURL),
+		APIBaseURL:         apiBaseURL,
 	})
 	defer mgr.CloseCheckpointer()
 	fCtx = sdkrequest.SetManager(fCtx, mgr)

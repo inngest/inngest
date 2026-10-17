@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 import connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 
