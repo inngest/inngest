@@ -109,6 +109,7 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 			WithGatewayLogger(connector.logger),
 			WithGatewayGRPCPort(opts.GRPCConfig.Gateway.Port),
 			WithExecutorGRPCPort(opts.GRPCConfig.Executor.Port),
+			WithExecutorBindHost(opts.GRPCConfig.BindHost),
 		)
 	}
 
