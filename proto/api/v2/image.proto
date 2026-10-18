@@ -23,10 +23,10 @@ message CreateBuildRequest {
   // A workspace-local name, without an account or inngest/ prefix.
   string name = 1;
   string tag = 2;
-  // One linux/amd64 image from docker save, as tar or tar.gz.
   string architecture = 3;
   int64 upload_size_bytes = 4;
-  // Lowercase SHA256 of the uploaded archive bytes.
+  // Lowercase SHA256 of the uploaded archive bytes.  commit fails when the
+  // uploaded bytes have a different hash.
   string upload_sha256 = 5;
   // Runtime config is read from the image archive, never supplied separately.
   reserved 6;
@@ -34,8 +34,14 @@ message CreateBuildRequest {
 }
 message CreateBuildResponse {
   Build data = 1;
+  // send the archive in a PUT request body with every header in
+  // upload_headers.  set Content-Length to upload_size_bytes.  storage
+  // rejects a request that changes a header or the length.
   string upload_url = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // send each header with its exact value.  the server can add a header,
+  // such as a checksum of the archive, without a client change.
+  map<string, string> upload_headers = 4;
 }
 message CommitBuildRequest {
   string build_id = 1;

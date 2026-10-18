@@ -1166,7 +1166,7 @@ service V2 {
     option (authz) = { require_authz: true permission: "images:write:create" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a build"
-      description: "Upload a linux/amd64 docker-save tar or tar.gz to the returned URL, then commit the upload to start conversion. Requires image-build access."
+      description: "Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to start conversion. Requires image-build access."
       tags: "Builds" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };

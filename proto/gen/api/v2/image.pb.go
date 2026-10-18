@@ -150,12 +150,12 @@ func (x *Build) GetFinishedAt() *timestamppb.Timestamp {
 type CreateBuildRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A workspace-local name, without an account or inngest/ prefix.
-	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Tag  string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
-	// One linux/amd64 image from docker save, as tar or tar.gz.
+	Name            string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Tag             string `protobuf:"bytes,2,opt,name=tag,proto3" json:"tag,omitempty"`
 	Architecture    string `protobuf:"bytes,3,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	UploadSizeBytes int64  `protobuf:"varint,4,opt,name=upload_size_bytes,json=uploadSizeBytes,proto3" json:"upload_size_bytes,omitempty"`
-	// Lowercase SHA256 of the uploaded archive bytes.
+	// Lowercase SHA256 of the uploaded archive bytes.  commit fails when the
+	// uploaded bytes have a different hash.
 	UploadSha256  string `protobuf:"bytes,5,opt,name=upload_sha256,json=uploadSha256,proto3" json:"upload_sha256,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -227,10 +227,16 @@ func (x *CreateBuildRequest) GetUploadSha256() string {
 }
 
 type CreateBuildResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          *Build                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	UploadUrl     string                 `protobuf:"bytes,2,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Data  *Build                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	// send the archive in a PUT request body with every header in
+	// upload_headers.  set Content-Length to upload_size_bytes.  storage
+	// rejects a request that changes a header or the length.
+	UploadUrl string                 `protobuf:"bytes,2,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// send each header with its exact value.  the server can add a header,
+	// such as a checksum of the archive, without a client change.
+	UploadHeaders map[string]string `protobuf:"bytes,4,rep,name=upload_headers,json=uploadHeaders,proto3" json:"upload_headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -282,6 +288,13 @@ func (x *CreateBuildResponse) GetUploadUrl() string {
 func (x *CreateBuildResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *CreateBuildResponse) GetUploadHeaders() map[string]string {
+	if x != nil {
+		return x.UploadHeaders
 	}
 	return nil
 }
@@ -578,13 +591,17 @@ const file_api_v2_image_proto_rawDesc = "" +
 	"\x03tag\x18\x02 \x01(\tR\x03tag\x12\"\n" +
 	"\farchitecture\x18\x03 \x01(\tR\farchitecture\x12*\n" +
 	"\x11upload_size_bytes\x18\x04 \x01(\x03R\x0fuploadSizeBytes\x12#\n" +
-	"\rupload_sha256\x18\x05 \x01(\tR\fuploadSha256J\x04\b\x06\x10\aR\x06config\"\x92\x01\n" +
+	"\rupload_sha256\x18\x05 \x01(\tR\fuploadSha256J\x04\b\x06\x10\aR\x06config\"\xab\x02\n" +
 	"\x13CreateBuildResponse\x12!\n" +
 	"\x04data\x18\x01 \x01(\v2\r.api.v2.BuildR\x04data\x12\x1d\n" +
 	"\n" +
 	"upload_url\x18\x02 \x01(\tR\tuploadUrl\x129\n" +
 	"\n" +
-	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"C\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12U\n" +
+	"\x0eupload_headers\x18\x04 \x03(\v2..api.v2.CreateBuildResponse.UploadHeadersEntryR\ruploadHeaders\x1a@\n" +
+	"\x12UploadHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"C\n" +
 	"\x12CommitBuildRequest\x12\x19\n" +
 	"\bbuild_id\x18\x01 \x01(\tR\abuildId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\",\n" +
@@ -610,7 +627,7 @@ func file_api_v2_image_proto_rawDescGZIP() []byte {
 	return file_api_v2_image_proto_rawDescData
 }
 
-var file_api_v2_image_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_api_v2_image_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_api_v2_image_proto_goTypes = []any{
 	(*Build)(nil),                 // 0: api.v2.Build
 	(*CreateBuildRequest)(nil),    // 1: api.v2.CreateBuildRequest
@@ -621,21 +638,23 @@ var file_api_v2_image_proto_goTypes = []any{
 	(*BuildResponse)(nil),         // 6: api.v2.BuildResponse
 	(*ListBuildsRequest)(nil),     // 7: api.v2.ListBuildsRequest
 	(*ListBuildsResponse)(nil),    // 8: api.v2.ListBuildsResponse
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	nil,                           // 9: api.v2.CreateBuildResponse.UploadHeadersEntry
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
 }
 var file_api_v2_image_proto_depIdxs = []int32{
-	9, // 0: api.v2.Build.created_at:type_name -> google.protobuf.Timestamp
-	9, // 1: api.v2.Build.updated_at:type_name -> google.protobuf.Timestamp
-	9, // 2: api.v2.Build.finished_at:type_name -> google.protobuf.Timestamp
-	0, // 3: api.v2.CreateBuildResponse.data:type_name -> api.v2.Build
-	9, // 4: api.v2.CreateBuildResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 5: api.v2.BuildResponse.data:type_name -> api.v2.Build
-	0, // 6: api.v2.ListBuildsResponse.data:type_name -> api.v2.Build
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	10, // 0: api.v2.Build.created_at:type_name -> google.protobuf.Timestamp
+	10, // 1: api.v2.Build.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 2: api.v2.Build.finished_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: api.v2.CreateBuildResponse.data:type_name -> api.v2.Build
+	10, // 4: api.v2.CreateBuildResponse.expires_at:type_name -> google.protobuf.Timestamp
+	9,  // 5: api.v2.CreateBuildResponse.upload_headers:type_name -> api.v2.CreateBuildResponse.UploadHeadersEntry
+	0,  // 6: api.v2.BuildResponse.data:type_name -> api.v2.Build
+	0,  // 7: api.v2.ListBuildsResponse.data:type_name -> api.v2.Build
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_image_proto_init() }
@@ -649,7 +668,7 @@ func file_api_v2_image_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_image_proto_rawDesc), len(file_api_v2_image_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
