@@ -29,15 +29,14 @@ type Build struct {
 	Tag          string                 `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
 	Architecture string                 `protobuf:"bytes,4,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	// pending (uploading), uploaded (queued/processing), ready, or failed.
-	Status           string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
-	ArtifactDigest   string                 `protobuf:"bytes,6,opt,name=artifact_digest,json=artifactDigest,proto3" json:"artifact_digest,omitempty"`
-	BuilderSandboxId string                 `protobuf:"bytes,7,opt,name=builder_sandbox_id,json=builderSandboxId,proto3" json:"builder_sandbox_id,omitempty"`
-	Error            string                 `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
-	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt        *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	FinishedAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	Status         string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	ArtifactDigest string                 `protobuf:"bytes,6,opt,name=artifact_digest,json=artifactDigest,proto3" json:"artifact_digest,omitempty"`
+	Error          string                 `protobuf:"bytes,7,opt,name=error,proto3" json:"error,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	FinishedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Build) Reset() {
@@ -112,13 +111,6 @@ func (x *Build) GetArtifactDigest() string {
 	return ""
 }
 
-func (x *Build) GetBuilderSandboxId() string {
-	if x != nil {
-		return x.BuilderSandboxId
-	}
-	return ""
-}
-
 func (x *Build) GetError() string {
 	if x != nil {
 		return x.Error
@@ -147,6 +139,7 @@ func (x *Build) GetFinishedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// runtime config such as ENV and CMD comes from the image archive.
 type CreateBuildRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// A workspace-local name, without an account or inngest/ prefix.
@@ -569,29 +562,28 @@ var File_api_v2_image_proto protoreflect.FileDescriptor
 
 const file_api_v2_image_proto_rawDesc = "" +
 	"\n" +
-	"\x12api/v2/image.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\x99\x03\n" +
+	"\x12api/v2/image.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xeb\x02\n" +
 	"\x05Build\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
 	"\x03tag\x18\x03 \x01(\tR\x03tag\x12\"\n" +
 	"\farchitecture\x18\x04 \x01(\tR\farchitecture\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12'\n" +
-	"\x0fartifact_digest\x18\x06 \x01(\tR\x0eartifactDigest\x12,\n" +
-	"\x12builder_sandbox_id\x18\a \x01(\tR\x10builderSandboxId\x12\x14\n" +
-	"\x05error\x18\b \x01(\tR\x05error\x129\n" +
+	"\x0fartifact_digest\x18\x06 \x01(\tR\x0eartifactDigest\x12\x14\n" +
+	"\x05error\x18\a \x01(\tR\x05error\x129\n" +
 	"\n" +
-	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12;\n" +
-	"\vfinished_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"finishedAt\"\xbd\x01\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12;\n" +
+	"\vfinished_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\"\xaf\x01\n" +
 	"\x12CreateBuildRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03tag\x18\x02 \x01(\tR\x03tag\x12\"\n" +
 	"\farchitecture\x18\x03 \x01(\tR\farchitecture\x12*\n" +
 	"\x11upload_size_bytes\x18\x04 \x01(\x03R\x0fuploadSizeBytes\x12#\n" +
-	"\rupload_sha256\x18\x05 \x01(\tR\fuploadSha256J\x04\b\x06\x10\aR\x06config\"\xab\x02\n" +
+	"\rupload_sha256\x18\x05 \x01(\tR\fuploadSha256\"\xab\x02\n" +
 	"\x13CreateBuildResponse\x12!\n" +
 	"\x04data\x18\x01 \x01(\v2\r.api.v2.BuildR\x04data\x12\x1d\n" +
 	"\n" +

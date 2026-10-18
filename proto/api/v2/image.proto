@@ -12,13 +12,13 @@ message Build {
   // pending (uploading), uploaded (queued/processing), ready, or failed.
   string status = 5;
   string artifact_digest = 6;
-  string builder_sandbox_id = 7;
-  string error = 8;
-  google.protobuf.Timestamp created_at = 9;
-  google.protobuf.Timestamp updated_at = 10;
-  google.protobuf.Timestamp finished_at = 11;
+  string error = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
 }
 
+// runtime config such as ENV and CMD comes from the image archive.
 message CreateBuildRequest {
   // A workspace-local name, without an account or inngest/ prefix.
   string name = 1;
@@ -28,9 +28,6 @@ message CreateBuildRequest {
   // Lowercase SHA256 of the uploaded archive bytes.  commit fails when the
   // uploaded bytes have a different hash.
   string upload_sha256 = 5;
-  // Runtime config is read from the image archive, never supplied separately.
-  reserved 6;
-  reserved "config";
 }
 message CreateBuildResponse {
   Build data = 1;
