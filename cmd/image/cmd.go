@@ -31,15 +31,19 @@ func Command() *cli.Command {
 	}
 }
 
-func writers(cmd *cli.Command) (io.Writer, io.Writer) {
+func stdio(cmd *cli.Command) (io.Reader, io.Writer, io.Writer) {
+	var stdin io.Reader = os.Stdin
 	var stdout, stderr io.Writer = os.Stdout, os.Stderr
+	if r := cmd.Root().Reader; r != nil {
+		stdin = r
+	}
 	if w := cmd.Root().Writer; w != nil {
 		stdout = w
 	}
 	if w := cmd.Root().ErrWriter; w != nil {
 		stderr = w
 	}
-	return stdout, stderr
+	return stdin, stdout, stderr
 }
 
 func validateName(name string) error {

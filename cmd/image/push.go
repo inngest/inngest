@@ -46,8 +46,8 @@ func push(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	stdout, stderr := writers(cmd)
-	dc, err := docker.New(stdout, stderr)
+	stdin, stdout, stderr := stdio(cmd)
+	dc, err := docker.New(stdin, stdout, stderr)
 	if err != nil {
 		return err
 	}

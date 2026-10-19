@@ -20,9 +20,9 @@ func buildCommand() *cli.Command {
 }
 
 func build(ctx context.Context, cmd *cli.Command) error {
-	stdout, stderr := writers(cmd)
+	stdin, stdout, stderr := stdio(cmd)
 
-	dc, err := docker.New(stdout, stderr)
+	dc, err := docker.New(stdin, stdout, stderr)
 	if err != nil {
 		return err
 	}

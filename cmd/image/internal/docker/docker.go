@@ -12,13 +12,16 @@ import (
 
 // Client runs the docker binary found in PATH.
 type Client struct {
-	path   string
+	path string
+	// stdin goes to `docker build`, which reads a Dockerfile or build
+	// context from it for `-f -` or a context of "-".
+	stdin  io.Reader
 	stdout io.Writer
 	stderr io.Writer
 }
 
 // New finds docker in PATH.  docker output goes to stdout and stderr.
-func New(stdout, stderr io.Writer) (*Client, error) {
+func New(stdin io.Reader, stdout, stderr io.Writer) (*Client, error) {
 	// TODO: Look up podman as well as docker in the future.
 	path, err := exec.LookPath("docker")
 	if err != nil {
@@ -26,6 +29,7 @@ func New(stdout, stderr io.Writer) (*Client, error) {
 	}
 	return &Client{
 		path:   path,
+		stdin:  stdin,
 		stdout: stdout,
 		stderr: stderr,
 	}, nil
@@ -43,7 +47,7 @@ func (c *Client) Build(ctx context.Context, platform string, args []string) erro
 		}
 	}
 	args = append([]string{"build", "--platform", platform, "--load"}, args...)
-	if err := c.run(ctx, args...); err != nil {
+	if err := c.run(ctx, c.stdin, args...); err != nil {
 		return fmt.Errorf("docker build failed: %w", err)
 	}
 	return nil
@@ -68,7 +72,7 @@ func flagValues(args []string, names ...string) []string {
 
 // Save writes the image as a tar archive to path.
 func (c *Client) Save(ctx context.Context, tag, path string) error {
-	if err := c.run(ctx, "save", "-o", path, tag); err != nil {
+	if err := c.run(ctx, nil, "save", "-o", path, tag); err != nil {
 		return fmt.Errorf("docker save failed: %w", err)
 	}
 	return nil
@@ -107,8 +111,9 @@ func (c *Client) Inspect(ctx context.Context, tag string) (*Image, error) {
 	return &image, nil
 }
 
-func (c *Client) run(ctx context.Context, args ...string) error {
+func (c *Client) run(ctx context.Context, stdin io.Reader, args ...string) error {
 	ecmd := exec.CommandContext(ctx, c.path, args...)
+	ecmd.Stdin = stdin
 	ecmd.Stdout = c.stdout
 	ecmd.Stderr = c.stderr
 	return ecmd.Run()
