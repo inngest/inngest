@@ -128,6 +128,21 @@ message ExistsResponse {
   bool exists = 1;
 }
 
+message LookupIdempotencyRequest {
+  ID     id  = 1;
+  string key = 2;
+}
+
+message IdempotencyEntry {
+  string run_id       = 1;
+  bool   is_tombstone = 2;
+}
+
+message LookupIdempotencyResponse {
+  // entry is unset when the key has no entry.
+  IdempotencyEntry entry = 1;
+}
+
 message LoadEventsRequest {
   ID id = 1;
 }
@@ -257,6 +272,7 @@ service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
   rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+  rpc LookupIdempotency(LookupIdempotencyRequest) returns (LookupIdempotencyResponse) {}
   rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
   rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}

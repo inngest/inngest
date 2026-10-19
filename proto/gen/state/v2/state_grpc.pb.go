@@ -22,6 +22,7 @@ const (
 	RunService_Create_FullMethodName            = "/state.v2.RunService/Create"
 	RunService_Delete_FullMethodName            = "/state.v2.RunService/Delete"
 	RunService_Exists_FullMethodName            = "/state.v2.RunService/Exists"
+	RunService_LookupIdempotency_FullMethodName = "/state.v2.RunService/LookupIdempotency"
 	RunService_UpdateMetadata_FullMethodName    = "/state.v2.RunService/UpdateMetadata"
 	RunService_SaveStep_FullMethodName          = "/state.v2.RunService/SaveStep"
 	RunService_SavePending_FullMethodName       = "/state.v2.RunService/SavePending"
@@ -44,6 +45,7 @@ type RunServiceClient interface {
 	Create(ctx context.Context, in *CreateStateRequest, opts ...grpc.CallOption) (*CreateStateResponse, error)
 	Delete(ctx context.Context, in *DeleteStateRequest, opts ...grpc.CallOption) (*DeleteStateResponse, error)
 	Exists(ctx context.Context, in *ExistsRequest, opts ...grpc.CallOption) (*ExistsResponse, error)
+	LookupIdempotency(ctx context.Context, in *LookupIdempotencyRequest, opts ...grpc.CallOption) (*LookupIdempotencyResponse, error)
 	UpdateMetadata(ctx context.Context, in *UpdateMetadataRequest, opts ...grpc.CallOption) (*UpdateMetadataResponse, error)
 	SaveStep(ctx context.Context, in *SaveStepRequest, opts ...grpc.CallOption) (*SaveStepResponse, error)
 	SavePending(ctx context.Context, in *SavePendingRequest, opts ...grpc.CallOption) (*SavePendingResponse, error)
@@ -91,6 +93,16 @@ func (c *runServiceClient) Exists(ctx context.Context, in *ExistsRequest, opts .
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExistsResponse)
 	err := c.cc.Invoke(ctx, RunService_Exists_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runServiceClient) LookupIdempotency(ctx context.Context, in *LookupIdempotencyRequest, opts ...grpc.CallOption) (*LookupIdempotencyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LookupIdempotencyResponse)
+	err := c.cc.Invoke(ctx, RunService_LookupIdempotency_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +246,7 @@ type RunServiceServer interface {
 	Create(context.Context, *CreateStateRequest) (*CreateStateResponse, error)
 	Delete(context.Context, *DeleteStateRequest) (*DeleteStateResponse, error)
 	Exists(context.Context, *ExistsRequest) (*ExistsResponse, error)
+	LookupIdempotency(context.Context, *LookupIdempotencyRequest) (*LookupIdempotencyResponse, error)
 	UpdateMetadata(context.Context, *UpdateMetadataRequest) (*UpdateMetadataResponse, error)
 	SaveStep(context.Context, *SaveStepRequest) (*SaveStepResponse, error)
 	SavePending(context.Context, *SavePendingRequest) (*SavePendingResponse, error)
@@ -265,6 +278,9 @@ func (UnimplementedRunServiceServer) Delete(context.Context, *DeleteStateRequest
 }
 func (UnimplementedRunServiceServer) Exists(context.Context, *ExistsRequest) (*ExistsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Exists not implemented")
+}
+func (UnimplementedRunServiceServer) LookupIdempotency(context.Context, *LookupIdempotencyRequest) (*LookupIdempotencyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LookupIdempotency not implemented")
 }
 func (UnimplementedRunServiceServer) UpdateMetadata(context.Context, *UpdateMetadataRequest) (*UpdateMetadataResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateMetadata not implemented")
@@ -376,6 +392,24 @@ func _RunService_Exists_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RunServiceServer).Exists(ctx, req.(*ExistsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RunService_LookupIdempotency_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LookupIdempotencyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).LookupIdempotency(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_LookupIdempotency_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).LookupIdempotency(ctx, req.(*LookupIdempotencyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -632,6 +666,10 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Exists",
 			Handler:    _RunService_Exists_Handler,
+		},
+		{
+			MethodName: "LookupIdempotency",
+			Handler:    _RunService_LookupIdempotency_Handler,
 		},
 		{
 			MethodName: "UpdateMetadata",
