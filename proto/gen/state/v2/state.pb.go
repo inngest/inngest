@@ -1044,8 +1044,12 @@ func (x *SaveStepRequest) GetData() []byte {
 type SaveStepResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	HasPendingSteps bool                   `protobuf:"varint,1,opt,name=has_pending_steps,json=hasPendingSteps,proto3" json:"has_pending_steps,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// idempotent is set when the step already had exactly this output, so nothing new
+	// was written.  Servers return this instead of an ErrIdempotentResponse error so
+	// has_pending_steps survives.
+	Idempotent    bool `protobuf:"varint,2,opt,name=idempotent,proto3" json:"idempotent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SaveStepResponse) Reset() {
@@ -1081,6 +1085,13 @@ func (*SaveStepResponse) Descriptor() ([]byte, []int) {
 func (x *SaveStepResponse) GetHasPendingSteps() bool {
 	if x != nil {
 		return x.HasPendingSteps
+	}
+	return false
+}
+
+func (x *SaveStepResponse) GetIdempotent() bool {
+	if x != nil {
+		return x.Idempotent
 	}
 	return false
 }
@@ -2708,9 +2719,12 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0fSaveStepRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x17\n" +
 	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\">\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"^\n" +
 	"\x10SaveStepResponse\x12*\n" +
-	"\x11has_pending_steps\x18\x01 \x01(\bR\x0fhasPendingSteps\"L\n" +
+	"\x11has_pending_steps\x18\x01 \x01(\bR\x0fhasPendingSteps\x12\x1e\n" +
+	"\n" +
+	"idempotent\x18\x02 \x01(\bR\n" +
+	"idempotent\"L\n" +
 	"\x12SavePendingRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x18\n" +
 	"\apending\x18\x02 \x03(\tR\apending\"\x15\n" +

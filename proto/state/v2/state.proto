@@ -111,6 +111,10 @@ message SaveStepRequest {
 
 message SaveStepResponse{
   bool has_pending_steps = 1;
+  // idempotent is set when the step already had exactly this output, so nothing new
+  // was written.  Servers return this instead of an ErrIdempotentResponse error so
+  // has_pending_steps survives.
+  bool idempotent = 2;
 }
 
 message SavePendingRequest {
