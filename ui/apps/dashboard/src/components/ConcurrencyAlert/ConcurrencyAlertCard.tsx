@@ -21,13 +21,12 @@ const numberFormatter = new Intl.NumberFormat('en-US');
 const arrow = <RiArrowRightLine className="h-3.5 w-3.5" />;
 
 const boostedStyles = {
-  card: 'border-[rgb(var(--color-carbon-1000))] bg-[rgb(var(--color-carbon-1000))] text-[rgb(var(--color-carbon-200))]',
-  divider: 'border-[rgb(var(--color-carbon-600))]',
-  meta: 'text-[rgb(var(--color-carbon-0))]',
-  icon: 'text-[rgb(var(--color-breeze-500))]',
-  link: 'text-[rgb(var(--color-breeze-400))] hover:decoration-[rgb(var(--color-breeze-400))]',
-  track: 'bg-[rgb(var(--color-carbon-700))]',
-  bar: 'bg-gradient-to-r from-[rgb(var(--color-breeze-500))] to-[rgb(var(--color-breeze-300))]',
+  card: 'bg-contrast border-contrast text-onContrast',
+  divider: 'border-contrast',
+  icon: 'text-secondary-moderate',
+  link: 'text-secondary-subtle hover:decoration-secondary-subtle',
+  track: 'bg-[rgb(var(--color-foreground-subtle))]',
+  bar: 'bg-gradient-to-r from-secondary-moderate to-secondary-xSubtle',
 };
 
 const limitedStyles = {
@@ -90,9 +89,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
     >
       <div className="flex items-center gap-1">
         <RiRocket2Line className={cn('h-4 w-4 shrink-0', boostedStyles.icon)} />
-        <h2 className={cn('text-xs font-bold leading-4', boostedStyles.meta)}>
-          Concurrency boosted!
-        </h2>
+        <h2 className="text-xs font-bold leading-4">Concurrency boosted!</h2>
       </div>
       <p className="mt-1 text-xs font-medium leading-4">
         Your account concurrency has been boosted by {BURST_MULTIPLIER}x. Add
@@ -107,7 +104,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
           value={alert.usedRatio}
         />
         {alert.minutesRemaining != null && (
-          <p className={cn('mt-[3px] text-xs leading-4', boostedStyles.meta)}>
+          <p className="mt-[3px] text-xs leading-4">
             {minutesLeftLabel(alert.minutesRemaining)} remaining this month
           </p>
         )}
