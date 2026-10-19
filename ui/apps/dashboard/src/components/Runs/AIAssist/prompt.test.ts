@@ -23,54 +23,38 @@ function build(
 ) {
   return buildRunDiscoveryPrompt({ ...context, ...overrides, search }, now);
 }
-function filters(prompt: string) {
-  return JSON.parse(
-    prompt.slice(prompt.indexOf('{'), prompt.indexOf('\n}') + 2),
-  );
-}
-
 describe('basic run discovery prompts', () => {
-  it('uses the page default range without inventing app or status filters', () => {
-    expect(filters(build({}).prompt!)).toEqual({
-      account: 'Example account',
-      env: 'staging',
-      timeField: 'queuedAt',
-      from: '2026-10-18T22:00:00.000Z',
-      until: now.toISOString(),
-    });
+  it('uses the original design copy and a readable default window', () => {
+    expect(build({}).prompt).toBe(
+      'Find runs in “staging” from the last 24 hours. Show the run IDs and inspect the trace of the most recent run. Use the “Example account” account.',
+    );
   });
 
-  it('resolves dashboard JSON selections to API-facing app IDs and preserves multiple statuses', () => {
+  it('preserves resolved apps and multiple statuses in natural language', () => {
     const result = build({
-      filterApp: JSON.stringify(['internal-1', 'internal-2']),
-      filterStatus: JSON.stringify(['FAILED', 'CANCELLED']),
+      filterApp: '["internal-1","internal-2"]',
+      filterStatus: '["FAILED","CANCELLED"]',
       last: '2h',
     });
-    expect(filters(result.prompt!)).toMatchObject({
-      appId: ['billing', 'orders'],
-      status: ['FAILED', 'CANCELLED'],
-      from: '2026-10-19T20:00:00.000Z',
-    });
+    expect(result.prompt).toBe(
+      'Find failed or cancelled runs in apps “billing” or “orders” in “staging” from the last 2 hours. Show the run IDs and inspect the trace of the most recent run. Use the “Example account” account.',
+    );
   });
 
   it.each([
-    ['QUEUED_AT', 'queuedAt'],
-    ['STARTED_AT', 'startedAt'],
-    ['ENDED_AT', 'endedAt'],
-  ])('preserves %s and absolute boundaries', (field, expected) => {
+    ['QUEUED_AT', 'between'],
+    ['STARTED_AT', 'that started between'],
+    ['ENDED_AT', 'that ended between'],
+  ])('preserves %s and absolute UTC boundaries', (field, description) => {
     expect(
-      filters(
-        build({
-          timeField: field,
-          start: '2026-10-18T09:00:00-07:00',
-          end: '2026-10-19T10:00:00-07:00',
-        }).prompt!,
-      ),
-    ).toMatchObject({
-      timeField: expected,
-      from: '2026-10-18T16:00:00.000Z',
-      until: '2026-10-19T17:00:00.000Z',
-    });
+      build({
+        timeField: field,
+        start: '2026-10-18T09:00:00-07:00',
+        end: '2026-10-19T10:00:00-07:00',
+      }).prompt,
+    ).toContain(
+      `${description} 2026-10-18T16:00:00.000Z and 2026-10-19T17:00:00.000Z`,
+    );
   });
 
   it('reads selections after the actual router URL round trip', () => {
@@ -80,38 +64,39 @@ describe('basic run discovery prompts', () => {
         filterStatus: '["FAILED"]',
       }),
     );
-    expect(filters(build(search).prompt!)).toMatchObject({
-      appId: ['billing'],
-      status: ['FAILED'],
-    });
+    expect(build(search).prompt).toContain('Find failed runs in app “billing”');
+    expect(build(search).prompt).toContain('trace of the most recent failure');
   });
 
-  it('freezes a relative window at copy time', () => {
-    const later = new Date('2026-10-19T22:05:00Z');
-    expect(
-      filters(
-        buildRunDiscoveryPrompt({ ...context, search: { last: '1h' } }, later)
-          .prompt!,
-      ),
-    ).toMatchObject({
-      from: '2026-10-19T21:05:00.000Z',
-      until: later.toISOString(),
-    });
+  it('keeps relative windows readable in the copied prompt', () => {
+    const result = buildRunDiscoveryPrompt(
+      { ...context, search: { last: '1h' } },
+      new Date('2026-10-19T22:05:00Z'),
+    );
+    expect(result.prompt).toContain('from the last 1 hour');
+    expect(result.prompt).not.toContain('2026-');
+  });
+
+  it('preserves the selected time field for relative windows', () => {
+    expect(build({ timeField: 'STARTED_AT', last: '1d' }).prompt).toContain(
+      'that started in the last 24 hours',
+    );
+    expect(build({ timeField: 'ENDED_AT', last: '30m' }).prompt).toContain(
+      'that ended in the last 30 minutes',
+    );
   });
 
   it('uses the resolved parent app and public function ID on function pages', () => {
     expect(
-      filters(
-        build(
-          {},
-          {
-            scope: 'fn',
-            functionAppID: 'billing',
-            functionSlug: 'billing-charge-card',
-          },
-        ).prompt!,
-      ),
-    ).toMatchObject({ appId: ['billing'], functionId: ['charge-card'] });
+      build(
+        { filterStatus: '["FAILED"]' },
+        {
+          scope: 'fn',
+          functionAppID: 'billing',
+          functionSlug: 'billing-charge-card',
+        },
+      ).prompt,
+    ).toContain('Find failed runs for “charge-card” in app “billing”');
   });
 
   it.each([
@@ -147,7 +132,7 @@ describe('basic run discovery prompts', () => {
       { token: 'secret', output: 'private payload' },
       { account },
     );
-    expect(filters(result.prompt!).account).toBe(account);
+    expect(result.prompt).toContain(`“${account}”`);
     expect(result.prompt).not.toContain('secret');
     expect(result.prompt).not.toContain('private payload');
   });

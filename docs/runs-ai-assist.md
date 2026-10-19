@@ -2,7 +2,7 @@
 
 The Cloud Runs toolbar includes a Use AI popover. It links to existing MCP setup and copies a prompt using account, environment, app, function scope, status, and time filters. It makes no MCP calls and grants no access. The local Dev Server has no AI toolbar entry. There is no feature flag; review the change in staging before deployment.
 
-CEL search, restrictive Run type selections, PAUSED, and unsupported statuses block copying with an explanation. App identities resolve from dashboard metadata; function IDs follow the existing Runs REST adapter. Relative time windows resolve at copy time. Prompt contents and filter values are excluded from feature telemetry.
+CEL search, restrictive Run type selections, PAUSED, and unsupported statuses block copying with an explanation. App identities resolve from dashboard metadata; function IDs follow the existing Runs REST adapter. Prompts use readable relative windows such as “the last 24 hours” and retain UTC boundaries for absolute windows. Prompt contents and filter values are excluded from feature telemetry.
 
 ## Tracking contract
 

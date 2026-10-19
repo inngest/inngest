@@ -179,12 +179,22 @@ export function RunAIAssistPopover({
             </a>
           ))}
         </div>
-        <p className="text-muted mb-2 mt-4 text-xs">
-          Already connected? Copy this prompt into your AI tool.
-        </p>
-        <p className="text-muted mb-2 text-xs">
-          Uses environment, app, function, status, and time filters.
-        </p>
+        <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+          <p className="text-muted text-xs">Already connected? Try asking</p>
+          <Button
+            label={
+              copyState === 'copied'
+                ? 'Copied'
+                : copyState === 'copying'
+                  ? 'Copying…'
+                  : 'Copy prompt'
+            }
+            onClick={() => void copyPrompt()}
+            disabled={blocked || copyState === 'copying'}
+            appearance="outlined"
+            size="small"
+          />
+        </div>
         {message ? (
           <p role="status" className="text-muted rounded border p-2 text-xs">
             {message}
@@ -193,7 +203,7 @@ export function RunAIAssistPopover({
           <pre
             aria-label="Prompt preview"
             tabIndex={0}
-            className="bg-canvasSubtle text-basis max-h-52 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
+            className="bg-canvasSubtle text-basis max-h-36 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
           >
             {result.prompt}
           </pre>
@@ -207,25 +217,6 @@ export function RunAIAssistPopover({
             className="mt-2"
           />
         )}
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="text-muted text-xs">
-            Only the context shown is copied.
-          </p>
-          <Button
-            label={
-              copyState === 'copied'
-                ? 'Copied'
-                : copyState === 'copying'
-                  ? 'Copying…'
-                  : 'Copy prompt'
-            }
-            onClick={() => void copyPrompt()}
-            disabled={blocked || copyState === 'copying'}
-            kind="secondary"
-            appearance="outlined"
-            size="small"
-          />
-        </div>
         <p role="status" aria-live="polite" className="text-muted mt-1 text-xs">
           {copyState === 'copied'
             ? 'Prompt copied.'
@@ -242,7 +233,7 @@ export function RunAIAssistPopover({
             onAction({ action: 'guide_clicked', guide: 'connection' })
           }
         >
-          Connection guide ↗
+          View MCP docs ↗
         </a>
       </PopoverContent>
     </Popover>

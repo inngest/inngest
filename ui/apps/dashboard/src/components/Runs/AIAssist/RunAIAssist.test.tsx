@@ -154,7 +154,7 @@ describe('Runs AI popover', () => {
     await act(async () => resolve());
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
     expect(screen.getByLabelText('Prompt preview').textContent).toContain(
-      'FAILED',
+      'failed',
     );
   });
 
