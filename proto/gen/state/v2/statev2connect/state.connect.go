@@ -39,6 +39,9 @@ const (
 	RunServiceDeleteProcedure = "/state.v2.RunService/Delete"
 	// RunServiceExistsProcedure is the fully-qualified name of the RunService's Exists RPC.
 	RunServiceExistsProcedure = "/state.v2.RunService/Exists"
+	// RunServiceLookupIdempotencyProcedure is the fully-qualified name of the RunService's
+	// LookupIdempotency RPC.
+	RunServiceLookupIdempotencyProcedure = "/state.v2.RunService/LookupIdempotency"
 	// RunServiceUpdateMetadataProcedure is the fully-qualified name of the RunService's UpdateMetadata
 	// RPC.
 	RunServiceUpdateMetadataProcedure = "/state.v2.RunService/UpdateMetadata"
@@ -76,6 +79,7 @@ type RunServiceClient interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
 	Delete(context.Context, *connect.Request[v2.DeleteStateRequest]) (*connect.Response[v2.DeleteStateResponse], error)
 	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
+	LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
@@ -118,6 +122,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			httpClient,
 			baseURL+RunServiceExistsProcedure,
 			connect.WithSchema(runServiceMethods.ByName("Exists")),
+			connect.WithClientOptions(opts...),
+		),
+		lookupIdempotency: connect.NewClient[v2.LookupIdempotencyRequest, v2.LookupIdempotencyResponse](
+			httpClient,
+			baseURL+RunServiceLookupIdempotencyProcedure,
+			connect.WithSchema(runServiceMethods.ByName("LookupIdempotency")),
 			connect.WithClientOptions(opts...),
 		),
 		updateMetadata: connect.NewClient[v2.UpdateMetadataRequest, v2.UpdateMetadataResponse](
@@ -206,6 +216,7 @@ type runServiceClient struct {
 	create            *connect.Client[v2.CreateStateRequest, v2.CreateStateResponse]
 	delete            *connect.Client[v2.DeleteStateRequest, v2.DeleteStateResponse]
 	exists            *connect.Client[v2.ExistsRequest, v2.ExistsResponse]
+	lookupIdempotency *connect.Client[v2.LookupIdempotencyRequest, v2.LookupIdempotencyResponse]
 	updateMetadata    *connect.Client[v2.UpdateMetadataRequest, v2.UpdateMetadataResponse]
 	saveStep          *connect.Client[v2.SaveStepRequest, v2.SaveStepResponse]
 	savePending       *connect.Client[v2.SavePendingRequest, v2.SavePendingResponse]
@@ -234,6 +245,11 @@ func (c *runServiceClient) Delete(ctx context.Context, req *connect.Request[v2.D
 // Exists calls state.v2.RunService.Exists.
 func (c *runServiceClient) Exists(ctx context.Context, req *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error) {
 	return c.exists.CallUnary(ctx, req)
+}
+
+// LookupIdempotency calls state.v2.RunService.LookupIdempotency.
+func (c *runServiceClient) LookupIdempotency(ctx context.Context, req *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error) {
+	return c.lookupIdempotency.CallUnary(ctx, req)
 }
 
 // UpdateMetadata calls state.v2.RunService.UpdateMetadata.
@@ -306,6 +322,7 @@ type RunServiceHandler interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
 	Delete(context.Context, *connect.Request[v2.DeleteStateRequest]) (*connect.Response[v2.DeleteStateResponse], error)
 	Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error)
+	LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error)
 	UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error)
 	SaveStep(context.Context, *connect.Request[v2.SaveStepRequest]) (*connect.Response[v2.SaveStepResponse], error)
 	SavePending(context.Context, *connect.Request[v2.SavePendingRequest]) (*connect.Response[v2.SavePendingResponse], error)
@@ -344,6 +361,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		RunServiceExistsProcedure,
 		svc.Exists,
 		connect.WithSchema(runServiceMethods.ByName("Exists")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceLookupIdempotencyHandler := connect.NewUnaryHandler(
+		RunServiceLookupIdempotencyProcedure,
+		svc.LookupIdempotency,
+		connect.WithSchema(runServiceMethods.ByName("LookupIdempotency")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceUpdateMetadataHandler := connect.NewUnaryHandler(
@@ -432,6 +455,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceDeleteHandler.ServeHTTP(w, r)
 		case RunServiceExistsProcedure:
 			runServiceExistsHandler.ServeHTTP(w, r)
+		case RunServiceLookupIdempotencyProcedure:
+			runServiceLookupIdempotencyHandler.ServeHTTP(w, r)
 		case RunServiceUpdateMetadataProcedure:
 			runServiceUpdateMetadataHandler.ServeHTTP(w, r)
 		case RunServiceSaveStepProcedure:
@@ -477,6 +502,10 @@ func (UnimplementedRunServiceHandler) Delete(context.Context, *connect.Request[v
 
 func (UnimplementedRunServiceHandler) Exists(context.Context, *connect.Request[v2.ExistsRequest]) (*connect.Response[v2.ExistsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.Exists is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) LookupIdempotency(context.Context, *connect.Request[v2.LookupIdempotencyRequest]) (*connect.Response[v2.LookupIdempotencyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("state.v2.RunService.LookupIdempotency is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) UpdateMetadata(context.Context, *connect.Request[v2.UpdateMetadataRequest]) (*connect.Response[v2.UpdateMetadataResponse], error) {

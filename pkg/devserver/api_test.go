@@ -1218,6 +1218,103 @@ func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestRegister_URLDerivedAppKeepsFunctionVersionAcrossPlaceholderUpsert(t *testing.T) {
+	ctx := context.Background()
+
+	req := sdk.RegisterRequest{
+		URL:     "http://localhost:3000/api/inngest",
+		AppName: "my-app",
+		V:       "1",
+		Functions: []sdk.SDKFunction{{
+			Name: "Test Function",
+			Slug: "test-function",
+			Triggers: []inngest.Trigger{{
+				EventTrigger: &inngest.EventTrigger{Event: "test/event"},
+			}},
+			Steps: map[string]sdk.SDKStep{
+				"step-1": {
+					ID:   "step-1",
+					Name: "test step",
+					Runtime: map[string]any{
+						"url": "http://localhost:3000/api/inngest",
+					},
+				},
+			},
+		}},
+	}
+
+	sum, err := req.Checksum()
+	require.NoError(t, err)
+
+	ds := newTestDevServer(t)
+	api := &devapi{devserver: ds}
+
+	legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
+	require.NotEqual(t, legacyAppID, inngest.DeterministicAppUUID(req.AppName))
+
+	_, err = ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:          legacyAppID,
+		Name:        req.AppName,
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Checksum:    sum,
+		Url:         req.URL,
+		Method:      enums.AppMethodServe.String(),
+	})
+	require.NoError(t, err)
+
+	fnID := uuid.New()
+	fnConfig, err := json.Marshal(inngest.Function{
+		ID:              fnID,
+		Name:            "Test Function",
+		Slug:            "test-function",
+		FunctionVersion: 51,
+		Triggers: []inngest.Trigger{{
+			EventTrigger: &inngest.EventTrigger{Event: "test/event"},
+		}},
+	})
+	require.NoError(t, err)
+	_, err = ds.Data.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+		ID:        fnID,
+		AppID:     legacyAppID,
+		Name:      "Test Function",
+		Slug:      "test-function",
+		Config:    string(fnConfig),
+		CreatedAt: time.Now(),
+	})
+	require.NoError(t, err)
+
+	// pollSDKs startup upsert: name="", error=unreachable, empty checksum, same id.
+	_, err = ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+		ID:  legacyAppID,
+		Url: req.URL,
+		Error: sql.NullString{
+			Valid:  true,
+			String: deploy.DeployErrUnreachable.Error(),
+		},
+	})
+	require.NoError(t, err)
+
+	app, err := ds.Data.GetAppByID(ctx, legacyAppID)
+	require.NoError(t, err)
+	require.Equal(t, req.AppName, app.Name)
+	require.Equal(t, sum, app.Checksum)
+	require.False(t, app.Error.Valid)
+
+	reply, err := api.register(ctx, req)
+	require.NoError(t, err)
+	require.True(t, reply.OK)
+	require.False(t, reply.Modified, "unchanged register must short-circuit")
+	require.Equal(t, legacyAppID, *reply.AppID)
+
+	funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, legacyAppID)
+	require.NoError(t, err)
+	require.Len(t, funcs, 1)
+	var got inngest.Function
+	require.NoError(t, json.Unmarshal([]byte(funcs[0].Config), &got))
+	require.Equal(t, 51, got.FunctionVersion)
+}
+
 func requireFeatureObservationsJSON(t *testing.T, metadata map[string]string, expected string) {
 	t.Helper()
 

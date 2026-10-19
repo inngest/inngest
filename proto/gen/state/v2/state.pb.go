@@ -1044,8 +1044,12 @@ func (x *SaveStepRequest) GetData() []byte {
 type SaveStepResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	HasPendingSteps bool                   `protobuf:"varint,1,opt,name=has_pending_steps,json=hasPendingSteps,proto3" json:"has_pending_steps,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// idempotent is set when the step already had exactly this output, so nothing new
+	// was written.  Servers return this instead of an ErrIdempotentResponse error so
+	// has_pending_steps survives.
+	Idempotent    bool `protobuf:"varint,2,opt,name=idempotent,proto3" json:"idempotent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SaveStepResponse) Reset() {
@@ -1081,6 +1085,13 @@ func (*SaveStepResponse) Descriptor() ([]byte, []int) {
 func (x *SaveStepResponse) GetHasPendingSteps() bool {
 	if x != nil {
 		return x.HasPendingSteps
+	}
+	return false
+}
+
+func (x *SaveStepResponse) GetIdempotent() bool {
+	if x != nil {
+		return x.Idempotent
 	}
 	return false
 }
@@ -1261,6 +1272,155 @@ func (x *ExistsResponse) GetExists() bool {
 	return false
 }
 
+type LookupIdempotencyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupIdempotencyRequest) Reset() {
+	*x = LookupIdempotencyRequest{}
+	mi := &file_state_v2_state_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupIdempotencyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupIdempotencyRequest) ProtoMessage() {}
+
+func (x *LookupIdempotencyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupIdempotencyRequest.ProtoReflect.Descriptor instead.
+func (*LookupIdempotencyRequest) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *LookupIdempotencyRequest) GetId() *ID {
+	if x != nil {
+		return x.Id
+	}
+	return nil
+}
+
+func (x *LookupIdempotencyRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type IdempotencyEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	IsTombstone   bool                   `protobuf:"varint,2,opt,name=is_tombstone,json=isTombstone,proto3" json:"is_tombstone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdempotencyEntry) Reset() {
+	*x = IdempotencyEntry{}
+	mi := &file_state_v2_state_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdempotencyEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdempotencyEntry) ProtoMessage() {}
+
+func (x *IdempotencyEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdempotencyEntry.ProtoReflect.Descriptor instead.
+func (*IdempotencyEntry) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *IdempotencyEntry) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *IdempotencyEntry) GetIsTombstone() bool {
+	if x != nil {
+		return x.IsTombstone
+	}
+	return false
+}
+
+type LookupIdempotencyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// An absent entry means no idempotency record exists.
+	Entry         *IdempotencyEntry `protobuf:"bytes,1,opt,name=entry,proto3" json:"entry,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupIdempotencyResponse) Reset() {
+	*x = LookupIdempotencyResponse{}
+	mi := &file_state_v2_state_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupIdempotencyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupIdempotencyResponse) ProtoMessage() {}
+
+func (x *LookupIdempotencyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_state_v2_state_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupIdempotencyResponse.ProtoReflect.Descriptor instead.
+func (*LookupIdempotencyResponse) Descriptor() ([]byte, []int) {
+	return file_state_v2_state_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *LookupIdempotencyResponse) GetEntry() *IdempotencyEntry {
+	if x != nil {
+		return x.Entry
+	}
+	return nil
+}
+
 type LoadEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1270,7 +1430,7 @@ type LoadEventsRequest struct {
 
 func (x *LoadEventsRequest) Reset() {
 	*x = LoadEventsRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[20]
+	mi := &file_state_v2_state_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1282,7 +1442,7 @@ func (x *LoadEventsRequest) String() string {
 func (*LoadEventsRequest) ProtoMessage() {}
 
 func (x *LoadEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[20]
+	mi := &file_state_v2_state_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1295,7 +1455,7 @@ func (x *LoadEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadEventsRequest.ProtoReflect.Descriptor instead.
 func (*LoadEventsRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{20}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *LoadEventsRequest) GetId() *ID {
@@ -1315,7 +1475,7 @@ type LoadEventsResponse struct {
 
 func (x *LoadEventsResponse) Reset() {
 	*x = LoadEventsResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[21]
+	mi := &file_state_v2_state_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1327,7 +1487,7 @@ func (x *LoadEventsResponse) String() string {
 func (*LoadEventsResponse) ProtoMessage() {}
 
 func (x *LoadEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[21]
+	mi := &file_state_v2_state_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1340,7 +1500,7 @@ func (x *LoadEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadEventsResponse.ProtoReflect.Descriptor instead.
 func (*LoadEventsResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{21}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *LoadEventsResponse) GetEvents() [][]byte {
@@ -1366,7 +1526,7 @@ type LoadStepsRequest struct {
 
 func (x *LoadStepsRequest) Reset() {
 	*x = LoadStepsRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[22]
+	mi := &file_state_v2_state_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1378,7 +1538,7 @@ func (x *LoadStepsRequest) String() string {
 func (*LoadStepsRequest) ProtoMessage() {}
 
 func (x *LoadStepsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[22]
+	mi := &file_state_v2_state_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1391,7 +1551,7 @@ func (x *LoadStepsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadStepsRequest.ProtoReflect.Descriptor instead.
 func (*LoadStepsRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{22}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *LoadStepsRequest) GetId() *ID {
@@ -1410,7 +1570,7 @@ type LoadStepsResponse struct {
 
 func (x *LoadStepsResponse) Reset() {
 	*x = LoadStepsResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[23]
+	mi := &file_state_v2_state_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1422,7 +1582,7 @@ func (x *LoadStepsResponse) String() string {
 func (*LoadStepsResponse) ProtoMessage() {}
 
 func (x *LoadStepsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[23]
+	mi := &file_state_v2_state_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1435,7 +1595,7 @@ func (x *LoadStepsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadStepsResponse.ProtoReflect.Descriptor instead.
 func (*LoadStepsResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{23}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *LoadStepsResponse) GetSteps() map[string][]byte {
@@ -1454,7 +1614,7 @@ type LoadStateRequest struct {
 
 func (x *LoadStateRequest) Reset() {
 	*x = LoadStateRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[24]
+	mi := &file_state_v2_state_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1466,7 +1626,7 @@ func (x *LoadStateRequest) String() string {
 func (*LoadStateRequest) ProtoMessage() {}
 
 func (x *LoadStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[24]
+	mi := &file_state_v2_state_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1479,7 +1639,7 @@ func (x *LoadStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadStateRequest.ProtoReflect.Descriptor instead.
 func (*LoadStateRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{24}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *LoadStateRequest) GetId() *ID {
@@ -1500,7 +1660,7 @@ type LoadStateResponse struct {
 
 func (x *LoadStateResponse) Reset() {
 	*x = LoadStateResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[25]
+	mi := &file_state_v2_state_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1512,7 +1672,7 @@ func (x *LoadStateResponse) String() string {
 func (*LoadStateResponse) ProtoMessage() {}
 
 func (x *LoadStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[25]
+	mi := &file_state_v2_state_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1525,7 +1685,7 @@ func (x *LoadStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadStateResponse.ProtoReflect.Descriptor instead.
 func (*LoadStateResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{25}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *LoadStateResponse) GetMetadata() *Metadata {
@@ -1562,7 +1722,7 @@ type Defer struct {
 
 func (x *Defer) Reset() {
 	*x = Defer{}
-	mi := &file_state_v2_state_proto_msgTypes[26]
+	mi := &file_state_v2_state_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1574,7 +1734,7 @@ func (x *Defer) String() string {
 func (*Defer) ProtoMessage() {}
 
 func (x *Defer) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[26]
+	mi := &file_state_v2_state_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1587,7 +1747,7 @@ func (x *Defer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Defer.ProtoReflect.Descriptor instead.
 func (*Defer) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{26}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Defer) GetFnSlug() string {
@@ -1637,7 +1797,7 @@ type DeferMeta struct {
 
 func (x *DeferMeta) Reset() {
 	*x = DeferMeta{}
-	mi := &file_state_v2_state_proto_msgTypes[27]
+	mi := &file_state_v2_state_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1649,7 +1809,7 @@ func (x *DeferMeta) String() string {
 func (*DeferMeta) ProtoMessage() {}
 
 func (x *DeferMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[27]
+	mi := &file_state_v2_state_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1662,7 +1822,7 @@ func (x *DeferMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeferMeta.ProtoReflect.Descriptor instead.
 func (*DeferMeta) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{27}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *DeferMeta) GetFnSlug() string {
@@ -1703,7 +1863,7 @@ type SaveDeferRequest struct {
 
 func (x *SaveDeferRequest) Reset() {
 	*x = SaveDeferRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[28]
+	mi := &file_state_v2_state_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1715,7 +1875,7 @@ func (x *SaveDeferRequest) String() string {
 func (*SaveDeferRequest) ProtoMessage() {}
 
 func (x *SaveDeferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[28]
+	mi := &file_state_v2_state_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1728,7 +1888,7 @@ func (x *SaveDeferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveDeferRequest.ProtoReflect.Descriptor instead.
 func (*SaveDeferRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{28}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SaveDeferRequest) GetId() *ID {
@@ -1753,7 +1913,7 @@ type SaveDeferResponse struct {
 
 func (x *SaveDeferResponse) Reset() {
 	*x = SaveDeferResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[29]
+	mi := &file_state_v2_state_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1765,7 +1925,7 @@ func (x *SaveDeferResponse) String() string {
 func (*SaveDeferResponse) ProtoMessage() {}
 
 func (x *SaveDeferResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[29]
+	mi := &file_state_v2_state_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1778,7 +1938,7 @@ func (x *SaveDeferResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveDeferResponse.ProtoReflect.Descriptor instead.
 func (*SaveDeferResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{29}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{32}
 }
 
 type SetDeferStatusRequest struct {
@@ -1792,7 +1952,7 @@ type SetDeferStatusRequest struct {
 
 func (x *SetDeferStatusRequest) Reset() {
 	*x = SetDeferStatusRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[30]
+	mi := &file_state_v2_state_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1804,7 +1964,7 @@ func (x *SetDeferStatusRequest) String() string {
 func (*SetDeferStatusRequest) ProtoMessage() {}
 
 func (x *SetDeferStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[30]
+	mi := &file_state_v2_state_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1817,7 +1977,7 @@ func (x *SetDeferStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDeferStatusRequest.ProtoReflect.Descriptor instead.
 func (*SetDeferStatusRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{30}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SetDeferStatusRequest) GetId() *ID {
@@ -1849,7 +2009,7 @@ type SetDeferStatusResponse struct {
 
 func (x *SetDeferStatusResponse) Reset() {
 	*x = SetDeferStatusResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[31]
+	mi := &file_state_v2_state_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +2021,7 @@ func (x *SetDeferStatusResponse) String() string {
 func (*SetDeferStatusResponse) ProtoMessage() {}
 
 func (x *SetDeferStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[31]
+	mi := &file_state_v2_state_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +2034,7 @@ func (x *SetDeferStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDeferStatusResponse.ProtoReflect.Descriptor instead.
 func (*SetDeferStatusResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{31}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{34}
 }
 
 type SaveRejectedDeferRequest struct {
@@ -1888,7 +2048,7 @@ type SaveRejectedDeferRequest struct {
 
 func (x *SaveRejectedDeferRequest) Reset() {
 	*x = SaveRejectedDeferRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[32]
+	mi := &file_state_v2_state_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1900,7 +2060,7 @@ func (x *SaveRejectedDeferRequest) String() string {
 func (*SaveRejectedDeferRequest) ProtoMessage() {}
 
 func (x *SaveRejectedDeferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[32]
+	mi := &file_state_v2_state_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1913,7 +2073,7 @@ func (x *SaveRejectedDeferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveRejectedDeferRequest.ProtoReflect.Descriptor instead.
 func (*SaveRejectedDeferRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{32}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SaveRejectedDeferRequest) GetId() *ID {
@@ -1945,7 +2105,7 @@ type SaveRejectedDeferResponse struct {
 
 func (x *SaveRejectedDeferResponse) Reset() {
 	*x = SaveRejectedDeferResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[33]
+	mi := &file_state_v2_state_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1957,7 +2117,7 @@ func (x *SaveRejectedDeferResponse) String() string {
 func (*SaveRejectedDeferResponse) ProtoMessage() {}
 
 func (x *SaveRejectedDeferResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[33]
+	mi := &file_state_v2_state_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1970,7 +2130,7 @@ func (x *SaveRejectedDeferResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveRejectedDeferResponse.ProtoReflect.Descriptor instead.
 func (*SaveRejectedDeferResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{33}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{36}
 }
 
 type LoadDefersRequest struct {
@@ -1982,7 +2142,7 @@ type LoadDefersRequest struct {
 
 func (x *LoadDefersRequest) Reset() {
 	*x = LoadDefersRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[34]
+	mi := &file_state_v2_state_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1994,7 +2154,7 @@ func (x *LoadDefersRequest) String() string {
 func (*LoadDefersRequest) ProtoMessage() {}
 
 func (x *LoadDefersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[34]
+	mi := &file_state_v2_state_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2007,7 +2167,7 @@ func (x *LoadDefersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDefersRequest.ProtoReflect.Descriptor instead.
 func (*LoadDefersRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{34}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *LoadDefersRequest) GetId() *ID {
@@ -2026,7 +2186,7 @@ type LoadDefersResponse struct {
 
 func (x *LoadDefersResponse) Reset() {
 	*x = LoadDefersResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[35]
+	mi := &file_state_v2_state_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2038,7 +2198,7 @@ func (x *LoadDefersResponse) String() string {
 func (*LoadDefersResponse) ProtoMessage() {}
 
 func (x *LoadDefersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[35]
+	mi := &file_state_v2_state_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2051,7 +2211,7 @@ func (x *LoadDefersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDefersResponse.ProtoReflect.Descriptor instead.
 func (*LoadDefersResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{35}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *LoadDefersResponse) GetDefers() map[string]*Defer {
@@ -2070,7 +2230,7 @@ type LoadDefersMetaRequest struct {
 
 func (x *LoadDefersMetaRequest) Reset() {
 	*x = LoadDefersMetaRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[36]
+	mi := &file_state_v2_state_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2242,7 @@ func (x *LoadDefersMetaRequest) String() string {
 func (*LoadDefersMetaRequest) ProtoMessage() {}
 
 func (x *LoadDefersMetaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[36]
+	mi := &file_state_v2_state_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2255,7 @@ func (x *LoadDefersMetaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDefersMetaRequest.ProtoReflect.Descriptor instead.
 func (*LoadDefersMetaRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{36}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *LoadDefersMetaRequest) GetId() *ID {
@@ -2114,7 +2274,7 @@ type LoadDefersMetaResponse struct {
 
 func (x *LoadDefersMetaResponse) Reset() {
 	*x = LoadDefersMetaResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[37]
+	mi := &file_state_v2_state_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2126,7 +2286,7 @@ func (x *LoadDefersMetaResponse) String() string {
 func (*LoadDefersMetaResponse) ProtoMessage() {}
 
 func (x *LoadDefersMetaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[37]
+	mi := &file_state_v2_state_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2139,7 +2299,7 @@ func (x *LoadDefersMetaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoadDefersMetaResponse.ProtoReflect.Descriptor instead.
 func (*LoadDefersMetaResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{37}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *LoadDefersMetaResponse) GetDefers() map[string]*DeferMeta {
@@ -2160,7 +2320,7 @@ type PauseIdentifier struct {
 
 func (x *PauseIdentifier) Reset() {
 	*x = PauseIdentifier{}
-	mi := &file_state_v2_state_proto_msgTypes[38]
+	mi := &file_state_v2_state_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2172,7 +2332,7 @@ func (x *PauseIdentifier) String() string {
 func (*PauseIdentifier) ProtoMessage() {}
 
 func (x *PauseIdentifier) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[38]
+	mi := &file_state_v2_state_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2185,7 +2345,7 @@ func (x *PauseIdentifier) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseIdentifier.ProtoReflect.Descriptor instead.
 func (*PauseIdentifier) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{38}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *PauseIdentifier) GetRunId() string {
@@ -2223,7 +2383,7 @@ type Pause struct {
 
 func (x *Pause) Reset() {
 	*x = Pause{}
-	mi := &file_state_v2_state_proto_msgTypes[39]
+	mi := &file_state_v2_state_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2235,7 +2395,7 @@ func (x *Pause) String() string {
 func (*Pause) ProtoMessage() {}
 
 func (x *Pause) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[39]
+	mi := &file_state_v2_state_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2248,7 +2408,7 @@ func (x *Pause) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Pause.ProtoReflect.Descriptor instead.
 func (*Pause) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{39}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *Pause) GetId() string {
@@ -2288,7 +2448,7 @@ type ConsumePauseOpts struct {
 
 func (x *ConsumePauseOpts) Reset() {
 	*x = ConsumePauseOpts{}
-	mi := &file_state_v2_state_proto_msgTypes[40]
+	mi := &file_state_v2_state_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2300,7 +2460,7 @@ func (x *ConsumePauseOpts) String() string {
 func (*ConsumePauseOpts) ProtoMessage() {}
 
 func (x *ConsumePauseOpts) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[40]
+	mi := &file_state_v2_state_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2313,7 +2473,7 @@ func (x *ConsumePauseOpts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumePauseOpts.ProtoReflect.Descriptor instead.
 func (*ConsumePauseOpts) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{40}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ConsumePauseOpts) GetData() []byte {
@@ -2333,7 +2493,7 @@ type ConsumePauseResult struct {
 
 func (x *ConsumePauseResult) Reset() {
 	*x = ConsumePauseResult{}
-	mi := &file_state_v2_state_proto_msgTypes[41]
+	mi := &file_state_v2_state_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2345,7 +2505,7 @@ func (x *ConsumePauseResult) String() string {
 func (*ConsumePauseResult) ProtoMessage() {}
 
 func (x *ConsumePauseResult) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[41]
+	mi := &file_state_v2_state_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2358,7 +2518,7 @@ func (x *ConsumePauseResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumePauseResult.ProtoReflect.Descriptor instead.
 func (*ConsumePauseResult) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{41}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ConsumePauseResult) GetDidConsume() bool {
@@ -2385,7 +2545,7 @@ type ConsumePauseRequest struct {
 
 func (x *ConsumePauseRequest) Reset() {
 	*x = ConsumePauseRequest{}
-	mi := &file_state_v2_state_proto_msgTypes[42]
+	mi := &file_state_v2_state_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2397,7 +2557,7 @@ func (x *ConsumePauseRequest) String() string {
 func (*ConsumePauseRequest) ProtoMessage() {}
 
 func (x *ConsumePauseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[42]
+	mi := &file_state_v2_state_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2410,7 +2570,7 @@ func (x *ConsumePauseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumePauseRequest.ProtoReflect.Descriptor instead.
 func (*ConsumePauseRequest) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{42}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ConsumePauseRequest) GetPause() *Pause {
@@ -2436,7 +2596,7 @@ type ConsumePauseResponse struct {
 
 func (x *ConsumePauseResponse) Reset() {
 	*x = ConsumePauseResponse{}
-	mi := &file_state_v2_state_proto_msgTypes[43]
+	mi := &file_state_v2_state_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2448,7 +2608,7 @@ func (x *ConsumePauseResponse) String() string {
 func (*ConsumePauseResponse) ProtoMessage() {}
 
 func (x *ConsumePauseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_state_v2_state_proto_msgTypes[43]
+	mi := &file_state_v2_state_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2461,7 +2621,7 @@ func (x *ConsumePauseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumePauseResponse.ProtoReflect.Descriptor instead.
 func (*ConsumePauseResponse) Descriptor() ([]byte, []int) {
-	return file_state_v2_state_proto_rawDescGZIP(), []int{43}
+	return file_state_v2_state_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ConsumePauseResponse) GetResult() *ConsumePauseResult {
@@ -2559,9 +2719,12 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x0fSaveStepRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x17\n" +
 	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\">\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"^\n" +
 	"\x10SaveStepResponse\x12*\n" +
-	"\x11has_pending_steps\x18\x01 \x01(\bR\x0fhasPendingSteps\"L\n" +
+	"\x11has_pending_steps\x18\x01 \x01(\bR\x0fhasPendingSteps\x12\x1e\n" +
+	"\n" +
+	"idempotent\x18\x02 \x01(\bR\n" +
+	"idempotent\"L\n" +
 	"\x12SavePendingRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x18\n" +
 	"\apending\x18\x02 \x03(\tR\apending\"\x15\n" +
@@ -2569,7 +2732,15 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\rExistsRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"(\n" +
 	"\x0eExistsResponse\x12\x16\n" +
-	"\x06exists\x18\x01 \x01(\bR\x06exists\"1\n" +
+	"\x06exists\x18\x01 \x01(\bR\x06exists\"J\n" +
+	"\x18LookupIdempotencyRequest\x12\x1c\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"L\n" +
+	"\x10IdempotencyEntry\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12!\n" +
+	"\fis_tombstone\x18\x02 \x01(\bR\visTombstone\"M\n" +
+	"\x19LookupIdempotencyResponse\x120\n" +
+	"\x05entry\x18\x01 \x01(\v2\x1a.state.v2.IdempotencyEntryR\x05entry\"1\n" +
 	"\x11LoadEventsRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"D\n" +
 	"\x12LoadEventsResponse\x12\x16\n" +
@@ -2661,12 +2832,14 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x16DEFER_STATUS_SCHEDULED\x10\x01\x12\x1a\n" +
 	"\x16DEFER_STATUS_AFTER_RUN\x10\x02\x12\x18\n" +
 	"\x14DEFER_STATUS_ABORTED\x10\x03\x12\x19\n" +
-	"\x15DEFER_STATUS_REJECTED\x10\x042\xe5\t\n" +
+	"\x15DEFER_STATUS_REJECTED\x10\x042\xc5\n" +
+	"\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
 	"\x06Delete\x12\x1c.state.v2.DeleteStateRequest\x1a\x1d.state.v2.DeleteStateResponse\"\x00\x12=\n" +
-	"\x06Exists\x12\x17.state.v2.ExistsRequest\x1a\x18.state.v2.ExistsResponse\"\x00\x12U\n" +
+	"\x06Exists\x12\x17.state.v2.ExistsRequest\x1a\x18.state.v2.ExistsResponse\"\x00\x12^\n" +
+	"\x11LookupIdempotency\x12\".state.v2.LookupIdempotencyRequest\x1a#.state.v2.LookupIdempotencyResponse\"\x00\x12U\n" +
 	"\x0eUpdateMetadata\x12\x1f.state.v2.UpdateMetadataRequest\x1a .state.v2.UpdateMetadataResponse\"\x00\x12C\n" +
 	"\bSaveStep\x12\x19.state.v2.SaveStepRequest\x1a\x1a.state.v2.SaveStepResponse\"\x00\x12L\n" +
 	"\vSavePending\x12\x1c.state.v2.SavePendingRequest\x1a\x1d.state.v2.SavePendingResponse\"\x00\x12O\n" +
@@ -2696,7 +2869,7 @@ func file_state_v2_state_proto_rawDescGZIP() []byte {
 }
 
 var file_state_v2_state_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_state_v2_state_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_state_v2_state_proto_goTypes = []any{
 	(DeferStatus)(0),                  // 0: state.v2.DeferStatus
 	(*Metadata)(nil),                  // 1: state.v2.Metadata
@@ -2719,118 +2892,125 @@ var file_state_v2_state_proto_goTypes = []any{
 	(*SavePendingResponse)(nil),       // 18: state.v2.SavePendingResponse
 	(*ExistsRequest)(nil),             // 19: state.v2.ExistsRequest
 	(*ExistsResponse)(nil),            // 20: state.v2.ExistsResponse
-	(*LoadEventsRequest)(nil),         // 21: state.v2.LoadEventsRequest
-	(*LoadEventsResponse)(nil),        // 22: state.v2.LoadEventsResponse
-	(*LoadStepsRequest)(nil),          // 23: state.v2.LoadStepsRequest
-	(*LoadStepsResponse)(nil),         // 24: state.v2.LoadStepsResponse
-	(*LoadStateRequest)(nil),          // 25: state.v2.LoadStateRequest
-	(*LoadStateResponse)(nil),         // 26: state.v2.LoadStateResponse
-	(*Defer)(nil),                     // 27: state.v2.Defer
-	(*DeferMeta)(nil),                 // 28: state.v2.DeferMeta
-	(*SaveDeferRequest)(nil),          // 29: state.v2.SaveDeferRequest
-	(*SaveDeferResponse)(nil),         // 30: state.v2.SaveDeferResponse
-	(*SetDeferStatusRequest)(nil),     // 31: state.v2.SetDeferStatusRequest
-	(*SetDeferStatusResponse)(nil),    // 32: state.v2.SetDeferStatusResponse
-	(*SaveRejectedDeferRequest)(nil),  // 33: state.v2.SaveRejectedDeferRequest
-	(*SaveRejectedDeferResponse)(nil), // 34: state.v2.SaveRejectedDeferResponse
-	(*LoadDefersRequest)(nil),         // 35: state.v2.LoadDefersRequest
-	(*LoadDefersResponse)(nil),        // 36: state.v2.LoadDefersResponse
-	(*LoadDefersMetaRequest)(nil),     // 37: state.v2.LoadDefersMetaRequest
-	(*LoadDefersMetaResponse)(nil),    // 38: state.v2.LoadDefersMetaResponse
-	(*PauseIdentifier)(nil),           // 39: state.v2.PauseIdentifier
-	(*Pause)(nil),                     // 40: state.v2.Pause
-	(*ConsumePauseOpts)(nil),          // 41: state.v2.ConsumePauseOpts
-	(*ConsumePauseResult)(nil),        // 42: state.v2.ConsumePauseResult
-	(*ConsumePauseRequest)(nil),       // 43: state.v2.ConsumePauseRequest
-	(*ConsumePauseResponse)(nil),      // 44: state.v2.ConsumePauseResponse
-	nil,                               // 45: state.v2.CreateStateResponse.StepsEntry
-	nil,                               // 46: state.v2.LoadStepsResponse.StepsEntry
-	nil,                               // 47: state.v2.LoadStateResponse.StepsEntry
-	nil,                               // 48: state.v2.LoadDefersResponse.DefersEntry
-	nil,                               // 49: state.v2.LoadDefersMetaResponse.DefersEntry
-	(*timestamppb.Timestamp)(nil),     // 50: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),           // 51: google.protobuf.Struct
+	(*LookupIdempotencyRequest)(nil),  // 21: state.v2.LookupIdempotencyRequest
+	(*IdempotencyEntry)(nil),          // 22: state.v2.IdempotencyEntry
+	(*LookupIdempotencyResponse)(nil), // 23: state.v2.LookupIdempotencyResponse
+	(*LoadEventsRequest)(nil),         // 24: state.v2.LoadEventsRequest
+	(*LoadEventsResponse)(nil),        // 25: state.v2.LoadEventsResponse
+	(*LoadStepsRequest)(nil),          // 26: state.v2.LoadStepsRequest
+	(*LoadStepsResponse)(nil),         // 27: state.v2.LoadStepsResponse
+	(*LoadStateRequest)(nil),          // 28: state.v2.LoadStateRequest
+	(*LoadStateResponse)(nil),         // 29: state.v2.LoadStateResponse
+	(*Defer)(nil),                     // 30: state.v2.Defer
+	(*DeferMeta)(nil),                 // 31: state.v2.DeferMeta
+	(*SaveDeferRequest)(nil),          // 32: state.v2.SaveDeferRequest
+	(*SaveDeferResponse)(nil),         // 33: state.v2.SaveDeferResponse
+	(*SetDeferStatusRequest)(nil),     // 34: state.v2.SetDeferStatusRequest
+	(*SetDeferStatusResponse)(nil),    // 35: state.v2.SetDeferStatusResponse
+	(*SaveRejectedDeferRequest)(nil),  // 36: state.v2.SaveRejectedDeferRequest
+	(*SaveRejectedDeferResponse)(nil), // 37: state.v2.SaveRejectedDeferResponse
+	(*LoadDefersRequest)(nil),         // 38: state.v2.LoadDefersRequest
+	(*LoadDefersResponse)(nil),        // 39: state.v2.LoadDefersResponse
+	(*LoadDefersMetaRequest)(nil),     // 40: state.v2.LoadDefersMetaRequest
+	(*LoadDefersMetaResponse)(nil),    // 41: state.v2.LoadDefersMetaResponse
+	(*PauseIdentifier)(nil),           // 42: state.v2.PauseIdentifier
+	(*Pause)(nil),                     // 43: state.v2.Pause
+	(*ConsumePauseOpts)(nil),          // 44: state.v2.ConsumePauseOpts
+	(*ConsumePauseResult)(nil),        // 45: state.v2.ConsumePauseResult
+	(*ConsumePauseRequest)(nil),       // 46: state.v2.ConsumePauseRequest
+	(*ConsumePauseResponse)(nil),      // 47: state.v2.ConsumePauseResponse
+	nil,                               // 48: state.v2.CreateStateResponse.StepsEntry
+	nil,                               // 49: state.v2.LoadStepsResponse.StepsEntry
+	nil,                               // 50: state.v2.LoadStateResponse.StepsEntry
+	nil,                               // 51: state.v2.LoadDefersResponse.DefersEntry
+	nil,                               // 52: state.v2.LoadDefersMetaResponse.DefersEntry
+	(*timestamppb.Timestamp)(nil),     // 53: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),           // 54: google.protobuf.Struct
 }
 var file_state_v2_state_proto_depIdxs = []int32{
 	2,  // 0: state.v2.Metadata.id:type_name -> state.v2.ID
 	3,  // 1: state.v2.Metadata.config:type_name -> state.v2.Config
 	5,  // 2: state.v2.Metadata.metrics:type_name -> state.v2.RunMetrics
 	6,  // 3: state.v2.ID.tenant:type_name -> state.v2.Tenant
-	50, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
+	53, // 4: state.v2.Config.started_at:type_name -> google.protobuf.Timestamp
 	4,  // 5: state.v2.Config.concurrency_keys:type_name -> state.v2.ConcurrencyKey
-	51, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
-	50, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
+	54, // 6: state.v2.Config.context:type_name -> google.protobuf.Struct
+	53, // 7: state.v2.Config.scheduled_at:type_name -> google.protobuf.Timestamp
 	1,  // 8: state.v2.CreateStateRequest.metadata:type_name -> state.v2.Metadata
 	1,  // 9: state.v2.CreateStateResponse.metadata:type_name -> state.v2.Metadata
-	45, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
+	48, // 10: state.v2.CreateStateResponse.steps:type_name -> state.v2.CreateStateResponse.StepsEntry
 	2,  // 11: state.v2.DeleteStateRequest.id:type_name -> state.v2.ID
 	2,  // 12: state.v2.LoadMetadataRequest.id:type_name -> state.v2.ID
 	1,  // 13: state.v2.LoadMetadataResponse.metadata:type_name -> state.v2.Metadata
 	2,  // 14: state.v2.UpdateMetadataRequest.id:type_name -> state.v2.ID
-	50, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
+	53, // 15: state.v2.UpdateMetadataRequest.started_at:type_name -> google.protobuf.Timestamp
 	2,  // 16: state.v2.SaveStepRequest.id:type_name -> state.v2.ID
 	2,  // 17: state.v2.SavePendingRequest.id:type_name -> state.v2.ID
 	2,  // 18: state.v2.ExistsRequest.id:type_name -> state.v2.ID
-	2,  // 19: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
-	2,  // 20: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
-	46, // 21: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
-	2,  // 22: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
-	1,  // 23: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
-	47, // 24: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
-	0,  // 25: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
-	0,  // 26: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
-	2,  // 27: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
-	27, // 28: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
-	2,  // 29: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
-	0,  // 30: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
-	2,  // 31: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
-	2,  // 32: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
-	48, // 33: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
-	2,  // 34: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
-	49, // 35: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
-	39, // 36: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
-	40, // 37: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
-	41, // 38: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
-	42, // 39: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
-	27, // 40: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
-	28, // 41: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
-	7,  // 42: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
-	9,  // 43: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
-	19, // 44: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
-	13, // 45: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
-	15, // 46: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
-	17, // 47: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
-	43, // 48: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
-	29, // 49: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
-	31, // 50: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
-	33, // 51: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
-	11, // 52: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
-	21, // 53: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
-	23, // 54: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
-	25, // 55: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
-	35, // 56: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
-	37, // 57: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
-	8,  // 58: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
-	10, // 59: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
-	20, // 60: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
-	14, // 61: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
-	16, // 62: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
-	18, // 63: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
-	44, // 64: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
-	30, // 65: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
-	32, // 66: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
-	34, // 67: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
-	12, // 68: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
-	22, // 69: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
-	24, // 70: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
-	26, // 71: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
-	36, // 72: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
-	38, // 73: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
-	58, // [58:74] is the sub-list for method output_type
-	42, // [42:58] is the sub-list for method input_type
-	42, // [42:42] is the sub-list for extension type_name
-	42, // [42:42] is the sub-list for extension extendee
-	0,  // [0:42] is the sub-list for field type_name
+	2,  // 19: state.v2.LookupIdempotencyRequest.id:type_name -> state.v2.ID
+	22, // 20: state.v2.LookupIdempotencyResponse.entry:type_name -> state.v2.IdempotencyEntry
+	2,  // 21: state.v2.LoadEventsRequest.id:type_name -> state.v2.ID
+	2,  // 22: state.v2.LoadStepsRequest.id:type_name -> state.v2.ID
+	49, // 23: state.v2.LoadStepsResponse.steps:type_name -> state.v2.LoadStepsResponse.StepsEntry
+	2,  // 24: state.v2.LoadStateRequest.id:type_name -> state.v2.ID
+	1,  // 25: state.v2.LoadStateResponse.metadata:type_name -> state.v2.Metadata
+	50, // 26: state.v2.LoadStateResponse.steps:type_name -> state.v2.LoadStateResponse.StepsEntry
+	0,  // 27: state.v2.Defer.schedule_status:type_name -> state.v2.DeferStatus
+	0,  // 28: state.v2.DeferMeta.schedule_status:type_name -> state.v2.DeferStatus
+	2,  // 29: state.v2.SaveDeferRequest.id:type_name -> state.v2.ID
+	30, // 30: state.v2.SaveDeferRequest.defer:type_name -> state.v2.Defer
+	2,  // 31: state.v2.SetDeferStatusRequest.id:type_name -> state.v2.ID
+	0,  // 32: state.v2.SetDeferStatusRequest.status:type_name -> state.v2.DeferStatus
+	2,  // 33: state.v2.SaveRejectedDeferRequest.id:type_name -> state.v2.ID
+	2,  // 34: state.v2.LoadDefersRequest.id:type_name -> state.v2.ID
+	51, // 35: state.v2.LoadDefersResponse.defers:type_name -> state.v2.LoadDefersResponse.DefersEntry
+	2,  // 36: state.v2.LoadDefersMetaRequest.id:type_name -> state.v2.ID
+	52, // 37: state.v2.LoadDefersMetaResponse.defers:type_name -> state.v2.LoadDefersMetaResponse.DefersEntry
+	42, // 38: state.v2.Pause.identifier:type_name -> state.v2.PauseIdentifier
+	43, // 39: state.v2.ConsumePauseRequest.pause:type_name -> state.v2.Pause
+	44, // 40: state.v2.ConsumePauseRequest.opts:type_name -> state.v2.ConsumePauseOpts
+	45, // 41: state.v2.ConsumePauseResponse.result:type_name -> state.v2.ConsumePauseResult
+	30, // 42: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
+	31, // 43: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
+	7,  // 44: state.v2.RunService.Create:input_type -> state.v2.CreateStateRequest
+	9,  // 45: state.v2.RunService.Delete:input_type -> state.v2.DeleteStateRequest
+	19, // 46: state.v2.RunService.Exists:input_type -> state.v2.ExistsRequest
+	21, // 47: state.v2.RunService.LookupIdempotency:input_type -> state.v2.LookupIdempotencyRequest
+	13, // 48: state.v2.RunService.UpdateMetadata:input_type -> state.v2.UpdateMetadataRequest
+	15, // 49: state.v2.RunService.SaveStep:input_type -> state.v2.SaveStepRequest
+	17, // 50: state.v2.RunService.SavePending:input_type -> state.v2.SavePendingRequest
+	46, // 51: state.v2.RunService.ConsumePause:input_type -> state.v2.ConsumePauseRequest
+	32, // 52: state.v2.RunService.SaveDefer:input_type -> state.v2.SaveDeferRequest
+	34, // 53: state.v2.RunService.SetDeferStatus:input_type -> state.v2.SetDeferStatusRequest
+	36, // 54: state.v2.RunService.SaveRejectedDefer:input_type -> state.v2.SaveRejectedDeferRequest
+	11, // 55: state.v2.RunService.LoadMetadata:input_type -> state.v2.LoadMetadataRequest
+	24, // 56: state.v2.RunService.LoadEvents:input_type -> state.v2.LoadEventsRequest
+	26, // 57: state.v2.RunService.LoadSteps:input_type -> state.v2.LoadStepsRequest
+	28, // 58: state.v2.RunService.LoadState:input_type -> state.v2.LoadStateRequest
+	38, // 59: state.v2.RunService.LoadDefers:input_type -> state.v2.LoadDefersRequest
+	40, // 60: state.v2.RunService.LoadDefersMeta:input_type -> state.v2.LoadDefersMetaRequest
+	8,  // 61: state.v2.RunService.Create:output_type -> state.v2.CreateStateResponse
+	10, // 62: state.v2.RunService.Delete:output_type -> state.v2.DeleteStateResponse
+	20, // 63: state.v2.RunService.Exists:output_type -> state.v2.ExistsResponse
+	23, // 64: state.v2.RunService.LookupIdempotency:output_type -> state.v2.LookupIdempotencyResponse
+	14, // 65: state.v2.RunService.UpdateMetadata:output_type -> state.v2.UpdateMetadataResponse
+	16, // 66: state.v2.RunService.SaveStep:output_type -> state.v2.SaveStepResponse
+	18, // 67: state.v2.RunService.SavePending:output_type -> state.v2.SavePendingResponse
+	47, // 68: state.v2.RunService.ConsumePause:output_type -> state.v2.ConsumePauseResponse
+	33, // 69: state.v2.RunService.SaveDefer:output_type -> state.v2.SaveDeferResponse
+	35, // 70: state.v2.RunService.SetDeferStatus:output_type -> state.v2.SetDeferStatusResponse
+	37, // 71: state.v2.RunService.SaveRejectedDefer:output_type -> state.v2.SaveRejectedDeferResponse
+	12, // 72: state.v2.RunService.LoadMetadata:output_type -> state.v2.LoadMetadataResponse
+	25, // 73: state.v2.RunService.LoadEvents:output_type -> state.v2.LoadEventsResponse
+	27, // 74: state.v2.RunService.LoadSteps:output_type -> state.v2.LoadStepsResponse
+	29, // 75: state.v2.RunService.LoadState:output_type -> state.v2.LoadStateResponse
+	39, // 76: state.v2.RunService.LoadDefers:output_type -> state.v2.LoadDefersResponse
+	41, // 77: state.v2.RunService.LoadDefersMeta:output_type -> state.v2.LoadDefersMetaResponse
+	61, // [61:78] is the sub-list for method output_type
+	44, // [44:61] is the sub-list for method input_type
+	44, // [44:44] is the sub-list for extension type_name
+	44, // [44:44] is the sub-list for extension extendee
+	0,  // [0:44] is the sub-list for field type_name
 }
 
 func init() { file_state_v2_state_proto_init() }
@@ -2845,7 +3025,7 @@ func file_state_v2_state_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_state_v2_state_proto_rawDesc), len(file_state_v2_state_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   49,
+			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

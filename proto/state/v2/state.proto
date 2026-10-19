@@ -111,6 +111,10 @@ message SaveStepRequest {
 
 message SaveStepResponse{
   bool has_pending_steps = 1;
+  // idempotent is set when the step already had exactly this output, so nothing new
+  // was written.  Servers return this instead of an ErrIdempotentResponse error so
+  // has_pending_steps survives.
+  bool idempotent = 2;
 }
 
 message SavePendingRequest {
@@ -126,6 +130,21 @@ message ExistsRequest {
 
 message ExistsResponse {
   bool exists = 1;
+}
+
+message LookupIdempotencyRequest {
+  ID id = 1;
+  string key = 2;
+}
+
+message IdempotencyEntry {
+  string run_id = 1;
+  bool is_tombstone = 2;
+}
+
+message LookupIdempotencyResponse {
+  // An absent entry means no idempotency record exists.
+  IdempotencyEntry entry = 1;
 }
 
 message LoadEventsRequest {
@@ -257,6 +276,7 @@ service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
   rpc Exists(ExistsRequest) returns (ExistsResponse) {}
+  rpc LookupIdempotency(LookupIdempotencyRequest) returns (LookupIdempotencyResponse) {}
   rpc UpdateMetadata(UpdateMetadataRequest) returns (UpdateMetadataResponse) {}
   rpc SaveStep(SaveStepRequest) returns (SaveStepResponse) {}
   rpc SavePending(SavePendingRequest) returns (SavePendingResponse) {}
