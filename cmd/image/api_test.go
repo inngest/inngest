@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,11 +26,18 @@ func TestBuildAPI(t *testing.T) {
 	raw, _ := hex.DecodeString(digest)
 	checksum := base64.StdEncoding.EncodeToString(raw)
 
+	// each API request gets the next token, as it would after a refresh.
+	tokens := 0
+	token := func(context.Context) (string, error) {
+		tokens++
+		return fmt.Sprintf("token-%d", tokens), nil
+	}
+
 	var uploaded []byte
 	polls := 0
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v2/builds/app", func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+		require.Equal(t, "Bearer token-1", r.Header.Get("Authorization"))
 		require.Equal(t, "staging", r.Header.Get("X-Inngest-Env"))
 		var body map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -39,16 +47,19 @@ func TestBuildAPI(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{"id":"b1","status":"pending"},"upload_url":"` + "http://" + r.Host + `/upload","upload_headers":{"x-amz-checksum-sha256":"` + checksum + `"}}`))
 	})
 	mux.HandleFunc("PUT /upload", func(w http.ResponseWriter, r *http.Request) {
+		require.Empty(t, r.Header.Get("Authorization"))
 		require.Equal(t, checksum, r.Header.Get("x-amz-checksum-sha256"))
 		require.Equal(t, size, r.ContentLength)
 		uploaded, _ = io.ReadAll(r.Body)
 	})
 	mux.HandleFunc("POST /v2/builds/app/b1/commit", func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer token-2", r.Header.Get("Authorization"))
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte(`{"data":{"id":"b1","status":"uploaded"}}`))
 	})
 	mux.HandleFunc("GET /v2/builds/b1", func(w http.ResponseWriter, r *http.Request) {
 		polls++
+		require.Equal(t, "Bearer token-3", r.Header.Get("Authorization"))
 		_, _ = w.Write([]byte(`{"data":{"id":"b1","status":"ready","artifact_digest":"abc"}}`))
 	})
 	srv := httptest.NewServer(mux)
@@ -57,7 +68,7 @@ func TestBuildAPI(t *testing.T) {
 	ctx := context.Background()
 	api := &client{
 		baseURL: srv.URL + "/v2",
-		token:   "token",
+		token:   token,
 		env:     "staging",
 		http:    srv.Client(),
 	}
@@ -84,6 +95,7 @@ func TestBuildAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "abc", b.GetArtifactDigest())
 	require.Equal(t, 1, polls)
+	require.Equal(t, 3, tokens)
 }
 
 func TestWaitForBuildFailed(t *testing.T) {

@@ -24,10 +24,13 @@ const (
 	maxResponseBytes = 1 << 20
 )
 
-// client calls the v2 builds API with the token from `inngest login`.
+// client calls the v2 builds API with the login from `inngest login`.
 type client struct {
 	baseURL string
-	token   string
+	// token returns an access token for each request.  a deploy can run
+	// longer than one access token lasts, and the saved login refreshes
+	// the token only when it is asked for one.
+	token func(context.Context) (string, error)
 	// env selects the environment when the login covers more than one.  it
 	// comes from INNGEST_ENV, the same variable `inngest api` reads.
 	env  string
@@ -83,7 +86,11 @@ func (c *client) do(ctx context.Context, method, path string, in, out proto.Mess
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "inngest-cli/"+version.Version)
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	token, err := c.token(ctx)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 	if c.env != "" {
 		req.Header.Set("X-Inngest-Env", c.env)
 	}
