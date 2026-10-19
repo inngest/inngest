@@ -239,13 +239,11 @@ export function RunAIAssistPopover({
             className="mt-2"
           />
         )}
-        <p role="status" aria-live="polite" className="text-muted mt-1 text-xs">
-          {copyState === 'copied'
-            ? 'Prompt copied.'
-            : copyState === 'failed'
-              ? 'Couldn’t copy. Select and copy the full prompt below.'
-              : ''}
-        </p>
+        {copyState === 'failed' && (
+          <p role="status" className="text-muted mt-1 text-xs">
+            Couldn’t copy. Select and copy the full prompt below.
+          </p>
+        )}
         {copyState === 'failed' && result.prompt && (
           <textarea
             aria-label="Full prompt"
