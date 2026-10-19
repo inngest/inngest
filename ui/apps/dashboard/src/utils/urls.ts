@@ -112,10 +112,12 @@ export const pathCreator = {
     dimension,
     previous,
     ref,
+    hash,
   }: {
     dimension?: string;
     previous?: boolean;
     ref?: string;
+    hash?: string;
   } = {}) {
     let path = '/billing/usage';
     const query = new URLSearchParams();
@@ -130,6 +132,9 @@ export const pathCreator = {
     }
     if (query.toString()) {
       path += `?${query.toString()}`;
+    }
+    if (hash) {
+      path += `#${hash}`;
     }
     return path;
   },

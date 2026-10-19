@@ -9,6 +9,10 @@ import {
   HOUR_MS,
   createConcurrencyChartOptions,
 } from '@/components/Billing/Usage/concurrencyChart';
+import {
+  ACCOUNT_CONCURRENCY_SECTION_ID,
+  useScrollIntoViewOnHash,
+} from '@/components/Billing/Usage/useScrollIntoViewOnHash';
 import { graphql } from '@/gql';
 import { Route as BillingRoute } from '@/routes/_authed/billing/route';
 import { pathCreator } from '@/utils/urls';
@@ -16,6 +20,7 @@ import { pathCreator } from '@/utils/urls';
 const GetAccountConcurrencyTimeSeriesDocument = graphql(`
   query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {
     account {
+      marketplaceBillingURL
       concurrencyTimeSeries(from: $from, to: $to) {
         baseLimit
         burstLimit
@@ -75,6 +80,8 @@ export function AccountConcurrency() {
     variables: range,
   });
   const series = data?.account.concurrencyTimeSeries;
+  const marketplaceBillingURL = data?.account.marketplaceBillingURL;
+  const sectionRef = useScrollIntoViewOnHash(ACCOUNT_CONCURRENCY_SECTION_ID);
 
   if (error || !series || !operation || series.burstLimit == null) {
     return null;
@@ -84,7 +91,7 @@ export function AccountConcurrency() {
   const fetchedRange = operation.variables;
 
   return (
-    <div className="mt-10">
+    <div id={ACCOUNT_CONCURRENCY_SECTION_ID} ref={sectionRef} className="mt-10">
       <div className="mb-6 flex items-center justify-between gap-6">
         <div>
           <h3 className="text-basis mb-1 text-xl">Account concurrency</h3>
@@ -100,10 +107,13 @@ export function AccountConcurrency() {
             href={pathCreator.support({ ref })}
             target="_blank"
           />
-          {!profile.isMarketplace && (
+          {(!profile.isMarketplace || marketplaceBillingURL) && (
             <Button
               label="Increase concurrency"
-              href={pathCreator.billing({ highlight: 'concurrency', ref })}
+              href={
+                marketplaceBillingURL ??
+                pathCreator.billing({ highlight: 'concurrency', ref })
+              }
             />
           )}
         </div>

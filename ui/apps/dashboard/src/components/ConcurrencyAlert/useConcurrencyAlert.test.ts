@@ -26,7 +26,6 @@ function account({
     account: {
       id: 'acct',
       marketplace: null,
-      marketplaceBillingURL: null,
       plan: { isFree: false },
       burstConcurrency: {
         limit: 300,
