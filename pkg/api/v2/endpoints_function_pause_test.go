@@ -136,7 +136,7 @@ func TestHTTPGateway_PauseFunctionRejectsInvalidRequests(t *testing.T) {
 		status  int
 		message string
 	}{
-		// The gateway maps unsupported HTTP methods through gRPC Unimplemented to 501.
+		// gateway returns 501 for unsupported methods
 		{name: "PUT", method: http.MethodPut, status: http.StatusNotImplemented, message: "Method Not Allowed"},
 		{name: "JSON body", method: http.MethodPost, body: "{}", status: http.StatusBadRequest},
 		{name: "whitespace body", method: http.MethodPost, body: " ", status: http.StatusBadRequest},

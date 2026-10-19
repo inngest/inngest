@@ -73,7 +73,7 @@ func TestFunctionPauseSharedState(t *testing.T) {
 	require.Len(t, page.Functions, 1)
 	require.Equal(t, first, page.Functions[0].PausedAt)
 
-	// The existing test API callbacks use the same state as the public API.
+	// test api shares state with the public api
 	provider.pauses.unpause(id)
 	require.False(t, get())
 	require.Equal(t, queue.PartitionPausedInfo{}, provider.pauses.partitionPaused(t.Context(), id))

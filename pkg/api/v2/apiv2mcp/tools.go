@@ -54,8 +54,7 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 
 	readOnly := endpoint.HTTPMethod == http.MethodGet
 	idempotent := readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete
-	// PauseFunction sets the requested state idempotently despite using POST;
-	// ResumeFunction (POST .../resume) will need the same override.
+	// pause is idempotent despite post. resume needs this too
 	if endpoint.MethodName == "PauseFunction" {
 		idempotent = true
 	}

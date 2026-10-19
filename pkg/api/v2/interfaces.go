@@ -88,10 +88,7 @@ type EventPublisher interface {
 type EventSender func(context.Context, *event.Event) (string, error)
 
 type FunctionPauser interface {
-	// PauseFunction pauses the resolved function and returns it with PausedAt set.
-	// It must be idempotent: pausing an already-paused function returns it unchanged.
-	// Implementations may apply the pause asynchronously; PausedAt is the time from
-	// which the pause applies.
+	// idempotent. may apply async; PausedAt is when the pause applies
 	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
 }
 

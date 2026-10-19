@@ -1802,7 +1802,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Pause a function"
-      description: "Pauses a function. Idempotent: pausing an already-paused function returns 200 and changes nothing. The response reflects the requested state. In Cloud, applying the pause may take up to about a minute; an immediate GetFunction may still show isPaused: false. Send no request body; a non-empty body returns 400. The dev server pauses immediately; new event-triggered runs stay queued until resumed or the dev server restarts. Runs already executing may continue. Bulk pause is not supported; call once per function."
+      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. In the dev server, the pause applies right away and lasts until resumed or restarted. No bulk pause; call once per function."
       tags: "Functions"
       tags: "Beta"
       security: {
@@ -4172,9 +4172,9 @@ message RunDeferredFrom {
 }
 
 message PauseFunctionRequest {
-  // App ID containing the function.
+  // App ID.
   string app_id = 1;
-  // Function ID within the app.
+  // Function ID.
   string function_id = 2;
 }
 
