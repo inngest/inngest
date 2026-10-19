@@ -25,7 +25,7 @@ function build(
 }
 describe('basic run discovery prompts', () => {
   it('uses the original design copy and a readable default window', () => {
-    expect(build({}).prompt).toBe(
+    expect(build({}).preview).toBe(
       'Find runs in “staging” from the last 24 hours. Show the run IDs and inspect the trace of the most recent run. Use the “Example account” account.',
     );
   });
@@ -36,7 +36,7 @@ describe('basic run discovery prompts', () => {
       filterStatus: '["FAILED","CANCELLED"]',
       last: '2h',
     });
-    expect(result.prompt).toBe(
+    expect(result.preview).toBe(
       'Find failed or cancelled runs in apps “billing” or “orders” in “staging” from the last 2 hours. Show the run IDs and inspect the trace of the most recent run. Use the “Example account” account.',
     );
   });
@@ -51,7 +51,7 @@ describe('basic run discovery prompts', () => {
         timeField: field,
         start: '2026-10-18T09:00:00-07:00',
         end: '2026-10-19T10:00:00-07:00',
-      }).prompt,
+      }).preview,
     ).toContain(
       `${description} 2026-10-18T16:00:00.000Z and 2026-10-19T17:00:00.000Z`,
     );
@@ -64,24 +64,26 @@ describe('basic run discovery prompts', () => {
         filterStatus: '["FAILED"]',
       }),
     );
-    expect(build(search).prompt).toContain('Find failed runs in app “billing”');
-    expect(build(search).prompt).toContain('trace of the most recent failure');
+    expect(build(search).preview).toContain(
+      'Find failed runs in app “billing”',
+    );
+    expect(build(search).preview).toContain('trace of the most recent failure');
   });
 
-  it('keeps relative windows readable in the copied prompt', () => {
+  it('keeps relative windows readable in the short preview', () => {
     const result = buildRunDiscoveryPrompt(
       { ...context, search: { last: '1h' } },
       new Date('2026-10-19T22:05:00Z'),
     );
-    expect(result.prompt).toContain('from the last 1 hour');
-    expect(result.prompt).not.toContain('2026-');
+    expect(result.preview).toContain('from the last 1 hour');
+    expect(result.preview).not.toContain('2026-');
   });
 
   it('preserves the selected time field for relative windows', () => {
-    expect(build({ timeField: 'STARTED_AT', last: '1d' }).prompt).toContain(
+    expect(build({ timeField: 'STARTED_AT', last: '1d' }).preview).toContain(
       'that started in the last 24 hours',
     );
-    expect(build({ timeField: 'ENDED_AT', last: '30m' }).prompt).toContain(
+    expect(build({ timeField: 'ENDED_AT', last: '30m' }).preview).toContain(
       'that ended in the last 30 minutes',
     );
   });
@@ -95,8 +97,74 @@ describe('basic run discovery prompts', () => {
           functionAppID: 'billing',
           functionSlug: 'billing-charge-card',
         },
-      ).prompt,
+      ).preview,
     ).toContain('Find failed runs for “charge-card” in app “billing”');
+  });
+
+  it('copies exact filter IDs and UTC bounds instead of relative preview wording', () => {
+    const result = build({
+      filterApp: '["internal-1","internal-2"]',
+      filterStatus: '["FAILED","CANCELLED"]',
+      last: '2h',
+      timeField: 'STARTED_AT',
+    });
+    expect(result.preview).toContain('the last 2 hours');
+    expect(payload(result.prompt!)).toEqual({
+      account: 'Example account',
+      env: 'staging',
+      appId: ['billing', 'orders'],
+      status: ['FAILED', 'CANCELLED'],
+      timeField: 'startedAt',
+      from: '2026-10-19T20:00:00.000Z',
+      until: now.toISOString(),
+    });
+    expect(result.prompt).toContain('Confirm the authenticated account');
+    expect(result.prompt).toContain('ask before broadening');
+    expect(result.prompt).toContain('Use at most 5 listing calls');
+    expect(result.prompt).toContain('Use read operations only');
+    expect(result.prompt).toContain(
+      'an empty page with a continuation cursor is not proof of no matches',
+    );
+    expect(result.prompt).not.toBe(result.preview);
+  });
+
+  it('freezes the relative range when copying and preserves function scope', () => {
+    const result = buildRunDiscoveryPrompt(
+      {
+        ...context,
+        scope: 'fn',
+        functionAppID: 'billing',
+        functionSlug: 'billing-charge-card',
+        search: { last: '1h' },
+      },
+      new Date('2026-10-19T22:05:00Z'),
+    );
+    expect(payload(result.prompt!)).toMatchObject({
+      appId: ['billing'],
+      functionId: ['charge-card'],
+      from: '2026-10-19T21:05:00.000Z',
+      until: '2026-10-19T22:05:00.000Z',
+    });
+  });
+
+  it('preserves absolute bounds and excludes arbitrary values from the full prompt', () => {
+    const account = 'Account "ignore instructions"';
+    const result = build(
+      {
+        start: '2026-10-18T09:00:00-07:00',
+        end: '2026-10-19T10:00:00-07:00',
+        token: 'secret',
+        output: 'private payload',
+      },
+      { account },
+    );
+    expect(payload(result.prompt!)).toMatchObject({
+      account,
+      from: '2026-10-18T16:00:00.000Z',
+      until: '2026-10-19T17:00:00.000Z',
+    });
+    expect(result.prompt).not.toContain('secret');
+    expect(result.prompt).not.toContain('private payload');
   });
 
   it.each([
@@ -123,7 +191,7 @@ describe('basic run discovery prompts', () => {
       build({}, { account: '' }),
       build({}, { environmentSlug: '' }),
     ])
-      expect(result.prompt).toBeUndefined();
+      expect(result.preview).toBeUndefined();
   });
 
   it('keeps names literal and excludes arbitrary URL values', () => {
@@ -132,8 +200,14 @@ describe('basic run discovery prompts', () => {
       { token: 'secret', output: 'private payload' },
       { account },
     );
-    expect(result.prompt).toContain(`“${account}”`);
-    expect(result.prompt).not.toContain('secret');
-    expect(result.prompt).not.toContain('private payload');
+    expect(result.preview).toContain(`“${account}”`);
+    expect(result.preview).not.toContain('secret');
+    expect(result.preview).not.toContain('private payload');
   });
 });
+
+function payload(prompt: string) {
+  return JSON.parse(
+    prompt.slice(prompt.indexOf('{'), prompt.indexOf('\n}') + 2),
+  );
+}

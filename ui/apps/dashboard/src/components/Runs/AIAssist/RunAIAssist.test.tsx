@@ -80,9 +80,19 @@ describe('Runs AI popover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copy_clicked' });
     expect(onAction).not.toHaveBeenCalledWith({ action: 'prompt_copied' });
-    expect(writeText).toHaveBeenCalledWith(
+    expect(writeText).not.toHaveBeenCalledWith(
       screen.getByLabelText('Prompt preview').textContent,
     );
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('"env": "production"'),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('Use read operations only'),
+    );
+    expect(screen.getByLabelText('Prompt preview').textContent).not.toContain(
+      'Use read operations only',
+    );
+    expect(screen.queryByLabelText('Full prompt')).toBeNull();
     await act(async () => resolve());
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copied' });
     expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
@@ -100,8 +110,13 @@ describe('Runs AI popover', () => {
     const { onAction } = mount();
     open();
     fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
-    await screen.findByText('Couldn’t copy. Select and copy the prompt above.');
+    await screen.findByText(
+      'Couldn’t copy. Select and copy the full prompt below.',
+    );
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
+    expect(screen.getByLabelText('Full prompt').textContent).toContain(
+      'Use read operations only',
+    );
     expect(onAction).toHaveBeenCalledWith({
       action: 'prompt_copy_failed',
       failure_category: 'permission_denied',

@@ -227,7 +227,7 @@ export function RunAIAssistPopover({
             tabIndex={0}
             className="bg-canvasSubtle text-basis max-h-24 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
           >
-            {result.prompt}
+            {result.preview}
           </pre>
         )}
         {metadataError && !metadataLoading && (
@@ -243,9 +243,18 @@ export function RunAIAssistPopover({
           {copyState === 'copied'
             ? 'Prompt copied.'
             : copyState === 'failed'
-              ? 'Couldn’t copy. Select and copy the prompt above.'
+              ? 'Couldn’t copy. Select and copy the full prompt below.'
               : ''}
         </p>
+        {copyState === 'failed' && result.prompt && (
+          <textarea
+            aria-label="Full prompt"
+            readOnly
+            value={result.prompt}
+            rows={3}
+            className="bg-canvasSubtle text-basis border-subtle max-h-24 w-full rounded border p-2 font-mono text-xs"
+          />
+        )}
         <a
           className="text-link mt-2 inline-block text-xs hover:underline"
           href="https://www.inngest.com/docs/ai-dev-tools/mcp"
