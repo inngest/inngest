@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -16,6 +17,7 @@ import (
 type cqrsFunctionProvider struct {
 	reader functionProviderReader
 	apps   cqrs.AppReader
+	pauses *functionPauses
 }
 
 type functionProviderReader interface {
@@ -26,7 +28,7 @@ type functionProviderReader interface {
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
 // app-scoped slug or UUID using the given function reader.
-func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
+func NewFunctionProvider(reader functionProviderReader) *cqrsFunctionProvider {
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {
 		apps = appReader
@@ -35,7 +37,13 @@ func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
 	return &cqrsFunctionProvider{
 		reader: reader,
 		apps:   apps,
+		pauses: &functionPauses{pausedAt: make(map[uuid.UUID]time.Time)},
 	}
+}
+
+func (p *cqrsFunctionProvider) PauseFunction(_ context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+	fn.PausedAt = p.pauses.pause(fn.ID)
+	return fn, nil
 }
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
@@ -161,6 +169,7 @@ func (p *cqrsFunctionProvider) toDeployedFunction(ctx context.Context, fn *cqrs.
 		AccountID:     consts.DevServerAccountID,
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,
+		PausedAt:      p.pauses.get(fn.ID),
 	}, nil
 }
 
@@ -178,6 +187,7 @@ func (p *cqrsFunctionProvider) toDeployedFunctionWithAppName(fn *cqrs.Function, 
 		AccountID:     consts.DevServerAccountID,
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,
+		PausedAt:      p.pauses.get(fn.ID),
 		ArchivedAt:    fn.ArchivedAt,
 	}, nil
 }

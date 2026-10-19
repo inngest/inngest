@@ -140,6 +140,8 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
 	V2GetFunctionProcedure = "/api.v2.V2/GetFunction"
+	// V2PauseFunctionProcedure is the fully-qualified name of the V2's PauseFunction RPC.
+	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
 	V2GetFunctionsProcedure = "/api.v2.V2/GetFunctions"
 	// V2SendEventProcedure is the fully-qualified name of the V2's SendEvent RPC.
@@ -222,6 +224,7 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
@@ -547,6 +550,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		pauseFunction: connect.NewClient[v2.PauseFunctionRequest, v2.PauseFunctionResponse](
+			httpClient,
+			baseURL+V2PauseFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("PauseFunction")),
+			connect.WithClientOptions(opts...),
+		),
 		getFunctions: connect.NewClient[v2.GetFunctionsRequest, v2.GetFunctionsResponse](
 			httpClient,
 			baseURL+V2GetFunctionsProcedure,
@@ -674,6 +683,7 @@ type v2Client struct {
 	syncApp                    *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace           *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
+	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
 	sendEvent                  *connect.Client[v2.SendEventRequest, v2.SendEventResponse]
 	invokeFunction             *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
@@ -938,6 +948,11 @@ func (c *v2Client) GetFunction(ctx context.Context, req *connect.Request[v2.GetF
 	return c.getFunction.CallUnary(ctx, req)
 }
 
+// PauseFunction calls api.v2.V2.PauseFunction.
+func (c *v2Client) PauseFunction(ctx context.Context, req *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
+	return c.pauseFunction.CallUnary(ctx, req)
+}
+
 // GetFunctions calls api.v2.V2.GetFunctions.
 func (c *v2Client) GetFunctions(ctx context.Context, req *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {
 	return c.getFunctions.CallUnary(ctx, req)
@@ -1053,6 +1068,7 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
@@ -1374,6 +1390,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2PauseFunctionHandler := connect.NewUnaryHandler(
+		V2PauseFunctionProcedure,
+		svc.PauseFunction,
+		connect.WithSchema(v2Methods.ByName("PauseFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetFunctionsHandler := connect.NewUnaryHandler(
 		V2GetFunctionsProcedure,
 		svc.GetFunctions,
@@ -1548,6 +1570,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2GetFunctionProcedure:
 			v2GetFunctionHandler.ServeHTTP(w, r)
+		case V2PauseFunctionProcedure:
+			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
 			v2GetFunctionsHandler.ServeHTTP(w, r)
 		case V2SendEventProcedure:
@@ -1779,6 +1803,10 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseFunction is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {

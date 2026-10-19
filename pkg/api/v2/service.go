@@ -24,6 +24,7 @@ type Service struct {
 	eventKeys      EventKeysProvider
 	apps           AppProvider
 	functions      FunctionProvider
+	functionPauser FunctionPauser
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
 	traces         FunctionTraceReader
@@ -42,6 +43,7 @@ type ServiceOptions struct {
 	EventKeysProvider   EventKeysProvider
 	Apps                AppProvider
 	Functions           FunctionProvider
+	FunctionPauser      FunctionPauser
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
 	FunctionTraces      FunctionTraceReader
@@ -67,6 +69,7 @@ func NewService(opts ServiceOptions) *Service {
 		eventKeys:      opts.EventKeysProvider,
 		apps:           opts.Apps,
 		functions:      opts.Functions,
+		functionPauser: opts.FunctionPauser,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
 		traces:         opts.FunctionTraces,
