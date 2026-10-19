@@ -41,6 +41,7 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 		{name: "unknown function", functionID: "missing", lookupErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 		{name: "lookup failure", lookupErr: errors.New("database unavailable"), status: 500, code: "internal_error"},
 		{name: "no provider", noPauser: true, status: 501, code: "not_implemented"},
+		{name: "provider scope miss", pauseErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 		{name: "provider failure", pauseErr: errors.New("queue unavailable"), status: 500, code: "internal_error"},
 		{name: "rate limited", limited: true, status: 429, code: "rate_limited"},
 	} {

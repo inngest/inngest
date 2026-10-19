@@ -81,6 +81,9 @@ func (s *Service) PauseFunction(ctx context.Context, req *apiv2.PauseFunctionReq
 		return nil, s.getFunctionError(err)
 	}
 	fn, err = s.functionPauser.PauseFunction(ctx, fn)
+	if errors.Is(err, ErrFunctionNotFound) {
+		return nil, s.getFunctionError(err)
+	}
 	if err != nil {
 		logger.From(ctx).Error("unable to pause function", "error", err)
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to pause function")
