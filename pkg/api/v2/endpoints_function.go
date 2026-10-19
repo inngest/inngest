@@ -80,6 +80,9 @@ func (s *Service) PauseFunction(ctx context.Context, req *apiv2.PauseFunctionReq
 	if err != nil {
 		return nil, s.getFunctionError(err)
 	}
+	if !fn.ArchivedAt.IsZero() && fn.ArchivedAt.Before(time.Now()) {
+		return nil, s.getFunctionError(ErrFunctionNotFound)
+	}
 	fn, err = s.functionPauser.PauseFunction(ctx, fn)
 	if errors.Is(err, ErrFunctionNotFound) {
 		return nil, s.getFunctionError(err)

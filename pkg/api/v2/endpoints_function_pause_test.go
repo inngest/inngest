@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 		lookupErr     error
 		pauseErr      error
 		alreadyPaused bool
+		archived      bool
 		noPauser      bool
 		limited       bool
 		status        int
@@ -37,6 +39,7 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 	}{
 		{name: "paused", status: 200},
 		{name: "already paused", alreadyPaused: true, status: 200},
+		{name: "archived", archived: true, status: 404, code: "not_found"},
 		{name: "unknown app", appID: "missing", lookupErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 		{name: "unknown function", functionID: "missing", lookupErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 		{name: "lookup failure", lookupErr: errors.New("database unavailable"), status: 500, code: "internal_error"},
@@ -61,6 +64,9 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 			if tc.alreadyPaused {
 				fn.PausedAt = pausedAt
 			}
+			if tc.archived {
+				fn.ArchivedAt = pausedAt
+			}
 			functions := &mockFunctionProvider{}
 			if !tc.noPauser && !tc.limited {
 				functions.On("GetFunctionByApp", mock.Anything, appID, functionID).Return(fn, tc.lookupErr).Once()
@@ -82,10 +88,10 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 			handler, err := newTestHTTPHandler(t.Context(), opts, HTTPHandlerOptions{})
 			require.NoError(t, err)
 			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPut, "/api/v2/apps/"+appID+"/functions/"+functionID+"/pause", nil))
+			handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v2/apps/"+appID+"/functions/"+functionID+"/pause", nil))
 			require.Equal(t, tc.status, recorder.Code, recorder.Body.String())
 			require.Equal(t, apiv2.V2_PauseFunction_FullMethodName, limiter.method)
-			if tc.lookupErr != nil || tc.noPauser || tc.limited {
+			if tc.lookupErr != nil || tc.noPauser || tc.limited || tc.archived {
 				require.Zero(t, calls)
 			} else {
 				require.Equal(t, 1, calls)
@@ -116,6 +122,32 @@ func TestHTTPGateway_PauseFunction(t *testing.T) {
 			require.Equal(t, "Function", body.Data.Name)
 			require.True(t, body.Data.IsPaused)
 			require.WithinDuration(t, time.Now(), body.Metadata.FetchedAt, time.Second)
+		})
+	}
+}
+
+func TestHTTPGateway_PauseFunctionRejectsInvalidRequests(t *testing.T) {
+	handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name    string
+		method  string
+		body    string
+		status  int
+		message string
+	}{
+		// The gateway maps unsupported HTTP methods through gRPC Unimplemented to 501.
+		{name: "PUT", method: http.MethodPut, status: http.StatusNotImplemented, message: "Method Not Allowed"},
+		{name: "JSON body", method: http.MethodPost, body: "{}", status: http.StatusBadRequest},
+		{name: "whitespace body", method: http.MethodPost, body: " ", status: http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(tc.method, "/api/v2/apps/app/functions/fn/pause", strings.NewReader(tc.body)))
+			require.Equal(t, tc.status, rec.Code, rec.Body.String())
+			if tc.message != "" {
+				require.JSONEq(t, `{"errors":[{"code":"api_error","message":"`+tc.message+`"}]}`, rec.Body.String())
+			}
 		})
 	}
 }

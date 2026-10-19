@@ -170,6 +170,7 @@ func (p *cqrsFunctionProvider) toDeployedFunction(ctx context.Context, fn *cqrs.
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,
 		PausedAt:      p.pauses.get(fn.ID),
+		ArchivedAt:    fn.ArchivedAt,
 	}, nil
 }
 

@@ -417,7 +417,7 @@ func TestCommandPausesFunction(t *testing.T) {
 	cmd.Writer = &out
 	err := cmd.Run(t.Context(), []string{"api", "pause-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
 	require.NoError(t, err)
-	require.Equal(t, http.MethodPut, method)
+	require.Equal(t, http.MethodPost, method)
 	require.Equal(t, "/api/v2/apps/app/functions/fn/pause", path)
 	require.Empty(t, body)
 	require.JSONEq(t, `{"data":{"id":"fn","isPaused":true}}`, out.String())

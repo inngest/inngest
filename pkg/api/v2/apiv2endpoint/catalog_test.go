@@ -39,7 +39,7 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, "functions:write:pause", byMethod["PauseFunction"].AuthzPermission)
 	require.Equal(t, "pause-function", byMethod["PauseFunction"].CommandName)
 	require.Equal(t, "pause_function", byMethod["PauseFunction"].ToolName)
-	require.Equal(t, http.MethodPut, byMethod["PauseFunction"].HTTPMethod)
+	require.Equal(t, http.MethodPost, byMethod["PauseFunction"].HTTPMethod)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", byMethod["PauseFunction"].Path)
 	require.Empty(t, byMethod["PauseFunction"].Body)
 	require.Equal(t, "runs:read:list", byMethod["ListRuns"].AuthzPermission)

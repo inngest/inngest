@@ -150,7 +150,7 @@ func TestMCPOperations(t *testing.T) {
 	require.Equal(t, "get-function-run", getRun.CLI.Command)
 	pause := operations["pause_function"]
 	require.Equal(t, "PauseFunction", pause.ID)
-	require.Equal(t, "PUT", pause.HTTP.Method)
+	require.Equal(t, "POST", pause.HTTP.Method)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", pause.HTTP.Path)
 	require.Equal(t, "pause-function", pause.CLI.Command)
 

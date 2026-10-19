@@ -32,6 +32,7 @@ func TestRequest(t *testing.T) {
 		"data":           map[string]any{"message": "hi"},
 		"idempotencyKey": "idem-1",
 	}, body)
+	require.False(t, Tool(endpoint).Annotations.IdempotentHint)
 }
 
 func TestPauseFunctionRequest(t *testing.T) {
@@ -40,7 +41,7 @@ func TestPauseFunctionRequest(t *testing.T) {
 		"appId": "my app", "functionId": "hello/world",
 	}, Options{})
 	require.NoError(t, err)
-	require.Equal(t, http.MethodPut, req.Method)
+	require.Equal(t, http.MethodPost, req.Method)
 	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/pause", req.URL.EscapedPath())
 	body, err := io.ReadAll(req.Body)
 	require.NoError(t, err)

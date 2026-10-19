@@ -1794,7 +1794,7 @@ service V2 {
 
   rpc PauseFunction(PauseFunctionRequest) returns (PauseFunctionResponse) {
     option (google.api.http) = {
-      put: "/apps/{app_id}/functions/{function_id}/pause"
+      post: "/apps/{app_id}/functions/{function_id}/pause"
     };
     option (authz) = {
       require_authz: true
@@ -1802,7 +1802,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Pause a function"
-      description: "Pauses a function. Idempotent: an already-paused function returns HTTP 200 unchanged. New runs stop starting once the pause propagates: Cloud may take up to about a minute; the dev server pauses immediately and keeps new event-triggered runs queued until resumed. Runs already executing may continue. Bulk pause is not supported; call once per function."
+      description: "Pauses a function. Idempotent: pausing an already-paused function returns 200 and changes nothing. The response reflects the requested state. In Cloud, applying the pause may take up to about a minute; an immediate GetFunction may still show isPaused: false. Send no request body; a non-empty body returns 400. The dev server pauses immediately; new event-triggered runs stay queued until unpaused or the dev server restarts. Runs already executing may continue. Bulk pause is not supported; call once per function."
       tags: "Functions"
       tags: "Beta"
       security: {
