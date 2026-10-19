@@ -92,10 +92,6 @@ vi.mock('@/utils/useAccountFeatures', () => ({
   useAccountFeatures: () => ({ data: { history: 7 } }),
 }));
 
-vi.mock('./AccountConcurrencyBanner', () => ({
-  AccountConcurrencyBanner: () => null,
-}));
-
 vi.mock('./useRunsPagination', () => ({
   useRunsPagination: mocks.useRunsPagination,
 }));

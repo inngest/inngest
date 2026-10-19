@@ -12,8 +12,6 @@ import {
 export type ConcurrencyAlertCheckQuery = {
   account: {
     id: string;
-    marketplace: string | null;
-    plan: { isFree: boolean } | null;
     burstConcurrency: {
       limit: number;
       budgetMinutes: number;
@@ -34,10 +32,6 @@ export const ConcurrencyAlertCheckDocument: TypedDocumentNode<
   query ConcurrencyAlertCheck {
     account {
       id
-      marketplace
-      plan {
-        isFree
-      }
       burstConcurrency {
         limit
         budgetMinutes
