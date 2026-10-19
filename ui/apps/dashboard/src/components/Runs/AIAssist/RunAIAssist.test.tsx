@@ -22,6 +22,7 @@ function mount(overrides = {}) {
   const onAction = vi.fn();
   const props = {
     context,
+    endpoint: 'https://api.inngest.com/mcp',
     metadataLoading: false,
     metadataError: false,
     onRetry: vi.fn(),
@@ -118,10 +119,15 @@ describe('Runs AI popover', () => {
     });
     expect(copy.hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/Clear CEL search/)).toBeTruthy();
-    const link = screen.getByRole('link', { name: 'Codex CLI' });
-    link.addEventListener('click', (event) => event.preventDefault());
-    fireEvent.click(link);
-    expect(link.getAttribute('href')).toBe('/mcp/setup?client=codex');
+    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    expect(
+      screen.getByRole('region', { name: 'Connection instructions' }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Full setup instructions ↗' })
+        .getAttribute('href'),
+    ).toBe('/mcp/setup?client=codex');
     expect(onAction).toHaveBeenCalledWith({
       action: 'setup_clicked',
       client: 'codex_cli',
@@ -129,6 +135,70 @@ describe('Runs AI popover', () => {
     expect(onAction).not.toHaveBeenCalledWith({
       action: 'prompt_copy_clicked',
     });
+  });
+
+  it('shows the selected client instructions inline and copies the actual setup command', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    const { onAction } = mount();
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    expect(
+      screen.getByText(
+        'claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/In Claude Code, run \/mcp/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    expect(screen.queryByText(/claude mcp add/)).toBeNull();
+    expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy setup command' }));
+    await waitFor(() =>
+      expect(onAction).toHaveBeenCalledWith({
+        action: 'setup_copied',
+        client: 'codex_cli',
+      }),
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      'codex mcp add inngest-cloud --url https://api.inngest.com/mcp',
+    );
+    expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    expect(
+      screen.queryByRole('region', { name: 'Connection instructions' }),
+    ).toBeNull();
+  });
+
+  it('offers a generic endpoint for other tools without hiding the prompt', () => {
+    mount({ endpoint: 'https://api.example.test/mcp' });
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Other tools' }));
+    expect(screen.getByText('https://api.example.test/mcp')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Copy server URL' }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Choose OAuth or Sign in/)).toBeTruthy();
+    expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
+  });
+
+  it('keeps setup text selectable when copying it fails', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+    const { onAction } = mount();
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Other tools' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy server URL' }));
+    await screen.findByText('Couldn’t copy. Select and copy the text above.');
+    expect(onAction).toHaveBeenCalledWith({
+      action: 'setup_copy_failed',
+      client: 'other',
+    });
+    expect(screen.getByText('https://api.inngest.com/mcp')).toBeTruthy();
   });
 
   it('does not show stale copy success after filters change during a pending copy', async () => {

@@ -11,13 +11,12 @@ import { defaultLinkStyles } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import TabCards from '@inngest/components/TabCards/TabCards';
-import { IconClaude } from '@inngest/components/icons/ai/Claude';
-import { IconCursor } from '@inngest/components/icons/ai/Cursor';
-import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
 import { RiBookOpenLine, RiBugLine, RiCheckLine, RiFlaskLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { ClientOnly } from '@tanstack/react-router';
+
+import { createMCPClients, type MCPClient } from './clients';
 
 type JSONSchema = {
   properties?: Record<string, JSONSchemaProperty>;
@@ -76,79 +75,6 @@ const toolType = (schema: JSONSchemaProperty) => {
   return schema.enum ? 'enum' : schema.type ?? 'value';
 };
 
-type MCPClient = {
-  id: 'claude' | 'codex' | 'cursor';
-  name: string;
-  Icon: ComponentType<{ className?: string; size?: number }>;
-  snippet: TabsProps;
-};
-
-const createClients = (
-  endpoint: string,
-  isDevServer: boolean,
-  bearerTokenEnvVar?: string
-): MCPClient[] => {
-  const serverName = isDevServer ? 'inngest-dev' : 'inngest-cloud';
-  const authorizationHeader = bearerTokenEnvVar
-    ? ` --header "Authorization: Bearer $${bearerTokenEnvVar}"`
-    : '';
-  const bearerTokenOption = bearerTokenEnvVar ? ` --bearer-token-env-var ${bearerTokenEnvVar}` : '';
-
-  return [
-    {
-      id: 'claude',
-      name: 'Claude Code',
-      Icon: IconClaude,
-      snippet: {
-        title: 'Terminal command',
-        language: 'shell',
-        content: `claude mcp add --transport http ${serverName} ${endpoint}${authorizationHeader}`,
-      },
-    },
-    {
-      id: 'codex',
-      name: 'Codex CLI',
-      Icon: IconOpenAI,
-      snippet: {
-        title: 'Terminal command',
-        language: 'shell',
-        content: `codex mcp add ${serverName} --url ${endpoint}${bearerTokenOption}`,
-      },
-    },
-    {
-      id: 'cursor',
-      name: 'Cursor',
-      Icon: IconCursor,
-      snippet: {
-        title: 'mcp.json',
-        language: 'json',
-        content: JSON.stringify(
-          {
-            mcpServers: {
-              [serverName]: {
-                url: endpoint,
-                ...(!isDevServer &&
-                  !bearerTokenEnvVar && {
-                    auth: {
-                      CLIENT_ID: 'inngest-mcp-static',
-                    },
-                  }),
-                ...(bearerTokenEnvVar && {
-                  headers: {
-                    Authorization: `Bearer \${env:${bearerTokenEnvVar}}`,
-                  },
-                }),
-              },
-            },
-          },
-          null,
-          2
-        ),
-      },
-    },
-  ];
-};
-
 // Approximate rendered height of a CommandBlock (tabs header + monaco padding
 // + content lines) so the SSR fallback skeleton matches and hydration doesn't
 // shift the page.
@@ -195,7 +121,7 @@ export const MCPSetup = ({
   const usesOAuth = !isDevServer && !bearerTokenEnvVar;
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
   const { error, loading, retry, tools } = useMCPTools(operationsEndpoint);
-  const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
+  const clients = createMCPClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
   const hasAuthStep = Boolean(bearerTokenEnvVar);
   const connectStep = hasAuthStep ? 2 : 1;

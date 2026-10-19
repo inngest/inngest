@@ -4,7 +4,10 @@ import { trackEvent, useTrackingUser } from '@/utils/tracking';
 
 export type RunAIAction =
   | { action: 'viewed' | 'opened' | 'prompt_copy_clicked' | 'prompt_copied' }
-  | { action: 'setup_clicked'; client: 'claude_code' | 'codex_cli' | 'other' }
+  | {
+      action: 'setup_clicked' | 'setup_copied' | 'setup_copy_failed';
+      client: 'claude_code' | 'codex_cli' | 'other';
+    }
   | {
       action: 'prompt_copy_failed';
       failure_category: 'permission_denied' | 'unavailable' | 'other';

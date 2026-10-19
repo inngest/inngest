@@ -30,6 +30,7 @@ export function RunAIAssist(props: Props) {
   return (
     <RunAIAssistPopover
       context={context}
+      endpoint={new URL('/mcp', import.meta.env.VITE_API_URL).toString()}
       metadataLoading={props.metadataLoading}
       metadataError={props.metadataError}
       onRetry={props.onRetry}

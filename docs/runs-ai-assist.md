@@ -1,6 +1,6 @@
 # Runs AI assistance
 
-The Cloud Runs toolbar includes a Use AI popover. It links to existing MCP setup and copies a prompt using account, environment, app, function scope, status, and time filters. It makes no MCP calls and grants no access. The local Dev Server has no AI toolbar entry. There is no feature flag; review the change in staging before deployment.
+The Cloud Runs toolbar includes a Use AI popover. Its client buttons expand short MCP connection instructions in place, with copyable commands or a server URL and a full-setup link. It copies a prompt using account, environment, app, function scope, status, and time filters. It makes no MCP calls and grants no access. The local Dev Server has no AI toolbar entry. There is no feature flag; review the change in staging before deployment.
 
 CEL search, restrictive Run type selections, PAUSED, and unsupported statuses block copying with an explanation. App identities resolve from dashboard metadata; function IDs follow the existing Runs REST adapter. Prompts use readable relative windows such as “the last 24 hours” and retain UTC boundaries for absolute windows. Prompt contents and filter values are excluded from feature telemetry.
 
@@ -12,7 +12,9 @@ Use the existing dashboard event transport with event name `app/runs.ai_assist.a
 | --- | --- | --- |
 | viewed | Entry became visible | None |
 | opened | Popover opened | None |
-| setup_clicked | Client setup selected | client: claude_code, codex_cli, other |
+| setup_clicked | Inline client instructions expanded | client: claude_code, codex_cli, other |
+| setup_copied | Setup command or server URL copied | client: claude_code, codex_cli, other |
+| setup_copy_failed | Setup copy failed | client: claude_code, codex_cli, other |
 | prompt_copy_clicked | Enabled copy button activated | None |
 | prompt_copied | Clipboard write completed | None |
 | prompt_copy_failed | Clipboard write failed | failure_category: permission_denied, unavailable, other |

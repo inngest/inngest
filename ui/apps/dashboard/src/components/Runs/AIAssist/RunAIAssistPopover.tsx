@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
   Popover,
@@ -10,6 +10,7 @@ import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { RiAppsLine, RiSparklingLine } from '@remixicon/react';
 
 import { buildRunDiscoveryPrompt, type RunPromptContext } from './prompt';
+import { RunAISetup } from './RunAISetup';
 import type { SetupClient } from './setup';
 import type { RunAIAction } from './tracking';
 
@@ -31,8 +32,10 @@ export function RunAIAssistPopover({
   onRetry,
   onAction,
   getSetupHref,
+  endpoint,
 }: {
   context: RunPromptContext;
+  endpoint: string;
   metadataLoading: boolean;
   metadataError: boolean;
   onRetry: () => void;
@@ -40,6 +43,10 @@ export function RunAIAssistPopover({
   getSetupHref: (client: SetupClient) => string;
 }) {
   const [open, setOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<SetupClient | null>(
+    null,
+  );
+  const setupID = useId();
   const [previewTime, setPreviewTime] = useState(() => new Date());
   const [copyState, setCopyState] = useState<
     'idle' | 'copying' | 'copied' | 'failed'
@@ -166,19 +173,34 @@ export function RunAIAssistPopover({
         </p>
         <div className="mt-3 grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-3">
           {clients.map(({ id, label, tracking, Icon }) => (
-            <a
+            <button
               key={id}
-              href={getSetupHref(id)}
-              className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle inline-flex items-center justify-center gap-1 whitespace-nowrap rounded border px-2 py-1.5 text-xs"
-              onClick={() =>
-                onAction({ action: 'setup_clicked', client: tracking })
-              }
+              type="button"
+              aria-expanded={selectedClient === id}
+              aria-controls={selectedClient === id ? setupID : undefined}
+              className={`text-basis hover:bg-canvasSubtle inline-flex items-center justify-center gap-1 whitespace-nowrap rounded border px-2 py-1.5 text-xs ${selectedClient === id ? 'border-contrast bg-canvasSubtle' : 'border-muted bg-canvasBase'}`}
+              onClick={() => {
+                setSelectedClient(selectedClient === id ? null : id);
+                if (selectedClient !== id)
+                  onAction({ action: 'setup_clicked', client: tracking });
+              }}
             >
               <Icon className="h-4 w-4 shrink-0" />
               {label}
-            </a>
+            </button>
           ))}
         </div>
+        {selectedClient && (
+          <div id={setupID}>
+            <RunAISetup
+              key={`${selectedClient}:${endpoint}`}
+              client={selectedClient}
+              endpoint={endpoint}
+              fullSetupHref={getSetupHref(selectedClient)}
+              onAction={onAction}
+            />
+          </div>
+        )}
         <div className="mb-2 mt-4 flex items-center justify-between gap-2">
           <p className="text-muted text-xs">Already connected? Try asking</p>
           <Button
