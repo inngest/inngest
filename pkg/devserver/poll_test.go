@@ -72,6 +72,10 @@ func TestPollSDKs_FirstSyncPingsOnceUnderNoPoll(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
+	defer func() {
+		cancel()
+		<-done
+	}()
 	go func() {
 		ds.pollSDKs(ctx)
 		close(done)
