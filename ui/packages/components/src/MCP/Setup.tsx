@@ -45,6 +45,7 @@ type MCPSetupProps = {
   endpoint: string;
   isDevServer?: boolean;
   operationsEndpoint: string;
+  initialClient?: 'claude' | 'codex' | 'other';
 };
 
 type Operation = {
@@ -187,6 +188,7 @@ export const MCPSetup = ({
   endpoint,
   isDevServer = false,
   operationsEndpoint,
+  initialClient = 'claude',
 }: MCPSetupProps) => {
   const [useAPIKey, setUseAPIKey] = useState(false);
   const bearerTokenEnvVar = isDevServer || useAPIKey ? apiKeyEnvVar : undefined;
@@ -273,6 +275,7 @@ export const MCPSetup = ({
               key={bearerTokenEnvVar ?? 'oauth'}
               bearerTokenEnvVar={bearerTokenEnvVar}
               clients={clients}
+              initialClient={initialClient}
               isDevServer={isDevServer}
             />
           </Step>
@@ -370,6 +373,7 @@ const Step = ({
 );
 
 const ClientPicker = ({
+  initialClient,
   bearerTokenEnvVar,
   clients,
   isDevServer,
@@ -377,8 +381,9 @@ const ClientPicker = ({
   bearerTokenEnvVar?: string;
   clients: MCPClient[];
   isDevServer: boolean;
+  initialClient: 'claude' | 'codex' | 'other';
 }) => (
-  <TabCards defaultValue="claude">
+  <TabCards defaultValue={initialClient === 'other' ? 'cursor' : initialClient}>
     <TabCards.ButtonList>
       {clients.map((client) => (
         <TabCards.Button className="w-36" key={client.id} value={client.id}>

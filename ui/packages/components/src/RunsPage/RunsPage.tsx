@@ -50,6 +50,7 @@ import type { Run, ViewScope } from './types';
 
 type Props = {
   data: Run[];
+  toolbarActions?: React.ReactNode;
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
@@ -104,6 +105,7 @@ export function RunsPage({
   progressiveSearch,
   infiniteScrollTrigger,
   searchLimit,
+  toolbarActions,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -388,6 +390,7 @@ export function RunsPage({
                 onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
+            {toolbarActions}
           </div>
           <div className="flex items-center gap-2">
             {progressiveSearch ? (
