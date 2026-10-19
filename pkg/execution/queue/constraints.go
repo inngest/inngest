@@ -673,8 +673,7 @@ func exhaustedSemaphores(exhausted []constraintapi.ConstraintItem) []constrainta
 }
 
 // hasAppSemaphore reports whether any of the given semaphores is an app worker
-// concurrency semaphore.  every item of a connect app carries the app semaphore,
-// so one exhausted app semaphore blocks the whole partition.
+// concurrency semaphore.
 func hasAppSemaphore(sems []constraintapi.SemaphoreConstraint) bool {
 	for _, s := range sems {
 		if s.Kind() == constraintapi.SemaphoreKindApp {

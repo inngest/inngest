@@ -395,15 +395,12 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			},
 		})
 
-		if appLimited {
-			// a partition is one function and a function belongs to one app, so every
-			// remaining item carries this exhausted app semaphore.  stop the iterator
-			// the same way fn concurrency does instead of checking each item.
-			return result, fmt.Errorf("semaphore hit: %w", ErrProcessNoUserConstraintCapacity)
-		}
-
-		// fn and fnkey semaphores are only on start items.  later steps of runs that
-		// already hold the semaphore carry none, so keep scanning.
+		// keep scanning.  fn and fnkey semaphores are only on start items, and later
+		// steps of runs that already hold the semaphore carry none.  the app semaphore
+		// is copied into run metadata when the run starts, so after an app moves from
+		// connect to serve, items of new runs in the same partition carry none.  the
+		// iterator memoizes the exhausted semaphores, so items that carry them are
+		// skipped without another constraint API call.
 		return result, nil
 	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
