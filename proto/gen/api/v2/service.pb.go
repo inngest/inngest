@@ -10023,7 +10023,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xc9\xcb\x01\n" +
+	"\x04INFO\x10\x032\xc8\xcb\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10525,10 +10525,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xdf\x05\n" +
-	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\x90\x05\x92A\xbb\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xde\x05\n" +
+	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\x8f\x05\x92A\xba\x04\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x10Pause a function\x1a\x83\x04Pauses a function. Idempotent: pausing an already-paused function returns 200 and changes nothing. The response reflects the requested state. In Cloud, applying the pause may take up to about a minute; an immediate GetFunction may still show isPaused: false. Send no request body; a non-empty body returns 400. The dev server pauses immediately; new event-triggered runs stay queued until unpaused or the dev server restarts. Runs already executing may continue. Bulk pause is not supported; call once per function.b\x10\n" +
+	"\x04Beta\x12\x10Pause a function\x1a\x82\x04Pauses a function. Idempotent: pausing an already-paused function returns 200 and changes nothing. The response reflects the requested state. In Cloud, applying the pause may take up to about a minute; an immediate GetFunction may still show isPaused: false. Send no request body; a non-empty body returns 400. The dev server pauses immediately; new event-triggered runs stay queued until resumed or the dev server restarts. Runs already executing may continue. Bulk pause is not supported; call once per function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02.\",/apps/{app_id}/functions/{function_id}/pause\x12\xf8\x01\n" +
