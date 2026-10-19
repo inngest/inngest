@@ -225,7 +225,7 @@ export function RunAIAssistPopover({
           <pre
             aria-label="Prompt preview"
             tabIndex={0}
-            className="bg-canvasSubtle text-basis max-h-36 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
+            className="bg-canvasSubtle text-basis max-h-24 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
           >
             {result.prompt}
           </pre>
