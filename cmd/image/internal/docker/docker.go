@@ -33,14 +33,16 @@ func New(stdout, stderr io.Writer) (*Client, error) {
 
 // Build runs `docker build` for one platform.  a --platform in args that
 // differs from platform is an error, because docker would build every
-// platform listed.
+// platform listed.  --load puts the image in the local image store.  without
+// it, a docker-container builder keeps the image only in its build cache and
+// the local tag still points to the previous image.
 func (c *Client) Build(ctx context.Context, platform string, args []string) error {
 	for _, value := range flagValues(args, "--platform") {
 		if value != platform {
 			return fmt.Errorf("images must be built for %s; remove --platform %s", platform, value)
 		}
 	}
-	args = append([]string{"build", "--platform", platform}, args...)
+	args = append([]string{"build", "--platform", platform, "--load"}, args...)
 	if err := c.run(ctx, args...); err != nil {
 		return fmt.Errorf("docker build failed: %w", err)
 	}

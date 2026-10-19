@@ -146,8 +146,9 @@ func waitForBuild(ctx context.Context, api *client, b *apiv2.Build) (*apiv2.Buil
 	}
 }
 
-// newClient returns an API client that uses the stored login.  deploy calls
-// it before docker runs, so no image is built that cannot be uploaded.
+// newClient returns an API client that uses the stored login.  it checks the
+// login once, and deploy calls it before docker runs, so no image is built
+// that cannot be uploaded.
 func newClient(ctx context.Context) (*client, error) {
 	manager, err := cliauth.NewManager()
 	if err != nil {
@@ -158,11 +159,14 @@ func newClient(ctx context.Context) (*client, error) {
 		return nil, err
 	}
 	resource := cliauth.Resource(issuer)
-	token, _, err := manager.AccessToken(ctx, resource)
-	if errors.Is(err, cliauth.ErrNotLoggedIn) {
-		return nil, errors.New("authentication required to push images; log in with `inngest login`")
+	token := func(ctx context.Context) (string, error) {
+		token, _, err := manager.AccessToken(ctx, resource)
+		if errors.Is(err, cliauth.ErrNotLoggedIn) {
+			return "", errors.New("authentication required to push images; log in with `inngest login`")
+		}
+		return token, err
 	}
-	if err != nil {
+	if _, err := token(ctx); err != nil {
 		return nil, err
 	}
 	return &client{
