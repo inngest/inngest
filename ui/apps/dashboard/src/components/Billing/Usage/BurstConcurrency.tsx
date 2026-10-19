@@ -8,6 +8,10 @@ import { formatInTimeZone } from '@inngest/components/utils/date';
 import { createColumnHelper } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
+import {
+  BURST_CONCURRENCY_SECTION_ID,
+  useScrollIntoViewOnHash,
+} from '@/components/Billing/Usage/useScrollIntoViewOnHash';
 import { graphql } from '@/gql';
 import { type GetBurstConcurrencyQuery } from '@/gql/graphql';
 
@@ -66,6 +70,7 @@ function durationMinutes({ startedAt, endedAt }: Burst) {
 export function BurstConcurrency() {
   const [showBreakdown, setShowBreakdown] = useState(true);
   const [{ data, error }] = useQuery({ query: GetBurstConcurrencyDocument });
+  const sectionRef = useScrollIntoViewOnHash(BURST_CONCURRENCY_SECTION_ID);
 
   const burstConcurrency = data?.account.burstConcurrency;
   if (error || !burstConcurrency) {
@@ -108,7 +113,7 @@ export function BurstConcurrency() {
   ];
 
   return (
-    <div className="mt-10">
+    <div id={BURST_CONCURRENCY_SECTION_ID} ref={sectionRef} className="mt-10">
       <h3 className="text-basis mb-3 text-xl">Concurrency burst</h3>
       <p className="text-muted mb-6 text-sm">
         Each month, for one hour, if you exceed your concurrency limit, we

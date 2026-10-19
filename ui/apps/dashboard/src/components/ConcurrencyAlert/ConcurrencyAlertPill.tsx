@@ -18,23 +18,29 @@ export function ConcurrencyAlertPill() {
 
   if (alert.state === 'boosted') {
     return (
-      <AlertPill
-        kind="boost"
-        icon={
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[rgb(var(--color-carbon-0))]">
-            <RiFlashlightFill className="h-3 w-3 text-[rgb(var(--color-breeze-600))]" />
-          </span>
-        }
-        action={
-          alert.minutesRemaining != null && (
-            <Link {...linkProps} className={linkClassName} iconAfter={arrow}>
-              {minutesLeftLabel(alert.minutesRemaining)} left
-            </Link>
-          )
-        }
+      <Link
+        {...linkProps}
+        className="text-current hover:decoration-transparent"
       >
-        Concurrency limit boosted by {BURST_MULTIPLIER}x.
-      </AlertPill>
+        <AlertPill
+          kind="boost"
+          icon={
+            <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[rgb(var(--color-carbon-0))]">
+              <RiFlashlightFill className="h-3 w-3 text-[rgb(var(--color-breeze-600))]" />
+            </span>
+          }
+          action={
+            alert.minutesRemaining != null && (
+              <span className="flex items-center gap-1 text-xs font-black leading-4">
+                {minutesLeftLabel(alert.minutesRemaining)} left
+                {arrow}
+              </span>
+            )
+          }
+        >
+          Concurrency limit boosted by {BURST_MULTIPLIER}x.
+        </AlertPill>
+      </Link>
     );
   }
 

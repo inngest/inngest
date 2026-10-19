@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { pathCreator } from '@/utils/urls';
 import {
   alertState,
   concurrencyLinkProps,
@@ -48,49 +47,19 @@ describe('usedRatio', () => {
 });
 
 describe('concurrencyLinkProps', () => {
-  const base = {
-    surface: 'pill' as const,
-    isMarketplace: false,
-    isFreePlan: false,
-    marketplaceBillingURL: null,
-  };
-
-  it('sends boosted accounts to usage', () => {
-    expect(concurrencyLinkProps({ ...base, state: 'boosted' })).toEqual({
-      to: pathCreator.billingUsage({ ref: 'app-concurrency-boost-pill' }),
-    });
+  it('sends boosted accounts to the usage burst section', () => {
+    expect(concurrencyLinkProps({ state: 'boosted', surface: 'pill' })).toEqual(
+      {
+        to: '/billing/usage?ref=app-concurrency-boost-pill#burst-concurrency',
+      },
+    );
   });
 
-  it('sends limited marketplace accounts to their marketplace billing', () => {
-    expect(
-      concurrencyLinkProps({
-        ...base,
-        state: 'limited',
-        isMarketplace: true,
-        marketplaceBillingURL: 'https://vercel.com/billing',
-      }),
-    ).toEqual({ to: 'https://vercel.com/billing' });
-  });
-
-  it('sends limited free accounts to plans', () => {
-    expect(
-      concurrencyLinkProps({ ...base, state: 'limited', isFreePlan: true }),
-    ).toEqual({
-      to: pathCreator.billing({
-        tab: 'plans',
-        ref: 'app-concurrency-limited-pill',
-      }),
-    });
-  });
-
-  it('sends limited paid accounts to the concurrency addon', () => {
-    expect(
-      concurrencyLinkProps({ ...base, state: 'limited', surface: 'card' }),
-    ).toEqual({
-      to: pathCreator.billing({
-        highlight: 'concurrency',
-        ref: 'app-concurrency-limited-card',
-      }),
-    });
+  it('sends limited accounts to the usage concurrency section', () => {
+    expect(concurrencyLinkProps({ state: 'limited', surface: 'card' })).toEqual(
+      {
+        to: '/billing/usage?ref=app-concurrency-limited-card#account-concurrency',
+      },
+    );
   });
 });

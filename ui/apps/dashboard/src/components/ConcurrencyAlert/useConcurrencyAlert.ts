@@ -12,9 +12,6 @@ import {
 export type ConcurrencyAlertCheckQuery = {
   account: {
     id: string;
-    marketplace: string | null;
-    marketplaceBillingURL: string | null;
-    plan: { isFree: boolean } | null;
     burstConcurrency: {
       limit: number;
       budgetMinutes: number;
@@ -35,11 +32,6 @@ export const ConcurrencyAlertCheckDocument: TypedDocumentNode<
   query ConcurrencyAlertCheck {
     account {
       id
-      marketplace
-      marketplaceBillingURL
-      plan {
-        isFree
-      }
       burstConcurrency {
         limit
         budgetMinutes
@@ -126,13 +118,6 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
       burst && minutesRemaining !== undefined
         ? usedRatio({ budgetMinutes: burst.budgetMinutes, minutesRemaining })
         : 0,
-    linkProps: (surface) =>
-      concurrencyLinkProps({
-        state,
-        surface,
-        isMarketplace: Boolean(data?.account.marketplace),
-        isFreePlan: data?.account.plan?.isFree,
-        marketplaceBillingURL: data?.account.marketplaceBillingURL,
-      }),
+    linkProps: (surface) => concurrencyLinkProps({ state, surface }),
   };
 }

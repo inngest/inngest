@@ -1,3 +1,7 @@
+import {
+  ACCOUNT_CONCURRENCY_SECTION_ID,
+  BURST_CONCURRENCY_SECTION_ID,
+} from '@/components/Billing/Usage/useScrollIntoViewOnHash';
 import { pathCreator } from '@/utils/urls';
 
 export const BURST_MULTIPLIER = 3;
@@ -52,28 +56,22 @@ export function usedRatio({
 export function concurrencyLinkProps({
   state,
   surface,
-  isMarketplace,
-  isFreePlan,
-  marketplaceBillingURL,
 }: {
   state: ConcurrencyAlertState;
   surface: ConcurrencyAlertSurface;
-  isMarketplace: boolean;
-  isFreePlan: boolean | undefined;
-  marketplaceBillingURL: string | null | undefined;
 }): { to: string } {
   if (state === 'boosted') {
     return {
-      to: pathCreator.billingUsage({ ref: `app-concurrency-boost-${surface}` }),
+      to: pathCreator.billingUsage({
+        ref: `app-concurrency-boost-${surface}`,
+        hash: BURST_CONCURRENCY_SECTION_ID,
+      }),
     };
   }
-  if (isMarketplace && marketplaceBillingURL) {
-    return { to: marketplaceBillingURL };
-  }
-  const ref = `app-concurrency-limited-${surface}`;
   return {
-    to: isFreePlan
-      ? pathCreator.billing({ tab: 'plans', ref })
-      : pathCreator.billing({ highlight: 'concurrency', ref }),
+    to: pathCreator.billingUsage({
+      ref: `app-concurrency-limited-${surface}`,
+      hash: ACCOUNT_CONCURRENCY_SECTION_ID,
+    }),
   };
 }

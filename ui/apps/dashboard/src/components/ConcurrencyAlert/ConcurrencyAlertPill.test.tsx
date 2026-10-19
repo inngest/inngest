@@ -67,9 +67,10 @@ describe('ConcurrencyAlertPill', () => {
 
     expect(screen.queryByText('execution limit pill')).toBeNull();
     expect(screen.getByText('Concurrency limit boosted by 3x.')).toBeTruthy();
-    expect(
-      screen.getByRole('link', { name: '42 mins left' }).getAttribute('href'),
-    ).toBe('/link/pill');
+    const link = screen.getByRole('link');
+    expect(link.getAttribute('href')).toBe('/link/pill');
+    expect(link.textContent).toContain('Concurrency limit boosted by 3x.');
+    expect(link.textContent).toContain('42 mins left');
   });
 
   it('shows the delay in place of the execution limit pill', () => {
