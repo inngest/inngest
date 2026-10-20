@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/cmd/apiv2cli"
 	authcmd "github.com/inngest/inngest/cmd/auth"
 	"github.com/inngest/inngest/cmd/devserver"
+	imagecmd "github.com/inngest/inngest/cmd/image"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
 	"github.com/inngest/inngest/pkg/api/tel"
@@ -99,6 +100,7 @@ func execute() {
 			authcmd.LoginCommand(),
 			authcmd.LogoutCommand(),
 			authcmd.AuthCommand(),
+			imagecmd.Command(),
 			apiv2cli.Command(),
 			devserver.Command(),
 			version.Command(),
