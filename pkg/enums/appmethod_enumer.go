@@ -11,11 +11,11 @@ import (
 	"strings"
 )
 
-const _AppMethodName = "serveconnectapi"
+const _AppMethodName = "serveconnectapiinngest_serve"
 
-var _AppMethodIndex = [...]uint8{0, 5, 12, 15}
+var _AppMethodIndex = [...]uint8{0, 5, 12, 15, 28}
 
-const _AppMethodLowerName = "serveconnectapi"
+const _AppMethodLowerName = "serveconnectapiinngest_serve"
 
 func (i AppMethod) String() string {
 	if i < 0 || i >= AppMethod(len(_AppMethodIndex)-1) {
@@ -31,9 +31,10 @@ func _AppMethodNoOp() {
 	_ = x[AppMethodServe-(0)]
 	_ = x[AppMethodConnect-(1)]
 	_ = x[AppMethodAPI-(2)]
+	_ = x[AppMethodInngestServe-(3)]
 }
 
-var _AppMethodValues = []AppMethod{AppMethodServe, AppMethodConnect, AppMethodAPI}
+var _AppMethodValues = []AppMethod{AppMethodServe, AppMethodConnect, AppMethodAPI, AppMethodInngestServe}
 
 var _AppMethodNameToValueMap = map[string]AppMethod{
 	_AppMethodName[0:5]:        AppMethodServe,
@@ -42,12 +43,15 @@ var _AppMethodNameToValueMap = map[string]AppMethod{
 	_AppMethodLowerName[5:12]:  AppMethodConnect,
 	_AppMethodName[12:15]:      AppMethodAPI,
 	_AppMethodLowerName[12:15]: AppMethodAPI,
+	_AppMethodName[15:28]:      AppMethodInngestServe,
+	_AppMethodLowerName[15:28]: AppMethodInngestServe,
 }
 
 var _AppMethodNames = []string{
 	_AppMethodName[0:5],
 	_AppMethodName[5:12],
 	_AppMethodName[12:15],
+	_AppMethodName[15:28],
 }
 
 // AppMethodString retrieves an enum value from the enum constants string name.

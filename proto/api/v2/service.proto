@@ -2892,6 +2892,7 @@ enum AppMethod {
   APP_METHOD_SERVE = 1;
   APP_METHOD_CONNECT = 2;
   APP_METHOD_API = 3;
+  APP_METHOD_INNGEST_SERVE = 4;
 }
 
 message App {
