@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -265,7 +266,9 @@ func TestQuackMergeAppenderDedupKeysKeepsLastRowPerKey(t *testing.T) {
 // quack.Session is extracted), so many concurrent, short-lived appenders
 // sharing a small connection pool never have one appender's in-flight
 // stream superseded by another's PrepareRequest landing on the same
-// connection mid-flight.
+// connection mid-flight. Each worker merges into its own table since DuckLake
+// conflicts concurrent MERGEs into one table (see QuackMergeAppender's doc
+// comment).
 func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
@@ -289,8 +292,11 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".concurrent_pooled_merge_t (k VARCHAR, v VARCHAR);")
-	require.NoError(t, err)
+	table := func(worker int) string { return fmt.Sprintf("concurrent_pooled_merge_t%d", worker) }
+	for w := range workers {
+		_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+"."+table(w)+" (k VARCHAR, v VARCHAR);")
+		require.NoError(t, err)
+	}
 
 	var wg sync.WaitGroup
 	errs := make([]error, workers)
@@ -299,7 +305,7 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 		go func(worker int) {
 			defer wg.Done()
 			for a := range appendersPerWorker {
-				appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", "concurrent_pooled_merge_t",
+				appender, err := NewQuackMergeAppender(t.Context(), db, DuckLakeAlias, "main", table(worker),
 					QuackMergeConfig{On: "t.k = s.k", UpdateSet: "v = s.v"},
 					[]QuackMergeColumn{
 						{Name: "k", Kind: QuackColumnVarchar},
@@ -329,9 +335,14 @@ func TestQuackMergeAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	}
 
 	const wantRows = workers * appendersPerWorker * rowsPerAppender
+	union := make([]string, workers)
+	for w := range workers {
+		union[w] = "SELECT k FROM " + DuckLakeAlias + "." + table(w)
+	}
+	all := "(" + strings.Join(union, " UNION ALL ") + ")"
 	var count, distinct int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+DuckLakeAlias+".concurrent_pooled_merge_t;").Scan(&count))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT k) FROM "+DuckLakeAlias+".concurrent_pooled_merge_t;").Scan(&distinct))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+all+";").Scan(&count))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT k) FROM "+all+";").Scan(&distinct))
 	require.Equal(t, wantRows, count)
 	require.Equal(t, wantRows, distinct, "no row should have been lost or duplicated across concurrent pooled merge appenders")
 }
