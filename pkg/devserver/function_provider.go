@@ -11,13 +11,15 @@ import (
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
 type cqrsFunctionProvider struct {
-	reader functionProviderReader
-	apps   cqrs.AppReader
-	pauses *functionPauses
+	reader   functionProviderReader
+	apps     cqrs.AppReader
+	pauses   *functionPauses
+	unpauser queue.Unpauser
 }
 
 type functionProviderReader interface {
@@ -44,6 +46,21 @@ func NewFunctionProvider(reader functionProviderReader) *cqrsFunctionProvider {
 func (p *cqrsFunctionProvider) PauseFunction(_ context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
 	fn.PausedAt = p.pauses.pause(fn.ID)
 	return fn, nil
+}
+
+func (p *cqrsFunctionProvider) ResumeFunction(ctx context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+	paused := p.pauses.unpause(fn.ID)
+	fn.PausedAt = time.Time{}
+	if !paused {
+		return fn, nil
+	}
+	if p.unpauser == nil {
+		return fn, fmt.Errorf("queue unpauser is not configured")
+	}
+	err := p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
+		AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID,
+	})
+	return fn, err
 }
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {

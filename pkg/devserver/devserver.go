@@ -404,6 +404,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
+	functionProvider.unpauser = rq
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
@@ -793,7 +794,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			PauseFunction: func(id uuid.UUID) {
 				functionProvider.pauses.pause(id)
 			},
-			UnpauseFunction: functionProvider.pauses.unpause,
 		})})
 	}
 

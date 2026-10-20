@@ -32,10 +32,12 @@ func (p *functionPauses) get(id uuid.UUID) time.Time {
 	return at
 }
 
-func (p *functionPauses) unpause(id uuid.UUID) {
+func (p *functionPauses) unpause(id uuid.UUID) bool {
 	p.mu.Lock()
+	_, paused := p.pausedAt[id]
 	delete(p.pausedAt, id)
 	p.mu.Unlock()
+	return paused
 }
 
 func (p *functionPauses) partitionPaused(_ context.Context, id uuid.UUID) queue.PartitionPausedInfo {
