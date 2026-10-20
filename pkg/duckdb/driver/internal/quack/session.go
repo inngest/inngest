@@ -230,24 +230,37 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 // goroutine would leak for the life of ctx (which, for a long-lived
 // context, is far longer than this one statement).
 //
-// Sending the cancel late (after query() already returned) is harmless, not
-// just wasteful: the server rejects a CancelRequest whose query_uuid
-// doesn't match whatever is currently running on the connection (see
-// encodeCancelRequest), so a stray cancel racing the statement's own
-// natural completion — or racing a *new* statement already started on the
-// same connection by the time it arrives — can never interrupt the wrong
-// query. stop exists purely to avoid the noise/latency of sending a cancel
-// nobody needs, not for correctness.
+// Once a cancel is in flight, stop waits for its response, so query()
+// can't return (and its caller can't start the next statement on this
+// connection) until the server is done with it. The server's query_uuid
+// check doesn't make a late cancel safe on its own: quack_server.cpp reads
+// the active query_uuid under the statement lock, releases it, and only
+// then calls Connection::Interrupt(), which interrupts whatever is running
+// on the connection by then. W/o the wait, the follow-up statement's
+// PREPARE reaches the server ~0.5ms before the cancel's response does, and
+// ~1.5% of the time the Interrupt() lands mid-statement and fails it w/
+// "INTERRUPT Error" (TestQuackCancelledQueryDoesNotRestartSubprocess on
+// v2.0.0). An Interrupt() that lands between statements is harmless,
+// since DuckDB clears the flag when the next query starts.
 //
 // The cancel request itself runs under cancelRequestTimeout, detached
-// from ctx (already done by the time this fires) — its own result is
-// logged, not returned: query()'s caller already gets ctx's own error back
-// regardless of whether the server managed to actually interrupt anything.
+// from ctx (already done by the time this fires), which also bounds how
+// long stop can wait. Its result is logged, not returned: query()'s caller
+// already gets ctx's own error back regardless of whether the server
+// managed to actually interrupt anything.
 func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop func()) {
 	done := make(chan struct{})
+	finished := make(chan struct{})
 	go func() {
+		defer close(finished)
 		select {
 		case <-ctx.Done():
+			select {
+			case <-done:
+				// query() already finished on its own, nothing to cancel
+				return
+			default:
+			}
 			cancelCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
 			defer cancel()
 			hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
@@ -263,7 +276,10 @@ func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop fun
 		case <-done:
 		}
 	}()
-	return func() { close(done) }
+	return func() {
+		close(done)
+		<-finished
+	}
 }
 
 // ErrDatabaseInvalidated marks an ErrorResponse w/ must_invalidate set: the
