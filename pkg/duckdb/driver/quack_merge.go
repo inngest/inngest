@@ -24,6 +24,24 @@ type QuackMergeColumn = quack.MergeColumn
 // *QuackMergeAppender — see NewQuackMergeAppender/NewQuackAppender's doc
 // comments for why concurrent *appenders*, each on its own instance, are
 // fine).
+//
+// On a DuckLake target, a Flush conflicts with any other transaction that
+// inserted into the same table since its snapshot, even when their keys are
+// disjoint and nothing matched. DuckLake (ducklake ddb4e23e, first shipped in
+// DuckDB v2.0.0) marks the whole table delete-attempted for any MERGE w/ a
+// WHEN NOT MATCHED INSERT action, and its commit-time conflict check is per
+// table, not per key, and runs against everything committed to the catalog
+// -- so it spans clients, not just this driver's pooled conns. Concurrent
+// merges into one table (from any mix of processes/clients sharing the
+// catalog), or a merge racing any plain INSERT/QuackAppender into it, fail
+// for whichever commits second w/ "Transaction conflict - attempting to
+// delete from table ... but another transaction has inserted into it".
+// DuckLake doesn't retry this (ducklake_max_retry_count only covers snapshot
+// races), so multi-client upserts into a lake table need a single writer
+// or retries on this error. The MERGE is a single auto-committed statement
+// and the rows stay buffered when Flush fails, so calling Flush again re-runs
+// it (Close doesn't, it releases the pooled conn even if its final Flush
+// fails).
 type QuackMergeAppender struct {
 	session *quack.Session
 	schema  string
