@@ -178,7 +178,7 @@ describe('Runs AI popover', () => {
     expect(screen.getByText('/mcp')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
-    expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();
+    expect(screen.getByText(/codex mcp login inngest-cloud/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Copy setup command' }));
     await waitFor(() =>
       expect(onAction).toHaveBeenCalledWith({
@@ -187,7 +187,7 @@ describe('Runs AI popover', () => {
       }),
     );
     expect(writeText).toHaveBeenCalledWith(
-      'codex mcp add inngest-cloud --url https://api.inngest.com/mcp',
+      'codex mcp add inngest-cloud --url https://api.inngest.com/mcp\ncodex mcp login inngest-cloud',
     );
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
