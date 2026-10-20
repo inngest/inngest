@@ -3,6 +3,7 @@ package quack
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,11 +82,11 @@ func NewSession(ctx context.Context, listenURL, token string) (*Session, error) 
 		return nil, fmt.Errorf("duckdb: quack handshake: %w", err)
 	}
 	if hdr.Type == msgErrorResponse {
-		msg, derr := decodeErrorResponseBody(r)
+		resp, derr := decodeErrorResponseBody(r)
 		if derr != nil {
 			return nil, fmt.Errorf("duckdb: quack handshake: server returned an error this client could not parse: %w", derr)
 		}
-		return nil, fmt.Errorf("duckdb: quack handshake rejected: %s", msg)
+		return nil, fmt.Errorf("duckdb: quack handshake rejected: %s", resp.Error())
 	}
 	if hdr.Type != msgConnectionResponse {
 		return nil, fmt.Errorf("duckdb: quack handshake: unexpected response message type %d", hdr.Type)
@@ -256,8 +257,8 @@ func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop fun
 			case err != nil:
 				l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)
 			case hdr.Type == msgErrorResponse:
-				msg, _ := decodeErrorResponseBody(r)
-				l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", msg)
+				resp, _ := decodeErrorResponseBody(r)
+				l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", resp.Error())
 			}
 		case <-done:
 		}
@@ -265,15 +266,25 @@ func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop fun
 	return func() { close(done) }
 }
 
+// ErrDatabaseInvalidated marks an ErrorResponse w/ must_invalidate set: the
+// server's database is gone, so unlike result.ErrStatementFailed the
+// subprocess is not healthy and the caller should respawn it rather than
+// retry against it.
+var ErrDatabaseInvalidated = errors.New("duckdb: quack server invalidated its database")
+
 // decodeStatementError decodes an ErrorResponse body into an error
 // wrapped in result.ErrStatementFailed: the server responded, it just rejected the
-// statement — not a transport or subprocess failure.
+// statement — not a transport or subprocess failure. The exception is
+// must_invalidate, which wraps ErrDatabaseInvalidated instead.
 func decodeStatementError(r *reader) error {
-	msg, derr := decodeErrorResponseBody(r)
+	resp, derr := decodeErrorResponseBody(r)
 	if derr != nil {
 		return fmt.Errorf("duckdb: quack: server returned an error this client could not parse: %w", derr)
 	}
-	return fmt.Errorf("%w: %s", result.ErrStatementFailed, msg)
+	if resp.MustInvalidate {
+		return fmt.Errorf("%w: %s", ErrDatabaseInvalidated, resp.Error())
+	}
+	return fmt.Errorf("%w: %s", result.ErrStatementFailed, resp.Error())
 }
 
 // send POSTs one quack message and returns the decoded response header, with
