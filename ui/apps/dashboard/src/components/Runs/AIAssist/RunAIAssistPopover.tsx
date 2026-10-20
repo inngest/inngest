@@ -112,7 +112,7 @@ export function RunAIAssistPopover({
         aria-label="Find runs with your AI tool"
         className="w-[400px] max-w-[calc(100vw-24px)] p-3"
       >
-        <h2 className="text-basis text-sm font-medium">
+        <h2 className="text-basis text-sm font-semibold">
           Find runs with your AI tool
         </h2>
         <p className="text-muted mt-1 text-xs">
@@ -148,8 +148,11 @@ export function RunAIAssistPopover({
             />
           </div>
         )}
-        <div className="mb-2 mt-4 flex items-center justify-between gap-2">
-          <p className="text-muted text-xs">Already connected? Try asking</p>
+        <hr className="border-subtle my-4" />
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-basis text-xs font-medium">
+            Already connected? Try asking
+          </h3>
           <Button
             label={
               copyState === 'copied'
@@ -209,7 +212,7 @@ export function RunAIAssistPopover({
             onAction({ action: 'guide_clicked', guide: 'connection' })
           }
         >
-          View MCP docs ↗
+          View MCP docs
         </a>
       </PopoverContent>
     </Popover>

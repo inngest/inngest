@@ -4,6 +4,7 @@ import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 type ButtonCopyProps = {
   code?: string;
   ariaLabel?: string;
+  className?: string;
   iconOnly?: boolean;
   isCopying: boolean;
   handleCopyClick: (code: string) => void;
@@ -14,6 +15,7 @@ type ButtonCopyProps = {
 export function CopyButton({
   size,
   ariaLabel = 'Copy',
+  className,
   code,
   iconOnly,
   isCopying,
@@ -25,6 +27,7 @@ export function CopyButton({
 
   return (
     <Button
+      className={className}
       disabled={!code}
       size={size}
       kind={isCopying ? 'primary' : 'secondary'}

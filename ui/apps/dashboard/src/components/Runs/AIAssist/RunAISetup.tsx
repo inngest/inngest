@@ -59,17 +59,16 @@ export function RunAISetup({
           />
         ) : client === 'claude' ? (
           <p className="text-muted leading-5">
-            <InlineCode>/mcp</InlineCode> →{' '}
-            <InlineCode>inngest-cloud</InlineCode> → Sign in
+            Open <InlineCode>/mcp</InlineCode>, select{' '}
+            <InlineCode>inngest-cloud</InlineCode>, then sign in.
           </p>
         ) : null}
       </SetupStep>
-      <SetupStep
-        compact
-        number={3}
-        isLast
-        title="Choose your account, environment, and read access"
-      />
+      <SetupStep compact number={3} isLast title="Choose access">
+        <p className="text-muted leading-5">
+          Select your account, environment, and read access.
+        </p>
+      </SetupStep>
       <a
         href="/mcp/setup"
         target="_blank"
@@ -79,7 +78,7 @@ export function RunAISetup({
           onAction({ action: 'guide_clicked', guide: 'connection' })
         }
       >
-        Setup guide ↗
+        Setup guide
       </a>
     </section>
   );
@@ -115,7 +114,8 @@ function SetupCommand({
         <CopyButton
           ariaLabel={label}
           code={code}
-          iconOnly
+          appearance="outlined"
+          className="text-muted border-subtle shrink-0"
           size="small"
           isCopying={status === 'copied'}
           handleCopyClick={() => void copyCommand()}

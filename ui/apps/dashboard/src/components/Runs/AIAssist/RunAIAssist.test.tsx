@@ -138,7 +138,7 @@ describe('Runs AI popover', () => {
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('link', { name: 'Setup guide ↗' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'Setup guide' }).getAttribute('href'),
     ).toBe('/mcp/setup');
     expect(onAction).toHaveBeenCalledWith({
       action: 'setup_clicked',
