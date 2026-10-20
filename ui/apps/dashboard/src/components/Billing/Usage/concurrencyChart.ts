@@ -21,7 +21,7 @@ type MarkAreaBound = { xAxis: number };
 type MarkAreaRange = [MarkAreaBound, MarkAreaBound];
 
 export const HOUR_MS = 60 * 60 * 1000;
-const BAND_OPACITY = 0.3;
+const BAND_OPACITY = 0.15;
 
 const seriesNames = {
   concurrentSteps: 'Total concurrent steps',
@@ -50,7 +50,7 @@ export function mergeHourRanges(
 
 export function niceCeiling(value: number): number {
   const raw = value * 1.1;
-  if (raw <= 0) return 0;
+  if (raw <= 0) return 10;
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw / 5)));
   const step =
     [1, 2, 2.5, 5, 10]
@@ -110,7 +110,6 @@ function markArea(data: MarkAreaRange[], color: string) {
   return {
     animation: false,
     silent: true,
-    z: 3,
     itemStyle: {
       color,
       opacity: BAND_OPACITY,
@@ -179,6 +178,7 @@ export function createConcurrencyChartOptions(
         seriesNames.limitHits,
       ],
     },
+    markArea: { z: 4 },
     xAxis: {
       type: 'time',
       min: new Date(range.from).getTime(),
@@ -272,6 +272,7 @@ export function createConcurrencyChartOptions(
           range,
         ),
         type: 'line',
+        z: 5,
         showSymbol: false,
         animation: false,
         tooltip: { show: false },

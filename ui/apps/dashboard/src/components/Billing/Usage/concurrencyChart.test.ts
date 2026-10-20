@@ -37,6 +37,7 @@ describe('niceCeiling', () => {
     [29, 40],
     [60, 80],
     [5, 10],
+    [0, 10],
   ])('rounds %d up to the clean tick ceiling %d', (value, expected) => {
     expect(niceCeiling(value)).toBe(expected);
   });
