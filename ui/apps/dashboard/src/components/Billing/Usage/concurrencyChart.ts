@@ -4,7 +4,10 @@ import { formatInTimeZone } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 
 import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
-import { type GetAccountConcurrencyTimeSeriesQuery } from '@/gql/graphql';
+import {
+  type GetAccountBacklogTimeSeriesQuery,
+  type GetAccountConcurrencyTimeSeriesQuery,
+} from '@/gql/graphql';
 import {
   textColor,
   colors,
@@ -14,6 +17,14 @@ import {
 
 export type ConcurrencyTimeSeries =
   GetAccountConcurrencyTimeSeriesQuery['account']['concurrencyTimeSeries'];
+
+export type BacklogTimeSeries =
+  GetAccountBacklogTimeSeriesQuery['account']['backlogTimeSeries'];
+
+export type ConcurrencyBands = Pick<
+  ConcurrencyTimeSeries,
+  'baseLimit' | 'buckets' | 'limitHits'
+>;
 
 export type TimeRange = { from: string; to: string };
 
@@ -25,6 +36,7 @@ const BAND_OPACITY = 0.3;
 
 const seriesNames = {
   concurrentSteps: 'Total concurrent steps',
+  backlog: 'Backlog',
   limit: 'Concurrency limit',
   bursts: 'Concurrency burst',
   limitHits: 'Concurrency hit',
@@ -119,39 +131,57 @@ function markArea(data: MarkAreaRange[], color: string) {
   };
 }
 
-export function createConcurrencyChartOptions(
-  series: ConcurrencyTimeSeries,
-  range: TimeRange,
-): Partial<ChartProps['option']> {
-  const dark = isDark();
+function hourPoints(
+  buckets: ConcurrencyTimeSeries['buckets'],
+): [number, number][] {
+  return buckets.map((point) => [
+    new Date(point.bucket).getTime() + HOUR_MS / 2,
+    point.value ?? 0,
+  ]);
+}
 
-  const points = series.buckets.map(
-    (point) =>
-      [new Date(point.bucket).getTime() + HOUR_MS / 2, point.value ?? 0] as [
-        number,
-        number,
-      ],
-  );
-
+function bandSeries(bands: ConcurrencyBands, range: TimeRange, dark: boolean) {
+  const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
+  const limitHitAreaColor = resolveColor(borderColor.error, dark, '#CB2A1D');
   const burstRanges = widenRanges(
-    mergeHourRanges(series.buckets, (value) => value > series.baseLimit),
+    mergeHourRanges(bands.buckets, (value) => value > bands.baseLimit),
     range,
   );
   const limitHitRanges = widenRanges(
-    mergeHourRanges(series.limitHits, (value) => value > 0),
+    mergeHourRanges(bands.limitHits, (value) => value > 0),
     range,
   );
+  return {
+    burstRanges,
+    series: [
+      {
+        name: seriesNames.bursts,
+        data: [],
+        type: 'line' as const,
+        itemStyle: { color: burstAreaColor, opacity: BAND_OPACITY },
+        lineStyle: { color: burstAreaColor },
+        markArea: markArea(burstRanges, burstAreaColor),
+      },
+      {
+        name: seriesNames.limitHits,
+        data: [],
+        type: 'line' as const,
+        itemStyle: { color: limitHitAreaColor, opacity: BAND_OPACITY },
+        lineStyle: { color: limitHitAreaColor },
+        markArea: markArea(limitHitRanges, limitHitAreaColor),
+      },
+    ],
+  };
+}
 
-  const limitColor = resolveColor(colors.tertiary['moderate'], dark, '#F54A3F');
-  const burstAreaColor = resolveColor(borderColor.info, dark, '#1450B1');
-  const limitHitAreaColor = resolveColor(borderColor.error, dark, '#CB2A1D');
-  const stepsColor = resolveColor(CHART_COLORS[3], dark, '#FCC43F');
+type LegendEntry = string | { name: string; icon: string };
 
-  const dataMax = points.reduce((max, [, value]) => Math.max(max, value), 0);
-  const yMax = niceCeiling(
-    Math.max(dataMax, series.baseLimit, series.burstLimit ?? 0),
-  );
-
+function baseChartOptions(
+  range: TimeRange,
+  yMax: number,
+  legend: LegendEntry[],
+  dark: boolean,
+): Partial<ChartProps['option']> {
   return {
     useUTC: true,
     tooltip: {
@@ -172,12 +202,7 @@ export function createConcurrencyChartOptions(
         fontSize: '12px',
         color: resolveColor(textColor.subtle, dark, '#4B4B4B'),
       },
-      data: [
-        seriesNames.concurrentSteps,
-        { name: seriesNames.limit, icon: 'path://M0,4 L10,4 L10,6 L0,6 Z' },
-        seriesNames.bursts,
-        seriesNames.limitHits,
-      ],
+      data: legend,
     },
     xAxis: {
       type: 'time',
@@ -236,23 +261,38 @@ export function createConcurrencyChartOptions(
       bottom: '15%',
       containLabel: true,
     },
+  };
+}
+
+export function createConcurrencyChartOptions(
+  series: ConcurrencyTimeSeries,
+  range: TimeRange,
+): Partial<ChartProps['option']> {
+  const dark = isDark();
+  const points = hourPoints(series.buckets);
+  const bands = bandSeries(series, range, dark);
+  const limitColor = resolveColor(colors.tertiary['moderate'], dark, '#F54A3F');
+  const stepsColor = resolveColor(CHART_COLORS[3], dark, '#FCC43F');
+
+  const dataMax = points.reduce((max, [, value]) => Math.max(max, value), 0);
+  const yMax = niceCeiling(
+    Math.max(dataMax, series.baseLimit, series.burstLimit ?? 0),
+  );
+
+  return {
+    ...baseChartOptions(
+      range,
+      yMax,
+      [
+        seriesNames.concurrentSteps,
+        { name: seriesNames.limit, icon: 'path://M0,4 L10,4 L10,6 L0,6 Z' },
+        seriesNames.bursts,
+        seriesNames.limitHits,
+      ],
+      dark,
+    ),
     series: [
-      {
-        name: seriesNames.bursts,
-        data: [],
-        type: 'line',
-        itemStyle: { color: burstAreaColor, opacity: BAND_OPACITY },
-        lineStyle: { color: burstAreaColor },
-        markArea: markArea(burstRanges, burstAreaColor),
-      },
-      {
-        name: seriesNames.limitHits,
-        data: [],
-        type: 'line',
-        itemStyle: { color: limitHitAreaColor, opacity: BAND_OPACITY },
-        lineStyle: { color: limitHitAreaColor },
-        markArea: markArea(limitHitRanges, limitHitAreaColor),
-      },
+      ...bands.series,
       {
         name: seriesNames.concurrentSteps,
         data: points,
@@ -268,7 +308,7 @@ export function createConcurrencyChartOptions(
         data: limitLine(
           series.baseLimit,
           series.burstLimit ?? series.baseLimit,
-          burstRanges,
+          bands.burstRanges,
           range,
         ),
         type: 'line',
@@ -277,6 +317,38 @@ export function createConcurrencyChartOptions(
         tooltip: { show: false },
         itemStyle: { color: limitColor },
         lineStyle: { width: 1, color: limitColor },
+      },
+    ],
+  };
+}
+
+export function createBacklogChartOptions(
+  backlog: BacklogTimeSeries,
+  bands: ConcurrencyBands,
+  range: TimeRange,
+): Partial<ChartProps['option']> {
+  const dark = isDark();
+  const points = hourPoints(backlog.buckets);
+  const backlogColor = resolveColor(CHART_COLORS[1], dark, '#F97316');
+
+  const dataMax = points.reduce((max, [, value]) => Math.max(max, value), 0);
+
+  return {
+    ...baseChartOptions(
+      range,
+      niceCeiling(dataMax),
+      [seriesNames.backlog, seriesNames.bursts, seriesNames.limitHits],
+      dark,
+    ),
+    series: [
+      ...bandSeries(bands, range, dark).series,
+      {
+        name: seriesNames.backlog,
+        data: points,
+        type: 'line',
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: backlogColor },
+        itemStyle: { color: backlogColor },
       },
     ],
   };
