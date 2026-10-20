@@ -2646,6 +2646,14 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
 		e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusCompleted)
 
+		// The function's code has finished. Finalization is platform
+		// bookkeeping whose errors are only reported, so release the held
+		// concurrency capacity now instead of after finalization and the
+		// queue's final dequeue, as step outputs already do once saved.
+		if err := i.ReleaseCapacityLease(); err != nil {
+			l.ReportError(err, "could not release capacity lease early")
+		}
+
 		// This is the function result.
 		if err := e.Finalize(ctx, execution.FinalizeOpts{
 			Metadata: i.md,
