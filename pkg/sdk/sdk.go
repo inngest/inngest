@@ -11,15 +11,16 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-var (
-	ErrNoFunctions = fmt.Errorf("No functions registered within your app")
-)
+var ErrNoFunctions = fmt.Errorf("No functions registered within your app")
 
 type DeployType string
 
 const (
 	DeployTypePing    DeployType = "ping"
 	DeployTypeConnect DeployType = "connect"
+	// DeployTypeIngnestServe represents an inngest-hosted lambda for serve
+	// type endpoints.
+	DeplyoTypeInngestServe DeployType = "inngest://serve"
 )
 
 type FromReadCloserOpts struct {
