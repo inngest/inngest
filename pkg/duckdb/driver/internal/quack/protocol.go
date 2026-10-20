@@ -319,11 +319,10 @@ func encodePrepareRequest(connectionID, sql string, queryID hugeint) []byte {
 // query_uuid of the statement to interrupt — the same value passed to the
 // PrepareRequest that started it. The server accepts the zero hugeint
 // {0,0} as a wildcard meaning "cancel whatever is running on this
-// connection", but this client always sends the real value: matching by
-// the exact id means a cancel that loses a race against the query's own
-// natural completion (or against a next query already started on the same
-// connection) is safely rejected by the server instead of ever being able
-// to interrupt the wrong query.
+// connection", but this client always sends the real value so a cancel
+// that arrives after a next query has been installed gets rejected. That
+// check alone isn't race-free on the server (see watchForCancel), which is
+// why Query waits for the cancel's response before returning.
 func encodeCancelRequest(connectionID string, queryID hugeint) []byte {
 	return encodeMessage(msgCancelRequest, connectionID, func(w *writer) {
 		w.writeHugeint(1, queryID)
