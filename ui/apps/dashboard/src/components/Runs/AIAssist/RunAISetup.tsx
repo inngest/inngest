@@ -1,4 +1,6 @@
-import { Button } from '@inngest/components/Button';
+import { CopyButton } from '@inngest/components/CopyButton';
+import { InlineCode } from '@inngest/components/Code';
+import { SetupStep } from '@inngest/components/MCP/SetupStep';
 import { createMCPClients } from '@inngest/components/MCP/clients';
 
 import { useRunAICopy } from './useRunAICopy';
@@ -27,43 +29,47 @@ export function RunAISetup({
   );
   return (
     <section aria-label="Connection instructions" className="mt-3 text-xs">
-      <ol className="text-muted list-decimal space-y-3 pl-4">
-        <li className="pl-1">
-          <p>
-            {client === 'other'
-              ? 'Add this MCP server URL:'
-              : 'Run in your terminal:'}
-          </p>
+      <SetupStep
+        compact
+        number={1}
+        title={
+          client === 'other'
+            ? 'Add this MCP server URL'
+            : 'Run in your terminal'
+        }
+      >
+        <SetupCommand
+          code={setup?.snippet.content ?? endpoint}
+          label={client === 'other' ? 'Copy server URL' : 'Copy setup command'}
+          client={trackingClient}
+          onAction={onAction}
+        />
+      </SetupStep>
+      <SetupStep
+        compact
+        number={2}
+        title={client === 'other' ? 'Sign in with OAuth' : 'Sign in'}
+      >
+        {client === 'codex' ? (
           <SetupCommand
-            code={setup?.snippet.content ?? endpoint}
-            label={
-              client === 'other' ? 'Copy server URL' : 'Copy setup command'
-            }
+            code="codex mcp login inngest-cloud"
+            label="Copy sign-in command"
             client={trackingClient}
             onAction={onAction}
           />
-        </li>
-        <li className="pl-1">
-          {client === 'codex' ? (
-            <>
-              <p>Sign in:</p>
-              <SetupCommand
-                code="codex mcp login inngest-cloud"
-                label="Copy sign-in command"
-                client={trackingClient}
-                onAction={onAction}
-              />
-            </>
-          ) : client === 'claude' ? (
-            'In Claude Code: /mcp → inngest-cloud → Sign in.'
-          ) : (
-            'Sign in with OAuth.'
-          )}
-        </li>
-        <li className="pl-1">
-          Choose your account, environment, and read access.
-        </li>
-      </ol>
+        ) : client === 'claude' ? (
+          <p className="text-muted leading-5">
+            <InlineCode>/mcp</InlineCode> →{' '}
+            <InlineCode>inngest-cloud</InlineCode> → Sign in
+          </p>
+        ) : null}
+      </SetupStep>
+      <SetupStep
+        compact
+        number={3}
+        isLast
+        title="Choose your account, environment, and read access"
+      />
       <a
         href="/mcp/setup"
         target="_blank"
@@ -101,20 +107,18 @@ function SetupCommand({
   }
 
   return (
-    <div className="mt-1.5">
-      <div className="bg-canvasSubtle flex items-start gap-2 rounded p-2">
+    <div>
+      <div className="bg-codeEditor flex items-start gap-2 rounded p-2">
         <code className="text-basis min-w-0 flex-1 select-text break-words font-mono text-xs">
           {code}
         </code>
-        <Button
-          aria-label={label}
-          label={status === 'copied' ? 'Copied' : 'Copy'}
-          onClick={() => void copyCommand()}
-          disabled={status === 'copying'}
-          kind="secondary"
-          appearance="outlined"
+        <CopyButton
+          ariaLabel={label}
+          code={code}
+          iconOnly
           size="small"
-          className="shrink-0"
+          isCopying={status === 'copied'}
+          handleCopyClick={() => void copyCommand()}
         />
       </div>
       {status === 'failed' && (

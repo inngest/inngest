@@ -3,6 +3,7 @@ import { RiCheckLine, RiFileCopy2Line } from '@remixicon/react';
 
 type ButtonCopyProps = {
   code?: string;
+  ariaLabel?: string;
   iconOnly?: boolean;
   isCopying: boolean;
   handleCopyClick: (code: string) => void;
@@ -12,6 +13,7 @@ type ButtonCopyProps = {
 
 export function CopyButton({
   size,
+  ariaLabel = 'Copy',
   code,
   iconOnly,
   isCopying,
@@ -31,7 +33,7 @@ export function CopyButton({
       appearance={iconOnly ? 'ghost' : isCopying ? 'solid' : appearance}
       icon={iconOnly && icon}
       title="Click to copy"
-      aria-label="Copy"
+      aria-label={ariaLabel}
     />
   );
 }

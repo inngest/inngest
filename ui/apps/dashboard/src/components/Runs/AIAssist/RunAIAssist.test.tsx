@@ -163,7 +163,7 @@ describe('Runs AI popover', () => {
         'claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp',
       ),
     ).toBeTruthy();
-    expect(screen.getByText(/In Claude Code: \/mcp/)).toBeTruthy();
+    expect(screen.getByText('/mcp')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
     expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();

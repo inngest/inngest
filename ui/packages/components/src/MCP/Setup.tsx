@@ -16,6 +16,7 @@ import { RiBookOpenLine, RiBugLine, RiCheckLine, RiFlaskLine } from '@remixicon/
 import { useQuery } from '@tanstack/react-query';
 import { ClientOnly } from '@tanstack/react-router';
 
+import { SetupStep as Step } from './SetupStep';
 import { createMCPClients, type MCPClient } from './clients';
 
 type JSONSchema = {
@@ -269,31 +270,6 @@ export const MCPSetup = ({
     </div>
   );
 };
-
-const Step = ({
-  children,
-  isLast = false,
-  number,
-  title,
-}: {
-  children: ReactNode;
-  isLast?: boolean;
-  number: number;
-  title: string;
-}) => (
-  <div className="flex gap-4">
-    <div className="flex flex-col items-center">
-      <div className="border-subtle bg-canvasBase text-basis flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
-        {number}
-      </div>
-      <div className="border-subtle my-1 w-px flex-1 border-l" />
-    </div>
-    <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-8'}`}>
-      <h3 className="text-basis mb-2 text-base font-medium leading-7">{title}</h3>
-      {children}
-    </div>
-  </div>
-);
 
 const ClientPicker = ({
   bearerTokenEnvVar,
