@@ -170,6 +170,8 @@ var AttrsByKey = map[string]Serializer{
 	Attrs.StepMaxAttempts.Key(): Attrs.StepMaxAttempts,
 	Attrs.StepCodeLocation.Key(): Attrs.StepCodeLocation,
 	Attrs.StepType.Key(): Attrs.StepType,
+	Attrs.StepSpanPath.Key(): Attrs.StepSpanPath,
+	Attrs.StepOrigin.Key(): Attrs.StepOrigin,
 	Attrs.StepInput.Key(): Attrs.StepInput,
 	Attrs.StepOutput.Key(): Attrs.StepOutput,
 	Attrs.StepOutputRef.Key(): Attrs.StepOutputRef,
