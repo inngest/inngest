@@ -357,6 +357,20 @@ func WithEnableBatchingInstrumentation(ebi func(ctx context.Context, accountID, 
 	}
 }
 
+// EarlyCapacityReleaseFn reports whether runs of an account hand back their
+// concurrency capacity as soon as they complete or start waiting, rather than
+// after finalization and the queue's final dequeue.
+type EarlyCapacityReleaseFn func(ctx context.Context, accountID uuid.UUID) bool
+
+// WithEarlyCapacityRelease enables early capacity release for the accounts fn
+// allows. It is off when unset.
+func WithEarlyCapacityRelease(fn EarlyCapacityReleaseFn) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).earlyCapacityRelease = fn
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -544,6 +558,7 @@ type executor struct {
 	semaphoreManager              constraintapi.SemaphoreManager
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
+	earlyCapacityRelease          EarlyCapacityReleaseFn
 
 	fl                        state.FunctionLoader
 	evalFactory               func(ctx context.Context, expr string) (expressions.Evaluator, error)
@@ -2650,9 +2665,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// bookkeeping whose errors are only reported, so release the held
 		// concurrency capacity now instead of after finalization and the
 		// queue's final dequeue, as step outputs already do once saved.
-		if err := i.ReleaseCapacityLease(); err != nil {
-			l.ReportError(err, "could not release capacity lease early")
-		}
+		e.releaseCapacityEarly(ctx, i, OpcodeGroup{})
 
 		// This is the function result.
 		if err := e.Finalize(ctx, execution.FinalizeOpts{
@@ -4007,6 +4020,11 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	groups.PriorityGroup.HandledAt = handledAt
 	groups.OtherGroup.HandledAt = handledAt
 
+	// Every opcode of the response shares the queue item's capacity lease.
+	capacity := newResponseCapacity(resp.Generator)
+	groups.PriorityGroup.capacity = capacity
+	groups.OtherGroup.capacity = capacity
+
 	nonLazyIDs := groups.NonLazyIDs()
 
 	// When scheduling multiple parallel steps, compute a stable coalesceKey
@@ -4035,7 +4053,57 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
+	// Every opcode has now been handled, so a release a waiting opcode
+	// deferred while a sibling ran inside the executor can go ahead.
+	capacity.releaseDeferred(ctx, i)
+
 	return nil
+}
+
+// responseCapacity coordinates early capacity release across the opcodes of
+// one SDK response, which run concurrently and share one capacity lease.
+type responseCapacity struct {
+	// hold is set when an opcode of the response does its work inside the
+	// executor (fetch, AI requests) and so needs the capacity until it ends.
+	hold bool
+	// requested is set when a waiting opcode deferred its release.
+	requested atomic.Bool
+}
+
+func (c *responseCapacity) releaseDeferred(ctx context.Context, runCtx execution.RunContext) {
+	if !c.requested.Load() {
+		return
+	}
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+}
+
+func newResponseCapacity(opcodes []*state.GeneratorOpcode) *responseCapacity {
+	c := &responseCapacity{}
+	for _, op := range opcodes {
+		if op != nil && (op.Op == enums.OpcodeGateway || op.Op == enums.OpcodeAIGateway) {
+			c.hold = true
+		}
+	}
+	return c
+}
+
+// releaseCapacityEarly hands back the run's concurrency capacity once the run
+// has completed or is waiting, when enabled for the account. While another
+// opcode of the same response still runs inside the executor, the release is
+// deferred until every opcode of the response has been handled.
+func (e *executor) releaseCapacityEarly(ctx context.Context, runCtx execution.RunContext, group OpcodeGroup) {
+	if e.earlyCapacityRelease == nil || !e.earlyCapacityRelease(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
+		return
+	}
+	if group.capacity != nil && group.capacity.hold {
+		group.capacity.requested.Store(true)
+		return
+	}
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
 }
 
 func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, group OpcodeGroup, resp *state.DriverResponse) error {
@@ -4147,7 +4215,7 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeRunComplete:
-		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
+		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeSyncRunComplete:
 		// This is an API-based function executed synchronously that had
 		// an async conversion.  The result must always be in the shape of
@@ -4670,7 +4738,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	return nil
 }
 
-func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	// In this case, we've reported that the function has finished.  It's an async
 	// function.  In this case, we always want to update the span ourselves to mark
 	// the function as finished, and add the output here.
@@ -4682,9 +4750,7 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 
 	// The function's code has finished; finalization is platform bookkeeping.
 	// Hand the concurrency capacity back now rather than after it.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	e.releaseCapacityEarly(ctx, runCtx, group)
 
 	err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *md,
@@ -4987,9 +5053,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	if err == nil || errors.Is(err, queue.ErrQueueItemExists) {
 		// Once the wake-up is enqueued, release the held capacity: the run
 		// is sleeping, not executing.
-		if err := runCtx.ReleaseCapacityLease(); err != nil {
-			logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-		}
+		e.releaseCapacityEarly(ctx, runCtx, group)
 	}
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
@@ -5474,9 +5538,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	// Once the pause has been saved, release the held capacity, as for
 	// WaitForEvent.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	e.releaseCapacityEarly(ctx, runCtx, group)
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if errors.Is(err, queue.ErrQueueItemExists) {
@@ -5717,9 +5779,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 
 	// The pause is saved and the invocation published; this run now waits
 	// on the invoked function, so release the held capacity.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	e.releaseCapacityEarly(ctx, runCtx, group)
 
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)

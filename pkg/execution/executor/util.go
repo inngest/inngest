@@ -58,6 +58,10 @@ type OpcodeGroup struct {
 	// batch.  When non-empty, handlers use it to derive a deterministic
 	// discovery JobID so concurrent fan-in completions deduplicate to one step.
 	ParallelCoalesceKey string
+	// capacity coordinates early capacity release across every group of one
+	// SDK response. Nil when an opcode is handled outside a response (e.g. the
+	// checkpoint API).
+	capacity *responseCapacity
 }
 
 // OpcodeGroups groups opcodes by processing priority. The priority group runs
