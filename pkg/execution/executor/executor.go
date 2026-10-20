@@ -4680,6 +4680,12 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 
 	e.emitNonStepSpan(ctx, runCtx, &gen, nil, enums.StepStatusCompleted)
 
+	// The function's code has finished; finalization is platform bookkeeping.
+	// Hand the concurrency capacity back now rather than after it.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+
 	err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *md,
 		Response: execution.FinalizeResponse{
@@ -4978,6 +4984,13 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
 		PassthroughJobId: true,
 	})
+	if err == nil || errors.Is(err, queue.ErrQueueItemExists) {
+		// Once the wake-up is enqueued, release the held capacity: the run
+		// is sleeping, not executing.
+		if err := runCtx.ReleaseCapacityLease(); err != nil {
+			logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+		}
+	}
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
@@ -5459,6 +5472,12 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		}
 	}
 
+	// Once the pause has been saved, release the held capacity, as for
+	// WaitForEvent.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		if span != nil {
@@ -5694,6 +5713,12 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	if err != nil {
 		// TODO Cancel pause/timeout?
 		return fmt.Errorf("error publishing internal invocation event: %w", err)
+	}
+
+	// The pause is saved and the invocation published; this run now waits
+	// on the invoked function, so release the held capacity.
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
 	for _, e := range e.lifecycles {
