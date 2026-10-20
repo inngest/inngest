@@ -205,21 +205,98 @@ func decodeConnectionResponseBody(r *reader) (connectionResponse, error) {
 
 // ---------- ErrorResponse ----------
 
-func decodeErrorResponseBody(r *reader) (string, error) {
-	var message string
+// errorResponse is the server's ErrorResponse body. Every field is
+// WritePropertyWithDefault upstream, so each one is omitted when empty/false.
+type errorResponse struct {
+	// Message is DuckDB's raw exception message, w/o the "<Type> Error: "
+	// prefix (that's ExceptionType, sent separately).
+	Message string
+	// ExceptionType is DuckDB's exception type name (e.g. "Catalog",
+	// "Constraint"), empty if the server didn't send one.
+	ExceptionType string
+	ExtraInfo     map[string]string
+	// MustInvalidate means the server's database is gone (e.g. a fatal
+	// error invalidated it), so nothing sent to this server can succeed
+	// again.
+	MustInvalidate bool
+}
+
+// Error formats the response the way DuckDB itself prints an exception.
+func (e errorResponse) Error() string {
+	if e.ExceptionType == "" {
+		return e.Message
+	}
+	return e.ExceptionType + " Error: " + e.Message
+}
+
+func decodeErrorResponseBody(r *reader) (errorResponse, error) {
+	var resp errorResponse
 	if ok, err := r.tryBeginProperty(1); err != nil {
-		return "", err
+		return resp, err
 	} else if ok {
-		v, err := r.readString()
-		if err != nil {
-			return "", err
+		if resp.Message, err = r.readString(); err != nil {
+			return resp, err
 		}
-		message = v
+	}
+	if ok, err := r.tryBeginProperty(2); err != nil {
+		return resp, err
+	} else if ok {
+		if resp.ExceptionType, err = r.readString(); err != nil {
+			return resp, err
+		}
+	}
+	if ok, err := r.tryBeginProperty(3); err != nil {
+		return resp, err
+	} else if ok {
+		info, err := decodeStringMap(r)
+		if err != nil {
+			return resp, fmt.Errorf("duckdb: decoding error extra_info: %w", err)
+		}
+		resp.ExtraInfo = info
+	}
+	if ok, err := r.tryBeginProperty(4); err != nil {
+		return resp, err
+	} else if ok {
+		if resp.MustInvalidate, err = r.readBool(); err != nil {
+			return resp, err
+		}
 	}
 	if err := r.endObject(); err != nil {
-		return "", err
+		return resp, err
 	}
-	return message, nil
+	return resp, nil
+}
+
+// decodeStringMap decodes DuckDB's serialized unordered_map<string, string>:
+// a list count, then one {0: key, 1: value} object per entry.
+func decodeStringMap(r *reader) (map[string]string, error) {
+	n, err := r.beginList()
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]string, n)
+	for i := uint64(0); i < n; i++ {
+		r.beginObject()
+		if err := r.beginProperty(0); err != nil {
+			return nil, err
+		}
+		k, err := r.readString()
+		if err != nil {
+			return nil, err
+		}
+		if err := r.beginProperty(1); err != nil {
+			return nil, err
+		}
+		v, err := r.readString()
+		if err != nil {
+			return nil, err
+		}
+		if err := r.endObject(); err != nil {
+			return nil, err
+		}
+		m[k] = v
+	}
+	return m, nil
 }
 
 // ---------- PrepareRequest / PrepareResponse ----------

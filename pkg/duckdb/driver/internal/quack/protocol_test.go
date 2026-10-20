@@ -67,9 +67,36 @@ func TestQuackDecodeErrorResponse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, byte(msgErrorResponse), hdr.Type)
 
-	msg, err := decodeErrorResponseBody(r)
+	resp, err := decodeErrorResponseBody(r)
 	require.NoError(t, err)
-	require.Equal(t, "Table with name t does not exist!", msg)
+	require.Equal(t, "Table with name t does not exist!", resp.Error())
+}
+
+func TestQuackDecodeErrorResponseAllFields(t *testing.T) {
+	w := &writer{}
+	w.beginObject()
+	w.writeStringDefault(1, "Table with name t does not exist!")
+	w.writeStringDefault(2, "Catalog")
+	w.writeFieldID(3)
+	w.beginList(2)
+	for _, kv := range [][2]string{{"name", "t"}, {"error_subtype", "MISSING_ENTRY"}} {
+		w.beginObject()
+		w.writeStringDefault(0, kv[0])
+		w.writeStringDefault(1, kv[1])
+		w.endObject()
+	}
+	w.writeBool(4, true)
+	w.endObject()
+
+	resp, err := decodeErrorResponseBody(newReader(w.bytes()))
+	require.NoError(t, err)
+	require.Equal(t, errorResponse{
+		Message:        "Table with name t does not exist!",
+		ExceptionType:  "Catalog",
+		ExtraInfo:      map[string]string{"name": "t", "error_subtype": "MISSING_ENTRY"},
+		MustInvalidate: true,
+	}, resp)
+	require.Equal(t, "Catalog Error: Table with name t does not exist!", resp.Error())
 }
 
 func TestQuackEncodePrepareRequest(t *testing.T) {
