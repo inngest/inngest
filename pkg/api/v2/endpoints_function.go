@@ -62,6 +62,41 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 	return s.getFunctionResponse(ctx, fn), nil
 }
 
+func (s *Service) PauseFunction(ctx context.Context, req *apiv2.PauseFunctionRequest) (*apiv2.PauseFunctionResponse, error) {
+	if req.AppId == "" || req.FunctionId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
+	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_PauseFunction_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no function was paused.")
+	}
+	if s.functions == nil || s.functionPauser == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Pause function is not yet implemented")
+	}
+
+	appID := decodePathParam(req.AppId)
+	functionID := decodePathParam(req.FunctionId)
+	fn, err := s.functions.GetFunctionByApp(ctx, appID, functionID)
+	if err != nil {
+		return nil, s.getFunctionError(err)
+	}
+	if !fn.ArchivedAt.IsZero() && fn.ArchivedAt.Before(time.Now()) {
+		return nil, s.getFunctionError(ErrFunctionNotFound)
+	}
+	fn, err = s.functionPauser.PauseFunction(ctx, fn)
+	if errors.Is(err, ErrFunctionNotFound) {
+		return nil, s.getFunctionError(err)
+	}
+	if err != nil {
+		logger.From(ctx).Error("unable to pause function", "error", err)
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to pause function")
+	}
+	fn.AppName = appID
+	fn.Function.Slug = publicFunctionID(appID, functionID, fn)
+	response := s.getFunctionResponse(ctx, fn)
+	return &apiv2.PauseFunctionResponse{Data: response.Data, Metadata: response.Metadata}, nil
+}
+
 func (s *Service) GetFunctions(ctx context.Context, req *apiv2.GetFunctionsRequest) (*apiv2.GetFunctionsResponse, error) {
 	if req.AppId == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID is required")

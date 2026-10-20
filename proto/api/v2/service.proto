@@ -1792,6 +1792,28 @@ service V2 {
     };
   }
 
+  rpc PauseFunction(PauseFunctionRequest) returns (PauseFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/pause"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:pause"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause a function"
+      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. In the dev server, the pause applies right away and lasts until resumed or restarted. No bulk pause; call once per function."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetFunctions(GetFunctionsRequest) returns (GetFunctionsResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}/functions"
@@ -4147,4 +4169,16 @@ message CancelRunData {
 message RunDeferredFrom {
   string function_slug = 1;
   optional string function_name = 2;
+}
+
+message PauseFunctionRequest {
+  // App ID.
+  string app_id = 1;
+  // Function ID.
+  string function_id = 2;
+}
+
+message PauseFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
 }
