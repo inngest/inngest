@@ -20,7 +20,7 @@ const (
 	DeployTypeConnect DeployType = "connect"
 	// DeployTypeIngnestServe represents an inngest-hosted lambda for serve
 	// type endpoints.
-	DeplyoTypeInngestServe DeployType = "inngest://serve"
+	DeployTypeInngestServe DeployType = "inngest://serve"
 )
 
 type FromReadCloserOpts struct {
