@@ -38,7 +38,7 @@ export function SetupStep({
         >
           {title}
         </h3>
-        {compact && children ? <div className="mt-1.5">{children}</div> : children}
+        {compact && children ? <div className="mt-0.5">{children}</div> : children}
       </div>
     </div>
   );
