@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -27,6 +28,8 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type mockGatewayGRPCManager struct {
@@ -736,156 +739,172 @@ func TestProxyGRPCNoHealthyConnection(t *testing.T) {
 
 // TestProxyGRPCForwardError tests error handling when forwarding fails
 func TestProxyGRPCForwardError(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
+	for _, tc := range []struct {
+		name     string
+		err      error
+		attempts int
+		retry    bool
+	}{
+		{"unavailable", status.Error(codes.Unavailable, "gateway unavailable"), 3, true},
+		{"capacity", status.Error(codes.ResourceExhausted, "gateway capacity exceeded"), 3, true},
+		{"receive size", status.Error(codes.ResourceExhausted, "grpc: received message larger than max (8979575 vs. 4194304)"), 1, false},
+		{"send size", status.Error(codes.ResourceExhausted, "trying to send message larger than max (16777217 vs. 16777216)"), 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{r.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+			defer rc.Close()
 
-	l := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
-		logger.WithLoggerWriter(os.Stdout),
-		logger.WithLoggerLevel(logger.LevelDebug),
-	)
+			l := logger.StdlibLogger(context.Background(),
+				logger.WithHandler(logger.TextHandler),
+				logger.WithLoggerWriter(os.Stdout),
+				logger.WithLoggerLevel(logger.LevelDebug),
+			)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-	sm := state.NewRedisConnectionStateManager(rc)
-	
-	// Mock forwarder that always returns an error
-	mockForwarder := &mockFailingGatewayGRPCManager{}
+			sm := state.NewRedisConnectionStateManager(rc)
 
-	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
-		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
-		StateManager: sm,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
-	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
+			// Mock forwarder that always returns an error
+			mockForwarder := &mockFailingGatewayGRPCManager{err: tc.err}
 
-	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-	connID := ulid.MustNew(ulid.Now(), rand.Reader)
-	gwID := ulid.MustNew(ulid.Now(), rand.Reader)
-	reqID := "reqid-test"
-	appName := "test-app"
-	fnName := "test-fn"
-	fnSlug := "test-app-test-fn"
-	appVersion := "v1.1"
+			connector := newGRPCConnector(ctx, GRPCConnectorOpts{
+				Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
+				StateManager: sm,
+				EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+					return true
+				},
+			}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
-	fns, err := json.Marshal([]sdk.SDKFunction{
-		{
-			Name: fnName,
-			Slug: fnSlug,
-			Triggers: []inngest.Trigger{
+			fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			connID := ulid.MustNew(ulid.Now(), rand.Reader)
+			gwID := ulid.MustNew(ulid.Now(), rand.Reader)
+			reqID := "reqid-test"
+			appName := "test-app"
+			fnName := "test-fn"
+			fnSlug := "test-app-test-fn"
+			appVersion := "v1.1"
+
+			fns, err := json.Marshal([]sdk.SDKFunction{
 				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "hello/world",
-					},
-				},
-			},
-			Steps: map[string]sdk.SDKStep{
-				"step": {
-					ID:   "step",
 					Name: fnName,
-					Runtime: map[string]any{
-						"url": fmt.Sprintf("ws://connect?fnId=%s&step=step", fnSlug),
+					Slug: fnSlug,
+					Triggers: []inngest.Trigger{
+						{
+							EventTrigger: &inngest.EventTrigger{
+								Event: "hello/world",
+							},
+						},
+					},
+					Steps: map[string]sdk.SDKStep{
+						"step": {
+							ID:   "step",
+							Name: fnName,
+							Runtime: map[string]any{
+								"url": fmt.Sprintf("ws://connect?fnId=%s&step=step", fnSlug),
+							},
+						},
 					},
 				},
-			},
-		},
-	})
-	require.NoError(t, err)
+			})
+			require.NoError(t, err)
 
-	appConfig := &connectpb.AppConfiguration{
-		AppName:    appName,
-		AppVersion: &appVersion,
-		Functions:  fns,
+			appConfig := &connectpb.AppConfiguration{
+				AppName:    appName,
+				AppVersion: &appVersion,
+				Functions:  fns,
+			}
+
+			caps, err := json.Marshal(sdk.Capabilities{
+				InBandSync: sdk.InBandSyncV1,
+				TrustProbe: sdk.TrustProbeV1,
+				Connect:    sdk.ConnectV1,
+			})
+			require.NoError(t, err)
+
+			reqData := &connectpb.WorkerConnectRequestData{
+				ConnectionId: connID.String(),
+				InstanceId:   "test-worker",
+				Apps:         []*connectpb.AppConfiguration{appConfig},
+				SdkLanguage:  "test-sdk",
+				SdkVersion:   "test-version",
+				Capabilities: caps,
+				AuthData: &connectpb.AuthData{
+					SessionToken: "test-session-token",
+					SyncToken:    "test-sync-token",
+				},
+			}
+
+			wg, err := state.NewWorkerGroupFromConnRequest(ctx, reqData, &auth.Response{
+				AccountID: accID,
+				EnvID:     envID,
+				Entitlements: auth.Entitlements{
+					ConnectionAllowed: true,
+					AppsPerConnection: 10,
+				},
+			}, appConfig)
+			require.NoError(t, err)
+
+			syncID := uuid.New()
+			wg.AppID = &appID
+			wg.SyncID = &syncID
+
+			err = sm.UpsertConnection(ctx, &state.Connection{
+				AccountID:    accID,
+				EnvID:        envID,
+				ConnectionId: connID,
+				WorkerIP:     "10.0.1.2",
+				Data:         reqData,
+				Groups: map[string]*state.WorkerGroup{
+					wg.Hash: wg,
+				},
+				GatewayId: gwID,
+			}, connectpb.ConnectionStatus_READY, time.Now())
+			require.NoError(t, err)
+
+			err = sm.UpsertGateway(ctx, &state.Gateway{
+				Id:                gwID,
+				Status:            state.GatewayStatusActive,
+				LastHeartbeatAtMS: time.Now().UnixMilli(),
+				Hostname:          "gw-host",
+				IPAddress:         net.ParseIP("127.0.0.1"),
+			})
+			require.NoError(t, err)
+
+			resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+				AccountID: accID,
+				EnvID:     envID,
+				AppID:     appID,
+				Data: &connectpb.GatewayExecutorRequestData{
+					RequestId:      reqID,
+					AccountId:      accID.String(),
+					EnvId:          envID.String(),
+					AppId:          appID.String(),
+					AppName:        appName,
+					FunctionId:     fnID.String(),
+					FunctionSlug:   fnSlug,
+					StepId:         nil,
+					RequestPayload: []byte("request payload"),
+					SystemTraceCtx: nil,
+					UserTraceCtx:   nil,
+					RunId:          runID.String(),
+				},
+				logger: l,
+			})
+
+			require.Nil(t, resp)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "failed to route request to gateway")
+			require.Equal(t, tc.attempts, mockForwarder.calls)
+			require.Equal(t, tc.retry, queue.ShouldRetry(fmt.Errorf("driver: %w", err), 0, 20))
+		})
 	}
-
-	caps, err := json.Marshal(sdk.Capabilities{
-		InBandSync: sdk.InBandSyncV1,
-		TrustProbe: sdk.TrustProbeV1,
-		Connect:    sdk.ConnectV1,
-	})
-	require.NoError(t, err)
-
-	reqData := &connectpb.WorkerConnectRequestData{
-		ConnectionId: connID.String(),
-		InstanceId:   "test-worker",
-		Apps:         []*connectpb.AppConfiguration{appConfig},
-		SdkLanguage:  "test-sdk",
-		SdkVersion:   "test-version",
-		Capabilities: caps,
-		AuthData: &connectpb.AuthData{
-			SessionToken: "test-session-token",
-			SyncToken:    "test-sync-token",
-		},
-	}
-
-	wg, err := state.NewWorkerGroupFromConnRequest(ctx, reqData, &auth.Response{
-		AccountID: accID,
-		EnvID:     envID,
-		Entitlements: auth.Entitlements{
-			ConnectionAllowed: true,
-			AppsPerConnection: 10,
-		},
-	}, appConfig)
-	require.NoError(t, err)
-
-	syncID := uuid.New()
-	wg.AppID = &appID
-	wg.SyncID = &syncID
-
-	err = sm.UpsertConnection(ctx, &state.Connection{
-		AccountID:    accID,
-		EnvID:        envID,
-		ConnectionId: connID,
-		WorkerIP:     "10.0.1.2",
-		Data:         reqData,
-		Groups: map[string]*state.WorkerGroup{
-			wg.Hash: wg,
-		},
-		GatewayId: gwID,
-	}, connectpb.ConnectionStatus_READY, time.Now())
-	require.NoError(t, err)
-
-	err = sm.UpsertGateway(ctx, &state.Gateway{
-		Id:                gwID,
-		Status:            state.GatewayStatusActive,
-		LastHeartbeatAtMS: time.Now().UnixMilli(),
-		Hostname:          "gw-host",
-		IPAddress:         net.ParseIP("127.0.0.1"),
-	})
-	require.NoError(t, err)
-
-	resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
-		AccountID: accID,
-		EnvID:     envID,
-		AppID:     appID,
-		Data: &connectpb.GatewayExecutorRequestData{
-			RequestId:      reqID,
-			AccountId:      accID.String(),
-			EnvId:          envID.String(),
-			AppId:          appID.String(),
-			AppName:        appName,
-			FunctionId:     fnID.String(),
-			FunctionSlug:   fnSlug,
-			StepId:         nil,
-			RequestPayload: []byte("request payload"),
-			SystemTraceCtx: nil,
-			UserTraceCtx:   nil,
-			RunId:          runID.String(),
-		},
-		logger: l,
-	})
-
-	require.Nil(t, resp)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to route request to gateway")
 }
 
 // TestProxyGRPCContextCancellation tests proxy behavior when context is cancelled
@@ -1128,10 +1147,14 @@ func TestProxyGRPCBufferedResponse(t *testing.T) {
 }
 
 // mockFailingGatewayGRPCManager is a mock that always fails forwards
-type mockFailingGatewayGRPCManager struct {}
+type mockFailingGatewayGRPCManager struct {
+	err   error
+	calls int
+}
 
 func (m *mockFailingGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
-	return fmt.Errorf("mock forward error")
+	m.calls++
+	return m.err
 }
 
 func (m *mockFailingGatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
