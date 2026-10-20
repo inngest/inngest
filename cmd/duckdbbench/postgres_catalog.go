@@ -89,9 +89,7 @@ func (env postgresCatalogEnv) duckLakeOptions(dataPath string) *driver.DuckLakeO
 		DataPath:           dataPath,
 		MetadataSchema:     "bench_" + ulid.Make().String(),
 		// Explicitly disabled to match file-mode's -1 (see duckLakeOptions
-		// in insert_bench_test.go) -- forced to 0 either way for a postgres
-		// catalog (ducklake#1175), spelled out here for clarity rather than
-		// relying on that override.
+		// in insert_bench_test.go).
 		DataInliningRowLimit: -1,
 	}
 }
