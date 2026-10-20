@@ -3691,6 +3691,14 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return fmt.Errorf("deleting pause by ID: %w", err)
 	}
 
+	// Remove the pause from the expression aggregator so that waitForEvent
+	// pauses ending by timeout do not accumulate for the process lifetime.
+	if e.exprAggregator != nil && pause.GetEvent() != nil {
+		if err := e.exprAggregator.RemovePause(ctx, &pause); err != nil {
+			e.log.Warn("error removing pause from aggregator", "error", err)
+		}
+	}
+
 	return nil
 }
 
