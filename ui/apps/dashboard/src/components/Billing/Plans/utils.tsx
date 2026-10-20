@@ -29,36 +29,46 @@ export type SelfServePlan = GetPlansQuery['plans'][number];
 export function pickSelfServePlans(plans?: SelfServePlan[]): {
   hobby: SelfServePlan | null;
   pro: SelfServePlan | null;
-  growth: SelfServePlan | null;
+  business: SelfServePlan | null;
 } {
   const selectablePlans = plans ?? [];
 
-  // Multiple matches indicate that an old plan was not retired correctly, so
-  // report that via Sentry. Keep checkout available by picking a plan arbitrarily.
-  const pickPlan = (name: string, isFree: boolean) => {
+  const pickPlan = (names: string[], isFree: boolean) => {
     const candidates = selectablePlans.filter(
-      (plan) => plan.isFree === isFree && !plan.isLegacy && plan.name === name,
+      (plan) =>
+        plan.isFree === isFree && !plan.isLegacy && names.includes(plan.name),
     );
 
-    if (candidates.length > 1) {
+    for (const name of names) {
+      const matches = candidates.filter((plan) => plan.name === name);
+      if (matches.length > 1) {
+        Sentry.captureMessage(
+          `Multiple active, visible ${name} billing plans returned`,
+          {
+            level: 'error',
+            extra: {
+              plans: matches.map(({ amount, slug }) => ({ amount, slug })),
+            },
+          },
+        );
+      }
+    }
+
+    if (plans && candidates.length === 0) {
       Sentry.captureMessage(
-        `Multiple active, visible ${name} billing plans returned`,
+        `Missing active, visible ${names[0]} billing plan`,
         {
           level: 'error',
-          extra: {
-            plans: candidates.map(({ amount, slug }) => ({ amount, slug })),
-          },
         },
       );
     }
 
-    if (plans && candidates.length === 0) {
-      Sentry.captureMessage(`Missing active, visible ${name} billing plan`, {
-        level: 'error',
-      });
-    }
-
-    return candidates.reduce<SelfServePlan | null>(
+    const preferredCandidates = candidates.filter(
+      (plan) => plan.name === names[0],
+    );
+    return (
+      preferredCandidates.length ? preferredCandidates : candidates
+    ).reduce<SelfServePlan | null>(
       (selected, candidate) =>
         !selected || candidate.amount > selected.amount ? candidate : selected,
       null,
@@ -66,9 +76,9 @@ export function pickSelfServePlans(plans?: SelfServePlan[]): {
   };
 
   const selfServePlans = {
-    hobby: pickPlan('Hobby', true),
-    pro: pickPlan('Pro', false),
-    growth: pickPlan('Growth', false),
+    hobby: pickPlan(['Hobby'], true),
+    pro: pickPlan(['Pro'], false),
+    business: pickPlan(['Business', 'Growth'], false),
   };
 
   return selfServePlans;
@@ -78,9 +88,13 @@ export enum PlanNames {
   Free = 'Free Tier',
   Basic = 'Basic',
   Pro = 'Pro',
-  Growth = 'Growth',
+  Business = 'Business',
   Hobby = 'Hobby - Free',
   Enterprise = 'Enterprise',
+}
+
+export function displayPlanName(name: string): string {
+  return name === 'Growth' ? PlanNames.Business : name;
 }
 
 export function processPlan(plan: Plan) {
@@ -98,7 +112,7 @@ export function processPlan(plan: Plan) {
         }).format(amount / 100);
 
   return {
-    name,
+    name: displayPlanName(name),
     price: priceLabel,
     billingPeriod:
       typeof billingPeriod === 'string'
