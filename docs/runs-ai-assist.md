@@ -2,7 +2,7 @@
 
 Use AI sits beside Show search in Cloud Runs. Client buttons expand short setup instructions; the setup guide opens in a new tab. The local Dev Server is unchanged. There is no feature flag.
 
-The preview stays short. Copy prompt includes exact API filter IDs, UTC boundaries frozen at copy time, and full investigation instructions. Unsupported filters block copying. Clipboard failures expose selectable full text. Both copy actions share one handler.
+The scrollable preview shows exactly what Copy prompt copies: API filter IDs, UTC boundaries frozen when the popover opens, and full investigation instructions. Reopening refreshes relative time bounds. Unsupported filters block copying. Clipboard failures expose selectable full text. Both copy actions share one handler.
 
 ## Tracking
 

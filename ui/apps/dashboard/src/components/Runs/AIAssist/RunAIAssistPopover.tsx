@@ -69,12 +69,9 @@ export function RunAIAssistPopover({
 
   async function copyPrompt() {
     if (blocked || copyState === 'copying') return;
-    const now = new Date();
-    const snapshot = buildRunDiscoveryPrompt(context, now);
-    setPreviewTime(now);
-    if (!snapshot.prompt) return;
+    if (!result.prompt) return;
     onAction({ action: 'prompt_copy_clicked' });
-    const failure = await copy(snapshot.prompt);
+    const failure = await copy(result.prompt);
     onAction(
       failure
         ? { action: 'prompt_copy_failed', failure_category: failure }
@@ -177,7 +174,7 @@ export function RunAIAssistPopover({
             tabIndex={0}
             className="bg-canvasSubtle text-basis max-h-24 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
           >
-            {result.preview}
+            {result.prompt}
           </pre>
         )}
         {metadataError && !metadataLoading && (

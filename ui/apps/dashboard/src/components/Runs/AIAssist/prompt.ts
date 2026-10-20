@@ -15,8 +15,8 @@ export type RunPromptContext = {
 };
 
 export type RunPromptResult =
-  | { prompt: string; preview: string; error?: never }
-  | { prompt?: never; preview?: never; error: string };
+  | { prompt: string; error?: never }
+  | { prompt?: never; error: string };
 
 const statuses = new Set([
   'QUEUED',
@@ -35,7 +35,7 @@ const supportedFilterKeys = new Set(['filterApp', 'filterStatus']);
 
 export function buildRunDiscoveryPrompt(
   context: RunPromptContext,
-  copiedAt: Date,
+  snapshotTime: Date,
 ): RunPromptResult {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(context.search)) {
@@ -87,11 +87,11 @@ export function buildRunDiscoveryPrompt(
     const relative = params.get('last');
     const start = params.get('start');
     from = relative
-      ? subtractDuration(copiedAt, parseDuration(relative))
+      ? subtractDuration(snapshotTime, parseDuration(relative))
       : start
         ? new Date(start)
-        : subtractDuration(copiedAt, parseDuration(DEFAULT_TIME));
-    until = params.get('end') ? new Date(params.get('end')!) : copiedAt;
+        : subtractDuration(snapshotTime, parseDuration(DEFAULT_TIME));
+    until = params.get('end') ? new Date(params.get('end')!) : snapshotTime;
     if (
       !Number.isFinite(from.getTime()) ||
       !Number.isFinite(until.getTime()) ||
@@ -146,28 +146,6 @@ export function buildRunDiscoveryPrompt(
     until: until.toISOString(),
   };
 
-  const statusDescription = selectedStatuses.length
-    ? `${selectedStatuses.map((status) => status.toLowerCase()).join(' or ')} `
-    : '';
-  const functionDescription = functionID ? ` for ${quote(functionID)}` : '';
-  const uniqueApps = [...new Set(appIDs)];
-  const appDescription = uniqueApps.length
-    ? ` in ${uniqueApps.length === 1 ? 'app' : 'apps'} ${uniqueApps.map(quote).join(' or ')}`
-    : '';
-  const relative = !params.get('end')
-    ? (params.get('last') ?? (!params.get('start') ? DEFAULT_TIME : undefined))
-    : undefined;
-  const range = relative
-    ? `the last ${describeDuration(relative)}`
-    : `${from.toISOString()} and ${until.toISOString()}`;
-  const timeDescription =
-    timeField === 'queuedAt'
-      ? `${relative ? 'from' : 'between'} ${range}`
-      : `that ${timeField === 'startedAt' ? 'started' : 'ended'} ${relative ? 'in' : 'between'} ${range}`;
-  const latest =
-    selectedStatuses.length === 1 && selectedStatuses[0] === 'FAILED'
-      ? 'failure'
-      : 'run';
   return {
     prompt: `Use Inngest Cloud MCP to find runs using these basic filters:
 ${
@@ -183,7 +161,6 @@ Use the available tool schema and preserve the supplied filters. If a filter or 
 Return up to 10 newest matches ordered DESC by the specified time field. Show their run IDs, functions, statuses, and timestamps. Inspect the newest match's trace and explain its outcome with run and step evidence. If no matches are found, skip trace inspection.
 Use at most 5 listing calls. Report partial search coverage; an empty page with a continuation cursor is not proof of no matches. Do not claim the newest match overall unless the results establish that.
 Use read operations only. Do not invoke, rerun, cancel, or change data.`,
-    preview: `Find ${statusDescription}runs${functionDescription}${appDescription} in ${quote(context.environmentSlug)} ${timeDescription}. Show the run IDs and inspect the trace of the most recent ${latest}. Use the ${quote(context.account)} account.`,
   };
 }
 
@@ -199,18 +176,4 @@ function parseSelection(value: unknown): string[] {
     throw new Error('Invalid selection');
   }
   return parsed;
-}
-
-function quote(value: string): string {
-  return `“${value.replaceAll('“', '\\u201c').replaceAll('”', '\\u201d')}”`;
-}
-
-function describeDuration(value: string): string {
-  const duration = parseDuration(value);
-  if (duration.days === 1) return '24 hours';
-  return Object.entries(duration)
-    .map(
-      ([unit, count]) => `${count} ${count === 1 ? unit.slice(0, -1) : unit}`,
-    )
-    .join(' ');
 }

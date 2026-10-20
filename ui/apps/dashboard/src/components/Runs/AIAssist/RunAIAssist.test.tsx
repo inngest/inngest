@@ -43,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.getElementById('modals')?.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -76,10 +77,14 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
+    const displayedPrompt = screen.getByLabelText('Prompt preview').textContent;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.now() + 60_000));
     fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
+    expect(writeText).toHaveBeenCalledWith(displayedPrompt);
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copy_clicked' });
     expect(onAction).not.toHaveBeenCalledWith({ action: 'prompt_copied' });
-    expect(writeText).not.toHaveBeenCalledWith(
+    expect(writeText).toHaveBeenCalledWith(
       screen.getByLabelText('Prompt preview').textContent,
     );
     expect(writeText).toHaveBeenCalledWith(
@@ -88,7 +93,7 @@ describe('Runs AI popover', () => {
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining('Use read operations only'),
     );
-    expect(screen.getByLabelText('Prompt preview').textContent).not.toContain(
+    expect(screen.getByLabelText('Prompt preview').textContent).toContain(
       'Use read operations only',
     );
     expect(screen.queryByLabelText('Full prompt')).toBeNull();
@@ -236,7 +241,7 @@ describe('Runs AI popover', () => {
     await act(async () => resolve());
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
     expect(screen.getByLabelText('Prompt preview').textContent).toContain(
-      'failed',
+      '"FAILED"',
     );
   });
 
