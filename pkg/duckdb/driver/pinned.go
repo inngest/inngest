@@ -8,7 +8,7 @@ package driver
 // driver targets, so EnsureBinary (download.go) fetches it from DuckDB's
 // staging distribution server instead — see pinnedStagedCommit and
 // defaultInstallBaseURL.
-const PinnedVersion = "v2.0.0-alpha41533"
+const PinnedVersion = "v2.0.0"
 
 // pinnedStagedCommit is the (10-character, matching DuckDB's own install
 // script convention) commit hash PinnedVersion was built from, required to
@@ -22,7 +22,7 @@ const PinnedVersion = "v2.0.0-alpha41533"
 // scripts/update-duckdb-version.sh to bump PinnedVersion,
 // pinnedStagedCommit, and pinnedChecksums together to a build that's still
 // available.
-const pinnedStagedCommit = "10de957379"
+const pinnedStagedCommit = "d54cbbe3df"
 
 // pinnedChecksums are the SHA256 digests of each pinned-version release
 // archive EnsureBinary might download, keyed by asset name. Unlike a tagged
@@ -34,8 +34,8 @@ const pinnedStagedCommit = "10de957379"
 // is not a third-party attestation the way a GA release's published
 // checksum would be.
 var pinnedChecksums = map[string]string{
-	"duckdb-cli-osx-universal.tar.gz": "bf702f47e0cbfc4adf638ba8d407245f06bf36f102def1b7bba752f648936bc5",
-	"duckdb-cli-linux-amd64.tar.gz":   "22af160c96d0b97ef2108244bf80e228227325655fd7706207a2803de479f927",
-	"duckdb-cli-linux-arm64.tar.gz":   "e0f109c043197e885b8277828e864d5fbfa0e3e2677102c03986109d4a0cc8bf",
-	"duckdb-cli-windows-amd64.tar.gz": "5e51eb98ce7748af56a37efe16bb515e78c827a31af0a28d7f16af3cea03c675",
+	"duckdb-cli-osx-universal.tar.gz": "8a8f67e7c7f7d1392fa63ba3971948391392fe2a25fca63e7008e33c50beb4c2",
+	"duckdb-cli-linux-amd64.tar.gz":   "c6507206baf7793c6013dbd82368469a45f20dc0e17a6f92f204602f652ed2bc",
+	"duckdb-cli-linux-arm64.tar.gz":   "859e1875d2a9515fbb4bf8871061437a14af82320da68c753f094c4b776348fe",
+	"duckdb-cli-windows-amd64.tar.gz": "91663c2f36c2a334b0e5e639006d8c29c29e013af0c477d80bb931df68870312",
 }
