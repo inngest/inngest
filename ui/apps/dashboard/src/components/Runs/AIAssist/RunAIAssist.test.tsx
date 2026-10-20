@@ -144,7 +144,14 @@ describe('Runs AI popover', () => {
     ).toBeTruthy();
     expect(
       screen.getByRole('link', { name: 'Setup guide' }).getAttribute('href'),
-    ).toBe('/mcp/setup');
+    ).toBe(
+      'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud',
+    );
+    for (const name of ['Setup guide', 'View MCP docs']) {
+      const link = screen.getByRole('link', { name });
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    }
     expect(onAction).toHaveBeenCalledWith({
       action: 'setup_clicked',
       client: 'codex_cli',

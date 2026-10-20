@@ -1,6 +1,6 @@
 # Runs AI assistance
 
-Use AI sits beside Show search in Cloud Runs. Client buttons expand short setup instructions; the setup guide opens in a new tab. The local Dev Server is unchanged. There is no feature flag.
+Use AI sits beside Show search in Cloud Runs. Client buttons expand short setup instructions; the setup guide opens the Cloud connection documentation in a new tab. The MCP documentation link also opens a new tab. The local Dev Server is unchanged. There is no feature flag.
 
 The scrollable preview shows exactly what Copy prompt copies: API filter IDs, UTC boundaries frozen when the popover opens, and full investigation instructions. Reopening refreshes relative time bounds. Unsupported filters block copying. Clipboard failures expose selectable full text. Both copy actions share one handler.
 

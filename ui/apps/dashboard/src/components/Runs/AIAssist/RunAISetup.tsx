@@ -70,7 +70,7 @@ export function RunAISetup({
         </p>
       </SetupStep>
       <a
-        href="/mcp/setup"
+        href="https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud"
         target="_blank"
         rel="noopener noreferrer"
         className="text-link mt-3 inline-block hover:underline"
