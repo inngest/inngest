@@ -108,7 +108,7 @@ function SetupCommand({
   return (
     <div>
       <div className="bg-codeEditor flex items-center gap-2 rounded p-2">
-        <code className="text-basis min-w-0 flex-1 select-text break-words font-mono text-xs">
+        <code className="text-basis min-w-0 flex-1 select-text break-words font-mono text-[11px] leading-4">
           {code}
         </code>
         <CopyButton
