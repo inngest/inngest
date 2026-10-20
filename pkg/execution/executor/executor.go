@@ -4066,7 +4066,7 @@ type responseCapacity struct {
 	// hold is set when an opcode of the response does its work inside the
 	// executor (fetch, AI requests) and so needs the capacity until it ends.
 	hold bool
-	// requested is set when a waiting opcode deferred its release.
+	// requested is set when an opcode deferred its release.
 	requested atomic.Bool
 }
 
@@ -4090,13 +4090,19 @@ func newResponseCapacity(opcodes []*state.GeneratorOpcode) *responseCapacity {
 }
 
 // releaseCapacityEarly hands back the run's concurrency capacity once the run
-// has completed or is waiting, when enabled for the account. While another
-// opcode of the same response still runs inside the executor, the release is
-// deferred until every opcode of the response has been handled.
+// has completed or is waiting, when enabled for the account.
 func (e *executor) releaseCapacityEarly(ctx context.Context, runCtx execution.RunContext, group OpcodeGroup) {
 	if e.earlyCapacityRelease == nil || !e.earlyCapacityRelease(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
 		return
 	}
+	releaseCapacity(ctx, runCtx, group)
+}
+
+// releaseCapacity hands back the queue item's concurrency capacity once the
+// opcode no longer needs it. While another opcode of the same response still
+// runs inside the executor, the release is deferred until every opcode of the
+// response has been handled.
+func releaseCapacity(ctx context.Context, runCtx execution.RunContext, group OpcodeGroup) {
 	if group.capacity != nil && group.capacity.hold {
 		group.capacity.requested.Store(true)
 		return
@@ -4197,9 +4203,9 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
 		return nil
 	case enums.OpcodeStep, enums.OpcodeStepRun:
-		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
+		return e.handleGeneratorStep(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeStepError:
-		return e.handleStepError(ctx, runCtx, gen, edge)
+		return e.handleStepError(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeStepPlanned:
 		return e.handleGeneratorStepPlanned(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeSleep:
@@ -4222,7 +4228,7 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		// apiresult.APIResult
 		return e.handleGeneratorSyncFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepFailed:
-		return e.handleStepFailed(ctx, runCtx, gen, edge)
+		return e.handleStepFailed(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeDiscoveryRequest:
 		return e.handleGeneratorDiscoveryRequest(ctx, runCtx, gen, edge)
 	case enums.OpcodeDeferAdd:
@@ -4489,7 +4495,7 @@ func (e *executor) enqueueLazyOpFallback(
 
 // handleGeneratorStep handles OpcodeStep and OpcodeStepRun, both indicating that a function step
 // has finished
-func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	// Save the response to the state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -4540,9 +4546,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// Once step output has been saved, we can release the held capacity.
 	// This allows us to continue work in the queue on other items even before
 	// the next step is enqueued and accounting is handled.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	releaseCapacity(ctx, runCtx, group)
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
 	// running the step again, needing a new history group
@@ -4576,7 +4580,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// }
 }
 
-func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	// With the introduction of the StepError opcode, step errors are handled gracefully, and we can
 	// finally distinguish between application level errors (this function) and network errors/other
 	// errors (as the SDK didn't return this opcode).
@@ -4623,10 +4627,10 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	// This was the final step attempt and we still failed, so we convert the Error to Failed
 	// and use that handler.
 	gen.Op = enums.OpcodeStepFailed
-	return e.handleStepFailed(ctx, runCtx, gen, edge)
+	return e.handleStepFailed(ctx, runCtx, gen, edge, group)
 }
 
-func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	// First, save the error to our state store.
 	output, err := gen.Output()
 	if err != nil {
@@ -4657,9 +4661,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	// Once step output has been saved, we can release the held capacity.
 	// This allows us to continue work in the queue on other items even before
 	// the next step is enqueued and accounting is handled.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	releaseCapacity(ctx, runCtx, group)
 
 	// Because this is a final step error that was handled gracefully, enqueue
 	// another attempt to the function with a new edge type.
@@ -5982,9 +5984,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	// Once pause has been saved, we can release the held capacity.
 	// This allows us to continue work in the queue on other items even before
 	// the next step is enqueued and accounting is handled.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
+	releaseCapacity(ctx, runCtx, group)
 
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
