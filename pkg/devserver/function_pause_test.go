@@ -3,6 +3,7 @@ package devserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -113,7 +114,7 @@ func TestFunctionPauseSharedState(t *testing.T) {
 		require.Equal(t, "fn", response.Data.ID)
 		require.False(t, response.Data.IsPaused)
 		require.False(t, get())
-		require.Equal(t, 1, wakes)
+		require.Equal(t, i+1, wakes)
 	}
 	resumed, err := provider.GetFunction(t.Context(), id.String())
 	require.NoError(t, err)
@@ -122,7 +123,7 @@ func TestFunctionPauseSharedState(t *testing.T) {
 	repeated, err = provider.ResumeFunction(t.Context(), resumed)
 	require.NoError(t, err)
 	require.Equal(t, resumed, repeated)
-	require.Equal(t, 1, wakes)
+	require.Equal(t, 3, wakes)
 	require.Equal(t, queue.PartitionPausedInfo{}, provider.pauses.partitionPaused(t.Context(), id))
 
 	testHandler := testapi.New(testapi.Options{
@@ -201,6 +202,35 @@ func TestFunctionPauseConcurrentFirstWriteWins(t *testing.T) {
 	}
 	require.Equal(t, first, provider.pauses.get(fn.ID))
 	require.Equal(t, queue.PartitionPausedInfo{Paused: true}, provider.pauses.partitionPaused(t.Context(), fn.ID))
+}
+
+func TestFunctionResumeRetriesFailedWake(t *testing.T) {
+	provider := NewFunctionProvider(&fakeFunctionStore{})
+	fn, err := provider.PauseFunction(t.Context(), inngest.DeployedFunction{
+		ID: uuid.New(), AccountID: consts.DevServerAccountID, EnvironmentID: consts.DevServerEnvID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, queue.PartitionPausedInfo{Paused: true}, provider.pauses.partitionPaused(t.Context(), fn.ID))
+	wakeErr := errors.New("queue unavailable")
+	wakes := 0
+	provider.unpauser = functionUnpauserFunc(func(_ context.Context, shard string, scope queue.Scope) error {
+		wakes++
+		require.Equal(t, consts.DefaultQueueShardName, shard)
+		require.Equal(t, queue.Scope{AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID}, scope)
+		if wakes == 1 {
+			return wakeErr
+		}
+		return nil
+	})
+	resumed, err := provider.ResumeFunction(t.Context(), fn)
+	require.ErrorIs(t, err, wakeErr)
+	require.Equal(t, inngest.DeployedFunction{}, resumed)
+	require.Equal(t, queue.PartitionPausedInfo{}, provider.pauses.partitionPaused(t.Context(), fn.ID))
+	resumed, err = provider.ResumeFunction(t.Context(), fn)
+	require.NoError(t, err)
+	fn.PausedAt = time.Time{}
+	require.Equal(t, fn, resumed)
+	require.Equal(t, 2, wakes)
 }
 
 func TestFunctionResumeStartsQueuedRun(t *testing.T) {

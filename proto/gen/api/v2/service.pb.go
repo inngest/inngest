@@ -10136,7 +10136,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x8f\xd0\x01\n" +
+	"\x04INFO\x10\x032\xf7\xd1\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10638,16 +10638,16 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xbf\x05\n" +
-	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\xf0\x04\x92A\x9b\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xb3\x06\n" +
+	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\xe4\x05\x92A\x8f\x05\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x10Pause a function\x1a\xe3\x03Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function.b\x10\n" +
+	"\x04Beta\x12\x10Pause a function\x1a\xd7\x04Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. There, a pause and resume sent close together can apply out of order; confirm with GetFunction and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02.\",/apps/{app_id}/functions/{function_id}/pause\x12\xe3\x04\n" +
-	"\x0eResumeFunction\x12\x1d.api.v2.ResumeFunctionRequest\x1a\x1e.api.v2.ResumeFunctionResponse\"\x91\x04\x92A\xba\x03\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02.\",/apps/{app_id}/functions/{function_id}/pause\x12\xd7\x05\n" +
+	"\x0eResumeFunction\x12\x1d.api.v2.ResumeFunctionRequest\x1a\x1e.api.v2.ResumeFunctionResponse\"\x85\x05\x92A\xae\x04\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x11Resume a function\x1a\x81\x03Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false and changes nothing. Send no request body. In Cloud, the resume can take up to a minute to apply. New runs skipped while paused are not recreated. In the dev server, the resume applies right away and queued runs can start immediately. No bulk resume; call once per function.b\x10\n" +
+	"\x04Beta\x12\x11Resume a function\x1a\xf5\x03Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false and changes nothing. Send no request body. In Cloud, the resume can take up to a minute to apply. New runs skipped while paused are not recreated. There, a pause and resume sent close together can apply out of order; confirm with GetFunction and retry if needed. In the dev server, the resume applies right away and queued runs can start immediately. No bulk resume; call once per function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16functions:write:resume\x82\xd3\xe4\x93\x02/\"-/apps/{app_id}/functions/{function_id}/resume\x12\xf8\x01\n" +

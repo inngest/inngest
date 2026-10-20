@@ -49,18 +49,17 @@ func (p *cqrsFunctionProvider) PauseFunction(_ context.Context, fn inngest.Deplo
 }
 
 func (p *cqrsFunctionProvider) ResumeFunction(ctx context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
-	paused := p.pauses.unpause(fn.ID)
-	fn.PausedAt = time.Time{}
-	if !paused {
-		return fn, nil
-	}
+	p.pauses.unpause(fn.ID)
 	if p.unpauser == nil {
-		return fn, fmt.Errorf("queue unpauser is not configured")
+		return inngest.DeployedFunction{}, fmt.Errorf("queue unpauser is not configured")
 	}
-	err := p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
+	if err := p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
 		AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID,
-	})
-	return fn, err
+	}); err != nil {
+		return inngest.DeployedFunction{}, err
+	}
+	fn.PausedAt = time.Time{}
+	return fn, nil
 }
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
