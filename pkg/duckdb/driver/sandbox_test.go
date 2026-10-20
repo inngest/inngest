@@ -24,6 +24,14 @@ func TestSandboxStmts(t *testing.T) {
 		"SET allowed_directories=['/lake/data/'];",
 		"SET enable_external_access=false;",
 	}, stmts)
+
+	stmts, err = sandboxStmts(&DuckLakeOptions{DataPath: "/lake/data", QuackCatalogAddr: "10.0.0.1:9494"})
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"SET allowed_paths=['http://10.0.0.1:9494/quack', 'https://10.0.0.1:9494/quack'];",
+		"SET allowed_directories=['/lake/data/'];",
+		"SET enable_external_access=false;",
+	}, stmts)
 }
 
 // requireSandboxed asserts db can't reach the filesystem or environment

@@ -43,9 +43,17 @@ func (p *process) bootstrapSandboxLocked(ctx context.Context) error {
 //     running, and refuses any further change to allowed_directories/
 //     allowed_paths once it is off. So no later statement can widen it.
 //   - The database file's own temp directory is added to allowed_directories
-//     automatically, and an already-attached catalog (DuckDB or SQLite
-//     file, Postgres, quack) keeps working; only DuckLake's DATA_PATH needs
-//     listing, since DuckLake opens Parquet files under it on demand.
+//     automatically, and an already-attached DuckDB/SQLite/Postgres catalog
+//     keeps working. DuckLake's DATA_PATH needs listing since DuckLake opens
+//     Parquet files under it on demand, and (since DuckDB v2.0.0) so does a
+//     quack catalog's endpoint, because the quack client's HTTP requests go
+//     through the same external access check.
+//   - NOTE: the sandbox does NOT isolate a quack catalog. Its endpoint has to
+//     be allowed and its secret stays registered, so SQL in this process can
+//     still ATTACH 'quack:<QuackCatalogAddr>' or quack_query() it w/ the
+//     catalog's credentials (the pre-v2.0.0 quack client skipped the
+//     external access check entirely, so this was already the case). Don't
+//     rely on it as the only barrier for untrusted SQL w/ a quack catalog.
 //   - lock_configuration is deliberately NOT set: DuckLake changes settings
 //     internally, so locking the configuration makes every DuckLake
 //     statement fail ("Failed to query most recent snapshot").
@@ -59,7 +67,23 @@ func sandboxStmts(duckLake *DuckLakeOptions) ([]string, error) {
 		dirs = append(dirs, strings.TrimSuffix(abs, string(filepath.Separator))+string(filepath.Separator))
 	}
 
+	var paths []string
+	if duckLake != nil && duckLake.QuackCatalogAddr != "" {
+		// The quack client picks http for loopback binds and https otherwise,
+		// so allow both.
+		for _, scheme := range []string{"http", "https"} {
+			paths = append(paths, scheme+"://"+duckLake.QuackCatalogAddr+"/quack")
+		}
+	}
+
 	var stmts []string
+	if len(paths) > 0 {
+		lit, err := encodeLiteral(paths)
+		if err != nil {
+			return nil, fmt.Errorf("duckdb: encoding allowed paths: %w", err)
+		}
+		stmts = append(stmts, fmt.Sprintf("SET allowed_paths=%s;", lit))
+	}
 	if len(dirs) > 0 {
 		lit, err := encodeLiteral(dirs)
 		if err != nil {
