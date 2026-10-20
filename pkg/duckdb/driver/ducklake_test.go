@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -255,22 +256,24 @@ func TestDuckLakeBootstrapStmtsUsesLocalExtensionPaths(t *testing.T) {
 	require.NotContains(t, stmts, "INSTALL postgres;")
 }
 
-// TestDuckLakeBootstrapStmtsPostgresForcesInliningOff pins the workaround for
-// https://github.com/duckdb/ducklake/issues/1175: DuckLake's postgres catalog
-// backend corrupts inlined rows that contain JSON columns, so a postgres
-// catalog must always attach with DATA_INLINING_ROW_LIMIT 0, even when the
-// caller explicitly configured a non-zero DataInliningRowLimit.
-func TestDuckLakeBootstrapStmtsPostgresForcesInliningOff(t *testing.T) {
-	stmts, err := duckLakeBootstrapStmts(DuckLakeOptions{
-		PostgresCatalogURI:   "postgres://user:pass@localhost:5432/catalog",
-		DataPath:             filepath.Join(t.TempDir(), "lake-data"),
-		DataInliningRowLimit: 500,
-	}, nil)
-	require.NoError(t, err)
-
-	attach := requireAttachStmt(t, stmts)
-	require.Contains(t, attach, "DATA_INLINING_ROW_LIMIT 0")
-	require.NotContains(t, attach, "DATA_INLINING_ROW_LIMIT 500")
+// TestDuckLakeBootstrapStmtsPostgresHonorsInliningLimit pins that a postgres
+// catalog uses DataInliningRowLimit like every other catalog. It used to be
+// forced to 0 to work around https://github.com/duckdb/ducklake/issues/1175,
+// which is fixed as of the DuckDB v2.0.0 pin.
+func TestDuckLakeBootstrapStmtsPostgresHonorsInliningLimit(t *testing.T) {
+	for limit, want := range map[int]string{
+		0:   fmt.Sprintf("DATA_INLINING_ROW_LIMIT %d", DefaultDataInliningRowLimit),
+		500: "DATA_INLINING_ROW_LIMIT 500",
+		-1:  "DATA_INLINING_ROW_LIMIT 0",
+	} {
+		stmts, err := duckLakeBootstrapStmts(DuckLakeOptions{
+			PostgresCatalogURI:   "postgres://user:pass@localhost:5432/catalog",
+			DataPath:             filepath.Join(t.TempDir(), "lake-data"),
+			DataInliningRowLimit: limit,
+		}, nil)
+		require.NoError(t, err)
+		require.Contains(t, requireAttachStmt(t, stmts), want, "limit %d", limit)
+	}
 }
 
 // TestDuckLakeBootstrapStmtsPostgresLoadsExtension pins that a postgres
@@ -351,64 +354,6 @@ func TestDuckLakeBootstrapStmtsPostgresAttachTarget(t *testing.T) {
 
 	attach := requireAttachStmt(t, stmts)
 	require.Contains(t, attach, "'ducklake:postgres:postgres://user:pass@localhost:5432/catalog'")
-}
-
-// TestDuckLakePostgresInliningOverridden pins exactly when the postgres
-// forced-inlining-off override is worth warning a caller about: only an
-// explicit, positive DataInliningRowLimit is silently discarded. Zero ("use
-// the default") and negative ("explicitly disable") both already agree with
-// (or are subsumed by) the forced override, so neither should warn -- and a
-// non-postgres catalog never overrides anything, regardless of the limit.
-func TestDuckLakePostgresInliningOverridden(t *testing.T) {
-	dataPath := filepath.Join(t.TempDir(), "lake-data")
-
-	cases := []struct {
-		name     string
-		opts     DuckLakeOptions
-		expected bool
-	}{
-		{
-			name: "postgres with explicit positive limit warns",
-			opts: DuckLakeOptions{
-				PostgresCatalogURI:   "postgres://user:pass@localhost:5432/catalog",
-				DataPath:             dataPath,
-				DataInliningRowLimit: 500,
-			},
-			expected: true,
-		},
-		{
-			name: "postgres with default (zero) limit does not warn",
-			opts: DuckLakeOptions{
-				PostgresCatalogURI: "postgres://user:pass@localhost:5432/catalog",
-				DataPath:           dataPath,
-			},
-			expected: false,
-		},
-		{
-			name: "postgres with explicitly-disabled (negative) limit does not warn",
-			opts: DuckLakeOptions{
-				PostgresCatalogURI:   "postgres://user:pass@localhost:5432/catalog",
-				DataPath:             dataPath,
-				DataInliningRowLimit: -1,
-			},
-			expected: false,
-		},
-		{
-			name: "file catalog with positive limit does not warn",
-			opts: DuckLakeOptions{
-				CatalogPath:          filepath.Join(t.TempDir(), "catalog.ducklake"),
-				DataPath:             dataPath,
-				DataInliningRowLimit: 500,
-			},
-			expected: false,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, duckLakePostgresInliningOverridden(tc.opts))
-		})
-	}
 }
 
 // TestDuckLakeBootstrapStmtsRejectsAmbiguousCatalog covers the misconfigured
