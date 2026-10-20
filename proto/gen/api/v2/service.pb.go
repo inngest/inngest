@@ -373,10 +373,11 @@ func (FunctionSingletonMode) EnumDescriptor() ([]byte, []int) {
 type AppMethod int32
 
 const (
-	AppMethod_APP_METHOD_UNSPECIFIED AppMethod = 0
-	AppMethod_APP_METHOD_SERVE       AppMethod = 1
-	AppMethod_APP_METHOD_CONNECT     AppMethod = 2
-	AppMethod_APP_METHOD_API         AppMethod = 3
+	AppMethod_APP_METHOD_UNSPECIFIED   AppMethod = 0
+	AppMethod_APP_METHOD_SERVE         AppMethod = 1
+	AppMethod_APP_METHOD_CONNECT       AppMethod = 2
+	AppMethod_APP_METHOD_API           AppMethod = 3
+	AppMethod_APP_METHOD_INNGEST_SERVE AppMethod = 4
 )
 
 // Enum value maps for AppMethod.
@@ -386,12 +387,14 @@ var (
 		1: "APP_METHOD_SERVE",
 		2: "APP_METHOD_CONNECT",
 		3: "APP_METHOD_API",
+		4: "APP_METHOD_INNGEST_SERVE",
 	}
 	AppMethod_value = map[string]int32{
-		"APP_METHOD_UNSPECIFIED": 0,
-		"APP_METHOD_SERVE":       1,
-		"APP_METHOD_CONNECT":     2,
-		"APP_METHOD_API":         3,
+		"APP_METHOD_UNSPECIFIED":   0,
+		"APP_METHOD_SERVE":         1,
+		"APP_METHOD_CONNECT":       2,
+		"APP_METHOD_API":           3,
+		"APP_METHOD_INNGEST_SERVE": 4,
 	}
 )
 
@@ -9881,12 +9884,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x15FunctionSingletonMode\x12'\n" +
 	"#FUNCTION_SINGLETON_MODE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cFUNCTION_SINGLETON_MODE_SKIP\x10\x01\x12\"\n" +
-	"\x1eFUNCTION_SINGLETON_MODE_CANCEL\x10\x02*i\n" +
+	"\x1eFUNCTION_SINGLETON_MODE_CANCEL\x10\x02*\x87\x01\n" +
 	"\tAppMethod\x12\x1a\n" +
 	"\x16APP_METHOD_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10APP_METHOD_SERVE\x10\x01\x12\x16\n" +
 	"\x12APP_METHOD_CONNECT\x10\x02\x12\x12\n" +
-	"\x0eAPP_METHOD_API\x10\x03*/\n" +
+	"\x0eAPP_METHOD_API\x10\x03\x12\x1c\n" +
+	"\x18APP_METHOD_INNGEST_SERVE\x10\x04*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
