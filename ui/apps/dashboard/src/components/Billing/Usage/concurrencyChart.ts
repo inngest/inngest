@@ -329,7 +329,7 @@ export function createBacklogChartOptions(
 ): Partial<ChartProps['option']> {
   const dark = isDark();
   const points = hourPoints(backlog.buckets);
-  const backlogColor = resolveColor(CHART_COLORS[1], dark, '#F97316');
+  const backlogColor = resolveColor(CHART_COLORS[1], dark, '#FFAE7F');
 
   const dataMax = points.reduce((max, [, value]) => Math.max(max, value), 0);
 
