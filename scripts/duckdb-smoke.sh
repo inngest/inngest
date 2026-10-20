@@ -22,11 +22,11 @@ command -v jq >/dev/null || {
 }
 
 # package => -run pattern. Covers process close/restart, pooled-connection
-# restart recovery, quack append, migrations (incl. persistent reopen),
+# restart recovery, quack append, quack cancel, migrations (incl. persistent reopen),
 # listener shutdown flush, dual-write -> query round trips, and the
 # duckdbseed appender against the real schema (catches column drift).
 declare -A SMOKE=(
-	[./pkg/duckdb/driver]='^(TestConnectorCloseTerminatesSubprocess|TestExecTriggersRestartAfterCrash|TestQuackTransportSurvivesRestart|TestPooledQuackConn.*|TestQuackAppenderWritesRowsIntoRealTable|TestQuackBootstrapErrorDoesNotLeakToken)$'
+	[./pkg/duckdb/driver]='^(TestConnectorCloseTerminatesSubprocess|TestExecTriggersRestartAfterCrash|TestQuackTransportSurvivesRestart|TestPooledQuackConn.*|TestQuackAppenderWritesRowsIntoRealTable|TestQuackBootstrapErrorDoesNotLeakToken|TestQuackCancelledQueryDoesNotRestartSubprocess)$'
 	[./pkg/duckdb/driver/internal/quack]='^TestQuackSession(HandshakeAndExec|FetchesAllRowsWhenResultExceedsOneInlineResponse|StatementErrorMapsToErrStatementFailed)$'
 	[./pkg/db/duckdb]='^TestMigrate'
 	[./pkg/duckdb/tracing]='^(TestNewListenerEndToEnd.*|TestBatcherDrainsChannelOnStopBeforeExiting)$'
