@@ -27,7 +27,6 @@ function mount(overrides = {}) {
     metadataError: false,
     onRetry: vi.fn(),
     onAction,
-    getSetupHref: (client: string) => `/mcp/setup?client=${client}`,
     ...overrides,
   };
   return { ...render(<RunAIAssistPopover {...props} />), props, onAction };
@@ -139,10 +138,8 @@ describe('Runs AI popover', () => {
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
-      screen
-        .getByRole('link', { name: 'Full setup instructions ↗' })
-        .getAttribute('href'),
-    ).toBe('/mcp/setup?client=codex');
+      screen.getByRole('link', { name: 'Setup guide ↗' }).getAttribute('href'),
+    ).toBe('/mcp/setup');
     expect(onAction).toHaveBeenCalledWith({
       action: 'setup_clicked',
       client: 'codex_cli',
@@ -166,7 +163,7 @@ describe('Runs AI popover', () => {
         'claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp',
       ),
     ).toBeTruthy();
-    expect(screen.getByText(/In Claude Code, run \/mcp/)).toBeTruthy();
+    expect(screen.getByText(/In Claude Code: \/mcp/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
     expect(screen.getByText('codex mcp login inngest-cloud')).toBeTruthy();
@@ -195,7 +192,7 @@ describe('Runs AI popover', () => {
     expect(
       screen.getByRole('button', { name: 'Copy server URL' }),
     ).toBeTruthy();
-    expect(screen.getByText(/Choose OAuth or Sign in/)).toBeTruthy();
+    expect(screen.getByText(/Sign in with OAuth/)).toBeTruthy();
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
   });
 

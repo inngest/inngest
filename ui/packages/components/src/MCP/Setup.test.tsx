@@ -35,14 +35,6 @@ const cloudProps = {
 };
 
 describe('MCP setup', () => {
-  it.each([
-    ['codex', 'Codex CLI'],
-    ['other', 'Cursor'],
-  ] as const)('preselects the %s setup path', (initialClient, name) => {
-    render(<MCPSetup {...cloudProps} initialClient={initialClient} />);
-    expect(screen.getByRole('tab', { name }).getAttribute('aria-selected')).toBe('true');
-  });
-
   it('defaults Cloud setup to OAuth without API-key headers', () => {
     render(<MCPSetup {...cloudProps} />);
     expect(screen.getByText('Sign in and approve access')).toBeTruthy();

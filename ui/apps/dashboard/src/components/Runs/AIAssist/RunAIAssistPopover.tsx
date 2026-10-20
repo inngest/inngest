@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
   Popover,
@@ -10,8 +10,8 @@ import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { RiAppsLine, RiSparklingLine } from '@remixicon/react';
 
 import { buildRunDiscoveryPrompt, type RunPromptContext } from './prompt';
-import { RunAISetup } from './RunAISetup';
-import type { SetupClient } from './setup';
+import { RunAISetup, type SetupClient } from './RunAISetup';
+import { useRunAICopy } from './useRunAICopy';
 import type { RunAIAction } from './tracking';
 
 const clients = [
@@ -31,7 +31,6 @@ export function RunAIAssistPopover({
   metadataError,
   onRetry,
   onAction,
-  getSetupHref,
   endpoint,
 }: {
   context: RunPromptContext;
@@ -40,7 +39,6 @@ export function RunAIAssistPopover({
   metadataError: boolean;
   onRetry: () => void;
   onAction: (event: RunAIAction) => void;
-  getSetupHref: (client: SetupClient) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<SetupClient | null>(
@@ -48,49 +46,19 @@ export function RunAIAssistPopover({
   );
   const setupID = useId();
   const [previewTime, setPreviewTime] = useState(() => new Date());
-  const [copyState, setCopyState] = useState<
-    'idle' | 'copying' | 'copied' | 'failed'
-  >('idle');
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const viewed = useRef(false);
-  const copyAttempt = useRef(0);
   const result = buildRunDiscoveryPrompt(context, previewTime);
-  const contextKey = JSON.stringify(context);
-
+  const {
+    status: copyState,
+    copy,
+    reset,
+  } = useRunAICopy(JSON.stringify([context, metadataLoading, metadataError]));
   useEffect(() => {
-    copyAttempt.current++;
-    setCopyState('idle');
-  }, [contextKey, metadataLoading, metadataError]);
-
-  useEffect(() => {
-    if (copyState !== 'copied') return;
-    const timer = setTimeout(() => setCopyState('idle'), 2000);
-    return () => clearTimeout(timer);
-  }, [copyState]);
-
-  const recordView = useCallback(() => {
     if (!viewed.current) {
       viewed.current = true;
       onAction({ action: 'viewed' });
     }
   }, [onAction]);
-
-  useEffect(() => {
-    const trigger = triggerRef.current;
-    if (!trigger || viewed.current) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      recordView();
-      return;
-    }
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        recordView();
-        observer.disconnect();
-      }
-    });
-    observer.observe(trigger);
-    return () => observer.disconnect();
-  }, [recordView]);
 
   const blocked = metadataLoading || metadataError || Boolean(result.error);
   const message = metadataLoading
@@ -105,31 +73,13 @@ export function RunAIAssistPopover({
     const snapshot = buildRunDiscoveryPrompt(context, now);
     setPreviewTime(now);
     if (!snapshot.prompt) return;
-    const attempt = ++copyAttempt.current;
-    setCopyState('copying');
     onAction({ action: 'prompt_copy_clicked' });
-    try {
-      if (!navigator.clipboard?.writeText) {
-        onAction({
-          action: 'prompt_copy_failed',
-          failure_category: 'unavailable',
-        });
-        if (attempt === copyAttempt.current) setCopyState('failed');
-        return;
-      }
-      await navigator.clipboard.writeText(snapshot.prompt);
-      onAction({ action: 'prompt_copied' });
-      if (attempt === copyAttempt.current) setCopyState('copied');
-    } catch (error) {
-      onAction({
-        action: 'prompt_copy_failed',
-        failure_category:
-          error instanceof DOMException && error.name === 'NotAllowedError'
-            ? 'permission_denied'
-            : 'other',
-      });
-      if (attempt === copyAttempt.current) setCopyState('failed');
-    }
+    const failure = await copy(snapshot.prompt);
+    onAction(
+      failure
+        ? { action: 'prompt_copy_failed', failure_category: failure }
+        : { action: 'prompt_copied' },
+    );
   }
 
   return (
@@ -137,9 +87,8 @@ export function RunAIAssistPopover({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        setCopyState('idle');
+        reset();
         if (next) {
-          recordView();
           setPreviewTime(new Date());
           onAction({ action: 'opened' });
         }
@@ -147,7 +96,6 @@ export function RunAIAssistPopover({
     >
       <PopoverTrigger asChild>
         <Button
-          ref={triggerRef}
           kind="secondary"
           appearance="outlined"
           size="small"
@@ -196,7 +144,6 @@ export function RunAIAssistPopover({
               key={`${selectedClient}:${endpoint}`}
               client={selectedClient}
               endpoint={endpoint}
-              fullSetupHref={getSetupHref(selectedClient)}
               onAction={onAction}
             />
           </div>
