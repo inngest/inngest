@@ -27,7 +27,7 @@ export function RunAISetup({
     createMCPClients(endpoint, false).find((item) => item.id === client)
       ?.snippet.content ?? endpoint;
   return (
-    <section aria-label="Connection instructions" className="mt-3 text-xs">
+    <section aria-label="Connection instructions" className="mt-5 text-xs">
       <p className="text-muted mb-1 text-xs">
         {client === 'other'
           ? 'Add this MCP server URL:'
