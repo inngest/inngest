@@ -972,6 +972,23 @@ func (e *executor) checkExecutionCap(ctx context.Context, req execution.Schedule
 		return enums.SkipReasonNone
 	}
 
+	// Reruns are new admissions, even when their inputs retain invoke metadata.
+	if req.OriginalRunID == nil && req.ReplayID == nil && req.ScheduleType != enums.ScheduleTypeRerun {
+		for _, tracked := range req.Events {
+			evt := tracked.GetEvent()
+			if evt.Name != event.InvokeFnName {
+				continue
+			}
+			md, err := evt.InngestMetadata()
+			if err != nil || md.RunID() == nil || md.SourceAppID == "" || md.SourceFnID == "" {
+				continue
+			}
+			// Let admitted work continue. One step invoke exempts the whole batch;
+			// historical invocation-event resends intentionally qualify too.
+			return enums.SkipReasonNone
+		}
+	}
+
 	decision := e.accountExecutionCap(ctx, req.AccountID)
 	if !decision.Exceeded || !decision.Enforce {
 		return enums.SkipReasonNone
@@ -991,6 +1008,12 @@ func (e *executor) checkExecutionCap(ctx context.Context, req execution.Schedule
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
 	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
+
+	// Debounce flushes retain events, not rerun identity. Reruns must reach
+	// admission checks directly rather than inherit an old invoke's exemption.
+	if req.OriginalRunID != nil || req.ReplayID != nil || req.ScheduleType == enums.ScheduleTypeRerun {
+		req.PreventDebounce = true
+	}
 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
