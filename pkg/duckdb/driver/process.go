@@ -601,13 +601,6 @@ func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
 		return err
 	}
 
-	if duckLakePostgresInliningOverridden(opts) {
-		logger.StdlibLogger(ctx).Warn(
-			"duckdb: DuckLake DataInliningRowLimit is ignored for a postgres catalog; inlining is forced off (see https://github.com/duckdb/ducklake/issues/1175)",
-			"configured_row_limit", opts.DataInliningRowLimit,
-		)
-	}
-
 	// DuckLake requires the data directory to exist before ATTACH runs.
 	// MkdirAll is idempotent, so re-running it on every respawn is free.
 	if err := os.MkdirAll(opts.DataPath, 0o755); err != nil {
@@ -679,14 +672,6 @@ func duckLakeBootstrapStmts(opts DuckLakeOptions, localExtensionPaths map[string
 
 	rowLimit := opts.DataInliningRowLimit
 	switch {
-	case usingPostgres:
-		// https://github.com/duckdb/ducklake/issues/1175: DuckLake's postgres
-		// catalog backend corrupts inlined rows that contain JSON columns (it
-		// writes a byte-escaped literal where postgres expects valid JSON),
-		// so inlining is forced off for a postgres catalog regardless of
-		// whatever DataInliningRowLimit the caller configured, until that bug
-		// is fixed upstream.
-		rowLimit = 0
 	case rowLimit == 0:
 		rowLimit = DefaultDataInliningRowLimit
 	case rowLimit < 0:
@@ -807,16 +792,6 @@ func installOrLoadStmts(extName string, localExtensionPaths map[string]string) (
 		return []string{fmt.Sprintf("LOAD %s;", literal)}, nil
 	}
 	return []string{fmt.Sprintf("INSTALL %s;", extName), fmt.Sprintf("LOAD %s;", extName)}, nil
-}
-
-// duckLakePostgresInliningOverridden reports whether opts silently discards a
-// caller-configured DataInliningRowLimit because a postgres catalog forces
-// inlining off (see duckLakeBootstrapStmts). Only an explicit positive limit
-// counts: zero means "unset, use the default" and a negative value already
-// means "explicitly disable inlining" — both already agree with, or are
-// subsumed by, the forced override, so neither is worth warning about.
-func duckLakePostgresInliningOverridden(opts DuckLakeOptions) bool {
-	return opts.PostgresCatalogURI != "" && opts.DataInliningRowLimit > 0
 }
 
 // restartLocked assumes mu is already held. It closes the current
@@ -1079,10 +1054,9 @@ type DuckLakeOptions struct {
 	// disk in this mode — only the catalog metadata moves to Postgres.
 	//
 	// Mutually exclusive with CatalogPath and SQLiteCatalogPath — exactly one
-	// catalog source is required. Setting this also forces
-	// DataInliningRowLimit to 0 regardless of its configured value: see
-	// https://github.com/duckdb/ducklake/issues/1175 (DuckLake's postgres
-	// catalog backend corrupts inlined rows that contain JSON columns).
+	// catalog source is required. Inlining is on by default like every other
+	// catalog (ducklake#1175, which corrupted inlined JSON rows on a postgres
+	// catalog, is fixed as of the DuckDB v2.0.0 pin).
 	PostgresCatalogURI string
 	// SQLiteCatalogPath, when set, attaches the DuckLake catalog against a
 	// SQLite database file instead of a local DuckDB catalog file:
@@ -1093,11 +1067,10 @@ type DuckLakeOptions struct {
 	// catalog metadata moves to a SQLite file instead of a DuckDB one.
 	//
 	// Mutually exclusive with CatalogPath, PostgresCatalogURI, and
-	// QuackCatalogAddr — exactly one catalog source is required. Unlike
-	// PostgresCatalogURI, this does not force DataInliningRowLimit off:
-	// DuckLake's SQLite metadata manager has no equivalent of ducklake#1175
-	// (JSON isn't in its TypeIsNativelySupported/SupportsInlining exclusion
-	// list — only FLOAT/DOUBLE/TIMESTAMP_TZ/STRUCT/MAP/LIST/VARIANT are).
+	// QuackCatalogAddr — exactly one catalog source is required. DuckLake's
+	// SQLite metadata manager never had an equivalent of ducklake#1175 (JSON
+	// isn't in its TypeIsNativelySupported/SupportsInlining exclusion list —
+	// only FLOAT/DOUBLE/TIMESTAMP_TZ/STRUCT/MAP/LIST/VARIANT are).
 	SQLiteCatalogPath string
 	// QuackCatalogAddr, when set, attaches the DuckLake catalog against a
 	// remote DuckDB instance over the quack wire protocol instead of a local
@@ -1160,9 +1133,6 @@ type DuckLakeOptions struct {
 	// negative value to disable inlining entirely (DATA_INLINING_ROW_LIMIT
 	// 0) — the zero value itself can't mean that, since it already means
 	// "unset" for every caller that doesn't set this field at all.
-	//
-	// Ignored (forced to 0) when PostgresCatalogURI is set — see that field's
-	// doc comment.
 	DataInliningRowLimit int
 }
 

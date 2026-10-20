@@ -79,10 +79,8 @@ func TestSelfBuiltDuckLakePostgresCatalogEndToEnd(t *testing.T) {
 		DuckLake: &DuckLakeOptions{
 			PostgresCatalogURI: pgURI,
 			DataPath:           filepath.Join(dir, "data"),
-			// Deliberately request inlining -- must still be forced to 0 for
-			// a postgres catalog (see duckLakePostgresInliningOverridden),
-			// same guarantee as the (upstream-blocked) ducklake_postgres_test.go
-			// tests this mirrors.
+			// Deliberately request inlining, which ducklake#1175 used to
+			// break for JSON columns on a postgres catalog.
 			DataInliningRowLimit: 1000,
 		},
 		AllowUnsignedExtensions: true,
