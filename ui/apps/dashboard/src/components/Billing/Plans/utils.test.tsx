@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   displayPlanName,
+  isActive,
   pickSelfServePlans,
   processPlan,
   type SelfServePlan,
@@ -183,7 +184,7 @@ describe('pickSelfServePlans', () => {
 
     expect(pickSelfServePlans(plans).business).toBe(plans[1]);
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
-      'Multiple active, visible Growth billing plans returned',
+      'Multiple active, visible Business billing plans returned',
       {
         level: 'error',
         extra: {
@@ -245,6 +246,37 @@ describe('pickSelfServePlans', () => {
     );
     expect(pickSelfServePlans([growth, business]).business).toBe(business);
   });
+
+  it('reports an active Growth plan next to an active Business plan', () => {
+    const growth = plan({
+      amount: 19_900,
+      isFree: false,
+      isLegacy: false,
+      name: 'Growth',
+      slug: 'growth-from-api',
+    });
+    const business = plan({
+      amount: 15_000,
+      isFree: false,
+      isLegacy: false,
+      name: 'Business',
+      slug: 'business-from-api',
+    });
+
+    expect(pickSelfServePlans([growth, business]).business).toBe(business);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      'Multiple active, visible Business billing plans returned',
+      {
+        level: 'error',
+        extra: {
+          plans: [
+            { amount: 19_900, slug: 'growth-from-api' },
+            { amount: 15_000, slug: 'business-from-api' },
+          ],
+        },
+      },
+    );
+  });
 });
 
 describe('Business plan display', () => {
@@ -261,5 +293,15 @@ describe('Business plan display', () => {
     expect(processPlan(growth).name).toBe('Business');
     expect(processPlan(growth).slug).toBe('growth-from-api');
     expect(displayPlanName('Business')).toBe('Business');
+  });
+
+  it('keeps the suffix of a Growth plan name', () => {
+    expect(displayPlanName('Growth Trial')).toBe('Business Trial');
+    expect(displayPlanName('Growth - Annual')).toBe('Business - Annual');
+  });
+
+  it('matches a Growth current plan to the Business card', () => {
+    expect(isActive({ name: 'Growth' }, { name: 'Business' })).toBe(true);
+    expect(isActive({ name: 'Pro' }, { name: 'Business' })).toBe(false);
   });
 });
