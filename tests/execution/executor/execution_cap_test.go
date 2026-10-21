@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,7 +15,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -88,4 +91,61 @@ func TestExecutorScheduleAccountExecutionCap(t *testing.T) {
 	defer lc.mu.Unlock()
 	require.Len(t, lc.skipped, 1)
 	require.Equal(t, enums.SkipReasonAccountExecutionCapHit, lc.skipped[0].Reason)
+}
+
+func TestExecutorInvokeAfterAccountExecutionCap(t *testing.T) {
+	infra := newExecTestInfra(t, "step")
+	var capped atomic.Bool
+	invocations := make(chan event.TrackedEvent, 2)
+	driver := &mockDriverV1{response: &state.DriverResponse{
+		StatusCode: 206,
+		Generator: []*state.GeneratorOpcode{{
+			Op: enums.OpcodeInvokeFunction,
+			ID: "call-child",
+			Opts: map[string]any{
+				"function_id": infra.fn.Slug,
+				"payload":     map[string]any{"data": map[string]any{"input": "child"}},
+			},
+		}},
+	}}
+	exec := infra.newExecutor(t,
+		executor.WithDriverV1(driver),
+		executor.WithAccountExecutionCap(func(context.Context, uuid.UUID) executor.ExecutionCapLimitDecision {
+			return executor.ExecutionCapLimitDecision{Exceeded: capped.Load(), Enforce: true}
+		}),
+		executor.WithInvokeEventHandler(func(_ context.Context, evt event.TrackedEvent) error {
+			invocations <- evt
+			return nil
+		}),
+	)
+	run := infra.scheduleRun(t, exec)
+	capped.Store(true)
+	scope := queue.Scope{AccountID: infra.aID, EnvID: infra.wsID, FunctionID: infra.fnID}
+	for _, generation := range []string{"child", "grandchild"} {
+		t.Run(generation, func(t *testing.T) {
+			jobs, err := infra.rq.RunJobs(infra.ctx, infra.queueShard.Name(), scope, run.ID.RunID, 100, 0)
+			require.NoError(t, err)
+			require.Len(t, jobs, 1)
+			job := jobs[0].Raw.(*queue.QueueItem)
+			_, err = exec.Execute(infra.ctx, statev2.V1FromMetadata(*run), job.Data, inngest.SourceEdge)
+			require.NoError(t, err)
+			var invoke event.TrackedEvent
+			select {
+			case invoke = <-invocations:
+			case <-time.After(time.Second):
+				t.Fatal("running parent did not publish step.invoke")
+			}
+			_, next, err := exec.Schedule(infra.ctx, execution.ScheduleRequest{
+				Function: infra.fn, AccountID: infra.aID, WorkspaceID: infra.wsID, AppID: infra.appID,
+				Events: []event.TrackedEvent{invoke},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, next)
+			require.NotEqual(t, run.ID.RunID, next.ID.RunID)
+			childJobs, err := infra.rq.RunJobs(infra.ctx, infra.queueShard.Name(), scope, next.ID.RunID, 100, 0)
+			require.NoError(t, err)
+			require.Len(t, childJobs, 1)
+			run = next
+		})
+	}
 }

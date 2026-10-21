@@ -967,9 +967,32 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
+func isExecutorInvocation(evt event.Event) bool {
+	if evt.Name != event.InvokeFnName {
+		return false
+	}
+
+	md, err := evt.InngestMetadata()
+	if err != nil {
+		return false
+	}
+
+	return md.RunID() != nil &&
+		md.SourceAppID != "" &&
+		md.SourceFnID != ""
+}
+
 func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
 	if e.accountExecutionCap == nil {
 		return enums.SkipReasonNone
+	}
+
+	for _, tracked := range req.Events {
+		if isExecutorInvocation(tracked.GetEvent()) {
+			// One step invoke exempts the whole batch. Eligibility follows the event,
+			// including historical resends and function reruns using that input.
+			return enums.SkipReasonNone
+		}
 	}
 
 	decision := e.accountExecutionCap(ctx, req.AccountID)
