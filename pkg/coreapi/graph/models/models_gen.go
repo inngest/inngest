@@ -467,10 +467,12 @@ type SleepStepInfo struct {
 func (SleepStepInfo) IsStepInfo() {}
 
 type SpanMetadata struct {
-	Scope     enums.MetadataScope `json:"scope"`
-	Kind      metadata.Kind       `json:"kind"`
-	Values    metadata.Values     `json:"values"`
-	UpdatedAt time.Time           `json:"updatedAt"`
+	Scope enums.MetadataScope `json:"scope"`
+	// The kind, with or without its userland/inngest prefix depending on the trace store; isUser disambiguates.
+	Kind      metadata.Kind   `json:"kind"`
+	IsUser    bool            `json:"isUser"`
+	Values    metadata.Values `json:"values"`
+	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
 type StepError struct {
