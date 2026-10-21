@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -871,6 +872,10 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		if qi == nil {
 			// NOTE: this shouldn't happen but is fine to ignore.
 			l.Warn("nil queue item in partition item iterator")
+			continue
+		}
+
+		if !cancellation.ContainsTime(c, ulid.Time(qi.Data.Identifier.RunID.Time())) {
 			continue
 		}
 
