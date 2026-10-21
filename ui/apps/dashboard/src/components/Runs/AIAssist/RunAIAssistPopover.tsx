@@ -118,8 +118,7 @@ export function RunAIAssistPopover({
           Find runs with your AI tool
         </h2>
         <p className="text-muted mt-1 text-xs">
-          Connect your AI tool to Inngest Cloud to find runs and inspect their
-          traces.
+          Connect your AI tool to find runs and inspect traces.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-3">
           {clients.map(({ id, label, tracking, Icon }) => (
