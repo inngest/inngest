@@ -32,7 +32,7 @@ type functionProviderReader interface {
 // app-scoped slug or UUID using the given function reader.
 func NewFunctionProvider(reader functionProviderReader, pauses *functionPauses, unpauser queue.Unpauser) *cqrsFunctionProvider {
 	if pauses == nil {
-		pauses = &functionPauses{pausedAt: make(map[uuid.UUID]time.Time)}
+		pauses = &functionPauses{}
 	}
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {

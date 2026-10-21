@@ -226,7 +226,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
-	pauseState := &functionPauses{pausedAt: make(map[uuid.UUID]time.Time)}
+	pauseState := &functionPauses{}
 
 	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis

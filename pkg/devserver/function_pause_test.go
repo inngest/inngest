@@ -196,6 +196,58 @@ func TestFunctionPauseConcurrentFirstWriteWins(t *testing.T) {
 	require.Equal(t, queue.PartitionPausedInfo{Paused: true}, provider.pauses.partitionPaused(t.Context(), fn.ID))
 }
 
+func TestFunctionResumeDoesNotBlockOtherFunctions(t *testing.T) {
+	for _, wakeErr := range []error{nil, errors.New("wake failed")} {
+		t.Run(fmt.Sprintf("wake error=%v", wakeErr), func(t *testing.T) {
+			provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
+			pauses := provider.pauses
+			id, other := uuid.New(), uuid.New()
+			original := pauses.pause(id)
+			pauses.pause(other)
+			wakeStarted, releaseWake := make(chan struct{}), make(chan struct{})
+			release := sync.OnceFunc(func() { close(releaseWake) })
+			defer release()
+			resumed := make(chan error, 1)
+			go func() {
+				resumed <- pauses.resume(id, func() error {
+					close(wakeStarted)
+					<-releaseWake
+					return wakeErr
+				})
+			}()
+			<-wakeStarted
+
+			read := make(chan time.Time, 1)
+			go func() { read <- pauses.get(id) }()
+			unrelated := make(chan bool, 1)
+			go func() {
+				paused := pauses.partitionPaused(t.Context(), other).Paused
+				pauses.unpause(other)
+				pauses.pause(uuid.New())
+				unrelated <- paused && pauses.get(other).IsZero()
+			}()
+			select {
+			case ok := <-unrelated:
+				require.True(t, ok)
+			case <-time.After(time.Second):
+				t.Fatal("resume blocked another function's pause state")
+			}
+			select {
+			case <-read:
+				t.Fatal("pause read finished before the wake")
+			default:
+			}
+			release()
+			require.ErrorIs(t, <-resumed, wakeErr)
+			if wakeErr == nil {
+				require.True(t, (<-read).IsZero())
+			} else {
+				require.Equal(t, original, <-read)
+			}
+		})
+	}
+}
+
 func TestFunctionResumeMissingUnpauser(t *testing.T) {
 	provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
 	fn, err := provider.PauseFunction(t.Context(), inngest.DeployedFunction{ID: uuid.New()})
