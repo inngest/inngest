@@ -57,14 +57,12 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET PARTITIONED BY (year(queued_
 -- on that table, mirroring the reference metadata insights table's own
 -- separation of concerns.
 --
--- Deliberately simpler than that reference design: this table drops the
--- concept of a metadata "op" (merge/set/delete/add) entirely. Each row is
--- the caller's full, already-resolved value set for one metadata emission,
--- not a delta to be folded with prior emissions by key. A reader wanting
--- "the current metadata for this span" collapses to the latest row per
--- (run_id, span_id, kind) -- the same latest-row-wins pattern
--- pkg/cqrs/duckdbquery already uses for inngest.runs -- rather than
--- replaying an op history.
+-- This table has no metadata "op" (merge/set/delete/add): every metadata
+-- write is a full replace of its kind, so each row is the full value for
+-- its kind. kind is stored without its userland/inngest prefix (is_user
+-- tells them apart). A reader wanting "the current metadata for this span"
+-- takes the latest row per (run_id, span_id, is_user, kind) (see
+-- inngest.run_metadata_rollup) rather than replaying an op history.
 CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   account_id     UUID NOT NULL,
   env_id         UUID NOT NULL,
