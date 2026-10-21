@@ -179,7 +179,7 @@ export function RunAIAssistPopover({
           />
         )}
         {!message && result.summary && (
-          <p className="text-muted mt-1.5 text-[11px] leading-4">
+          <p className="text-light mt-1.5 text-[11px] leading-4">
             {result.summary}
           </p>
         )}
