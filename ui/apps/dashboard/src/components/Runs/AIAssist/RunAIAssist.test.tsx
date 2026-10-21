@@ -77,7 +77,14 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
-    const displayedPrompt = screen.getByLabelText('Prompt preview').textContent;
+    const displayedPrompt = screen.getByRole('textbox', {
+      name: 'Prompt preview',
+    }).value;
+    expect(
+      screen.getByRole('textbox', {
+        name: 'Prompt preview',
+      }).readOnly,
+    ).toBe(true);
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(Date.now() + 60_000));
     fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
@@ -85,7 +92,9 @@ describe('Runs AI popover', () => {
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copy_clicked' });
     expect(onAction).not.toHaveBeenCalledWith({ action: 'prompt_copied' });
     expect(writeText).toHaveBeenCalledWith(
-      screen.getByLabelText('Prompt preview').textContent,
+      screen.getByRole('textbox', {
+        name: 'Prompt preview',
+      }).value,
     );
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining('"env": "production"'),
@@ -93,9 +102,11 @@ describe('Runs AI popover', () => {
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining('Use read operations only'),
     );
-    expect(screen.getByLabelText('Prompt preview').textContent).toContain(
-      'Use read operations only',
-    );
+    expect(
+      screen.getByRole('textbox', {
+        name: 'Prompt preview',
+      }).value,
+    ).toContain('Use read operations only');
     expect(screen.queryByLabelText('Full prompt')).toBeNull();
     await act(async () => resolve());
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copied' });
@@ -114,13 +125,13 @@ describe('Runs AI popover', () => {
     const { onAction } = mount();
     open();
     fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
-    await screen.findByText(
-      'Couldn’t copy. Select and copy the full prompt below.',
-    );
+    await screen.findByText('Couldn’t copy. Select and copy the prompt above.');
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
-    expect(screen.getByLabelText('Full prompt').textContent).toContain(
-      'Use read operations only',
-    );
+    expect(
+      screen.getByRole('textbox', {
+        name: 'Prompt preview',
+      }).value,
+    ).toContain('Use read operations only');
     expect(onAction).toHaveBeenCalledWith({
       action: 'prompt_copy_failed',
       failure_category: 'permission_denied',
@@ -247,9 +258,11 @@ describe('Runs AI popover', () => {
     );
     await act(async () => resolve());
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
-    expect(screen.getByLabelText('Prompt preview').textContent).toContain(
-      '"FAILED"',
-    );
+    expect(
+      screen.getByRole('textbox', {
+        name: 'Prompt preview',
+      }).value,
+    ).toContain('"FAILED"');
   });
 
   it('offers metadata retry and keeps copying disabled while loading', () => {

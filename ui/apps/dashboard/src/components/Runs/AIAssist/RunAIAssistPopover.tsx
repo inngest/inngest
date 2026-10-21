@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { Textarea } from '@inngest/components/Forms/Textarea';
 import {
   Popover,
   PopoverContent,
@@ -169,13 +170,13 @@ export function RunAIAssistPopover({
             {message}
           </p>
         ) : (
-          <pre
+          <Textarea
             aria-label="Prompt preview"
-            tabIndex={0}
-            className="bg-canvasSubtle text-basis max-h-24 select-text overflow-y-auto whitespace-pre-wrap break-words rounded border p-2 font-mono text-xs"
-          >
-            {result.prompt}
-          </pre>
+            readOnly
+            value={result.prompt ?? ''}
+            rows={4}
+            className="h-24 resize-none overflow-y-auto p-2 font-sans text-xs leading-5"
+          />
         )}
         {!message && result.summary && (
           <p className="text-muted mt-1.5 text-[11px] leading-4">
@@ -193,17 +194,8 @@ export function RunAIAssistPopover({
         )}
         {copyState === 'failed' && (
           <p role="status" className="text-muted mt-1 text-xs">
-            Couldn’t copy. Select and copy the full prompt below.
+            Couldn’t copy. Select and copy the prompt above.
           </p>
-        )}
-        {copyState === 'failed' && result.prompt && (
-          <textarea
-            aria-label="Full prompt"
-            readOnly
-            value={result.prompt}
-            rows={3}
-            className="bg-canvasSubtle text-basis border-subtle max-h-24 w-full rounded border p-2 font-mono text-xs"
-          />
         )}
         <a
           className="text-link mt-2 inline-block text-xs hover:underline"
