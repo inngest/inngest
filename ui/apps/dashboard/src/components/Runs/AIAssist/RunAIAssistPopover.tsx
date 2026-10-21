@@ -9,7 +9,11 @@ import {
 } from '@inngest/components/Popover';
 import { IconClaude } from '@inngest/components/icons/ai/Claude';
 import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
-import { RiAppsLine, RiSparklingLine } from '@remixicon/react';
+import {
+  RiAppsLine,
+  RiArrowRightUpLine,
+  RiSparklingLine,
+} from '@remixicon/react';
 
 import { buildRunDiscoveryPrompt, type RunPromptContext } from './prompt';
 import { RunAISetup, type SetupClient } from './RunAISetup';
@@ -195,7 +199,7 @@ export function RunAIAssistPopover({
           </p>
         )}
         <a
-          className="text-link mt-2 inline-block text-xs hover:underline"
+          className="text-link mt-2 inline-flex items-center gap-1 text-xs hover:underline"
           href="https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools"
           target="_blank"
           rel="noopener noreferrer"
@@ -204,6 +208,7 @@ export function RunAIAssistPopover({
           }
         >
           Available MCP tools
+          <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       </PopoverContent>
     </Popover>

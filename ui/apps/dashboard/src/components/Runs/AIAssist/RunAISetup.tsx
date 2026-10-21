@@ -1,3 +1,5 @@
+import { RiArrowRightUpLine } from '@remixicon/react';
+
 import { CopyButton } from '@inngest/components/CopyButton';
 import { InlineCode } from '@inngest/components/Code';
 import { createMCPClients } from '@inngest/components/MCP/clients';
@@ -58,12 +60,13 @@ export function RunAISetup({
         href="https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud"
         target="_blank"
         rel="noopener noreferrer"
-        className="text-link mt-3 inline-block hover:underline"
+        className="text-link mt-3 inline-flex items-center gap-1 hover:underline"
         onClick={() =>
           onAction({ action: 'guide_clicked', guide: 'connection' })
         }
       >
         Setup guide
+        <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
       </a>
     </section>
   );
