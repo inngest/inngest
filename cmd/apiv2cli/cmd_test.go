@@ -1198,3 +1198,26 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandCreatesCancellation(t *testing.T) {
+	var method, path, body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, path = r.Method, r.URL.Path
+		data, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		body = string(data)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000"}}`))
+	}))
+	defer srv.Close()
+	cmd := Command()
+	var out bytes.Buffer
+	cmd.Writer = &out
+	err := cmd.Run(t.Context(), []string{"api", "create-cancellation", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn", "--from", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z", "--if", "event.data.cancel == true", "--name", "cleanup"})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, method)
+	require.Equal(t, "/api/v2/cancellations", path)
+	require.JSONEq(t, `{"appId":"app","functionId":"fn","from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`, body)
+	require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000"}}`, out.String())
+}

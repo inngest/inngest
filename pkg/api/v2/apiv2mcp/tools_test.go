@@ -198,3 +198,22 @@ func endpointByMethod(t *testing.T, method string) apiv2endpoint.Endpoint {
 	t.Fatalf("endpoint %s not found", method)
 	return apiv2endpoint.Endpoint{}
 }
+
+func TestCreateCancellationRequest(t *testing.T) {
+	endpoint := endpointByMethod(t, "CreateCancellation")
+	args := map[string]any{"appId": "app", "functionId": "fn", "from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z", "if": "event.data.cancel == true", "name": "cleanup"}
+	req, err := Request(t.Context(), endpoint, args, Options{})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "/api/v2/cancellations", req.URL.Path)
+	require.Empty(t, req.URL.RawQuery)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+	require.Equal(t, args, body)
+	require.ElementsMatch(t, []string{"appId", "functionId", "from", "until"}, InputSchema(endpoint)["required"])
+	tool := Tool(endpoint)
+	require.Equal(t, "create_cancellation", tool.Name)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.True(t, *tool.Annotations.DestructiveHint)
+}

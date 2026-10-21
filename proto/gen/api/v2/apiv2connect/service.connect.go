@@ -140,6 +140,8 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
 	V2GetFunctionProcedure = "/api.v2.V2/GetFunction"
+	// V2CreateCancellationProcedure is the fully-qualified name of the V2's CreateCancellation RPC.
+	V2CreateCancellationProcedure = "/api.v2.V2/CreateCancellation"
 	// V2PauseFunctionProcedure is the fully-qualified name of the V2's PauseFunction RPC.
 	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
@@ -224,6 +226,7 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
@@ -550,6 +553,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		createCancellation: connect.NewClient[v2.CreateCancellationRequest, v2.CreateCancellationResponse](
+			httpClient,
+			baseURL+V2CreateCancellationProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateCancellation")),
+			connect.WithClientOptions(opts...),
+		),
 		pauseFunction: connect.NewClient[v2.PauseFunctionRequest, v2.PauseFunctionResponse](
 			httpClient,
 			baseURL+V2PauseFunctionProcedure,
@@ -683,6 +692,7 @@ type v2Client struct {
 	syncApp                    *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace           *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
+	createCancellation         *connect.Client[v2.CreateCancellationRequest, v2.CreateCancellationResponse]
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
 	sendEvent                  *connect.Client[v2.SendEventRequest, v2.SendEventResponse]
@@ -948,6 +958,11 @@ func (c *v2Client) GetFunction(ctx context.Context, req *connect.Request[v2.GetF
 	return c.getFunction.CallUnary(ctx, req)
 }
 
+// CreateCancellation calls api.v2.V2.CreateCancellation.
+func (c *v2Client) CreateCancellation(ctx context.Context, req *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error) {
+	return c.createCancellation.CallUnary(ctx, req)
+}
+
 // PauseFunction calls api.v2.V2.PauseFunction.
 func (c *v2Client) PauseFunction(ctx context.Context, req *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
 	return c.pauseFunction.CallUnary(ctx, req)
@@ -1068,6 +1083,7 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
@@ -1390,6 +1406,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateCancellationHandler := connect.NewUnaryHandler(
+		V2CreateCancellationProcedure,
+		svc.CreateCancellation,
+		connect.WithSchema(v2Methods.ByName("CreateCancellation")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2PauseFunctionHandler := connect.NewUnaryHandler(
 		V2PauseFunctionProcedure,
 		svc.PauseFunction,
@@ -1570,6 +1592,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2GetFunctionProcedure:
 			v2GetFunctionHandler.ServeHTTP(w, r)
+		case V2CreateCancellationProcedure:
+			v2CreateCancellationHandler.ServeHTTP(w, r)
 		case V2PauseFunctionProcedure:
 			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
@@ -1803,6 +1827,10 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateCancellation(context.Context, *connect.Request[v2.CreateCancellationRequest]) (*connect.Response[v2.CreateCancellationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateCancellation is not implemented"))
 }
 
 func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {

@@ -49,6 +49,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -504,6 +505,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
+		executor.WithCancellationChecker(cancellation.NewChecker(cancellation.NewRedisReader(unshardedRc, ""))),
 		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
@@ -715,6 +717,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Apps:                NewAppProvider(dbcqrs),
 		Functions:           functionProvider,
 		FunctionPauser:      functionProvider,
+		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),
 		Runs:                NewRunProvider(dbcqrs, exec),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
