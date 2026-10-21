@@ -172,11 +172,11 @@ export function RunAIAssistPopover({
             readOnly
             value={result.prompt ?? ''}
             rows={4}
-            className="h-24 resize-none overflow-y-auto p-2 font-sans text-xs leading-5"
+            className="block h-24 resize-none overflow-y-auto p-2 font-sans text-xs leading-5"
           />
         )}
         {!message && result.summary && (
-          <p className="text-light mt-1.5 text-[11px] leading-4">
+          <p className="text-light mt-1 text-[11px] leading-4">
             {result.summary}
           </p>
         )}
