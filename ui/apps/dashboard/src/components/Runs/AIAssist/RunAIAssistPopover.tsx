@@ -100,9 +100,8 @@ export function RunAIAssistPopover({
           size="small"
           title="Find runs with AI"
           icon={<RiSparklingLine />}
-          iconSide="left"
           aria-label="Find runs with AI"
-          className="h-[26px] w-[26px] shrink-0 rounded"
+          className="shrink-0"
         />
       </PopoverTrigger>
       <PopoverContent
