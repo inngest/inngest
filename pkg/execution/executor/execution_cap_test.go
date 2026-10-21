@@ -252,32 +252,6 @@ func TestScheduleAccountExecutionCapInvokes(t *testing.T) {
 			wantSkip: enums.SkipReasonAccountExecutionCapHit,
 		},
 		{
-			name: "direct rerun",
-			configure: func(req *execution.ScheduleRequest) {
-				id := ulid.Make()
-				req.OriginalRunID = &id
-				req.Function.Debounce = &inngest.Debounce{Period: "10s"}
-			},
-			wantSkip: enums.SkipReasonAccountExecutionCapHit,
-		},
-		{
-			name: "direct replay",
-			configure: func(req *execution.ScheduleRequest) {
-				id := uuid.New()
-				req.ReplayID = &id
-				req.Function.Debounce = &inngest.Debounce{Period: "10s"}
-			},
-			wantSkip: enums.SkipReasonAccountExecutionCapHit,
-		},
-		{
-			name: "rerun schedule type",
-			configure: func(req *execution.ScheduleRequest) {
-				req.ScheduleType = enums.ScheduleTypeRerun
-				req.Function.Debounce = &inngest.Debounce{Period: "10s"}
-			},
-			wantSkip: enums.SkipReasonAccountExecutionCapHit,
-		},
-		{
 			name: "exemption does not bypass pause",
 			configure: func(req *execution.ScheduleRequest) {
 				paused := time.Now().Add(-time.Minute)
@@ -309,6 +283,62 @@ func TestScheduleAccountExecutionCapInvokes(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, jobs, 1)
 		})
+	}
+}
+
+func TestScheduleAccountExecutionCapReruns(t *testing.T) {
+	for _, identity := range []string{"original run", "replay", "schedule type"} {
+		for _, debounced := range []bool{false, true} {
+			for _, invoke := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/debounce=%t/invoke=%t", identity, debounced, invoke), func(t *testing.T) {
+					e, req := newExecutionCapScheduler(t)
+					switch identity {
+					case "original run":
+						id := ulid.Make()
+						req.OriginalRunID = &id
+					case "replay":
+						id := uuid.New()
+						req.ReplayID = &id
+					case "schedule type":
+						req.ScheduleType = enums.ScheduleTypeRerun
+					}
+					if invoke {
+						req.Events = []event.TrackedEvent{executionCapInvoke(req)}
+					}
+					if debounced {
+						req.Function.Debounce = &inngest.Debounce{Period: "10s"}
+						_, md, err := e.Schedule(t.Context(), req)
+						require.ErrorIs(t, err, ErrFunctionDebounced)
+						require.Nil(t, md)
+						scope := queue.Scope{AccountID: req.AccountID, EnvID: req.WorkspaceID, FunctionID: req.Function.ID}
+						info, err := e.debouncer.GetDebounceInfo(t.Context(), scope, "")
+						require.NoError(t, err)
+						require.NotNil(t, info.Item)
+						require.Equal(t, req.Events[0].GetInternalID(), info.Item.EventID)
+						require.NoError(t, e.debouncer.StartExecution(t.Context(), *info.Item, req.Function, ulid.MustParse(info.DebounceID)))
+						// Flush reconstructs a request from the selected event, without rerun identity.
+						req = execution.ScheduleRequest{
+							AccountID: req.AccountID, WorkspaceID: req.WorkspaceID, AppID: req.AppID,
+							Function: req.Function, Events: []event.TrackedEvent{info.Item},
+							PreventDebounce: true, PreventRateLimit: true,
+						}
+					}
+					_, md, err := e.Schedule(t.Context(), req)
+					if !invoke {
+						var skipped SkippedError
+						require.ErrorAs(t, err, &skipped)
+						require.Equal(t, enums.SkipReasonAccountExecutionCapHit, skipped.Reason)
+						require.Nil(t, md)
+						return
+					}
+					require.NoError(t, err)
+					require.NotNil(t, md)
+					jobs, err := e.queue.RunJobs(t.Context(), "local", queue.Scope{AccountID: req.AccountID, EnvID: req.WorkspaceID, FunctionID: req.Function.ID}, md.ID.RunID, 10, 0)
+					require.NoError(t, err)
+					require.Len(t, jobs, 1)
+				})
+			}
+		}
 	}
 }
 
