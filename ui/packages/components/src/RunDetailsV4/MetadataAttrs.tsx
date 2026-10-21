@@ -141,7 +141,7 @@ const MetadataAttrRow = ({
                   </OptionalTooltip>
                 )}
               </div>
-              <div className="text-basis min-w-0 whitespace-pre-wrap text-sm font-normal leading-tight [overflow-wrap:anywhere]">
+              <div className="text-basis min-w-0 flex-1 whitespace-pre-wrap text-sm font-normal leading-tight [overflow-wrap:anywhere]">
                 <MetadataValue
                   format={format}
                   text={
