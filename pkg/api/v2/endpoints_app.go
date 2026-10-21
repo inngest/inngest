@@ -182,6 +182,8 @@ func toAppMethod(method enums.AppMethod) apiv2.AppMethod {
 		return apiv2.AppMethod_APP_METHOD_CONNECT
 	case enums.AppMethodAPI:
 		return apiv2.AppMethod_APP_METHOD_API
+	case enums.AppMethodInngestServe:
+		return apiv2.AppMethod_APP_METHOD_INNGEST_SERVE
 	default:
 		return apiv2.AppMethod_APP_METHOD_SERVE
 	}

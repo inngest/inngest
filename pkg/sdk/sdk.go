@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -153,6 +154,18 @@ func (f RegisterRequest) SDKVersion() string {
 
 func (f RegisterRequest) IsConnect() bool {
 	return f.Capabilities.Connect == ConnectV1 && f.DeployType == DeployTypeConnect
+}
+
+func (f RegisterRequest) AppMethod() enums.AppMethod {
+	if f.IsConnect() {
+		return enums.AppMethodConnect
+	}
+	switch f.DeployType {
+	case DeployTypeInngestServe:
+		return enums.AppMethodInngestServe
+	default:
+		return enums.AppMethodServe
+	}
 }
 
 func (f *RegisterRequest) normalize(forceHTTPS bool) error {
