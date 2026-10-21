@@ -34,6 +34,7 @@ export function Textarea({
       aria-label={ariaLabel}
       className={cn(
         'bg-canvasBase text-basis border-muted placeholder-disabled focus:outline-primary-moderate focus:border-muted w-full rounded-md border p-3 text-sm outline-2 transition-all focus:outline focus:ring-0',
+        readOnly && 'bg-canvasSubtle',
         className,
       )}
     />
