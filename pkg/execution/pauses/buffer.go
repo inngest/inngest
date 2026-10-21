@@ -109,6 +109,11 @@ func (r redisAdapter) DeletePausesForRun(ctx context.Context, runID ulid.ULID, w
 	if err != nil {
 		return err
 	}
+	// Most runs never wait on anything, so their index is empty: skip the
+	// round trip that would delete a key that does not exist.
+	if len(pauseIDs) == 0 {
+		return nil
+	}
 
 	for _, pauseID := range pauseIDs {
 		if err := r.rsm.DeletePauseByID(ctx, pauseID, workspaceID); err != nil {

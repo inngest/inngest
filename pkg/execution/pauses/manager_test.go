@@ -249,6 +249,39 @@ func TestDeletePauseByID(t *testing.T) {
 	})
 }
 
+// A run that never waited on anything has an empty pause index, so deleting
+// its pauses is a single read: no per-pause deletes and no index delete.
+func TestDeletePausesForRunSkipsEmptyIndex(t *testing.T) {
+	ctx := context.Background()
+	workspaceID := uuid.New()
+
+	t.Run("run without pauses", func(t *testing.T) {
+		buf := &mockBufferer{}
+		manager := NewManager(buf, nil, WithFlusher(&mockSimpleFlusher{}))
+
+		require.NoError(t, manager.DeletePausesForRun(ctx, ulid.Make(), workspaceID))
+
+		assert.Equal(t, 0, buf.deletePauseByIDCalled)
+		assert.Equal(t, 0, buf.deleteRunIndexCalled)
+	})
+
+	t.Run("run with a pause", func(t *testing.T) {
+		buf := &mockBufferer{}
+		manager := NewManager(buf, nil, WithFlusher(&mockSimpleFlusher{}))
+		runID := ulid.Make()
+		buf.pauses = append(buf.pauses, &state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: workspaceID,
+			Identifier:  state.PauseIdentifier{RunID: runID},
+		})
+
+		require.NoError(t, manager.DeletePausesForRun(ctx, runID, workspaceID))
+
+		assert.Equal(t, 1, buf.deletePauseByIDCalled)
+		assert.Equal(t, 1, buf.deleteRunIndexCalled)
+	})
+}
+
 // Helper functions
 
 func createTestPauses(count int, baseTime time.Time) []*state.Pause {

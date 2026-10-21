@@ -229,6 +229,7 @@ type mockBufferer struct {
 	mu                    sync.RWMutex
 	pauses                []*state.Pause
 	deletePauseByIDCalled int
+	deleteRunIndexCalled  int
 }
 
 func (m *mockBufferer) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
@@ -341,6 +342,9 @@ func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]u
 }
 
 func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.deleteRunIndexCalled++
 	return nil
 }
 
