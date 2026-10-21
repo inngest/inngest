@@ -178,5 +178,15 @@ this UI-only handoff. Review the implemented UI in staging before merging.
   A separate read-only staging MCP session confirmed the account, canonical
   environment, exact run, output, and failed trace. The returned error was
   `connect_no_healthy_connection`, matching the dashboard's error details.
-- These checks verify the MCP workflow; individual external AI clients' model
-  responses still need review. No run mutations were performed.
+- An actual Codex session received the exact deployed prompt, with only
+  `fetch_account`, `get_run`, and `get_run_trace` available through read-only
+  staging MCP. It checked the account first and preserved the exact run,
+  canonical environment, and output expansion in both run-tool calls.
+- Its diagnosis matched the returned error and failed spans: a Connect
+  connection availability failure, with worker/configuration causes clearly
+  labeled as hypotheses. It suggested restoring worker health and checking a
+  subsequent normally triggered run, and listed missing logs/connection history.
+  The cited timestamp, durations, and span IDs matched the tool responses.
+- This validates one real failure case in Codex; other clients and failure
+  categories remain untested. No shell commands, write tools, code changes, or
+  run mutations were performed during the diagnosis.
