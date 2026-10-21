@@ -93,7 +93,7 @@ describe('Cloud run debugging', () => {
       expect(preview.value).toContain('"runId": "run-1"');
       expect(
         screen.getByText(
-          'Example / production · Create chat completion · run-1',
+          'Example / production · Create chat completion',
         ),
       ).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));

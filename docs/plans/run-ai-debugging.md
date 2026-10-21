@@ -42,7 +42,8 @@ Reuse the discovery popover layout and controls:
 - Show exactly the string copied, in the shared read-only Textarea: subtle
   background and border, normal app typography, compact scrollable height.
 - Below the field, a small `text-light` context line:
-  `{account} / {environment label} · {function name} · {run ID}`.
+  `{account} / {environment label} · {function name}`. Keep the run ID in the
+  prompt and run details, rather than repeating it in this summary.
 - **Available MCP tools** opens the [tool list](https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools).
 
 Both links open a new tab with `rel="noopener noreferrer"` and

@@ -24,7 +24,6 @@ export function buildRunDebugPrompt(context: RunDebugContext) {
     summary: [
       `${context.accountName || context.accountID} / ${context.environmentLabel}`,
       context.functionName,
-      context.runID,
     ]
       .filter(Boolean)
       .join(' · '),
