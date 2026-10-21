@@ -372,3 +372,24 @@ func gzipCompressed(t *testing.T, input string) []byte {
 
 	return buf.Bytes()
 }
+
+func TestDoRequest_UnreachableKeepsDialError(t *testing.T) {
+	r := require.New(t)
+	ctx := silenceLogger(t.Context())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := server.URL
+	server.Close()
+
+	client := ExtendedClient{Client: &http.Client{}}
+	resp, err := client.DoRequest(ctx, SerializableRequest{
+		Method: http.MethodPost,
+		URL:    url,
+		Body:   json.RawMessage(`{}`),
+		Header: http.Header{},
+	})
+
+	r.Nil(resp)
+	r.ErrorIs(err, ErrUnableToReach)
+	r.ErrorContains(err, "connection refused")
+}
