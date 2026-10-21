@@ -198,6 +198,8 @@ func FromAppMethod(method AppMethod) (enums.AppMethod, error) {
 		return enums.AppMethodServe, nil
 	case AppMethodAPI:
 		return enums.AppMethodAPI, nil
+	case AppMethodInngestServe:
+		return enums.AppMethodInngestServe, nil
 	default:
 		return enums.AppMethodServe, fmt.Errorf("unknown connection type: %s", method.String())
 	}
@@ -228,6 +230,8 @@ func ToAppMethod(method enums.AppMethod) AppMethod {
 		return AppMethodConnect
 	case enums.AppMethodAPI:
 		return AppMethodAPI
+	case enums.AppMethodInngestServe:
+		return AppMethodInngestServe
 	default:
 		return AppMethodServe
 	}

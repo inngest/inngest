@@ -252,11 +252,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
 
-	method := enums.AppMethodServe
-	if r.IsConnect() {
-		method = enums.AppMethodConnect
-	}
-
 	if len(r.AppName) == 0 {
 		return nil, publicerr.Wrap(err, 400, "App ID required")
 	}
@@ -282,7 +277,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		Url:        r.URL,
 		Metadata:   registration.AppMetadataForRegisterRequest(r),
 		Checksum:   sum,
-		Method:     method.String(),
+		Method:     r.AppMethod().String(),
 		AppVersion: r.AppVersion,
 	}
 
