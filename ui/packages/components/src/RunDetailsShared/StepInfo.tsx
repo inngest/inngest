@@ -24,6 +24,7 @@ import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
+import { canonicalMetadataKind } from './metadataKind';
 import {
   isStepInfoInvoke,
   isStepInfoSignal,
@@ -149,8 +150,10 @@ export const StepInfo = ({
 
   const { booleanFlag } = useBooleanFlag();
   const { value: metadataIsEnabled } = booleanFlag('enable-step-metadata', false);
-  const scoreMetadata = trace.metadata?.filter((md) => isScoreKind(md.kind)) ?? [];
-  const nonScoreMetadata = trace.metadata?.filter((md) => !isScoreKind(md.kind)) ?? [];
+  const scoreMetadata =
+    trace.metadata?.filter((md) => isScoreKind(canonicalMetadataKind(md))) ?? [];
+  const nonScoreMetadata =
+    trace.metadata?.filter((md) => !isScoreKind(canonicalMetadataKind(md))) ?? [];
   const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
 
   useEffect(() => {
