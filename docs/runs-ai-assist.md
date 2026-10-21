@@ -4,7 +4,7 @@ Use AI sits beside Show search in Cloud Runs. Client buttons expand a copyable c
 
 A small muted line below the prompt summarizes the validated Runs filters: account/environment, statuses, apps, optional function/time field, and time range. It is hidden when the prompt is blocked or context is unavailable.
 
-The preview uses the shared read-only text area with normal app typography and a compact scrollable height. It shows exactly what Copy prompt copies: API filter IDs, UTC boundaries frozen when the popover opens, and full investigation instructions. Reopening refreshes relative time bounds. Unsupported filters block copying. Clipboard failures direct users to select and copy from the same text area. Both copy actions share one handler.
+The preview uses the shared read-only text area with normal app typography and a compact scrollable height. It shows exactly what Copy prompt copies: API filter IDs, UTC boundaries frozen when the popover opens, and full investigation instructions. Reopening refreshes relative time bounds. Unsupported filters block copying. Clipboard failures direct users to select and copy from the same text area. Both copy actions share one handler and the design-system CopyButton, including outlined secondary styling and copied-state feedback.
 
 ## Tracking
 

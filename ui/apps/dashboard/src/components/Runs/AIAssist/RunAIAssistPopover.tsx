@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { CopyButton } from '@inngest/components/CopyButton';
 import { Textarea } from '@inngest/components/Forms/Textarea';
 import {
   Popover,
@@ -151,15 +152,12 @@ export function RunAIAssistPopover({
           <h3 className="text-basis text-xs font-medium">
             Already connected? Try asking
           </h3>
-          <Button
-            label={
-              copyState === 'copied'
-                ? 'Copied'
-                : copyState === 'copying'
-                  ? 'Copying…'
-                  : 'Copy prompt'
-            }
-            onClick={() => void copyPrompt()}
+          <CopyButton
+            label="Copy prompt"
+            ariaLabel={copyState === 'copied' ? 'Copied' : 'Copy prompt'}
+            code={result.prompt}
+            isCopying={copyState === 'copied'}
+            handleCopyClick={() => void copyPrompt()}
             disabled={blocked || copyState === 'copying'}
             appearance="outlined"
             size="small"
