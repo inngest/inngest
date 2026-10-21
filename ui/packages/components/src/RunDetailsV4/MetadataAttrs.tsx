@@ -1,6 +1,11 @@
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { RiInformationLine } from '@remixicon/react';
 
+import { InlineCode } from '../Code/InlineCode';
+import { CodeBlock } from '../CodeBlock';
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
+import { Link } from '../Link';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import type { SpanMetadata, SpanMetadataKind } from './types';
 
 const inngestKindLabels: Record<string, string> = {
@@ -45,7 +50,32 @@ const getKindLabel = (kind: SpanMetadataKind): string => {
 // on the kind/values correlation. Indexing the union keeps it permissive enough
 // to accept any arm's values (including generated interface types like
 // AIMetadata, which lack an implicit index signature).
+// A `userland.display` entry has one flat `display.<kind>.<key>` key per displayed value. Its
+// value is a format ('text' | 'mono' | 'link' | 'code') or `{ format, description }`.
+const displayKind = 'userland.display';
+
+type DisplayHint = { format?: string; description?: string };
+
+const getHint = (hints: Record<string, unknown>, kind: string, key: string): DisplayHint => {
+  const hint = hints[`display.${kind}.${key}`];
+  return typeof hint === 'string' ? { format: hint } : ((hint as DisplayHint | undefined) ?? {});
+};
+
+const MetadataValue = ({ text, format }: { text: string; format?: string }) => {
+  if (format === 'mono') return <InlineCode>{text}</InlineCode>;
+  if (format === 'link' && /^https?:\/\//.test(text)) return <Link href={text}>{text}</Link>;
+  if (format === 'code') {
+    return (
+      <CodeBlock.Wrapper>
+        <CodeBlock tab={{ content: text, language: 'shell' }} />
+      </CodeBlock.Wrapper>
+    );
+  }
+  return <>{text}</>;
+};
+
 type MetadataAttrRowProps = {
+  hints: Record<string, unknown>;
   kind: SpanMetadataKind;
   scope: SpanMetadata['scope'];
   values: SpanMetadata['values'];
@@ -53,7 +83,14 @@ type MetadataAttrRowProps = {
   isLast: boolean;
 };
 
-const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAttrRowProps) => {
+const MetadataAttrRow = ({
+  hints,
+  kind,
+  scope,
+  values,
+  updatedAt,
+  isLast,
+}: MetadataAttrRowProps) => {
   const sortedEntries = useMemo(
     () =>
       Object.entries(values ?? {}).sort(([a], [b]) => {
@@ -61,7 +98,7 @@ const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAtt
         if (b === 'Status Code') return 1;
         return a.localeCompare(b);
       }),
-    [values]
+    [values],
   );
 
   return (
@@ -90,6 +127,7 @@ const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAtt
           <div className="">Value</div>
         </div>
         {sortedEntries.map(([key, value]) => {
+          const { format, description } = getHint(hints, kind, key);
           return (
             <div
               key={`metadata-attr-${key}`}
@@ -97,13 +135,23 @@ const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAtt
             >
               <div className="text-muted w-48 shrink-0 text-sm font-normal leading-tight">
                 {key}
+                {description && (
+                  <OptionalTooltip tooltip={description} side="top">
+                    <RiInformationLine className="ml-1 inline h-3.5 w-3.5" />
+                  </OptionalTooltip>
+                )}
               </div>
               <div className="text-basis min-w-0 whitespace-pre-wrap text-sm font-normal leading-tight [overflow-wrap:anywhere]">
-                {byteValueKeys.has(key) && typeof value === 'number'
-                  ? formatBytes(value)
-                  : typeof value === 'object' && value !== null
-                  ? JSON.stringify(value, null, 2)
-                  : String(value) || '--'}
+                <MetadataValue
+                  format={format}
+                  text={
+                    byteValueKeys.has(key) && typeof value === 'number'
+                      ? formatBytes(value)
+                      : typeof value === 'object' && value !== null
+                        ? JSON.stringify(value, null, 2)
+                        : String(value) || '--'
+                  }
+                />
               </div>
             </div>
           );
@@ -129,14 +177,20 @@ export const MetadataAttrs = ({
   }, [metadata]);
 
   const safeMetadata = metadata.filter((md) => md && typeof md === 'object' && md.kind);
+  const hints = Object.assign(
+    {},
+    ...safeMetadata.filter((md) => md.kind === displayKind).map((md) => md.values),
+  );
+  const shown = safeMetadata.filter((md) => md.kind !== displayKind);
 
   return (
     <div className="relative h-full overflow-y-auto overflow-x-hidden" ref={ref}>
-      {safeMetadata.map((md, idx) => {
-        const isLast = idx === safeMetadata.length - 1;
+      {shown.map((md, idx) => {
+        const isLast = idx === shown.length - 1;
 
         return (
           <MetadataAttrRow
+            hints={hints}
             key={`metadata-attr-${md.scope}-${md.kind}`}
             kind={md.kind}
             scope={md.scope}
