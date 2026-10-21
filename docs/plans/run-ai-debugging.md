@@ -173,5 +173,10 @@ this UI-only handoff. Review the implemented UI in staging before merging.
 - Using the exact prompt context captured from that UI, a read-only Demo MCP
   session confirmed the account and retrieved the failed run summary, output,
   and trace. Output identified an input exceeding the model's context window.
-- This checks the MCP workflow; individual external AI clients' model responses
-  and the deployed staging integration still need review.
+- Deployed staging review verified the failed-run entry, setup, exact prompt
+  preview, and compact summary. The captured prompt matched the current generator.
+  A separate read-only staging MCP session confirmed the account, canonical
+  environment, exact run, output, and failed trace. The returned error was
+  `connect_no_healthy_connection`, matching the dashboard's error details.
+- These checks verify the MCP workflow; individual external AI clients' model
+  responses still need review. No run mutations were performed.
