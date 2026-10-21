@@ -10190,10 +10190,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"functionId\"s\n" +
 	"\x15PauseFunctionResponse\x12$\n" +
 	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xdf\x05\n" +
-	"\x19CreateCancellationRequest\x129\n" +
-	"\x06app_id\x18\x01 \x01(\tB\"\x92A\x1c2\x1aApp ID defined in the SDK.\xe0A\x02R\x05appId\x12X\n" +
-	"\vfunction_id\x18\x02 \x01(\tB7\x92A12/Function ID within the app, defined in the SDK.\xe0A\x02R\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xaa\x06\n" +
+	"\x19CreateCancellationRequest\x12K\n" +
+	"\x06app_id\x18\x01 \x01(\tB4\x92A.2\"SDK app ID containing the functionJ\b\"my-app\"\xe0A\x02R\x05appId\x12\x90\x01\n" +
+	"\vfunction_id\x18\x02 \x01(\tBo\x92Ai2gSDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes).\xe0A\x02R\n" +
 	"functionId\x12a\n" +
 	"\x04from\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB1\x92A+2)Inclusive lower bound on run queued time.\xe0A\x02R\x04from\x12\xa1\x01\n" +
 	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampBo\x92Ai2gInclusive upper bound on run queued time. Must not be in the future; allows five seconds of clock skew.\xe0A\x02R\x05until\x12\x94\x01\n" +
@@ -10285,7 +10285,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xcb\xd4\x01\n" +
+	"\x04INFO\x10\x032\xf1\xd4\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10787,8 +10787,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xdc\t\n" +
-	"\x12CreateCancellation\x12!.api.v2.CreateCancellationRequest\x1a\".api.v2.CreateCancellationResponse\"\xfe\b\x92A\xc3\b\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\x82\n" +
+	"\n" +
+	"\x12CreateCancellation\x12!.api.v2.CreateCancellationRequest\x1a\".api.v2.CreateCancellationResponse\"\xa4\t\x92A\xc3\b\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x15Create a cancellation\x1a\xcc\x03Cancels a function's runs queued between from and until, inclusive. Includes runs that have never started, even when the function is paused. Running runs stop before their next step; sleeping or waiting runs are cancelled when they next resume. A step already executing may finish. The optional if expression filters the triggering event. Returns 201 when created; cancellation happens asynchronously. Not idempotent: each request creates another cancellation.JM\n" +
 	"\x03201\x12F\n" +
@@ -10817,7 +10818,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16runs:write:bulk_cancel\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/cancellations\x12\x82\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16runs:write:bulk_cancel\x82\xd3\xe4\x93\x029:\x01*\"4/apps/{app_id}/functions/{function_id}/cancellations\x12\x82\x05\n" +
 	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\xb3\x04\x92A\xde\x03\n" +
 	"\tFunctions\n" +
 	"\x04Beta\x12\x10Pause a function\x1a\xa6\x03Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. In the dev server, the pause applies right away and lasts until resumed or restarted. No bulk pause; call once per function.b\x10\n" +

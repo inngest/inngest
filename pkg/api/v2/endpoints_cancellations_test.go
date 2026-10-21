@@ -32,6 +32,7 @@ func (f cancellationCreatorFunc) CreateCancellation(ctx context.Context, fn inng
 func TestHTTPGateway_CreateCancellation(t *testing.T) {
 	for _, tc := range []struct {
 		name                                      string
+		bodyIDs                                   bool
 		lookupErr, createErr                      error
 		archived, noCreator, noFunctions, limited bool
 		status                                    int
@@ -40,6 +41,11 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 		{
 			name:   "created",
 			status: 201,
+		},
+		{
+			name:    "path IDs override body IDs",
+			bodyIDs: true,
+			status:  201,
 		},
 		{
 			name:      "unknown function",
@@ -144,7 +150,19 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 			handler, err := newTestHTTPHandler(t.Context(), opts, HTTPHandlerOptions{})
 			require.NoError(t, err)
 			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/cancellations", strings.NewReader(`{"appId":"app","functionId":"fn","from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.keep == false","name":"cleanup"}`)))
+			requestBody := map[string]any{
+				"from":  "2026-01-01T00:00:00Z",
+				"until": "2026-01-01T01:00:00Z",
+				"if":    "event.data.keep == false",
+				"name":  "cleanup",
+			}
+			if tc.bodyIDs {
+				requestBody["appId"] = "other-app"
+				requestBody["functionId"] = "other-function"
+			}
+			data, err := json.Marshal(requestBody)
+			require.NoError(t, err)
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/apps/app/functions/fn/cancellations", strings.NewReader(string(data))))
 			require.Equal(t, tc.status, rec.Code, rec.Body.String())
 			require.Equal(t, apiv2.V2_CreateCancellation_FullMethodName, limiter.method)
 			if tc.noCreator || tc.noFunctions || tc.limited || tc.lookupErr != nil || tc.archived {
@@ -184,24 +202,6 @@ func TestHTTPGateway_CreateCancellationValidation(t *testing.T) {
 		remove      bool
 		message     string
 	}{
-		{
-			name:    "missing app",
-			field:   "appId",
-			remove:  true,
-			message: "required",
-		},
-		{
-			name:    "blank app",
-			field:   "appId",
-			value:   " ",
-			message: "required",
-		},
-		{
-			name:    "missing function",
-			field:   "functionId",
-			remove:  true,
-			message: "required",
-		},
 		{
 			name:    "missing from",
 			field:   "from",
@@ -295,7 +295,7 @@ func TestHTTPGateway_CreateCancellationValidation(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			body := map[string]any{"appId": "app", "functionId": "fn", "from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z"}
+			body := map[string]any{"from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z"}
 			if tc.remove {
 				delete(body, tc.field)
 			} else {
@@ -306,7 +306,7 @@ func TestHTTPGateway_CreateCancellationValidation(t *testing.T) {
 			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
 			require.NoError(t, err)
 			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/cancellations", strings.NewReader(string(data))))
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/apps/app/functions/fn/cancellations", strings.NewReader(string(data))))
 			require.Equal(t, 400, rec.Code, rec.Body.String())
 			require.Contains(t, rec.Body.String(), tc.message)
 		})
@@ -317,11 +317,11 @@ func TestCreateCancellationEqualBoundsAndClockSkew(t *testing.T) {
 	for _, offset := range []time.Duration{-time.Hour, 3 * time.Second} {
 		at := time.Now().Add(offset)
 		fn := inngest.DeployedFunction{
-			Slug:     "my%20app-fn",
+			Slug:     "my app-fn",
 			Function: inngest.Function{Slug: "fn"},
 		}
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunctionByApp", mock.Anything, "my%20app", "fn").Return(fn, nil).Once()
+		functions.On("GetFunctionByApp", mock.Anything, "my app", "fn").Return(fn, nil).Once()
 		svc := NewService(ServiceOptions{
 			Functions: functions,
 			Cancellations: cancellationCreatorFunc(func(_ context.Context, _ inngest.DeployedFunction, opts CreateCancellationOpts) (*cqrs.Cancellation, error) {
@@ -336,13 +336,13 @@ func TestCreateCancellationEqualBoundsAndClockSkew(t *testing.T) {
 			}),
 		})
 		response, err := svc.CreateCancellation(t.Context(), &apiv2.CreateCancellationRequest{
-			AppId:      "my%20app",
-			FunctionId: "fn",
+			AppId:      "%20my%20app%20",
+			FunctionId: "%20fn%20",
 			From:       timestamppb.New(at),
 			Until:      timestamppb.New(at),
 		})
 		require.NoError(t, err)
-		require.Equal(t, "my%20app", response.Data.AppId)
+		require.Equal(t, "my app", response.Data.AppId)
 		require.Equal(t, "fn", response.Data.FunctionId)
 		functions.AssertExpectations(t)
 	}
@@ -389,15 +389,36 @@ func TestHTTPGateway_CreateCancellationName(t *testing.T) {
 				Cancellations: creator,
 			}, HTTPHandlerOptions{})
 			require.NoError(t, err)
-			data, err := json.Marshal(map[string]any{"appId": "app", "functionId": "fn", "from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z", "name": tc.input})
+			data, err := json.Marshal(map[string]any{"from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z", "name": tc.input})
 			require.NoError(t, err)
 			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/cancellations", strings.NewReader(string(data))))
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/apps/app/functions/fn/cancellations", strings.NewReader(string(data))))
 			require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 			var response apiv2.CreateCancellationResponse
 			require.NoError(t, protojson.Unmarshal(rec.Body.Bytes(), &response))
 			require.Equal(t, new(tc.want), response.Data.Name)
 			functions.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCreateCancellationPathValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name, appID, functionID, message string
+	}{
+		{"missing app", "", "fn", "appId is required"},
+		{"blank app", "%20", "fn", "appId is required"},
+		{"missing function", "app", "", "functionId is required"},
+		{"blank function", "app", "%20", "functionId is required"},
+		{"long function", "app", strings.Repeat("x", 257), "functionId cannot exceed 256 bytes"},
+		{"long unicode function", "app", strings.Repeat("界", 86), "functionId cannot exceed 256 bytes"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := NewService(ServiceOptions{}).CreateCancellation(t.Context(), &apiv2.CreateCancellationRequest{
+				AppId:      tc.appID,
+				FunctionId: tc.functionID,
+			})
+			require.ErrorContains(t, err, tc.message)
 		})
 	}
 }

@@ -19,8 +19,16 @@ import (
 )
 
 func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCancellationRequest) (*apiv2.CreateCancellationResponse, error) {
-	if strings.TrimSpace(req.GetAppId()) == "" || strings.TrimSpace(req.GetFunctionId()) == "" {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
+	appID := strings.TrimSpace(decodePathParam(req.GetAppId()))
+	if appID == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "appId is required")
+	}
+	functionID := strings.TrimSpace(decodePathParam(req.GetFunctionId()))
+	if functionID == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "functionId is required")
+	}
+	if len(functionID) > 256 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "functionId cannot exceed 256 bytes")
 	}
 	for _, field := range []struct {
 		name  string
@@ -67,7 +75,7 @@ func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCance
 	if s.functions == nil || s.cancellations == nil {
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Cancellation creation is not yet implemented")
 	}
-	fn, err := s.functions.GetFunctionByApp(ctx, req.AppId, req.FunctionId)
+	fn, err := s.functions.GetFunctionByApp(ctx, appID, functionID)
 	if err != nil {
 		return nil, s.getFunctionError(err)
 	}
@@ -90,8 +98,8 @@ func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCance
 	return &apiv2.CreateCancellationResponse{
 		Data: &apiv2.Cancellation{
 			Id:         c.ID.String(),
-			AppId:      req.AppId,
-			FunctionId: publicFunctionID(req.AppId, req.FunctionId, fn),
+			AppId:      appID,
+			FunctionId: publicFunctionID(appID, functionID, fn),
 			Name:       c.Name,
 			From:       timestamppb.New(opts.From),
 			Until:      timestamppb.New(opts.Until),

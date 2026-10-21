@@ -199,21 +199,51 @@ func endpointByMethod(t *testing.T, method string) apiv2endpoint.Endpoint {
 	return apiv2endpoint.Endpoint{}
 }
 
-func TestCreateCancellationRequest(t *testing.T) {
+func TestCancellationTool(t *testing.T) {
 	endpoint := endpointByMethod(t, "CreateCancellation")
-	args := map[string]any{"appId": "app", "functionId": "fn", "from": "2026-01-01T00:00:00Z", "until": "2026-01-01T01:00:00Z", "if": "event.data.cancel == true", "name": "cleanup"}
-	req, err := Request(t.Context(), endpoint, args, Options{})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, req.Method)
-	require.Equal(t, "/api/v2/cancellations", req.URL.Path)
-	require.Empty(t, req.URL.RawQuery)
-	var body map[string]any
-	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-	require.Equal(t, args, body)
-	require.ElementsMatch(t, []string{"appId", "functionId", "from", "until"}, InputSchema(endpoint)["required"])
 	tool := Tool(endpoint)
 	require.Equal(t, "create_cancellation", tool.Name)
 	require.False(t, tool.Annotations.IdempotentHint)
 	require.False(t, tool.Annotations.ReadOnlyHint)
 	require.True(t, *tool.Annotations.DestructiveHint)
+	schema := tool.InputSchema.(map[string]any)
+	require.ElementsMatch(t, []string{"appId", "functionId", "from", "until"}, schema["required"])
+	properties := schema["properties"].(map[string]any)
+	for _, field := range []string{"appId", "functionId", "from", "until"} {
+		require.Equal(t, "string", properties[field].(map[string]any)["type"])
+	}
+	for _, field := range []string{"from", "until"} {
+		require.Equal(t, "date-time", properties[field].(map[string]any)["format"])
+	}
+
+	var method, path, query, env string
+	var body map[string]any
+	result, err := call(t.Context(), &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{
+			"env":"branch-a","appId":"my app","functionId":"hello/world",
+			"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"
+		}`)},
+	}, endpoint, Options{
+		BasePath:  "/v2",
+		EnvHeader: "X-Inngest-Env",
+		Execute: func(_ context.Context, _ apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+			method, path, query = req.Method, req.URL.EscapedPath(), req.URL.RawQuery
+			env = req.Header.Get("X-Inngest-Env")
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			return ToolResult(map[string]any{"id": "cancellation-id"}, "created cancellation"), nil
+		},
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, map[string]any{"id": "cancellation-id"}, result.StructuredContent)
+	require.Equal(t, http.MethodPost, method)
+	require.Equal(t, "/v2/apps/my%20app/functions/hello%2Fworld/cancellations", path)
+	require.Empty(t, query)
+	require.Equal(t, "branch-a", env)
+	require.Equal(t, map[string]any{
+		"from":  "2026-01-01T00:00:00Z",
+		"until": "2026-01-01T01:00:00Z",
+		"if":    "event.data.cancel == true",
+		"name":  "cleanup",
+	}, body)
 }

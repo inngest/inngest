@@ -72,12 +72,12 @@ func TestCreateCancellationPersistsAndQueues(t *testing.T) {
 			RunID:       runID,
 		},
 	}, from, queue.EnqueueOpts{}))
-	body, err := json.Marshal(map[string]any{"appId": "app", "functionId": "fn", "from": from, "until": until, "if": "event.data.cancel == true", "name": "cleanup"})
+	body, err := json.Marshal(map[string]any{"from": from, "until": until, "if": "event.data.cancel == true", "name": "cleanup"})
 	require.NoError(t, err)
 	var ids []ulid.ULID
 	for i := 0; i < 2; i++ {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v2/cancellations", strings.NewReader(string(body))))
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v2/apps/app/functions/fn/cancellations", strings.NewReader(string(body))))
 		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 		var response struct {
 			Data struct {
@@ -172,7 +172,7 @@ func TestCreateCancellationUnknownFunction(t *testing.T) {
 	require.NoError(t, err)
 	for _, app := range []string{"app", "unknown"} {
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v2/cancellations", strings.NewReader(`{"appId":"`+app+`","functionId":"unknown","from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z"}`)))
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v2/apps/"+app+"/functions/unknown/cancellations", strings.NewReader(`{"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z"}`)))
 		require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 		require.JSONEq(t, `{"errors":[{"code":"not_found","message":"Function not found"}]}`, rec.Body.String())
 	}

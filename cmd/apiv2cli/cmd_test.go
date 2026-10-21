@@ -1200,24 +1200,82 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 }
 
 func TestCommandCreatesCancellation(t *testing.T) {
-	var method, path, body string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		method, path = r.Method, r.URL.Path
-		data, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		body = string(data)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000"}}`))
-	}))
-	defer srv.Close()
-	cmd := Command()
-	var out bytes.Buffer
-	cmd.Writer = &out
-	err := cmd.Run(t.Context(), []string{"api", "create-cancellation", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn", "--from", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z", "--if", "event.data.cancel == true", "--name", "cleanup"})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, method)
-	require.Equal(t, "/api/v2/cancellations", path)
-	require.JSONEq(t, `{"appId":"app","functionId":"fn","from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`, body)
-	require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000"}}`, out.String())
+	for _, input := range []string{"flags", "positionals", "body"} {
+		t.Run(input, func(t *testing.T) {
+			var method, path, query, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path, query = r.Method, r.URL.Path, r.URL.RawQuery
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000"}}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := []string{"api", "create-cancellation", "--api-host", srv.URL}
+			if input != "positionals" {
+				args = append(args, "--app-id", "app", "--function-id", "fn")
+			}
+			if input == "body" {
+				args = append(args, "--body", `{"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`)
+			} else {
+				args = append(args, "--from", "2026-01-01T00:00:00Z", "--until", "2026-01-01T01:00:00Z", "--if", "event.data.cancel == true", "--name", "cleanup")
+			}
+			if input == "positionals" {
+				args = append(args, "app", "fn")
+			}
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/fn/cancellations", path)
+			require.Empty(t, query)
+			require.JSONEq(t, `{"from":"2026-01-01T00:00:00Z","until":"2026-01-01T01:00:00Z","if":"event.data.cancel == true","name":"cleanup"}`, body)
+			require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000"}}`, out.String())
+		})
+	}
+}
+
+func TestCommandCancellationRequiresFields(t *testing.T) {
+	fields := []struct {
+		flag, jsonName, value string
+	}{
+		{"app-id", "appId", "app"},
+		{"function-id", "functionId", "fn"},
+		{"from", "from", "2026-01-01T00:00:00Z"},
+		{"until", "until", "2026-01-01T01:00:00Z"},
+	}
+	for _, missing := range fields {
+		for _, input := range []string{"flags", "body"} {
+			t.Run(missing.flag+"/"+input, func(t *testing.T) {
+				args := []string{"api", "--api-host", "http://localhost:1", "create-cancellation"}
+				body := map[string]any{}
+				for _, field := range fields {
+					if field.flag == missing.flag {
+						continue
+					}
+					if input == "flags" || field.flag == "app-id" || field.flag == "function-id" {
+						args = append(args, "--"+field.flag, field.value)
+					} else {
+						body[field.jsonName] = field.value
+					}
+				}
+				if input == "body" {
+					encoded, err := json.Marshal(body)
+					require.NoError(t, err)
+					args = append(args, "--body", string(encoded))
+				}
+				cmd := Command()
+				cmd.Writer = &bytes.Buffer{}
+				err := cmd.Run(t.Context(), args)
+				if missing.flag == "app-id" || missing.flag == "function-id" {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or positional argument <%s>", missing.flag, missing.flag))
+				} else {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or body field %q", missing.flag, missing.jsonName))
+				}
+			})
+		}
+	}
 }

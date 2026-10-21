@@ -152,7 +152,7 @@ func TestMCPOperations(t *testing.T) {
 	cancellation := operations["create_cancellation"]
 	require.Equal(t, "CreateCancellation", cancellation.ID)
 	require.Equal(t, "POST", cancellation.HTTP.Method)
-	require.Equal(t, "/cancellations", cancellation.HTTP.Path)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/cancellations", cancellation.HTTP.Path)
 	require.Equal(t, "create-cancellation", cancellation.CLI.Command)
 	pause := operations["pause_function"]
 	require.Equal(t, "PauseFunction", pause.ID)

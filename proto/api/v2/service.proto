@@ -1793,7 +1793,7 @@ service V2 {
   }
 
   rpc CreateCancellation(CreateCancellationRequest) returns (CreateCancellationResponse) {
-    option (google.api.http) = { post: "/cancellations" body: "*" };
+    option (google.api.http) = { post: "/apps/{app_id}/functions/{function_id}/cancellations" body: "*" };
     option (authz) = { require_authz: true permission: "runs:write:bulk_cancel" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a cancellation"
@@ -4206,11 +4206,14 @@ message PauseFunctionResponse {
 message CreateCancellationRequest {
   string app_id = 1 [
     (google.api.field_behavior) = REQUIRED,
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "App ID defined in the SDK." }
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
   ];
   string function_id = 2 [
     (google.api.field_behavior) = REQUIRED,
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Function ID within the app, defined in the SDK." }
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)." }
   ];
   google.protobuf.Timestamp from = 3 [
     (google.api.field_behavior) = REQUIRED,
