@@ -96,7 +96,7 @@ export function RunAIAssistPopover({
       <PopoverTrigger asChild>
         <Button
           kind="primary"
-          appearance="solid"
+          appearance="outlined"
           size="small"
           title="Find runs with AI"
           icon={<RiSparklingLine />}
