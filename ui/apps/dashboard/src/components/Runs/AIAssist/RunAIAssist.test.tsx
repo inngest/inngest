@@ -77,11 +77,11 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
-    const displayedPrompt = screen.getByRole('textbox', {
+    const displayedPrompt = screen.getByRole<HTMLTextAreaElement>('textbox', {
       name: 'Prompt preview',
     }).value;
     expect(
-      screen.getByRole('textbox', {
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).readOnly,
     ).toBe(true);
@@ -92,7 +92,7 @@ describe('Runs AI popover', () => {
     expect(onAction).toHaveBeenCalledWith({ action: 'prompt_copy_clicked' });
     expect(onAction).not.toHaveBeenCalledWith({ action: 'prompt_copied' });
     expect(writeText).toHaveBeenCalledWith(
-      screen.getByRole('textbox', {
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).value,
     );
@@ -103,7 +103,7 @@ describe('Runs AI popover', () => {
       expect.stringContaining('Use read operations only'),
     );
     expect(
-      screen.getByRole('textbox', {
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).value,
     ).toContain('Use read operations only');
@@ -128,7 +128,7 @@ describe('Runs AI popover', () => {
     await screen.findByText('Couldn’t copy. Select and copy the prompt above.');
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
     expect(
-      screen.getByRole('textbox', {
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).value,
     ).toContain('Use read operations only');
@@ -259,7 +259,7 @@ describe('Runs AI popover', () => {
     await act(async () => resolve());
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
     expect(
-      screen.getByRole('textbox', {
+      screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).value,
     ).toContain('"FAILED"');
