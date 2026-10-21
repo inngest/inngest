@@ -81,6 +81,8 @@ func TestGetSpansByRunIDAttachesMetadataViaJoin(t *testing.T) {
 	require.JSONEq(t, `2`, string(byKind["stale.kind"].Values["v"]))
 	require.Contains(t, byKind, "other.kind")
 	require.JSONEq(t, `3`, string(byKind["other.kind"].Values["v"]))
+	require.False(t, byKind["stale.kind"].IsUser)
+	require.True(t, byKind["other.kind"].IsUser)
 
 	require.Len(t, root.Children, 1)
 	child := root.Children[0]
@@ -118,15 +120,13 @@ func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
 	root, err := m.GetSpansByRunID(ctx, runID)
 	require.NoError(t, err)
 
-	// GetSpansByRunID doesn't return is_user, so split by values shape.
 	spans := map[bool]map[string]any{true: {}, false: {}}
 	for _, md := range root.Metadata {
 		byt, err := json.Marshal(md.Values)
 		require.NoError(t, err)
 		var values map[string]any
 		require.NoError(t, json.Unmarshal(byt, &values))
-		_, internal := values["internal"]
-		spans[!internal][string(md.Kind)] = values
+		spans[md.IsUser][string(md.Kind)] = values
 	}
 
 	var user, internal any
