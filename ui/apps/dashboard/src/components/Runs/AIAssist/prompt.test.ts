@@ -24,6 +24,18 @@ function build(
   return buildRunDiscoveryPrompt({ ...context, ...overrides, search }, now);
 }
 describe('basic run discovery prompts', () => {
+  it('keeps the MCP environment ID distinct from the dashboard display alias', () => {
+    const result = build(
+      {},
+      {
+        environmentSlug: 'default-6b963943',
+        environmentLabel: 'production',
+      },
+    );
+    expect(payload(result.prompt!).env).toBe('default-6b963943');
+    expect(result.summary).toContain('Example account / production');
+  });
+
   it('uses a precise default window', () => {
     expect(build({}).summary).toBe(
       'Example account / staging · All statuses · All apps · Last 24 hours',

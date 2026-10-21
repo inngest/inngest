@@ -27,3 +27,9 @@ Client values: claude_code, codex_cli, other. Failure categories: permission_den
 ## Validation
 
 Run `pnpm exec vitest run src/components/Runs` and `pnpm exec tsc --noEmit` from `ui/apps/dashboard`. Run the MCP setup and RunsPage tests from `ui/packages/components`. In staging, verify a known run-finding task, clipboard fallback, and analytics delivery.
+
+## Live verification
+
+Authenticated Cloud MCP smoke testing found that a dashboard alias such as `production` can differ from the MCP environment identifier. Resolve the current environment by its ID against the existing environment metadata query, use its API-facing slug in the prompt, and keep the dashboard label in the readable summary. Missing metadata blocks copying.
+
+After correction, the generated prompt returned the requested 10 newest runs and a readable trace. A separate app/status-filtered request returned only matching failed runs and a failure trace. Returned timestamps and ordering were checked; pagination remained explicitly partial. Only read operations were called. Regression tests cover environment resolution, missing environments, and display/API identity separation.

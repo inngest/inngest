@@ -227,6 +227,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
           key={`${environment.id}:${functionSlug ?? 'env'}`}
           scope={scope}
           environmentSlug={environment.slug}
+          environmentID={environment.id}
           apps={appsRes.data?.env?.apps}
           functionAppID={functionData?.workspace.workflow?.app.externalID}
           functionSlug={

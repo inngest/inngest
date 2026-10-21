@@ -8,6 +8,7 @@ import {
 export type RunPromptContext = {
   account: string;
   environmentSlug: string;
+  environmentLabel?: string;
   scope: 'env' | 'fn';
   apps?: ReadonlyArray<{ id: string; externalID: string }>;
   functionAppID?: string;
@@ -163,7 +164,7 @@ export function buildRunDiscoveryPrompt(
       }`
     : `${formatInTimeZone(from, 'UTC', 'MMM d, yyyy HH:mm')} – ${formatInTimeZone(until, 'UTC', 'MMM d, yyyy HH:mm')} UTC`;
   const summary = [
-    `${context.account} / ${context.environmentSlug}`,
+    `${context.account} / ${context.environmentLabel ?? context.environmentSlug}`,
     selectedStatuses.length
       ? selectedStatuses
           .map((status) => status[0] + status.slice(1).toLowerCase())
