@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createBacklogChartOptions,
   createConcurrencyChartOptions,
   HOUR_MS,
   mergeHourRanges,
@@ -120,5 +121,51 @@ describe('createConcurrencyChartOptions', () => {
       [at(threeHourBandRangeHours), 5],
       [at(threeHourBandRangeHours), 5],
     ]);
+  });
+});
+
+describe('createBacklogChartOptions', () => {
+  const at = (h: number) => ms(hour(0)) + h * HOUR_MS;
+  const range = { from: hour(0), to: new Date(at(24)).toISOString() };
+  const bands = {
+    baseLimit: 50,
+    buckets: [
+      { bucket: hour(1), value: 80 },
+      { bucket: hour(2), value: 10 },
+    ],
+    limitHits: [
+      { bucket: hour(1), value: 0 },
+      { bucket: hour(2), value: 3 },
+    ],
+  };
+  const options = createBacklogChartOptions(
+    { buckets: [{ bucket: hour(1), value: 3 }] },
+    bands,
+    range,
+  );
+  const seriesList = options.series as {
+    name: string;
+    markArea?: { data: unknown };
+  }[];
+
+  it('sizes the y axis from the backlog alone, ignoring the limits', () => {
+    expect((options.yAxis as { max: number }).max).toBe(10);
+  });
+
+  it('draws a plain line with no limit line', () => {
+    expect(seriesList.map((s) => s.name)).toEqual([
+      'Concurrency burst',
+      'Concurrency hit',
+      'Backlog',
+    ]);
+  });
+
+  it('places the bands on the burst and limit-hit hours', () => {
+    expect(
+      seriesList.find((s) => s.name === 'Concurrency burst')?.markArea?.data,
+    ).toEqual([[{ xAxis: at(1) }, { xAxis: at(2) }]]);
+    expect(
+      seriesList.find((s) => s.name === 'Concurrency hit')?.markArea?.data,
+    ).toEqual([[{ xAxis: at(2) }, { xAxis: at(3) }]]);
   });
 });
