@@ -335,7 +335,6 @@ export function RunsPage({
                 )}
               />
             </OptionalTooltip>
-            {toolbarActions}
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
@@ -391,6 +390,7 @@ export function RunsPage({
                 onExcludeDeferredChange={onExcludeDeferredChange}
               />
             )}
+            {toolbarActions}
           </div>
           <div className="flex items-center gap-2">
             {progressiveSearch ? (

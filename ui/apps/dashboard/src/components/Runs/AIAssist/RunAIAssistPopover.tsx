@@ -95,14 +95,14 @@ export function RunAIAssistPopover({
     >
       <PopoverTrigger asChild>
         <Button
-          kind="secondary"
+          kind="primary"
           appearance="outlined"
           size="small"
-          label="Use AI"
+          title="Find runs with AI"
           icon={<RiSparklingLine />}
           iconSide="left"
           aria-label="Find runs with AI"
-          className="h-[26px] shrink-0 rounded"
+          className="h-[26px] w-[26px] shrink-0 rounded"
         />
       </PopoverTrigger>
       <PopoverContent
