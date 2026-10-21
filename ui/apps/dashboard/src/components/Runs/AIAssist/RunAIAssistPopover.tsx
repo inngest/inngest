@@ -164,9 +164,6 @@ export function RunAIAssistPopover({
             size="small"
           />
         </div>
-        {!message && result.summary && (
-          <p className="text-muted mb-2 text-xs leading-5">{result.summary}</p>
-        )}
         {message ? (
           <p role="status" className="text-muted rounded border p-2 text-xs">
             {message}
@@ -179,6 +176,11 @@ export function RunAIAssistPopover({
           >
             {result.prompt}
           </pre>
+        )}
+        {!message && result.summary && (
+          <p className="text-muted mt-1.5 text-[11px] leading-4">
+            {result.summary}
+          </p>
         )}
         {metadataError && !metadataLoading && (
           <Button

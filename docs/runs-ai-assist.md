@@ -2,7 +2,7 @@
 
 Use AI sits beside Show search in Cloud Runs. Client buttons expand a copyable command block and short sign-in note, without numbered steps. Codex add and login commands copy together; the setup guide opens the Cloud connection documentation in a new tab. The MCP documentation link also opens a new tab. The local Dev Server is unchanged. There is no feature flag.
 
-A muted line below “Try asking” summarizes the validated Runs filters: account/environment, statuses, apps, optional function/time field, and time range. It is hidden when the prompt is blocked or context is unavailable.
+A small muted line below the prompt summarizes the validated Runs filters: account/environment, statuses, apps, optional function/time field, and time range. It is hidden when the prompt is blocked or context is unavailable.
 
 The scrollable preview shows exactly what Copy prompt copies: API filter IDs, UTC boundaries frozen when the popover opens, and full investigation instructions. Reopening refreshes relative time bounds. Unsupported filters block copying. Clipboard failures expose selectable full text. Both copy actions share one handler.
 

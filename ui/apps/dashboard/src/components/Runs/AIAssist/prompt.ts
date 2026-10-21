@@ -163,7 +163,6 @@ export function buildRunDiscoveryPrompt(
       }`
     : `${formatInTimeZone(from, 'UTC', 'MMM d, yyyy HH:mm')} – ${formatInTimeZone(until, 'UTC', 'MMM d, yyyy HH:mm')} UTC`;
   const summary = [
-    'From your Runs filters',
     `${context.account} / ${context.environmentSlug}`,
     selectedStatuses.length
       ? selectedStatuses

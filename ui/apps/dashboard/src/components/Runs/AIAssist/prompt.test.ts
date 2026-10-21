@@ -26,7 +26,7 @@ function build(
 describe('basic run discovery prompts', () => {
   it('uses a precise default window', () => {
     expect(build({}).summary).toBe(
-      'From your Runs filters · Example account / staging · All statuses · All apps · Last 24 hours',
+      'Example account / staging · All statuses · All apps · Last 24 hours',
     );
     expect(payload(build({}).prompt!)).toMatchObject({
       timeField: 'queuedAt',
@@ -76,7 +76,7 @@ describe('basic run discovery prompts', () => {
       timeField: 'STARTED_AT',
     });
     expect(result.summary).toBe(
-      'From your Runs filters · Example account / staging · Failed, Cancelled · Apps: billing, orders · Started at · Last 2 hours',
+      'Example account / staging · Failed, Cancelled · Apps: billing, orders · Started at · Last 2 hours',
     );
     expect(payload(result.prompt!)).toEqual({
       account: 'Example account',
