@@ -260,7 +260,7 @@ func cleanupUnhealthyConnection(stateManager state.StateManager, envID uuid.UUID
 	}
 
 	// Clean up unhealthy connection
-	err = stateManager.DeleteConnection(context.Background(), envID, connId)
+	_, err = stateManager.DeleteConnectionIfUnchanged(context.Background(), envID, connId, conn)
 	if err != nil {
 		log.Error("could not clean up inactive connection", "conn_id", conn.Id, "err", err)
 	}
