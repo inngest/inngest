@@ -211,11 +211,14 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 }
 
 func (r *resolver) dialParallelWithNAT64Fallback(ctx context.Context, network, port string, primaries, fallbacks []net.IP, allowNAT64Fallback bool) (net.Conn, error) {
+	// a pod with only IPv6 has no route to the A records.  NAT64 can still reach them.
+	ipv4HasNoRoute := func(v4 dialResult) bool {
+		return allowNAT64Fallback && network == "tcp" && ctx.Err() == nil && v4.allNoRoute
+	}
+
 	if len(fallbacks) == 0 {
 		result := r.dialSerialResult(ctx, network, port, primaries)
-		if result.error != nil && allowNAT64Fallback && network == "tcp" && ctx.Err() == nil && result.allNoRoute {
-			// a host with only A records is not reachable from a pod with only IPv6
-			// unless the request goes through NAT64.
+		if ipv4HasNoRoute(result) {
 			return r.dialNAT64(ctx, port, primaries, result.error)
 		}
 		return result.Conn, result.error
@@ -278,9 +281,7 @@ func (r *resolver) dialParallelWithNAT64Fallback(ctx context.Context, network, p
 				fallback = res
 			}
 			if primary.done && fallback.done {
-				if allowNAT64Fallback && network == "tcp" && ctx.Err() == nil && primary.allNoRoute && fallback.allTimedOutOrNoRoute {
-					// a pod with only IPv6 cannot reach the A records directly.  NAT64 can
-					// reach them when every native IPv6 dial times out or has no route.
+				if ipv4HasNoRoute(primary) && fallback.allTimedOutOrNoRoute {
 					return r.dialNAT64(ctx, port, primaries, primary.error)
 				}
 				// err != nil and both are done, so return the primary err.
