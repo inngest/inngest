@@ -63,7 +63,11 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 }
 
 func (s *Service) PauseFunction(ctx context.Context, req *apiv2.PauseFunctionRequest) (*apiv2.PauseFunctionResponse, error) {
-	data, metadata, err := s.setFunctionPaused(ctx, req.AppId, req.FunctionId, true)
+	data, metadata, err := s.setFunctionPaused(ctx, req.AppId, req.FunctionId, functionPauseOperation{
+		action: "pause", title: "Pause", pastAction: "paused",
+		method: apiv2.V2_PauseFunction_FullMethodName,
+		apply:  FunctionPauser.PauseFunction,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -71,27 +75,32 @@ func (s *Service) PauseFunction(ctx context.Context, req *apiv2.PauseFunctionReq
 }
 
 func (s *Service) ResumeFunction(ctx context.Context, req *apiv2.ResumeFunctionRequest) (*apiv2.ResumeFunctionResponse, error) {
-	data, metadata, err := s.setFunctionPaused(ctx, req.AppId, req.FunctionId, false)
+	data, metadata, err := s.setFunctionPaused(ctx, req.AppId, req.FunctionId, functionPauseOperation{
+		action: "resume", title: "Resume", pastAction: "resumed",
+		method: apiv2.V2_ResumeFunction_FullMethodName,
+		apply:  FunctionPauser.ResumeFunction,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return &apiv2.ResumeFunctionResponse{Data: data, Metadata: metadata}, nil
 }
 
-func (s *Service) setFunctionPaused(ctx context.Context, appID, functionID string, paused bool) (*apiv2.Function, *apiv2.ResponseMetadata, error) {
-	action, title, pastAction, method := "pause", "Pause", "paused", apiv2.V2_PauseFunction_FullMethodName
-	if !paused {
-		action, title, pastAction, method = "resume", "Resume", "resumed", apiv2.V2_ResumeFunction_FullMethodName
-	}
+type functionPauseOperation struct {
+	action, title, pastAction, method string
+	apply                             func(FunctionPauser, context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+}
+
+func (s *Service) setFunctionPaused(ctx context.Context, appID, functionID string, op functionPauseOperation) (*apiv2.Function, *apiv2.ResponseMetadata, error) {
 	if appID == "" || functionID == "" {
 		return nil, nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
 	}
-	if result := s.rateLimiter.CheckRateLimit(ctx, method); result.Limited {
+	if result := s.rateLimiter.CheckRateLimit(ctx, op.method); result.Limited {
 		return nil, nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
-			"API rate limit exceeded. The request was rejected and no function was "+pastAction+".")
+			"API rate limit exceeded. The request was rejected and no function was "+op.pastAction+".")
 	}
 	if s.functions == nil || s.functionPauser == nil {
-		return nil, nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, title+" function is not yet implemented")
+		return nil, nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, op.title+" function is not yet implemented")
 	}
 
 	appID = decodePathParam(appID)
@@ -103,11 +112,7 @@ func (s *Service) setFunctionPaused(ctx context.Context, appID, functionID strin
 	if !fn.ArchivedAt.IsZero() && fn.ArchivedAt.Before(time.Now()) {
 		return nil, nil, s.getFunctionError(ErrFunctionNotFound)
 	}
-	if paused {
-		fn, err = s.functionPauser.PauseFunction(ctx, fn)
-	} else {
-		fn, err = s.functionPauser.ResumeFunction(ctx, fn)
-	}
+	fn, err = op.apply(s.functionPauser, ctx, fn)
 	if errors.Is(err, ErrFunctionNotFound) {
 		return nil, nil, s.getFunctionError(err)
 	}
@@ -115,8 +120,8 @@ func (s *Service) setFunctionPaused(ctx context.Context, appID, functionID strin
 		return nil, nil, s.base.NewError(http.StatusConflict, apiv2base.ErrorInvalidRequest, "A scheduled pause cannot be resumed before it takes effect")
 	}
 	if err != nil {
-		logger.From(ctx).Error("unable to "+action+" function", "error", err)
-		return nil, nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to "+action+" function")
+		logger.From(ctx).Error("unable to "+op.action+" function", "error", err)
+		return nil, nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to "+op.action+" function")
 	}
 	fn.AppName = appID
 	fn.Function.Slug = publicFunctionID(appID, functionID, fn)
