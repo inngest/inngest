@@ -30,16 +30,20 @@ type functionProviderReader interface {
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
 // app-scoped slug or UUID using the given function reader.
-func NewFunctionProvider(reader functionProviderReader) *cqrsFunctionProvider {
+func NewFunctionProvider(reader functionProviderReader, pauses *functionPauses, unpauser queue.Unpauser) *cqrsFunctionProvider {
+	if pauses == nil {
+		pauses = &functionPauses{pausedAt: make(map[uuid.UUID]time.Time)}
+	}
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {
 		apps = appReader
 	}
 
 	return &cqrsFunctionProvider{
-		reader: reader,
-		apps:   apps,
-		pauses: &functionPauses{pausedAt: make(map[uuid.UUID]time.Time)},
+		reader:   reader,
+		apps:     apps,
+		pauses:   pauses,
+		unpauser: unpauser,
 	}
 }
 
@@ -49,12 +53,14 @@ func (p *cqrsFunctionProvider) PauseFunction(_ context.Context, fn inngest.Deplo
 }
 
 func (p *cqrsFunctionProvider) ResumeFunction(ctx context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
-	p.pauses.unpause(fn.ID)
 	if p.unpauser == nil {
 		return inngest.DeployedFunction{}, fmt.Errorf("queue unpauser is not configured")
 	}
-	if err := p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
-		AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID,
+	// Always wake the queue so a retry can recover a failed wake.
+	if err := p.pauses.resume(fn.ID, func() error {
+		return p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
+			AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID,
+		})
 	}); err != nil {
 		return inngest.DeployedFunction{}, err
 	}

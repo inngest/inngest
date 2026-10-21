@@ -38,6 +38,18 @@ func (p *functionPauses) unpause(id uuid.UUID) {
 	p.mu.Unlock()
 }
 
+func (p *functionPauses) resume(id uuid.UUID, wake func() error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Readers must not see the wake before the pause is cleared.
+	if err := wake(); err != nil {
+		return err
+	}
+	delete(p.pausedAt, id)
+	return nil
+}
+
 func (p *functionPauses) partitionPaused(_ context.Context, id uuid.UUID) queue.PartitionPausedInfo {
 	return queue.PartitionPausedInfo{Paused: !p.get(id).IsZero()}
 }

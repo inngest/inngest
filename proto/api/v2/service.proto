@@ -1802,7 +1802,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Pause a function"
-      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. There, a pause and resume sent close together can apply out of order; confirm with GetFunction and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function."
+      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function."
       tags: "Functions"
       tags: "Beta"
       security: {
@@ -1824,7 +1824,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Resume a function"
-      description: "Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false and changes nothing. Send no request body. In Cloud, the resume can take up to a minute to apply. New runs skipped while paused are not recreated. There, a pause and resume sent close together can apply out of order; confirm with GetFunction and retry if needed. In the dev server, the resume applies right away and queued runs can start immediately. No bulk resume; call once per function."
+      description: "Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false. The dev server still wakes the queue so retries can recover a failed wake. Send no request body. In Cloud, the response reflects the requested state; the resume can take up to a minute to apply. A future scheduled pause returns 409 and is left unchanged. New runs skipped while paused are not recreated. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, resume clears the pause after waking the queue; a failed wake leaves the pause in place. Queued runs can then start. No bulk resume; call once per function."
       tags: "Functions"
       tags: "Beta"
       security: {

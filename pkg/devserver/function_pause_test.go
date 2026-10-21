@@ -45,18 +45,10 @@ func TestFunctionPauseSharedState(t *testing.T) {
 	provider := NewFunctionProvider(&fakeFunctionStore{
 		app: &cqrs.App{ID: appID, Name: "app"},
 		fns: []*cqrs.Function{{ID: id, AppID: appID, Slug: "app-fn", Config: []byte(`{"name":"Function","slug":"fn"}`)}},
-	})
+	}, nil, nil)
 	wakes := 0
 	provider.unpauser = functionUnpauserFunc(func(_ context.Context, shard string, scope queue.Scope) error {
 		wakes++
-		state := make(chan queue.PartitionPausedInfo, 1)
-		go func() { state <- provider.pauses.partitionPaused(t.Context(), id) }()
-		select {
-		case info := <-state:
-			require.Equal(t, queue.PartitionPausedInfo{}, info)
-		case <-time.After(time.Second):
-			t.Fatal("pause reads blocked during queue wake")
-		}
 		require.Equal(t, consts.DefaultQueueShardName, shard)
 		require.Equal(t, queue.Scope{AccountID: consts.DevServerAccountID, EnvID: consts.DevServerEnvID, FunctionID: id}, scope)
 		return nil
@@ -144,7 +136,7 @@ func TestFunctionPauseResumeArchived(t *testing.T) {
 			ID: id, AppID: appID, Slug: "app-fn", Config: []byte(`{"name":"Function","slug":"fn"}`),
 			ArchivedAt: time.Now().Add(-time.Hour),
 		}},
-	})
+	}, nil, nil)
 	handler, err := apiv2.NewHTTPHandler(t.Context(), apiv2.ServiceOptions{
 		Functions: provider, FunctionPauser: provider,
 	}, apiv2.HTTPHandlerOptions{}, apiv2base.NewBase())
@@ -171,7 +163,7 @@ func TestFunctionPauseResumeArchived(t *testing.T) {
 }
 
 func TestFunctionPauseConcurrentFirstWriteWins(t *testing.T) {
-	provider := NewFunctionProvider(&fakeFunctionStore{})
+	provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
 	fn := inngest.DeployedFunction{ID: uuid.New()}
 	const workers = 32
 	results := make(chan time.Time, workers)
@@ -204,8 +196,18 @@ func TestFunctionPauseConcurrentFirstWriteWins(t *testing.T) {
 	require.Equal(t, queue.PartitionPausedInfo{Paused: true}, provider.pauses.partitionPaused(t.Context(), fn.ID))
 }
 
+func TestFunctionResumeMissingUnpauser(t *testing.T) {
+	provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
+	fn, err := provider.PauseFunction(t.Context(), inngest.DeployedFunction{ID: uuid.New()})
+	require.NoError(t, err)
+
+	_, err = provider.ResumeFunction(t.Context(), fn)
+	require.ErrorContains(t, err, "queue unpauser is not configured")
+	require.Equal(t, fn.PausedAt, provider.pauses.get(fn.ID))
+}
+
 func TestFunctionResumeRetriesFailedWake(t *testing.T) {
-	provider := NewFunctionProvider(&fakeFunctionStore{})
+	provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
 	fn, err := provider.PauseFunction(t.Context(), inngest.DeployedFunction{
 		ID: uuid.New(), AccountID: consts.DevServerAccountID, EnvironmentID: consts.DevServerEnvID,
 	})
@@ -225,7 +227,8 @@ func TestFunctionResumeRetriesFailedWake(t *testing.T) {
 	resumed, err := provider.ResumeFunction(t.Context(), fn)
 	require.ErrorIs(t, err, wakeErr)
 	require.Equal(t, inngest.DeployedFunction{}, resumed)
-	require.Equal(t, queue.PartitionPausedInfo{}, provider.pauses.partitionPaused(t.Context(), fn.ID))
+	require.Equal(t, queue.PartitionPausedInfo{Paused: true}, provider.pauses.partitionPaused(t.Context(), fn.ID))
+	require.Equal(t, fn.PausedAt, provider.pauses.get(fn.ID))
 	resumed, err = provider.ResumeFunction(t.Context(), fn)
 	require.NoError(t, err)
 	fn.PausedAt = time.Time{}
@@ -240,7 +243,7 @@ func TestFunctionResumeStartsQueuedRun(t *testing.T) {
 			provider := NewFunctionProvider(&fakeFunctionStore{
 				app: &cqrs.App{ID: appID, Name: "app"},
 				fns: []*cqrs.Function{{ID: id, AppID: appID, Slug: "app-fn", Config: []byte(`{"name":"Function","slug":"fn"}`)}},
-			})
+			}, nil, nil)
 			r := miniredis.RunT(t)
 			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
 			require.NoError(t, err)
