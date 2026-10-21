@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.47.0] - 2026-10-21
+
+### 🚀 Features
+
+- *(state)* Persist a run's scheduled_at in run state (#4972)
+- *(dashboard)* Prompt sandbox upgrades on unpaid plans (#4984)
+- *(dashboard)* Make the Insights link more prominent in runs search (#4981)
+- *(api)* Expose generated include selector parsers (#4982)
+- *(api)* Share typed include selectors across run endpoints (#4940)
+- *(api)* Allow naming sandbox snapshots and listing by name (#4985)
+- *(metadata)* Accept per-name score & warning kinds (#4992)
+- *(metadata)* Write all metadata as set (#4993)
+- *(tracing)* Add custom trace spans and groups (#4990)
+- *(tracing)* Show `inngest.warnings` more obviously (#4991)
+- *(api)* Add sandbox image selection contract (#4989)
+- *(api)* Pause a function via v2 api, cli & mcp (#5035)
+
+### 🐛 Bug Fixes
+
+- *(expressions)* Evaluate presence against concrete data (#4971)
+- *(api)* Support camelCase (and snake_case) run include selectors (#4939)
+- *(event)* Reject NUL characters in event names (#4973)
+- *(api)* Set Retry-After on extended-trace cap 429s (#4987)
+- *(executor)* Validate SDK step metadata kinds (#4994)
+- *(executor)* Always retry failed discovery enqueues (#5001)
+- *(executor)* Finalize runs of permanently failed jobs (#5002)
+- *(api)* Handle every event in a batch like Cloud (#5011)
+- *(queue)* Reject singleton conflicts before writing items (#5005)
+- Extend scheduling retry protection past delivery backoff (#5020)
+- *(executor)* Preserve singleton runs on scheduling retries (#5030)
+- *(queue)* Enforce throttling per execution attempt (#5026)
+- *(dashboard)* Use full-width page scrollers below fixed headers (#5027)
+- *(exechttp)* Synchronize HTTP timing during cancellation (#4961)
+- *(state)* Expose idempotency lookup over the state RPC (#5038)
+- *(devserver)* Do not clobber checksum/error on named apps during -u sdk-url startup (#5003)
+- *(httpdriver)* Amend dns lookups with misconfigured AAAA (#5055)
+
+### 🚜 Refactor
+
+- *(state)* Return ErrIdempotentResponse from v2 SaveStep (#5008)
+
+### ⚡ Performance
+
+- *(queue)* Look up account priorities concurrently in AccountPeek (#4976)
+- *(constraintapi)* Let a capacity-release wake skip the limiting-constraint cache (#4983)
+
+### 🧪 Testing
+
+- *(batch)* Adding batching tests for valkey 9 (#4980)
+- *(queue)* Isolate capacity lease expiry test lifecycle (#5037)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(api)* Soft-deprecate includeOutput (#4979)
+- *(codeql)* Scan fork pull requests (#5032)
+- *(http)* Improve no route errors (#5056)
+
 ## [v1.46.0] - 2026-10-06
 
 ### 🚀 Features
@@ -54,6 +111,7 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Pin GitHub Actions to commit SHAs (#4932)
 - *(dashboard)* Make runs list REST + v2 traces backed only and v2 traces only for every other runs data (#4928)
 - *(queue)* Set Scope.EnvID from Item if Item.Identifier is not available (#4954)
+- *(release)* V1.46.0 (#4889)
 
 ### 🛡️ Security
 
