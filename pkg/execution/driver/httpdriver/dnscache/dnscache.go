@@ -2,9 +2,11 @@ package dnscache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -34,6 +36,7 @@ type cacheType []net.IP
 type DNSResolver interface {
 	Lookup(ctx context.Context, host string) ([]net.IP, error)
 	Dialer() Dialer
+	DialerWithNAT64Fallback() Dialer
 }
 
 type (
@@ -110,6 +113,14 @@ type resolver struct {
 }
 
 func (r *resolver) Dialer() Dialer {
+	return r.dialerWithNAT64Fallback(false)
+}
+
+func (r *resolver) DialerWithNAT64Fallback() Dialer {
+	return r.dialerWithNAT64Fallback(true)
+}
+
+func (r *resolver) dialerWithNAT64Fallback(allowNAT64Fallback bool) Dialer {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
@@ -130,8 +141,17 @@ func (r *resolver) Dialer() Dialer {
 		// We also implement our own "happy eyes" dial mechanism which allows us
 		// to dial both and eject after some delay.
 		six, four := sixfour(ips)
-		return r.dialParallel(ctx, network, port, four, six)
+		return r.dialParallelWithNAT64Fallback(ctx, network, port, four, six, allowNAT64Fallback)
 	}
+}
+
+type dialResult struct {
+	net.Conn
+	error
+	primary     bool
+	done        bool
+	allTimedOut bool
+	allNoRoute  bool
 }
 
 // dialSerial takes a list of IPs and dials them sequentially, without happy eyeballs
@@ -139,31 +159,41 @@ func (r *resolver) Dialer() Dialer {
 //
 // This defers to the default dialer, and so we don't need to handle TCP, unix sockets, etc.
 func (r *resolver) dialSerial(ctx context.Context, network, port string, ips []net.IP) (net.Conn, error) {
+	result := r.dialSerialResult(ctx, network, port, ips)
+	return result.Conn, result.error
+}
+
+func (r *resolver) dialSerialResult(ctx context.Context, network, port string, ips []net.IP) dialResult {
 	if len(ips) == 0 {
-		return nil, ErrNoIPsAvailable
+		return dialResult{error: ErrNoIPsAvailable}
 	}
 
 	var firstErr error
+	allTimedOut := true
+	allNoRoute := true
 	for _, idx := range r.randPerm(len(ips)) {
 		ip := ips[idx]
 		addr := net.JoinHostPort(ip.String(), port)
 
 		conn, err := r.dialer(ctx, network, addr)
 		if err == nil {
-			return conn, nil
+			return dialResult{Conn: conn}
 		}
 
 		if firstErr == nil {
 			firstErr = err
 		}
+		var netErr net.Error
+		allTimedOut = allTimedOut && errors.As(err, &netErr) && netErr.Timeout()
+		allNoRoute = allNoRoute && errors.Is(err, syscall.ENETUNREACH)
 
 		if ctx.Err() != nil {
 			// check if context was cancelled
-			return nil, ctx.Err()
+			return dialResult{error: ctx.Err()}
 		}
 	}
 
-	return nil, firstErr
+	return dialResult{error: firstErr, allTimedOut: allTimedOut, allNoRoute: allNoRoute}
 }
 
 // dialParallel races two copies of dialSerial, giving the first a
@@ -171,8 +201,18 @@ func (r *resolver) dialSerial(ctx context.Context, network, port string, ips []n
 // closes the others. Otherwise it returns an error from the first
 // primary address.
 func (r *resolver) dialParallel(ctx context.Context, network, port string, primaries, fallbacks []net.IP) (net.Conn, error) {
+	return r.dialParallelWithNAT64Fallback(ctx, network, port, primaries, fallbacks, false)
+}
+
+func (r *resolver) dialParallelWithNAT64Fallback(ctx context.Context, network, port string, primaries, fallbacks []net.IP, allowNAT64Fallback bool) (net.Conn, error) {
 	if len(fallbacks) == 0 {
-		return r.dialSerial(ctx, network, port, primaries)
+		result := r.dialSerialResult(ctx, network, port, primaries)
+		if result.error != nil && allowNAT64Fallback && network == "tcp" && ctx.Err() == nil && result.allNoRoute {
+			// a host with only A records is not reachable from a pod with only IPv6
+			// unless the request goes through NAT64.
+			return r.dialNAT64(ctx, port, primaries, result.error)
+		}
+		return result.Conn, result.error
 	}
 	if len(primaries) == 0 {
 		// also handle ipv6 only, if someone is brave enough to do so!
@@ -184,12 +224,6 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 	returned := make(chan struct{})
 	defer close(returned)
 
-	type dialResult struct {
-		net.Conn
-		error
-		primary bool
-		done    bool
-	}
 	results := make(chan dialResult) // unbuffered
 
 	startRacer := func(ctx context.Context, primary bool) {
@@ -197,12 +231,14 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 		if !primary {
 			ras = fallbacks
 		}
-		c, err := r.dialSerial(ctx, network, port, ras)
+		result := r.dialSerialResult(ctx, network, port, ras)
+		result.primary = primary
+		result.done = true
 		select {
-		case results <- dialResult{Conn: c, error: err, primary: primary, done: true}:
+		case results <- result:
 		case <-returned:
-			if c != nil {
-				c.Close()
+			if result.Conn != nil {
+				result.Conn.Close()
 			}
 		}
 	}
@@ -236,6 +272,11 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 				fallback = res
 			}
 			if primary.done && fallback.done {
+				if allowNAT64Fallback && network == "tcp" && ctx.Err() == nil && primary.allNoRoute && fallback.allTimedOut {
+					// a pod with only IPv6 cannot reach the A records directly.  NAT64 can
+					// reach them after every native IPv6 connection times out.
+					return r.dialNAT64(ctx, port, primaries, primary.error)
+				}
 				// err != nil and both are done, so return the primary err.
 				return nil, primary.error
 			}
@@ -248,6 +289,30 @@ func (r *resolver) dialParallel(ctx context.Context, network, port string, prima
 			}
 		}
 	}
+}
+
+// dialNAT64 dials each IPv4 address through the NAT64 prefix 64:ff9b::/96.
+// if every NAT64 dial fails, it returns dialErr so the caller sees the error
+// from the original IPv4 dial.
+func (r *resolver) dialNAT64(ctx context.Context, port string, ips []net.IP, dialErr error) (net.Conn, error) {
+	conn, err := r.dialSerial(ctx, "tcp6", port, nat64Addresses(ips))
+	if err != nil {
+		return nil, dialErr
+	}
+	return conn, nil
+}
+
+func nat64Addresses(ips []net.IP) []net.IP {
+	addresses := make([]net.IP, 0, len(ips))
+	for _, ip := range ips {
+		address := make(net.IP, net.IPv6len)
+		address[1] = 0x64
+		address[2] = 0xff
+		address[3] = 0x9b
+		copy(address[12:], ip.To4())
+		addresses = append(addresses, address)
+	}
+	return addresses
 }
 
 func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
