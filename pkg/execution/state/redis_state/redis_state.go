@@ -232,11 +232,22 @@ func WithPauseDeleter(d state.PauseDeleter) Opt {
 	}
 }
 
+// WithAsyncPauseDeletion makes Delete return once the run's state is removed,
+// deleting the run's pauses in the background. Pause cleanup is index
+// bookkeeping: with the run's state gone, a leftover pause cannot resume it.
+// Errors are logged rather than returned.
+func WithAsyncPauseDeletion() Opt {
+	return func(m *mgr) {
+		m.asyncPauseDeletion = true
+	}
+}
+
 type mgr struct {
 	// unsafe: Operate on sharded manager instead.
 	unsafeShardedClientDoNotUse *ShardedClient
 
-	pauseDeleter state.PauseDeleter
+	pauseDeleter       state.PauseDeleter
+	asyncPauseDeletion bool
 
 	shardedMgr
 }
@@ -1163,7 +1174,17 @@ func (m mgr) Delete(ctx context.Context, i state.Identifier, opts ...state.Delet
 	if o.IsMigration || m.pauseDeleter == nil {
 		return nil
 	}
-	return m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
+	if !m.asyncPauseDeletion {
+		return m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
+	}
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
+		defer cancel()
+		if err := m.pauseDeleter.DeletePausesForRun(bgCtx, i.RunID, i.WorkspaceID); err != nil {
+			logger.StdlibLogger(bgCtx).Error("error deleting pauses for deleted run", "error", err, "run_id", i.RunID)
+		}
+	}()
+	return nil
 }
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
