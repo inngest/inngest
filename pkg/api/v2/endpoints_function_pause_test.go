@@ -59,7 +59,7 @@ func TestHTTPGateway_FunctionPauseResume(t *testing.T) {
 				{name: "app mismatch", appID: "other", lookupErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 				{name: "lookup failure", lookupErr: errors.New("database unavailable"), status: 500, code: "internal_error"},
 				{name: "no provider", noPauser: true, status: 501, code: "not_implemented"},
-				{name: "scheduled pause", mutationErr: ErrFunctionPauseScheduled, status: 409, code: "invalid_request"},
+				{name: "scheduled pause", mutationErr: ErrFunctionPauseScheduled, status: 409, code: "function_pause_scheduled"},
 				{name: "provider scope miss", mutationErr: ErrFunctionNotFound, status: 404, code: "not_found"},
 				{name: "provider failure", mutationErr: errors.New("queue unavailable"), status: 500, code: "internal_error"},
 				{name: "rate limited", limited: true, status: 429, code: "rate_limited"},

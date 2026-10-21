@@ -117,7 +117,7 @@ func (s *Service) setFunctionPaused(ctx context.Context, appID, functionID strin
 		return nil, nil, s.getFunctionError(err)
 	}
 	if errors.Is(err, ErrFunctionPauseScheduled) {
-		return nil, nil, s.base.NewError(http.StatusConflict, apiv2base.ErrorInvalidRequest, "A scheduled pause cannot be resumed before it takes effect")
+		return nil, nil, s.base.NewError(http.StatusConflict, apiv2base.ErrorFunctionPauseScheduled, "A scheduled pause cannot be resumed before it takes effect")
 	}
 	if err != nil {
 		logger.From(ctx).Error("unable to "+op.action+" function", "error", err)

@@ -10,7 +10,7 @@ import (
 )
 
 type functionPauses struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	functions map[uuid.UUID]*functionPause
 }
 
@@ -20,6 +20,13 @@ type functionPause struct {
 }
 
 func (p *functionPauses) state(id uuid.UUID) *functionPause {
+	p.mu.RLock()
+	state := p.functions[id]
+	p.mu.RUnlock()
+	if state != nil {
+		return state
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.functions == nil {
@@ -29,7 +36,7 @@ func (p *functionPauses) state(id uuid.UUID) *functionPause {
 		return state
 	}
 	// Keep the entry so concurrent callers always use the same lock.
-	state := &functionPause{}
+	state = &functionPause{}
 	p.functions[id] = state
 	return state
 }
