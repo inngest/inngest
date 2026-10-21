@@ -51,6 +51,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   toolbarActions?: React.ReactNode;
+  renderRunAction?: React.ComponentProps<typeof RunDetailsV4>['renderRunAction'];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
@@ -106,6 +107,7 @@ export function RunsPage({
   infiniteScrollTrigger,
   searchLimit,
   toolbarActions,
+  renderRunAction,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -273,11 +275,12 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
+            renderRunAction={renderRunAction}
           />
         </div>
       );
     },
-    [getTrigger, pollInterval]
+    [getTrigger, pollInterval, renderRunAction]
   );
 
   const options = useMemo(() => {

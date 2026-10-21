@@ -19,6 +19,20 @@ afterEach(() => {
 });
 
 describe('Runs AI tracking', () => {
+  it.each(['inline', 'standalone'] as const)(
+    'identifies debugging engagement in %s details without run context',
+    (view) => {
+      const { result } = renderHook(() => useRunAITracking('debug', view));
+      result.current({ action: 'prompt_copied' });
+      expect(trackEvent.mock.lastCall?.[0].data).toEqual({
+        action: 'prompt_copied',
+        surface: 'run_details',
+        template_version: 'run_debug_v1',
+        detail_view: view,
+      });
+    }
+  );
+
   it('uses the existing identity and emits only categorical feature data', () => {
     const { result, rerender } = renderHook(() => useRunAITracking('fn'));
     result.current({ action: 'opened' });
@@ -44,7 +58,7 @@ describe('Runs AI tracking', () => {
       throw new Error('offline');
     });
     expect(() =>
-      result.current({ action: 'setup_clicked', client: 'codex_cli' }),
+      result.current({ action: 'setup_clicked', client: 'codex_cli' })
     ).not.toThrow();
   });
 });

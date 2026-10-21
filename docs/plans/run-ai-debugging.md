@@ -1,6 +1,6 @@
 ---
 TITLE: Debug failed Cloud runs with AI
-STATUS: Draft — specification only
+STATUS: Implemented — pending staging review
 ---
 
 # Debug failed Cloud runs with AI
@@ -10,8 +10,8 @@ that targets that exact run. The agent uses existing Cloud MCP tools to inspect
 the failure and suggest next steps. The dashboard does not run an AI model.
 
 This is a proposed follow-up to [Runs AI discovery (#5043)](https://github.com/inngest/inngest/pull/5043).
-This PR contains the spec only; implementation follows after design review and
-should reuse the discovery UI once that change lands.
+The implementation reuses its popover, setup, copy controls, and tracking.
+This follow-up is stacked on that PR until the shared discovery UI lands.
 
 ## V1 scope
 
@@ -79,6 +79,8 @@ Use Inngest Cloud MCP to investigate this failed run:
 }
 
 Confirm the authenticated account with fetch_account before reading the run.
+Compare its ID with accountId above; accountId is identity context, not a
+run-tool argument.
 Use get_run and get_run_trace with the exact runId and env above, including
 include: ["output"] for available run and span output.
 Explain what failed, identify the relevant failed steps or spans, and cite the
@@ -157,4 +159,18 @@ Acceptance checks:
 - Tracking records engagement without context contents or duplicate poll views.
 
 Use normal Cloud staging review and release; no new feature flag proposed for
-this UI-only handoff. Review this spec before starting implementation.
+this UI-only handoff. Review the implemented UI in staging before merging.
+
+
+## Validation
+
+- Dashboard Runs and debugging suites: 95 tests passed; shared RunsPage tests:
+  2 passed. Dashboard TypeScript and targeted lint passed.
+- Browser review used the actual run header and popover components. Verified
+  setup expansion, copied feedback, and closing stale content on run change.
+  Automated tests assert that clipboard text equals the read-only preview.
+- Using the exact prompt context captured from that UI, a read-only Demo MCP
+  session confirmed the account and retrieved the failed run summary, output,
+  and trace. Output identified an input exceeding the model's context window.
+- This checks the MCP workflow; individual external AI clients' model responses
+  and the deployed staging integration still need review.
