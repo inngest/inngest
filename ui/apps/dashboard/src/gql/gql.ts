@@ -181,6 +181,7 @@ type Documents = {
     "\n  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {\n    retryWorkflowRun(\n      input: { workspaceID: $environmentID, workflowID: $functionID }\n      workflowRunID: $functionRunID\n    ) {\n      id\n    }\n  }\n": typeof types.RerunFunctionRunDocument,
     "\n  mutation Rerun($envID: UUID!, $runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(envID: $envID, runID: $runID, fromStep: $fromStep)\n  }\n": typeof types.RerunDocument,
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": typeof types.SetUpAccountDocument,
+    "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n": typeof types.ClaimSignupConversionDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": typeof types.CreateUserDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": typeof types.GetFunctionPauseStateDocument,
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": typeof types.GetIngestKeyDocument,
@@ -358,6 +359,7 @@ const documents: Documents = {
     "\n  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {\n    retryWorkflowRun(\n      input: { workspaceID: $environmentID, workflowID: $functionID }\n      workflowRunID: $functionRunID\n    ) {\n      id\n    }\n  }\n": types.RerunFunctionRunDocument,
     "\n  mutation Rerun($envID: UUID!, $runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(envID: $envID, runID: $runID, fromStep: $fromStep)\n  }\n": types.RerunDocument,
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
+    "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n": types.ClaimSignupConversionDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": types.GetFunctionPauseStateDocument,
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": types.GetIngestKeyDocument,
@@ -1050,6 +1052,10 @@ export function graphql(source: "\n  mutation Rerun($envID: UUID!, $runID: ULID!
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n"): (typeof documents)["\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

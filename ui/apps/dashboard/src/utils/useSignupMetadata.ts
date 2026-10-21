@@ -2,14 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { getSignupMetadata } from './signupAttribution';
 
-// On app.inngest.com, Segment loads GTM (and with it GA4 and the Conversion
-// Linker) after the page hydrates. On a visitor's first page view, the GA
-// cookies and the Conversion Linker's click-ID cookie can therefore appear
-// after Clerk's form has mounted, and not necessarily together, so keep
-// re-reading briefly; Clerk applies prop updates to the mounted form without
-// remounting it, and sends whatever metadata is current at submit/OAuth time.
-// Polling stops early only once both GA IDs and a click ID are present;
-// visitors who arrive without an ad click simply poll until the cap.
+// GTM can write GA and click cookies after the auth form mounts.
 const REFRESH_INTERVAL_MS = 1000;
 const MAX_REFRESHES = 20;
 

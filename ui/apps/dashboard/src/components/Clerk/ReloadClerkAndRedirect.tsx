@@ -7,27 +7,16 @@ type ClerkUser = NonNullable<ReturnType<typeof useUser>['user']>;
 
 type ReloadClerkAndRedirectProps = {
   redirectURL: string;
-  /**
-   * Runs after Clerk has reloaded the user and before the redirect, which
-   * waits for it. Errors are swallowed so they can never block the redirect.
-   */
   beforeRedirect?: (user: ClerkUser) => Promise<void>;
 };
 
-/**
- * This is used to reload Clerk on the client before redirecting to a new page. This is needed when
- * we update some Clerk data on the server and need to ensure that the client has the latest data
- * before redirecting.
- *
- * @param {string} redirectURL - The URL to redirect to after reloading Clerk
- */
+// Refresh server-side Clerk changes before navigating.
 export default function ReloadClerkAndRedirect({
   redirectURL,
   beforeRedirect,
 }: ReloadClerkAndRedirectProps) {
   const { isLoaded, user } = useUser();
-  // Held in a ref so a new callback identity on re-render doesn't re-run the
-  // reload/redirect effect.
+  // Callback changes should not restart the redirect.
   const beforeRedirectRef = useRef(beforeRedirect);
   beforeRedirectRef.current = beforeRedirect;
 

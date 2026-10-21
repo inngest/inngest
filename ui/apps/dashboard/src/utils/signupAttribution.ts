@@ -19,11 +19,9 @@ const fields = {
   first_landing_url: 'firstLandingUrl',
 } as const;
 
-// Session cookie for the GA4 web stream G-4YPM75W7D9, the measurement ID used
-// by the GA4 tag in GTM-5VCKJ23T on www.inngest.com and app.inngest.com.
+// GA4 web stream shared by www.inngest.com and app.inngest.com.
 const GA4_SESSION_COOKIE = '_ga_4YPM75W7D9';
 
-// gclid/gbraid/wbraid are URL-safe tokens; anything else is not a click ID.
 const CLICK_ID_PATTERN = /^[A-Za-z0-9_-]{1,512}$/;
 
 const readCookie = (name: string): string | undefined => {
@@ -37,15 +35,7 @@ const readCookie = (name: string): string | undefined => {
     ?.slice(prefix.length);
 };
 
-/**
- * Writes the first-touch cookie from the current URL when none exists.
- *
- * The website writes the same cookie on www.inngest.com. Campaign links that
- * redirect straight to app.inngest.com skip the website, so without this the
- * campaign never reaches sign-up. Only runs when the URL carries utm
- * parameters, so a plain visit does not claim first touch ahead of a later
- * campaign visit. Never overwrites an existing cookie.
- */
+// Capture campaign links that land on the dashboard without visiting the website.
 export const ensureFirstTouch = (): void => {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
@@ -124,11 +114,7 @@ export const parseGaClientId = (
   value: string | undefined,
 ): string | undefined => value?.match(/^GA\d+\.\d+\.(\d+\.\d+)$/)?.[1];
 
-/**
- * `_ga_<stream>` holds the current session ID in one of two formats:
- * `GS1.1.<session>.<count>...` (legacy) or `GS2.1.s<session>$o<count>$...`
- * (Google switched to this in 2025).
- */
+// GA4 uses GS1 positional fields or GS2 named fields.
 export const parseGaSessionId = (
   value: string | undefined,
 ): string | undefined => {
@@ -144,11 +130,7 @@ export const parseGaSessionId = (
   return undefined;
 };
 
-/**
- * Conversion Linker cookies (`_gcl_aw`, `_gcl_gb`) are `GCL.<unix seconds>.<click ID>`.
- * The timestamp is dropped (not the click ID) when it can't be a valid Date, so
- * a malformed cookie can never make `toISOString()` throw and break the auth forms.
- */
+// Ignore invalid dates so malformed cookies cannot break the auth forms.
 export const parseGclCookie = (
   value: string | undefined,
 ): { clickId: string; clickedAtMs?: number } | undefined => {
@@ -163,10 +145,6 @@ export const parseGclCookie = (
   };
 };
 
-/**
- * GA4 identifiers (so the server-side Account Created event can join the
- * visitor's GA4 session) and Google Ads click IDs (for conversion uploads).
- */
 export const getGoogleAttribution = (): Record<string, string> => {
   const attribution: Record<string, string> = {};
 
@@ -176,9 +154,7 @@ export const getGoogleAttribution = (): Record<string, string> => {
   const gaSessionId = parseGaSessionId(readCookie(GA4_SESSION_COOKIE));
   if (gaSessionId) attribution.gaSessionId = gaSessionId;
 
-  // A click ID on the current URL is the newest click and may not have reached
-  // the Conversion Linker yet. Otherwise use what the linker stored for
-  // inngest.com (last click, 90 days).
+  // Prefer the current click over cookies from a previous visit.
   const urlClickIds = Object.fromEntries(
     (['gclid', 'gbraid', 'wbraid'] as const).flatMap((key) => {
       const value = readUrlParam(key);
