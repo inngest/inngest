@@ -1189,7 +1189,7 @@ func TestCleanupWorkerRequestOrLogError(t *testing.T) {
 	instanceID := "test-instance"
 	requestID := "test-request"
 
-	// Test with empty instance ID - should log error
+	// No assignment exists to recover for an empty instance ID.
 	cleanupWorkerRequestOrLogError(ctx, sm, envID, "", requestID, l, "test message")
 
 	// Test with valid instance ID - should work without error

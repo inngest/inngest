@@ -109,12 +109,6 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
 	l := logger.StdlibLogger(ctx)
 
-	requestID := r.RequestID
-	if requestID == "" {
-		l.Warn("connect request missing requestID", "item", item, "id", id)
-		requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	}
-
 	jobID := r.JobID
 	if jobID == "" && item.JobID != nil {
 		// Use the stable queue item ID
@@ -123,6 +117,16 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 	if jobID == "" {
 		// This should never happen, handle it gracefully
 		l.Warn("queue item missing jobID", "item", item, "id", id)
+	}
+
+	// Connect leases and buffered responses must survive executor recovery.
+	// Dispatch request IDs change on requeue, but the queue job ID is stable.
+	requestID := jobID
+	if requestID == "" {
+		requestID = r.RequestID
+		if requestID == "" {
+			requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+		}
 	}
 	l = l.With("request_id", requestID, "job_id", jobID)
 
