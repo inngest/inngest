@@ -154,7 +154,7 @@ describe('Runs AI popover', () => {
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('link', { name: 'Setup guide' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'Full setup guide' }).getAttribute('href'),
     ).toBe(
       'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud',
     );
@@ -163,7 +163,7 @@ describe('Runs AI popover', () => {
         .getByRole('link', { name: 'Available MCP tools' })
         .getAttribute('href'),
     ).toBe('https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools');
-    for (const name of ['Setup guide', 'Available MCP tools']) {
+    for (const name of ['Full setup guide', 'Available MCP tools']) {
       const link = screen.getByRole('link', { name });
       expect(link.getAttribute('target')).toBe('_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');

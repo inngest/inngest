@@ -65,7 +65,7 @@ export function RunAISetup({
           onAction({ action: 'guide_clicked', guide: 'connection' })
         }
       >
-        Setup guide
+        Full setup guide
         <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
       </a>
     </section>
