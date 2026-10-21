@@ -100,7 +100,7 @@ function SetupCommand({
           ariaLabel={label}
           code={code}
           appearance="outlined"
-          className="text-muted border-subtle shrink-0"
+          className="shrink-0"
           size="small"
           isCopying={status === 'copied'}
           handleCopyClick={() => void copyCommand()}
