@@ -1,5 +1,6 @@
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
+  formatInTimeZone,
   parseDuration,
   subtractDuration,
 } from '@inngest/components/utils/date';
@@ -15,8 +16,8 @@ export type RunPromptContext = {
 };
 
 export type RunPromptResult =
-  | { prompt: string; error?: never }
-  | { prompt?: never; error: string };
+  | { prompt: string; summary: string; error?: never }
+  | { prompt?: never; summary?: never; error: string };
 
 const statuses = new Set([
   'QUEUED',
@@ -146,7 +147,41 @@ export function buildRunDiscoveryPrompt(
     until: until.toISOString(),
   };
 
+  const relativeRange = !params.get('end')
+    ? (params.get('last') ?? (!params.get('start') ? DEFAULT_TIME : undefined))
+    : undefined;
+  const rangeLabel = relativeRange
+    ? `Last ${
+        relativeRange === '1d'
+          ? '24 hours'
+          : Object.entries(parseDuration(relativeRange))
+              .map(
+                ([unit, count]) =>
+                  `${count} ${count === 1 ? unit.slice(0, -1) : unit}`,
+              )
+              .join(' ')
+      }`
+    : `${formatInTimeZone(from, 'UTC', 'MMM d, yyyy HH:mm')} – ${formatInTimeZone(until, 'UTC', 'MMM d, yyyy HH:mm')} UTC`;
+  const summary = [
+    'From your Runs filters',
+    `${context.account} / ${context.environmentSlug}`,
+    selectedStatuses.length
+      ? selectedStatuses
+          .map((status) => status[0] + status.slice(1).toLowerCase())
+          .join(', ')
+      : 'All statuses',
+    appIDs.length
+      ? `App${appIDs.length > 1 ? 's' : ''}: ${[...new Set(appIDs)].join(', ')}`
+      : 'All apps',
+    ...(functionID ? [`Function: ${functionID}`] : []),
+    ...(timeField !== 'queuedAt'
+      ? [timeField === 'startedAt' ? 'Started at' : 'Ended at']
+      : []),
+    rangeLabel,
+  ].join(' · ');
+
   return {
+    summary,
     prompt: `Use Inngest Cloud MCP to find runs using these basic filters:
 ${
   '{\n' +

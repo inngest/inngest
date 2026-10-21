@@ -164,6 +164,9 @@ export function RunAIAssistPopover({
             size="small"
           />
         </div>
+        {!message && result.summary && (
+          <p className="text-muted mb-2 text-xs leading-5">{result.summary}</p>
+        )}
         {message ? (
           <p role="status" className="text-muted rounded border p-2 text-xs">
             {message}
