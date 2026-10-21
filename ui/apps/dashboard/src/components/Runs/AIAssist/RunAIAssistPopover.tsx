@@ -196,14 +196,14 @@ export function RunAIAssistPopover({
         )}
         <a
           className="text-link mt-2 inline-block text-xs hover:underline"
-          href="https://www.inngest.com/docs/ai-dev-tools/mcp"
+          href="https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools"
           target="_blank"
           rel="noopener noreferrer"
           onClick={() =>
             onAction({ action: 'guide_clicked', guide: 'connection' })
           }
         >
-          View MCP docs
+          Available MCP tools
         </a>
       </PopoverContent>
     </Popover>

@@ -1,6 +1,6 @@
 # Runs AI assistance
 
-A primary outlined AI icon button sits at the end of the Cloud Runs filters, after Run type, with a tooltip and accessible label. Client buttons expand a copyable command block and short sign-in note, without numbered steps. Codex add and login commands copy together; the setup guide opens the Cloud connection documentation in a new tab. The MCP documentation link also opens a new tab. The local Dev Server is unchanged. There is no feature flag.
+A primary outlined AI icon button sits at the end of the Cloud Runs filters, after Run type, with a tooltip and accessible label. Client buttons expand a copyable command block and short sign-in note, without numbered steps. Codex add and login commands copy together; the setup guide opens the Cloud connection documentation in a new tab. The “Available MCP tools” link opens the tools section of the MCP documentation in a new tab. The local Dev Server is unchanged. There is no feature flag.
 
 A small muted line below the prompt summarizes the validated Runs filters: account/environment, statuses, apps, optional function/time field, and time range. It is hidden when the prompt is blocked or context is unavailable.
 
