@@ -19,6 +19,8 @@ const (
 	DefaultConnectGatewayGRPCPort  = 50052
 	DefaultConnectExecutorGRPCPort = 50053
 	DefaultConnectGRPCIP           = "127.0.0.1"
+	// MaxMessageSize covers execution requests and SDK replies, including protobuf overhead.
+	MaxMessageSize = 16 * 1024 * 1024
 )
 
 type GatewayGRPCForwarder interface {
@@ -96,7 +98,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 	mgr := &gatewayGRPCManager{
 		gatewayManager:   stateManager,
 		dialer:           grpcLib.NewClient,
-		grpcServer:       grpcLib.NewServer(),
+		grpcServer:       grpcLib.NewServer(grpcLib.MaxRecvMsgSize(MaxMessageSize)),
 		logger:           logger.StdlibLogger(ctx),
 		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
 		executorGRPCPort: DefaultConnectExecutorGRPCPort,

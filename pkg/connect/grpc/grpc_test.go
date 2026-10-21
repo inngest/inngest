@@ -17,8 +17,44 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 )
+
+func TestExecutorGRPCMessageSize(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	sm, cleanup := setupRedisGatewayManager(t)
+	defer cleanup()
+	mgr := newGatewayGRPCManager(ctx, sm, func(m *gatewayGRPCManager) { m.executorGRPCPort = 0 }).(*gatewayGRPCManager)
+	lis := bufconn.Listen(1024 * 1024)
+	go func() { _ = mgr.grpcServer.Serve(lis) }()
+	t.Cleanup(mgr.grpcServer.Stop)
+	t.Cleanup(func() { _ = lis.Close() })
+	clients := NewGRPCClientManager(connectpb.NewConnectExecutorClient,
+		WithDialer[connectpb.ConnectExecutorClient](func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+			return grpc.NewClient("passthrough:///executor", append(opts, grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+				return lis.Dial()
+			}))...)
+		}))
+	t.Cleanup(func() { clients.RemoveClient("executor") })
+	client, err := clients.GetOrCreateClient(ctx, "executor", "executor")
+	require.NoError(t, err)
+	for _, size := range []int{9 * 1024 * 1024, 16 * 1024 * 1024} {
+		req := &connectpb.ReplyRequest{Data: &connectpb.SDKResponse{RequestId: "missing", Body: make([]byte, size)}}
+		resp, err := client.Reply(ctx, req)
+		if size == 9*1024*1024 {
+			require.Greater(t, proto.Size(req), 4*1024*1024)
+			require.Less(t, proto.Size(req), 16*1024*1024)
+			require.NoError(t, err)
+			require.False(t, resp.Success, "decoded by handler; subscription does not exist")
+		} else {
+			require.Equal(t, codes.ResourceExhausted, status.Code(err))
+		}
+	}
+}
 
 func setupRedisGatewayManager(t *testing.T) (state.GatewayManager, func()) {
 	r := miniredis.RunT(t)

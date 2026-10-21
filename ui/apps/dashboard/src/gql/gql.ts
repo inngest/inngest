@@ -44,6 +44,7 @@ type Documents = {
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": typeof types.UpdatePlanDocument,
     "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $renderedOrder: [String!]\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      renderedOrder: $renderedOrder\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n": typeof types.SubmitChurnSurveyDocument,
     "\n  query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {\n    account {\n      marketplaceBillingURL\n      concurrencyTimeSeries(from: $from, to: $to) {\n        baseLimit\n        burstLimit\n        buckets {\n          bucket\n          value\n        }\n        limitHits {\n          bucket\n          value\n        }\n      }\n    }\n  }\n": typeof types.GetAccountConcurrencyTimeSeriesDocument,
+    "\n  query GetAccountBacklogTimeSeries($from: Time!, $to: Time!) {\n    account {\n      backlogTimeSeries(from: $from, to: $to) {\n        buckets {\n          bucket\n          value\n        }\n      }\n    }\n  }\n": typeof types.GetAccountBacklogTimeSeriesDocument,
     "\n  query GetBurstConcurrency {\n    account {\n      burstConcurrency {\n        limit\n        budgetMinutes\n        periodEnd\n        usage {\n          minutesUsed\n          minutesRemaining\n          bursts {\n            startedAt\n            endedAt\n            peak\n            limitHits\n          }\n        }\n      }\n    }\n  }\n": typeof types.GetBurstConcurrencyDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": typeof types.GetBillableStepsDocument,
     "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": typeof types.GetBillableRunsDocument,
@@ -185,6 +186,7 @@ type Documents = {
     "\n  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {\n    retryWorkflowRun(\n      input: { workspaceID: $environmentID, workflowID: $functionID }\n      workflowRunID: $functionRunID\n    ) {\n      id\n    }\n  }\n": typeof types.RerunFunctionRunDocument,
     "\n  mutation Rerun($envID: UUID!, $runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(envID: $envID, runID: $runID, fromStep: $fromStep)\n  }\n": typeof types.RerunDocument,
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": typeof types.SetUpAccountDocument,
+    "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n": typeof types.ClaimSignupConversionDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": typeof types.CreateUserDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": typeof types.GetFunctionPauseStateDocument,
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": typeof types.GetIngestKeyDocument,
@@ -225,6 +227,7 @@ const documents: Documents = {
     "\n  mutation UpdatePlan($planSlug: String!) {\n    updatePlan(slug: $planSlug) {\n      plan {\n        id\n        name\n      }\n    }\n  }\n": types.UpdatePlanDocument,
     "\n  mutation SubmitChurnSurvey(\n    $reason: String!\n    $feedback: String\n    $renderedOrder: [String!]\n    $email: String!\n    $accountID: UUID!\n    $clerkUserID: String!\n  ) {\n    submitChurnSurvey(\n      reason: $reason\n      feedback: $feedback\n      renderedOrder: $renderedOrder\n      email: $email\n      accountID: $accountID\n      clerkUserID: $clerkUserID\n    )\n  }\n": types.SubmitChurnSurveyDocument,
     "\n  query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {\n    account {\n      marketplaceBillingURL\n      concurrencyTimeSeries(from: $from, to: $to) {\n        baseLimit\n        burstLimit\n        buckets {\n          bucket\n          value\n        }\n        limitHits {\n          bucket\n          value\n        }\n      }\n    }\n  }\n": types.GetAccountConcurrencyTimeSeriesDocument,
+    "\n  query GetAccountBacklogTimeSeries($from: Time!, $to: Time!) {\n    account {\n      backlogTimeSeries(from: $from, to: $to) {\n        buckets {\n          bucket\n          value\n        }\n      }\n    }\n  }\n": types.GetAccountBacklogTimeSeriesDocument,
     "\n  query GetBurstConcurrency {\n    account {\n      burstConcurrency {\n        limit\n        budgetMinutes\n        periodEnd\n        usage {\n          minutesUsed\n          minutesRemaining\n          bursts {\n            startedAt\n            endedAt\n            peak\n            limitHits\n          }\n        }\n      }\n    }\n  }\n": types.GetBurstConcurrencyDocument,
     "\n  query GetBillableSteps($month: Int!, $year: Int!) {\n    usage: billableStepTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableStepsDocument,
     "\n  query GetBillableRuns($month: Int!, $year: Int!) {\n    usage: runCountTimeSeries(timeOptions: { month: $month, year: $year }) {\n      data {\n        time\n        value\n      }\n    }\n  }\n": types.GetBillableRunsDocument,
@@ -366,6 +369,7 @@ const documents: Documents = {
     "\n  mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {\n    retryWorkflowRun(\n      input: { workspaceID: $environmentID, workflowID: $functionID }\n      workflowRunID: $functionRunID\n    ) {\n      id\n    }\n  }\n": types.RerunFunctionRunDocument,
     "\n  mutation Rerun($envID: UUID!, $runID: ULID!, $fromStep: RerunFromStepInput) {\n    rerun(envID: $envID, runID: $runID, fromStep: $fromStep)\n  }\n": types.RerunDocument,
     "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n": types.SetUpAccountDocument,
+    "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n": types.ClaimSignupConversionDocument,
     "\n  mutation CreateUser {\n    createUser {\n      user {\n        id\n      }\n    }\n  }\n": types.CreateUserDocument,
     "\n  query GetFunctionPauseState($environmentID: ID!, $functionSlug: String!) {\n    environment: workspace(id: $environmentID) {\n      function: workflowBySlug(slug: $functionSlug) {\n        id\n        isPaused\n      }\n    }\n  }\n": types.GetFunctionPauseStateDocument,
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": types.GetIngestKeyDocument,
@@ -510,6 +514,10 @@ export function graphql(source: "\n  mutation SubmitChurnSurvey(\n    $reason: S
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {\n    account {\n      marketplaceBillingURL\n      concurrencyTimeSeries(from: $from, to: $to) {\n        baseLimit\n        burstLimit\n        buckets {\n          bucket\n          value\n        }\n        limitHits {\n          bucket\n          value\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAccountConcurrencyTimeSeries($from: Time!, $to: Time!) {\n    account {\n      marketplaceBillingURL\n      concurrencyTimeSeries(from: $from, to: $to) {\n        baseLimit\n        burstLimit\n        buckets {\n          bucket\n          value\n        }\n        limitHits {\n          bucket\n          value\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetAccountBacklogTimeSeries($from: Time!, $to: Time!) {\n    account {\n      backlogTimeSeries(from: $from, to: $to) {\n        buckets {\n          bucket\n          value\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAccountBacklogTimeSeries($from: Time!, $to: Time!) {\n    account {\n      backlogTimeSeries(from: $from, to: $to) {\n        buckets {\n          bucket\n          value\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -1074,6 +1082,10 @@ export function graphql(source: "\n  mutation Rerun($envID: UUID!, $runID: ULID!
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation SetUpAccount {\n    setUpAccount {\n      account {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n"): (typeof documents)["\n  mutation ClaimSignupConversion($accountID: UUID!) {\n    claimSignupConversion(accountID: $accountID)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -446,6 +447,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			// Clean up the old worker lease before re-routing.
 			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 				l, "could not clean up worker lease after forward failure")
+
+			// Another route cannot fix a payload that exceeds the transport limit.
+			// Preserve this decision through the driver and outer execution queue.
+			if util.IsGRPCMessageSizeError(err) {
+				err = queue.NeverRetryError(err)
+				break
+			}
 
 			if forwardAttempt == maxForwardAttempts-1 {
 				break

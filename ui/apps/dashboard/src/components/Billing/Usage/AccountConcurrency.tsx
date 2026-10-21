@@ -7,6 +7,7 @@ import { useQuery } from 'urql';
 
 import {
   HOUR_MS,
+  createBacklogChartOptions,
   createConcurrencyChartOptions,
 } from '@/components/Billing/Usage/concurrencyChart';
 import {
@@ -37,7 +38,21 @@ const GetAccountConcurrencyTimeSeriesDocument = graphql(`
   }
 `);
 
+const GetAccountBacklogTimeSeriesDocument = graphql(`
+  query GetAccountBacklogTimeSeries($from: Time!, $to: Time!) {
+    account {
+      backlogTimeSeries(from: $from, to: $to) {
+        buckets {
+          bucket
+          value
+        }
+      }
+    }
+  }
+`);
+
 const ref = 'app-billing-usage-concurrency';
+type Tab = 'account' | 'backlog';
 const periodOptions = [
   { id: '24h', name: '24 hours', hours: 24 },
   { id: '7d', name: '7 days', hours: 7 * 24 },
@@ -68,6 +83,7 @@ function Tile({ title, children }: TileProps) {
 export function AccountConcurrency() {
   const { profile } = BillingRoute.useLoaderData();
   const [period, setPeriod] = useState(periodOptions[2]);
+  const [tab, setTab] = useState<Tab>('account');
   const range = useMemo(() => {
     const to = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
     return {
@@ -79,6 +95,11 @@ export function AccountConcurrency() {
     query: GetAccountConcurrencyTimeSeriesDocument,
     variables: range,
   });
+  const [backlog] = useQuery({
+    query: GetAccountBacklogTimeSeriesDocument,
+    variables: range,
+    pause: tab !== 'backlog',
+  });
   const series = data?.account.concurrencyTimeSeries;
   const marketplaceBillingURL = data?.account.marketplaceBillingURL;
   const sectionRef = useScrollIntoViewOnHash(ACCOUNT_CONCURRENCY_SECTION_ID);
@@ -89,6 +110,16 @@ export function AccountConcurrency() {
   const { baseLimit, burstLimit } = series;
   const multiplier = burstMultiplier(burstLimit, baseLimit);
   const fetchedRange = operation.variables;
+
+  const backlogSeries = backlog.data?.account.backlogTimeSeries;
+  const backlogRange = backlog.operation?.variables ?? fetchedRange;
+  const backlogEmpty =
+    !backlog.fetching && backlogSeries?.buckets.every((b) => !b.value);
+  const backlogMessage = backlog.error
+    ? 'Unable to load backlog'
+    : backlogEmpty
+    ? 'No runs waited to start in this period'
+    : null;
 
   return (
     <div id={ACCOUNT_CONCURRENCY_SECTION_ID} ref={sectionRef} className="mt-10">
@@ -129,11 +160,20 @@ export function AccountConcurrency() {
       </div>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-center justify-between">
-          <Tabs defaultValue="account" className="mr-4 flex-1">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => setTab(value as Tab)}
+            className="mr-4 flex-1"
+          >
             <Tabs.List>
               <Tabs.Tab
                 value="account"
                 title="Account concurrency"
+                className="flex-none max-w-none"
+              />
+              <Tabs.Tab
+                value="backlog"
+                title="Backlog"
                 className="flex-none max-w-none border-r-0"
               />
             </Tabs.List>
@@ -159,12 +199,28 @@ export function AccountConcurrency() {
             </Select.Options>
           </Select>
         </div>
-        <div className="mt-6">
-          <Chart
-            option={createConcurrencyChartOptions(series, fetchedRange)}
-            className="h-[384px] w-full"
-            loading={fetching}
-          />
+        <div className="mt-6 h-[384px]">
+          {tab === 'account' ? (
+            <Chart
+              option={createConcurrencyChartOptions(series, fetchedRange)}
+              className="h-full w-full"
+              loading={fetching}
+            />
+          ) : backlogMessage ? (
+            <p className="text-subtle flex h-full items-center justify-center text-sm">
+              {backlogMessage}
+            </p>
+          ) : (
+            <Chart
+              option={createBacklogChartOptions(
+                backlogSeries ?? { buckets: [] },
+                series,
+                backlogRange,
+              )}
+              className="h-full w-full"
+              loading={backlog.fetching}
+            />
+          )}
         </div>
       </div>
     </div>
