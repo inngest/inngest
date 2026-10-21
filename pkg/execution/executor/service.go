@@ -34,6 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -559,13 +560,10 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	case enums.CancellationKindFinishTimeout:
 		return s.handleEagerCancelFinishTimeout(ctx, c, item)
 	case enums.CancellationKindRun:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelRun(ctx, c)
 	case enums.CancellationKindBulkRun:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBulkRun(ctx, c)
 	case enums.CancellationKindBacklog:
-		// NOTE: CancellationReadWriter is responsible for writing system jobs to the system queue for this CancellationKind. Since we do not initialize a CancellationReadWriter in OSS, this never gets triggered in OSS.
 		return s.handleEagerCancelBacklog(ctx, c)
 	default:
 		return fmt.Errorf("unhandled cancellation kind: %s", c.Kind)
@@ -863,6 +861,9 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		EnvID:      c.WorkspaceID,
 		FunctionID: c.FunctionID,
 	}, c.FunctionID.String(), from, c.StartedBefore)
+	if errors.Is(err, rueidis.Nil) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("error retrieving partition items: %w", err)
 	}
@@ -882,8 +883,8 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		if c.If != nil {
 			st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
 			if err != nil {
-				l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
-				return fmt.Errorf("error loading state for cancellation: %w", err)
+				l.Warn("error loading state for cancellation", "error", err, "queue_item", qi)
+				continue
 			}
 
 			event := st.Event()
@@ -903,7 +904,8 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
 			CancellationID: &c.ID,
 		}); err != nil {
-			return err
+			l.Warn("error cancelling run", "error", err, "queue_item", qi)
+			continue
 		}
 	}
 	return nil

@@ -30,6 +30,9 @@ func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCance
 	if len(functionID) > 256 {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "functionId cannot exceed 256 bytes")
 	}
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_CreateCancellation_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no cancellation was created.")
+	}
 	for _, field := range []struct {
 		name  string
 		value *timestamppb.Timestamp
@@ -68,9 +71,6 @@ func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCance
 		if err := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If); err != nil {
 			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, fmt.Sprintf("Invalid expression: %s", err))
 		}
-	}
-	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_CreateCancellation_FullMethodName); result.Limited {
-		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited, "API rate limit exceeded. The request was rejected and no cancellation was created.")
 	}
 	if s.functions == nil || s.cancellations == nil {
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Cancellation creation is not yet implemented")

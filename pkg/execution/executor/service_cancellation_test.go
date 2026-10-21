@@ -3,6 +3,8 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -26,9 +28,13 @@ type bulkCancellationRecorder struct {
 	execution.Executor
 	ids           []ulid.ULID
 	cancellations []ulid.ULID
+	failRun       ulid.ULID
 }
 
 func (e *bulkCancellationRecorder) Cancel(_ context.Context, id sv2.ID, r execution.CancelRequest) error {
+	if id.RunID == e.failRun {
+		return errors.New("cancel failed")
+	}
 	e.ids = append(e.ids, id.RunID)
 	e.cancellations = append(e.cancellations, *r.CancellationID)
 	return nil
@@ -117,4 +123,119 @@ func TestEagerBulkCancellationQueuedTime(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newBulkCancellationQueue(t *testing.T) (rueidis.Client, queue.ShardRegistryController) {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(rc.Close)
+	shard := redis_state.NewQueueShard("local", redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey))
+	registry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	return rc, registry
+}
+
+func TestEagerBulkCancellationNoPartition(t *testing.T) {
+	_, registry := newBulkCancellationQueue(t)
+	s := &svc{
+		shards: registry,
+		log:    logger.VoidLogger(),
+	}
+	require.NoError(t, s.handleEagerCancelBulkRun(t.Context(), cqrs.Cancellation{
+		AccountID:     uuid.New(),
+		WorkspaceID:   uuid.New(),
+		FunctionID:    uuid.New(),
+		StartedBefore: time.Now(),
+	}))
+}
+
+type bulkCancellationState struct {
+	state.Manager
+	failRun ulid.ULID
+}
+
+func (s bulkCancellationState) Load(_ context.Context, _ uuid.UUID, runID ulid.ULID) (state.State, error) {
+	if runID == s.failRun {
+		return nil, errors.New("load failed")
+	}
+	return state.NewStateInstance(state.Identifier{RunID: runID}, state.Metadata{}, []map[string]any{{"data": map[string]any{"cancel": true}}}, nil, nil), nil
+}
+
+func TestEagerBulkCancellationContinuesAfterItemError(t *testing.T) {
+	for _, failure := range []string{"load", "cancel"} {
+		t.Run(failure, func(t *testing.T) {
+			_, registry := newBulkCancellationQueue(t)
+			producer := queue.NewProducer(registry)
+			from := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+			c := cqrs.Cancellation{
+				ID:            ulid.Make(),
+				AccountID:     uuid.New(),
+				WorkspaceID:   uuid.New(),
+				FunctionID:    uuid.New(),
+				StartedAfter:  &from,
+				StartedBefore: from.Add(time.Minute),
+				If:            new("event.data.cancel == true"),
+			}
+			runs := []ulid.ULID{
+				ulid.MustNew(ulid.Timestamp(from), rand.Reader),
+				ulid.MustNew(ulid.Timestamp(from.Add(time.Second)), rand.Reader),
+			}
+			for i, runID := range runs {
+				require.NoError(t, producer.Enqueue(t.Context(), queue.Item{
+					JobID:       new(runID.String()),
+					Kind:        queue.KindStart,
+					WorkspaceID: c.WorkspaceID,
+					Identifier: state.Identifier{
+						AccountID:   c.AccountID,
+						WorkspaceID: c.WorkspaceID,
+						WorkflowID:  c.FunctionID,
+						RunID:       runID,
+					},
+				}, from.Add(time.Duration(i)*time.Second), queue.EnqueueOpts{}))
+			}
+			recorder := &bulkCancellationRecorder{}
+			loader := bulkCancellationState{}
+			if failure == "load" {
+				loader.failRun = runs[0]
+			} else {
+				recorder.failRun = runs[0]
+			}
+			s := &svc{
+				shards: registry,
+				state:  loader,
+				exec:   recorder,
+				log:    logger.VoidLogger(),
+			}
+			require.NoError(t, s.handleEagerCancelBulkRun(t.Context(), c))
+			require.Equal(t, []ulid.ULID{runs[1]}, recorder.ids)
+			require.Equal(t, []ulid.ULID{c.ID}, recorder.cancellations)
+		})
+	}
+}
+
+func TestCheckCancellationWithoutEvents(t *testing.T) {
+	e := &executor{cancellationChecker: cancellation.NewChecker(nil)}
+	for _, events := range [][]json.RawMessage{nil, {}} {
+		cancelled, err := e.checkCancellation(t.Context(), sv2.Metadata{}, events)
+		require.NoError(t, err)
+		require.False(t, cancelled)
+	}
+}
+
+func TestCheckCancellationStoreError(t *testing.T) {
+	rc, _ := newBulkCancellationQueue(t)
+	rc.Close()
+	e := &executor{
+		cancellationChecker: cancellation.NewChecker(cancellation.NewRedisReader(rc, "")),
+		clock:               clockwork.NewRealClock(),
+	}
+	ctx := logger.WithStdlib(t.Context(), logger.VoidLogger())
+	cancelled, err := e.checkCancellation(ctx, sv2.Metadata{}, []json.RawMessage{json.RawMessage(`{"name":"test"}`)})
+	require.NoError(t, err)
+	require.False(t, cancelled)
 }

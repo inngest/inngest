@@ -505,6 +505,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithDriverV2(httpv2.NewDriver(httpClient)),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
+		// records never expire; each step reads all of a function's cancellations
 		executor.WithCancellationChecker(cancellation.NewChecker(cancellation.NewRedisReader(unshardedRc, ""))),
 		executor.WithRateLimiter(rl),
 		executor.WithLogger(l),

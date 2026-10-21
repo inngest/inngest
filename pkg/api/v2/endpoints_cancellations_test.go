@@ -422,3 +422,21 @@ func TestCreateCancellationPathValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPGateway_CreateCancellationRateLimitBeforeValidation(t *testing.T) {
+	for _, body := range []string{
+		`{}`,
+		`{"from":"2026-01-02T00:00:00Z","until":"2026-01-01T00:00:00Z"}`,
+		`{"from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","name":" "}`,
+		`{"from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","if":"event.data. =="}`,
+	} {
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{
+			RateLimitProvider: &testEventRateLimiter{limited: true},
+		}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v2/apps/app/functions/fn/cancellations", strings.NewReader(body)))
+		require.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Body.String(), `"code":"rate_limited"`)
+	}
+}
