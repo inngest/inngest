@@ -554,6 +554,76 @@ func TestExtendRequestLeaseReplayOwnershipClearedOnReassignment(t *testing.T) {
 	require.NotNil(t, newOwnerLeaseID)
 }
 
+func TestExtendRequestLeaseWorkerCapacityExpiresWithoutCleanup(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		renewals int
+	}{
+		{name: "one renewal", renewals: 1},
+		{name: "multiple renewals", renewals: 3},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{r.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+			defer rc.Close()
+
+			fakeClock := clockwork.NewFakeClockAt(time.Date(2026, time.October, 20, 1, 0, 0, 789_000_000, time.UTC))
+			connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{Clock: fakeClock})
+			advance := func(duration time.Duration) {
+				fakeClock.Advance(duration)
+				r.FastForward(duration)
+			}
+
+			envID := uuid.New()
+			instanceID := "capacity-instance"
+			requestID := ulid.MustNew(ulid.Timestamp(fakeClock.Now()), rand.Reader).String()
+			require.NoError(t, connManager.SetWorkerTotalCapacity(ctx, envID, instanceID, 1))
+			leaseID, err := connManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration, net.IPv4(1, 1, 1, 1))
+			require.NoError(t, err)
+			require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+			for range tt.renewals {
+				advance(consts.ConnectWorkerRequestExtendLeaseInterval)
+				leaseID, err = connManager.ExtendRequestLease(ctx, envID, instanceID, requestID, *leaseID, consts.ConnectWorkerRequestLeaseDuration, false)
+				require.NoError(t, err)
+				require.NotNil(t, leaseID)
+			}
+
+			// An executor crash can lose explicit cleanup while the worker stays
+			// connected. Heartbeats must not keep the abandoned reservation active.
+			remaining := consts.ConnectWorkerRequestToWorkerMappingTTL - time.Second
+			for remaining > 0 {
+				tick := min(remaining, consts.ConnectWorkerHeartbeatInterval)
+				advance(tick)
+				require.NoError(t, connManager.WorkerCapacityOnHeartbeat(ctx, envID, instanceID))
+				remaining -= tick
+			}
+
+			leased, err := connManager.IsRequestLeased(ctx, envID, requestID)
+			require.NoError(t, err)
+			require.False(t, leased)
+			capacity, err := connManager.GetWorkerCapacities(ctx, envID, instanceID)
+			require.NoError(t, err)
+			require.Zero(t, capacity.Available)
+			require.ErrorIs(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, "next-request"), ErrWorkerCapacityExceeded)
+
+			advance(2 * time.Second)
+			require.NoError(t, connManager.WorkerCapacityOnHeartbeat(ctx, envID, instanceID))
+			require.True(t, r.Exists(connManager.workerRequestsKey(envID, instanceID)))
+			capacity, err = connManager.GetWorkerCapacities(ctx, envID, instanceID)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, capacity.Total)
+			require.EqualValues(t, 1, capacity.Available)
+			require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, "next-request"))
+		})
+	}
+}
+
 func TestExtendRequestLeaseIdempotentReplayWithCapacityLimit(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
