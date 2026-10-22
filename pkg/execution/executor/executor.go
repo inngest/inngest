@@ -3425,7 +3425,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	l.DebugSample(10, "resuming pause from invoke", "pause.DataKey", pause.DataKey)
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
-	return e.Resume(ctx, *pause, execution.ResumeRequest{
+	err = e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
 		EventID:        &evtID,
 		EventName:      evt.GetEvent().Name,
@@ -3433,6 +3433,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		StepName:       resumeData.StepName,
 		IdempotencyKey: correlationID,
 	})
+	if errors.Is(err, state.ErrRunNotFound) {
+		l.Debug("deleting orphaned invoke pause for missing run")
+		_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
+	}
+	return err
 }
 
 // Cancel cancels an in-progress function.
