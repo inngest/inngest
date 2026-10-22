@@ -14,6 +14,7 @@ import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { RunAIAssist } from './AIAssist/RunAIAssist';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { runsInsightsHref } from './runsInsights';
@@ -216,11 +217,27 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       : runsInsightsHref({
           envSlug: environment.slug,
           celQuery: search ?? '',
-          functionSlug: scope === 'fn' ? functionInsightsSlug ?? null : null,
+          functionSlug: scope === 'fn' ? (functionInsightsSlug ?? null) : null,
         });
 
   return (
     <RunsPage
+      toolbarActions={
+        <RunAIAssist
+          key={`${environment.id}:${functionSlug ?? 'env'}`}
+          scope={scope}
+          environmentSlug={environment.slug}
+          environmentID={environment.id}
+          apps={appsRes.data?.env?.apps}
+          functionAppID={functionData?.workspace.workflow?.app.externalID}
+          functionSlug={
+            scope === 'fn' ? functionData?.workspace.workflow?.slug : undefined
+          }
+          metadataLoading={isRestRunsMetadataLoading}
+          metadataError={Boolean(metadataError)}
+          onRetry={onRefresh}
+        />
+      }
       apps={appsRes.data?.env?.apps.map((app) => ({
         id: app.id,
         name: app.externalID,
