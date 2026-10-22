@@ -272,6 +272,28 @@ func (o QueueOptions) SemaphoreRequeueExtension() time.Duration {
 	return o.semaphoreRequeueExtension
 }
 
+// WithConcurrencyRequeueExtension selects the forced retry delay for ordinary
+// function partitions blocked by concurrency. The callback can opt in individual
+// shards or accounts; returning zero preserves the five-second default. System
+// queues, throttle-only parks, semaphore-only parks and shadow partitions are
+// unaffected. The callback is called on the processing path and should be cheap.
+func WithConcurrencyRequeueExtension(fn func(context.Context, string, PartitionIdentifier) time.Duration) QueueOpt {
+	return func(q *QueueOptions) { q.concurrencyRequeueExtension = fn }
+}
+
+func (o QueueOptions) ConcurrencyRequeueExtension(ctx context.Context, shardName string, p PartitionIdentifier) time.Duration {
+	if o.concurrencyRequeueExtension == nil || (p.SystemQueueName != nil && *p.SystemQueueName != "") {
+		return PartitionConcurrencyLimitRequeueExtension
+	}
+	d := o.concurrencyRequeueExtension(ctx, shardName, p)
+	// Requeue timestamps are truncated to seconds. Keep at least a full second
+	// beyond the scanner lookahead before truncation to avoid immediate rescans.
+	if d < PartitionLookahead+time.Second {
+		return PartitionConcurrencyLimitRequeueExtension
+	}
+	return d
+}
+
 func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
 	return func(q *QueueOptions) {
 		q.peekCurrMultiplier = m
@@ -581,7 +603,8 @@ type QueueOptions struct {
 	// semaphoreRequeueExtension is how far into the future a partition is
 	// requeued when only the local semaphore limit is reached. Falls back to
 	// PartitionSemaphoreLimitRequeueExtension when unset.
-	semaphoreRequeueExtension time.Duration
+	semaphoreRequeueExtension   time.Duration
+	concurrencyRequeueExtension func(context.Context, string, PartitionIdentifier) time.Duration
 
 	NormalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	RefreshItemThrottle                       RefreshItemThrottleFn

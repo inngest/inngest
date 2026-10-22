@@ -327,7 +327,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		// as random offset is currently false (so we don't loop forever)
 
 		// Note: we must requeue the partition to remove the lease.
-		err := shard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		err := shard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(q.ConcurrencyRequeueExtension(ctx, shard.Name(), partitionIdentifier)), true)
 		if err != nil {
 			l.Warn("error requeuieng partition for random peek", "error", err)
 		}
@@ -336,7 +336,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
-	// with a force:  ensure that we won't re-scan it until 2 seconds in the future.
+	// with a force: do not re-scan it until the applicable retry delay has passed.
 	if iter.IsRequeuable() {
 		requeue := PartitionConcurrencyLimitRequeueExtension
 		if iter.CtrConcurrency.Load() == 0 {
@@ -351,6 +351,8 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			// quickly once capacity is freed. Use a shorter requeue to reduce latency
 			// between run completion and the next run starting.
 			requeue = q.SemaphoreRequeueExtension()
+		} else {
+			requeue = q.ConcurrencyRequeueExtension(ctx, shard.Name(), partitionIdentifier)
 		}
 
 		if iter.CtrSuccess.Load() == 0 {
