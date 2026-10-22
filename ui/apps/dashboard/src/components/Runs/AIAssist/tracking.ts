@@ -17,7 +17,10 @@ export type RunAIAction =
       guide: 'connection' | 'troubleshooting' | 'more_ai_resources';
     };
 
-export function useRunAITracking(scope: 'env' | 'fn') {
+export function useRunAITracking(
+  scope: 'env' | 'fn' | 'debug',
+  detailView?: 'inline' | 'standalone',
+) {
   const user = useTrackingUser();
   return useCallback(
     (event: RunAIAction) => {
@@ -28,14 +31,20 @@ export function useRunAITracking(scope: 'env' | 'fn') {
           user,
           data: {
             ...event,
-            surface: scope === 'fn' ? 'function_runs' : 'environment_runs',
-            template_version: 'basic_v1',
+            surface:
+              scope === 'debug'
+                ? 'run_details'
+                : scope === 'fn'
+                  ? 'function_runs'
+                  : 'environment_runs',
+            template_version: scope === 'debug' ? 'run_debug_v1' : 'basic_v1',
+            ...(scope === 'debug' ? { detail_view: detailView } : {}),
           },
         });
       } catch {
         // Analytics must not interrupt user actions.
       }
     },
-    [scope, user],
+    [scope, detailView, user],
   );
 }

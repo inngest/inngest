@@ -10,6 +10,7 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { renderRunAIDebug } from '@/components/RunDetails/RunAIDebug';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useFunction } from '@/queries/functions';
@@ -222,6 +223,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   return (
     <RunsPage
+      renderRunAction={renderRunAIDebug}
       toolbarActions={
         <RunAIAssist
           key={`${environment.id}:${functionSlug ?? 'env'}`}
