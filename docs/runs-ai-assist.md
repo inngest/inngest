@@ -8,7 +8,7 @@ The preview uses the shared read-only text area with normal app typography and a
 
 ## Tracking
 
-Reuse the dashboard transport and existing user/account identity. Event: `app/runs.ai_assist.action`, version `1`. Each event includes `surface` (environment_runs or function_runs) and `template_version` (basic_v1).
+Use the standard Segment registry in `utils/analyticsEvents.ts`. Event: `Assistant Action Performed`, with `feature: runs-ai-assist`, `action`, and an explicit `account_id`; user identity comes from the existing Segment identify call. Each event includes `surface` (`environment_runs`, `function_runs`, or `run_details`) and `template_version` (`basic_v1` or `run_debug_v1`). Debugging also includes `detail_view` (`inline` or `standalone`). This replaces the legacy Inngest event `app/runs.ai_assist.action`; it does not dual-send or backfill historical usage.
 
 | Action | Meaning | Additional data |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ Client values: claude_code, codex_cli, other. Failure categories: permission_den
 
 ## Validation
 
-Run `pnpm exec vitest run src/components/Runs` and `pnpm exec tsc --noEmit` from `ui/apps/dashboard`. Run the MCP setup and RunsPage tests from `ui/packages/components`. In staging, verify a known run-finding task, clipboard fallback, and analytics delivery.
+Run `pnpm exec vitest run src/components/Runs` and `pnpm exec tsc --noEmit` from `ui/apps/dashboard`. Run the MCP setup and RunsPage tests from `ui/packages/components`. In staging, verify a known run-finding task, clipboard fallback, and analytics delivery. In Segment Source Debugger, open each popover and copy its prompt; verify `opened` and `prompt_copied` for each surface, with the expected account and user identity. Confirm downstream warehouse delivery before using Hex counts. Segment requires the existing `VITE_SEGMENT_WRITE_KEY` deployment configuration; these events will no longer appear in Inngest Insights.
 
 ## Live verification
 
