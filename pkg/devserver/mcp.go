@@ -155,10 +155,11 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 }
 
 type MCPHandler struct {
-	events api.EventHandler
-	data   cqrs.Manager
-	tick   time.Duration
-	v2     http.Handler
+	events     api.EventHandler
+	data       cqrs.Manager
+	tick       time.Duration
+	v2         http.Handler
+	signingKey *string
 
 	serverOnce sync.Once
 	server     *mcp.Server
@@ -334,6 +335,10 @@ func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpo
 
 	if h.v2 == nil {
 		return apiv2mcp.ToolError("REST API v2 is not configured", map[string]any{"status": http.StatusServiceUnavailable}), nil
+	}
+
+	if req.Header.Get("Authorization") == "" && h.signingKey != nil && *h.signingKey != "" {
+		req.Header.Set("Authorization", "Bearer "+*h.signingKey)
 	}
 
 	recorder := httptest.NewRecorder()
