@@ -1792,6 +1792,117 @@ service V2 {
     };
   }
 
+  rpc CreateCancellation(CreateCancellationRequest) returns (CreateCancellationResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/cancellations"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:bulk_cancel"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a cancellation"
+      description: "Cancels a function's runs queued between from and until, inclusive, with millisecond precision. until may be up to now plus five seconds. There is no cap on range width; a from far in the past includes all queued runs through until. Includes runs that have never started, even when the function is paused. Running runs stop before their next step; sleeping or waiting runs are cancelled when they next resume. A step already executing may finish. The optional if expression filters the triggering event. Returns 201 when created; cancellation happens asynchronously. Not idempotent: each request creates another cancellation."
+      tags: "Runs"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Cancellation created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateCancellationResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid cancellation request"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Permission denied"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Function not found"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Rate limit exceeded"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Unable to create cancellation"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "501"
+        value: {
+          description: "Cancellation creation is not implemented"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc PauseFunction(PauseFunctionRequest) returns (PauseFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/pause"
@@ -4181,4 +4292,48 @@ message PauseFunctionRequest {
 message PauseFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message CreateCancellationRequest {
+  string app_id = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
+  ];
+  string function_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)." }
+  ];
+  google.protobuf.Timestamp from = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Inclusive lower bound on run queued time, with millisecond precision. No limit on range width." }
+  ];
+  google.protobuf.Timestamp until = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Inclusive upper bound on run queued time, with millisecond precision. May be up to now plus five seconds." }
+  ];
+  optional string if = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "CEL expression over event, the triggering event. Maximum 1024 characters; macros and non-logical functions are restricted." }
+  ];
+  optional string name = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = { description: "Optional name, trimmed of surrounding whitespace. Must contain 1 to 255 characters when provided." }
+  ];
+}
+
+message CreateCancellationResponse {
+  Cancellation data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Cancellation {
+  string id = 1;
+  string app_id = 2;
+  string function_id = 3;
+  optional string name = 4;
+  google.protobuf.Timestamp from = 5;
+  google.protobuf.Timestamp until = 6;
+  optional string if = 7;
+  google.protobuf.Timestamp created_at = 8;
 }

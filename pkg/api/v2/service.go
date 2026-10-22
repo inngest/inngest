@@ -25,6 +25,7 @@ type Service struct {
 	apps           AppProvider
 	functions      FunctionProvider
 	functionPauser FunctionPauser
+	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
 	traces         FunctionTraceReader
@@ -44,6 +45,7 @@ type ServiceOptions struct {
 	Apps                AppProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
+	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
 	FunctionTraces      FunctionTraceReader
@@ -70,6 +72,7 @@ func NewService(opts ServiceOptions) *Service {
 		apps:           opts.Apps,
 		functions:      opts.Functions,
 		functionPauser: opts.FunctionPauser,
+		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
 		traces:         opts.FunctionTraces,
