@@ -3436,7 +3436,8 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	if errors.Is(err, state.ErrRunNotFound) {
 		l.Debug("deleting orphaned invoke pause for missing run")
 		if deleteErr := e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause); deleteErr != nil {
-			return errors.Join(err, fmt.Errorf("failed to delete orphaned invoke pause: %w", deleteErr))
+			// Finalize ignores ErrRunNotFound to avoid retrying, so report the cleanup failure here.
+			l.Error("failed to delete orphaned invoke pause", "error", deleteErr, "pause_id", pause.ID.String())
 		}
 	}
 	return err

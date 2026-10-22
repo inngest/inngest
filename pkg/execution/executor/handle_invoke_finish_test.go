@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -74,8 +75,13 @@ func TestHandleInvokeFinishDeletesPauseWhenRunIsMissing(t *testing.T) {
 				Event:   &eventName,
 			}
 			pm := &invokeFinishPauseManager{pause: pause, deleteErr: tc.deleteErr}
+			var logs bytes.Buffer
 			e := &executor{
-				log:   logger.VoidLogger(),
+				log: logger.From(context.Background(),
+					logger.WithLoggerWriter(&logs),
+					logger.WithHandler(logger.JSONHandler),
+					logger.WithLoggerLevel(logger.LevelError),
+				),
 				smv2:  missingRunService{},
 				pm:    pm,
 				queue: &stubQueue{},
@@ -99,8 +105,10 @@ func TestHandleInvokeFinishDeletesPauseWhenRunIsMissing(t *testing.T) {
 			require.Equal(t, pauses.Index{WorkspaceID: workspaceID, EventName: eventName}, pm.deletedIndex)
 			require.Equal(t, pause.ID, pm.deletedPause.ID)
 			if tc.deleteErr != nil {
-				require.ErrorIs(t, err, tc.deleteErr)
-				require.ErrorContains(t, err, "failed to delete orphaned invoke pause")
+				require.Contains(t, logs.String(), "failed to delete orphaned invoke pause")
+				require.Contains(t, logs.String(), tc.deleteErr.Error())
+			} else {
+				require.Empty(t, logs.String())
 			}
 		})
 	}
