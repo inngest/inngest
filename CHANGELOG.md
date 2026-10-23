@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.49.0] - 2026-10-23
+
+### 🚀 Features
+
+- *(api)* Resume a function via v2 api, cli & mcp (#5054)
+- *(api)* Add function replays to v2 (#5010)
+
+### 🐛 Bug Fixes
+
+- *(cqrs)* Include skipped runs and keep precise paging (#5015)
+- *(api)* Enforce request limits before parsing (#5025)
+- *(dashboard)* Show replay failures and correct skipped counts (#5018)
+
 ## [v1.48.0] - 2026-10-22
 
 ### 🚀 Features
@@ -15,6 +28,10 @@ All notable changes to this project will be documented in this file.
 - *(connect)* Resume requests across executor recovery (#5063)
 - *(connect)* Expire renewed worker capacity reservations (#5062)
 - *(ui)* Upgrade Next and Sharp for image optimizer security (#5070)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.48.0 (#5064)
 
 ## [v1.47.0] - 2026-10-21
 
