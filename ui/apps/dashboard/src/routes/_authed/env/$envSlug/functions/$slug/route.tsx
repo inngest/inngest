@@ -18,6 +18,7 @@ import { ArchivedAppBanner } from '@/components/Apps/ArchivedAppBanner';
 import { ArchivedFuncBanner } from '@/components/Functions/ArchivedFuncBanner';
 import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
+import { Banner } from '@inngest/components/Banner';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug')({
   component: FunctionComponent,
@@ -172,6 +173,12 @@ function FunctionComponent() {
             : []),
         ]}
       />
+      {fn?.isDraining && (
+        <Banner severity="warning">
+          This function is draining. New runs are skipped while existing runs
+          continue to execute.
+        </Banner>
+      )}
       <Outlet />
     </>
   );
