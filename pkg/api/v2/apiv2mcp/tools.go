@@ -54,8 +54,8 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 
 	readOnly := endpoint.HTTPMethod == http.MethodGet
 	idempotent := readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete
-	// pause is idempotent despite post. resume needs this too
-	if endpoint.MethodName == "PauseFunction" {
+	// pause and resume are idempotent despite post
+	if endpoint.MethodName == "PauseFunction" || endpoint.MethodName == "ResumeFunction" {
 		idempotent = true
 	}
 	return &mcp.Tool{

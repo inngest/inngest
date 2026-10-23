@@ -27,6 +27,7 @@ type Props = {
   runID: string;
   isDurableEndpoint?: boolean;
   readOnly?: boolean;
+  additionalAction?: React.ReactNode;
 };
 
 type Run = {
@@ -59,6 +60,7 @@ export const RunInfo = ({
   standalone,
   isDurableEndpoint,
   readOnly,
+  additionalAction,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
@@ -94,6 +96,7 @@ export const RunInfo = ({
 
         {!readOnly && (
           <div className="flex items-center gap-2">
+            {additionalAction}
             <Actions
               runID={runID}
               fnID={isLazyDone(run) ? run.fn.id : undefined}
