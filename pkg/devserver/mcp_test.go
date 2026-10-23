@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2operations"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 )
@@ -219,6 +220,102 @@ func TestMCPNotImplementedIsToolError(t *testing.T) {
 			"message": "Sessions not implemented in OSS",
 		}},
 	}, result.StructuredContent)
+}
+
+func TestMCPExecuteV2RequiresCallerAuthorization(t *testing.T) {
+	const signingKey = "signkey-test-abc123def456"
+
+	for _, tc := range []struct {
+		name          string
+		authorization string
+		wantStatus    int
+		wantCall      bool
+	}{
+		{name: "missing credentials are not elevated", wantStatus: http.StatusUnauthorized},
+		{name: "caller credentials are forwarded", authorization: "Bearer " + signingKey, wantStatus: http.StatusOK, wantCall: true},
+		{name: "invalid caller credentials are rejected", authorization: "Bearer signkey-test-wrongkey123", wantStatus: http.StatusUnauthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			protectedHandlerCalled := false
+			trustedSigningKey := signingKey
+			v2 := authn.SigningKeyMiddleware(&trustedSigningKey)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				protectedHandlerCalled = true
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			handler := &MCPHandler{v2: v2}
+			req := httptest.NewRequest(http.MethodGet, "/api/v2/test", nil)
+			if tc.authorization != "" {
+				req.Header.Set("Authorization", tc.authorization)
+			}
+
+			result, err := handler.executeV2(context.Background(), apiv2endpoint.Endpoint{}, req)
+
+			require.NoError(t, err)
+			require.Equal(t, tc.wantCall, protectedHandlerCalled)
+			require.Equal(t, tc.wantStatus == http.StatusUnauthorized, result.IsError)
+			if tc.wantStatus == http.StatusUnauthorized {
+				require.Contains(t, result.Content[0].(*mcp.TextContent).Text, "HTTP 401")
+			} else {
+				require.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
+			}
+		})
+	}
+}
+
+func TestMCPToolCallsForwardCallerAuthorization(t *testing.T) {
+	const signingKey = "signkey-test-abc123def456"
+
+	for _, tc := range []struct {
+		name          string
+		authorization string
+		wantCall      bool
+	}{
+		{name: "missing credentials are rejected"},
+		{name: "caller credentials are forwarded", authorization: "Bearer " + signingKey, wantCall: true},
+		{name: "invalid credentials are rejected", authorization: "Bearer signkey-test-wrongkey123"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			protectedHandlerCalled := false
+			trustedSigningKey := signingKey
+			v2 := authn.SigningKeyMiddleware(&trustedSigningKey)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				protectedHandlerCalled = true
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			handler := NewMCPHandler(nil, nil, 0, v2)
+			call := func(body, sessionID, authorization string) *httptest.ResponseRecorder {
+				req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+				req.Header.Set("Accept", "application/json, text/event-stream")
+				req.Header.Set("Content-Type", "application/json")
+				if sessionID != "" {
+					req.Header.Set("Mcp-Session-Id", sessionID)
+				}
+				if authorization != "" {
+					req.Header.Set("Authorization", authorization)
+				}
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, req)
+				return recorder
+			}
+
+			initialize := call(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}`, "", "")
+			require.Equal(t, http.StatusOK, initialize.Code)
+			sessionID := initialize.Header().Get("Mcp-Session-Id")
+			require.NotEmpty(t, sessionID)
+			require.Less(t, call(`{"jsonrpc":"2.0","method":"notifications/initialized"}`, sessionID, "").Code, http.StatusBadRequest)
+
+			toolCall := call(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_functions","arguments":{"appId":"test-app"}}}`, sessionID, tc.authorization)
+			require.Equal(t, http.StatusOK, toolCall.Code)
+			require.Equal(t, tc.wantCall, protectedHandlerCalled)
+			if tc.wantCall {
+				require.Contains(t, toolCall.Body.String(), `"ok":true`)
+			} else {
+				require.Contains(t, toolCall.Body.String(), "HTTP 401")
+			}
+		})
+	}
 }
 
 type listedMCPTool struct {
