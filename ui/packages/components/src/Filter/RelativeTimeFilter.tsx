@@ -28,7 +28,7 @@ export default function RelativeTimeFilter({
           return (
             <Select.Option key={option.id} option={option}>
               <span className="inline-flex w-full items-center justify-between gap-2">
-                <label className="text-sm lowercase first-letter:capitalize">{option.name}</label>
+                <label className="lowercase first-letter:capitalize">{option.name}</label>
                 {option.disabled && (
                   <Pill kind="primary" appearance="outlined">
                     Upgrade Plan

@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 
 import { KeyboardShortcut } from '../KeyboardShortcut';
@@ -78,66 +79,66 @@ export function SQLEditorContextMenu({
           top: `${contextMenu.y}px`,
         }}
       >
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none"
-          onSelect={onPrettifySQL}
-        >
+        <DropdownMenuItem onSelect={onPrettifySQL}>
           <span>Format SQL</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['shift', 'alt', 'F']} />
+            <KeyboardShortcut
+              className="py-0"
+              color="text-muted"
+              keys={['shift', 'alt', 'F']}
+            />
           </span>
         </DropdownMenuItem>
-        <div className="border-subtle my-1 border-t" />
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-          disabled={!contextMenu.hasSelection}
-          onSelect={onCut}
-        >
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={!contextMenu.hasSelection} onSelect={onCut}>
           <span>Cut</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'X']} />
+            <KeyboardShortcut
+              className="py-0"
+              color="text-muted"
+              keys={['cmd', 'ctrl', 'X']}
+            />
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
           disabled={!contextMenu.hasSelection}
           onSelect={onCopy}
         >
           <span>Copy</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'C']} />
+            <KeyboardShortcut
+              className="py-0"
+              color="text-muted"
+              keys={['cmd', 'ctrl', 'C']}
+            />
           </span>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none"
-          onSelect={onPaste}
-        >
+        <DropdownMenuItem onSelect={onPaste}>
           <span>Paste</span>
           <span className="ml-auto">
-            <KeyboardShortcut color="text-muted" keys={['cmd', 'ctrl', 'V']} />
+            <KeyboardShortcut
+              className="py-0"
+              color="text-muted"
+              keys={['cmd', 'ctrl', 'V']}
+            />
           </span>
         </DropdownMenuItem>
-        <div className="border-subtle my-1 border-t" />
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none"
-          onSelect={onRunQuery}
-        >
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onRunQuery}>
           <span>Run query</span>
           <span className="ml-auto">
             <KeyboardShortcut
+              className="py-0"
               color="text-muted"
               keys={['cmd', 'ctrl', 'enter']}
             />
           </span>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-basis px-4 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-          disabled={!hasUnsavedChanges}
-          onSelect={onSaveQuery}
-        >
+        <DropdownMenuItem disabled={!hasUnsavedChanges} onSelect={onSaveQuery}>
           <span>Save query</span>
           <span className="ml-auto">
             <KeyboardShortcut
+              className="py-0"
               color="text-muted"
               keys={['cmd', 'ctrl', 'alt', 'S']}
             />

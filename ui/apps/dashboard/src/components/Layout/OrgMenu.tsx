@@ -119,7 +119,7 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
                 button's own. */}
             <DropdownMenuItem
               asChild
-              className="text-basis p-0"
+              className="p-0"
               onSelect={() =>
                 navigate({
                   to: '/billing/plans' as FileRouteTypes['to'],
