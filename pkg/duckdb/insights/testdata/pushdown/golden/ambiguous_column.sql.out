@@ -1,0 +1,5 @@
+{
+  "description": "An unqualified column two joined tables could both have is rejected by validation.",
+  "mode": "product",
+  "error": "insights: ambiguous column \"run_id\": qualify with a table name (at 7:3)"
+}

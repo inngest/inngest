@@ -55,12 +55,13 @@ var (
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
 		duckdbdriver.QuackColumnVarchar,                                                          // status
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
-		duckdbdriver.QuackColumnVarchar, // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
-		duckdbdriver.QuackColumnVarchar, // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
-		duckdbdriver.QuackColumnVarchar, // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
-		duckdbdriver.QuackColumnVarchar, // defer_parent_fn_slug
-		duckdbdriver.QuackColumnVarchar, // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
-		duckdbdriver.QuackColumnVarchar, // trace_id
+		duckdbdriver.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
+		duckdbdriver.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
+		duckdbdriver.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs
+		duckdbdriver.QuackColumnVarchar,     // defer_parent_fn_slug
+		duckdbdriver.QuackColumnVarchar,     // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
+		duckdbdriver.QuackColumnVarchar,     // trace_id
+		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
@@ -69,11 +70,13 @@ var (
 		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
+		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, internal_id, received_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // source, source_id, event_id, event_name
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
+		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
 	// (BOOLEAN) have no native duckdbdriver.QuackColumnKind — see that type's own
@@ -209,7 +212,8 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 // 500) on any native LIST-typed column, verified down to the minimal case;
 // see pkg/duckdb/driver/internal/quack/append.go's ColumnKind.wireID doc comment for the full
 // writeup. scheduled_at is NOT NULL: a run with none falls back to its
-// queued_at, as the dual-write path's materializeRuns does.
+// queued_at, as the dual-write path's materializeRuns does. bucket_at is
+// when the run's final row would have reached the buffer (runBucketAt).
 func runRowValues(r RunRow) []any {
 	scheduledAt := r.QueuedAt
 	if r.ScheduledAt != nil {
@@ -224,6 +228,7 @@ func runRowValues(r RunRow) []any {
 		nil,     // defer_parent_fn_slug
 		"[]",    // defer_parent_run_ids
 		r.TraceID,
+		runBucketAt(r),
 	}
 }
 
@@ -236,6 +241,7 @@ func spanRowValues(s SpanRow) []any {
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
 		s.AppID, s.AppName, s.FunctionID, s.FunctionSlug, s.Name, s.StartTime, s.EndTime,
 		s.TraceID, s.SpanID, parent, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
+		s.EndTime, // bucket_at: a span is written when it ends
 	}
 }
 
@@ -272,7 +278,20 @@ func eventRowValues(e EventRow) []any {
 		e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt,
 		e.Source, sourceID, e.EventID, e.EventName,
 		e.EventData, e.EventV, e.EventTS, e.EventMeta,
+		e.ReceivedAt, // bucket_at
 	}
+}
+
+// runBucketAt is when a run's latest row would have reached the buffer:
+// when it ended, else started, else was queued.
+func runBucketAt(r RunRow) time.Time {
+	switch {
+	case r.EndedAt != nil:
+		return *r.EndedAt
+	case r.StartedAt != nil:
+		return *r.StartedAt
+	}
+	return r.QueuedAt
 }
 
 func nullableTime(t *time.Time) any {

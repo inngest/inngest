@@ -1,0 +1,4 @@
+{
+  "description": "Datetime columns aren't extracted: the query's time bound is extracted separately.",
+  "mode": "product"
+}

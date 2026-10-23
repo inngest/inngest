@@ -1,0 +1,4 @@
+{
+  "description": "A numeric cast of a JSON key isn't extracted.",
+  "mode": "product"
+}

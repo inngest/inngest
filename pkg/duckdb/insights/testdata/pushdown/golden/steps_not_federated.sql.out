@@ -1,0 +1,13 @@
+{
+  "description": "steps isn't federated: its predicates are extracted, but nothing is pushed.",
+  "mode": "product",
+  "tables": {
+    "steps": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "pushed": false,
+        "kept": "table not federated"
+      }
+    ]
+  }
+}

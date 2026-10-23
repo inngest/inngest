@@ -1,0 +1,28 @@
+{
+  "description": "metadata isn't federated: its predicates are extracted, but nothing is pushed.",
+  "mode": "product",
+  "tables": {
+    "metadata": [
+      {
+        "logical": "scope = 'step'",
+        "pushed": false,
+        "kept": "table not federated"
+      },
+      {
+        "logical": "step_index \u003e= 1",
+        "pushed": false,
+        "kept": "table not federated"
+      },
+      {
+        "logical": "step_index \u003c= 3",
+        "pushed": false,
+        "kept": "table not federated"
+      },
+      {
+        "logical": "step_attempt \u003e -1",
+        "pushed": false,
+        "kept": "table not federated"
+      }
+    ]
+  }
+}
