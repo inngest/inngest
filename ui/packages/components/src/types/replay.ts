@@ -3,12 +3,14 @@ import { type FunctionRunStatus } from './functionRun';
 export enum ReplayStatus {
   Created = 'CREATED',
   Ended = 'ENDED',
+  Failed = 'FAILED',
 }
 
 export type Replay = {
   id: string;
   name: string;
   status: ReplayStatus;
+  error?: string;
   createdAt: Date;
   endedAt?: Date;
   duration?: number;

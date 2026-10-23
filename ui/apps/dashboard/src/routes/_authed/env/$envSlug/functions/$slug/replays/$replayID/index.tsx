@@ -2,6 +2,7 @@ import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { StatusCell } from '@inngest/components/Table/Cell';
 import { Time } from '@inngest/components/Time';
+import { ReplayStatus } from '@inngest/components/types/replay';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -35,13 +36,22 @@ function ReplayDetailsPage() {
         <div className="py-1 text-2xl">{replay?.name}</div>
       )}
       {replay && (
-        <StatusCell
-          size="small"
-          status={replay.status}
-          label={
-            replay.status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'
-          }
-        />
+        <div>
+          <StatusCell
+            size="small"
+            status={replay.status}
+            label={
+              replay.status === ReplayStatus.Failed
+                ? 'Failed'
+                : replay.status === ReplayStatus.Ended
+                ? 'Queuing complete'
+                : 'Queuing runs'
+            }
+          />
+          {replay.error && (
+            <p className="text-error mt-2 text-sm">{replay.error}</p>
+          )}
+        </div>
       )}
       <AppDetailsCard title="Replay information" className="mt-9">
         <AppDetailsCard.Item
