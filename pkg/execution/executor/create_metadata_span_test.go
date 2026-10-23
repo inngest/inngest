@@ -28,6 +28,8 @@ type mockRunContext struct {
 	lifecycleItem queue.Item
 	httpClient    exechttp.RequestExecutor
 	attempt       int
+	// released counts ReleaseCapacityLease calls.
+	released int
 }
 
 func (m *mockRunContext) Metadata() *sv2.Metadata                                              { return &m.md }
@@ -50,7 +52,7 @@ func (m *mockRunContext) SetStatusCode(code int)                                
 func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)     {}
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}
 func (m *mockRunContext) SetError(err error)                                                   {}
-func (m *mockRunContext) ReleaseCapacityLease() error                                          { return nil }
+func (m *mockRunContext) ReleaseCapacityLease() error                                          { m.released++; return nil }
 func (m *mockRunContext) RootSpan() *meta.SpanReference                                        { return &meta.SpanReference{} }
 func (m *mockRunContext) StartTime() time.Time                                                 { return time.Time{} }
 

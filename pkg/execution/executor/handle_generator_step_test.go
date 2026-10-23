@@ -118,6 +118,7 @@ func TestHandleGeneratorStep_ConcurrentCompletionsCoalesce(t *testing.T) {
 			context.Background(), rc,
 			state.GeneratorOpcode{Op: enums.OpcodeStepRun, ID: stepID, Data: json.RawMessage(`null`)},
 			edge,
+			OpcodeGroup{},
 		)
 		require.NoError(t, err)
 	}
@@ -185,6 +186,7 @@ func TestHandleGeneratorStepEnqueuesDiscoveryOnDuplicate(t *testing.T) {
 		rc,
 		state.GeneratorOpcode{Op: enums.OpcodeStepRun, ID: "step", Data: json.RawMessage(`null`)},
 		queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}},
+		OpcodeGroup{},
 	)
 	require.NoError(t, err)
 	require.Len(t, q.enqueued, 1, "expected discovery enqueue despite duplicate save")
