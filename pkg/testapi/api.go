@@ -24,12 +24,11 @@ type TestAPI struct {
 }
 
 type Options struct {
-	QueueShards     queue.ShardRegistry
-	Executor        execution.Executor
-	StateManager    statev2.RunService
-	ResetAll        func()
-	PauseFunction   func(id uuid.UUID)
-	UnpauseFunction func(id uuid.UUID)
+	QueueShards   queue.ShardRegistry
+	Executor      execution.Executor
+	StateManager  statev2.RunService
+	ResetAll      func()
+	PauseFunction func(id uuid.UUID)
 }
 
 func ShouldEnable() bool {

@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrFunctionNotFound            = errors.New("function not found")
+	ErrFunctionPauseScheduled      = errors.New("function pause is scheduled")
 	ErrAppNotFound                 = errors.New("app not found")
 	ErrRunNotFound                 = errors.New("run not found")
 	ErrCronRerunNotSupported       = errors.New("cron rerun is not supported")
