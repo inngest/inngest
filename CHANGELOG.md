@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.48.0] - 2026-10-22
+
+### 🚀 Features
+
+- *(dashboard)* Add failed run AI debugging handoff (#5061)
+
+### 🐛 Bug Fixes
+
+- *(connect)* Raise gRPC receive limits and stop retrying oversized messages (#5048)
+- *(executor)* Preserve step invokes after execution cap (#5051)
+- *(connect)* Resume requests across executor recovery (#5063)
+- *(connect)* Expire renewed worker capacity reservations (#5062)
+- *(ui)* Upgrade Next and Sharp for image optimizer security (#5070)
+
 ## [v1.47.0] - 2026-10-21
 
 ### 🚀 Features
@@ -38,6 +52,7 @@ All notable changes to this project will be documented in this file.
 - *(state)* Expose idempotency lookup over the state RPC (#5038)
 - *(devserver)* Do not clobber checksum/error on named apps during -u sdk-url startup (#5003)
 - *(httpdriver)* Amend dns lookups with misconfigured AAAA (#5055)
+- *(connect)* Preserve refreshed connections during cleanup (#5060)
 
 ### 🚜 Refactor
 
@@ -58,6 +73,7 @@ All notable changes to this project will be documented in this file.
 - *(api)* Soft-deprecate includeOutput (#4979)
 - *(codeql)* Scan fork pull requests (#5032)
 - *(http)* Improve no route errors (#5056)
+- *(release)* V1.47.0 (#4977)
 
 ## [v1.46.0] - 2026-10-06
 

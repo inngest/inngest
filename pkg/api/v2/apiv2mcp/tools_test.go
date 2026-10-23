@@ -35,25 +35,29 @@ func TestRequest(t *testing.T) {
 	require.False(t, Tool(endpoint).Annotations.IdempotentHint)
 }
 
-func TestPauseFunctionRequest(t *testing.T) {
-	endpoint := endpointByMethod(t, "PauseFunction")
-	req, err := Request(t.Context(), endpoint, map[string]any{
-		"appId": "my app", "functionId": "hello/world",
-	}, Options{})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, req.Method)
-	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/pause", req.URL.EscapedPath())
-	body, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-	require.Empty(t, body)
-	require.Empty(t, req.URL.RawQuery)
-	schema := InputSchema(endpoint)
-	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
-	require.Len(t, schema["properties"], 3)
-	tool := Tool(endpoint)
-	require.Equal(t, "pause_function", tool.Name)
-	require.True(t, tool.Annotations.IdempotentHint)
-	require.False(t, tool.Annotations.ReadOnlyHint)
+func TestFunctionPauseResumeRequest(t *testing.T) {
+	for _, action := range []struct{ method, name string }{{"PauseFunction", "pause"}, {"ResumeFunction", "resume"}} {
+		t.Run(action.name, func(t *testing.T) {
+			endpoint := endpointByMethod(t, action.method)
+			req, err := Request(t.Context(), endpoint, map[string]any{
+				"appId": "my app", "functionId": "hello/world",
+			}, Options{})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/"+action.name, req.URL.EscapedPath())
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.Empty(t, body)
+			require.Empty(t, req.URL.RawQuery)
+			schema := InputSchema(endpoint)
+			require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
+			require.Len(t, schema["properties"], 3)
+			tool := Tool(endpoint)
+			require.Equal(t, action.name+"_function", tool.Name)
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+		})
+	}
 }
 
 func TestSendEventRequest(t *testing.T) {
