@@ -447,13 +447,13 @@ func (c *connectGatewaySvc) gc(ctx context.Context) {
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
-	addr := fmt.Sprintf(":%d", c.gatewayPublicPort)
+	addr := c.grpcConfig.ListenAddr(c.gatewayPublicPort)
 	server := &http.Server{
 		Addr:    addr,
 		Handler: c.gatewayRoutes,
 	}
 
-	grpcAddr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
+	grpcAddr := c.grpcConfig.ListenAddr(c.grpcConfig.Gateway.Port)
 	grpcListener, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		c.logger.Error("could not listen for connect gateway grpc", "error", err, "addr", grpcAddr)

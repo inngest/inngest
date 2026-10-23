@@ -53,6 +53,7 @@ type gatewayGRPCManager struct {
 
 	gatewayGRPCPort  int
 	executorGRPCPort int
+	executorBindHost string
 }
 
 type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.ClientConn, error)
@@ -86,6 +87,12 @@ func WithExecutorGRPCPort(p int) GatewayGRPCManagerOption {
 		if p > 0 {
 			m.executorGRPCPort = p
 		}
+	}
+}
+
+func WithExecutorBindHost(host string) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		m.executorBindHost = host
 	}
 }
 
@@ -126,7 +133,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 }
 
 func (i *gatewayGRPCManager) gRPCServerListen(ctx context.Context) {
-	addr := fmt.Sprintf(":%d", i.executorGRPCPort)
+	addr := net.JoinHostPort(i.executorBindHost, fmt.Sprintf("%d", i.executorGRPCPort))
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
