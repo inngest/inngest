@@ -82,14 +82,20 @@ type v2 struct {
 
 // Create creates new state in the store for the given run ID.
 func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error) {
-	batchData := make([]map[string]any, len(s.Events))
-	for n, evt := range s.Events {
+	// Supplying both representations is a caller bug. Reject the request rather
+	// than choosing one and risking inconsistent durable state. The legacy Events
+	// representation and this guard will be removed after all callers migrate.
+	if len(s.Events) > 0 && s.SerializedEvents.Len() > 0 {
+		return state.State{}, fmt.Errorf("create state contains raw and immutable event payloads")
+	}
+	rawEvents := s.MaterializeEvents()
+	batchData := make([]map[string]any, len(rawEvents))
+	for n, evt := range rawEvents {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
 			return state.State{}, err
 		}
 		batchData[n] = data
-
 	}
 	st, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
@@ -208,7 +214,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 		}
 	}
 
-	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
+	return state.State{Metadata: metadata, Events: rawEvents, Steps: steps}, nil
 }
 
 func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
