@@ -184,14 +184,17 @@ func TestNewFunctionProviderErrors(t *testing.T) {
 		require.Empty(t, fn.ID)
 	})
 
-	t.Run("not found", func(t *testing.T) {
-		provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
+	for _, identifier := range []string{"missing-slug", uuid.NewString()} {
+		t.Run("not found/"+identifier, func(t *testing.T) {
+			provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
 
-		fn, err := provider.GetFunction(context.Background(), "missing")
+			fn, err := provider.GetFunction(context.Background(), identifier)
 
-		require.ErrorContains(t, err, "function not found")
-		require.Empty(t, fn.ID)
-	})
+			require.ErrorIs(t, err, apiv2.ErrFunctionNotFound)
+			require.NotErrorIs(t, err, sql.ErrNoRows)
+			require.Empty(t, fn.ID)
+		})
+	}
 
 	t.Run("invalid function config", func(t *testing.T) {
 		provider := NewFunctionProvider(&fakeFunctionStore{
@@ -494,7 +497,7 @@ func (f *fakeFunctionStore) GetFunctionByInternalUUID(ctx context.Context, fnID 
 			return fn, nil
 		}
 	}
-	return nil, errors.New("function not found")
+	return nil, sql.ErrNoRows
 }
 
 func (f *fakeFunctionStore) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {

@@ -1071,6 +1071,51 @@ service V2 {
     };
   }
 
+  rpc CreateReplay(CreateReplayRequest) returns (CreateReplayResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/replays"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:replay"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create replay"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Creates an asynchronous replay for matching runs of one function. Cloud bounds have millisecond precision: from rounds down; until includes the end of its millisecond. Dev server bounds are inclusive at stored timestamp precision. Dev server replays run in memory and are lost on restart. Requests are not idempotent: retrying creates another replay. In Inngest Cloud, replays are listed on the function's Replays page in the dashboard. Scheduling is best effort and does not preserve event order."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Replay successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateReplayResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc Rerun(RerunRequest) returns (RerunResponse) {
     option (google.api.http) = {
       post: "/runs/{run_id}/rerun"
@@ -4215,4 +4260,99 @@ message ResumeFunctionRequest {
 message ResumeFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message CreateReplayRequest {
+  string app_id = 6 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
+  ];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters"
+      example: "\"Replay cancelled orders\""
+    }
+  ];
+  string function_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range"
+    }
+  ];
+  google.protobuf.Timestamp until = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400."
+    }
+  ];
+  repeated string statuses = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
+}
+
+message CreateReplayResponse {
+  Replay data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Replay {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay ID"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+  google.protobuf.Timestamp created_at = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Time the replay was created"
+    }
+  ];
+  string name = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters. Echoes the request after trimming surrounding whitespace."
+    }
+  ];
+  string function_id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range. Echoes the request timestamp normalized to UTC."
+    }
+  ];
+  google.protobuf.Timestamp until = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400. Echoes the request timestamp normalized to UTC and clamped when necessary."
+    }
+  ];
+  repeated string statuses = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400. Echoes the normalized request with surrounding whitespace trimmed, values uppercased, and duplicates removed."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
 }

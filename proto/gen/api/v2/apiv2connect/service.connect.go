@@ -68,6 +68,8 @@ const (
 	V2ListFunctionRunsProcedure = "/api.v2.V2/ListFunctionRuns"
 	// V2GetEventRunsProcedure is the fully-qualified name of the V2's GetEventRuns RPC.
 	V2GetEventRunsProcedure = "/api.v2.V2/GetEventRuns"
+	// V2CreateReplayProcedure is the fully-qualified name of the V2's CreateReplay RPC.
+	V2CreateReplayProcedure = "/api.v2.V2/CreateReplay"
 	// V2RerunProcedure is the fully-qualified name of the V2's Rerun RPC.
 	V2RerunProcedure = "/api.v2.V2/Rerun"
 	// V2CancelRunProcedure is the fully-qualified name of the V2's CancelRun RPC.
@@ -192,6 +194,7 @@ type V2Client interface {
 	ListRuns(context.Context, *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error)
 	ListFunctionRuns(context.Context, *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
+	CreateReplay(context.Context, *connect.Request[v2.CreateReplayRequest]) (*connect.Response[v2.CreateReplayResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
@@ -347,6 +350,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2GetEventRunsProcedure,
 			connect.WithSchema(v2Methods.ByName("GetEventRuns")),
+			connect.WithClientOptions(opts...),
+		),
+		createReplay: connect.NewClient[v2.CreateReplayRequest, v2.CreateReplayResponse](
+			httpClient,
+			baseURL+V2CreateReplayProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateReplay")),
 			connect.WithClientOptions(opts...),
 		),
 		rerun: connect.NewClient[v2.RerunRequest, v2.RerunResponse](
@@ -658,6 +667,7 @@ type v2Client struct {
 	listRuns                   *connect.Client[v2.ListRunsRequest, v2.ListRunsResponse]
 	listFunctionRuns           *connect.Client[v2.ListFunctionRunsRequest, v2.ListFunctionRunsResponse]
 	getEventRuns               *connect.Client[v2.GetEventRunsRequest, v2.GetEventRunsResponse]
+	createReplay               *connect.Client[v2.CreateReplayRequest, v2.CreateReplayResponse]
 	rerun                      *connect.Client[v2.RerunRequest, v2.RerunResponse]
 	cancelRun                  *connect.Client[v2.CancelRunRequest, v2.CancelRunResponse]
 	getApp                     *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
@@ -786,6 +796,11 @@ func (c *v2Client) ListFunctionRuns(ctx context.Context, req *connect.Request[v2
 // GetEventRuns calls api.v2.V2.GetEventRuns.
 func (c *v2Client) GetEventRuns(ctx context.Context, req *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error) {
 	return c.getEventRuns.CallUnary(ctx, req)
+}
+
+// CreateReplay calls api.v2.V2.CreateReplay.
+func (c *v2Client) CreateReplay(ctx context.Context, req *connect.Request[v2.CreateReplayRequest]) (*connect.Response[v2.CreateReplayResponse], error) {
+	return c.createReplay.CallUnary(ctx, req)
 }
 
 // Rerun calls api.v2.V2.Rerun.
@@ -1049,6 +1064,7 @@ type V2Handler interface {
 	ListRuns(context.Context, *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error)
 	ListFunctionRuns(context.Context, *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
+	CreateReplay(context.Context, *connect.Request[v2.CreateReplayRequest]) (*connect.Response[v2.CreateReplayResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
@@ -1200,6 +1216,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2GetEventRunsProcedure,
 		svc.GetEventRuns,
 		connect.WithSchema(v2Methods.ByName("GetEventRuns")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreateReplayHandler := connect.NewUnaryHandler(
+		V2CreateReplayProcedure,
+		svc.CreateReplay,
+		connect.WithSchema(v2Methods.ByName("CreateReplay")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2RerunHandler := connect.NewUnaryHandler(
@@ -1524,6 +1546,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListFunctionRunsHandler.ServeHTTP(w, r)
 		case V2GetEventRunsProcedure:
 			v2GetEventRunsHandler.ServeHTTP(w, r)
+		case V2CreateReplayProcedure:
+			v2CreateReplayHandler.ServeHTTP(w, r)
 		case V2RerunProcedure:
 			v2RerunHandler.ServeHTTP(w, r)
 		case V2CancelRunProcedure:
@@ -1691,6 +1715,10 @@ func (UnimplementedV2Handler) ListFunctionRuns(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetEventRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateReplay(context.Context, *connect.Request[v2.CreateReplayRequest]) (*connect.Response[v2.CreateReplayResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateReplay is not implemented"))
 }
 
 func (UnimplementedV2Handler) Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error) {

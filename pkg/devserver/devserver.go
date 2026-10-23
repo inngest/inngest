@@ -717,9 +717,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		Functions:           functionProvider,
 		FunctionPauser:      functionProvider,
 		Runs:                NewRunProvider(dbcqrs, exec),
-		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
-		Executor:            exec,
-		EventPublisher:      runner,
+		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
+			return !functionProvider.pauses.get(id).IsZero()
+		}),
+		FunctionTraces: NewFunctionTraceReader(dbcqrs),
+		Executor:       exec,
+		EventPublisher: runner,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
 			return ds.HandleEvent(ctx, evt, nil)
 		},
