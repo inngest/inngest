@@ -13,6 +13,7 @@ import {
 const atLimit = {
   usage: 50_000,
   limit: 50_000,
+  overageLimit: 0,
   enforced: true,
   exceeded: true,
 };
@@ -52,8 +53,8 @@ describe('legacyExecutionCap', () => {
 });
 
 describe('usageBand', () => {
-  const band = (usage: number, capHit = false) =>
-    usageBand({ usage, limit: 50_000, capHit });
+  const band = (usage: number, capHit = false, overageLimit = 0) =>
+    usageBand({ usage, limit: 50_000, overageLimit, capHit });
 
   it('stays quiet below half the limit', () => {
     expect(band(0)).toBe('under50');
@@ -68,10 +69,15 @@ describe('usageBand', () => {
     expect(band(45_000)).toBe('90');
   });
 
-  it('reports limitReached at the limit even while enforcement is off', () => {
-    expect(band(49_999)).toBe('90');
-    expect(band(50_000)).toBe('limitReached');
-    expect(band(60_000)).toBe('limitReached');
+  it('never reports limitReached past the limit unless the cap is hit', () => {
+    expect(band(50_000)).toBe('90');
+    expect(band(60_000)).toBe('90');
+  });
+
+  it('reports a grace period past the limit when extra executions are granted', () => {
+    expect(band(49_999, false, 10_000)).toBe('90');
+    expect(band(50_000, false, 10_000)).toBe('grace');
+    expect(band(60_000, true, 10_000)).toBe('limitReached');
   });
 
   it('reports limitReached whenever the cap is hit, whatever the ratio', () => {
@@ -80,7 +86,12 @@ describe('usageBand', () => {
   });
 
   it('treats a non-positive limit as no usage', () => {
-    expect(usageBand({ usage: 10, limit: 0, capHit: false })).toBe('under50');
+    expect(
+      usageBand({ usage: 10, limit: 0, overageLimit: 0, capHit: false }),
+    ).toBe('under50');
+    expect(
+      usageBand({ usage: 10, limit: 0, overageLimit: 10_000, capHit: false }),
+    ).toBe('under50');
   });
 });
 
@@ -137,30 +148,45 @@ describe('isDismissalActive', () => {
 
 describe('pillContent', () => {
   it('stays hidden below half of the limit', () => {
-    expect(pillContent('under50', false)).toBeNull();
+    expect(pillContent('under50', false, 0)).toBeNull();
   });
 
   it('cautions once usage crosses half of the limit', () => {
-    expect(pillContent('50', false)).toMatchObject({ kind: 'caution' });
-    expect(pillContent('50', false)?.text).toContain('almost reached');
+    expect(pillContent('50', false, 0)).toMatchObject({ kind: 'caution' });
+    expect(pillContent('50', false, 0)?.text).toContain('almost reached');
   });
 
   it('warns at three-quarters of the limit', () => {
-    expect(pillContent('75', false)).toMatchObject({ kind: 'warning' });
-    expect(pillContent('75', false)?.text).toContain('almost reached');
+    expect(pillContent('75', false, 0)).toMatchObject({ kind: 'warning' });
+    expect(pillContent('75', false, 0)?.text).toContain('almost reached');
   });
 
   it('errors at 90% of the limit, keeping the almost-reached copy', () => {
-    expect(pillContent('90', false)).toMatchObject({ kind: 'error' });
-    expect(pillContent('90', false)?.text).toContain('almost reached');
+    expect(pillContent('90', false, 0)).toMatchObject({ kind: 'error' });
+    expect(pillContent('90', false, 0)?.text).toContain('almost reached');
   });
 
   it('escalates to an error once the limit is reached, dropping the almost-reached copy', () => {
-    expect(pillContent('limitReached', false)).toMatchObject({ kind: 'error' });
-    expect(pillContent('limitReached', false)?.text).not.toContain('almost');
+    expect(pillContent('limitReached', false, 0)).toMatchObject({
+      kind: 'error',
+    });
+    expect(pillContent('limitReached', false, 0)?.text).not.toContain('almost');
   });
 
   it('points Vercel accounts at the integration settings', () => {
-    expect(pillContent('75', true)?.text).toContain('Vercel');
+    expect(pillContent('75', true, 0)?.text).toContain('Vercel');
+  });
+
+  it('warns about the grace period, pointing Vercel accounts at the integration settings', () => {
+    expect(pillContent('grace', false, 8_000)).toMatchObject({
+      kind: 'warning',
+    });
+    expect(pillContent('grace', false, 8_000)?.text).toContain(
+      '8,000 executions left',
+    );
+    expect(pillContent('grace', false, 8_000)?.text).not.toContain('Vercel');
+    expect(pillContent('grace', true, 8_000)?.text).toContain(
+      'Vercel Integrations Settings',
+    );
   });
 });
