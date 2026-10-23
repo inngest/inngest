@@ -16,11 +16,17 @@ func (r *eventsConnectionResolver) TotalCount(
 ) (int, error) {
 	filter := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.EventsFilter)
 
+	var cel string
+	if filter.Query != nil {
+		cel = *filter.Query
+	}
+
 	opts := cqrs.WorkspaceEventsOpts{
 		Limit:                 cqrs.MaxEvents, // pass in dummy value to pass validation, but won't be used in actual count query
 		Names:                 filter.EventNames,
 		IncludeInternalEvents: filter.IncludeInternalEvents,
 		Oldest:                filter.From,
+		CEL:                   cel,
 	}
 
 	// this relies on the frontend not requesting TotalCount except on loading the first page
