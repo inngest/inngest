@@ -221,8 +221,15 @@ func (s *Session) Query(ctx context.Context, sql string) (cols []string, types [
 // session exactly as exec's read loop always has: the subprocess's
 // remaining output for the abandoned statement(s) is still queued, so the
 // session can no longer correlate output with statements.
+//
+// Under a result.WithMaxBytes ctx, once the segment's row lines exceed that
+// many bytes the rest are drained and discarded (keeping the session in
+// sync) and result.TooLargeError is returned at the marker.
 func (s *Session) readSegment(ctx context.Context, marker string) (cols []string, rows []result.Row, diags []string, err error) {
 	var shared *result.Columns
+	maxBytes := result.MaxBytes(ctx)
+	var rowBytes int64
+	tooLarge := false
 	for {
 		select {
 		case line, ok := <-s.lines:
@@ -244,7 +251,18 @@ func (s *Session) readSegment(ctx context.Context, marker string) (cols []string
 			}
 
 			if len(lineCols) == 1 && lineCols[0] == "__marker__" && vals[0] == marker {
+				if tooLarge {
+					return nil, nil, diags, result.TooLargeError(maxBytes)
+				}
 				return cols, rows, diags, nil
+			}
+
+			if maxBytes > 0 {
+				rowBytes += int64(len(line))
+				if tooLarge = tooLarge || rowBytes > maxBytes; tooLarge {
+					rows = nil
+					continue
+				}
 			}
 
 			// Every row of one statement has the same columns, so the

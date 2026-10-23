@@ -1,0 +1,19 @@
+{
+  "sql": "SELECT now()::TIMESTAMP AS t FROM inngest.insights_runs(?, ?) AS runs UNION ALL SELECT now()::TIMESTAMP FROM inngest.insights_runs(?, ?) AS runs ORDER BY now()::TIMESTAMP LIMIT 5 OFFSET (SELECT count(*) FROM inngest.insights_events(?, ?) AS events)",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs",
+    "events"
+  ],
+  "columnHints": [
+    0
+  ]
+}

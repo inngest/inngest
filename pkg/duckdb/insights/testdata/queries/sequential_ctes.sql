@@ -1,0 +1,1 @@
+WITH a AS (SELECT run_id, app_id FROM runs), b AS (SELECT run_id FROM a) SELECT * FROM b

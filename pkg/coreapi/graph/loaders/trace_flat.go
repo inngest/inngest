@@ -15,6 +15,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
 func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
@@ -77,6 +78,13 @@ func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.
 	if span.Attributes.StepID != nil {
 		gqlSpan.StepID = span.Attributes.StepID
 	}
+	if span.Attributes.CustomConcurrencyKeys != nil {
+		gqlSpan.CustomConcurrencyKeys = *span.Attributes.CustomConcurrencyKeys
+	}
+	if span.Attributes.StepSpanPath != nil {
+		gqlSpan.SpanPath = *span.Attributes.StepSpanPath
+	}
+	gqlSpan.Origin = span.Attributes.StepOrigin
 	if span.Attributes.StepOp != nil {
 		gqlSpan.StepOp = opcodeToGQL(span.Attributes.StepOp)
 	}
@@ -142,6 +150,8 @@ func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.
 		}
 	}
 
+	gqlSpan.Metadata = spanMetadataToGQL(span.Metadata)
+
 	gqlSpan.ChildrenSpans = make([]*models.RunTraceSpan, 0, len(span.Children))
 	for _, cs := range span.Children {
 		child, err := convertFlatRunSpanToGQL(ctx, cs)
@@ -149,6 +159,22 @@ func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.
 			return nil, fmt.Errorf("error converting child span: %w", err)
 		}
 		gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
+	}
+	// A step's span path and origin are set on its executions: the step
+	// takes its latest execution's, as convertRunSpanToGQL does.
+	if span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery {
+		for _, child := range gqlSpan.ChildrenSpans {
+			if child.SpanPath != nil {
+				gqlSpan.SpanPath = child.SpanPath
+			}
+			if child.Origin != nil {
+				gqlSpan.Origin = child.Origin
+			}
+		}
+	}
+	// Group the run's steps by their span paths, as convertRunSpanToGQL does.
+	if span.Name == meta.SpanNameRun {
+		GroupBySpanPath(gqlSpan)
 	}
 
 	return gqlSpan, nil

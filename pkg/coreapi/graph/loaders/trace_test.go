@@ -77,9 +77,43 @@ func TestConvertRunSpanToGQL_CustomConcurrencyKeys(t *testing.T) {
 		Attributes:  &meta.ExtractedValues{CustomConcurrencyKeys: &keys},
 	}
 
-	result, err := convertDynamicRunSpanToGQL(context.Background(), span)
-	require.NoError(t, err)
-	assert.Equal(t, keys, result.CustomConcurrencyKeys)
+	for name, convert := range runConverters {
+		t.Run(name, func(t *testing.T) {
+			result, err := convert(context.Background(), span)
+			require.NoError(t, err)
+			assert.Equal(t, keys, result.CustomConcurrencyKeys)
+		})
+	}
+}
+
+// TestConvertRunSpanToGQL_MetadataIsUser checks both converters map isUser,
+// so a user and an internal kind w/ the same prefix-stripped name (as DuckDB
+// returns them) stay distinct.
+func TestConvertRunSpanToGQL_MetadataIsUser(t *testing.T) {
+	converters := map[string]func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error){
+		"dynamic": convertDynamicRunSpanToGQL,
+		"flat":    convertFlatRunSpanToGQL,
+	}
+	for name, convert := range converters {
+		t.Run(name, func(t *testing.T) {
+			span := &cqrs.OtelSpan{
+				RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+				Attributes:  &meta.ExtractedValues{},
+				Metadata: []*cqrs.SpanMetadata{
+					{Scope: enums.MetadataScopeRun, Kind: "score", IsUser: true, Values: metadata.Values{}},
+					{Scope: enums.MetadataScopeRun, Kind: "score", IsUser: false, Values: metadata.Values{}},
+				},
+			}
+
+			result, err := convert(context.Background(), span)
+			require.NoError(t, err)
+			require.Len(t, result.Metadata, 2)
+			assert.Equal(t, metadata.Kind("score"), result.Metadata[0].Kind)
+			assert.True(t, result.Metadata[0].IsUser)
+			assert.Equal(t, metadata.Kind("score"), result.Metadata[1].Kind)
+			assert.False(t, result.Metadata[1].IsUser)
+		})
+	}
 }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
