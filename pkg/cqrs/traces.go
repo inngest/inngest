@@ -387,6 +387,8 @@ type TraceRun struct {
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
 
+	SkipReason *enums.SkipReason `json:"skip_reason,omitempty"`
+
 	AppName      string `json:"app_name,omitempty"`
 	FunctionSlug string `json:"function_slug,omitempty"`
 	FunctionName string `json:"function_name,omitempty"`
@@ -457,6 +459,8 @@ type GetTraceRunOpt struct {
 	Cursor        string
 	Items         uint
 	IncludeOutput bool
+	// IncludeSkipped exposes skipped runs for replay selection; ordinary run lists omit them.
+	IncludeSkipped bool
 	// Whether the run list should use the tracing preview stores
 	Preview bool
 }
@@ -613,4 +617,7 @@ type TraceCursor struct {
 	Field string `json:"f"`
 	// Value represents the value used for this cursor
 	Value int64 `json:"v"`
+	// NanosecondRemainder preserves sub-microsecond precision for span timestamps.
+	// Older cursors omit this field and retain their original precision.
+	NanosecondRemainder int64 `json:"ns,omitempty"`
 }
