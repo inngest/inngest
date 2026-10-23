@@ -1061,8 +1061,145 @@ func TestUpsertAppPreservesNameOnEmptyClobber(t *testing.T) {
 	got, err := q.GetAppByID(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, "real-app", got.Name, "placeholder upsert must not blank a real name")
-	require.True(t, got.Error.Valid, "error should be set by the placeholder upsert")
-	require.Equal(t, "unreachable", got.Error.String)
+	require.False(t, got.Error.Valid, "placeholder upsert must not set an error on a named app")
+}
+
+// TestUpsertAppPreservesErrorOnEmptyClobber covers the -u startup upsert
+// (service.go:315) hitting a legacy row whose id is still sha1(URL). That
+// upsert sends name="" and error=unreachable with an empty checksum. On a
+// row that already has a name, the query must keep the stored error and
+// checksum so /fn/register can still short-circuit. A row whose name is
+// already empty is a real placeholder and must still take the error. An
+// archived named row is revived by this upsert and must take the incoming
+// error and empty checksum so registration cannot short-circuit.
+func TestUpsertAppPreservesErrorOnEmptyClobber(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	t.Run("named row keeps error and checksum", func(t * testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          id,
+			Name:        "real-app",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Framework:   sql.NullString{String: "next", Valid: true},
+			Metadata:    `{"k":"v"}`,
+			Status:      "active",
+			Checksum:    "real-checksum",
+			Url:         "https://example.com/real",
+			Method:      "serve",
+			AppVersion:  sql.NullString{String: "1.2.3", Valid: true},
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, "real-app", got.Name)
+		require.False(t, got.Error.Valid)
+		require.Equal(t, "real-checksum", got.Checksum)
+		require.Equal(t, "go", got.SdkLanguage)
+		require.Equal(t, "1.0.0", got.SdkVersion)
+		require.Equal(t, "next", got.Framework.String)
+		require.Equal(t, `{"k":"v"}`, got.Metadata)
+		require.Equal(t, "active", got.Status)
+		require.Equal(t, "serve", got.Method)
+		require.Equal(t, "1.2.3", got.AppVersion.String)
+	})
+
+	t.Run("named row keeps a saved error", func(t *testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          id,
+			Name:        "real-app-with-error",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "real-checksum",
+			Url:         "https://example.com/real-error",
+			Error:       sql.NullString{Valid: true, String: "sdk compile failed"},
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real-error",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.True(t, got.Error.Valid)
+		require.Equal(t, "sdk compile failed", got.Error.String)
+		require.Equal(t, "real-checksum", got.Checksum)
+	})
+
+	t.Run("empty-name row still takes the unreachable error", func(t *testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+		})
+		require.NoError(t, err)
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/real",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.True(t, got.Error.Valid)
+		require.Equal(t, "unreachable", got.Error.String)
+	})
+
+	t.Run("archived named row takes the unreachable error and drops checksum", func(t *testing.T) {
+		id := uuid.New()
+		_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:          id,
+			Name:        "real-app-archived",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
+			Status:      "active",
+			Checksum:    "real-checksum",
+			Url:         "https://example.com/archived",
+		})
+		require.NoError(t, err)
+		require.NoError(t, q.DeleteApp(ctx, id))
+
+		_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+			ID:    id,
+			Name:  "",
+			Url:   "https://example.com/archived",
+			Error: sql.NullString{Valid: true, String: "unreachable"},
+		})
+		require.NoError(t, err)
+
+		got, err := q.GetAppByID(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, "real-app-archived", got.Name)
+		require.False(t, got.ArchivedAt.Valid)
+		require.True(t, got.Error.Valid)
+		require.Equal(t, "unreachable", got.Error.String)
+		require.Equal(t, "", got.Checksum)
+	})
 }
 
 // TestInsertFunctionIdempotentOnSameID covers the resync path: the sync loop

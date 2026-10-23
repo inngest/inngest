@@ -75,10 +75,6 @@ type Props = {
     insightsHref?: string;
   };
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
-  // Rendered above the filter row, inside the sticky header so it stays put
-  // while the run list scrolls. Cloud passes an account-level banner here; the
-  // dev server has no such data and passes nothing.
-  banner?: React.ReactNode;
   // When set, the CEL search button is hidden once `totalCount` reaches this
   // threshold (unless the user already has an active query, so they're not
   // stranded without a "Hide search" toggle). Used by self-hosted deployments
@@ -108,7 +104,6 @@ export function RunsPage({
   progressiveSearch,
   infiniteScrollTrigger,
   searchLimit,
-  banner,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -306,7 +301,6 @@ export function RunsPage({
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
-        {banner}
         <div className="flex h-11 items-center justify-between gap-1.5 px-3">
           <div className="flex items-center gap-1.5">
             {/* CEL search scans the returned run set and gets prohibitively slow on large pages.

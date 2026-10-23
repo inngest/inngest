@@ -49,6 +49,9 @@ type ConnectionManager interface {
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
 	DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error
+	// DeleteConnectionIfUnchanged atomically deletes only the observed connection record.
+	// It returns false if the record changed or was already removed.
+	DeleteConnectionIfUnchanged(ctx context.Context, envID uuid.UUID, connID ulid.ULID, expected *connpb.ConnMetadata) (bool, error)
 	GarbageCollectConnections(ctx context.Context) (int, error)
 	GarbageCollectGateways(ctx context.Context) (int, error)
 }

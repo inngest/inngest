@@ -8,18 +8,18 @@ import { formatInTimeZone } from '@inngest/components/utils/date';
 import { createColumnHelper } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
+import {
+  BURST_CONCURRENCY_SECTION_ID,
+  useScrollIntoViewOnHash,
+} from '@/components/Billing/Usage/useScrollIntoViewOnHash';
 import { graphql } from '@/gql';
 import { type GetBurstConcurrencyQuery } from '@/gql/graphql';
 
 const GetBurstConcurrencyDocument = graphql(`
   query GetBurstConcurrency {
     account {
-      entitlements: ents {
-        concurrency {
-          limit
-        }
-      }
       burstConcurrency {
+        limit
         budgetMinutes
         periodEnd
         usage {
@@ -48,11 +48,17 @@ function formatMinutes(minutes: number) {
 }
 
 function formatBurstWindow({ startedAt, endedAt }: Burst) {
-  return `${formatInTimeZone(
-    new Date(startedAt),
+  const start = new Date(startedAt);
+  const end = new Date(endedAt);
+  const endFormat =
+    start.toISOString().slice(0, 10) === end.toISOString().slice(0, 10)
+      ? 'HH:mm'
+      : 'MMM d HH:mm';
+  return `${formatInTimeZone(start, 'UTC', 'MMM d HH:mm')} – ${formatInTimeZone(
+    end,
     'UTC',
-    'MMM d HH:mm',
-  )} – ${formatInTimeZone(new Date(endedAt), 'UTC', 'HH:mm')} UTC`;
+    endFormat,
+  )} UTC`;
 }
 
 function durationMinutes({ startedAt, endedAt }: Burst) {
@@ -64,90 +70,77 @@ function durationMinutes({ startedAt, endedAt }: Burst) {
 export function BurstConcurrency() {
   const [showBreakdown, setShowBreakdown] = useState(true);
   const [{ data, error }] = useQuery({ query: GetBurstConcurrencyDocument });
-
-  if (error) {
-    return null;
-  }
+  const sectionRef = useScrollIntoViewOnHash(BURST_CONCURRENCY_SECTION_ID);
 
   const burstConcurrency = data?.account.burstConcurrency;
-  if (!burstConcurrency) {
+  if (error || !burstConcurrency) {
     return null;
   }
 
   const { usage } = burstConcurrency;
-  const accountConcurrencyLimit = data.account.entitlements.concurrency.limit;
   const periodEnd = new Date(burstConcurrency.periodEnd);
   const budgetExhausted = usage.minutesRemaining <= 0;
 
   const columns = [
     columnHelper.accessor('startedAt', {
       header: 'Burst',
-      cell: ({ row }) => (
-        <TextCell className="font-normal">
-          {formatBurstWindow(row.original)}
-        </TextCell>
-      ),
+      cell: ({ row }) => <TextCell>{formatBurstWindow(row.original)}</TextCell>,
     }),
     columnHelper.display({
       id: 'duration',
       header: 'Duration',
       cell: ({ row }) => (
-        <TextCell className="font-normal">
-          {formatMinutes(durationMinutes(row.original))}
-        </TextCell>
+        <TextCell>{formatMinutes(durationMinutes(row.original))}</TextCell>
       ),
     }),
     columnHelper.accessor('peak', {
       header: 'Peak concurrency',
-      cell: ({ getValue }) => (
-        <TextCell className="text-error font-normal">
-          {getValue()} of {accountConcurrencyLimit}
+      cell: ({ row, getValue }) => (
+        <TextCell className={cn(row.original.limitHits > 0 && 'text-error')}>
+          {getValue()} of {burstConcurrency.limit}
         </TextCell>
       ),
     }),
     columnHelper.accessor('limitHits', {
-      header: 'Runs throttled',
+      header: 'Limit hits',
       cell: ({ getValue }) => {
         const hits = getValue();
         return (
-          <TextCell className="font-normal">
-            {hits === 0 ? 'None' : hits.toLocaleString()}
-          </TextCell>
+          <TextCell>{hits === 0 ? 'None' : hits.toLocaleString()}</TextCell>
         );
       },
     }),
   ];
 
   return (
-    <div className="mt-10">
+    <div id={BURST_CONCURRENCY_SECTION_ID} ref={sectionRef} className="mt-10">
       <h3 className="text-basis mb-3 text-xl">Concurrency burst</h3>
       <p className="text-muted mb-6 text-sm">
-        Each month, for {formatMinutes(burstConcurrency.budgetMinutes)}, if you
-        exceed your concurrency limit, we provide a burst that allows you to
-        process more concurrent steps. This boosts your concurrency temporarily
-        and resets every month.
+        Each month, for one hour, if you exceed your concurrency limit, we
+        provide a burst that allows you to process more concurrent steps. This
+        boosts your concurrency temporarily and resets every month.
       </p>
       <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-basis text-sm">Burst usage this month</p>
-            <p className="text-basis text-3xl">
+            <p className="text-subtle text-sm">Burst usage this month</p>
+            <p className="text-basis text-2xl">
               {formatMinutes(usage.minutesUsed)}
             </p>
           </div>
-          <Pill className="h-8 px-4 text-sm">
+          <Pill className="h-6 px-3 text-sm">
             renews every month on {formatInTimeZone(periodEnd, 'UTC', 'do')}, at{' '}
             {formatInTimeZone(periodEnd, 'UTC', 'h a')} UTC
           </Pill>
         </div>
         <ProgressBar
-          className="bg-canvasMuted mt-4 h-2.5 rounded-full"
+          className="bg-canvasMuted mt-4 h-2 rounded-full"
           size="small"
           value={usage.minutesUsed}
           limit={burstConcurrency.budgetMinutes}
           kind={budgetExhausted ? 'error' : 'default'}
         />
-        <p className="text-basis mt-2 text-right text-sm">
+        <p className="text-subtle mt-2 text-right text-sm">
           {formatMinutes(usage.minutesRemaining)} left
         </p>
         {usage.bursts.length > 0 && (
@@ -158,7 +151,6 @@ export function BurstConcurrency() {
                   data={usage.bursts}
                   columns={columns}
                   headerStyle="subtle"
-                  cellClassName="py-6"
                 />
               </div>
             )}

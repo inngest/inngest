@@ -53,6 +53,11 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 	}
 
 	readOnly := endpoint.HTTPMethod == http.MethodGet
+	idempotent := readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete
+	// pause is idempotent despite post. resume needs this too
+	if endpoint.MethodName == "PauseFunction" {
+		idempotent = true
+	}
 	return &mcp.Tool{
 		Name:        endpoint.ToolName,
 		Title:       endpoint.Summary,
@@ -61,7 +66,7 @@ func tool(endpoint apiv2endpoint.Endpoint, includeEnv bool) *mcp.Tool {
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    readOnly,
 			DestructiveHint: new(!readOnly),
-			IdempotentHint:  readOnly || endpoint.HTTPMethod == http.MethodPut || endpoint.HTTPMethod == http.MethodDelete,
+			IdempotentHint:  idempotent,
 			OpenWorldHint:   new(false),
 		},
 	}

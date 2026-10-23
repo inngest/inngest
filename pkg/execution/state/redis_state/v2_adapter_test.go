@@ -439,7 +439,7 @@ func TestV2Adapter(t *testing.T) {
 			assert.ErrorIs(t, err2, state.ErrDuplicateResponse)
 		})
 
-		t.Run("SaveStep with same data succeeds (idempotent)", func(t *testing.T) {
+		t.Run("SaveStep with same data returns ErrIdempotentResponse", func(t *testing.T) {
 			idempotentRunID := ulid.MustNew(ulid.Now(), rand.Reader)
 			idempotentKey := fmt.Sprintf("idempotent-key-%s", idempotentRunID.String())
 
@@ -476,9 +476,53 @@ func TestV2Adapter(t *testing.T) {
 			_, err1 := v2svc.SaveStep(ctx, createdState.Metadata.ID, stepID, stepData)
 			assert.NoError(t, err1)
 
-			// Save step second time with SAME data - should succeed (idempotent)
+			// Save step second time with SAME data - reports the unchanged re-save
 			_, err2 := v2svc.SaveStep(ctx, createdState.Metadata.ID, stepID, stepData)
-			assert.NoError(t, err2) // Should not error for idempotent responses
+			assert.ErrorIs(t, err2, statev2.ErrIdempotentResponse)
+		})
+
+		t.Run("SaveStep with same data reports accurate hasPending", func(t *testing.T) {
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			createdState, err := v2svc.Create(ctx, statev2.CreateState{
+				Metadata: statev2.Metadata{
+					ID: statev2.ID{
+						RunID:      runID,
+						FunctionID: functionID,
+						Tenant: statev2.Tenant{
+							AccountID: accountID,
+							EnvID:     workspaceID,
+							AppID:     appID,
+						},
+					},
+					Config: *statev2.InitConfig(&statev2.Config{
+						EventIDs:    []ulid.ULID{eventID},
+						Idempotency: fmt.Sprintf("idempotent-pending-key-%s", runID.String()),
+					}),
+				},
+				Events: []json.RawMessage{eventBytes},
+			})
+			require.NoError(t, err)
+			id := createdState.Metadata.ID
+
+			// Two parallel steps are pending.
+			require.NoError(t, v2svc.SavePending(ctx, id, []string{"step-a", "step-b"}))
+			dataA := json.RawMessage(`{"result": "a"}`)
+
+			hasPending, err := v2svc.SaveStep(ctx, id, "step-a", dataA)
+			require.NoError(t, err)
+			require.True(t, hasPending, "step-b is still pending")
+
+			hasPending, err = v2svc.SaveStep(ctx, id, "step-a", dataA)
+			require.ErrorIs(t, err, statev2.ErrIdempotentResponse)
+			require.True(t, hasPending, "idempotent re-save must still report step-b pending")
+
+			hasPending, err = v2svc.SaveStep(ctx, id, "step-b", json.RawMessage(`{"result": "b"}`))
+			require.NoError(t, err)
+			require.False(t, hasPending, "nothing is pending once step-b finishes")
+
+			hasPending, err = v2svc.SaveStep(ctx, id, "step-a", dataA)
+			require.ErrorIs(t, err, statev2.ErrIdempotentResponse)
+			require.False(t, hasPending, "idempotent re-save must report nothing pending")
 		})
 	})
 }

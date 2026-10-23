@@ -37,6 +37,7 @@ export default function EntitlementListItemSelfService({
   entitlement: {
     currentValue: number | boolean;
     displayValue?: string | React.ReactNode;
+    purchasedValue?: number; // planLimit + purchased addons, excluding account-level overrides
     planLimit: number;
     maxValue: number;
   };
@@ -71,10 +72,17 @@ export default function EntitlementListItemSelfService({
 
   const isDedicatedSlackChannel = title === 'Dedicated Slack Channel';
 
+  const purchasedValue = entitlement.purchasedValue ?? entitlement.currentValue;
+  const grantedValue =
+    typeof entitlement.currentValue === 'number' &&
+    typeof purchasedValue === 'number'
+      ? entitlement.currentValue - purchasedValue
+      : 0;
+
   const addonCostStr = addonQtyCostString(addonQty, addon);
 
   const addonConfirmTitle =
-    entitlement.currentValue === entitlement.planLimit ||
+    purchasedValue === entitlement.planLimit ||
     (switchInput && !entitlement.currentValue)
       ? `Add ${title.toLowerCase()} to plan`
       : `Change ${title.toLowerCase()} addon`;
@@ -161,12 +169,18 @@ export default function EntitlementListItemSelfService({
               {entitlement.displayValue}
             </div>
           ) : null}
+          {grantedValue > 0 && (
+            <p className="text-muted mt-0.5 text-xs">
+              Includes {grantedValue} additional granted to your account by
+              Inngest. Your plan and addon cover {purchasedValue}.
+            </p>
+          )}
         </div>
         {!openSelfService && (
           <Button
             appearance="outlined"
             label={
-              entitlement.currentValue === entitlement.planLimit
+              purchasedValue === entitlement.planLimit
                 ? `Add ${title}`
                 : `Update ${title}`
             }
@@ -180,10 +194,10 @@ export default function EntitlementListItemSelfService({
       </div>
       {openSelfService &&
         numericInput &&
-        typeof entitlement.currentValue === 'number' && (
+        typeof purchasedValue === 'number' && (
           <EntitlementListItemSelfServiceNumeric
             entitlement={{
-              currentValue: entitlement.currentValue,
+              currentValue: purchasedValue,
               planLimit: entitlement.planLimit,
               maxValue: entitlement.maxValue,
             }}

@@ -40,6 +40,11 @@ const (
 	V2_CancelRun_FullMethodName                  = "/api.v2.V2/CancelRun"
 	V2_GetApp_FullMethodName                     = "/api.v2.V2/GetApp"
 	V2_GetApps_FullMethodName                    = "/api.v2.V2/GetApps"
+	V2_CreateBuild_FullMethodName                = "/api.v2.V2/CreateBuild"
+	V2_CommitBuild_FullMethodName                = "/api.v2.V2/CommitBuild"
+	V2_GetBuild_FullMethodName                   = "/api.v2.V2/GetBuild"
+	V2_ListBuilds_FullMethodName                 = "/api.v2.V2/ListBuilds"
+	V2_CancelBuild_FullMethodName                = "/api.v2.V2/CancelBuild"
 	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
@@ -65,6 +70,7 @@ const (
 	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
+	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
 	V2_SendEvent_FullMethodName                  = "/api.v2.V2/SendEvent"
 	V2_InvokeFunction_FullMethodName             = "/api.v2.V2/InvokeFunction"
@@ -106,6 +112,11 @@ type V2Client interface {
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
 	GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc.CallOption) (*GetAppsResponse, error)
+	CreateBuild(ctx context.Context, in *CreateBuildRequest, opts ...grpc.CallOption) (*CreateBuildResponse, error)
+	CommitBuild(ctx context.Context, in *CommitBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
+	GetBuild(ctx context.Context, in *GetBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
+	ListBuilds(ctx context.Context, in *ListBuildsRequest, opts ...grpc.CallOption) (*ListBuildsResponse, error)
+	CancelBuild(ctx context.Context, in *CancelBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
@@ -131,6 +142,7 @@ type V2Client interface {
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
+	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
 	SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
@@ -347,6 +359,56 @@ func (c *v2Client) GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetAppsResponse)
 	err := c.cc.Invoke(ctx, V2_GetApps_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateBuild(ctx context.Context, in *CreateBuildRequest, opts ...grpc.CallOption) (*CreateBuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateBuildResponse)
+	err := c.cc.Invoke(ctx, V2_CreateBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CommitBuild(ctx context.Context, in *CommitBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BuildResponse)
+	err := c.cc.Invoke(ctx, V2_CommitBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetBuild(ctx context.Context, in *GetBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BuildResponse)
+	err := c.cc.Invoke(ctx, V2_GetBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListBuilds(ctx context.Context, in *ListBuildsRequest, opts ...grpc.CallOption) (*ListBuildsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBuildsResponse)
+	err := c.cc.Invoke(ctx, V2_ListBuilds_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CancelBuild(ctx context.Context, in *CancelBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BuildResponse)
+	err := c.cc.Invoke(ctx, V2_CancelBuild_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -630,6 +692,16 @@ func (c *v2Client) GetFunction(ctx context.Context, in *GetFunctionRequest, opts
 	return out, nil
 }
 
+func (c *v2Client) PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_PauseFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionsResponse)
@@ -777,6 +849,11 @@ type V2Server interface {
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
 	GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error)
+	CreateBuild(context.Context, *CreateBuildRequest) (*CreateBuildResponse, error)
+	CommitBuild(context.Context, *CommitBuildRequest) (*BuildResponse, error)
+	GetBuild(context.Context, *GetBuildRequest) (*BuildResponse, error)
+	ListBuilds(context.Context, *ListBuildsRequest) (*ListBuildsResponse, error)
+	CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error)
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
@@ -802,6 +879,7 @@ type V2Server interface {
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
+	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
 	SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
@@ -884,6 +962,21 @@ func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppRes
 func (UnimplementedV2Server) GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApps not implemented")
 }
+func (UnimplementedV2Server) CreateBuild(context.Context, *CreateBuildRequest) (*CreateBuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateBuild not implemented")
+}
+func (UnimplementedV2Server) CommitBuild(context.Context, *CommitBuildRequest) (*BuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitBuild not implemented")
+}
+func (UnimplementedV2Server) GetBuild(context.Context, *GetBuildRequest) (*BuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBuild not implemented")
+}
+func (UnimplementedV2Server) ListBuilds(context.Context, *ListBuildsRequest) (*ListBuildsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBuilds not implemented")
+}
+func (UnimplementedV2Server) CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelBuild not implemented")
+}
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
 }
@@ -958,6 +1051,9 @@ func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTrace
 }
 func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
+}
+func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PauseFunction not implemented")
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
@@ -1372,6 +1468,96 @@ func _V2_GetApps_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetApps(ctx, req.(*GetAppsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateBuild(ctx, req.(*CreateBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CommitBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CommitBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CommitBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CommitBuild(ctx, req.(*CommitBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetBuild(ctx, req.(*GetBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListBuilds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBuildsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListBuilds(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListBuilds_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListBuilds(ctx, req.(*ListBuildsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CancelBuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelBuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CancelBuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CancelBuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CancelBuild(ctx, req.(*CancelBuildRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1805,6 +1991,24 @@ func _V2_GetFunction_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_PauseFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).PauseFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_PauseFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).PauseFunction(ctx, req.(*PauseFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionsRequest)
 	if err := dec(in); err != nil {
@@ -2109,6 +2313,26 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_GetApps_Handler,
 		},
 		{
+			MethodName: "CreateBuild",
+			Handler:    _V2_CreateBuild_Handler,
+		},
+		{
+			MethodName: "CommitBuild",
+			Handler:    _V2_CommitBuild_Handler,
+		},
+		{
+			MethodName: "GetBuild",
+			Handler:    _V2_GetBuild_Handler,
+		},
+		{
+			MethodName: "ListBuilds",
+			Handler:    _V2_ListBuilds_Handler,
+		},
+		{
+			MethodName: "CancelBuild",
+			Handler:    _V2_CancelBuild_Handler,
+		},
+		{
 			MethodName: "CreateSandbox",
 			Handler:    _V2_CreateSandbox_Handler,
 		},
@@ -2195,6 +2419,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunction",
 			Handler:    _V2_GetFunction_Handler,
+		},
+		{
+			MethodName: "PauseFunction",
+			Handler:    _V2_PauseFunction_Handler,
 		},
 		{
 			MethodName: "GetFunctions",

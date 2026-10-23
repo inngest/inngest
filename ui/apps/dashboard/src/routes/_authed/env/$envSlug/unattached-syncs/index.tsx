@@ -24,7 +24,7 @@ function UnattachedSyncsPage() {
 
   if (syncsRes.isLoading) {
     return (
-      <div className="flex h-full min-h-0">
+      <div className="flex min-h-0 flex-1">
         <SyncList onClick={setSelectedSyncID} loading />
       </div>
     );
@@ -33,7 +33,7 @@ function UnattachedSyncsPage() {
   const firstSync = syncsRes.data[0];
   if (!firstSync) {
     return (
-      <div className="h-full w-full overflow-y-auto">
+      <div className="min-h-0 w-full flex-1 overflow-y-auto">
         <div className="mx-auto mt-16 w-full max-w-[1200px] p-4">
           <p className="bg-canvasMuted text-basis rounded-md p-4 text-center">
             No syncs found
@@ -44,7 +44,7 @@ function UnattachedSyncsPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex min-h-0 flex-1">
       <SyncList
         onClick={setSelectedSyncID}
         selectedSyncID={selectedSyncID ?? firstSync.id}

@@ -12,6 +12,10 @@ import (
 // End sets the time when reading response is done.
 // This must be called after reading response body.
 func (r *Result) End(t time.Time) {
+	// Transport callbacks can still finish after a request is canceled.
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	r.transferDone = t
 
 	// This means result is empty (it does nothing).
@@ -28,6 +32,9 @@ func (r *Result) End(t time.Time) {
 // It is from first response byte to the given time. The time must
 // be time after read body (go-httpstat can not detect that time).
 func (r *Result) ContentTransfer(t time.Time) time.Duration {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	return t.Sub(r.serverDone)
 }
 

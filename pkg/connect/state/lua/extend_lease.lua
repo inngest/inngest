@@ -115,8 +115,8 @@ if workerCapUnlimitedBool == true then
 	return {1, newLeaseID}
 end
 
--- Add to the new lease to the worker's set
-redis.call("ZADD", workerRequestsKey, currentTime + requestLeaseDuration, requestID)
+-- Worker request scores use Unix seconds; currentTime is in milliseconds.
+redis.call("ZADD", workerRequestsKey, math.floor(currentTime / 1000) + requestLeaseDuration, requestID)
 redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 
 -- Update the request-worker mapping with the new TTL

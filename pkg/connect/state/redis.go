@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
@@ -472,12 +473,14 @@ func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Cont
 
 					connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(now.Add(-consts.ConnectGCThreshold))
 					if connectionHeartbeatMissed {
-						err = r.DeleteConnection(ctx, envID, connID)
+						deleted, err := r.DeleteConnectionIfUnchanged(ctx, envID, connID, &conn)
 						if err != nil {
 							return 0, fmt.Errorf("could not delete connection: %w", err)
 						}
 
-						cleanedUp++
+						if deleted {
+							cleanedUp++
+						}
 					}
 				}
 
@@ -539,13 +542,36 @@ func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context
 }
 
 func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connID ulid.ULID) error {
-	existingConn, err := r.GetConnection(ctx, envID, connID)
+	_, err := r.deleteConnection(ctx, envID, connID, nil)
+	return err
+}
+
+func (r *redisConnectionStateManager) DeleteConnectionIfUnchanged(ctx context.Context, envID uuid.UUID, connID ulid.ULID, expected *connpb.ConnMetadata) (bool, error) {
+	if expected == nil {
+		return false, fmt.Errorf("expected connection metadata is required")
+	}
+	return r.deleteConnection(ctx, envID, connID, expected)
+}
+
+func (r *redisConnectionStateManager) deleteConnection(ctx context.Context, envID uuid.UUID, connID ulid.ULID, expected *connpb.ConnMetadata) (bool, error) {
+	serialized, err := r.client.Do(ctx, r.client.B().Hget().Key(r.connectionHash(envID)).Field(connID.String()).Build()).ToString()
+	if rueidis.IsRedisNil(err) {
+		return false, nil
+	}
 	if err != nil {
-		return fmt.Errorf("could not get connection: %w", err)
+		return false, fmt.Errorf("could not get connection: %w", err)
 	}
 
-	if existingConn == nil {
-		return nil
+	var existingConn connpb.ConnMetadata
+	if err := json.Unmarshal([]byte(serialized), &existingConn); err != nil {
+		return false, fmt.Errorf("could not parse connection: %w", err)
+	}
+	expectedSerialized := ""
+	if expected != nil {
+		if !proto.Equal(expected, &existingConn) {
+			return false, nil
+		}
+		expectedSerialized = serialized
 	}
 
 	// Fetch all associated worker groups
@@ -556,7 +582,7 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 
 	groups, err := r.GetWorkerGroupsByHash(ctx, envID, groupHashes)
 	if err != nil {
-		return fmt.Errorf("could not get worker groups for connection: %w", err)
+		return false, fmt.Errorf("could not get worker groups for connection: %w", err)
 	}
 
 	/*
@@ -587,9 +613,11 @@ func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envI
 
 	argDefs := []string{
 		"local connID = ARGV[1]",
+		"local expectedConn = ARGV[2]",
 	}
 	args := []string{
 		connID.String(),
+		expectedSerialized,
 	}
 
 	indexUpdates := make([]string, 0)
@@ -636,6 +664,12 @@ redis.call("SREM", %s, connID)`, indexVarName, indexVarName))
 
 -- $include(ends_with.lua)
 
+-- A heartbeat or status update may have arrived while cleanup loaded the groups.
+-- Check and delete atomically so an older health decision cannot remove it.
+if expectedConn ~= "" and redis.call("HGET", indexConnectionsByEnvIdKey, connID) ~= expectedConn then
+  return 1
+end
+
 -- Remove the connection from the map
 redis.call("HDEL", indexConnectionsByEnvIdKey, connID)
 
@@ -653,7 +687,7 @@ return 0
 		strings.Join(emptyGroupCleanup, "\n\n"),
 	))
 	if err != nil {
-		return fmt.Errorf("could not create delete script: %w", err)
+		return false, fmt.Errorf("could not create delete script: %w", err)
 	}
 
 	status, err := script.Exec(
@@ -663,15 +697,17 @@ return 0
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("could not delete connection: %w", err)
+		return false, fmt.Errorf("could not delete connection: %w", err)
 	}
 
 	switch status {
 	case 0:
-		return nil
+		return true, nil
+	case 1:
+		return false, nil
 
 	default:
-		return fmt.Errorf("unknow status when deleting connection: %w", err)
+		return false, fmt.Errorf("unknown status when deleting connection: %d", status)
 	}
 }
 
