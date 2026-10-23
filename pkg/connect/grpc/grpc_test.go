@@ -15,6 +15,7 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -22,6 +23,62 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestSlowClientCreationDoesNotBlockOtherPeers(t *testing.T) {
+	ctx, _, dialer, _, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	started := make(chan struct{})
+	clients := NewGRPCClientManager(connectpb.NewConnectGatewayClient,
+		WithDialer[connectpb.ConnectGatewayClient](func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+			if target == "slow" {
+				opts = append(opts, grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+					close(started)
+					<-ctx.Done()
+					return ctx.Err()
+				}))
+			}
+			return dialer(target, opts...)
+		}))
+	t.Cleanup(func() {
+		for _, key := range clients.GetClientKeys() {
+			clients.RemoveClient(key)
+		}
+	})
+	cached, err := clients.GetOrCreateClient(ctx, "cached", "cached")
+	require.NoError(t, err)
+	slowCtx, cancelSlow := context.WithCancel(ctx)
+	defer cancelSlow()
+	slowDone := make(chan error, 1)
+	go func() {
+		_, err := clients.GetOrCreateClient(slowCtx, "slow", "slow")
+		slowDone <- err
+	}()
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("slow peer did not start pinging")
+	}
+	healthyDone := make(chan struct{})
+	go func() {
+		client, err := clients.GetOrCreateClient(ctx, "cached", "cached")
+		assert.NoError(t, err)
+		assert.Same(t, cached, client)
+		_, err = clients.GetOrCreateClient(ctx, "new", "new")
+		assert.NoError(t, err)
+		close(healthyDone)
+	}()
+	select {
+	case <-healthyDone:
+	case <-time.After(time.Second):
+		cancelSlow()
+		<-healthyDone
+		t.Fatal("slow peer blocked healthy peers")
+	}
+	cancelSlow()
+	require.ErrorIs(t, <-slowDone, context.Canceled)
+}
 
 func TestExecutorGRPCMessageSize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
