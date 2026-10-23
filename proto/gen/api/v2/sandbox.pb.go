@@ -415,17 +415,20 @@ func (x *SandboxPage) GetLimit() int32 {
 }
 
 type Sandbox struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Status        SandboxStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.SandboxStatus" json:"status,omitempty"`
-	VpcId         string                 `protobuf:"bytes,4,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
-	ImageRef      string                 `protobuf:"bytes,5,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
-	Resources     *SandboxResourceSpec   `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
-	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
-	Error         *string                `protobuf:"bytes,10,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Status    SandboxStatus          `protobuf:"varint,3,opt,name=status,proto3,enum=api.v2.SandboxStatus" json:"status,omitempty"`
+	VpcId     string                 `protobuf:"bytes,4,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	ImageRef  string                 `protobuf:"bytes,5,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
+	Resources *SandboxResourceSpec   `protobuf:"bytes,6,opt,name=resources,proto3" json:"resources,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	StartedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	EndedAt   *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
+	Error     *string                `protobuf:"bytes,10,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	// The pinned launch artifact, formatted as sha256:<hex>. Absent for legacy
+	// sandboxes without a catalog image. This is not the rootfs file checksum.
+	ImageDigest   *string `protobuf:"bytes,11,opt,name=image_digest,json=imageDigest,proto3,oneof" json:"image_digest,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -526,6 +529,13 @@ func (x *Sandbox) GetEndedAt() *timestamppb.Timestamp {
 func (x *Sandbox) GetError() string {
 	if x != nil && x.Error != nil {
 		return *x.Error
+	}
+	return ""
+}
+
+func (x *Sandbox) GetImageDigest() string {
+	if x != nil && x.ImageDigest != nil {
+		return *x.ImageDigest
 	}
 	return ""
 }
@@ -699,7 +709,13 @@ type CreateSandboxRequest struct {
 	// workload; create recovery retains those bindings even if a secret is archived
 	// and its name reused. Values are fetched at launch and may remain in the guest
 	// and its snapshots. Cannot be supplied with snapshot_id.
-	Secrets       []string `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	Secrets []string `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	// An already-published image accessible to this workspace: name[:tag],
+	// name@sha256:<hex>, or sha256:<hex>. Omitted tags mean latest. Omit image
+	// to use the default base image. Cannot be supplied with snapshot_id.
+	// Resolves once for a new sandbox; name-idempotent retries keep the original
+	// artifact even when a tag moves. Does not build or upload an image.
+	Image         *string `protobuf:"bytes,7,opt,name=image,proto3,oneof" json:"image,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -774,6 +790,13 @@ func (x *CreateSandboxRequest) GetSecrets() []string {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *CreateSandboxRequest) GetImage() string {
+	if x != nil && x.Image != nil {
+		return *x.Image
+	}
+	return ""
 }
 
 type ListSandboxesRequest struct {
@@ -3231,7 +3254,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\bhas_more\x18\x02 \x01(\bR\ahasMore\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limitB\t\n" +
-	"\a_cursor\"\xc3\x03\n" +
+	"\a_cursor\"\xfc\x03\n" +
 	"\aSandbox\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12-\n" +
@@ -3245,10 +3268,12 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tstartedAt\x88\x01\x01\x12:\n" +
 	"\bended_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampH\x01R\aendedAt\x88\x01\x01\x12\x19\n" +
 	"\x05error\x18\n" +
-	" \x01(\tH\x02R\x05error\x88\x01\x01B\r\n" +
+	" \x01(\tH\x02R\x05error\x88\x01\x01\x12&\n" +
+	"\fimage_digest\x18\v \x01(\tH\x03R\vimageDigest\x88\x01\x01B\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\b\n" +
-	"\x06_error\"y\n" +
+	"\x06_errorB\x0f\n" +
+	"\r_image_digest\"y\n" +
 	"\x15CreateSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x12;\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"v\n" +
@@ -3259,7 +3284,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxH\x00R\x04data\x88\x01\x01\x12@\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataH\x01R\bmetadata\x88\x01\x01B\a\n" +
 	"\x05_dataB\v\n" +
-	"\t_metadata\"\xbc\x02\n" +
+	"\t_metadata\"\xe1\x02\n" +
 	"\x14CreateSandboxRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1b\n" +
@@ -3267,11 +3292,13 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x12$\n" +
 	"\vsnapshot_id\x18\x05 \x01(\tH\x00R\n" +
 	"snapshotId\x88\x01\x01\x12\x18\n" +
-	"\asecrets\x18\x06 \x03(\tR\asecrets\x1a>\n" +
+	"\asecrets\x18\x06 \x03(\tR\asecrets\x12\x19\n" +
+	"\x05image\x18\a \x01(\tH\x01R\x05image\x88\x01\x01\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
-	"\f_snapshot_id\"c\n" +
+	"\f_snapshot_idB\b\n" +
+	"\x06_image\"c\n" +
 	"\x14ListSandboxesRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +

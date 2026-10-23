@@ -1,7 +1,13 @@
 import * as Sentry from '@sentry/tanstackstart-react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { pickSelfServePlans, type SelfServePlan } from './utils';
+import {
+  displayPlanName,
+  isActive,
+  pickSelfServePlans,
+  processPlan,
+  type SelfServePlan,
+} from './utils';
 
 vi.mock('@sentry/tanstackstart-react', () => ({
   captureMessage: vi.fn(),
@@ -64,8 +70,8 @@ describe('pickSelfServePlans', () => {
         amount: 19_900,
         isFree: false,
         isLegacy: false,
-        name: 'Growth',
-        slug: 'growth-from-api',
+        name: 'Business',
+        slug: 'business-from-api',
       }),
       plan({
         amount: 7_500,
@@ -79,7 +85,7 @@ describe('pickSelfServePlans', () => {
     expect(pickSelfServePlans(plans)).toEqual({
       hobby: plans[0],
       pro: plans[1],
-      growth: plans[2],
+      business: plans[2],
     });
   });
 
@@ -122,7 +128,7 @@ describe('pickSelfServePlans', () => {
           slug: 'retired-growth',
         }),
       ]),
-    ).toEqual({ hobby: null, pro: null, growth: null });
+    ).toEqual({ hobby: null, pro: null, business: null });
   });
 
   it('reports multiple current Pro plans and selects the most expensive', () => {
@@ -176,9 +182,9 @@ describe('pickSelfServePlans', () => {
       }),
     ];
 
-    expect(pickSelfServePlans(plans).growth).toBe(plans[1]);
+    expect(pickSelfServePlans(plans).business).toBe(plans[1]);
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
-      'Multiple active, visible Growth billing plans returned',
+      'Multiple active, visible Business billing plans returned',
       {
         level: 'error',
         extra: {
@@ -205,15 +211,97 @@ describe('pickSelfServePlans', () => {
     expect(pickSelfServePlans(plans)).toEqual({
       hobby: plans[0],
       pro: null,
-      growth: null,
+      business: null,
     });
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
       'Missing active, visible Pro billing plan',
       { level: 'error' },
     );
     expect(Sentry.captureMessage).toHaveBeenCalledWith(
-      'Missing active, visible Growth billing plan',
+      'Missing active, visible Business billing plan',
       { level: 'error' },
     );
+  });
+
+  it('uses Growth only when Business is unavailable', () => {
+    const growth = plan({
+      amount: 19_900,
+      isFree: false,
+      isLegacy: false,
+      name: 'Growth',
+      slug: 'growth-from-api',
+    });
+    const business = plan({
+      amount: 19_900,
+      isFree: false,
+      isLegacy: false,
+      name: 'Business',
+      slug: 'business-from-api',
+    });
+
+    expect(pickSelfServePlans([growth]).business).toBe(growth);
+    expect(Sentry.captureMessage).not.toHaveBeenCalledWith(
+      'Missing active, visible Business billing plan',
+      { level: 'error' },
+    );
+    expect(pickSelfServePlans([growth, business]).business).toBe(business);
+  });
+
+  it('reports an active Growth plan next to an active Business plan', () => {
+    const growth = plan({
+      amount: 19_900,
+      isFree: false,
+      isLegacy: false,
+      name: 'Growth',
+      slug: 'growth-from-api',
+    });
+    const business = plan({
+      amount: 15_000,
+      isFree: false,
+      isLegacy: false,
+      name: 'Business',
+      slug: 'business-from-api',
+    });
+
+    expect(pickSelfServePlans([growth, business]).business).toBe(business);
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      'Multiple active, visible Business billing plans returned',
+      {
+        level: 'error',
+        extra: {
+          plans: [
+            { amount: 19_900, slug: 'growth-from-api' },
+            { amount: 15_000, slug: 'business-from-api' },
+          ],
+        },
+      },
+    );
+  });
+});
+
+describe('Business plan display', () => {
+  it('shows the new name for a Growth plan without changing its slug', () => {
+    const growth = plan({
+      amount: 19_900,
+      isFree: false,
+      isLegacy: false,
+      name: 'Growth',
+      slug: 'growth-from-api',
+    });
+
+    expect(displayPlanName(growth.name)).toBe('Business');
+    expect(processPlan(growth).name).toBe('Business');
+    expect(processPlan(growth).slug).toBe('growth-from-api');
+    expect(displayPlanName('Business')).toBe('Business');
+  });
+
+  it('keeps the suffix of a Growth plan name', () => {
+    expect(displayPlanName('Growth Trial')).toBe('Business Trial');
+    expect(displayPlanName('Growth - Annual')).toBe('Business - Annual');
+  });
+
+  it('matches a Growth current plan to the Business card', () => {
+    expect(isActive({ name: 'Growth' }, { name: 'Business' })).toBe(true);
+    expect(isActive({ name: 'Pro' }, { name: 'Business' })).toBe(false);
   });
 });

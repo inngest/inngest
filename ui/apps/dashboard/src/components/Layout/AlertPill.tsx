@@ -2,12 +2,18 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiErrorWarningLine } from '@remixicon/react';
 
-export type AlertPillKind = 'error' | 'warning' | 'caution';
+export type AlertPillKind =
+  | 'error'
+  | 'warning'
+  | 'caution'
+  | 'delayed'
+  | 'boost';
 
 type AlertPillProps = {
   children: React.ReactNode;
   action?: React.ReactNode;
   kind?: AlertPillKind;
+  icon?: React.ReactNode;
 };
 
 const kindStyles: Record<AlertPillKind, { gradient: string; text: string }> = {
@@ -26,12 +32,23 @@ const kindStyles: Record<AlertPillKind, { gradient: string; text: string }> = {
       'from-[rgb(var(--color-honey-300))] to-[rgb(var(--color-honey-400))]',
     text: 'text-alwaysBlack',
   },
+  delayed: {
+    gradient:
+      'from-[rgb(var(--color-ruby-600))] to-[rgb(var(--color-citrus-500))]',
+    text: 'text-alwaysWhite',
+  },
+  boost: {
+    gradient:
+      'from-[rgb(var(--color-breeze-600))] to-[rgb(var(--color-breeze-400))]',
+    text: 'text-alwaysWhite',
+  },
 };
 
 export function AlertPill({
   children,
   action,
   kind = 'error',
+  icon = <RiErrorWarningLine className="h-[18px] w-[18px]" />,
 }: AlertPillProps) {
   return (
     <Pill
@@ -40,7 +57,7 @@ export function AlertPill({
         kindStyles[kind].gradient,
         kindStyles[kind].text,
       )}
-      icon={<RiErrorWarningLine className="h-[18px] w-[18px]" />}
+      icon={icon}
       iconSide="left"
       action={action}
     >

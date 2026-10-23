@@ -118,7 +118,6 @@ func TestSecureDialer(t *testing.T) {
 	t.Run("nat64", func(t *testing.T) {
 		hosts := []string{
 			"[64:ff9b::d8c6:4fc1]:80",
-			"[64:ff9b::7f00:0001]:80",
 			"[2001:db8:c000:0201::]:80",
 			"[2001:db8:aaaa:c000:0002:0100::]:80",
 		}
@@ -158,6 +157,46 @@ func TestSecureDialer(t *testing.T) {
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
 				if err != nil {
 					require.NotContains(t, err.Error(), "NAT64 address")
+					return
+				}
+			})
+		}
+	})
+
+	t.Run("nat64 to private ipv4", func(t *testing.T) {
+		hosts := []string{
+			"[64:ff9b::7f00:0001]:80", // 127.0.0.1
+			"[64:ff9b::a9fe:a9fe]:80", // 169.254.169.254
+			"[64:ff9b::a00:1]:80",     // 10.0.0.1
+			"[64:ff9b::c0a8:101]:80",  // 192.168.1.1
+			"[64:ff9b::]:80",          // 0.0.0.0
+		}
+
+		for _, h := range hosts {
+			t.Run(fmt.Sprintf("disabled: %s", h), func(t *testing.T) {
+				c := client(SecureDialer(SecureDialerOpts{
+					AllowNAT64: true,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						panic("should not resolve!")
+					},
+				}))
+				r, err := c.Get(fmt.Sprintf("http://%s", h))
+				require.Nil(t, r)
+				require.NotNil(t, err)
+				require.Contains(t, err.Error(), "private IP range")
+			})
+
+			t.Run(fmt.Sprintf("enabled: %s", h), func(t *testing.T) {
+				c := client(SecureDialer(SecureDialerOpts{
+					AllowNAT64:   true,
+					AllowPrivate: true,
+					dial: func(ctx context.Context, network, addr string) (net.Conn, error) {
+						return nil, nil
+					},
+				}))
+				_, err := c.Get(fmt.Sprintf("http://%s", h))
+				if err != nil {
+					require.NotContains(t, err.Error(), "private IP range")
 					return
 				}
 			})

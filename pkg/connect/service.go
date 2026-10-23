@@ -258,7 +258,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 		drainAckTimeout: 25 * time.Second,
 
-		grpcServer: grpcLib.NewServer(),
+		grpcServer: grpcLib.NewServer(grpcLib.MaxRecvMsgSize(grpc.MaxMessageSize)),
 	}
 
 	for _, opt := range opts {

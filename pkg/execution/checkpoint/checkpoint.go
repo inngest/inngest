@@ -610,6 +610,17 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			// for a sync listener to record this step.
 			c.Executor.RunStepRunFinishedLifecycle(ctx, md, queue.Item{}, inngest.SourceEdge, op, time.Now())
 
+			// Report usage for the step.  The executor only sees the final response of
+			// the request wrapping these checkpoints, so without this every step
+			// checkpointed here goes uncounted.  Duplicate and idempotent saves `continue`
+			// above, so retried checkpoints aren't double counted.
+			c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
+				AccountID: input.AccountID,
+				EnvID:     input.EnvID,
+				AppID:     md.ID.Tenant.AppID,
+				FnID:      md.ID.FunctionID,
+			}, enums.StepStatusCompleted)
+
 		case enums.OpcodeStepPlanned:
 			// When the SDK announces a step is about to run, we open a Running
 			// executor.step span to show progress to the user.

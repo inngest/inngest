@@ -11,6 +11,7 @@ import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChange
 import { pathCreator } from '@/utils/urls';
 import {
   PlanNames,
+  displayPlanName,
   isEnterprisePlan,
   isHobbyFreePlan,
   type Plan,
@@ -129,7 +130,7 @@ export default function UpgradeButton({
               : 'upgrade',
             item: {
               planSlug: plan.slug,
-              name: plan.name,
+              name: displayPlanName(plan.name),
               quantity: 1,
               amount: plan.amount,
             },

@@ -27,7 +27,7 @@ export const Header = ({
   loading,
 }: HeaderType) => {
   return (
-    <div className="border-subtle sticky top-0 z-50 flex flex-col justify-start border-b">
+    <div className="border-subtle sticky top-0 z-50 flex shrink-0 flex-col justify-start border-b">
       <div
         className={`bg-canvasBase flex h-[48px] flex-row items-center justify-between px-3 ${className}`}
       >

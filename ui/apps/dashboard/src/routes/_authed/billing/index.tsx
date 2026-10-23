@@ -9,7 +9,11 @@ import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
+import {
+  displayPlanName,
+  isHobbyFreePlan,
+  isHobbyPlan,
+} from '@/components/Billing/Plans/utils';
 import { usageKind } from '@/components/ExecutionLimit/executionLimit';
 import { useExecutionLimit } from '@/components/ExecutionLimit/useExecutionLimit';
 import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
@@ -236,7 +240,9 @@ function BillingComponent() {
           <Card.Content>
             <p className="text-muted mb-1">Your plan</p>
             <div className="flex items-center justify-between">
-              <p className="text-basis text-xl">{currentPlan.name}</p>
+              <p className="text-basis text-xl">
+                {displayPlanName(currentPlan.name)}
+              </p>
               <Button
                 appearance="ghost"
                 label="Change plan"

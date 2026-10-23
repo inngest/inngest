@@ -43,7 +43,7 @@ function AIOverviewComponent() {
         infoIcon={<AIOverviewInfo />}
         action={<RefreshButton />}
       />
-      <div className="bg-canvasBase mx-auto flex h-full w-full flex-col">
+      <div className="bg-canvasBase mx-auto flex min-h-0 w-full flex-1 flex-col">
         <ClientOnly>
           <AIOverviewDashboard envSlug={envSlug} />
         </ClientOnly>

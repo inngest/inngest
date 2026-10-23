@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -180,6 +181,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			})
 			// We have a response already, return it
 			l.Debug("found buffered response")
+
+			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, "", opts.Data.RequestId,
+				l, "could not delete worker lease after recovering buffered response")
+			if err := i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId); err != nil {
+				span.RecordError(err)
+				l.ReportError(err, "could not delete recovered request lease")
+			}
 
 			// The response has a short TTL so it will be cleaned up, but we should try
 			// to garbage-collect unused state as quickly as possible
@@ -447,6 +455,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 				l, "could not clean up worker lease after forward failure")
 
+			// Another route cannot fix a payload that exceeds the transport limit.
+			// Preserve this decision through the driver and outer execution queue.
+			if util.IsGRPCMessageSizeError(err) {
+				err = queue.NeverRetryError(err)
+				break
+			}
+
 			if forwardAttempt == maxForwardAttempts-1 {
 				break
 			}
@@ -583,10 +598,18 @@ func cleanupWorkerRequestOrLogError(ctx context.Context, stateManager state.Stat
 	// log the cleanup of the worker request
 	l.Trace("cleaning up worker lease", "instance_id", instanceID, "request_id", requestID, "env_id", envID.String())
 
-	// if the instance ID is not set, we need to return an error
+	// A replacement executor can resume an existing lease without routing the
+	// request itself. Recover the assigned worker so completion still frees its slot.
 	if instanceID == "" {
-		l.Info(fmt.Sprintf("%s: %s", state.ErrNoInstanceIDFound.Error(), message))
-		return
+		var err error
+		instanceID, err = stateManager.GetAssignedWorkerID(ctx, envID, requestID)
+		if err != nil {
+			l.ReportError(err, "could not recover assigned worker for cleanup")
+			return
+		}
+		if instanceID == "" {
+			return
+		}
 	}
 
 	if err := stateManager.DeleteRequestFromWorker(ctx, envID, instanceID, requestID); err != nil {

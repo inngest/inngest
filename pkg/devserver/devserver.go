@@ -226,7 +226,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
-	pauseOverrides := make(map[uuid.UUID]bool)
+	functionProvider := NewFunctionProvider(dbcqrs)
 
 	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
@@ -378,15 +378,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		queue.WithBacklogRefillLimit(10),
-		queue.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) queue.PartitionPausedInfo {
-			if paused, ok := pauseOverrides[functionID]; ok && paused {
-				return queue.PartitionPausedInfo{
-					Stale:  false,
-					Paused: true,
-				}
-			}
-			return queue.PartitionPausedInfo{}
-		}),
+		queue.WithPartitionPausedGetter(functionProvider.pauses.partitionPaused),
 		queue.WithConditionalTracer(conditionalQueueTracer),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -721,7 +713,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                NewAppProvider(dbcqrs),
-		Functions:           NewFunctionProvider(dbcqrs),
+		Functions:           functionProvider,
+		FunctionPauser:      functionProvider,
 		Runs:                NewRunProvider(dbcqrs, exec),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
@@ -798,11 +791,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				}
 			},
 			PauseFunction: func(id uuid.UUID) {
-				pauseOverrides[id] = true
+				functionProvider.pauses.pause(id)
 			},
-			UnpauseFunction: func(id uuid.UUID) {
-				delete(pauseOverrides, id)
-			},
+			UnpauseFunction: functionProvider.pauses.unpause,
 		})})
 	}
 

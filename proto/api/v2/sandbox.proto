@@ -69,6 +69,9 @@ message Sandbox {
   optional google.protobuf.Timestamp started_at = 8;
   optional google.protobuf.Timestamp ended_at = 9;
   optional string error = 10;
+  // The pinned launch artifact, formatted as sha256:<hex>. Absent for legacy
+  // sandboxes without a catalog image. This is not the rootfs file checksum.
+  optional string image_digest = 11;
 }
 
 message CreateSandboxResponse {
@@ -99,6 +102,12 @@ message CreateSandboxRequest {
   // and its name reused. Values are fetched at launch and may remain in the guest
   // and its snapshots. Cannot be supplied with snapshot_id.
   repeated string secrets = 6;
+  // An already-published image accessible to this workspace: name[:tag],
+  // name@sha256:<hex>, or sha256:<hex>. Omitted tags mean latest. Omit image
+  // to use the default base image. Cannot be supplied with snapshot_id.
+  // Resolves once for a new sandbox; name-idempotent retries keep the original
+  // artifact even when a tag moves. Does not build or upload an image.
+  optional string image = 7;
 }
 
 message ListSandboxesRequest {
