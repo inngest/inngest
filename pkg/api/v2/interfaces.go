@@ -88,8 +88,9 @@ type EventPublisher interface {
 type EventSender func(context.Context, *event.Event) (string, error)
 
 type FunctionPauser interface {
-	// idempotent. may apply async; PausedAt is when the pause applies
+	// idempotent pause and resume; may apply asynchronously
 	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+	ResumeFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
 }
 
 type GetRunOpts struct {

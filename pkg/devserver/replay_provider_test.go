@@ -42,7 +42,7 @@ func TestReplayRejectsFunctionsFromAnotherStoredEnvironment(t *testing.T) {
 				return []*cqrs.TraceRun{run}, nil
 			}}
 			scheduler := newReplayScheduler()
-			provider := NewReplayProvider(data, NewFunctionProvider(store), scheduler, nil)
+			provider := NewReplayProvider(data, NewFunctionProvider(store, nil, nil), scheduler, nil)
 			wrongApp := replayOpts(fn.Slug)
 			wrongApp.AppID = "another-app"
 			_, err = provider.CreateReplay(t.Context(), wrongApp)

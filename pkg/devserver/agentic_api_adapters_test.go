@@ -36,7 +36,7 @@ func TestNewFunctionProvider(t *testing.T) {
 		},
 	}
 
-	provider := NewFunctionProvider(store)
+	provider := NewFunctionProvider(store, nil, nil)
 
 	fn, err := provider.GetFunction(ctx, fnID.String())
 
@@ -70,7 +70,7 @@ func TestNewFunctionProviderFindsFunctionByApp(t *testing.T) {
 		},
 	}
 
-	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "test-fn")
+	fn, err := NewFunctionProvider(store, nil, nil).GetFunctionByApp(ctx, "app", "test-fn")
 
 	require.NoError(t, err)
 	require.Equal(t, fnID, fn.ID)
@@ -99,7 +99,7 @@ func TestNewFunctionProviderFindsFunctionWhenFunctionIDStartsWithAppID(t *testin
 		},
 	}
 
-	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "app-test-fn")
+	fn, err := NewFunctionProvider(store, nil, nil).GetFunctionByApp(ctx, "app", "app-test-fn")
 
 	require.NoError(t, err)
 	require.Equal(t, fnID, fn.ID)
@@ -135,7 +135,7 @@ func TestNewFunctionProviderPrefersExactPublicFunctionID(t *testing.T) {
 		},
 	}
 
-	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "app-test-fn")
+	fn, err := NewFunctionProvider(store, nil, nil).GetFunctionByApp(ctx, "app", "app-test-fn")
 
 	require.NoError(t, err)
 	require.Equal(t, exactFnID, fn.ID)
@@ -164,7 +164,7 @@ func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
 		},
 	}
 
-	fn, err := NewFunctionProvider(store).GetFunction(ctx, fnID.String())
+	fn, err := NewFunctionProvider(store, nil, nil).GetFunction(ctx, fnID.String())
 
 	require.NoError(t, err)
 	require.Equal(t, fnID, fn.ID)
@@ -176,7 +176,7 @@ func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
 
 func TestNewFunctionProviderErrors(t *testing.T) {
 	t.Run("reader error", func(t *testing.T) {
-		provider := NewFunctionProvider(&fakeFunctionStore{err: errors.New("read failed")})
+		provider := NewFunctionProvider(&fakeFunctionStore{err: errors.New("read failed")}, nil, nil)
 
 		fn, err := provider.GetFunction(context.Background(), "missing")
 
@@ -186,7 +186,7 @@ func TestNewFunctionProviderErrors(t *testing.T) {
 
 	for _, identifier := range []string{"missing-slug", uuid.NewString()} {
 		t.Run("not found/"+identifier, func(t *testing.T) {
-			provider := NewFunctionProvider(&fakeFunctionStore{})
+			provider := NewFunctionProvider(&fakeFunctionStore{}, nil, nil)
 
 			fn, err := provider.GetFunction(context.Background(), identifier)
 
@@ -205,7 +205,7 @@ func TestNewFunctionProviderErrors(t *testing.T) {
 					Config: []byte(`not-json`),
 				},
 			},
-		})
+		}, nil, nil)
 
 		fn, err := provider.GetFunction(context.Background(), "bad-fn")
 
@@ -247,7 +247,7 @@ func TestNewFunctionProviderPagesFunctionsInReader(t *testing.T) {
 		},
 	}
 
-	result, err := NewFunctionProvider(store).GetFunctions(ctx, "app", apiv2.GetFunctionsOpts{
+	result, err := NewFunctionProvider(store, nil, nil).GetFunctions(ctx, "app", apiv2.GetFunctionsOpts{
 		Cursor: firstID,
 		Limit:  1,
 	})

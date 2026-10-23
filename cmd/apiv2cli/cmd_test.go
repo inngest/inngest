@@ -401,26 +401,33 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
 }
 
-func TestCommandPausesFunction(t *testing.T) {
-	var method, path, body string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		method, path = r.Method, r.URL.Path
-		data, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		body = string(data)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"id":"fn","isPaused":true}}`))
-	}))
-	defer srv.Close()
-	cmd := Command()
-	var out bytes.Buffer
-	cmd.Writer = &out
-	err := cmd.Run(t.Context(), []string{"api", "pause-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, method)
-	require.Equal(t, "/api/v2/apps/app/functions/fn/pause", path)
-	require.Empty(t, body)
-	require.JSONEq(t, `{"data":{"id":"fn","isPaused":true}}`, out.String())
+func TestCommandPausesAndResumesFunction(t *testing.T) {
+	for _, action := range []struct{ name, response string }{
+		{"pause", `{"data":{"id":"fn","isPaused":true}}`},
+		{"resume", `{"data":{"id":"fn","isPaused":false}}`},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			var method, path, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(action.response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/fn/"+action.name, path)
+			require.Empty(t, body)
+			require.JSONEq(t, action.response, out.String())
+		})
+	}
 }
 
 func TestWriteSandboxFileSendsRawBodyAndQueryParameters(t *testing.T) {
