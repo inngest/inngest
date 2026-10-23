@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -227,12 +226,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
-	// Pause state is local to the test API and shared with the queue and replay admission.
-	var pauseOverrides sync.Map
-	isFunctionPaused := func(id uuid.UUID) bool {
-		_, paused := pauseOverrides.Load(id)
-		return paused
-	}
+	functionProvider := NewFunctionProvider(dbcqrs)
 
 	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
@@ -384,15 +378,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		queue.WithBacklogRefillLimit(10),
-		queue.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) queue.PartitionPausedInfo {
-			if isFunctionPaused(functionID) {
-				return queue.PartitionPausedInfo{
-					Stale:  false,
-					Paused: true,
-				}
-			}
-			return queue.PartitionPausedInfo{}
-		}),
+		queue.WithPartitionPausedGetter(functionProvider.pauses.partitionPaused),
 		queue.WithConditionalTracer(conditionalQueueTracer),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -723,17 +709,19 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	// Create the API v2 service handler
-	functions := NewFunctionProvider(dbcqrs)
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                NewAppProvider(dbcqrs),
-		Functions:           functions,
+		Functions:           functionProvider,
+		FunctionPauser:      functionProvider,
 		Runs:                NewRunProvider(dbcqrs, exec),
-		Replays:             NewReplayProvider(dbcqrs, functions, exec, isFunctionPaused),
-		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
-		Executor:            exec,
-		EventPublisher:      runner,
+		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
+			return !functionProvider.pauses.get(id).IsZero()
+		}),
+		FunctionTraces: NewFunctionTraceReader(dbcqrs),
+		Executor:       exec,
+		EventPublisher: runner,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
 			return ds.HandleEvent(ctx, evt, nil)
 		},
@@ -806,11 +794,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				}
 			},
 			PauseFunction: func(id uuid.UUID) {
-				pauseOverrides.Store(id, true)
+				functionProvider.pauses.pause(id)
 			},
-			UnpauseFunction: func(id uuid.UUID) {
-				pauseOverrides.Delete(id)
-			},
+			UnpauseFunction: functionProvider.pauses.unpause,
 		})})
 	}
 

@@ -14,8 +14,14 @@ import (
 var (
 	privateIPBlocks []*net.IPNet
 	nat64blocks     []*net.IPNet
-	cachedResolver  dnscache.DNSResolver
-	once            sync.Once
+	// nat64WellKnownPrefix is the RFC 6052 prefix that NAT64 gateways
+	// translate to the IPv4 address in the last four bytes.
+	nat64WellKnownPrefix = &net.IPNet{
+		IP:   net.ParseIP("64:ff9b::"),
+		Mask: net.CIDRMask(96, 128),
+	}
+	cachedResolver dnscache.DNSResolver
+	once           sync.Once
 )
 
 const (
@@ -75,6 +81,9 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 	resolver := initResolver()
 
 	dial := resolver.Dialer()
+	if o.AllowNAT64 {
+		dial = resolver.DialerWithNAT64Fallback()
+	}
 	if o.dial != nil {
 		dial = o.dial
 	}
@@ -149,6 +158,12 @@ func isPrivateHost(host string) bool {
 }
 
 func isPrivateIP(ip net.IP) bool {
+	// check the IPv4 address that the NAT64 gateway connects to.  without this,
+	// 64:ff9b::a9fe:a9fe reaches 169.254.169.254 when NAT64 addresses are allowed.
+	if ip.To4() == nil && nat64WellKnownPrefix.Contains(ip) {
+		ip = ip[12:]
+	}
+
 	if ip.IsLoopback() ||
 		ip.IsUnspecified() ||
 		ip.IsLinkLocalUnicast() ||

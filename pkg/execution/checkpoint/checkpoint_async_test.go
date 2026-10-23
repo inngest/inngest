@@ -94,6 +94,16 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 
 		mocks.queue.AssertCalled(t, "ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123")
 
+		// Each checkpointed step must be reported for usage, since the executor
+		// only sees the final response of the request wrapping these checkpoints.
+		mocks.metrics.AssertNumberOfCalls(t, "OnStepFinished", 3)
+		mocks.metrics.AssertCalled(t, "OnStepFinished", ctx, MetricCardinality{
+			AccountID: testData.metadata.ID.Tenant.AccountID,
+			EnvID:     testData.metadata.ID.Tenant.EnvID,
+			AppID:     testData.metadata.ID.Tenant.AppID,
+			FnID:      testData.metadata.ID.FunctionID,
+		}, enums.StepStatusCompleted)
+
 		mocks.state.AssertExpectations(t)
 		mocks.tracer.AssertExpectations(t)
 		mocks.queue.AssertExpectations(t)
@@ -689,6 +699,8 @@ func TestCheckpointAsyncSteps_NotifiesRunStepRunFinishedLifecycle(t *testing.T) 
 		require.NoError(err)
 
 		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+		// Retried checkpoints must not double count usage.
+		mocks.metrics.AssertNotCalled(t, "OnStepFinished")
 	})
 
 	t.Run("does not dispatch when SaveStep fails", func(t *testing.T) {
@@ -717,6 +729,7 @@ func TestCheckpointAsyncSteps_NotifiesRunStepRunFinishedLifecycle(t *testing.T) 
 		require.Error(err)
 
 		mocks.executor.AssertNotCalled(t, "RunStepRunFinishedLifecycle")
+		mocks.metrics.AssertNotCalled(t, "OnStepFinished")
 		mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
 	})
 }
@@ -784,6 +797,8 @@ func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool
 
 	// Setup mock expectations
 	mocks.state.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(testMetadata, nil)
+	// Every saved StepRun/Step reports usage; most tests don't care to assert on it.
+	mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted).Maybe()
 
 	// Create checkpointer
 	checkpointer := New(Opts{

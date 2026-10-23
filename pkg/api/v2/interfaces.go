@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
@@ -85,6 +86,11 @@ type EventPublisher interface {
 }
 
 type EventSender func(context.Context, *event.Event) (string, error)
+
+type FunctionPauser interface {
+	// idempotent. may apply async; PausedAt is when the pause applies
+	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+}
 
 type GetRunOpts struct {
 	IncludeOutput bool

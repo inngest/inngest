@@ -3,6 +3,7 @@ import { Select, type Option } from '@inngest/components/Select/Select';
 import ToggleGroup from '@inngest/components/ToggleGroup/ToggleGroup';
 import { useQuery } from 'urql';
 
+import { AccountConcurrency } from '@/components/Billing/Usage/AccountConcurrency';
 import { BurstConcurrency } from '@/components/Billing/Usage/BurstConcurrency';
 import UsageChart from '@/components/Billing/Usage/UsageChart';
 import {
@@ -146,6 +147,7 @@ export const UsagePage = ({
           />
         </div>
       </div>
+      <AccountConcurrency />
       <BurstConcurrency />
     </>
   );

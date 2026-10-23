@@ -1,8 +1,8 @@
 import LogoWall from '@/components/SignIn/LogoWall';
 import SplitView from '@/components/SignIn/SplitView';
 import TrustPanel from '@/components/SignIn/TrustPanel';
-import { getSignupMetadata } from '@/utils/signupAttribution';
 import { absoluteUrl, canonicalLink } from '@/utils/urls';
+import { useSignupMetadata } from '@/utils/useSignupMetadata';
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { cn } from '@inngest/components/utils/classNames';
@@ -94,6 +94,7 @@ function FormSkeleton() {
 
 function RouteComponent() {
   const { pathname } = useLocation();
+  const signupMetadata = useSignupMetadata();
 
   // Clerk renders its "Already have an account?" action inside the card, which
   // puts it above our trust and legal copy. On the first step we hide that
@@ -124,7 +125,7 @@ function RouteComponent() {
             <ClerkLoading>{isStartStep ? <FormSkeleton /> : null}</ClerkLoading>
             <ClerkLoaded>
               <SignUp
-                unsafeMetadata={getSignupMetadata()}
+                unsafeMetadata={signupMetadata}
                 appearance={{
                   elements: {
                     footer: isStartStep ? 'hidden' : 'bg-none',

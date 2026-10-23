@@ -78,6 +78,16 @@ const (
 	V2GetAppProcedure = "/api.v2.V2/GetApp"
 	// V2GetAppsProcedure is the fully-qualified name of the V2's GetApps RPC.
 	V2GetAppsProcedure = "/api.v2.V2/GetApps"
+	// V2CreateBuildProcedure is the fully-qualified name of the V2's CreateBuild RPC.
+	V2CreateBuildProcedure = "/api.v2.V2/CreateBuild"
+	// V2CommitBuildProcedure is the fully-qualified name of the V2's CommitBuild RPC.
+	V2CommitBuildProcedure = "/api.v2.V2/CommitBuild"
+	// V2GetBuildProcedure is the fully-qualified name of the V2's GetBuild RPC.
+	V2GetBuildProcedure = "/api.v2.V2/GetBuild"
+	// V2ListBuildsProcedure is the fully-qualified name of the V2's ListBuilds RPC.
+	V2ListBuildsProcedure = "/api.v2.V2/ListBuilds"
+	// V2CancelBuildProcedure is the fully-qualified name of the V2's CancelBuild RPC.
+	V2CancelBuildProcedure = "/api.v2.V2/CancelBuild"
 	// V2CreateSandboxProcedure is the fully-qualified name of the V2's CreateSandbox RPC.
 	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
 	// V2ListSandboxesProcedure is the fully-qualified name of the V2's ListSandboxes RPC.
@@ -132,6 +142,8 @@ const (
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
 	V2GetFunctionProcedure = "/api.v2.V2/GetFunction"
+	// V2PauseFunctionProcedure is the fully-qualified name of the V2's PauseFunction RPC.
+	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
 	V2GetFunctionsProcedure = "/api.v2.V2/GetFunctions"
 	// V2SendEventProcedure is the fully-qualified name of the V2's SendEvent RPC.
@@ -185,6 +197,11 @@ type V2Client interface {
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	GetApps(context.Context, *connect.Request[v2.GetAppsRequest]) (*connect.Response[v2.GetAppsResponse], error)
+	CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error)
+	CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
+	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -210,6 +227,7 @@ type V2Client interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
@@ -359,6 +377,36 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2GetAppsProcedure,
 			connect.WithSchema(v2Methods.ByName("GetApps")),
+			connect.WithClientOptions(opts...),
+		),
+		createBuild: connect.NewClient[v2.CreateBuildRequest, v2.CreateBuildResponse](
+			httpClient,
+			baseURL+V2CreateBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		commitBuild: connect.NewClient[v2.CommitBuildRequest, v2.BuildResponse](
+			httpClient,
+			baseURL+V2CommitBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CommitBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		getBuild: connect.NewClient[v2.GetBuildRequest, v2.BuildResponse](
+			httpClient,
+			baseURL+V2GetBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("GetBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		listBuilds: connect.NewClient[v2.ListBuildsRequest, v2.ListBuildsResponse](
+			httpClient,
+			baseURL+V2ListBuildsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListBuilds")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelBuild: connect.NewClient[v2.CancelBuildRequest, v2.BuildResponse](
+			httpClient,
+			baseURL+V2CancelBuildProcedure,
+			connect.WithSchema(v2Methods.ByName("CancelBuild")),
 			connect.WithClientOptions(opts...),
 		),
 		createSandbox: connect.NewClient[v2.CreateSandboxRequest, v2.CreateSandboxResponse](
@@ -511,6 +559,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		pauseFunction: connect.NewClient[v2.PauseFunctionRequest, v2.PauseFunctionResponse](
+			httpClient,
+			baseURL+V2PauseFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("PauseFunction")),
+			connect.WithClientOptions(opts...),
+		),
 		getFunctions: connect.NewClient[v2.GetFunctionsRequest, v2.GetFunctionsResponse](
 			httpClient,
 			baseURL+V2GetFunctionsProcedure,
@@ -609,6 +663,11 @@ type v2Client struct {
 	cancelRun                  *connect.Client[v2.CancelRunRequest, v2.CancelRunResponse]
 	getApp                     *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
 	getApps                    *connect.Client[v2.GetAppsRequest, v2.GetAppsResponse]
+	createBuild                *connect.Client[v2.CreateBuildRequest, v2.CreateBuildResponse]
+	commitBuild                *connect.Client[v2.CommitBuildRequest, v2.BuildResponse]
+	getBuild                   *connect.Client[v2.GetBuildRequest, v2.BuildResponse]
+	listBuilds                 *connect.Client[v2.ListBuildsRequest, v2.ListBuildsResponse]
+	cancelBuild                *connect.Client[v2.CancelBuildRequest, v2.BuildResponse]
 	createSandbox              *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
 	listSandboxes              *connect.Client[v2.ListSandboxesRequest, v2.ListSandboxesResponse]
 	getSandbox                 *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
@@ -634,6 +693,7 @@ type v2Client struct {
 	syncApp                    *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace           *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
+	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
 	sendEvent                  *connect.Client[v2.SendEventRequest, v2.SendEventResponse]
 	invokeFunction             *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
@@ -751,6 +811,31 @@ func (c *v2Client) GetApp(ctx context.Context, req *connect.Request[v2.GetAppReq
 // GetApps calls api.v2.V2.GetApps.
 func (c *v2Client) GetApps(ctx context.Context, req *connect.Request[v2.GetAppsRequest]) (*connect.Response[v2.GetAppsResponse], error) {
 	return c.getApps.CallUnary(ctx, req)
+}
+
+// CreateBuild calls api.v2.V2.CreateBuild.
+func (c *v2Client) CreateBuild(ctx context.Context, req *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error) {
+	return c.createBuild.CallUnary(ctx, req)
+}
+
+// CommitBuild calls api.v2.V2.CommitBuild.
+func (c *v2Client) CommitBuild(ctx context.Context, req *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.commitBuild.CallUnary(ctx, req)
+}
+
+// GetBuild calls api.v2.V2.GetBuild.
+func (c *v2Client) GetBuild(ctx context.Context, req *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.getBuild.CallUnary(ctx, req)
+}
+
+// ListBuilds calls api.v2.V2.ListBuilds.
+func (c *v2Client) ListBuilds(ctx context.Context, req *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error) {
+	return c.listBuilds.CallUnary(ctx, req)
+}
+
+// CancelBuild calls api.v2.V2.CancelBuild.
+func (c *v2Client) CancelBuild(ctx context.Context, req *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return c.cancelBuild.CallUnary(ctx, req)
 }
 
 // CreateSandbox calls api.v2.V2.CreateSandbox.
@@ -878,6 +963,11 @@ func (c *v2Client) GetFunction(ctx context.Context, req *connect.Request[v2.GetF
 	return c.getFunction.CallUnary(ctx, req)
 }
 
+// PauseFunction calls api.v2.V2.PauseFunction.
+func (c *v2Client) PauseFunction(ctx context.Context, req *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
+	return c.pauseFunction.CallUnary(ctx, req)
+}
+
 // GetFunctions calls api.v2.V2.GetFunctions.
 func (c *v2Client) GetFunctions(ctx context.Context, req *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {
 	return c.getFunctions.CallUnary(ctx, req)
@@ -964,6 +1054,11 @@ type V2Handler interface {
 	CancelRun(context.Context, *connect.Request[v2.CancelRunRequest]) (*connect.Response[v2.CancelRunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	GetApps(context.Context, *connect.Request[v2.GetAppsRequest]) (*connect.Response[v2.GetAppsResponse], error)
+	CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error)
+	CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
+	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -989,6 +1084,7 @@ type V2Handler interface {
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
+	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
@@ -1134,6 +1230,36 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2GetAppsProcedure,
 		svc.GetApps,
 		connect.WithSchema(v2Methods.ByName("GetApps")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreateBuildHandler := connect.NewUnaryHandler(
+		V2CreateBuildProcedure,
+		svc.CreateBuild,
+		connect.WithSchema(v2Methods.ByName("CreateBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CommitBuildHandler := connect.NewUnaryHandler(
+		V2CommitBuildProcedure,
+		svc.CommitBuild,
+		connect.WithSchema(v2Methods.ByName("CommitBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetBuildHandler := connect.NewUnaryHandler(
+		V2GetBuildProcedure,
+		svc.GetBuild,
+		connect.WithSchema(v2Methods.ByName("GetBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListBuildsHandler := connect.NewUnaryHandler(
+		V2ListBuildsProcedure,
+		svc.ListBuilds,
+		connect.WithSchema(v2Methods.ByName("ListBuilds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CancelBuildHandler := connect.NewUnaryHandler(
+		V2CancelBuildProcedure,
+		svc.CancelBuild,
+		connect.WithSchema(v2Methods.ByName("CancelBuild")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateSandboxHandler := connect.NewUnaryHandler(
@@ -1286,6 +1412,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2PauseFunctionHandler := connect.NewUnaryHandler(
+		V2PauseFunctionProcedure,
+		svc.PauseFunction,
+		connect.WithSchema(v2Methods.ByName("PauseFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetFunctionsHandler := connect.NewUnaryHandler(
 		V2GetFunctionsProcedure,
 		svc.GetFunctions,
@@ -1402,6 +1534,16 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetAppHandler.ServeHTTP(w, r)
 		case V2GetAppsProcedure:
 			v2GetAppsHandler.ServeHTTP(w, r)
+		case V2CreateBuildProcedure:
+			v2CreateBuildHandler.ServeHTTP(w, r)
+		case V2CommitBuildProcedure:
+			v2CommitBuildHandler.ServeHTTP(w, r)
+		case V2GetBuildProcedure:
+			v2GetBuildHandler.ServeHTTP(w, r)
+		case V2ListBuildsProcedure:
+			v2ListBuildsHandler.ServeHTTP(w, r)
+		case V2CancelBuildProcedure:
+			v2CancelBuildHandler.ServeHTTP(w, r)
 		case V2CreateSandboxProcedure:
 			v2CreateSandboxHandler.ServeHTTP(w, r)
 		case V2ListSandboxesProcedure:
@@ -1452,6 +1594,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2GetFunctionProcedure:
 			v2GetFunctionHandler.ServeHTTP(w, r)
+		case V2PauseFunctionProcedure:
+			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
 			v2GetFunctionsHandler.ServeHTTP(w, r)
 		case V2SendEventProcedure:
@@ -1569,6 +1713,26 @@ func (UnimplementedV2Handler) GetApps(context.Context, *connect.Request[v2.GetAp
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetApps is not implemented"))
 }
 
+func (UnimplementedV2Handler) CreateBuild(context.Context, *connect.Request[v2.CreateBuildRequest]) (*connect.Response[v2.CreateBuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) CommitBuild(context.Context, *connect.Request[v2.CommitBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CommitBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListBuilds is not implemented"))
+}
+
+func (UnimplementedV2Handler) CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelBuild is not implemented"))
+}
+
 func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateSandbox is not implemented"))
 }
@@ -1667,6 +1831,10 @@ func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request
 
 func (UnimplementedV2Handler) GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseFunction is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {

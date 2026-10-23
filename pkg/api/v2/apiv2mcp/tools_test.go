@@ -3,6 +3,7 @@ package apiv2mcp
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 
@@ -31,6 +32,28 @@ func TestRequest(t *testing.T) {
 		"data":           map[string]any{"message": "hi"},
 		"idempotencyKey": "idem-1",
 	}, body)
+	require.False(t, Tool(endpoint).Annotations.IdempotentHint)
+}
+
+func TestPauseFunctionRequest(t *testing.T) {
+	endpoint := endpointByMethod(t, "PauseFunction")
+	req, err := Request(t.Context(), endpoint, map[string]any{
+		"appId": "my app", "functionId": "hello/world",
+	}, Options{})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "/api/v2/apps/my%20app/functions/hello%2Fworld/pause", req.URL.EscapedPath())
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	require.Empty(t, body)
+	require.Empty(t, req.URL.RawQuery)
+	schema := InputSchema(endpoint)
+	require.ElementsMatch(t, []string{"appId", "functionId"}, schema["required"])
+	require.Len(t, schema["properties"], 3)
+	tool := Tool(endpoint)
+	require.Equal(t, "pause_function", tool.Name)
+	require.True(t, tool.Annotations.IdempotentHint)
+	require.False(t, tool.Annotations.ReadOnlyHint)
 }
 
 func TestReplayTool(t *testing.T) {

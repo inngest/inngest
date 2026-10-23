@@ -26,6 +26,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type capacityExpiryTestClock struct {
+	clockwork.Clock
+	timerReady chan struct{}
+	timerOnce  sync.Once
+}
+
+func (c *capacityExpiryTestClock) NewTimer(d time.Duration) clockwork.Timer {
+	timer := c.Clock.NewTimer(d)
+	c.timerOnce.Do(func() { close(c.timerReady) })
+	return timer
+}
+
 func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -241,10 +253,11 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 	t.Run("stops processing when capacity lease expires before renewal", func(t *testing.T) {
 		reset()
+		expiryClock := &capacityExpiryTestClock{Clock: clock, timerReady: make(chan struct{})}
 
 		q, shard := newQueue(
 			t, rc,
-			osqueue.WithClock(clock),
+			osqueue.WithClock(expiryClock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
 			}),
@@ -294,7 +307,21 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		started := make(chan struct{})
 		cancelled := make(chan struct{})
 		done := make(chan error, 1)
+		processDone := make(chan struct{})
+		stopHandler := make(chan struct{})
+		t.Cleanup(func() {
+			// A failed assertion must not leave ProcessItem running against the
+			// Redis state and lifecycle recorder reused by the next subtest.
+			close(stopHandler)
+			select {
+			case <-processDone:
+				service.Wait()
+			case <-time.After(time.Second):
+				t.Error("timed out waiting for capacity-lease test cleanup")
+			}
+		})
 		go func() {
+			defer close(processDone)
 			_, err := q.ProcessItem(ctx, osqueue.ProcessItem{
 				I: qi,
 				CapacityLease: &osqueue.CapacityLease{
@@ -303,8 +330,11 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 				},
 			}, func(ctx context.Context, _ osqueue.RunInfo, _ osqueue.Item) (osqueue.RunResult, error) {
 				close(started)
-				<-ctx.Done()
-				close(cancelled)
+				select {
+				case <-ctx.Done():
+					close(cancelled)
+				case <-stopHandler:
+				}
 				return osqueue.RunResult{}, nil
 			})
 			done <- err
@@ -314,6 +344,15 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		case <-started:
 		case <-time.After(time.Second):
 			t.Fatal("timed out waiting for item processing to start")
+		}
+
+		// Starting the handler does not guarantee that the independent expiry
+		// watcher has registered its timer. Advancing first can instead register
+		// a fresh five-second timer after the six-second jump.
+		select {
+		case <-expiryClock.timerReady:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for capacity lease expiry timer")
 		}
 
 		clock.Advance(6 * time.Second)

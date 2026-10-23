@@ -132,7 +132,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	}
 
 	if isUnreachable(resp, err) {
-		return nil, ErrUnableToReach
+		// keep the dial error so logs show if the request was refused, had no
+		// route, or got an EOF.
+		return nil, fmt.Errorf("%w: %w", ErrUnableToReach, err)
 	}
 
 	if err != nil {

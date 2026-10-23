@@ -40,6 +40,7 @@ export default function EntitlementListItem({
     quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
     price: number | null; // Price for one purchase of this addon, in US Cents.
     purchased?: boolean;
+    purchaseCount?: number;
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
   // Does the user have permissions to edit this:
@@ -69,6 +70,13 @@ export default function EntitlementListItem({
   ) {
     // The user can increase this entitlement by purchasing an addon.
 
+    // currentValue includes account-level overrides, which aren't billed, so
+    // the self-service input needs to start from what's actually purchased.
+    const purchasedValue =
+      addon.purchaseCount !== undefined
+        ? addon.baseValue + addon.purchaseCount * addon.quantityPer
+        : undefined;
+
     content = (
       <EntitlementListItemSelfService
         title={title}
@@ -77,6 +85,7 @@ export default function EntitlementListItem({
         entitlement={{
           currentValue: entitlement.currentValue,
           displayValue: entitlement.displayValue,
+          purchasedValue,
           planLimit: addon.baseValue,
           maxValue: addon.maxValue,
         }}

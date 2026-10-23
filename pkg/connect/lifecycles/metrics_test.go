@@ -61,6 +61,9 @@ func (m *MockStateManager) UpsertConnection(ctx context.Context, conn *state.Con
 func (m *MockStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error {
 	panic("not implemented")
 }
+func (m *MockStateManager) DeleteConnectionIfUnchanged(ctx context.Context, envID uuid.UUID, connID ulid.ULID, expected *connectpb.ConnMetadata) (bool, error) {
+	panic("not implemented")
+}
 func (m *MockStateManager) GarbageCollectConnections(ctx context.Context) (int, error) {
 	panic("not implemented")
 }
