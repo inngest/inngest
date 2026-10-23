@@ -1,5 +1,7 @@
 import type { ExecutionLimitCheckQuery } from '@/gql/graphql';
 
+const numberFormatter = new Intl.NumberFormat('en-US');
+
 type LegacyEntitlements = ExecutionLimitCheckQuery['account']['entitlements'];
 
 export type LegacyExecutions = LegacyEntitlements['executions'] & {
@@ -9,6 +11,7 @@ export type LegacyExecutions = LegacyEntitlements['executions'] & {
 export type ExecutionCap = {
   usage: number;
   limit: number;
+  overageLimit: number;
   enforced: boolean;
   exceeded: boolean;
 };
@@ -24,25 +27,39 @@ export function legacyExecutionCap({
 }: LegacyExecutions): ExecutionCap | null {
   if (limit === null || overageAllowed) return null;
   // Legacy has no enforcement signal; treat the limit as a hard cap like the pre-flag UI.
-  return { usage, limit, enforced: true, exceeded: usage >= limit };
+  return {
+    usage,
+    limit,
+    overageLimit: 0,
+    enforced: true,
+    exceeded: usage >= limit,
+  };
 }
 
-export type UsageBand = 'under50' | '50' | '75' | '90' | 'limitReached';
+export type UsageBand =
+  | 'under50'
+  | '50'
+  | '75'
+  | '90'
+  | 'grace'
+  | 'limitReached';
 
 export function usageBand({
   usage,
   limit,
+  overageLimit,
   capHit,
 }: {
   usage: number;
   limit: number;
+  overageLimit: number;
   capHit: boolean;
 }): UsageBand {
   if (capHit) return 'limitReached';
   if (limit <= 0) return 'under50';
+  if (overageLimit > 0 && usage >= limit) return 'grace';
 
   const ratio = usage / limit;
-  if (ratio >= 1) return 'limitReached';
   if (ratio >= 0.9) return '90';
   if (ratio >= 0.75) return '75';
   if (ratio >= 0.5) return '50';
@@ -55,16 +72,29 @@ export function usageKind(band: UsageBand): UsageKind {
   if (band === 'limitReached') return 'error';
   if (band === 'under50') return 'default';
   if (band === '50') return 'caution';
-  if (band === '75') return 'warning';
+  if (band === '75' || band === 'grace') return 'warning';
   return 'error';
 }
 
 export function pillContent(
   band: UsageBand,
   isVercel: boolean,
+  remaining: number,
 ): { kind: 'caution' | 'warning' | 'error'; text: string } | null {
   const kind = usageKind(band);
   if (kind === 'default') return null;
+
+  if (band === 'grace') {
+    const text = `Hobby limit reached. You're in a temporary grace period with ${numberFormatter.format(
+      remaining,
+    )} executions left this month.`;
+    return {
+      kind,
+      text: isVercel
+        ? `${text} Change configurations on the Vercel Integrations Settings page to upgrade and avoid disruption.`
+        : text,
+    };
+  }
 
   if (band === 'limitReached') {
     return {

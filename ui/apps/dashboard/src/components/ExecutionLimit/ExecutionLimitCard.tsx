@@ -63,9 +63,17 @@ const limitReachedContent = {
   dismissable: false,
 };
 
+const graceContent = {
+  title: 'Temporary grace period',
+  body: (usage: string) =>
+    `You've used ${usage} executions this month and passed the Hobby limit. We've temporarily extended it, so new runs will pause once the extra executions are used. Upgrade to Pro to avoid disruption.`,
+  dismissable: false,
+};
+
 function enhancedContent(band: UsageBand): CardContent | undefined {
   const kind = usageKind(band);
   if (kind === 'default') return undefined;
+  if (band === 'grace') return { kind, ...graceContent };
   if (band === 'limitReached') return { kind, ...limitReachedContent };
   return { kind, ...pausedContent, dismissable: band !== '90' };
 }
@@ -89,13 +97,17 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   if (content.dismissable && (!isReady || isDismissed)) return null;
 
   const styles = kindStyles[content.kind];
+  const inGrace = data.band === 'grace';
+  const upgradeRef = inGrace
+    ? 'app-hobby-execution-grace-card'
+    : 'app-hobby-execution-limit-card';
 
   if (collapsed) {
     return (
       <MenuItem
         {...upgradeLinkProps(
           data.marketplaceBillingURL,
-          'app-hobby-execution-limit-card-collapsed',
+          `${upgradeRef}-collapsed`,
         )}
         className={cn('border', styles.collapsed)}
         collapsed={collapsed}
@@ -118,10 +130,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       kind={content.kind}
       footer={
         <Link
-          {...upgradeLinkProps(
-            data.marketplaceBillingURL,
-            'app-hobby-execution-limit-card',
-          )}
+          {...upgradeLinkProps(data.marketplaceBillingURL, upgradeRef)}
           className={cn('gap-0.5 text-xs leading-5', styles.link)}
           iconAfter={<RiArrowRightLine className="h-3.5 w-3.5" />}
         >
@@ -152,12 +161,16 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       <div className="mt-2 pt-1">
         <ProgressBar
           kind={content.kind}
-          limit={data.limit}
+          limit={inGrace ? data.limit + data.overageLimit : data.limit}
           size="small"
           value={data.usage}
         />
         <p className="mt-[3px] text-xs font-bold leading-4">
-          {formattedUsage}/{formattedLimit} Executions
+          {inGrace
+            ? `${numberFormatter.format(
+                data.remaining,
+              )} executions remaining this month`
+            : `${formattedUsage}/${formattedLimit} Executions`}
         </p>
       </div>
     </SidebarAlertCard>
