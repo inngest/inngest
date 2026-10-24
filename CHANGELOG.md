@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.49.1] - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- *(connect)* Avoid blocking replies on unreachable executors (#5074)
+
+### 🎨 Styling
+
+- *(ui)* Unify dropdown styling across dashboard and dev server (#5016)
+
 ## [v1.49.0] - 2026-10-23
 
 ### 🚀 Features
@@ -14,6 +24,10 @@ All notable changes to this project will be documented in this file.
 - *(cqrs)* Include skipped runs and keep precise paging (#5015)
 - *(api)* Enforce request limits before parsing (#5025)
 - *(dashboard)* Show replay failures and correct skipped counts (#5018)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.49.0 (#5072)
 
 ## [v1.48.0] - 2026-10-22
 
