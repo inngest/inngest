@@ -102,8 +102,12 @@ function track(
 export type AssistantAction =
   | { action: 'viewed' | 'opened' | 'prompt_copy_clicked' | 'prompt_copied' }
   | {
-      action: 'setup_clicked' | 'setup_copied' | 'setup_copy_failed';
-      client: 'claude_code' | 'codex_cli' | 'other';
+      action:
+        | 'setup_clicked'
+        | 'setup_opened'
+        | 'setup_copied'
+        | 'setup_copy_failed';
+      client: 'chatgpt' | 'claude_code' | 'codex_cli' | 'other';
     }
   | {
       action: 'prompt_copy_failed';

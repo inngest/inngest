@@ -22,6 +22,7 @@ import { useRunAICopy } from './useRunAICopy';
 import type { RunAIAction } from './tracking';
 
 const clients = [
+  { id: 'chatgpt', label: 'ChatGPT', tracking: 'chatgpt', Icon: IconOpenAI },
   {
     id: 'claude',
     label: 'Claude Code',
@@ -137,24 +138,37 @@ export function RunAIAssistPopover({
             ? 'Connect your AI tool to investigate this run.'
             : 'Connect your AI tool to find runs and inspect traces.'}
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-3">
-          {clients.map(({ id, label, tracking, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-expanded={selectedClient === id}
-              aria-controls={selectedClient === id ? setupID : undefined}
-              className={`text-basis hover:bg-canvasSubtle inline-flex items-center justify-center gap-1 whitespace-nowrap rounded border px-2 py-1.5 text-xs ${selectedClient === id ? 'border-contrast bg-canvasSubtle' : 'border-muted bg-canvasBase'}`}
-              onClick={() => {
-                setSelectedClient(selectedClient === id ? null : id);
-                if (selectedClient !== id)
-                  onAction({ action: 'setup_clicked', client: tracking });
-              }}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </button>
-          ))}
+        <div
+          className={`mt-3 grid gap-1.5 ${endpoint === 'https://api.inngest.com/mcp' ? 'grid-cols-2' : 'grid-cols-1 min-[420px]:grid-cols-3'}`}
+        >
+          {clients
+            .filter(
+              ({ id }) =>
+                id !== 'chatgpt' || endpoint === 'https://api.inngest.com/mcp',
+            )
+            .map(({ id, label, tracking, Icon }) => (
+              <Button
+                key={id}
+                kind="secondary"
+                appearance="outlined"
+                size="small"
+                label={label}
+                icon={<Icon />}
+                iconSide="left"
+                aria-expanded={selectedClient === id}
+                aria-controls={selectedClient === id ? setupID : undefined}
+                className={
+                  selectedClient === id
+                    ? 'border-contrast bg-canvasSubtle'
+                    : undefined
+                }
+                onClick={() => {
+                  setSelectedClient(selectedClient === id ? null : id);
+                  if (selectedClient !== id)
+                    onAction({ action: 'setup_clicked', client: tracking });
+                }}
+              />
+            ))}
         </div>
         {selectedClient && (
           <div id={setupID}>

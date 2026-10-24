@@ -47,6 +47,20 @@ describe('Runs AI tracking', () => {
     });
   });
 
+  it('tracks opening the ChatGPT listing as a setup handoff', () => {
+    const { result } = renderHook(() => useRunAITracking('debug', 'inline'));
+    result.current({ action: 'setup_opened', client: 'chatgpt' });
+    expect(track).toHaveBeenCalledWith('Assistant Action Performed', {
+      feature: 'runs-ai-assist',
+      account_id: 'account-1',
+      action: 'setup_opened',
+      client: 'chatgpt',
+      surface: 'run_details',
+      template_version: 'run_debug_v1',
+      detail_view: 'inline',
+    });
+  });
+
   it('handles asynchronous transport failures', async () => {
     const { result } = renderHook(() => useRunAITracking('env'));
     track.mockRejectedValueOnce(new Error('offline'));
