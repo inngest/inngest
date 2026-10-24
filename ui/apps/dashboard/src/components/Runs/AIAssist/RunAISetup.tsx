@@ -8,7 +8,10 @@ import { useRunAICopy } from './useRunAICopy';
 
 import type { RunAIAction } from './tracking';
 
-export type SetupClient = 'claude' | 'codex' | 'other';
+export type SetupClient = 'chatgpt' | 'claude' | 'codex' | 'other';
+
+const chatGPTPluginURL =
+  'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216';
 
 export function RunAISetup({
   client,
@@ -19,21 +22,49 @@ export function RunAISetup({
   endpoint: string;
   onAction: (event: RunAIAction) => void;
 }) {
+  const productionCloud = endpoint === 'https://api.inngest.com/mcp';
+  if (client === 'chatgpt') {
+    if (!productionCloud) return null;
+    return (
+      <section aria-label="Connection instructions" className="mt-5 text-xs">
+        <p className="text-muted mb-2 leading-5">
+          Install the Inngest plugin and connect your account. Then paste the
+          prompt below into ChatGPT.
+        </p>
+        <a
+          href={chatGPTPluginURL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-link inline-flex items-center gap-1 hover:underline"
+          onClick={() =>
+            onAction({ action: 'setup_opened', client: 'chatgpt' })
+          }
+        >
+          Open in ChatGPT
+          <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      </section>
+    );
+  }
+  const claudePlugin = client === 'claude' && productionCloud;
   const trackingClient =
     client === 'claude'
       ? 'claude_code'
       : client === 'codex'
         ? 'codex_cli'
         : 'other';
-  const command =
-    createMCPClients(endpoint, false).find((item) => item.id === client)
-      ?.snippet.content ?? endpoint;
+  const command = claudePlugin
+    ? 'claude plugin install inngest@anthropic-plugin-directory'
+    : (createMCPClients(endpoint, false).find((item) => item.id === client)
+        ?.snippet.content ?? endpoint);
   return (
     <section aria-label="Connection instructions" className="mt-5 text-xs">
       <p className="text-muted mb-1 text-xs">
         {client === 'other'
           ? 'Add this MCP server URL:'
-          : 'Run in your terminal:'}
+          : claudePlugin
+            ? 'Install the Inngest plugin:'
+            : 'Run in your terminal:'}
       </p>
       <SetupCommand
         code={
@@ -48,16 +79,35 @@ export function RunAISetup({
       <p className="text-muted mt-2 leading-5">
         {client === 'claude' ? (
           <>
-            Open <InlineCode>/mcp</InlineCode> in Claude Code, select{' '}
-            <InlineCode>inngest-cloud</InlineCode>, and sign in.{' '}
+            {claudePlugin ? 'Start a new Claude Code session, open ' : 'Open '}
+            <InlineCode>/mcp</InlineCode>, select{' '}
+            <InlineCode>
+              {claudePlugin ? 'plugin:inngest:inngest-cloud' : 'inngest-cloud'}
+            </InlineCode>
+            , and sign in.{' '}
           </>
         ) : client === 'other' ? (
           <>Sign in with OAuth. </>
         ) : null}
         Choose your account, environment, and read access in your browser.
       </p>
+      {claudePlugin && (
+        <p className="text-muted mt-2 leading-5">
+          Already using the plugin or Cloud MCP? Use that connection—no extra
+          setup needed.
+        </p>
+      )}
+      {client === 'codex' && (
+        <p className="text-muted mt-2 leading-5">
+          Already have Inngest tools in Codex? Just copy the prompt.
+        </p>
+      )}
       <a
-        href="https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud"
+        href={
+          claudePlugin
+            ? 'https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin'
+            : 'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud'
+        }
         target="_blank"
         rel="noopener noreferrer"
         className="text-link mt-3 inline-flex items-center gap-1 hover:underline"

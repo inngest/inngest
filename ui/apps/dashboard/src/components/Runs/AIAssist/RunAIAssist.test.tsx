@@ -154,7 +154,9 @@ describe('Runs AI popover', () => {
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('link', { name: 'Full setup guide' }).getAttribute('href'),
+      screen
+        .getByRole('link', { name: 'Full setup guide' })
+        .getAttribute('href'),
     ).toBe(
       'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud',
     );
@@ -188,10 +190,18 @@ describe('Runs AI popover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
     expect(
       screen.getByText(
-        'claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp',
+        'claude plugin install inngest@anthropic-plugin-directory',
       ),
     ).toBeTruthy();
     expect(screen.getByText('/mcp')).toBeTruthy();
+    expect(screen.getByText('plugin:inngest:inngest-cloud')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Full setup guide' })
+        .getAttribute('href'),
+    ).toBe(
+      'https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
     expect(screen.getByText(/codex mcp login inngest-cloud/)).toBeTruthy();
@@ -210,6 +220,73 @@ describe('Runs AI popover', () => {
     expect(
       screen.queryByRole('region', { name: 'Connection instructions' }),
     ).toBeNull();
+  });
+
+  it.each(['discovery', 'debug'] as const)(
+    'offers the official ChatGPT plugin in the %s popover without changing the prompt',
+    (mode) => {
+      const { onAction } = mount(
+        mode === 'debug'
+          ? {
+              mode: 'debug',
+              context: {
+                accountID: 'account-1',
+                accountName: 'Example',
+                environmentSlug: 'production',
+                environmentLabel: 'production',
+                runID: 'run-1',
+                functionName: 'Example function',
+              },
+            }
+          : {},
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: mode === 'debug' ? 'Debug with AI' : 'Find runs with AI',
+        }),
+      );
+      const prompt = screen.getByRole<HTMLTextAreaElement>('textbox', {
+        name: 'Prompt preview',
+      }).value;
+      fireEvent.click(screen.getByRole('button', { name: 'ChatGPT' }));
+      const link = screen.getByRole('link', { name: 'Open in ChatGPT' });
+      expect(link.getAttribute('href')).toBe(
+        'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
+      );
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      fireEvent.click(link);
+      expect(onAction).toHaveBeenCalledWith({
+        action: 'setup_clicked',
+        client: 'chatgpt',
+      });
+      expect(onAction).toHaveBeenCalledWith({
+        action: 'setup_opened',
+        client: 'chatgpt',
+      });
+      expect(
+        screen.queryByRole('button', { name: 'Copy setup command' }),
+      ).toBeNull();
+      expect(
+        screen.getByRole<HTMLTextAreaElement>('textbox', {
+          name: 'Prompt preview',
+        }).value,
+      ).toBe(prompt);
+    },
+  );
+
+  it('keeps staging on the correct MCP backend rather than recommending production plugins', () => {
+    mount({ endpoint: 'https://api.inngest.net/mcp' });
+    open();
+    expect(screen.queryByRole('button', { name: 'ChatGPT' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    expect(
+      screen.getByText(
+        'claude mcp add --transport http inngest-cloud https://api.inngest.net/mcp',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/claude plugin install/)).toBeNull();
+    expect(screen.getByText('inngest-cloud')).toBeTruthy();
   });
 
   it('offers a generic endpoint for other tools without hiding the prompt', () => {
