@@ -2988,6 +2988,19 @@ func (e *executor) executeDriverV1(ctx context.Context, i *runInstance) (*state.
 				gracefulErr.Stack = fmt.Sprintf("%s\n%s\n%s", serr.Message, "This is a retryable error", "The executor will retry again")
 			}
 
+			// No healthy connection at routing means nothing was forwarded, so the
+			// run halts rather than fails: always retry without consuming an
+			// attempt, at a fixed delay so halted runs don't re-check routing at
+			// the attempt-0 backoff.  RetryAtError must be the outer wrapper:
+			// alwaysRetry has no Unwrap, so the queue's AsRetryAtError cannot see
+			// a retryAtError nested inside it.
+			if state.IsConnectNoHealthyConnectionCode(serr.Code) {
+				at := state.ConnectNoHealthyConnectionRetryAt(e.now())
+				err = queue.RetryAtError(queue.AlwaysRetryError(state.ErrConnectNoHealthyConnection), &at)
+				gracefulErr.Message = "No worker is connected"
+				gracefulErr.Stack = fmt.Sprintf("%s\n%s\n%s", serr.Message, "This is a retryable error", "The executor will retry once a worker connects")
+			}
+
 			// serialize error
 			gracefulErrSerialized := gracefulErr.Serialize(execution.StateErrorKey)
 			response.Output = gracefulErrSerialized
