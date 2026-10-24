@@ -34,7 +34,14 @@ const stubBrowser = ({
     set cookie(value: string) {
       written.push(value);
       const pair = value.split(';')[0] ?? '';
-      jar = jar ? `${jar}; ${pair}` : pair;
+      const name = pair.split('=')[0];
+      jar = [
+        ...jar
+          .split(';')
+          .map((item) => item.trim())
+          .filter((item) => item && !item.startsWith(`${name}=`)),
+        pair,
+      ].join('; ');
     },
   });
   vi.stubGlobal('window', {
@@ -63,6 +70,7 @@ describe('getSignupAttribution', () => {
       first_utm_source: 'newsletter',
       first_utm_medium: 'email',
       first_utm_campaign: 'launch & learn',
+      last_utm_campaign: 'autumn-promo',
       first_utm_content: 'hero',
       first_utm_term: 'durable workflows',
       first_landing_url: 'https://www.inngest.com/?utm_source=newsletter&x=a=b',
@@ -79,6 +87,7 @@ describe('getSignupAttribution', () => {
       utmSource: 'newsletter',
       utmMedium: 'email',
       utmCampaign: 'launch & learn',
+      lastUtmCampaign: 'autumn-promo',
       utmContent: 'hero',
       utmTerm: 'durable workflows',
       firstLandingUrl: firstTouch.first_landing_url,
@@ -146,15 +155,23 @@ describe('ensureFirstTouch', () => {
       first_utm_medium: 'booth',
       first_utm_source: 'card',
       first_utm_campaign: 'taic26',
+      last_utm_campaign: 'taic26',
       first_landing_url: href,
       first_referrer: 'https://www.inngest.com/ai-conf-2026',
       first_seen_at: expect.any(String),
     });
   });
 
-  it('never overwrites an existing first-touch cookie', () => {
+  it('updates the last campaign and preserves the first campaign and expiry', () => {
+    const firstSeenAt = new Date(
+      Date.now() - 24 * 60 * 60 * 1000,
+    ).toISOString();
     const existing = encodeURIComponent(
-      JSON.stringify({ first_utm_campaign: 'earlier' }),
+      JSON.stringify({
+        first_utm_campaign: 'earlier',
+        last_utm_campaign: 'previous',
+        first_seen_at: firstSeenAt,
+      }),
     );
     const written = stubBrowser({
       href: 'https://app.inngest.com/sign-up?utm_campaign=taic26',
@@ -163,8 +180,38 @@ describe('ensureFirstTouch', () => {
 
     ensureFirstTouch();
 
-    expect(written).toHaveLength(0);
-    expect(getSignupAttribution()).toEqual({ utmCampaign: 'earlier' });
+    expect(written).toHaveLength(1);
+    expect(decodeFirstTouch(written[0] ?? '')).toEqual({
+      first_utm_campaign: 'earlier',
+      last_utm_campaign: 'taic26',
+      first_seen_at: firstSeenAt,
+    });
+    const maxAge = Number(written[0]?.match(/max-age=(\d+)/)?.[1]);
+    const remaining = (6 * 30 - 1) * 24 * 60 * 60;
+    expect(maxAge).toBeGreaterThanOrEqual(remaining - 5);
+    expect(maxAge).toBeLessThanOrEqual(remaining);
+    expect(getSignupAttribution()).toEqual({
+      utmCampaign: 'earlier',
+      lastUtmCampaign: 'taic26',
+    });
+  });
+
+  it('backfills the last campaign from an existing first campaign', () => {
+    const existing = encodeURIComponent(
+      JSON.stringify({ first_utm_campaign: 'earlier' }),
+    );
+    const written = stubBrowser({
+      href: 'https://app.inngest.com/sign-up',
+      cookie: `inngest_first_touch=${existing}`,
+    });
+
+    ensureFirstTouch();
+
+    expect(written).toHaveLength(1);
+    expect(getSignupAttribution()).toEqual({
+      utmCampaign: 'earlier',
+      lastUtmCampaign: 'earlier',
+    });
   });
 
   it('does nothing when the url carries no utm parameters', () => {
@@ -205,6 +252,7 @@ describe('getSignupMetadata', () => {
       utmMedium: 'booth',
       utmSource: 'card',
       utmCampaign: 'taic26',
+      lastUtmCampaign: 'taic26',
       firstLandingUrl: href,
     });
   });
