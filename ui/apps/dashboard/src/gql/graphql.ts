@@ -416,6 +416,7 @@ export type AppCheckResult = {
 export enum AppMethod {
   Api = 'API',
   Connect = 'CONNECT',
+  InngestServe = 'INNGEST_SERVE',
   Serve = 'SERVE'
 }
 

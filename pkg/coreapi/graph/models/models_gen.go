@@ -490,20 +490,22 @@ type Workspace struct {
 type AppMethod string
 
 const (
-	AppMethodServe   AppMethod = "SERVE"
-	AppMethodConnect AppMethod = "CONNECT"
-	AppMethodAPI     AppMethod = "API"
+	AppMethodServe        AppMethod = "SERVE"
+	AppMethodConnect      AppMethod = "CONNECT"
+	AppMethodAPI          AppMethod = "API"
+	AppMethodInngestServe AppMethod = "INNGEST_SERVE"
 )
 
 var AllAppMethod = []AppMethod{
 	AppMethodServe,
 	AppMethodConnect,
 	AppMethodAPI,
+	AppMethodInngestServe,
 }
 
 func (e AppMethod) IsValid() bool {
 	switch e {
-	case AppMethodServe, AppMethodConnect, AppMethodAPI:
+	case AppMethodServe, AppMethodConnect, AppMethodAPI, AppMethodInngestServe:
 		return true
 	}
 	return false
