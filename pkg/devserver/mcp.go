@@ -155,10 +155,11 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 }
 
 type MCPHandler struct {
-	events api.EventHandler
-	data   cqrs.Manager
-	tick   time.Duration
-	v2     http.Handler
+	events     api.EventHandler
+	data       cqrs.Manager
+	tick       time.Duration
+	v2         http.Handler
+	signingKey *string
 
 	serverOnce sync.Once
 	server     *mcp.Server
@@ -225,12 +226,17 @@ func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duratio
 	return newMCPHandler(events, data, tick, v2).handler()
 }
 
-func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) *MCPHandler {
+func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler, signingKey ...*string) *MCPHandler {
+	var key *string
+	if len(signingKey) > 0 {
+		key = signingKey[0]
+	}
 	return &MCPHandler{
 		events:        events,
 		data:          data,
 		tick:          tick,
 		v2:            v2,
+		signingKey:    key,
 		fileCache:     make(map[string][]byte),
 		fileInfoCache: make(map[string]fs.FileInfo),
 	}
@@ -334,6 +340,10 @@ func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpo
 
 	if h.v2 == nil {
 		return apiv2mcp.ToolError("REST API v2 is not configured", map[string]any{"status": http.StatusServiceUnavailable}), nil
+	}
+
+	if h.signingKey != nil && *h.signingKey != "" && req.Header.Get("Authorization") == "" {
+		req.Header.Set("Authorization", "Bearer "+*h.signingKey)
 	}
 
 	recorder := httptest.NewRecorder()
