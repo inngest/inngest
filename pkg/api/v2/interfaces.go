@@ -88,8 +88,9 @@ type EventPublisher interface {
 type EventSender func(context.Context, *event.Event) (string, error)
 
 type FunctionPauser interface {
-	// idempotent. may apply async; PausedAt is when the pause applies
+	// idempotent pause and resume; may apply asynchronously
 	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+	ResumeFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
 }
 
 type GetRunOpts struct {
@@ -171,6 +172,27 @@ type GetRunsResult struct {
 	Runs    []*RunListItem
 	Cursor  string
 	HasMore bool
+}
+
+type CreateReplayOpts struct {
+	AppID      string
+	Name       string
+	FunctionID string
+	From       time.Time
+	Until      time.Time
+	Statuses   []enums.ReplayRunStatus
+}
+
+type ReplayResult struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+type ReplayProvider interface {
+	// CreateReplay starts a replay for one function in the authenticated environment.
+	// Cloud uses the existing function replay worker. Local work is asynchronous,
+	// in memory, and lost on restart. Retrying creation creates another replay.
+	CreateReplay(ctx context.Context, opts CreateReplayOpts) (ReplayResult, error)
 }
 
 type RunProvider interface {

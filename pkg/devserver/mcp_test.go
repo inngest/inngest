@@ -54,8 +54,10 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	}
 	require.Contains(t, names, "list_functions")
 	require.Contains(t, names, "invoke_function")
+	require.Contains(t, names, "create_replay")
 	require.Contains(t, names, "pause_function")
 	require.Contains(t, names, "create_cancellation")
+	require.Contains(t, names, "resume_function")
 	for method := range unsupportedDevServerMCPMethods {
 		// The dev server keeps its older send_event tool for eventIdSeed support.
 		if method == "SendEvent" {
@@ -159,6 +161,11 @@ func TestMCPOperations(t *testing.T) {
 	require.Equal(t, "POST", pause.HTTP.Method)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/pause", pause.HTTP.Path)
 	require.Equal(t, "pause-function", pause.CLI.Command)
+	resume := operations["resume_function"]
+	require.Equal(t, "ResumeFunction", resume.ID)
+	require.Equal(t, "POST", resume.HTTP.Method)
+	require.Equal(t, "/apps/{app_id}/functions/{function_id}/resume", resume.HTTP.Path)
+	require.Equal(t, "resume-function", resume.CLI.Command)
 
 	grepDocs := operations["grep_docs"]
 	require.Equal(t, "mcp.grep_docs", grepDocs.ID)

@@ -8,6 +8,8 @@ import (
 
 var (
 	ErrFunctionNotFound            = errors.New("function not found")
+	ErrFunctionPaused              = errors.New("function is paused")
+	ErrFunctionPauseScheduled      = errors.New("function pause is scheduled")
 	ErrAppNotFound                 = errors.New("app not found")
 	ErrRunNotFound                 = errors.New("run not found")
 	ErrCronRerunNotSupported       = errors.New("cron rerun is not supported")
@@ -17,6 +19,7 @@ var (
 	ErrRunEnded                    = errors.New("run has already ended")
 	ErrExpressionInvalid           = errors.New("expression is invalid")
 	ErrPausedRunStatusNotSupported = errors.New("filtering runs by paused status is not supported")
+	ErrReplayInvalid               = errors.New("replay is invalid")
 
 	// ErrScoresNotEnabled is returned by ScoreProvider implementations when
 	// score submission is not enabled for the authenticated account.

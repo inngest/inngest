@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import {
+  menuItemClassName,
+  menuPanelClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import {
   Popover,
   PopoverClose,
   PopoverContent,
@@ -54,18 +58,28 @@ export default function KeysNavItem({
           align="start"
           side="right"
           sideOffset={8}
-          className="w-[160px] py-1"
+          className={cn(menuPanelClassName, 'w-[160px]')}
         >
           <PopoverClose asChild>
             <Link to={keysPath} className="block">
-              <div className="text-subtle hover:bg-canvasSubtle hover:text-basis mx-1 my-0.5 flex h-8 cursor-pointer items-center rounded px-2 text-sm">
+              <div
+                className={cn(
+                  menuItemClassName,
+                  'hover:bg-canvasSubtle cursor-pointer',
+                )}
+              >
                 Event keys
               </div>
             </Link>
           </PopoverClose>
           <PopoverClose asChild>
             <Link to={signingPath} className="block">
-              <div className="text-subtle hover:bg-canvasSubtle hover:text-basis mx-1 my-0.5 flex h-8 cursor-pointer items-center rounded px-2 text-sm">
+              <div
+                className={cn(
+                  menuItemClassName,
+                  'hover:bg-canvasSubtle cursor-pointer',
+                )}
+              >
                 Signing key
               </div>
             </Link>

@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 
 import { KeyboardShortcut } from '@/components/Insights/KeyboardShortcut';
@@ -77,20 +78,20 @@ export function TabContextMenu({
             }}
           >
             <DropdownMenuItem
-              className="text-basis flex items-center justify-between gap-8 px-4 outline-none"
+              className="justify-between gap-2"
               onSelect={tabManagerActions.createNewTab}
             >
               <span>New tab</span>
               <span className="ml-auto">
                 <KeyboardShortcut
+                  className="py-0"
                   color="text-muted"
                   keys={['cmd', 'ctrl', 'alt', 't']}
                 />
               </span>
             </DropdownMenuItem>
-            <div className="border-subtle my-1 border-t" />
+            <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-basis px-4 outline-none"
               onSelect={() => {
                 const tab = tabs.find((t) => t.id === contextMenu.tabId);
                 if (tab && hasUnsavedChanges(queries.data, tab)) {
@@ -105,21 +106,16 @@ export function TabContextMenu({
               <span>Close tab</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-basis px-4 outline-none"
               onSelect={() => handleCloseOtherTabs(contextMenu.tabId)}
             >
               <span>Close other tabs</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-basis px-4 outline-none"
               onSelect={() => handleCloseToTheRight(contextMenu.tabId)}
             >
               <span>Close to the right</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-basis px-4 outline-none"
-              onSelect={handleCloseAll}
-            >
+            <DropdownMenuItem onSelect={handleCloseAll}>
               <span>Close all</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

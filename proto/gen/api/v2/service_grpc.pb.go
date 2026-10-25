@@ -36,6 +36,7 @@ const (
 	V2_ListRuns_FullMethodName                   = "/api.v2.V2/ListRuns"
 	V2_ListFunctionRuns_FullMethodName           = "/api.v2.V2/ListFunctionRuns"
 	V2_GetEventRuns_FullMethodName               = "/api.v2.V2/GetEventRuns"
+	V2_CreateReplay_FullMethodName               = "/api.v2.V2/CreateReplay"
 	V2_Rerun_FullMethodName                      = "/api.v2.V2/Rerun"
 	V2_CancelRun_FullMethodName                  = "/api.v2.V2/CancelRun"
 	V2_GetApp_FullMethodName                     = "/api.v2.V2/GetApp"
@@ -72,6 +73,7 @@ const (
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
 	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
+	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
 	V2_SendEvent_FullMethodName                  = "/api.v2.V2/SendEvent"
 	V2_InvokeFunction_FullMethodName             = "/api.v2.V2/InvokeFunction"
@@ -109,6 +111,7 @@ type V2Client interface {
 	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error)
 	ListFunctionRuns(ctx context.Context, in *ListFunctionRunsRequest, opts ...grpc.CallOption) (*ListFunctionRunsResponse, error)
 	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
+	CreateReplay(ctx context.Context, in *CreateReplayRequest, opts ...grpc.CallOption) (*CreateReplayResponse, error)
 	Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.CallOption) (*RerunResponse, error)
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
@@ -145,6 +148,7 @@ type V2Client interface {
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
 	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
+	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
 	SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
@@ -321,6 +325,16 @@ func (c *v2Client) GetEventRuns(ctx context.Context, in *GetEventRunsRequest, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetEventRunsResponse)
 	err := c.cc.Invoke(ctx, V2_GetEventRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateReplay(ctx context.Context, in *CreateReplayRequest, opts ...grpc.CallOption) (*CreateReplayResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateReplayResponse)
+	err := c.cc.Invoke(ctx, V2_CreateReplay_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -714,6 +728,16 @@ func (c *v2Client) PauseFunction(ctx context.Context, in *PauseFunctionRequest, 
 	return out, nil
 }
 
+func (c *v2Client) ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_ResumeFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionsResponse)
@@ -857,6 +881,7 @@ type V2Server interface {
 	ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error)
 	ListFunctionRuns(context.Context, *ListFunctionRunsRequest) (*ListFunctionRunsResponse, error)
 	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
+	CreateReplay(context.Context, *CreateReplayRequest) (*CreateReplayResponse, error)
 	Rerun(context.Context, *RerunRequest) (*RerunResponse, error)
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
@@ -893,6 +918,7 @@ type V2Server interface {
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
 	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
+	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
 	SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
@@ -962,6 +988,9 @@ func (UnimplementedV2Server) ListFunctionRuns(context.Context, *ListFunctionRuns
 }
 func (UnimplementedV2Server) GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetEventRuns not implemented")
+}
+func (UnimplementedV2Server) CreateReplay(context.Context, *CreateReplayRequest) (*CreateReplayResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateReplay not implemented")
 }
 func (UnimplementedV2Server) Rerun(context.Context, *RerunRequest) (*RerunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Rerun not implemented")
@@ -1070,6 +1099,9 @@ func (UnimplementedV2Server) CreateCancellation(context.Context, *CreateCancella
 }
 func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PauseFunction not implemented")
+}
+func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeFunction not implemented")
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
@@ -1412,6 +1444,24 @@ func _V2_GetEventRuns_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetEventRuns(ctx, req.(*GetEventRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateReplay_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateReplayRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateReplay(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateReplay_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateReplay(ctx, req.(*CreateReplayRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2043,6 +2093,24 @@ func _V2_PauseFunction_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ResumeFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ResumeFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ResumeFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ResumeFunction(ctx, req.(*ResumeFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionsRequest)
 	if err := dec(in); err != nil {
@@ -2331,6 +2399,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_GetEventRuns_Handler,
 		},
 		{
+			MethodName: "CreateReplay",
+			Handler:    _V2_CreateReplay_Handler,
+		},
+		{
 			MethodName: "Rerun",
 			Handler:    _V2_Rerun_Handler,
 		},
@@ -2461,6 +2533,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PauseFunction",
 			Handler:    _V2_PauseFunction_Handler,
+		},
+		{
+			MethodName: "ResumeFunction",
+			Handler:    _V2_ResumeFunction_Handler,
 		},
 		{
 			MethodName: "GetFunctions",

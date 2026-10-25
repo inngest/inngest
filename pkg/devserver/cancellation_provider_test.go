@@ -45,7 +45,7 @@ func TestCreateCancellationPersistsAndQueues(t *testing.T) {
 			Slug:   "app-fn",
 			Config: []byte(`{"name":"Function","slug":"fn"}`),
 		}},
-	})
+	}, nil, nil)
 	functions.pauses.pause(id)
 	shard := redis_state.NewQueueShard("local", redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey), queue.WithPartitionPausedGetter(functions.pauses.partitionPaused))
 	registry, err := queue.NewSingleShardRegistry(shard)
@@ -164,7 +164,7 @@ func TestCreateCancellationUnknownFunction(t *testing.T) {
 	functions := NewFunctionProvider(&fakeFunctionStore{app: &cqrs.App{
 		ID:   uuid.New(),
 		Name: "app",
-	}})
+	}}, nil, nil)
 	handler, err := apiv2.NewHTTPHandler(t.Context(), apiv2.ServiceOptions{
 		Functions:     functions,
 		Cancellations: NewCancellationProvider(nil),

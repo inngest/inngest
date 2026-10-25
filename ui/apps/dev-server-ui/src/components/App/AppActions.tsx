@@ -1,3 +1,4 @@
+import { menuDangerItemClassName } from '@inngest/components/DropdownMenu/menuStyles';
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import {
@@ -43,7 +44,7 @@ export default function AppActions({ id, name }: { id: string; name: string }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem
-            className="text-error"
+            className={menuDangerItemClassName}
             onSelect={() => setIsAlertModalOpen(true)}
           >
             <RiDeleteBinLine className="h-4 w-4" />

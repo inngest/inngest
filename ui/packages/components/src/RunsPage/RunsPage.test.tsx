@@ -3,10 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { RunsPage } from './RunsPage';
+import type { Run } from './types';
+
+const mocks = vi.hoisted(() => ({
+  details: vi.fn((_props?: any) => null),
+  table: vi.fn((_props?: any) => null),
+}));
 
 vi.mock('../CodeSearch/CodeSearch', () => ({ default: () => null }));
 vi.mock('../Filter/EntityFilter', () => ({ default: () => null }));
-vi.mock('../RunDetailsV4', () => ({ RunDetailsV4: () => null }));
+vi.mock('../RunDetailsV4', () => ({ RunDetailsV4: mocks.details }));
 vi.mock('../hooks/useSearchParams', () => ({
   useBatchedSearchParams: () => vi.fn(),
   useBooleanSearchParam: () => [false, vi.fn(), vi.fn()],
@@ -16,7 +22,7 @@ vi.mock('../hooks/useSearchParams', () => ({
   useValidatedSearchParam: () => [undefined, vi.fn()],
 }));
 vi.mock('./RunsStatusFilter', () => ({ default: () => null }));
-vi.mock('./RunsTable', () => ({ default: () => null }));
+vi.mock('./RunsTable', () => ({ default: mocks.table }));
 vi.mock('./RunsTypeFilter', () => ({ default: () => null }));
 vi.mock('./columns', () => ({
   isColumnID: () => false,
@@ -44,6 +50,22 @@ describe('RunsPage progressive search actions', () => {
     scope: 'env' as const,
     totalCount: undefined,
   };
+
+  it('forwards the optional Cloud action to expanded row details', () => {
+    const renderRunAction = vi.fn(() => null);
+    render(
+      <TooltipProvider>
+        <RunsPage {...baseProps} renderRunAction={renderRunAction} />
+      </TooltipProvider>
+    );
+    const renderDetails = mocks.table.mock.lastCall?.[0].renderSubComponent;
+    render(renderDetails({ id: 'run-1' } as Run));
+    expect(mocks.details.mock.lastCall?.[0]).toMatchObject({
+      runID: 'run-1',
+      standalone: false,
+      renderRunAction,
+    });
+  });
 
   it('renders an interactive Insights link only for representable progressive searches', () => {
     const { rerender } = render(

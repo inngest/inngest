@@ -11,6 +11,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
@@ -28,6 +29,7 @@ type Service struct {
 	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
+	replays        ReplayProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
@@ -48,6 +50,7 @@ type ServiceOptions struct {
 	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
+	Replays             ReplayProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
@@ -75,6 +78,7 @@ func NewService(opts ServiceOptions) *Service {
 		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
+		replays:        opts.Replays,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
@@ -166,9 +170,13 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 
 	// Build map of paths that require authorization
 	authzPaths := base.BuildAuthzPathMap()
+	authzRoutes := chi.NewRouter()
+	for path := range authzPaths {
+		authzRoutes.Handle(path, gwmux)
+	}
 
 	r := chi.NewRouter()
-	r.Use(SendEventBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
+	r.Use(RequestBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
 
 	// Add authentication middleware first
 	if httpOpts.AuthnMiddleware != nil {
@@ -181,35 +189,71 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Strip supported v2 prefixes and forward to gateway
+		// Authorization, request validation, and routing must use the same path.
 		originalPath := req.URL.Path
-		if after, ok := strings.CutPrefix(req.URL.Path, "/api/v2"); ok {
-			req.URL.Path = after
-		} else if after, ok := strings.CutPrefix(req.URL.Path, "/v2"); ok {
-			req.URL.Path = after
+		originalRawPath := req.URL.RawPath
+		req.URL.Path = normalizedV2Path(req.URL.Path)
+		if req.URL.RawPath != "" {
+			req.URL.RawPath = normalizedV2Path(req.URL.RawPath)
 		}
+		defer func() {
+			req.URL.Path = originalPath
+			req.URL.RawPath = originalRawPath
+		}()
 
 		// Apply authorization middleware if this path requires it
-		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
+		if httpOpts.AuthzMiddleware != nil && authzRoutes.Match(chi.NewRouteContext(), req.Method, req.URL.EscapedPath()) {
 			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
-				validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					gwmux.ServeHTTP(w, r)
-				}))
+				validationHandler := base.JSONTypeValidationMiddleware()(gwmux)
 				validationHandler.ServeHTTP(w, r)
 			}))
 			authzHandler.ServeHTTP(w, req)
 		} else {
 			// Add JSON validation for unprotected paths
-			validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
-			}))
+			validationHandler := base.JSONTypeValidationMiddleware()(gwmux)
 			validationHandler.ServeHTTP(w, req)
 		}
 
-		// Restore original path for logging
-		req.URL.Path = originalPath
 	}))
 
 	return r, nil
+}
+
+func normalizedV2Path(path string) string {
+	for _, prefix := range []string{"/api/v2", "/v2"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			path = strings.TrimPrefix(path, prefix)
+			break
+		}
+	}
+	if path == "" {
+		return "/"
+	}
+	return path
+}
+
+// RequestBodyLimitMiddleware rejects oversized bodies before validation reads them.
+func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		type route struct{ method, path string }
+		limits := map[string]int64{"SendEvent": maxEventBytes, "CreateReplay": 64 << 10}
+		handlers := map[route]http.Handler{}
+		paths := chi.NewRouter()
+		for _, endpoint := range apiv2endpoint.Discover() {
+			if limit, ok := limits[endpoint.MethodName]; ok {
+				paths.Method(endpoint.HTTPMethod, endpoint.Path, next)
+				handlers[route{endpoint.HTTPMethod, endpoint.Path}] = apiv2base.MaxRequestBodyBytesMiddleware(limit)(next)
+			}
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rctx := chi.NewRouteContext()
+			if paths.Match(rctx, r.Method, strings.TrimRight(normalizedV2Path(r.URL.EscapedPath()), "/")) {
+				limited := handlers[route{r.Method, rctx.RoutePattern()}]
+				limited.ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

@@ -227,7 +227,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
-	functionProvider := NewFunctionProvider(dbcqrs)
+	pauseState := &functionPauses{}
 
 	var shardedRc, unshardedRc, connectRc, realtimePubRc, realtimeSubRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster, realtimeCluster *miniredis.Miniredis
@@ -379,7 +379,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		queue.WithBacklogRefillLimit(10),
-		queue.WithPartitionPausedGetter(functionProvider.pauses.partitionPaused),
+		queue.WithPartitionPausedGetter(pauseState.partitionPaused),
 		queue.WithConditionalTracer(conditionalQueueTracer),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
@@ -405,6 +405,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("could not create queue: %w", err)
 	}
+	functionProvider := NewFunctionProvider(dbcqrs, pauseState, rq)
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
@@ -720,9 +721,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionPauser:      functionProvider,
 		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),
 		Runs:                NewRunProvider(dbcqrs, exec),
-		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
-		Executor:            exec,
-		EventPublisher:      runner,
+		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
+			return !functionProvider.pauses.get(id).IsZero()
+		}),
+		FunctionTraces: NewFunctionTraceReader(dbcqrs),
+		Executor:       exec,
+		EventPublisher: runner,
 		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
 			return ds.HandleEvent(ctx, evt, nil)
 		},
@@ -797,7 +801,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			PauseFunction: func(id uuid.UUID) {
 				functionProvider.pauses.pause(id)
 			},
-			UnpauseFunction: functionProvider.pauses.unpause,
 		})})
 	}
 

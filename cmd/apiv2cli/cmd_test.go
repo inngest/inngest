@@ -401,26 +401,33 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
 }
 
-func TestCommandPausesFunction(t *testing.T) {
-	var method, path, body string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		method, path = r.Method, r.URL.Path
-		data, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		body = string(data)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"id":"fn","isPaused":true}}`))
-	}))
-	defer srv.Close()
-	cmd := Command()
-	var out bytes.Buffer
-	cmd.Writer = &out
-	err := cmd.Run(t.Context(), []string{"api", "pause-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
-	require.NoError(t, err)
-	require.Equal(t, http.MethodPost, method)
-	require.Equal(t, "/api/v2/apps/app/functions/fn/pause", path)
-	require.Empty(t, body)
-	require.JSONEq(t, `{"data":{"id":"fn","isPaused":true}}`, out.String())
+func TestCommandPausesAndResumesFunction(t *testing.T) {
+	for _, action := range []struct{ name, response string }{
+		{"pause", `{"data":{"id":"fn","isPaused":true}}`},
+		{"resume", `{"data":{"id":"fn","isPaused":false}}`},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			var method, path, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(action.response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-function", "--api-host", srv.URL, "--app-id", "app", "--function-id", "fn"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/fn/"+action.name, path)
+			require.Empty(t, body)
+			require.JSONEq(t, action.response, out.String())
+		})
+	}
 }
 
 func TestWriteSandboxFileSendsRawBodyAndQueryParameters(t *testing.T) {
@@ -542,6 +549,88 @@ func TestCommandSendsEvent(t *testing.T) {
 		"ts":   float64(1786032000000),
 	}, gotBody)
 	require.Contains(t, out.String(), `"eventId": "01K1QQ3VQ8R3M8QX4D51J8G7XH"`)
+}
+
+func TestCommandBuildsReplayBody(t *testing.T) {
+	var gotMethod, gotPath, gotQuery string
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotQuery = r.Method, r.URL.Path, r.URL.RawQuery
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"550e8400-e29b-41d4-a716-446655440000","createdAt":"2026-01-03T00:00:00Z"}}`))
+	}))
+	defer srv.Close()
+
+	var out bytes.Buffer
+	cmd := Command()
+	cmd.Writer = &out
+	err := cmd.Run(t.Context(), []string{
+		"api", "--api-host", srv.URL, "create-replay",
+		"--app-id", "my-app",
+		"--name", "Replay orders",
+		"--function-id", "orders-created",
+		"--statuses", "FAILED", "--statuses", "CANCELLED",
+		"--from", "2026-01-01T00:00:00.123Z",
+		"--until", "2026-01-02T00:00:00Z",
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, gotMethod)
+	require.Equal(t, "/api/v2/apps/my-app/functions/orders-created/replays", gotPath)
+	require.Empty(t, gotQuery)
+	require.Equal(t, map[string]any{
+		"name":     "Replay orders",
+		"statuses": []any{"FAILED", "CANCELLED"},
+		"from":     "2026-01-01T00:00:00.123Z", "until": "2026-01-02T00:00:00Z",
+	}, gotBody)
+	require.Contains(t, out.String(), `"id": "550e8400-e29b-41d4-a716-446655440000"`)
+}
+
+func TestCommandReplayRequiresFields(t *testing.T) {
+	fields := []struct {
+		flag, jsonName, value string
+	}{
+		{"app-id", "appId", "my-app"},
+		{"name", "name", "Replay orders"},
+		{"function-id", "functionId", "orders-created"},
+		{"from", "from", "2026-01-01T00:00:00Z"},
+		{"until", "until", "2026-01-02T00:00:00Z"},
+		{"statuses", "statuses", "FAILED"},
+	}
+	for _, missing := range fields {
+		for _, input := range []string{"flags", "body"} {
+			t.Run(missing.flag+"/"+input, func(t *testing.T) {
+				args := []string{"api", "--api-host", "http://localhost:1", "create-replay"}
+				body := map[string]any{}
+				for _, field := range fields {
+					if field.flag == missing.flag {
+						continue
+					}
+					if input == "flags" || field.flag == "app-id" || field.flag == "function-id" {
+						args = append(args, "--"+field.flag, field.value)
+					}
+					body[field.jsonName] = field.value
+					if field.jsonName == "statuses" {
+						body[field.jsonName] = []string{field.value}
+					}
+				}
+				if input == "body" {
+					encoded, err := json.Marshal(body)
+					require.NoError(t, err)
+					args = append(args, "--body", string(encoded))
+				}
+				cmd := Command()
+				cmd.Writer = &bytes.Buffer{}
+				err := cmd.Run(t.Context(), args)
+				if missing.flag == "app-id" || missing.flag == "function-id" {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or positional argument <%s>", missing.flag, missing.flag))
+				} else {
+					require.EqualError(t, err, fmt.Sprintf("missing required --%s or body field %q", missing.flag, missing.jsonName))
+				}
+			})
+		}
+	}
 }
 
 func TestCommandBuildsRerunFromStepBody(t *testing.T) {

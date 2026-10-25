@@ -2,7 +2,24 @@ package util
 
 import (
 	"errors"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+// IsGRPCMessageSizeError distinguishes gRPC's send/receive size violations from
+// ResourceExhausted errors caused by transient quota or capacity constraints.
+func IsGRPCMessageSizeError(err error) bool {
+	s, ok := status.FromError(err)
+	if !ok || s.Code() != codes.ResourceExhausted {
+		return false
+	}
+	msg := s.Message()
+	return strings.Contains(msg, "received message larger than max") ||
+		strings.Contains(msg, "received message after decompression larger than max") ||
+		strings.Contains(msg, "trying to send message larger than max")
+}
 
 type ErrSet struct {
 	errs []error

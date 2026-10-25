@@ -10,10 +10,12 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { renderRunAIDebug } from '@/components/RunDetails/RunAIDebug';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { RunAIAssist } from './AIAssist/RunAIAssist';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { runsInsightsHref } from './runsInsights';
@@ -221,6 +223,23 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   return (
     <RunsPage
+      renderRunAction={renderRunAIDebug}
+      toolbarActions={
+        <RunAIAssist
+          key={`${environment.id}:${functionSlug ?? 'env'}`}
+          scope={scope}
+          environmentSlug={environment.slug}
+          environmentID={environment.id}
+          apps={appsRes.data?.env?.apps}
+          functionAppID={functionData?.workspace.workflow?.app.externalID}
+          functionSlug={
+            scope === 'fn' ? functionData?.workspace.workflow?.slug : undefined
+          }
+          metadataLoading={isRestRunsMetadataLoading}
+          metadataError={Boolean(metadataError)}
+          onRetry={onRefresh}
+        />
+      }
       apps={appsRes.data?.env?.apps.map((app) => ({
         id: app.id,
         name: app.externalID,
