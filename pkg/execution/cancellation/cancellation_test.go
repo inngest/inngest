@@ -25,7 +25,7 @@ func TestCheckerOnlyCancelsRunsQueuedInRange(t *testing.T) {
 	after := at.Add(-time.Hour)
 	runID := ulid.MustNew(ulid.Timestamp(at), nil)
 	early := cqrs.Cancellation{ID: ulid.Make(), StartedBefore: at.Add(-time.Minute)}
-	late := cqrs.Cancellation{ID: ulid.Make(), StartedAfter: ptr(at.Add(time.Minute)), StartedBefore: at.Add(time.Hour)}
+	late := cqrs.Cancellation{ID: ulid.Make(), StartedAfter: new(at.Add(time.Minute)), StartedBefore: at.Add(time.Hour)}
 	match := cqrs.Cancellation{ID: ulid.Make(), StartedAfter: &after, StartedBefore: at}
 
 	got, err := NewChecker(staticReader{early, late}).IsCancelled(t.Context(), uuid.New(), uuid.New(), runID, nil)
@@ -51,15 +51,13 @@ func TestRedisReadAtExcludesCancellationsOutOfRange(t *testing.T) {
 		require.NoError(t, err)
 		mr.HSet(redisReadWriter{prefix: DefaultPrefix}.key(wsID, fnID), c.ID.String(), string(byt))
 	}
-	inRange := cqrs.Cancellation{ID: ulid.Make(), StartedAfter: ptr(at.Add(-time.Hour)), StartedBefore: at.Add(time.Hour)}
+	inRange := cqrs.Cancellation{ID: ulid.Make(), StartedAfter: new(at.Add(-time.Hour)), StartedBefore: at.Add(time.Hour)}
 	store(inRange)
 	store(cqrs.Cancellation{ID: ulid.Make(), StartedBefore: at.Add(-time.Minute)})
-	store(cqrs.Cancellation{ID: ulid.Make(), StartedAfter: ptr(at.Add(time.Minute)), StartedBefore: at.Add(time.Hour)})
+	store(cqrs.Cancellation{ID: ulid.Make(), StartedAfter: new(at.Add(time.Minute)), StartedBefore: at.Add(time.Hour)})
 
 	got, err := NewRedisReader(rc, "").ReadAt(t.Context(), wsID, fnID, at)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	require.Equal(t, inRange.ID, got[0].ID)
 }
-
-func ptr[T any](v T) *T { return &v }
