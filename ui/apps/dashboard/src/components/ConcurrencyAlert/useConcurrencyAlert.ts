@@ -1,4 +1,11 @@
+import { useEffect, useRef } from 'react';
+import { ulid } from 'ulid';
 import { gql, useQuery, type TypedDocumentNode } from 'urql';
+
+import {
+  trackBannerCTAClicked,
+  trackBannerViewed,
+} from '@/utils/analyticsEvents';
 
 import {
   alertState,
@@ -76,10 +83,12 @@ export type ConcurrencyAlert = {
   limit: number | undefined;
   minutesRemaining: number | undefined;
   usedRatio: number;
-  linkProps: (surface: ConcurrencyAlertSurface) => { to: string };
+  linkProps: { to: string; onClick: () => void };
 };
 
-export function useConcurrencyAlert(): ConcurrencyAlert | null {
+export function useConcurrencyAlert(
+  surface: ConcurrencyAlertSurface,
+): ConcurrencyAlert | null {
   const [{ data }] = useQuery({
     query: ConcurrencyAlertCheckDocument,
     requestPolicy: 'cache-first',
@@ -97,6 +106,38 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
     boosted: bursting,
     pressured: data?.account.concurrencyStatus?.limitReached ?? false,
   });
+  const accountId = data?.account.id;
+  const impression = useRef<Parameters<typeof trackBannerCTAClicked>[0] | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!state || !accountId) {
+      impression.current = null;
+      return;
+    }
+
+    // Usage refreshes and Strict Mode effect replay are the same appearance.
+    if (
+      impression.current?.accountId === accountId &&
+      impression.current.alertState === state &&
+      impression.current.surface === surface
+    ) {
+      return;
+    }
+
+    impression.current = {
+      feature: 'account-concurrency',
+      bannerId: 'concurrency-alert',
+      accountId,
+      impressionId: ulid(),
+      alertState: state,
+      surface,
+      cta: state === 'boosted' ? 'view-usage' : 'add-concurrency',
+    };
+    trackBannerViewed(impression.current);
+  }, [accountId, state, surface]);
+
   if (!state) {
     return null;
   }
@@ -118,6 +159,13 @@ export function useConcurrencyAlert(): ConcurrencyAlert | null {
       burst && minutesRemaining !== undefined
         ? usedRatio({ budgetMinutes: burst.budgetMinutes, minutesRemaining })
         : 0,
-    linkProps: (surface) => concurrencyLinkProps({ state, surface }),
+    linkProps: {
+      ...concurrencyLinkProps({ state, surface }),
+      onClick: () => {
+        if (impression.current) {
+          trackBannerCTAClicked(impression.current);
+        }
+      },
+    },
   };
 }

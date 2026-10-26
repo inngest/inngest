@@ -129,6 +129,8 @@ type BannerViewedArgs = {
   // the same appearance carry it too, which is what joins them to this view.
   impressionId?: string;
   scope?: string;
+  alertState?: string;
+  surface?: string;
   minutesWithHits?: number;
   windowMinutes?: number;
   // Which CTAs the impression actually offered. A banner can vary its CTAs by
@@ -144,6 +146,8 @@ export function trackBannerViewed({
   accountId,
   impressionId,
   scope,
+  alertState,
+  surface,
   minutesWithHits,
   windowMinutes,
   cta,
@@ -154,6 +158,8 @@ export function trackBannerViewed({
     account_id: accountId,
     impression_id: impressionId,
     scope,
+    alert_state: alertState,
+    surface,
     minutes_with_hits: minutesWithHits,
     window_minutes: windowMinutes,
     cta,
@@ -201,6 +207,8 @@ type BannerCTAClickedArgs = {
   accountId?: string;
   impressionId?: string;
   scope?: string;
+  alertState?: string;
+  surface?: string;
   // The impression's own snapshot — see BannerDismissedArgs.
   minutesWithHits?: number;
   windowMinutes?: number;
@@ -217,6 +225,8 @@ export function trackBannerCTAClicked({
   accountId,
   impressionId,
   scope,
+  alertState,
+  surface,
   minutesWithHits,
   windowMinutes,
   cta,
@@ -226,6 +236,8 @@ export function trackBannerCTAClicked({
     account_id: accountId,
     impression_id: impressionId,
     scope,
+    alert_state: alertState,
+    surface,
     minutes_with_hits: minutesWithHits,
     window_minutes: windowMinutes,
     cta,
