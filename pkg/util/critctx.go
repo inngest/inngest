@@ -94,7 +94,10 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 							"recover":   fmt.Sprintf("%v", r),
 						}),
 					)
-					if err != nil {
+					// f panicked before assigning its return values, so err is
+					// still nil here.  Surface the panic as the error, but never
+					// clobber an error f already returned.
+					if err == nil {
 						err = fmt.Errorf("panic in crit: %v", r)
 					}
 					doneCh <- pair[T]{res: res, err: err}
