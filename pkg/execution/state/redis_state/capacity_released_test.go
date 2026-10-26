@@ -120,12 +120,15 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 		processItem bool
 		// otherExecutor retries from a second executor with its own stale cache.
 		otherExecutor bool
-		expected      int
+		// wakeDisabled turns the account's capacity release wake off.
+		wakeDisabled bool
+		expected     int
 	}{
 		{name: "dequeue wake only parks the partition", expected: 0},
 		{name: "confirmed release refills the key", notify: true, expected: 6},
 		{name: "process item notifies the shard", processItem: true, expected: 6},
 		{name: "other executor with a stale cache", notify: true, otherExecutor: true, expected: 6},
+		{name: "disabled for the account parks the partition", notify: true, wakeDisabled: true, expected: 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -179,6 +182,10 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 				osqueue.WithRunMode(osqueue.QueueRunMode{}),
 				osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 					return config
+				}),
+				osqueue.WithCapacityReleaseWakeEnabled(func(_ context.Context, id uuid.UUID) bool {
+					require.Equal(t, accountID, id)
+					return !tc.wakeDisabled
 				}),
 			}
 			shard := NewQueueShard("local", NewQueueClient(rc, "{sys-1449}"), opts...)

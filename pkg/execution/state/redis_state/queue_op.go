@@ -142,9 +142,13 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 func (q *queue) CapacityReleased(ctx context.Context, i osqueue.QueueItem) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CapacityReleased"), redis_telemetry.ScopeQueue)
 
+	accountID := i.Data.Identifier.AccountID
+	if q.CapacityReleaseWakeEnabled != nil && !q.CapacityReleaseWakeEnabled(ctx, accountID) {
+		return
+	}
+
 	kg := q.RedisClient.kg
 	partition := osqueue.ItemShadowPartition(ctx, i)
-	accountID := i.Data.Identifier.AccountID
 
 	keys := []string{
 		kg.PartitionItem(),
