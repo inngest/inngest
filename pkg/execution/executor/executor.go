@@ -2577,6 +2577,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					},
 				}); err != nil {
 					l.ReportError(err, "error running finish handler")
+					return err
 				}
 
 				// Can be reached multiple times for parallel discovery steps
@@ -2650,6 +2651,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			},
 		}); err != nil {
 			l.ReportError(err, "error running finish handler")
+			return err
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -2686,6 +2688,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 			},
 		}); err != nil {
 			l.ReportError(err, "error running finish handler")
+			return err
 		}
 
 		// Can be reached multiple times for parallel discovery steps
