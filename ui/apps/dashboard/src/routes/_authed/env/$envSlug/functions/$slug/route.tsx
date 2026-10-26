@@ -10,7 +10,7 @@ import { useFunction } from '@/queries/functions';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
-import { RiPauseCircleLine } from '@remixicon/react';
+import { RiHourglassLine, RiPauseCircleLine } from '@remixicon/react';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useCallback, useState } from 'react';
 import { useMutation } from 'urql';
@@ -18,7 +18,6 @@ import { ArchivedAppBanner } from '@/components/Apps/ArchivedAppBanner';
 import { ArchivedFuncBanner } from '@/components/Functions/ArchivedFuncBanner';
 import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
-import { Banner } from '@inngest/components/Banner';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug')({
   component: FunctionComponent,
@@ -38,7 +37,7 @@ function FunctionComponent() {
   const env = useEnvironment();
 
   const fn = data?.workspace.workflow;
-  const { isArchived = false, isPaused } = fn ?? {};
+  const { isArchived = false, isPaused, isDraining } = fn ?? {};
 
   const doesFunctionAcceptPayload =
     fn?.triggers.some((trigger) => {
@@ -116,14 +115,27 @@ function FunctionComponent() {
           { text: fn?.name || 'Function' },
         ]}
         infoIcon={
-          isPaused && (
-            <Pill
-              kind="warning"
-              icon={<RiPauseCircleLine className="h-4 w-4" />}
-              iconSide="left"
-            >
-              Paused
-            </Pill>
+          (isPaused || isDraining) && (
+            <div className="flex items-center gap-2">
+              {isPaused && (
+                <Pill
+                  kind="warning"
+                  icon={<RiPauseCircleLine className="h-4 w-4" />}
+                  iconSide="left"
+                >
+                  Paused
+                </Pill>
+              )}
+              {isDraining && (
+                <Pill
+                  kind="warning"
+                  icon={<RiHourglassLine className="h-4 w-4" />}
+                  iconSide="left"
+                >
+                  Draining
+                </Pill>
+              )}
+            </div>
           )
         }
         loading={fetching}
@@ -173,12 +185,6 @@ function FunctionComponent() {
             : []),
         ]}
       />
-      {fn?.isDraining && (
-        <Banner severity="warning">
-          This function is draining. New runs are skipped while existing runs
-          continue to execute.
-        </Banner>
-      )}
       <Outlet />
     </>
   );
