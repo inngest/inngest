@@ -59,15 +59,17 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 		if err := checkRetiredSemaphores(md.Config.Semaphores, req.RetiredSemaphoreID); err != nil {
 			return nil, err
 		}
-		defers, err := store.LoadDefers(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if len(defers) != 0 {
-			return nil, fmt.Errorf("%w: run has deferred work", ErrRunRetirementUnsafe)
-		}
 	} else if !metadataAbsent(err) {
 		return nil, err
+	}
+	// Deferred work can survive partially missing metadata too. Never infer
+	// that it is absent merely because the metadata record is gone.
+	defers, err := store.LoadDefers(ctx, id)
+	if err != nil && !metadataAbsent(err) {
+		return nil, err
+	}
+	if len(defers) != 0 {
+		return nil, fmt.Errorf("%w: run has deferred work", ErrRunRetirementUnsafe)
 	}
 	if _, err := store.LoadEvents(ctx, id); err != nil && !errors.Is(err, state.ErrEventNotFound) && !metadataAbsent(err) {
 		return nil, err

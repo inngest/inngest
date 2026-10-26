@@ -21,6 +21,8 @@ type retirementState struct {
 	md                            sv2.Metadata
 	absent, eventsAbsent, deleted bool
 	readErr, eventsErr, deleteErr error
+	defers                        map[string]sv2.Defer
+	defersErr                     error
 }
 
 func (s *retirementState) LoadMetadata(context.Context, sv2.ID, ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
@@ -42,7 +44,7 @@ func (s *retirementState) LoadEvents(context.Context, sv2.ID) ([]json.RawMessage
 	return []json.RawMessage{json.RawMessage(`{"name":"maintenance"}`)}, nil
 }
 func (s *retirementState) LoadDefers(context.Context, sv2.ID) (map[string]sv2.Defer, error) {
-	return nil, nil
+	return s.defers, s.defersErr
 }
 func (s *retirementState) Delete(context.Context, sv2.ID, ...sv2.DeleteOption) error {
 	if s.deleteErr != nil {
@@ -92,7 +94,7 @@ func (q *retirementShard) Dequeue(context.Context, queue.QueueItem, ...queue.Deq
 }
 
 func TestRetireMaintenanceRun(t *testing.T) {
-	for _, name := range []string{"success", "legacy counter not released", "missing metadata", "missing input", "both missing", "already removed", "inventoried orphan", "wrong tenant", "wrong metadata", "expired lease", "current job", "future run", "unknown manual semaphore", "extra index item", "wrong indexed item", "queue read error", "state read error", "input read error", "dequeue error", "raw verification", "index verification", "delete error", "hold lost", "no guard"} {
+	for _, name := range []string{"success", "legacy counter not released", "missing metadata", "missing input", "both missing", "already removed", "inventoried orphan", "wrong tenant", "wrong metadata", "expired lease", "current job", "future run", "unknown manual semaphore", "extra index item", "wrong indexed item", "queue read error", "state read error", "input read error", "deferred work", "deferred work without metadata", "defer read error", "dequeue error", "raw verification", "index verification", "delete error", "hold lost", "no guard"} {
 		t.Run(name, func(t *testing.T) {
 			id := sv2.ID{RunID: ulid.Make(), FunctionID: uuid.New(), Tenant: sv2.Tenant{AccountID: uuid.New(), EnvID: uuid.New(), AppID: uuid.New()}}
 			sem := constraintapi.Semaphore{ID: constraintapi.SemaphoreIDFnKey(id.FunctionID, "event.data.app_id"), Release: constraintapi.SemaphoreReleaseManual, Weight: 1}
@@ -111,6 +113,11 @@ func TestRetireMaintenanceRun(t *testing.T) {
 			failure := errors.New("injected failure")
 			wantErr := true
 			switch name {
+			case "deferred work", "deferred work without metadata":
+				s.defers = map[string]sv2.Defer{"pending": {}}
+				s.absent = name == "deferred work without metadata"
+			case "defer read error":
+				s.defersErr = failure
 			case "success", "legacy counter not released":
 				wantErr = false
 			case "missing metadata":
