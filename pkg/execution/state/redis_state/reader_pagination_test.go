@@ -27,7 +27,8 @@ func TestRunJobsRankPagination(t *testing.T) {
 		data, err := json.Marshal(item)
 		require.NoError(t, err)
 		r.HSet(kg.QueueItem(), id, string(data))
-		r.ZAdd(kg.RunIndex(run), float64(i), id)
+		_, err = r.ZAdd(kg.RunIndex(run), float64(i), id)
+		require.NoError(t, err)
 	}
 	for _, tc := range []struct {
 		offset, limit int64

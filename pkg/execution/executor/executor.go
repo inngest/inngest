@@ -3517,7 +3517,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		}
 		return nil
 	}
-	if err != nil && !(r.RequireCleanupVerification && errors.Is(err, state.ErrEventNotFound)) {
+	if err != nil && (!r.RequireCleanupVerification || !errors.Is(err, state.ErrEventNotFound)) {
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 
