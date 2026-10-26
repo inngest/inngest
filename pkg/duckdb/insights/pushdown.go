@@ -116,9 +116,7 @@ func (w *pushdownWalk) collect(s *parser.SelectStatement) {
 		entries = appendPushdownEntries(w.tables, entries, ref)
 	}
 	for _, conj := range conjuncts(s.Where) {
-		for _, c := range pushdownPredicates(conj, entries) {
-			w.candidates = append(w.candidates, c)
-		}
+		w.candidates = append(w.candidates, pushdownPredicates(conj, entries)...)
 	}
 }
 

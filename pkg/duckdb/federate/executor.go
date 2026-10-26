@@ -237,7 +237,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		src, err := sourceCTE(t, sourceSpec{
 			AccountID: q.AccountID, EnvID: q.EnvID, AllTenants: q.AllTenants, From: q.From, To: q.To,
 			Lake: q.Lake, Watermark: q.Watermark, Delta: deltaRel[t], DeltaColumns: deltaCols[t],
-			TopN: topNOf(q, t), Collapses: collapses[t] && !(t == TableRuns && q.RunsCollapsed),
+			TopN: topNOf(q, t), Collapses: collapses[t] && (t != TableRuns || !q.RunsCollapsed),
 		})
 		if err != nil {
 			return "", nil, err
