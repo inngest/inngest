@@ -20,12 +20,12 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 			expression, bucket := "event.data.app_id", "app-a"
 			key := semaphoreUsageKey(account, SemaphoreIDFnKey(fn, expression), bucket)
 			other := semaphoreUsageKey(account, SemaphoreIDFnKey(uuid.New(), expression), bucket)
-			r.Set(key, "1")
-			r.Set(other, "7")
+			require.NoError(t, r.Set(key, "1"))
+			require.NoError(t, r.Set(other, "7"))
 			wantErr := false
 			switch name {
 			case "zero usage":
-				r.Set(key, "0")
+				require.NoError(t, r.Set(key, "0"))
 			case "missing usage":
 				r.Del(key)
 			case "positive legacy usage":
@@ -35,7 +35,8 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 				if name == "expired lease" {
 					lease = ulid.MustNew(ulid.Timestamp(time.Now().Add(-time.Hour)), nil)
 				}
-				r.ZAdd(cm.keyAccountLeases(account), float64(lease.Time()), lease.String())
+				_, err := r.ZAdd(cm.keyAccountLeases(account), float64(lease.Time()), lease.String())
+				require.NoError(t, err)
 				requestID := ulid.Make()
 				r.HSet(cm.keyLeaseDetails(account, lease), "req", requestID.String())
 				request := map[string]any{"f": fn.String(), "s": []any{}}
@@ -48,7 +49,7 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 				}
 				encoded, err := json.Marshal(request)
 				require.NoError(t, err)
-				r.Set(cm.keyRequestState(account, requestID), string(encoded))
+				require.NoError(t, r.Set(cm.keyRequestState(account, requestID), string(encoded)))
 				if name == "missing lease details" {
 					r.Del(cm.keyLeaseDetails(account, lease))
 				}
@@ -56,11 +57,12 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 					r.Del(cm.keyRequestState(account, requestID))
 				}
 				if name == "malformed request" {
-					r.Set(cm.keyRequestState(account, requestID), "garbage")
+					require.NoError(t, r.Set(cm.keyRequestState(account, requestID), "garbage"))
 				}
 				if name == "lease bound" {
 					for i := 0; i < 1001; i++ {
-						r.ZAdd(cm.keyAccountLeases(account), 0, ulid.Make().String())
+						_, err := r.ZAdd(cm.keyAccountLeases(account), 0, ulid.Make().String())
+						require.NoError(t, err)
 					}
 				}
 			}
