@@ -398,6 +398,34 @@ func (l *listener) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, _ e
 	})
 }
 
+// OnFunctionSkipped writes a skipped run's one and only row: skips happen
+// before the run is scheduled, so there's no queued/started row to finish and
+// the root run span carries the terminal Skipped status directly, w/ a NULL
+// started_at and ended_at at the skip.
+func (l *listener) OnFunctionSkipped(ctx context.Context, md sv2.Metadata, s execution.SkipState, now time.Time) {
+	status := enums.StepStatusSkipped
+	reason := s.Reason
+	queuedAt := ulid.Time(md.ID.RunID.Time())
+	mdPtr := safeMetadata(md)
+
+	runAttrs := meta.NewAttrSet()
+	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &status)
+	meta.AddAttr(runAttrs, meta.Attrs.SkipReason, &reason)
+	addEventsInputAttr(ctx, runAttrs, s.Events)
+	addRunEventAttrs(runAttrs, md, s.Events)
+	tracing.AddTimingAttrs(runAttrs, queuedAt, md.Config.ScheduledAt, time.Time{}, now)
+	// Explicitly nil, as in OnFunctionCancelled: a skipped run never starts.
+	meta.AddAttr(runAttrs, meta.Attrs.StartedAt, (*time.Time)(nil))
+	addRunSpanAttrs(runAttrs, mdPtr)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameRun, &tracing.CreateSpanOptions{
+		Seed:       md.ID.RunID[:],
+		Metadata:   mdPtr,
+		StartTime:  queuedAt,
+		EndTime:    now,
+		Attributes: runAttrs,
+	})
+}
+
 // OnStepScheduled creates a point-in-time marker span (tracingv3.SpanNameStepPlanned)
 // for when a step is scheduled — a distinct span kind from the real
 // "executor.step" span, with its own random span_id rather than a seed
