@@ -13,14 +13,17 @@ import (
 
 const (
 	semaphoreIdempotencyTTL = 60 * time.Second
+	// Expiry never permits another decrement: after this window an uncertain
+	// retry fails closed instead. Held ownership records have no expiry.
+	semaphoreOwnershipRetention = 7 * 24 * time.Hour
 )
 
-var ErrSemaphoreUsageNotEmpty = errors.New("manual semaphore usage is not empty")
+var ErrSemaphoreOwnershipUnknown = errors.New("manual semaphore ownership is unknown")
 
-// UnusedSemaphoreChecker is an optional, read-only precondition for maintenance
-// cleanup under an external hold. It does not prove ownership or lock the key.
-type UnusedSemaphoreChecker interface {
-	CheckSemaphoreUnused(context.Context, uuid.UUID, string, string) error
+// OwnedSemaphoreManager is required by strict recovery callers. It deliberately
+// has no fallback to the legacy, ownership-blind decrement.
+type OwnedSemaphoreManager interface {
+	ReleaseOwnedSemaphore(context.Context, uuid.UUID, string, string, string, int64) error
 }
 
 // SetResult describes the outcome of SetCapacity. Applied is false when the
@@ -177,38 +180,36 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 }
 
 func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error {
+	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, idempotencyKey, weight, false)
+}
+
+func (m *redisSemaphoreManager) ReleaseOwnedSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, runID string, weight int64) error {
+	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, runID, weight, true)
+}
+
+func (m *redisSemaphoreManager) releaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64, strict bool) error {
 	start := time.Now()
 
 	keys := []string{
 		semaphoreUsageKey(accountID, name, evaluatedKeyHash),
 		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
+		semaphoreUsageKey(accountID, name, evaluatedKeyHash) + ":owner:" + idempotencyKey,
 	}
 	args := []string{
 		fmt.Sprintf("%d", weight),
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%t", strict),
+		fmt.Sprintf("%d", int(semaphoreOwnershipRetention.Seconds())),
 	}
 
-	err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+	result, err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).AsInt64()
+	if err == nil && result == -1 {
+		err = fmt.Errorf("%w: %s", ErrSemaphoreOwnershipUnknown, name)
+	}
 
 	m.recordMetrics(ctx, "release", start, err)
 
 	return err
-}
-
-// CheckSemaphoreUnused never releases a permit. Recovery callers must also skip
-// ordinary manual release, so another holder's later acquisition is untouched.
-func (m *redisSemaphoreManager) CheckSemaphoreUnused(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash string) error {
-	usage, err := m.client.Do(ctx, m.client.B().Get().Key(semaphoreUsageKey(accountID, name, evaluatedKeyHash)).Build()).AsInt64()
-	if rueidis.IsRedisNil(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("check manual semaphore usage: %w", err)
-	}
-	if usage != 0 {
-		return fmt.Errorf("%w: %s", ErrSemaphoreUsageNotEmpty, name)
-	}
-	return nil
 }
 
 func (m *redisSemaphoreManager) recordMetrics(ctx context.Context, operation string, start time.Time, err error) {
