@@ -181,6 +181,43 @@ func TestExecutorRunsUnion(t *testing.T) {
 	})
 }
 
+// TestExecutorRunsCollapsedSkipsRawRuns checks RunsCollapsed reads runs as
+// the plain union: a lake and delta that are one row per run, disjoint (as
+// cloud's are), come back as is, and the delta is asked for just the
+// columns the query reads, none for raw_runs' collapse.
+func TestExecutorRunsCollapsedSkipsRawRuns(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		q := f.base
+		done := q.Add(time.Minute)
+		f.lakeRun(t, f.account, "run-A", "Completed", q, &done)
+		f.deltaRun("run-B", "Running", q, nil, "")
+		f.deltaRun("run-C", "Failed", q, &done, "")
+
+		rows, err := f.exec.Query(context.Background(), Query{
+			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
+			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(), Tables: []Table{TableRuns},
+			RowCap: 1000, RunsCollapsed: true, SQL: `SELECT run_id, status FROM runs`,
+		})
+		require.NoError(t, err)
+		defer rows.Close()
+		got := map[string]string{}
+		for rows.Next() {
+			var k, v string
+			require.NoError(t, rows.Scan(&k, &v))
+			got[k] = v
+		}
+		require.NoError(t, rows.Err())
+		require.Equal(t, map[string]string{"run-A": "Completed", "run-B": "Running", "run-C": "Failed"}, got)
+
+		require.Len(t, f.streamer.reqs, 1)
+		var cols []string
+		for _, c := range f.streamer.reqs[0].Columns {
+			cols = append(cols, c.Name)
+		}
+		require.ElementsMatch(t, []string{"run_id", "status"}, cols)
+	})
+}
+
 // TestExecutorForwardsStatusPredicates covers a mutable-column filter: the
 // runs delta filters each run's latest row (the buffer collapses first), and
 // the lake holds only final rows, disjoint from the delta's, so a filter for
@@ -319,6 +356,12 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		}
 		require.NotContains(t, got, "attributes")
 		require.NotContains(t, got, "output")
+
+		// A count reads no column of the plain union, so one streams.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans}, nil, `SELECT count(*)::VARCHAR, '' FROM spans`)
+		require.Len(t, f.streamer.reqs, 1)
+		require.Len(t, f.streamer.reqs[0].Columns, 1)
 	})
 }
 

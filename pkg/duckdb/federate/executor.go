@@ -55,6 +55,13 @@ type Query struct {
 	Predicates map[Table][]Predicate
 	// RowCap bounds each table's delta.
 	RowCap int
+	// RunsCollapsed says the runs lake and delta are already one row per
+	// run, disjoint (cloud: the lake holds exported finals at or below W and
+	// the delta each run's latest row above it, or still open), so nothing
+	// collapses them: the runs view is the plain union rather than
+	// raw_runs, and a top-n cuts no lake side of its own. Leave it unset
+	// where a run's rows can straddle the two.
+	RunsCollapsed bool
 	// TopN pushes the query's ORDER BY ... LIMIT into a table's source,
 	// when the query meets TopN's conditions.
 	TopN map[Table]TopN
@@ -230,7 +237,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		src, err := sourceCTE(t, sourceSpec{
 			AccountID: q.AccountID, EnvID: q.EnvID, AllTenants: q.AllTenants, From: q.From, To: q.To,
 			Lake: q.Lake, Watermark: q.Watermark, Delta: deltaRel[t], DeltaColumns: deltaCols[t],
-			TopN: topNOf(q, t),
+			TopN: topNOf(q, t), Collapses: collapses[t] && !(t == TableRuns && q.RunsCollapsed),
 		})
 		if err != nil {
 			return "", nil, err
@@ -255,7 +262,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 	}
 	views := append([]string{}, preludeSQL...)
 	for _, t := range needed {
-		v, err := rawView(t, q.Lake)
+		v, err := rawView(t, q.Lake, q.RunsCollapsed)
 		if err != nil {
 			return "", nil, err
 		}
