@@ -1305,13 +1305,20 @@ func TestCache(t *testing.T) {
 				require.Len(t, res.Leases, 0, "a normal caller is answered from the stale cache entry")
 				require.Len(t, deps.lifecycles.AcquireCalls, 1)
 
-				res = acquire(WithoutLimitingConstraintCacheLookup(ctx), "woken")
+				deps.clock.(*clockwork.FakeClock).Advance(time.Millisecond)
+				woken := WithoutLimitingConstraintCacheBefore(ctx, deps.clock.Now())
+
+				res = acquire(woken, "woken")
 				require.Len(t, res.Leases, 1, "a caller woken by the release reaches the manager and gets the slot")
 				require.Len(t, deps.lifecycles.AcquireCalls, 2)
 
 				// The woken caller's result exhausted the constraint again and refreshed the cache.
 				res = acquire(ctx, "after")
 				require.Len(t, res.Leases, 0)
+				require.Len(t, deps.lifecycles.AcquireCalls, 2)
+
+				res = acquire(woken, "woken-after")
+				require.Len(t, res.Leases, 0, "exhaustion cached after the release is honored")
 				require.Len(t, deps.lifecycles.AcquireCalls, 2)
 			},
 		},

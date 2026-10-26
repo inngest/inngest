@@ -122,10 +122,13 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 		otherExecutor bool
 		// wakeDisabled turns the account's capacity release wake off.
 		wakeDisabled bool
-		expected     int
+		// fifo leases items sequentially instead of in parallel.
+		fifo     bool
+		expected int
 	}{
 		{name: "dequeue wake only parks the partition", expected: 0},
 		{name: "confirmed release refills the key", notify: true, expected: 6},
+		{name: "fifo honors exhaustion cached by the retry", notify: true, fifo: true, expected: 6},
 		{name: "process item notifies the shard", processItem: true, expected: 6},
 		{name: "other executor with a stale cache", notify: true, otherExecutor: true, expected: 6},
 		{name: "disabled for the account parks the partition", notify: true, wakeDisabled: true, expected: 0},
@@ -178,7 +181,6 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 				osqueue.WithClock(clock),
 				osqueue.WithCapacityManager(cache),
 				osqueue.WithPeekSizeRange(100, 100),
-				osqueue.WithDisableFifoForFunctions(map[string]struct{}{fnID.String(): {}}),
 				osqueue.WithRunMode(osqueue.QueueRunMode{}),
 				osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 					return config
@@ -187,6 +189,9 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 					require.Equal(t, accountID, id)
 					return !tc.wakeDisabled
 				}),
+			}
+			if !tc.fifo {
+				opts = append(opts, osqueue.WithDisableFifoForFunctions(map[string]struct{}{fnID.String(): {}}))
 			}
 			shard := NewQueueShard("local", NewQueueClient(rc, "{sys-1449}"), opts...)
 			registry, err := osqueue.NewSingleShardRegistry(shard)
@@ -225,6 +230,7 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 			// Fill all six slots; the response caches the key as exhausted.
 			require.NoError(t, processor.ProcessPartition(ctx, &p, 0, false, dispatch))
 			require.Len(t, dispatched, 6)
+			coldAcquires := counted.acquires.Load()
 
 			if tc.otherExecutor {
 				// A second executor caches its own denial while the key is full,
@@ -277,11 +283,18 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 				}, 5*time.Second, time.Millisecond)
 			}
 
+			// Separate the retry's cache entries from those cached before the release.
+			clock.Advance(time.Millisecond)
+
 			before := counted.acquires.Load()
 			dispatched = nil
 			require.NoError(t, processor.ProcessPartition(ctx, &p, 0, false, dispatch))
 			require.Len(t, dispatched, tc.expected)
-			t.Logf("retry dispatched=%d authoritative_acquires=%d", len(dispatched), counted.acquires.Load()-before)
+			acquires := counted.acquires.Load() - before
+			t.Logf("retry dispatched=%d authoritative_acquires=%d cold_acquires=%d", len(dispatched), acquires, coldAcquires)
+			// Skipping stale exhaustion must not cost more than scanning with an
+			// empty cache: exhaustion cached during the retry is still honored.
+			require.LessOrEqual(t, acquires, coldAcquires)
 
 			if tc.expected == 0 {
 				require.Equal(t, before, counted.acquires.Load(), "the retry is answered entirely by the stale cache")

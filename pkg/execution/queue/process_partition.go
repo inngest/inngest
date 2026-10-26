@@ -108,10 +108,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 
 	if p.CapacityReleased {
-		// Capacity was released after any cached exhaustion for this partition
-		// could have been recorded, so ask the Constraint API instead of parking
-		// on the stale answer.
-		ctx = constraintapi.WithoutLimitingConstraintCacheLookup(ctx)
+		// Capacity was released before this lease, so exhaustion cached before
+		// now may be stale. Ask the Constraint API instead, but keep honoring
+		// exhaustion this scan caches once it refills a constraint.
+		ctx = constraintapi.WithoutLimitingConstraintCacheBefore(ctx, q.Clock().Now())
 		span.SetAttributes(attribute.Bool("capacity_released", true))
 	}
 
