@@ -209,7 +209,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- inngest.run_trace_spans as is: spans need no collapse, each row is its own
 -- emission.
 --
--- A lake whose runs are already one row per run (duckdb.ModeCloud: it only
+-- A lake whose runs are already one row per run (duckdb.ModeFlatLake: it only
 -- holds exported final rows, and a federated read's delta is each run's
 -- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
 -- the window over every run row is most of an Insights query's cost there.

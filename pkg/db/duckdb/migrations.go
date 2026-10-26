@@ -26,13 +26,13 @@ const (
 	// DuckLake ATTACH, so Migrate creates the "inngest" schema itself and the
 	// DuckLake-only SET SORTED/PARTITIONED BY statements are no-ops.
 	ModeMemory Mode = iota
-	// ModeDuckLake is a DuckLake catalog whose tables hold every emission
+	// ModeRawLake is a DuckLake catalog whose tables hold every emission
 	// (devserver --persist): the migrations run unchanged.
-	ModeDuckLake
-	// ModeCloud is a DuckLake catalog whose runs are already one row per run
-	// (cloud's lake, exported from final rows only): as ModeDuckLake, but
-	// raw_runs doesn't collapse.
-	ModeCloud
+	ModeRawLake
+	// ModeFlatLake is a DuckLake catalog whose runs are already one row per
+	// run (IE exported from final rows only): as ModeRawLake, but raw_runs
+	// doesn't collapse.
+	ModeFlatLake
 )
 
 // modeEnv is the env vars each Mode sets while migrating.
@@ -53,8 +53,8 @@ const (
 // statement is still the rest of the macro, never empty).
 var modeEnv = map[Mode]map[string]string{
 	ModeMemory:   {"DUCKDB_DUCKLAKE_ONLY": "SELECT 1"},
-	ModeDuckLake: {},
-	ModeCloud:    {"DUCKDB_RUNS_COLLAPSE": ""},
+	ModeRawLake:  {},
+	ModeFlatLake: {"DUCKDB_RUNS_COLLAPSE": ""},
 }
 
 // Migrate applies every staging-table migration to db. It's safe to call

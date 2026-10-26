@@ -41,7 +41,7 @@ func newTestQuackDuckDB(t *testing.T) *sql.DB {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeDuckLake))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake))
 	return db
 }
 

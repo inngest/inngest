@@ -279,7 +279,7 @@ func TestDualWriteEndToEndRowsLandInDuckDB(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NoError(t, duckdb.Migrate(ctx, db, duckdb.ModeDuckLake))
+	require.NoError(t, duckdb.Migrate(ctx, db, duckdb.ModeRawLake))
 
 	l := tracing.NewListener(db)
 	closer, ok := l.(tracing.Closer)

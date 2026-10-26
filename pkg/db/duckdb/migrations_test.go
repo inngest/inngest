@@ -32,7 +32,7 @@ func TestMigrateCreatesStagingTables(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	require.NoError(t, Migrate(t.Context(), db, ModeDuckLake))
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
 
 	for _, table := range []string{"runs", "run_trace_spans", "events"} {
 		rows, err := db.QueryContext(t.Context(), "SELECT * FROM "+driver.DuckLakeAlias+"."+table+" LIMIT 0;")
@@ -105,12 +105,12 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	require.NoError(t, Migrate(t.Context(), db, ModeDuckLake))
-	require.NoError(t, Migrate(t.Context(), db, ModeDuckLake)) // second call must be a no-op, not an error
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake))
+	require.NoError(t, Migrate(t.Context(), db, ModeRawLake)) // second call must be a no-op, not an error
 }
 
 // TestMigrateModeRawRunsCollapse checks raw_runs collapses a run's rows to
-// its latest in every mode but ModeCloud, whose runs are already one row per
+// its latest in every mode but ModeFlatLake, whose runs are already one row per
 // run, and that insights_runs (which reads through raw_runs) follows.
 func TestMigrateModeRawRunsCollapse(t *testing.T) {
 	binPath := driver.RequireDuckDBBinary(t)
@@ -120,8 +120,8 @@ func TestMigrateModeRawRunsCollapse(t *testing.T) {
 		want int
 	}{
 		{ModeMemory, 1},
-		{ModeDuckLake, 1},
-		{ModeCloud, 2},
+		{ModeRawLake, 1},
+		{ModeFlatLake, 2},
 	}
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("mode %d", tc.mode), func(t *testing.T) {

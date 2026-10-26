@@ -36,7 +36,7 @@ func newSchemaTestDuckDB(t *testing.T) *sql.DB {
 		t.Fatalf("opening duckdb: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := duckdb.Migrate(t.Context(), db, duckdb.ModeDuckLake); err != nil {
+	if err := duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake); err != nil {
 		t.Fatalf("migrating duckdb: %v", err)
 	}
 	return db
