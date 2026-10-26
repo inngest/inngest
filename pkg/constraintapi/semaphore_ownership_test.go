@@ -36,7 +36,7 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 		if bucket == "legacy-zero" {
 			require.NoError(t, client.Do(ctx, client.B().Set().Key(semaphoreUsageKey(account, "legacy", bucket)).Value("0").Build()).Error())
 		}
-		require.ErrorIs(t, strict.ReleaseOwnedSemaphore(ctx, account, "legacy", bucket, ulid.Make().String(), 1), ErrSemaphoreOwnershipUnknown)
+		require.ErrorIs(t, strict.ReleaseOwnedSemaphore(ctx, account, "legacy", bucket, ulid.Make().String()), ErrSemaphoreOwnershipUnknown)
 	}
 	sem := SemaphoreConstraint{ID: SemaphoreIDFn(fn), EvaluatedKeyHash: "app-a", Weight: 2, Release: SemaphoreReleaseManual}
 	_, err := sm.SetCapacity(ctx, account, sem.ID, uuid.NewString(), 10)
@@ -72,12 +72,12 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 	require.ErrorIs(t, err, ErrSemaphoreOwnershipUnknown)
 	usage(4)
 
-	require.NoError(t, sm.ReleaseSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, owner.String(), 2))
+	require.NoError(t, strict.ReleaseOwnedSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, owner.String()))
 	usage(2)
 	// Erasing the old 60-second marker models a retry after its expiry. The
 	// durable owner tombstone, not that marker, must prevent a second release.
 	require.NoError(t, client.Do(ctx, client.B().Del().Key(semaphoreIdempotencyKey(account, "rel", owner.String())).Build()).Error())
-	require.NoError(t, sm.ReleaseSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, owner.String(), 2))
+	require.NoError(t, strict.ReleaseOwnedSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, owner.String()))
 	usage(2)
 
 	// Scavenge after finalization must not take the surviving holder's permit.

@@ -13,20 +13,23 @@ import (
 
 var ErrCancellationCleanupUnverified = errors.New("cancellation cleanup could not be verified")
 
-// prepareVerifiedCancellation requires an external hold with no executing work.
+// cleanupAndVerifyCancellation requires an external hold with no executing work.
 // It checks indexed and inventoried records, not unknown orphans outside both.
-func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts execution.FinalizeOpts) error {
+func (e *executor) cleanupAndVerifyCancellation(ctx context.Context, opts execution.FinalizeOpts) error {
 	if !opts.Optional.Cancel || len(opts.Optional.KnownQueueItemIDs) > 1000 {
 		return fmt.Errorf("%w: invalid bounded cancellation request", ErrCancellationCleanupUnverified)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+
+	// Phase 1: inspect the complete bounded index and inventory before mutation.
 	id := opts.Metadata.ID
 	scope := queue.Scope{AccountID: id.Tenant.AccountID, EnvID: id.Tenant.EnvID, FunctionID: id.FunctionID}
 	shard, err := e.shards.Resolve(ctx, scope, nil)
 	if err != nil {
 		return fmt.Errorf("resolve cleanup shard: %w", err)
 	}
+	// A nil entry retains an already-absent inventoried ID for final verification.
 	items := map[string]*queue.QueueItem{}
 	check := func(item *queue.QueueItem) error {
 		if item == nil || item.Data.Identifier.RunID != id.RunID || item.Data.Identifier.AccountID != id.Tenant.AccountID || item.Data.Identifier.WorkspaceID != id.Tenant.EnvID || item.FunctionID != id.FunctionID {
@@ -38,7 +41,6 @@ func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts executi
 		items[item.ID] = item
 		return nil
 	}
-	// Read and validate the complete bounded index before any destructive work.
 	count, err := shard.OutstandingJobCount(ctx, scope, id.RunID)
 	if err != nil {
 		return err
@@ -64,6 +66,7 @@ func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts executi
 	for _, itemID := range opts.Optional.KnownQueueItemIDs {
 		item, err := e.queue.LoadQueueItem(ctx, shard.Name(), itemID)
 		if errors.Is(err, queue.ErrQueueItemNotFound) {
+			items[itemID] = nil
 			continue
 		}
 		if err != nil {
@@ -73,6 +76,8 @@ func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts executi
 			return err
 		}
 	}
+
+	// Phase 2: release proven-owned permits and remove the inspected jobs.
 	for _, sem := range opts.Metadata.Config.Semaphores {
 		if sem.Release != constraintapi.SemaphoreReleaseManual {
 			continue
@@ -81,16 +86,21 @@ func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts executi
 		if !ok {
 			return fmt.Errorf("%w: ownership-aware semaphore manager required", ErrCancellationCleanupUnverified)
 		}
-		if err := manager.ReleaseOwnedSemaphore(ctx, id.Tenant.AccountID, sem.ID, sem.EvaluatedKeyHash, id.RunID.String(), sem.Weight); err != nil {
+		if err := manager.ReleaseOwnedSemaphore(ctx, id.Tenant.AccountID, sem.ID, sem.EvaluatedKeyHash, id.RunID.String()); err != nil {
 			return fmt.Errorf("%w: manual permit release: %w", ErrCancellationCleanupUnverified, err)
 		}
 	}
 	for _, item := range items {
+		if item == nil {
+			continue
+		}
 		err := e.queue.Dequeue(ctx, shard.Name(), *item)
 		if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 			return fmt.Errorf("dequeue cleanup item: %w", err)
 		}
 	}
+
+	// Phase 3: verify both the index and every indexed/inventoried raw record.
 	remaining, err := shard.OutstandingJobCount(ctx, scope, id.RunID)
 	if err != nil {
 		return err
@@ -98,15 +108,7 @@ func (e *executor) prepareVerifiedCancellation(ctx context.Context, opts executi
 	if remaining != 0 {
 		return fmt.Errorf("%w: %d indexed jobs remain", ErrCancellationCleanupUnverified, remaining)
 	}
-	// Independently verify raw records, including inventoried index orphans.
-	checkIDs := make(map[string]struct{}, len(items)+len(opts.Optional.KnownQueueItemIDs))
 	for itemID := range items {
-		checkIDs[itemID] = struct{}{}
-	}
-	for _, itemID := range opts.Optional.KnownQueueItemIDs {
-		checkIDs[itemID] = struct{}{}
-	}
-	for itemID := range checkIDs {
 		_, err := e.queue.LoadQueueItem(ctx, shard.Name(), itemID)
 		if !errors.Is(err, queue.ErrQueueItemNotFound) {
 			return fmt.Errorf("%w: item %s remains or cannot be checked: %v", ErrCancellationCleanupUnverified, itemID, err)

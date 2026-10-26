@@ -54,7 +54,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		if len(opts.Optional.InputEvents) == 0 {
 			return fmt.Errorf("%w: input events required", ErrCancellationCleanupUnverified)
 		}
-		if err := e.prepareVerifiedCancellation(ctx, opts); err != nil {
+		if err := e.cleanupAndVerifyCancellation(ctx, opts); err != nil {
 			return err
 		}
 	}

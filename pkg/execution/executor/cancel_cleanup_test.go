@@ -53,7 +53,7 @@ type cleanupSemaphores struct {
 	held, legacyCalls int
 }
 
-func (s *cleanupSemaphores) ReleaseOwnedSemaphore(context.Context, uuid.UUID, string, string, string, int64) error {
+func (s *cleanupSemaphores) ReleaseOwnedSemaphore(context.Context, uuid.UUID, string, string, string) error {
 	if s.err != nil {
 		return s.err
 	}
@@ -149,7 +149,7 @@ func newCleanupFixture(t *testing.T, jobs int) (*executor, *cleanupState, *clean
 }
 
 func TestVerifiedCancellationCleanup(t *testing.T) {
-	for _, name := range []string{"success", "metadata missing", "input missing", "permit failure", "leased item", "executing item", "read failure", "dequeue failure", "delete failure", "unreadable index", "inventoried orphan", "wrong run", "large run"} {
+	for _, name := range []string{"success", "metadata missing", "input missing", "permit failure", "leased item", "executing item", "read failure", "dequeue failure", "delete failure", "unreadable index", "inventoried orphan", "inventoried absent", "wrong run", "large run"} {
 		t.Run(name, func(t *testing.T) {
 			jobs := 3
 			if name == "large run" {
@@ -182,12 +182,14 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 			case "inventoried orphan":
 				delete(q.indexed, "0")
 				req.KnownQueueItemIDs = []string{"0", "1", "2"}
+			case "inventoried absent":
+				req.KnownQueueItemIDs = []string{"already-absent"}
 			case "wrong run":
 				q.items["0"].Data.Identifier.RunID = ulid.Make()
 				req.KnownQueueItemIDs = []string{"0"}
 			}
 			err := e.Cancel(ctx, s.md.ID, req)
-			success := name == "success" || name == "large run" || name == "inventoried orphan"
+			success := name == "success" || name == "large run" || name == "inventoried orphan" || name == "inventoried absent"
 			if success {
 				require.NoError(t, err)
 				require.True(t, s.deleted)
