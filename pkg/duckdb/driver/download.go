@@ -15,18 +15,15 @@ import (
 	"runtime"
 )
 
-// PinnedVersion, pinnedStagedCommit, and pinnedChecksums live in the
+// PinnedVersion and pinnedChecksums live in the
 // generated pinned.go, kept separate from this file so that bumping the pin
 // (via scripts/update-duckdb-version.sh) produces a small, easy-to-review
 // diff instead of touching download logic.
 
 // defaultInstallBaseURL is where EnsureBinary downloads
-// duckdb-cli-<dist>.tar.gz assets from — DuckDB's nightly/staged
-// distribution server, addressed by commit+version, mirroring the URL
-// duckdb's own official install script
-// (https://github.com/duckdb/duckdb-install-scripts) constructs for
-// DUCKDB_STAGED builds.
-const defaultInstallBaseURL = "https://duckdb-staging.duckdb.org/" + pinnedStagedCommit + "/" + PinnedVersion + "/duckdb/duckdb/github_release/"
+// duckdb-cli-<dist>.tar.gz assets from: the pinned release's GitHub release
+// downloads.
+const defaultInstallBaseURL = "https://github.com/duckdb/duckdb/releases/download/" + PinnedVersion + "/"
 
 // maxDownloadSize bounds the release archive download, mirroring
 // pkg/update/check.go's io.LimitReader precedent — the CLI archive is a few
