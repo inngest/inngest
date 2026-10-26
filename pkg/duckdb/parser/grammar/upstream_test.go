@@ -11,21 +11,21 @@ import (
 // wantLines guards against a silently truncated or failed re-fetch — see
 // Task 1/Task 15 of docs/plans/011-duckdb-select-parser-plan.md.
 var wantLines = map[string]int{
-	"vendor/statements/select.gram":            215,
-	"vendor/statements/expression.gram":        342,
-	"vendor/statements/common.gram":            196,
-	"vendor/statements/pivot.gram":             24,
-	"vendor/statements/describe.gram":          39,
-	"vendor/statements/base.gram":              19,
-	"vendor/keywords/reserved_keyword.list":    75,
-	"vendor/keywords/unreserved_keyword.list":  339,
-	"vendor/keywords/column_name_keyword.list": 54,
-	"vendor/keywords/func_name_keyword.list":   29,
-	"vendor/keywords/type_name_keyword.list":   31,
+	"upstream/statements/select.gram":            215,
+	"upstream/statements/expression.gram":        342,
+	"upstream/statements/common.gram":            196,
+	"upstream/statements/pivot.gram":             24,
+	"upstream/statements/describe.gram":          39,
+	"upstream/statements/base.gram":              19,
+	"upstream/keywords/reserved_keyword.list":    75,
+	"upstream/keywords/unreserved_keyword.list":  339,
+	"upstream/keywords/column_name_keyword.list": 54,
+	"upstream/keywords/func_name_keyword.list":   29,
+	"upstream/keywords/type_name_keyword.list":   31,
 }
 
 func TestVendoredGrammarShape(t *testing.T) {
-	version, err := os.ReadFile("vendor/VERSION")
+	version, err := os.ReadFile("upstream/VERSION")
 	require.NoError(t, err)
 	require.Equal(t, "f931913e6b03beaf75df0f56695900f765dab426", strings.TrimSpace(string(version)))
 

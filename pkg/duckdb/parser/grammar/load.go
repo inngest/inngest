@@ -7,15 +7,18 @@ import (
 	"github.com/inngest/inngest/pkg/duckdb/parser/peg"
 )
 
-//go:embed vendor
-var vendorFS embed.FS
+// Not named vendor: Go module zips drop subdirectories of any vendor
+// directory, so consumers would get an empty grammar.
+//
+//go:embed upstream
+var upstreamFS embed.FS
 
 type KeywordLists struct {
 	Reserved, Unreserved, ColumnName, FuncName, TypeName []string
 }
 
 func readLines(path string) ([]string, error) {
-	data, err := vendorFS.ReadFile(path)
+	data, err := upstreamFS.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +40,7 @@ func readLines(path string) ([]string, error) {
 func Load() (*peg.Grammar, *KeywordLists, error) {
 	var sources []string
 	for _, name := range []string{"select", "expression", "common", "pivot", "describe", "base"} {
-		data, err := vendorFS.ReadFile("vendor/statements/" + name + ".gram")
+		data, err := upstreamFS.ReadFile("upstream/statements/" + name + ".gram")
 		if err != nil {
 			return nil, nil, err
 		}
@@ -59,7 +62,7 @@ func Load() (*peg.Grammar, *KeywordLists, error) {
 		{"func_name_keyword", &kl.FuncName},
 		{"type_name_keyword", &kl.TypeName},
 	} {
-		lines, err := readLines("vendor/keywords/" + kw.file + ".list")
+		lines, err := readLines("upstream/keywords/" + kw.file + ".list")
 		if err != nil {
 			return nil, nil, err
 		}
