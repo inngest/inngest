@@ -415,6 +415,32 @@ func TestListenerOnFunctionCancelledWritesTerminalRunRow(t *testing.T) {
 	}
 }
 
+// TestListenerOnFunctionSkippedWritesTerminalRunRow proves a skipped run
+// reaches inngest.runs at all: skips return before OnFunctionScheduled, so
+// OnFunctionSkipped is the only hook a skipped run fires and its root run
+// span is the run's one and only row.
+func TestListenerOnFunctionSkippedWritesTerminalRunRow(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+	md := testMetadata(t)
+	ctx := context.Background()
+
+	l.OnFunctionSkipped(ctx, md, execution.SkipState{Reason: enums.SkipReasonFunctionPaused}, time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		_ = db.QueryRowContext(ctx, "SELECT count(*) FROM inngest.runs;").Scan(&count)
+		return count == 1
+	}, 5*time.Second, 20*time.Millisecond)
+
+	rows := selectRows(t, db, "SELECT status, started_at, ended_at FROM inngest.runs;")
+	skipped := rowByStatus(t, rows, enums.StepStatusSkipped.String())
+	require.Nil(t, skipped["started_at"])
+	require.NotNil(t, skipped["ended_at"])
+}
+
 // TestListenerEmitsGroupIDOnSpansWithQueueItem proves createSpan sets
 // meta.Attrs.GroupID (job.group.id) from queue.Item.GroupID on every span
 // built with a QueueItem — see tracing.go's addQueueItemAttrs doc comment

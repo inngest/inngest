@@ -2037,16 +2037,23 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
+	skip := execution.SkipState{
+		Reason: reason,
+		Events: evts,
+	}
+	if len(req.Events) > 0 {
+		skip.CronSchedule = req.Events[0].GetEvent().CronSchedule()
+	}
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
-				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-					Reason:       reason,
-					Events:       evts,
-				})
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, skip)
 			})
 	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionSkipped", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionSkipped(ctx, metadata, skip, syncNow)
+	})
 	return nil, nil, SkippedError{Reason: reason}
 }
 
