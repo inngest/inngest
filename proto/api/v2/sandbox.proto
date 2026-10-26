@@ -293,6 +293,9 @@ message StartSandboxProcessRequest {
   repeated string command = 2;
   map<string, string> environment = 3;
   optional string cwd = 4;
+  // signal_id, when set, asks the platform to send this signal into the
+  // environment when the process exits, carrying the exit result.
+  optional string signal_id = 5;
 }
 
 message ListSandboxProcessesRequest {

@@ -4,11 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/util"
 )
+
+// maxScopedSignalBodyBytes bounds the body of a token-authenticated signal. The
+// token holder is not a trusted API client, so the body is capped well below
+// the general request limits.
+const maxScopedSignalBodyBytes = 64 * 1024
 
 type ReceiveSignalRequest struct {
 	Signal string          `json:"signal"`
@@ -33,11 +41,49 @@ func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a.resumeSignal(w, r, auth.WorkspaceID(), data)
+}
+
+// receiveScopedSignal sends a signal authenticated by a signal token instead of
+// the environment's API key. The token names the one signal it may send, so a
+// holder (for example a sandbox) can only wake the wait it was given.
+func (a router) receiveScopedSignal(w http.ResponseWriter, r *http.Request) {
+	header := r.Header.Get("Authorization")
+	token, ok := strings.CutPrefix(header, "Bearer ")
+	if !ok || token == "" {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(nil, 401, "Missing signal token"))
+		return
+	}
+
+	claims, err := apiv1auth.VerifySignalJWT(a.opts.SignalJWTSecret, token)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "Invalid signal token"))
+		return
+	}
+
+	data := ReceiveSignalRequest{}
+	body := http.MaxBytesReader(w, r.Body, maxScopedSignalBodyBytes)
+	if err := json.NewDecoder(body).Decode(&data); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid signal data"))
+		return
+	}
+
+	if data.Signal != claims.SignalID {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(nil, 403, "Token cannot send this signal"))
+		return
+	}
+
+	a.resumeSignal(w, r, claims.Env, data)
+}
+
+func (a router) resumeSignal(w http.ResponseWriter, r *http.Request, workspaceID uuid.UUID, data ReceiveSignalRequest) {
+	ctx := r.Context()
+
 	signalRes, err := util.WithRetry(
 		ctx,
 		"apiv1.receiveSignal",
 		func(ctx context.Context) (*execution.ResumeSignalResult, error) {
-			return a.opts.Executor.ResumeSignal(ctx, auth.WorkspaceID(), data.Signal, data.Data)
+			return a.opts.Executor.ResumeSignal(ctx, workspaceID, data.Signal, data.Data)
 		},
 		util.NewRetryConf(),
 	)

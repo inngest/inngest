@@ -2576,11 +2576,14 @@ func (x *WaitSandboxProcessResponse) GetMetadata() *SandboxResponseMetadata {
 }
 
 type StartSandboxProcessRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
-	Command       []string               `protobuf:"bytes,2,rep,name=command,proto3" json:"command,omitempty"`
-	Environment   map[string]string      `protobuf:"bytes,3,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Cwd           *string                `protobuf:"bytes,4,opt,name=cwd,proto3,oneof" json:"cwd,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId   string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	Command     []string               `protobuf:"bytes,2,rep,name=command,proto3" json:"command,omitempty"`
+	Environment map[string]string      `protobuf:"bytes,3,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Cwd         *string                `protobuf:"bytes,4,opt,name=cwd,proto3,oneof" json:"cwd,omitempty"`
+	// signal_id, when set, asks the platform to send this signal into the
+	// environment when the process exits, carrying the exit result.
+	SignalId      *string `protobuf:"bytes,5,opt,name=signal_id,json=signalId,proto3,oneof" json:"signal_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2639,6 +2642,13 @@ func (x *StartSandboxProcessRequest) GetEnvironment() map[string]string {
 func (x *StartSandboxProcessRequest) GetCwd() string {
 	if x != nil && x.Cwd != nil {
 		return *x.Cwd
+	}
+	return ""
+}
+
+func (x *StartSandboxProcessRequest) GetSignalId() string {
+	if x != nil && x.SignalId != nil {
+		return *x.SignalId
 	}
 	return ""
 }
@@ -3453,17 +3463,20 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\x85\x01\n" +
 	"\x1aWaitSandboxProcessResponse\x12*\n" +
 	"\x04data\x18\x01 \x01(\v2\x16.api.v2.SandboxProcessR\x04data\x12;\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\x8b\x02\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"\xbb\x02\n" +
 	"\x1aStartSandboxProcessRequest\x12\x1d\n" +
 	"\n" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x18\n" +
 	"\acommand\x18\x02 \x03(\tR\acommand\x12U\n" +
 	"\venvironment\x18\x03 \x03(\v23.api.v2.StartSandboxProcessRequest.EnvironmentEntryR\venvironment\x12\x15\n" +
-	"\x03cwd\x18\x04 \x01(\tH\x00R\x03cwd\x88\x01\x01\x1a>\n" +
+	"\x03cwd\x18\x04 \x01(\tH\x00R\x03cwd\x88\x01\x01\x12 \n" +
+	"\tsignal_id\x18\x05 \x01(\tH\x01R\bsignalId\x88\x01\x01\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x06\n" +
-	"\x04_cwd\"\x89\x01\n" +
+	"\x04_cwdB\f\n" +
+	"\n" +
+	"_signal_id\"\x89\x01\n" +
 	"\x1bListSandboxProcessesRequest\x12\x1d\n" +
 	"\n" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x12\x1b\n" +

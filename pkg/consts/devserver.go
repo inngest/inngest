@@ -35,4 +35,5 @@ var (
 	DevServerConnectJwtSecret  = []byte("this-does-not-need-to-be-secret")
 	DevServerRealtimeJWTSecret = []byte("dev-mode-is-not-secret")
 	DevServerRunJWTSecret      = []byte("dev-mode-is-not-secret")
+	DevServerSignalJWTSecret   = []byte("dev-mode-is-not-secret")
 )

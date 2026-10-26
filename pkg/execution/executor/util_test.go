@@ -453,3 +453,19 @@ func TestAllEmptyNoneOps(t *testing.T) {
 		})
 	}
 }
+
+func TestOpGroupsPrioritizesWaitForSignal(t *testing.T) {
+	// A step that triggers the signal must not be enqueued before the wait is
+	// registered, whatever order the SDK reported them in.
+	input := []*state.GeneratorOpcode{
+		{Op: enums.OpcodeStepRun, ID: "start"},
+		{Op: enums.OpcodeWaitForSignal, ID: "wait"},
+	}
+
+	actual := opGroups(input)
+
+	require.Len(t, actual.PriorityGroup.Opcodes, 1)
+	require.Equal(t, "wait", actual.PriorityGroup.Opcodes[0].ID)
+	require.Len(t, actual.OtherGroup.Opcodes, 1)
+	require.Equal(t, "start", actual.OtherGroup.Opcodes[0].ID)
+}

@@ -78,6 +78,13 @@ func OpcodeIsPriority(o Opcode) bool {
 		// finish processing the WaitForEvent before the SendEvent does its
 		// thing, then we may miss the event.
 		return true
+	case OpcodeWaitForSignal:
+		// Prioritize in case the user wrote a "[WaitForSignal, StepRun]"
+		// pattern, where the step causes the signal to be sent (for example a
+		// sandbox process that signals when it exits). The wait must be
+		// registered before the step is enqueued, or the signal could arrive
+		// first and be dropped.
+		return true
 	case OpcodeDeferAdd, OpcodeDeferAbort:
 		// Prioritize in case the SDK returned something like "[DeferAdd,
 		// RunComplete]". If we don't finish processing the DeferAdd before

@@ -91,6 +91,11 @@ type Opts struct {
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
 
+	// SignalJWTSecret signs and verifies signal tokens (see
+	// apiv1auth.CreateSignalJWT). When empty, the token-authenticated signal
+	// route is not mounted.
+	SignalJWTSecret []byte
+
 	// CheckpointOpts represents required opts for the checkpoint API
 	CheckpointOpts CheckpointAPIOpts
 
@@ -172,6 +177,12 @@ func (a *router) setup() {
 				})
 				r.Mount("/", rt)
 			})
+		}
+
+		// The scoped signal route authenticates with a signal token rather than
+		// the general auth middleware, so it sits outside the authed group.
+		if len(a.opts.SignalJWTSecret) > 0 {
+			r.Post("/signals/scoped", a.receiveScopedSignal)
 		}
 
 		// Checkpoint output API does its own auth (using query params), so
