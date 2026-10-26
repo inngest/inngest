@@ -56,6 +56,7 @@ type redisCapacityManager struct {
 	enableHighCardinalityInstrumentation EnableHighCardinalityInstrumentation
 	enableAcquireCache                   EnableAcquireCacheFn
 	acquireCacheTTL                      AcquireCacheTTLFn
+	manualSemaphoreOwnership             bool
 
 	lifecycles []ConstraintAPILifecycleHooks
 
@@ -66,6 +67,13 @@ type redisCapacityManager struct {
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
+
+// WithManualSemaphoreOwnership records manual permits by run, atomically with
+// acquisition. Deploy ownership-aware releasers (including scavengers) before
+// enabling this on any writer. Legacy permits cannot be attributed retroactively.
+func WithManualSemaphoreOwnership() RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) { m.manualSemaphoreOwnership = true }
+}
 
 func WithShardName(name string) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {

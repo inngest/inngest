@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,18 @@ import (
 
 const (
 	semaphoreIdempotencyTTL = 60 * time.Second
+	// Expiry never permits another decrement: after this window an uncertain
+	// retry fails closed instead. Held ownership records have no expiry.
+	semaphoreOwnershipRetention = 7 * 24 * time.Hour
 )
+
+var ErrSemaphoreOwnershipUnknown = errors.New("manual semaphore ownership is unknown")
+
+// OwnedSemaphoreManager is required by strict recovery callers. It deliberately
+// has no fallback to the legacy, ownership-blind decrement.
+type OwnedSemaphoreManager interface {
+	ReleaseOwnedSemaphore(context.Context, uuid.UUID, string, string, string, int64) error
+}
 
 // SetResult describes the outcome of SetCapacity. Applied is false when the
 // call was an idempotent replay of a previously-seen idempotency key; callers
@@ -54,11 +66,25 @@ type SemaphoreManager interface {
 }
 
 type redisSemaphoreManager struct {
-	client rueidis.Client
+	client          rueidis.Client
+	strictOwnership bool
 }
 
-func NewRedisSemaphoreManager(client rueidis.Client) SemaphoreManager {
-	return &redisSemaphoreManager{client: client}
+type SemaphoreManagerOption func(*redisSemaphoreManager)
+
+// WithStrictSemaphoreOwnership refuses legacy releases when usage is positive
+// but the target run has no ownership record. It must not infer ownership from
+// a run's start time or from a shared counter.
+func WithStrictSemaphoreOwnership() SemaphoreManagerOption {
+	return func(m *redisSemaphoreManager) { m.strictOwnership = true }
+}
+
+func NewRedisSemaphoreManager(client rueidis.Client, options ...SemaphoreManagerOption) SemaphoreManager {
+	m := &redisSemaphoreManager{client: client}
+	for _, option := range options {
+		option(m)
+	}
+	return m
 }
 
 func semaphoreCapacityKey(accountID uuid.UUID, name string) string {
@@ -168,18 +194,32 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 }
 
 func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error {
+	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, idempotencyKey, weight, m.strictOwnership)
+}
+
+func (m *redisSemaphoreManager) ReleaseOwnedSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, runID string, weight int64) error {
+	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, runID, weight, true)
+}
+
+func (m *redisSemaphoreManager) releaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64, strict bool) error {
 	start := time.Now()
 
 	keys := []string{
 		semaphoreUsageKey(accountID, name, evaluatedKeyHash),
 		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
+		semaphoreUsageKey(accountID, name, evaluatedKeyHash) + ":owner:" + idempotencyKey,
 	}
 	args := []string{
 		fmt.Sprintf("%d", weight),
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%t", strict),
+		fmt.Sprintf("%d", int(semaphoreOwnershipRetention.Seconds())),
 	}
 
-	err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()
+	result, err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).AsInt64()
+	if err == nil && result == -1 {
+		err = fmt.Errorf("%w: %s", ErrSemaphoreOwnershipUnknown, name)
+	}
 
 	m.recordMetrics(ctx, "release", start, err)
 
