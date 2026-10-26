@@ -62,10 +62,6 @@ type redisRequestState struct {
 	// LeaseRunIDs stores the run IDs associated with hashed lease idempotency keys
 	LeaseRunIDs map[string]ulid.ULID `json:"lri,omitempty"`
 
-	// Persist the protocol version so release/scavenge honors how this request
-	// acquired permits, even if the writer's rollout setting changes later.
-	ManualSemaphoreOwnership bool `json:"mso,omitempty"`
-
 	// Annotate metadata
 	Metadata stateMetadata `json:"m,omitzero"`
 }
@@ -77,10 +73,6 @@ func buildRequestState(req *CapacityAcquireRequest) (
 	string,
 	error,
 ) {
-	return buildRequestStateWithOwnership(req, false)
-}
-
-func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool) ([]byte, []ConstraintItem, map[string]string, string, error) {
 	state := &redisRequestState{
 		OperationIdempotencyKey: req.IdempotencyKey,
 		EnvID:                   req.EnvID,
@@ -125,19 +117,6 @@ func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool)
 	}
 
 	state.LeaseRunIDs = leaseRunIDs
-	state.ManualSemaphoreOwnership = ownership
-	if ownership {
-		for _, c := range req.Constraints {
-			if c.Kind != ConstraintKindSemaphore || c.Semaphore.Release != SemaphoreReleaseManual {
-				continue
-			}
-			for _, key := range req.LeaseIdempotencyKeys {
-				if req.LeaseRunIDs[key] == (ulid.ULID{}) {
-					return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires a run ID for each lease")
-				}
-			}
-		}
-	}
 
 	// Sort and serialize constraints with embedded configuration limits
 	constraints := req.Constraints
@@ -245,7 +224,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestStateWithOwnership(req, r.manualSemaphoreOwnership)
+	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestState(req)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}

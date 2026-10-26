@@ -259,17 +259,6 @@ for index, value in ipairs(constraints) do
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if requestDetails.mso and value.sem.rel == 1 then
-			for _, lik in ipairs(requestDetails.lik) do
-				local runID = requestDetails.lri[lik]
-				local owned = call("GET", value.sem.k .. ":owner:" .. runID)
-				if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
-					return redis.error_reply("ERR manual semaphore ownership is invalid")
-				end
-				-- Never revive an already finalized/scavenged run's permit.
-				if owned == "0" then remaining = 0 end
-			end
-		end
 		if remaining < weight then
 			constraintCapacity = 0
 		else
@@ -395,15 +384,6 @@ for i, value in ipairs(constraints) do
 			weight = 1
 		end
 		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
-		if requestDetails.mso and value.sem.rel == 1 then
-			-- Once a key uses ownership, a missing owner must never fall back
-			-- to a legacy decrement, even after released tombstones expire.
-			call("SET", value.sem.k .. ":ownership", "1")
-			for j = 1, granted do
-				local runID = requestDetails.lri[requestDetails.lik[j]]
-				call("INCRBY", value.sem.k .. ":owner:" .. runID, toInteger(weight))
-			end
-		end
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
 		local remaining = capacity - newUsage
 		if remaining < weight then
