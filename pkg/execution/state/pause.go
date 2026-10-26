@@ -14,7 +14,6 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
@@ -29,10 +28,10 @@ type PauseMutater interface {
 	DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error
 
 	// PauseIDsForRun returns all pause IDs associated with a run.
-	PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error)
+	PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error)
 
 	// DeleteRunPausesIndex deletes the index tracking pauses for a run.
-	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error
+	DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
 
 	// DeletePausesForRun deletes all pauses associated with a run.
 	DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error
@@ -61,7 +60,7 @@ type PauseGetter interface {
 	// that have not yet been consumed in order to properly handle timeouts.
 	//
 	// This should not return consumed pauses.
-	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
+	PauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) (*Pause, error)
 
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.

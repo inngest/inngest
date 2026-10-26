@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
@@ -111,11 +112,24 @@ func (s *ShardedClient) Batch() *BatchClient {
 }
 
 type PauseClient struct {
-	kg          PauseKeyGenerator
-	unshardedRc rueidis.Client
+	kg              PauseKeyGenerator
+	unshardedRc     rueidis.Client
+	stateDefaultKey string
+	workspaceScoped bool
 }
 
-func (p *PauseClient) KeyGenerator() PauseKeyGenerator {
+// KeyPrefix is the hash tag shared by a workspace's pause records and indexes.
+func (p *PauseClient) KeyPrefix(workspaceID uuid.UUID) string {
+	if p.workspaceScoped {
+		return fmt.Sprintf("%s:%s", p.stateDefaultKey, workspaceID)
+	}
+	return p.stateDefaultKey
+}
+
+func (p *PauseClient) KeyGenerator(workspaceID uuid.UUID) PauseKeyGenerator {
+	if p.workspaceScoped {
+		return pauseKeyGenerator{stateDefaultKey: p.KeyPrefix(workspaceID)}
+	}
 	return p.kg
 }
 
@@ -125,8 +139,9 @@ func (p *PauseClient) Client() rueidis.Client {
 
 func NewPauseClient(r rueidis.Client, stateDefaultKey string) *PauseClient {
 	return &PauseClient{
-		kg:          pauseKeyGenerator{stateDefaultKey: stateDefaultKey},
-		unshardedRc: r,
+		kg:              pauseKeyGenerator{stateDefaultKey: stateDefaultKey},
+		unshardedRc:     r,
+		stateDefaultKey: stateDefaultKey,
 	}
 }
 
@@ -225,12 +240,25 @@ func (u *UnshardedClient) Global() *GlobalClient {
 	return u.global
 }
 
-func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string) *UnshardedClient {
-	return &UnshardedClient{
+type UnshardedClientOpt func(*UnshardedClient)
+
+// WithWorkspaceScopedPauseKeys opts a new pause store into workspace hash tags.
+// It does not migrate existing keys. Keep legacy readers on the default layout.
+// Other users of the unsharded client retain their existing key layout.
+func WithWorkspaceScopedPauseKeys() UnshardedClientOpt {
+	return func(u *UnshardedClient) { u.pauses.workspaceScoped = true }
+}
+
+func NewUnshardedClient(r rueidis.Client, stateDefaultKey, queueDefaultKey string, opts ...UnshardedClientOpt) *UnshardedClient {
+	u := &UnshardedClient{
 		pauses:        NewPauseClient(r, stateDefaultKey),
 		queue:         NewQueueClient(r, queueDefaultKey),
 		debounce:      NewDebounceClient(r, queueDefaultKey),
 		global:        NewGlobalClient(r, stateDefaultKey),
 		unshardedConn: r,
 	}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }

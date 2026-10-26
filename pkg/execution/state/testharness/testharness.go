@@ -1293,7 +1293,7 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 	_, err := pm.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	found, err := pm.PauseByID(ctx, pause.ID)
+	found, err := pm.PauseByID(ctx, pause.ID, pause.WorkspaceID)
 	require.Nil(t, err)
 	// SavePause embeds the CreatedAt time, so assign it to expected pause for comparison
 	pause.CreatedAt = found.CreatedAt
@@ -1302,7 +1302,7 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 	<-time.After(time.Second * 3)
 
 	// Still found.
-	found, err = pm.PauseByID(ctx, pause.ID)
+	found, err = pm.PauseByID(ctx, pause.ID, pause.WorkspaceID)
 	require.Nil(t, err, "PauseByID should return expired but unconsumed pauses")
 	require.EqualValues(t, pause, *found)
 
@@ -1312,12 +1312,12 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 	})
 	require.Nil(t, err, "Consuming an expired pause should work")
 
-	found, err = pm.PauseByID(ctx, pause.ID)
+	found, err = pm.PauseByID(ctx, pause.ID, pause.WorkspaceID)
 	require.Nil(t, found, "PauseByID should not return consumed pauses")
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
-	found, err = pm.PauseByID(ctx, uuid.New())
+	found, err = pm.PauseByID(ctx, uuid.New(), pause.WorkspaceID)
 	require.Nil(t, found, "PauseByID should not return random IDs")
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
