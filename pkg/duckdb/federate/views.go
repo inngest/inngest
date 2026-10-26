@@ -66,6 +66,9 @@ type sourceSpec struct {
 	// TopN, if set, keeps the lake side to its first rows (Query.TopN), its
 	// predicates applied exactly.
 	TopN *topNSpec
+	// Collapses says the table's view collapses rows (see collapses), so a
+	// TopN cuts the lake side on its own.
+	Collapses bool
 }
 
 // collapses are the tables whose views collapse rows (raw_runs keeps each
@@ -128,7 +131,7 @@ func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
 			quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name))}, nil
 	}
 	lakeSide := fmt.Sprintf("SELECT %s\n  FROM %s WHERE %s", strings.Join(lake, ", "), spec.Lake.table(phys.Name), filter)
-	if spec.TopN != nil && collapses[t] {
+	if spec.TopN != nil && spec.Collapses {
 		where, whereArgs, err := predicatesSQL(t, spec.TopN.Predicates)
 		if err != nil {
 			return CTEDef{}, err
@@ -153,11 +156,15 @@ func deltaSelect(c schema.Column) string {
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
-// inngest.raw_runs over their federated source; spans and events are the
-// source itself (each row is its own emission / event).
-func rawView(t Table, lake LakeSource) (string, error) {
+// inngest.raw_runs over their federated source (unless runsCollapsed, see
+// Query.RunsCollapsed); spans and events are the source itself (each row is
+// its own emission / event).
+func rawView(t Table, lake LakeSource, runsCollapsed bool) (string, error) {
 	switch t {
 	case TableRuns:
+		if runsCollapsed {
+			return fmt.Sprintf("%s AS (SELECT * FROM %s)", quoteIdent(string(t)), quoteIdent(SourceName(t))), nil
+		}
 		return fmt.Sprintf("%s AS (SELECT * FROM %s.raw_runs(p_runs := '%s'))",
 			quoteIdent(string(t)), quoteIdent(lake.Catalog), SourceName(t)), nil
 	case TableSpans, TableEvents:

@@ -103,6 +103,11 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 				cols = append(cols, c)
 			}
 		}
+		if len(cols) == 0 {
+			// The scan reads rows but no columns (count(*) over a plain
+			// union): stream one, so the delta still has its rows.
+			cols = DeltaColumns(t)[:1]
+		}
 		out[t] = cols
 	}
 	return out, nil
