@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { RiArrowDownSLine, RiArrowRightUpLine } from '@remixicon/react';
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { Button } from '@inngest/components/Button';
 
@@ -91,64 +91,64 @@ export function RunAISetup({
 }
 
 function ClaudeSetup({ onAction }: { onAction: (event: RunAIAction) => void }) {
-  const [showCLI, setShowCLI] = useState(false);
   return (
     <section aria-label="Connection instructions" className="mt-5 text-xs">
       <p className="text-muted leading-5">
-        Connect your Inngest account in Claude, then paste the prompt below.
+        Connect using the official Inngest connector. Then paste the prompt
+        below.
       </p>
-      <a
+      <Button
+        kind="primary"
+        appearance="outlined"
+        size="small"
+        label="Connect Inngest"
+        icon={<RiArrowRightUpLine />}
+        iconSide="right"
         href="https://claude.ai/directory/inngest"
         target="_blank"
         rel="noopener noreferrer"
-        className="text-link mt-2 inline-flex items-center gap-1 hover:underline"
+        className="mt-2"
         onClick={() => onAction({ action: 'setup_opened', client: 'claude' })}
-      >
-        Connect Inngest in Claude
-        <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
-      </a>
-      <Button
-        kind="secondary"
-        appearance="ghost"
-        size="small"
-        label="Set up with Claude Code"
-        icon={
-          <RiArrowDownSLine className={showCLI ? 'rotate-180' : undefined} />
-        }
-        iconSide="right"
-        aria-expanded={showCLI}
-        className="mt-3 px-0"
-        onClick={() => setShowCLI(!showCLI)}
       />
-      {showCLI && (
-        <div className="mt-2">
-          <p className="text-muted mb-1">Run in your terminal:</p>
-          <SetupCommand
-            code="claude plugin install inngest@anthropic-plugin-directory"
-            label="Copy setup command"
-            client="claude_code"
-            onAction={onAction}
-          />
-          <p className="text-muted mt-2 leading-5">
-            Start a new Claude Code session, open <InlineCode>/mcp</InlineCode>,
-            select <InlineCode>plugin:inngest:inngest-cloud</InlineCode>, and
-            sign in. Choose your account, environment, and read access in your
-            browser.
-          </p>
-          <a
-            href="https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-link mt-3 inline-flex items-center gap-1 hover:underline"
-            onClick={() =>
-              onAction({ action: 'guide_clicked', guide: 'connection' })
-            }
-          >
-            Full setup guide
-            <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
-          </a>
-        </div>
-      )}
+      <AccordionList
+        type="single"
+        collapsible
+        className="mt-3 rounded-none border-0"
+      >
+        <AccordionList.Item value="cli">
+          <AccordionList.Trigger className="text-muted text-xs [&_button>div]:px-0 [&_button>div]:py-1 [&_button:hover]:bg-transparent [&_button:hover]:text-basis">
+            Set up with Claude Code
+          </AccordionList.Trigger>
+          <AccordionList.Content className="px-0 pb-0 pt-2 text-xs">
+            <p className="text-muted mb-1">Run in your terminal:</p>
+            <SetupCommand
+              code="claude plugin install inngest@anthropic-plugin-directory"
+              label="Copy setup command"
+              client="claude_code"
+              onAction={onAction}
+            />
+            <p className="text-muted mt-2 leading-5">
+              Start a new Claude Code session, open{' '}
+              <InlineCode>/mcp</InlineCode>, select{' '}
+              <InlineCode>plugin:inngest:inngest-cloud</InlineCode>, and sign
+              in. Choose your account, environment, and read access in your
+              browser.
+            </p>
+            <a
+              href="https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-link mt-3 inline-flex items-center gap-1 hover:underline"
+              onClick={() =>
+                onAction({ action: 'guide_clicked', guide: 'connection' })
+              }
+            >
+              Full setup guide
+              <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
+            </a>
+          </AccordionList.Content>
+        </AccordionList.Item>
+      </AccordionList>
     </section>
   );
 }
@@ -160,55 +160,53 @@ function OpenAISetup({
   endpoint: string;
   onAction: (event: RunAIAction) => void;
 }) {
-  const [showCLI, setShowCLI] = useState(false);
   const command = createMCPClients(endpoint, false).find(
     ({ id }) => id === 'codex',
   )!.snippet.content;
   return (
     <section aria-label="Connection instructions" className="mt-5 text-xs">
       <p className="text-muted leading-5">
-        Install the Inngest plugin in ChatGPT or Codex and connect your account.
-        Start a new chat, then paste the prompt below.
+        Connect using the official Inngest plugin. Then start a new chat and
+        paste the prompt below.
       </p>
-      <a
+      <Button
+        kind="primary"
+        appearance="outlined"
+        size="small"
+        label="Connect Inngest"
+        icon={<RiArrowRightUpLine />}
+        iconSide="right"
         href={chatGPTPluginURL}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-link mt-2 inline-flex items-center gap-1 hover:underline"
+        className="mt-2"
         onClick={() =>
           onAction({ action: 'setup_opened', client: 'chatgpt_codex' })
         }
-      >
-        Connect Inngest to ChatGPT / Codex
-        <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
-      </a>
-      <Button
-        kind="secondary"
-        appearance="ghost"
-        size="small"
-        label="Set up with Codex CLI"
-        icon={
-          <RiArrowDownSLine className={showCLI ? 'rotate-180' : undefined} />
-        }
-        iconSide="right"
-        aria-expanded={showCLI}
-        className="mt-3 px-0"
-        onClick={() => setShowCLI(!showCLI)}
       />
-      {showCLI && (
-        <div className="mt-2">
-          <p className="text-muted mb-1">Run in your terminal:</p>
-          <SetupCommand
-            code={`${command}\ncodex mcp login inngest-cloud`}
-            label="Copy setup command"
-            client="codex_cli"
-            onAction={onAction}
-          />
-          <p className="text-muted mt-2 leading-5">
-            Choose your account, environment, and read access in your browser.
-          </p>
-        </div>
-      )}
+      <AccordionList
+        type="single"
+        collapsible
+        className="mt-3 rounded-none border-0"
+      >
+        <AccordionList.Item value="cli">
+          <AccordionList.Trigger className="text-muted text-xs [&_button>div]:px-0 [&_button>div]:py-1 [&_button:hover]:bg-transparent [&_button:hover]:text-basis">
+            Set up with Codex CLI
+          </AccordionList.Trigger>
+          <AccordionList.Content className="px-0 pb-0 pt-2 text-xs">
+            <p className="text-muted mb-1">Run in your terminal:</p>
+            <SetupCommand
+              code={`${command}\ncodex mcp login inngest-cloud`}
+              label="Copy setup command"
+              client="codex_cli"
+              onAction={onAction}
+            />
+            <p className="text-muted mt-2 leading-5">
+              Choose your account, environment, and read access in your browser.
+            </p>
+          </AccordionList.Content>
+        </AccordionList.Item>
+      </AccordionList>
     </section>
   );
 }

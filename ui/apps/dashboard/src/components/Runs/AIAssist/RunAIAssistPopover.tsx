@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import Tabs from '@inngest/components/Tabs/Tabs';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { Textarea } from '@inngest/components/Forms/Textarea';
@@ -59,10 +60,7 @@ export function RunAIAssistPopover({
 }: Props) {
   const productionCloud = endpoint === 'https://api.inngest.com/mcp';
   const [open, setOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<SetupClient | null>(
-    null,
-  );
-  const setupID = useId();
+  const [selectedClient, setSelectedClient] = useState<SetupClient>('codex');
   const [previewTime, setPreviewTime] = useState(() => new Date());
   const viewed = useRef(false);
   const debugging = mode === 'debug';
@@ -143,57 +141,51 @@ export function RunAIAssistPopover({
             ? 'Connect your AI tool to investigate this run.'
             : 'Connect your AI tool to find runs and inspect traces.'}
         </p>
-        <div
-          className={`mt-3 grid gap-1.5 ${productionCloud ? 'grid-cols-[1.4fr_1fr_1fr]' : 'grid-cols-3'}`}
+        <Tabs
+          value={selectedClient}
+          className="mt-3"
+          onValueChange={(value) => {
+            const client = clients.find(({ id }) => id === value)!;
+            setSelectedClient(client.id);
+            onAction({
+              action: 'setup_clicked',
+              client:
+                productionCloud && client.id === 'codex'
+                  ? 'chatgpt_codex'
+                  : productionCloud && client.id === 'claude'
+                    ? 'claude'
+                    : client.tracking,
+            });
+          }}
         >
-          {clients.map(({ id, label, tracking, Icon }) => (
-            <Button
-              key={id}
-              kind="secondary"
-              appearance="outlined"
-              size="small"
-              label={
-                !productionCloud && id === 'codex'
-                  ? 'Codex'
-                  : !productionCloud && id === 'claude'
-                    ? 'Claude Code'
-                    : label
-              }
-              icon={<Icon />}
-              iconSide="left"
-              aria-expanded={selectedClient === id}
-              aria-controls={selectedClient === id ? setupID : undefined}
-              className={
-                selectedClient === id
-                  ? 'border-contrast bg-canvasSubtle'
-                  : undefined
-              }
-              onClick={() => {
-                setSelectedClient(selectedClient === id ? null : id);
-                if (selectedClient !== id)
-                  onAction({
-                    action: 'setup_clicked',
-                    client:
-                      id === 'codex' && productionCloud
-                        ? 'chatgpt_codex'
-                        : id === 'claude' && productionCloud
-                          ? 'claude'
-                          : tracking,
-                  });
-              }}
-            />
+          <Tabs.List aria-label="AI tool">
+            {clients.map(({ id, label, Icon }) => (
+              <Tabs.Tab
+                key={id}
+                value={id}
+                title={
+                  !productionCloud && id === 'codex'
+                    ? 'Codex'
+                    : !productionCloud && id === 'claude'
+                      ? 'Claude Code'
+                      : label
+                }
+                iconBefore={<Icon className="h-4 w-4" />}
+                className={`min-w-0 gap-1 border-r-0 px-2 text-xs ${productionCloud && id === 'codex' ? 'flex-[1.4]' : ''}`}
+              />
+            ))}
+          </Tabs.List>
+          {clients.map(({ id }) => (
+            <Tabs.Content key={id} value={id}>
+              <RunAISetup
+                key={`${id}:${endpoint}`}
+                client={id}
+                endpoint={endpoint}
+                onAction={onAction}
+              />
+            </Tabs.Content>
           ))}
-        </div>
-        {selectedClient && (
-          <div id={setupID}>
-            <RunAISetup
-              key={`${selectedClient}:${endpoint}`}
-              client={selectedClient}
-              endpoint={endpoint}
-              onAction={onAction}
-            />
-          </div>
-        )}
+        </Tabs>
         <hr className="border-subtle my-4" />
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-basis text-xs font-medium">
