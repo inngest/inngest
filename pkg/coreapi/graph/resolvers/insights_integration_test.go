@@ -43,7 +43,7 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)
 	}
-	if err := duckdb.Migrate(t.Context(), db, true); err != nil {
+	if err := duckdb.Migrate(t.Context(), db, duckdb.ModeDuckLake); err != nil {
 		t.Fatalf("migrating duckdb: %v", err)
 	}
 	return db, func() { _ = db.Close() }

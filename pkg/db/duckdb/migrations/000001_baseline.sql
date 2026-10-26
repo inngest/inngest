@@ -208,14 +208,18 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(recei
 -- push below the window into the scan. raw_run_trace_spans is
 -- inngest.run_trace_spans as is: spans need no collapse, each row is its own
 -- emission.
-
+--
+-- A lake whose runs are already one row per run (duckdb.ModeCloud: it only
+-- holds exported final rows, and a federated read's delta is each run's
+-- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
+-- the window over every run row is most of an Insights query's cost there.
+-- The QUALIFY is one line because goose's substitution can't take a default
+-- spanning lines.
+-- +goose ENVSUB ON
 CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
 SELECT * FROM query_table(p_runs)
-QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY account_id, env_id, run_id
-  ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC,
-           COALESCE(ended_at, started_at, queued_at) DESC
-) = 1;
+${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC) = 1};
+-- +goose ENVSUB OFF
 
 CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
 SELECT * FROM query_table(p_spans);

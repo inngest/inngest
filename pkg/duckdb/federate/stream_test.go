@@ -37,7 +37,7 @@ func newTestDB(t *testing.T) *sql.DB {
 		t.Skipf("duckdb with quack unavailable: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, duckdb.Migrate(t.Context(), db, true))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeDuckLake))
 	return db
 }
 
