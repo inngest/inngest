@@ -482,7 +482,7 @@ func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Tim
 
 	ids, err := b.pc.Client().Do(
 		ctx,
-		b.pc.Client().B().Zrangebyscore().Key(blockIndexKey(index)).Min(score).Max("+inf").Build(),
+		b.pc.Client().B().Zrangebyscore().Key(b.blockIndexKey(index)).Min(score).Max("+inf").Build(),
 	).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error querying block index: since %s: %w", score, err)
@@ -540,7 +540,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 		return nil
 	}
 
-	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pause.ID)
+	blockIndexKey := b.pc.KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, pause.ID)
 	err = b.pc.Client().Do(ctx, b.pc.Client().B().Set().Key(blockIndexKey).Value(PauseBlockIndexTombstone).Ex(PauseBlockIndexTombstoneDuration).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error deleting block index while deleting pause: %w", err)
@@ -551,7 +551,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 	// - Pauses on block boundaries (2 operations)
 	// - Legacy pauses without timestamps (all blocks)
 	for _, blockID := range blockIDs {
-		err = b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pause.ID.String()).Build()).Error()
+		err = b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(b.blockDeleteKey(index, blockID)).Member(pause.ID.String()).Build()).Error()
 		if err != nil {
 			return fmt.Errorf("error tracking pause delete in block %s: %w", blockID, err)
 		}
@@ -581,7 +581,7 @@ return 0
 // This method must be called before the pause is deleted from the buffer, otherwise the block index
 // lookup will fail and we won't know which block contains the pause.
 func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
-	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
+	blockIndexKey := b.pc.KeyGenerator(workspaceID).PauseBlockIndex(ctx, pauseID)
 
 	// Keep the locator until the deletion marker is written so failures can retry.
 	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Get().Key(blockIndexKey).Build()).ToString()
@@ -631,7 +631,7 @@ func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspace
 
 	index := Index{WorkspaceID: workspaceID, EventName: blockIndex.EventName}
 
-	if err := b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error(); err != nil {
+	if err := b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(b.blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error(); err != nil {
 		return err
 	}
 
@@ -657,7 +657,7 @@ func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
 func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
 	cmd := b.pc.Client().B().
 		Zrevrangebyscore().
-		Key(blockIndexKey(index)).
+		Key(b.blockIndexKey(index)).
 		Max("+inf").
 		Min("-inf").
 		Limit(0, 1).
@@ -679,7 +679,7 @@ func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*block
 
 	id := ids[0]
 
-	cmd = b.pc.Client().B().Hget().Key(blockMetadataKey(index)).Field(id).Build()
+	cmd = b.pc.Client().B().Hget().Key(b.blockMetadataKey(index)).Field(id).Build()
 
 	md := &blockMetadata{}
 	if err := b.pc.Client().Do(ctx, cmd).DecodeJSON(md); err != nil {
@@ -690,7 +690,7 @@ func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*block
 
 func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
 	// First, look up the pause ID -> block ID mapping from the pause block index
-	indexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
+	indexKey := b.pc.KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, pauseID)
 	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Get().Key(indexKey).Build()).ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
@@ -730,7 +730,7 @@ func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UU
 	for _, pause := range block.Pauses {
 		if pause.ID == pauseID {
 			// Check if this pause has been marked for deletion
-			deleteKey := blockDeleteKey(index, blockID)
+			deleteKey := b.blockDeleteKey(index, blockID)
 			isDeleted, err := b.pc.Client().Do(ctx, b.pc.Client().B().Sismember().Key(deleteKey).Member(pauseID.String()).Build()).AsBool()
 			if err != nil {
 				return nil, fmt.Errorf("error checking if pause is deleted: %w", err)
@@ -760,7 +760,7 @@ func (b *blockstore) maybeCompact(ctx context.Context, index Index, blockIDs []u
 
 		var maxDeletes int64
 		for _, blockID := range blockIDs {
-			size, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(blockDeleteKey(index, blockID)).Build()).AsInt64()
+			size, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(b.blockDeleteKey(index, blockID)).Build()).AsInt64()
 			if err != nil {
 				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err, "block_id", blockID)
 				continue
@@ -834,7 +834,7 @@ func (b *blockstore) compact(ctx context.Context, index Index) error {
 			continue
 		}
 
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := b.blockDeleteKey(index, blockID)
 		deleteCount, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(deleteKey).Build()).AsInt64()
 		if err != nil {
 			l.Error("error getting delete count for block", "block_id", blockIDStr, "error", err)
@@ -904,7 +904,7 @@ func (b *blockstore) compactBlock(ctx context.Context, l logger.Logger, index In
 	}
 
 	// Filter out deleted pauses from the block
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := b.blockDeleteKey(index, blockID)
 	deletedPauseIDs, err := b.pc.Client().Do(ctx, b.pc.Client().B().Smembers().Key(deleteKey).Build()).AsStrSlice()
 	if err != nil {
 		l.ReportError(err, "error getting deleted pause IDs for block", blockIDTags)
@@ -1019,7 +1019,7 @@ func (b *blockstore) GetBlockMetadata(ctx context.Context, index Index) (map[str
 }
 
 func (b *blockstore) GetBlockDeleteCount(ctx context.Context, index Index, blockID ulid.ULID) (int64, error) {
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := b.blockDeleteKey(index, blockID)
 	return b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(deleteKey).Build()).AsInt64()
 }
 
@@ -1041,7 +1041,7 @@ func (b *blockstore) GetBlockPauseIDs(ctx context.Context, index Index, blockID 
 }
 
 func (b *blockstore) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := b.blockDeleteKey(index, blockID)
 
 	// Get total count first
 	totalCount, err := b.pc.Client().Do(ctx, b.pc.Client().B().Scard().Key(deleteKey).Build()).AsInt64()
@@ -1059,7 +1059,7 @@ func (b *blockstore) GetBlockDeletedIDs(ctx context.Context, index Index, blockI
 }
 
 func (b *blockstore) readAllBlockMetadata(ctx context.Context, index Index) (map[string]*blockMetadata, error) {
-	metadataKey := blockMetadataKey(index)
+	metadataKey := b.blockMetadataKey(index)
 	metadataMap, err := b.pc.Client().Do(ctx, b.pc.Client().B().Hgetall().Key(metadataKey).Build()).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("error reading block metadata for index %s: %w", index, err)
@@ -1086,7 +1086,7 @@ func (b *blockstore) blockIDsForTimestamp(ctx context.Context, idx Index, ts tim
 	// Get first 2 blocks that could contain this timestamp
 	ids, err := b.pc.Client().Do(
 		ctx,
-		b.pc.Client().B().Zrange().Key(blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 2).Build(),
+		b.pc.Client().B().Zrange().Key(b.blockIndexKey(idx)).Min(score).Max("+inf").Byscore().Limit(0, 2).Build(),
 	).AsStrSlice()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		return nil, err
@@ -1170,7 +1170,7 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 
 	cmd := b.pc.Client().B().
 		Zadd().
-		Key(blockIndexKey(idx)).
+		Key(b.blockIndexKey(idx)).
 		ScoreMember().
 		ScoreMember(
 			// We use metadata timestamp because the time in the blockID can diverge
@@ -1188,7 +1188,7 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 		ctx,
 		b.pc.Client().B().
 			Hset().
-			Key(blockMetadataKey(idx)).
+			Key(b.blockMetadataKey(idx)).
 			FieldValue().
 			FieldValue(block.ID.String(), string(metadata)).
 			Build(),
@@ -1204,20 +1204,20 @@ func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 // blockIndexKey is internal and stores a list of all blocks for a given index.
 //
 // This is a zset containing block IDs -> the last pause timestamp.
-func blockIndexKey(idx Index) string {
-	return fmt.Sprintf("{estate}:blk:idx:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+func (b blockstore) blockIndexKey(idx Index) string {
+	return fmt.Sprintf("{%s}:blk:idx:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockMetadataKey is internal and stores metadata for a given block.
 //
 // This is an HMAP of block IDs -> metadata.
-func blockMetadataKey(idx Index) string {
-	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+func (b blockstore) blockMetadataKey(idx Index) string {
+	return fmt.Sprintf("{%s}:blk:md:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockDeleteKey tracks all deletes for a specific block within an index.
-func blockDeleteKey(idx Index, blockID ulid.ULID) string {
-	return fmt.Sprintf("{estate}:blk:dels:%s:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
+func (b blockstore) blockDeleteKey(idx Index, blockID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:blk:dels:%s:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
 }
 
 type blockMetadata struct {
@@ -1257,19 +1257,19 @@ func blockID(b *Block, m *blockMetadata) ulid.ULID {
 // deleteBlock completely removes a block when all its pauses have been deleted.
 // This includes removing the block from Redis indexes, metadata, delete tracking, and blob storage.
 func (b *blockstore) deleteBlock(ctx context.Context, index Index, blockID ulid.ULID) error {
-	indexKey := blockIndexKey(index)
+	indexKey := b.blockIndexKey(index)
 	err := b.pc.Client().Do(ctx, b.pc.Client().B().Zrem().Key(indexKey).Member(blockID.String()).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error removing block from index: %w", err)
 	}
 
-	metadataKey := blockMetadataKey(index)
+	metadataKey := b.blockMetadataKey(index)
 	err = b.pc.Client().Do(ctx, b.pc.Client().B().Hdel().Key(metadataKey).Field(blockID.String()).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error removing block metadata: %w", err)
 	}
 
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := b.blockDeleteKey(index, blockID)
 	err = b.pc.Client().Do(ctx, b.pc.Client().B().Del().Key(deleteKey).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error removing block delete tracking: %w", err)
