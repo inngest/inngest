@@ -52,6 +52,15 @@ type constraintCacheItem struct {
 
 type limitingConstraintCacheCutoffKey struct{}
 
+// skipAllCachedExhaustion is a cutoff after any cache entry's addedAt.
+var skipAllCachedExhaustion = time.Unix(1<<62, 0)
+
+// WithoutLimitingConstraintCacheLookup marks ctx so that Acquire is never
+// answered from cached exhaustion. Exhausted results are still cached.
+func WithoutLimitingConstraintCacheLookup(ctx context.Context) context.Context {
+	return WithoutLimitingConstraintCacheBefore(ctx, skipAllCachedExhaustion)
+}
+
 // WithoutLimitingConstraintCacheBefore marks ctx so that Acquire is not
 // answered from exhaustion cached before cutoff. Use it when the caller knows
 // capacity was released before cutoff, such as a queue pass woken by a capacity
