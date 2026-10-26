@@ -80,6 +80,12 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 	usage(2)
 	// Nor may the already-finalized run reacquire the tombstoned permit.
 	require.Empty(t, acquire(owner, sem).Leases)
+	// After even the durable tombstone expires, ordinary callers must not
+	// fall back to the unsafe legacy path and spend the surviving hold.
+	require.NoError(t, client.Do(ctx, client.B().Del().Key(sem.UsageKey(account)+":owner:"+owner.String()).Build()).Error())
+	err = NewRedisSemaphoreManager(client).ReleaseSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, owner.String(), 2)
+	require.ErrorIs(t, err, ErrSemaphoreOwnershipUnknown)
+	usage(2)
 
 	// The same run can own more than one keyed permit; their releases must
 	// not share the old account-wide release-idempotency marker.

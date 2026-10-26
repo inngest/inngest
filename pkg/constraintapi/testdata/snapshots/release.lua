@@ -69,6 +69,20 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 local constraintUsage = {}
+local manualHolds = {}
+if requestDetails.mso and forceReleaseSemaphores then
+	local runID = call("HGET", keyLeaseDetails, "rid")
+	for index, c in ipairs(constraints) do
+		if c.k == 4 and c.sem.rel == 1 then
+			local held = tonumber(call("GET", c.sem.k .. ":owner:" .. runID))
+			local usage = tonumber(call("GET", c.sem.k)) or 0
+			if held == nil or held < 0 or usage < held then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			manualHolds[index] = held
+		end
+	end
+end
 for index, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
@@ -80,7 +94,22 @@ for index, c in ipairs(constraints) do
 			if not weight or weight <= 0 then
 				weight = 1
 			end
-			local newVal = call("DECRBY", c.sem.k, toInteger(weight))
+			local releaseWeight = toInteger(weight)
+			if c.sem.rel == 1 and requestDetails.mso then
+				local runID = call("HGET", keyLeaseDetails, "rid")
+				local ownerKey = c.sem.k .. ":owner:" .. runID
+				local held = manualHolds[index]
+				releaseWeight = math.min(releaseWeight, held)
+				if held > 0 then
+					local remaining = held - releaseWeight
+					if remaining == 0 then
+						call("SET", ownerKey, "0", "EX", 604800)
+					else
+						call("SET", ownerKey, tostring(remaining))
+					end
+				end
+			end
+			local newVal = call("DECRBY", c.sem.k, releaseWeight)
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
 			end

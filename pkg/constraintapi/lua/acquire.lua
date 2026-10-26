@@ -396,6 +396,9 @@ for i, value in ipairs(constraints) do
 		end
 		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
 		if requestDetails.mso and value.sem.rel == 1 then
+			-- Once a key uses ownership, a missing owner must never fall back
+			-- to a legacy decrement, even after released tombstones expire.
+			call("SET", value.sem.k .. ":ownership", "1")
 			for j = 1, granted do
 				local runID = requestDetails.lri[requestDetails.lik[j]]
 				call("INCRBY", value.sem.k .. ":owner:" .. runID, toInteger(weight))

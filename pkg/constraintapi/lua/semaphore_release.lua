@@ -27,7 +27,7 @@ if owned ~= false and owned ~= nil then
 	return remaining
 end
 
-if strictOwnership then
+if strictOwnership or redis.call("EXISTS", keyUsage .. ":ownership") == 1 then
 	-- An empty counter needs no decrement. Positive legacy usage cannot tell
 	-- us whether this run or a different run acquired it.
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0
