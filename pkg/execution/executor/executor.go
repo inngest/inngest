@@ -3444,6 +3444,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == sv2.ErrMetadataNotFound || errors.Is(err, state.ErrRunNotFound) {
+		if r.RequireCleanupVerification {
+			return fmt.Errorf("%w: missing metadata for %s", ErrCancellationCleanupUnverified, id.RunID)
+		}
 		if r.ForceLifecycleHook {
 			l.Warn(
 				"cancel: metadata not found while force lifecycle hook was requested",
@@ -3489,7 +3492,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
-	if errors.Is(err, state.ErrEventNotFound) {
+	if r.RequireCleanupVerification && err != nil {
+		return fmt.Errorf("%w: unable to load run events: %w", ErrCancellationCleanupUnverified, err)
+	}
+	if errors.Is(err, state.ErrEventNotFound) && !r.RequireCleanupVerification {
 		// If the event has gone, another thread cancelled the function.
 		l.Warn(
 			"cancel: events not found but metadata exists",
@@ -3530,12 +3536,17 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			DriverResponse: state.DriverResponse{}, // empty.
 		},
 		Optional: execution.FinalizeOptional{
-			FnSlug:      f.Function.GetSlug(),
-			InputEvents: evts,
-			Cancel:      true,
-			Reason:      "cancel",
+			RequireCleanupVerification: r.RequireCleanupVerification,
+			KnownQueueItemIDs:          r.KnownQueueItemIDs,
+			FnSlug:                     f.Function.GetSlug(),
+			InputEvents:                evts,
+			Cancel:                     true,
+			Reason:                     "cancel",
 		},
 	}); err != nil {
+		if r.RequireCleanupVerification {
+			return fmt.Errorf("cancellation cleanup failed: %w", err)
+		}
 		l.Error("error running finish handler", "error", err)
 	}
 	for _, e := range e.lifecycles {
