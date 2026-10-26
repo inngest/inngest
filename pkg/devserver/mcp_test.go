@@ -281,3 +281,27 @@ func listMCPTools(t *testing.T, handler http.Handler) []listedMCPTool {
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	return response.Result.Tools
 }
+
+func TestMCPHandlerStripsChunkedTransferEncoding(t *testing.T) {
+	handler := NewMCPHandler(nil, nil, 0, nil)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"initialize",
+		"params":{
+			"protocolVersion":"2025-06-18",
+			"capabilities":{},
+			"clientInfo":{"name":"test","version":"1.0.0"}
+		}
+	}`))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Empty(t, recorder.Header().Values("transfer-encoding"))
+	require.Empty(t, recorder.Header().Values("Transfer-Encoding"))
+}
+
