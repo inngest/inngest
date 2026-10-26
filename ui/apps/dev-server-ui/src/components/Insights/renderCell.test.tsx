@@ -102,6 +102,20 @@ describe('renderCell', () => {
     expect(content.props.children).toBe('my-fn');
   });
 
+  it('renders an unparseable Datetime value as plain text instead of throwing', () => {
+    const element = renderCell(
+      'not a date',
+      InsightsColumnType.Datetime,
+      null,
+      pathCreator,
+    );
+
+    expect(element.type).toBe(CopyableCell);
+    expect(element.props.value).toBe('not a date');
+    expect(element.props.children.type).toBe(TextCell);
+    expect(element.props.children.props.children).toBe('not a date');
+  });
+
   it('renders NULL for nullish values regardless of hint, wrapped in a copy affordance', () => {
     const element = renderCell(
       null,
