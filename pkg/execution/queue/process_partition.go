@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -104,6 +105,14 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
+	}
+
+	if p.CapacityReleased {
+		// Capacity was released after any cached exhaustion for this partition
+		// could have been recorded, so ask the Constraint API instead of parking
+		// on the stale answer.
+		ctx = constraintapi.WithoutLimitingConstraintCacheLookup(ctx)
+		span.SetAttributes(attribute.Bool("capacity_released", true))
 	}
 
 	if !p.IsSystem() {

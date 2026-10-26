@@ -136,6 +136,38 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 	}
 }
 
+// CapacityReleased implements osqueue.CapacityReleaseNotifier. It wakes the
+// item's partition and marks it so the next scan bypasses cached constraint
+// exhaustion, which may have been recorded before this release.
+func (q *queue) CapacityReleased(ctx context.Context, i osqueue.QueueItem) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CapacityReleased"), redis_telemetry.ScopeQueue)
+
+	kg := q.RedisClient.kg
+	partition := osqueue.ItemShadowPartition(ctx, i)
+	accountID := i.Data.Identifier.AccountID
+
+	keys := []string{
+		kg.PartitionItem(),
+		shadowPartitionReadyQueueKey(partition, kg),
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(accountID),
+	}
+	args := []string{partition.PartitionID, accountID.String()}
+
+	_, err := scripts["queue/capacityReleased"].Exec(
+		redis_telemetry.WithScriptName(ctx, "capacityReleased"),
+		q.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("error waking partition after capacity release", "error", err, "partition_id", partition.PartitionID)
+	}
+}
+
+var _ osqueue.CapacityReleaseNotifier = (*queue)(nil)
+
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, options ...osqueue.RequeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)

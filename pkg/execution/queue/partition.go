@@ -49,6 +49,10 @@ type QueuePartition struct {
 	// that it was requeued due to concurrency issues and should not be brought forward
 	// when a new step is enqueued, if now < ForcedAtMS.
 	ForceAtMS int64 `json:"forceAtMS"`
+	// CapacityReleased is set by PartitionLease when a confirmed capacity
+	// release arrived since the previous lease. Cached constraint exhaustion
+	// predates the release, so the leased scan must not trust it.
+	CapacityReleased bool `json:"-"`
 }
 
 func (qp QueuePartition) IsSystem() bool {
