@@ -155,7 +155,7 @@ describe('Runs AI popover', () => {
     ).toBeTruthy();
     expect(
       screen
-        .getByRole('link', { name: 'View Inngest plugin' })
+        .getByRole('link', { name: 'Connect Inngest to ChatGPT / Codex' })
         .getAttribute('href'),
     ).toBe(
       'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
@@ -165,7 +165,10 @@ describe('Runs AI popover', () => {
         .getByRole('link', { name: 'Available MCP tools' })
         .getAttribute('href'),
     ).toBe('https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools');
-    for (const name of ['View Inngest plugin', 'Available MCP tools']) {
+    for (const name of [
+      'Connect Inngest to ChatGPT / Codex',
+      'Available MCP tools',
+    ]) {
       const link = screen.getByRole('link', { name });
       expect(link.getAttribute('target')).toBe('_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
@@ -273,7 +276,9 @@ describe('Runs AI popover', () => {
         name: 'Prompt preview',
       }).value;
       fireEvent.click(screen.getByRole('button', { name: 'ChatGPT / Codex' }));
-      const link = screen.getByRole('link', { name: 'View Inngest plugin' });
+      const link = screen.getByRole('link', {
+        name: 'Connect Inngest to ChatGPT / Codex',
+      });
       expect(link.getAttribute('href')).toBe(
         'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
       );

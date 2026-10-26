@@ -179,7 +179,7 @@ function OpenAISetup({
           onAction({ action: 'setup_opened', client: 'chatgpt_codex' })
         }
       >
-        View Inngest plugin
+        Connect Inngest to ChatGPT / Codex
         <RiArrowRightUpLine className="h-3.5 w-3.5" aria-hidden="true" />
       </a>
       <Button
