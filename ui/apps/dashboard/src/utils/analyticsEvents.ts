@@ -107,7 +107,13 @@ export type AssistantAction =
         | 'setup_opened'
         | 'setup_copied'
         | 'setup_copy_failed';
-      client: 'chatgpt' | 'claude_code' | 'codex_cli' | 'other';
+      client:
+        | 'chatgpt'
+        | 'chatgpt_codex'
+        | 'claude'
+        | 'claude_code'
+        | 'codex_cli'
+        | 'other';
     }
   | {
       action: 'prompt_copy_failed';

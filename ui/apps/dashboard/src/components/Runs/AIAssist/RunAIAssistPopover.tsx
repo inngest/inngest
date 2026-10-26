@@ -22,14 +22,18 @@ import { useRunAICopy } from './useRunAICopy';
 import type { RunAIAction } from './tracking';
 
 const clients = [
-  { id: 'chatgpt', label: 'ChatGPT', tracking: 'chatgpt', Icon: IconOpenAI },
+  {
+    id: 'codex',
+    label: 'ChatGPT / Codex',
+    tracking: 'codex_cli',
+    Icon: IconOpenAI,
+  },
   {
     id: 'claude',
-    label: 'Claude Code',
+    label: 'Claude',
     tracking: 'claude_code',
     Icon: IconClaude,
   },
-  { id: 'codex', label: 'Codex CLI', tracking: 'codex_cli', Icon: IconOpenAI },
   { id: 'other', label: 'Other tools', tracking: 'other', Icon: RiAppsLine },
 ] as const;
 
@@ -53,6 +57,7 @@ export function RunAIAssistPopover({
   endpoint,
   mode,
 }: Props) {
+  const productionCloud = endpoint === 'https://api.inngest.com/mcp';
   const [open, setOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<SetupClient | null>(
     null,
@@ -139,36 +144,45 @@ export function RunAIAssistPopover({
             : 'Connect your AI tool to find runs and inspect traces.'}
         </p>
         <div
-          className={`mt-3 grid gap-1.5 ${endpoint === 'https://api.inngest.com/mcp' ? 'grid-cols-2' : 'grid-cols-1 min-[420px]:grid-cols-3'}`}
+          className={`mt-3 grid gap-1.5 ${productionCloud ? 'grid-cols-[1.4fr_1fr_1fr]' : 'grid-cols-3'}`}
         >
-          {clients
-            .filter(
-              ({ id }) =>
-                id !== 'chatgpt' || endpoint === 'https://api.inngest.com/mcp',
-            )
-            .map(({ id, label, tracking, Icon }) => (
-              <Button
-                key={id}
-                kind="secondary"
-                appearance="outlined"
-                size="small"
-                label={label}
-                icon={<Icon />}
-                iconSide="left"
-                aria-expanded={selectedClient === id}
-                aria-controls={selectedClient === id ? setupID : undefined}
-                className={
-                  selectedClient === id
-                    ? 'border-contrast bg-canvasSubtle'
-                    : undefined
-                }
-                onClick={() => {
-                  setSelectedClient(selectedClient === id ? null : id);
-                  if (selectedClient !== id)
-                    onAction({ action: 'setup_clicked', client: tracking });
-                }}
-              />
-            ))}
+          {clients.map(({ id, label, tracking, Icon }) => (
+            <Button
+              key={id}
+              kind="secondary"
+              appearance="outlined"
+              size="small"
+              label={
+                !productionCloud && id === 'codex'
+                  ? 'Codex'
+                  : !productionCloud && id === 'claude'
+                    ? 'Claude Code'
+                    : label
+              }
+              icon={<Icon />}
+              iconSide="left"
+              aria-expanded={selectedClient === id}
+              aria-controls={selectedClient === id ? setupID : undefined}
+              className={
+                selectedClient === id
+                  ? 'border-contrast bg-canvasSubtle'
+                  : undefined
+              }
+              onClick={() => {
+                setSelectedClient(selectedClient === id ? null : id);
+                if (selectedClient !== id)
+                  onAction({
+                    action: 'setup_clicked',
+                    client:
+                      id === 'codex' && productionCloud
+                        ? 'chatgpt_codex'
+                        : id === 'claude' && productionCloud
+                          ? 'claude'
+                          : tracking,
+                  });
+              }}
+            />
+          ))}
         </div>
         {selectedClient && (
           <div id={setupID}>

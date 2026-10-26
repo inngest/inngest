@@ -149,30 +149,30 @@ describe('Runs AI popover', () => {
     });
     expect(copy.hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/Clear CEL search/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ChatGPT / Codex' }));
     expect(
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
       screen
-        .getByRole('link', { name: 'Full setup guide' })
+        .getByRole('link', { name: 'View Inngest plugin' })
         .getAttribute('href'),
     ).toBe(
-      'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud',
+      'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
     );
     expect(
       screen
         .getByRole('link', { name: 'Available MCP tools' })
         .getAttribute('href'),
     ).toBe('https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools');
-    for (const name of ['Full setup guide', 'Available MCP tools']) {
+    for (const name of ['View Inngest plugin', 'Available MCP tools']) {
       const link = screen.getByRole('link', { name });
       expect(link.getAttribute('target')).toBe('_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     }
     expect(onAction).toHaveBeenCalledWith({
       action: 'setup_clicked',
-      client: 'codex_cli',
+      client: 'chatgpt_codex',
     });
     expect(onAction).not.toHaveBeenCalledWith({
       action: 'prompt_copy_clicked',
@@ -187,7 +187,25 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
-    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Claude' }));
+    const directory = screen.getByRole('link', {
+      name: 'Connect Inngest in Claude',
+    });
+    expect(directory.getAttribute('href')).toBe(
+      'https://claude.ai/directory/inngest',
+    );
+    expect(directory.getAttribute('target')).toBe('_blank');
+    expect(
+      screen.queryByRole('button', { name: 'Copy setup command' }),
+    ).toBeNull();
+    fireEvent.click(directory);
+    expect(onAction).toHaveBeenCalledWith({
+      action: 'setup_opened',
+      client: 'claude',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Claude Code' }),
+    );
     expect(
       screen.getByText(
         'claude plugin install inngest@anthropic-plugin-directory',
@@ -202,8 +220,14 @@ describe('Runs AI popover', () => {
     ).toBe(
       'https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin',
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ChatGPT / Codex' }));
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Copy setup command' }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Codex CLI' }),
+    );
     expect(screen.getByText(/codex mcp login inngest-cloud/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Copy setup command' }));
     await waitFor(() =>
@@ -216,14 +240,14 @@ describe('Runs AI popover', () => {
       'codex mcp add inngest-cloud --url https://api.inngest.com/mcp\ncodex mcp login inngest-cloud',
     );
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ChatGPT / Codex' }));
     expect(
       screen.queryByRole('region', { name: 'Connection instructions' }),
     ).toBeNull();
   });
 
   it.each(['discovery', 'debug'] as const)(
-    'offers the official ChatGPT plugin in the %s popover without changing the prompt',
+    'offers a single ChatGPT / Codex plugin option in the %s popover without changing the prompt',
     (mode) => {
       const { onAction } = mount(
         mode === 'debug'
@@ -248,8 +272,8 @@ describe('Runs AI popover', () => {
       const prompt = screen.getByRole<HTMLTextAreaElement>('textbox', {
         name: 'Prompt preview',
       }).value;
-      fireEvent.click(screen.getByRole('button', { name: 'ChatGPT' }));
-      const link = screen.getByRole('link', { name: 'Open in ChatGPT' });
+      fireEvent.click(screen.getByRole('button', { name: 'ChatGPT / Codex' }));
+      const link = screen.getByRole('link', { name: 'View Inngest plugin' });
       expect(link.getAttribute('href')).toBe(
         'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
       );
@@ -258,11 +282,11 @@ describe('Runs AI popover', () => {
       fireEvent.click(link);
       expect(onAction).toHaveBeenCalledWith({
         action: 'setup_clicked',
-        client: 'chatgpt',
+        client: 'chatgpt_codex',
       });
       expect(onAction).toHaveBeenCalledWith({
         action: 'setup_opened',
-        client: 'chatgpt',
+        client: 'chatgpt_codex',
       });
       expect(
         screen.queryByRole('button', { name: 'Copy setup command' }),
@@ -278,7 +302,9 @@ describe('Runs AI popover', () => {
   it('keeps staging on the correct MCP backend rather than recommending production plugins', () => {
     mount({ endpoint: 'https://api.inngest.net/mcp' });
     open();
-    expect(screen.queryByRole('button', { name: 'ChatGPT' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'ChatGPT / Codex' }),
+    ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
     expect(
       screen.getByText(
