@@ -21,7 +21,7 @@ anything that looks like scope creep.
 ```
 peg/            generic packrat PEG engine — knows nothing about SQL
 grammar/        loads the vendored DuckDB .gram files into a peg.Grammar
-grammar/vendor/ the vendored .gram/keyword files themselves — DO NOT hand-edit
+grammar/upstream/ the vendored .gram/keyword files themselves — DO NOT hand-edit
 primitives.go   the leaf-token matchers (identifiers, literals, keywords) peg calls into
 parser.go       ParseString — the public entry point
 ast.go          the typed AST node definitions
@@ -42,14 +42,14 @@ SQL text --peg.Parser.Parse--> *peg.Node CST --adapter--> typed AST (*SelectStat
    interprets a `peg.Grammar` (rules + expressions) against an input string
    and primitive functions you supply, building a CST of `*peg.Node`.
 2. **`grammar/`** loads DuckDB's own vendored `.gram` grammar files
-   (`grammar/vendor/statements/*.gram`) into a `peg.Grammar` at
+   (`grammar/upstream/statements/*.gram`) into a `peg.Grammar` at
    `sync.Once`-guarded startup. This package's grammar *is* DuckDB's
    grammar, interpreted directly — not hand-transcribed. That's the whole
    point: re-vendoring a newer DuckDB commit should only ever require
    fixing adapter call sites, not re-deriving the grammar.
 3. **`primitives.go`** supplies the leaf matchers (`Identifier`,
    `NumberLiteral`, keyword sets, etc.) that DuckDB's own grammar expects to
-   be supplied out-of-band — see `grammar/vendor/README.md`'s "Rule-name
+   be supplied out-of-band — see `grammar/upstream/README.md`'s "Rule-name
    overrides" section for exactly which rule names these are and why.
 4. **`adapter_*.go`** walks the resulting CST into the typed AST in
    `ast.go`. This is where DuckDB grammar knowledge — rule names, sequence
@@ -132,7 +132,7 @@ handful of things worth knowing if you're optimizing further:
 ## Re-vendoring DuckDB's grammar
 
 Full procedure and the most recent bump's notes are in
-`grammar/vendor/README.md`. The one thing worth repeating here because it's
+`grammar/upstream/README.md`. The one thing worth repeating here because it's
 easy to miss: **a green `go test` run after a re-vendor is necessary but not
 sufficient.** A cardinality change (`?` -> `*`/`+`, or the reverse) at a
 grammar position no existing fixture exercises multiple/absent occurrences
