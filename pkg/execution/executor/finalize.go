@@ -49,6 +49,24 @@ const (
 func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
 	ctx = context.WithoutCancel(ctx)
 	l := logger.StdlibLogger(ctx)
+	if opts.Optional.RequireCleanupVerification {
+		// Check/read inputs before destructive cleanup. Missing input still
+		// permits verified queue/permit cleanup, but must remain an explicit
+		// exception: completion effects cannot be reconstructed from nothing.
+		var inputErr error
+		if len(opts.Optional.InputEvents) == 0 {
+			opts.Optional.InputEvents, inputErr = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
+			if inputErr != nil && !errors.Is(inputErr, state.ErrEventNotFound) {
+				return inputErr
+			}
+		}
+		if err := e.prepareVerifiedCancellation(ctx, opts); err != nil {
+			return err
+		}
+		if inputErr != nil {
+			return fmt.Errorf("%w: %w", ErrCancellationCleanupUnverified, inputErr)
+		}
+	}
 
 	var endTimeOffset time.Duration
 	status := opts.Status()
@@ -101,7 +119,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	if e.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
+	if !opts.Optional.RequireCleanupVerification && e.semaphoreManager != nil && len(opts.Metadata.Config.Semaphores) > 0 {
 		for _, sem := range opts.Metadata.Config.Semaphores {
 			if sem.Release != constraintapi.SemaphoreReleaseManual {
 				continue
@@ -181,6 +199,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 			"error", err,
 			"run_id", opts.Metadata.ID.RunID,
 		)
+		if opts.Optional.RequireCleanupVerification {
+			return errors.Join(err, finalizationClaim.Release(ctx))
+		}
 	}
 
 	metricTags := e.finalizeMetricTags(ctx, status, opts)
@@ -200,7 +221,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		Tags:    metricTags,
 	})
 
-	e.finalizeRemoveJobs(ctx, opts)
+	if !opts.Optional.RequireCleanupVerification {
+		e.finalizeRemoveJobs(ctx, opts)
+	}
 
 	// finalizeEvents creates function finished events, and also attempts to fast-resume
 	// any parent function that invoked this run. Defer events are published as
