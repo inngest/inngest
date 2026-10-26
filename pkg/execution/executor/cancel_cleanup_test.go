@@ -70,6 +70,8 @@ type cleanupQueue struct {
 	items               map[string]*queue.QueueItem
 	indexed             map[string]bool
 	readErr, dequeueErr error
+	keepIndexOnDequeue  bool
+	keepRawOnDequeue    bool
 }
 
 func (q *cleanupQueue) RunJobs(_ context.Context, _ string, _ queue.Scope, _ ulid.ULID, limit, offset int64) ([]queue.JobResponse, error) {
@@ -102,8 +104,12 @@ func (q *cleanupQueue) Dequeue(_ context.Context, _ string, item queue.QueueItem
 	if q.dequeueErr != nil {
 		return q.dequeueErr
 	}
-	delete(q.items, item.ID)
-	delete(q.indexed, item.ID)
+	if !q.keepRawOnDequeue {
+		delete(q.items, item.ID)
+	}
+	if !q.keepIndexOnDequeue {
+		delete(q.indexed, item.ID)
+	}
 	return nil
 }
 
@@ -226,4 +232,27 @@ func TestVerifiedCancellationRequiresInputs(t *testing.T) {
 	require.False(t, s.deleted)
 	require.Len(t, q.items, 3)
 	require.Equal(t, 1, m.held)
+}
+
+func TestVerifiedCancellationDetectsIncompleteDequeue(t *testing.T) {
+	for _, name := range []string{"index remains", "raw record remains"} {
+		t.Run(name, func(t *testing.T) {
+			e, s, q, m := newCleanupFixture(t, 3)
+			// Independently leave either index entries or raw records behind.
+			// Dequeue reports success in both cases.
+			q.keepIndexOnDequeue = name == "index remains"
+			q.keepRawOnDequeue = name == "raw record remains"
+			err := e.Cancel(context.Background(), s.md.ID, execution.CancelRequest{RequireCleanupVerification: true})
+			require.ErrorIs(t, err, ErrCancellationCleanupUnverified)
+			require.False(t, s.deleted, "do not delete metadata after an unverified dequeue")
+			require.Zero(t, m.legacyCalls)
+			if q.keepIndexOnDequeue {
+				require.Len(t, q.indexed, 3)
+				require.Empty(t, q.items, "raw-record verification alone would miss this")
+			} else {
+				require.Empty(t, q.indexed, "index verification alone would miss this")
+				require.Len(t, q.items, 3)
+			}
+		})
+	}
 }
