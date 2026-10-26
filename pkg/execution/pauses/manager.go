@@ -400,7 +400,7 @@ func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspa
 }
 
 func (m manager) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
-	pauseIDs, err := m.buf.PauseIDsForRun(ctx, runID)
+	pauseIDs, err := m.buf.PauseIDsForRun(ctx, runID, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -411,15 +411,15 @@ func (m manager) DeletePausesForRun(ctx context.Context, runID ulid.ULID, worksp
 		}
 	}
 
-	return m.buf.DeleteRunPausesIndex(ctx, runID)
+	return m.buf.DeleteRunPausesIndex(ctx, runID, workspaceID)
 }
 
-func (m manager) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
-	return m.buf.PauseIDsForRun(ctx, runID)
+func (m manager) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
+	return m.buf.PauseIDsForRun(ctx, runID, workspaceID)
 }
 
-func (m manager) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
-	return m.buf.DeleteRunPausesIndex(ctx, runID)
+func (m manager) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	return m.buf.DeleteRunPausesIndex(ctx, runID, workspaceID)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {

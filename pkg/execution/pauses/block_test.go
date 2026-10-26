@@ -328,7 +328,7 @@ func (m *mockBufferer) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, w
 	return state.ErrPauseNotFound
 }
 
-func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var ids []uuid.UUID
@@ -340,7 +340,7 @@ func (m *mockBufferer) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]u
 	return ids, nil
 }
 
-func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+func (m *mockBufferer) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
 	return nil
 }
 
@@ -495,7 +495,7 @@ func (m *mockBuffererSameTimestamp) DeletePauseByID(ctx context.Context, pauseID
 	return state.ErrPauseNotFound
 }
 
-func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var ids []uuid.UUID
@@ -507,7 +507,7 @@ func (m *mockBuffererSameTimestamp) PauseIDsForRun(ctx context.Context, runID ul
 	return ids, nil
 }
 
-func (m *mockBuffererSameTimestamp) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+func (m *mockBuffererSameTimestamp) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
 	return nil
 }
 
@@ -773,7 +773,7 @@ func TestBlockstoreDelete(t *testing.T) {
 		var foundCount int
 		var foundBlocks []ulid.ULID
 		for _, blockID := range blocks {
-			deleteKey := blockDeleteKey(index, blockID)
+			deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 			exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(testPause.ID.String()).Build()).AsBool()
 			require.NoError(t, err)
 			if exists {
@@ -947,7 +947,7 @@ func TestBoundaryPauseDelete(t *testing.T) {
 	var foundCount int
 	var foundBlocks []ulid.ULID
 	for _, blockID := range blocks {
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(boundaryPause.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
 		if exists {
@@ -1064,7 +1064,7 @@ func TestLegacyPauseDelete(t *testing.T) {
 
 	var foundCount int
 	for _, blockID := range blocks {
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Sismember().Key(deleteKey).Member(pauseWithoutTime.ID.String()).Build()).AsBool()
 		require.NoError(t, err)
 		if exists {
@@ -1282,7 +1282,7 @@ func TestCompaction(t *testing.T) {
 	require.Len(t, blocks, 1)
 
 	blockID := blocks[0]
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 
 	// Delete one pause - below compaction threshold of 2
 	err = store.Delete(ctx, index, *pause1)
@@ -1314,7 +1314,7 @@ func TestCompaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, block.Pauses, 3)
 
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		exists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
 		assert.NoError(t, err)
 		assert.False(t, exists)
@@ -1326,13 +1326,13 @@ func TestCompaction(t *testing.T) {
 	}, 5*time.Second, 20*time.Millisecond)
 
 	// Verify that block index score was updated to the new latest timestamp (even though the blockID is stable)
-	indexKey := blockIndexKey(index)
+	indexKey := store.(*blockstore).blockIndexKey(index)
 	score, err := rc.Do(ctx, rc.B().Zscore().Key(indexKey).Member(blockID.String()).Build()).AsFloat64()
 	require.NoError(t, err)
 	require.Equal(t, float64(pause4.CreatedAt.UnixMilli()), score)
 
 	// Verify updated metadata reflects the new block composition with boundaries from pause2 to pause4
-	metadataKey := blockMetadataKey(index)
+	metadataKey := store.(*blockstore).blockMetadataKey(index)
 	exists, err := rc.Do(ctx, rc.B().Hexists().Key(metadataKey).Field(blockID.String()).Build()).AsBool()
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -1370,7 +1370,7 @@ func TestCompaction(t *testing.T) {
 		assert.False(t, metadataExists)
 
 		// Delete tracking should be cleaned up
-		deleteKey := blockDeleteKey(index, blockID)
+		deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 		deleteExists, err := rc.Do(ctx, rc.B().Exists().Key(deleteKey).Build()).AsBool()
 		assert.NoError(t, err)
 		assert.False(t, deleteExists)
@@ -1479,7 +1479,7 @@ func TestCompactionFailsBoundaryCheck(t *testing.T) {
 	require.Len(t, block.Pauses, 4, "block should still have all original pauses when compaction fails")
 
 	// Verify delete tracking still exists since compaction failed
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(deleteKey).Build()).AsInt64()
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleteCount, "delete tracking should remain when compaction fails")
@@ -1864,7 +1864,7 @@ func TestCompactionCleansUpBlockIndexWhenSomePausesDeleted(t *testing.T) {
 	assert.Len(t, pauseIdxs, 1)
 
 	remainingKey := pauseIdxs[0]
-	expectedKey := pauseClient.KeyGenerator().PauseBlockIndex(ctx, pause3.ID)
+	expectedKey := pauseClient.KeyGenerator(index.WorkspaceID).PauseBlockIndex(ctx, pause3.ID)
 	assert.Equal(t, expectedKey, remainingKey, "Remaining pause-block key should be for pause3")
 }
 
@@ -2524,7 +2524,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	require.Len(t, blocks, 1)
 
 	blockID := blocks[0]
-	deleteKey := blockDeleteKey(index, blockID)
+	deleteKey := store.(*blockstore).blockDeleteKey(index, blockID)
 
 	// Delete 2 pauses, leaving only pause3 - this will trigger phantom compaction
 	err = store.Delete(ctx, index, *pause1)
@@ -2545,7 +2545,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	require.Equal(t, int64(1), deleteCount, "should have 1 delete (phantom)")
 
 	// Verify metadata shows Len=2
-	metadataKey := blockMetadataKey(index)
+	metadataKey := store.(*blockstore).blockMetadataKey(index)
 	metadataBytes, err := rc.Do(ctx, rc.B().Hget().Key(metadataKey).Field(blockID.String()).Build()).AsBytes()
 	require.NoError(t, err)
 
@@ -2671,7 +2671,7 @@ func TestPauseIteratorSkipsCompactionPhantoms(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, block.Pauses, 2)
 
-	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(blockDeleteKey(index, blocks[0])).Build()).AsInt64()
+	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(store.(*blockstore).blockDeleteKey(index, blocks[0])).Build()).AsInt64()
 	require.NoError(t, err)
 	require.Equal(t, int64(1), deleteCount)
 

@@ -32,7 +32,7 @@ func NewPauseStore(unsharded *UnshardedClient) *PauseStore {
 // workspace <> event Index.
 func (s *PauseStore) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error) {
 	pc := s.unsharded.Pauses()
-	idx := pc.kg.PauseIndex(ctx, "add", workspaceID, event)
+	idx := pc.KeyGenerator(workspaceID).PauseIndex(ctx, "add", workspaceID, event)
 	result, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).ToArray()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
@@ -97,18 +97,19 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 
 	pause := s.unsharded.Pauses()
 
-	// Warning: We need to access global keys, which must be colocated on the same Redis cluster
-	global := s.unsharded.Global()
+	kg := pause.KeyGenerator(p.WorkspaceID)
+	// Correlation indexes must share the pause's hash slot, not the global client's.
+	global := globalKeyGenerator{stateDefaultKey: pause.KeyPrefix(p.WorkspaceID)}
 
 	keys := []string{
-		pause.kg.Pause(ctx, p.ID),
-		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
-		global.kg.Invoke(ctx, p.WorkspaceID),
-		global.kg.Signal(ctx, p.WorkspaceID),
-		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
-		pause.kg.RunPauses(ctx, p.Identifier.RunID),
-		pause.kg.GlobalPauseIndex(ctx),
+		kg.Pause(ctx, p.ID),
+		kg.PauseEvent(ctx, p.WorkspaceID, evt),
+		global.Invoke(ctx, p.WorkspaceID),
+		global.Signal(ctx, p.WorkspaceID),
+		kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		kg.RunPauses(ctx, p.Identifier.RunID),
+		kg.GlobalPauseIndex(ctx),
 	}
 
 	replaceSignalOnConflict := "0"
@@ -156,7 +157,7 @@ func (s *PauseStore) SavePause(ctx context.Context, p state.Pause) (int64, error
 
 func (s *PauseStore) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	// Attempt to fetch this pause.
-	pause, err := s.PauseByID(ctx, pauseID)
+	pause, err := s.PauseByID(ctx, pauseID, workspaceID)
 	if err != nil {
 		if err == state.ErrPauseNotFound {
 			// pause doesn't exist, nothing to delete
@@ -168,11 +169,11 @@ func (s *PauseStore) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, wor
 	return s.DeletePause(ctx, *pause)
 }
 
-func (s *PauseStore) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
+func (s *PauseStore) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseIDsForRun"), redis_telemetry.ScopePauses)
 
 	pause := s.unsharded.Pauses()
-	pauseIDStrs, err := pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.kg.RunPauses(ctx, runID)).Build()).AsStrSlice()
+	pauseIDStrs, err := pause.Client().Do(ctx, pause.Client().B().Smembers().Key(pause.KeyGenerator(workspaceID).RunPauses(ctx, runID)).Build()).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
@@ -190,15 +191,15 @@ func (s *PauseStore) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uui
 	return pauseIDs, nil
 }
 
-func (s *PauseStore) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
+func (s *PauseStore) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeleteRunPausesIndex"), redis_telemetry.ScopePauses)
 
 	pause := s.unsharded.Pauses()
-	return pause.Client().Do(ctx, pause.Client().B().Del().Key(pause.kg.RunPauses(ctx, runID)).Build()).Error()
+	return pause.Client().Do(ctx, pause.Client().B().Del().Key(pause.KeyGenerator(workspaceID).RunPauses(ctx, runID)).Build()).Error()
 }
 
 func (s *PauseStore) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
-	pauseIDs, err := s.PauseIDsForRun(ctx, runID)
+	pauseIDs, err := s.PauseIDsForRun(ctx, runID, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func (s *PauseStore) DeletePausesForRun(ctx context.Context, runID ulid.ULID, wo
 		}
 	}
 
-	return s.DeleteRunPausesIndex(ctx, runID)
+	return s.DeleteRunPausesIndex(ctx, runID, workspaceID)
 }
 
 func (s *PauseStore) DeletePause(ctx context.Context, p state.Pause, options ...state.DeletePauseOpt) error {
@@ -222,13 +223,14 @@ func (s *PauseStore) DeletePause(ctx context.Context, p state.Pause, options ...
 
 	pause := s.unsharded.Pauses()
 
-	global := s.unsharded.Global()
+	kg := pause.KeyGenerator(p.WorkspaceID)
+	global := globalKeyGenerator{stateDefaultKey: pause.KeyPrefix(p.WorkspaceID)}
 
 	// Add a default event here, which is null and overwritten by everything.  This is necessary
 	// to keep the same cluster key.
-	eventKey := pause.kg.PauseEvent(ctx, p.WorkspaceID, "-")
+	eventKey := kg.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
-		eventKey = pause.kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+		eventKey = kg.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
 
 	evt := ""
@@ -246,20 +248,19 @@ func (s *PauseStore) DeletePause(ctx context.Context, p state.Pause, options ...
 		signalCorrId = *p.SignalID
 	}
 
-	pauseKey := pause.kg.Pause(ctx, p.ID)
-	runPausesKey := pause.kg.RunPauses(ctx, p.Identifier.RunID)
+	pauseKey := kg.Pause(ctx, p.ID)
+	runPausesKey := kg.RunPauses(ctx, p.Identifier.RunID)
 
 	keys := []string{
 		pauseKey,
 		eventKey,
-		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
-		global.kg.Invoke(ctx, p.WorkspaceID),
-		global.kg.Signal(ctx, p.WorkspaceID),
-		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
-		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
+		global.Invoke(ctx, p.WorkspaceID),
+		global.Signal(ctx, p.WorkspaceID),
+		kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
+		kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
-		pause.kg.GlobalPauseIndex(ctx),
-		pause.kg.PauseBlockIndex(ctx, p.ID),
+		kg.GlobalPauseIndex(ctx),
+		kg.PauseBlockIndex(ctx, p.ID),
 	}
 
 	// Marshal WriteBlockIndex to JSON if it has content, otherwise pass empty string
@@ -299,16 +300,16 @@ func (s *PauseStore) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EventHasPauses"), redis_telemetry.ScopePauses)
 
 	pause := s.unsharded.Pauses()
-	key := pause.kg.PauseEvent(ctx, workspaceID, event)
+	key := pause.KeyGenerator(workspaceID).PauseEvent(ctx, workspaceID, event)
 	cmd := pause.Client().B().Exists().Key(key).Build()
 	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
-func (s *PauseStore) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
+func (s *PauseStore) PauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByID"), redis_telemetry.ScopePauses)
 
 	pauses := s.unsharded.Pauses()
-	cmd := pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, pauseID)).Build()
+	cmd := pauses.Client().B().Get().Key(pauses.KeyGenerator(workspaceID).Pause(ctx, pauseID)).Build()
 	str, err := pauses.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -324,10 +325,11 @@ func (s *PauseStore) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.P
 func (s *PauseStore) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByInvokeCorrelationID"), redis_telemetry.ScopePauses)
 
-	global := s.unsharded.Global()
-	key := global.kg.Invoke(ctx, wsID)
-	cmd := global.Client().B().Hget().Key(key).Field(correlationID).Build()
-	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
+	pc := s.unsharded.Pauses()
+	global := globalKeyGenerator{stateDefaultKey: pc.KeyPrefix(wsID)}
+	key := global.Invoke(ctx, wsID)
+	cmd := pc.Client().B().Hget().Key(key).Field(correlationID).Build()
+	pauseIDstr, err := pc.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
 	}
@@ -339,16 +341,17 @@ func (s *PauseStore) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.U
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
 	}
-	return s.PauseByID(ctx, pauseID)
+	return s.PauseByID(ctx, pauseID, wsID)
 }
 
 func (s *PauseStore) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseBySignalID"), redis_telemetry.ScopePauses)
 
-	global := s.unsharded.Global()
-	key := global.kg.Signal(ctx, wsID)
-	cmd := global.Client().B().Hget().Key(key).Field(signalID).Build()
-	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
+	pc := s.unsharded.Pauses()
+	global := globalKeyGenerator{stateDefaultKey: pc.KeyPrefix(wsID)}
+	key := global.Signal(ctx, wsID)
+	cmd := pc.Client().B().Hget().Key(key).Field(signalID).Build()
+	pauseIDstr, err := pc.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, nil
 	}
@@ -361,7 +364,7 @@ func (s *PauseStore) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signal
 		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
 	}
 
-	p, err := s.PauseByID(ctx, pauseID)
+	p, err := s.PauseByID(ctx, pauseID, wsID)
 	if err != nil {
 		if err == state.ErrPauseNotFound {
 			return nil, nil
@@ -376,7 +379,7 @@ func (s *PauseStore) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signal
 func (s *PauseStore) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
 	pauses := s.unsharded.Pauses()
-	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+	key := pauses.KeyGenerator(workspaceID).PauseEvent(ctx, workspaceID, event)
 	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
 	return pauses.Client().Do(ctx, cntCmd).AsInt64()
 }
@@ -392,14 +395,14 @@ func (s *PauseStore) pausesByEvent(ctx context.Context, workspaceID uuid.UUID, e
 
 	pauses := s.unsharded.Pauses()
 
-	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+	key := pauses.KeyGenerator(workspaceID).PauseEvent(ctx, workspaceID, event)
 	// If there are > 1000 keys in the hmap, use scanning
 
 	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
 	cnt, err := pauses.Client().Do(ctx, cntCmd).AsInt64()
 
 	if err != nil || cnt > 1000 {
-		key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+		key := pauses.KeyGenerator(workspaceID).PauseEvent(ctx, workspaceID, event)
 		iter := &scanIter{
 			count:          cnt,
 			r:              pauses.Client(),
@@ -428,7 +431,7 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 	pauses := s.unsharded.Pauses()
 
 	// Load all items in the set.
-	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	addIndexKey := pauses.KeyGenerator(workspaceID).PauseIndex(ctx, "add", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrangebyscore().
 		Key(addIndexKey).
@@ -442,7 +445,7 @@ func (s *PauseStore) PausesByEventSince(ctx context.Context, workspaceID uuid.UU
 
 	iter := &keyIter{
 		r:     pauses.Client(),
-		kf:    pauses.kg,
+		kf:    pauses.KeyGenerator(workspaceID),
 		start: start,
 	}
 	err = iter.init(ctx, ids, []float64{}, 100)
@@ -458,7 +461,7 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 
 	pauses := s.unsharded.Pauses()
 
-	addIndexKey := pauses.kg.PauseIndex(ctx, "add", workspaceID, event)
+	addIndexKey := pauses.KeyGenerator(workspaceID).PauseIndex(ctx, "add", workspaceID, event)
 	cmd := pauses.Client().B().
 		Zrange().
 		Key(addIndexKey).
@@ -483,7 +486,7 @@ func (s *PauseStore) PausesByEventSinceWithCreatedAt(ctx context.Context, worksp
 
 	iter := &keyIter{
 		r:     pauses.Client(),
-		kf:    pauses.kg,
+		kf:    pauses.KeyGenerator(workspaceID),
 		start: start,
 	}
 	err = iter.init(ctx, ids, scores, 100)

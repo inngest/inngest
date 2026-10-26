@@ -671,7 +671,7 @@ func TestDeletePause(t *testing.T) {
 	_, err := pauseStore.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	foundPause, err := pauseStore.PauseByID(ctx, pauseID)
+	foundPause, err := pauseStore.PauseByID(ctx, pauseID, workspaceID)
 	require.NoError(t, err)
 	require.Equal(t, pauseID, foundPause.ID)
 
@@ -680,7 +680,7 @@ func TestDeletePause(t *testing.T) {
 	err = pauseStore.DeletePause(ctx, pause)
 	require.NoError(t, err)
 
-	_, err = pauseStore.PauseByID(ctx, pauseID)
+	_, err = pauseStore.PauseByID(ctx, pauseID, workspaceID)
 	require.Error(t, err)
 	require.ErrorIs(t, err, state.ErrPauseNotFound)
 
