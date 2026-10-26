@@ -28,6 +28,7 @@ import {
   RiPlayLine,
   RiStopLine,
 } from '@remixicon/react';
+import { isValidDate } from '@inngest/components/utils/date';
 import type { Monaco } from '@monaco-editor/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -283,6 +284,15 @@ export function renderCell(
   switch (type) {
     case InsightsColumnType.Datetime: {
       const date = new Date(String(value));
+      // toISOString() throws on an Invalid Date, which would take down the
+      // whole results table, so show an unparseable value as plain text.
+      if (!isValidDate(date)) {
+        return (
+          <CopyableCell value={String(value)}>
+            <TextCell>{String(value)}</TextCell>
+          </CopyableCell>
+        );
+      }
       return (
         <CopyableCell value={date.toISOString()}>
           <TimeCell date={date} copyable={false} />
