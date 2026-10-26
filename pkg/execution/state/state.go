@@ -56,6 +56,21 @@ var (
 	ErrTimeoutTooLong = fmt.Errorf("timeout exceeds the maximum duration")
 	// Error Connect Retry Errors
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
+	// ErrConnectNoHealthyConnection halts a run when routing finds no healthy
+	// Connect worker connection, before anything is forwarded; it is always
+	// retried and never consumes an attempt.
+	ErrConnectNoHealthyConnection = fmt.Errorf("no healthy connect worker connection")
+)
+
+const (
+	// ConnectNoHealthyConnectionRetryDelay is the fixed requeue delay while no
+	// healthy Connect worker connection exists.  Always-retry errors never
+	// advance the attempt, so without it every halted run would re-check
+	// routing at the attempt-0 backoff.
+	ConnectNoHealthyConnectionRetryDelay = time.Minute
+	// ConnectNoHealthyConnectionRetryJitter spreads halted runs so a
+	// reconnecting worker is not hit by every queued run at once.
+	ConnectNoHealthyConnectionRetryJitter = 10 * time.Second
 )
 
 // IsMigration signals JIT-migration source cleanup; backends must skip pause
