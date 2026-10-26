@@ -3492,8 +3492,8 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 
 	// We need events to finalize the function.
 	evts, err := e.smv2.LoadEvents(ctx, id)
-	if r.RequireCleanupVerification && errors.Is(err, state.ErrEventNotFound) {
-		evts = nil
+	if r.RequireCleanupVerification && err != nil {
+		return fmt.Errorf("%w: unable to load run events: %w", ErrCancellationCleanupUnverified, err)
 	}
 	if errors.Is(err, state.ErrEventNotFound) && !r.RequireCleanupVerification {
 		// If the event has gone, another thread cancelled the function.
@@ -3517,7 +3517,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 		}
 		return nil
 	}
-	if err != nil && (!r.RequireCleanupVerification || !errors.Is(err, state.ErrEventNotFound)) {
+	if err != nil {
 		return fmt.Errorf("unable to load run events: %w", err)
 	}
 

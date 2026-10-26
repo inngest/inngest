@@ -66,25 +66,11 @@ type SemaphoreManager interface {
 }
 
 type redisSemaphoreManager struct {
-	client          rueidis.Client
-	strictOwnership bool
+	client rueidis.Client
 }
 
-type SemaphoreManagerOption func(*redisSemaphoreManager)
-
-// WithStrictSemaphoreOwnership refuses legacy releases when usage is positive
-// but the target run has no ownership record. It must not infer ownership from
-// a run's start time or from a shared counter.
-func WithStrictSemaphoreOwnership() SemaphoreManagerOption {
-	return func(m *redisSemaphoreManager) { m.strictOwnership = true }
-}
-
-func NewRedisSemaphoreManager(client rueidis.Client, options ...SemaphoreManagerOption) SemaphoreManager {
-	m := &redisSemaphoreManager{client: client}
-	for _, option := range options {
-		option(m)
-	}
-	return m
+func NewRedisSemaphoreManager(client rueidis.Client) SemaphoreManager {
+	return &redisSemaphoreManager{client: client}
 }
 
 func semaphoreCapacityKey(accountID uuid.UUID, name string) string {
@@ -194,7 +180,7 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 }
 
 func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error {
-	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, idempotencyKey, weight, m.strictOwnership)
+	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, idempotencyKey, weight, false)
 }
 
 func (m *redisSemaphoreManager) ReleaseOwnedSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, runID string, weight int64) error {

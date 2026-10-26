@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -71,17 +72,22 @@ type cleanupQueue struct {
 	readErr, dequeueErr error
 }
 
-func (q *cleanupQueue) RunJobs(context.Context, string, queue.Scope, ulid.ULID, int64, int64) ([]queue.JobResponse, error) {
+func (q *cleanupQueue) RunJobs(_ context.Context, _ string, _ queue.Scope, _ ulid.ULID, limit, offset int64) ([]queue.JobResponse, error) {
 	if q.readErr != nil {
 		return nil, q.readErr
 	}
-	var jobs []queue.JobResponse
+	ids := make([]string, 0, len(q.indexed))
 	for id := range q.indexed {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var jobs []queue.JobResponse
+	for i, id := range ids {
+		if int64(i) < offset || int64(i) >= offset+limit {
+			continue
+		}
 		if item := q.items[id]; item != nil {
 			jobs = append(jobs, queue.JobResponse{Raw: item})
-		}
-		if len(jobs) == 1000 {
-			break
 		}
 	}
 	return jobs, nil
@@ -137,7 +143,7 @@ func newCleanupFixture(t *testing.T, jobs int) (*executor, *cleanupState, *clean
 }
 
 func TestVerifiedCancellationCleanup(t *testing.T) {
-	for _, name := range []string{"success", "metadata missing", "input missing", "permit failure", "read failure", "dequeue failure", "delete failure", "unreadable index", "inventoried orphan", "wrong run", "large run"} {
+	for _, name := range []string{"success", "metadata missing", "input missing", "permit failure", "leased item", "executing item", "read failure", "dequeue failure", "delete failure", "unreadable index", "inventoried orphan", "wrong run", "large run"} {
 		t.Run(name, func(t *testing.T) {
 			jobs := 3
 			if name == "large run" {
@@ -146,6 +152,7 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 			e, s, q, m := newCleanupFixture(t, jobs)
 			req := execution.CancelRequest{ForceLifecycleHook: true, RequireCleanupVerification: true}
 			sentinel := errors.New("injected dependency failure")
+			ctx := context.Background()
 			switch name {
 			case "metadata missing":
 				s.metadataErr = sv2.ErrMetadataNotFound
@@ -153,6 +160,11 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 				s.eventsErr = state.ErrEventNotFound
 			case "permit failure":
 				m.err = sentinel
+			case "leased item":
+				lease := ulid.Make()
+				q.items["0"].LeaseID = &lease
+			case "executing item":
+				ctx = queue.WithJobID(ctx, "0")
 			case "read failure":
 				q.readErr = sentinel
 			case "dequeue failure":
@@ -168,7 +180,7 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 				q.items["0"].Data.Identifier.RunID = ulid.Make()
 				req.KnownQueueItemIDs = []string{"0"}
 			}
-			err := e.Cancel(context.Background(), s.md.ID, req)
+			err := e.Cancel(ctx, s.md.ID, req)
 			success := name == "success" || name == "large run" || name == "inventoried orphan"
 			if success {
 				require.NoError(t, err)
@@ -180,14 +192,15 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 				require.False(t, s.deleted, "keep recovery metadata on incomplete cleanup")
 			}
 			require.Zero(t, m.legacyCalls, "strict mode must never use the old release")
-			if name == "metadata missing" || name == "permit failure" {
-				require.Equal(t, 1, m.held)
+			if name == "metadata missing" || name == "permit failure" || name == "input missing" || name == "leased item" || name == "executing item" || name == "wrong run" || name == "unreadable index" || name == "read failure" {
 				require.Len(t, q.items, jobs)
+				require.Equal(t, 1, m.held, "do not release a permit when recovery prerequisites are missing")
 			}
 			if name == "input missing" {
 				require.ErrorIs(t, err, state.ErrEventNotFound)
-				require.Empty(t, q.items, "missing input must not leave retries running")
-				require.Zero(t, m.held)
+			}
+			if name == "leased item" {
+				require.Contains(t, q.items, "0", "leave potentially executing work for separate recovery")
 			}
 			if name == "wrong run" {
 				require.Contains(t, q.items, "0", "do not delete another run's item")
@@ -201,4 +214,16 @@ func TestVerifiedCancellationCleanup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVerifiedCancellationRequiresInputs(t *testing.T) {
+	e, s, q, m := newCleanupFixture(t, 3)
+	err := e.Finalize(context.Background(), execution.FinalizeOpts{
+		Metadata: s.md,
+		Optional: execution.FinalizeOptional{Cancel: true, RequireCleanupVerification: true},
+	})
+	require.ErrorIs(t, err, ErrCancellationCleanupUnverified)
+	require.False(t, s.deleted)
+	require.Len(t, q.items, 3)
+	require.Equal(t, 1, m.held)
 }

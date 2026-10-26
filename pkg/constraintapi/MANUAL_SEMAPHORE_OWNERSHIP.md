@@ -22,9 +22,9 @@ released run's record expires. That marker is retained, not silently aged out.
    once marked, untracked positive usage cannot be automatically attributed.
    Manual acquisitions then require a run ID for each lease. There is no new
    wire/RPC field: the protocol marker lives in internal Redis request state.
-3. Use `ReleaseOwnedSemaphore` for recovery, or opt ordinary callers into
-   `WithStrictSemaphoreOwnership()`. Positive legacy usage without a matching
-   ownership record returns `ErrSemaphoreOwnershipUnknown` without a decrement.
+3. Use `ReleaseOwnedSemaphore` for recovery. Untracked legacy keys without a
+   matching ownership record return `ErrSemaphoreOwnershipUnknown`, even when
+   usage is zero: an old lease could still be scavenged later. No decrement occurs.
    This is a quarantine condition, not proof the run never held a permit.
 
 Disabling acquisition tracking does not restore legacy release on marked keys;

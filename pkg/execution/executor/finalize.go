@@ -50,21 +50,12 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	ctx = context.WithoutCancel(ctx)
 	l := logger.StdlibLogger(ctx)
 	if opts.Optional.RequireCleanupVerification {
-		// Check/read inputs before destructive cleanup. Missing input still
-		// permits verified queue/permit cleanup, but must remain an explicit
-		// exception: completion effects cannot be reconstructed from nothing.
-		var inputErr error
+		// Recovery needs complete inputs before touching permits or jobs.
 		if len(opts.Optional.InputEvents) == 0 {
-			opts.Optional.InputEvents, inputErr = e.smv2.LoadEvents(ctx, opts.Metadata.ID)
-			if inputErr != nil && !errors.Is(inputErr, state.ErrEventNotFound) {
-				return inputErr
-			}
+			return fmt.Errorf("%w: input events required", ErrCancellationCleanupUnverified)
 		}
 		if err := e.prepareVerifiedCancellation(ctx, opts); err != nil {
 			return err
-		}
-		if inputErr != nil {
-			return fmt.Errorf("%w: %w", ErrCancellationCleanupUnverified, inputErr)
 		}
 	}
 

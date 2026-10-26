@@ -26,9 +26,18 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 		cm.client = client
 	}
 	cm.manualSemaphoreOwnership = true
-	sm := NewRedisSemaphoreManager(client, WithStrictSemaphoreOwnership())
+	sm := NewRedisSemaphoreManager(client)
 	ctx := context.Background()
 	account, env, fn := uuid.New(), uuid.New(), uuid.New()
+	// Zero/missing legacy usage is not ownership evidence. Recovery must not
+	// authorize cleanup while an untracked capacity lease could remain.
+	strict := sm.(OwnedSemaphoreManager)
+	for _, bucket := range []string{"legacy-missing", "legacy-zero"} {
+		if bucket == "legacy-zero" {
+			require.NoError(t, client.Do(ctx, client.B().Set().Key(semaphoreUsageKey(account, "legacy", bucket)).Value("0").Build()).Error())
+		}
+		require.ErrorIs(t, strict.ReleaseOwnedSemaphore(ctx, account, "legacy", bucket, ulid.Make().String(), 1), ErrSemaphoreOwnershipUnknown)
+	}
 	sem := SemaphoreConstraint{ID: SemaphoreIDFn(fn), EvaluatedKeyHash: "app-a", Weight: 2, Release: SemaphoreReleaseManual}
 	_, err := sm.SetCapacity(ctx, account, sem.ID, uuid.NewString(), 10)
 	require.NoError(t, err)

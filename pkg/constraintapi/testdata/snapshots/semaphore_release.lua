@@ -16,9 +16,10 @@ if owned ~= false and owned ~= nil then
 	redis.call("SET", keyOwner, "0", "EX", retention)
 	return remaining
 end
-if strictOwnership or redis.call("EXISTS", keyUsage .. ":ownership") == 1 then
+local tracked = redis.call("EXISTS", keyUsage .. ":ownership") == 1
+if strictOwnership or tracked then
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0
-	if usage == 0 then return 0 end
+	if tracked and usage == 0 then return 0 end
 	return -1
 end
 local existing = redis.call("GET", keyIdempotency)

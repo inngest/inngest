@@ -5,13 +5,17 @@ operation, not an automatic production sweep. Ordinary cancellation is unchanged
 The caller must hold the target maintenance function and verify no work is
 executing. Do not use this to cancel customer functions as part of SYSOP recovery.
 
-The mode requires an ownership-aware semaphore manager (`ReleaseOwnedSemaphore`),
-then drains and checks the run index before deleting metadata. A read, release,
-dequeue or state-delete error is returned so the operator can stop and retry.
-Missing metadata refuses cleanup: it cannot establish the target's permit list.
-An intact metadata record with missing input can have its verified permits and
-jobs removed, but returns an explicit exception and retains its metadata. It
-does not fabricate completion events or claim full recovery.
+The mode checks the complete bounded job list before touching permits or jobs.
+It then requires an ownership-aware semaphore manager (`ReleaseOwnedSemaphore`),
+removes the jobs, and verifies the run index and raw records before deleting
+metadata. A read, release, dequeue or state-delete error is returned so the
+operator can stop and retry. Failures after cleanup starts can leave partial
+progress; permit release is idempotent. Metadata deletion is not attempted until
+queue/permit verification succeeds; a state-delete error must still be inspected.
+Missing metadata or input refuses cleanup before permits or jobs are touched.
+Jobs with any lease marker (including an expired marker), or the executing job
+itself, are left for separate recovery. This mode does not reconstruct missing
+state or fabricate completion events.
 
 Pass up to 1,000 `KnownQueueItemIDs` from the saved inventory to include jobs whose
 run-index entry is missing. Every loaded item must match the target run, account,
@@ -23,7 +27,8 @@ inventory and verify queue memberships externally before restoring the hold.
 
 - Deploy ownership-aware acquisition, release and scavenging first; enable
   acquisition tracking only after legacy holds on selected keys are drained or
-  quarantined. Old positive usage without ownership evidence fails closed.
+  quarantined. Untracked legacy keys fail closed even when usage is zero:
+  an old capacity lease could still be scavenged later.
 - The separate existing PR inngest/inngest#4866 addresses preserving input/state
   when finish-event publishing fails. This PR does not duplicate that work and
   is not sufficient for a fully retryable publish/finalization protocol on its

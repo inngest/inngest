@@ -129,7 +129,7 @@ func TestVerifiedCancellationRedis(t *testing.T) {
 			}
 			for _, item := range items {
 				_, err := q.LoadQueueItem(ctx, shard.Name(), item.ID)
-				if name == "missing-metadata" || name == "unknown-owner" {
+				if name == "missing-metadata" || name == "missing-input" || name == "unknown-owner" {
 					require.NoError(t, err)
 				} else {
 					require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
@@ -138,7 +138,7 @@ func TestVerifiedCancellationRedis(t *testing.T) {
 			_, usage, err := sm.GetCapacity(ctx, tenant.AccountID, sem.ID, sem.EvaluatedKeyHash)
 			require.NoError(t, err)
 			want := int64(1)
-			if name == "missing-metadata" {
+			if name == "missing-metadata" || name == "missing-input" {
 				want = 2
 			}
 			require.Equal(t, want, usage, "preserve the other run's actual acquired permit")
