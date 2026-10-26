@@ -10,10 +10,12 @@ import (
 
 	"github.com/inngest/inngest/cmd/internal/cloudsandboxes"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
+	"github.com/inngest/inngest/cmd/internal/fakesandboxes"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
@@ -128,11 +130,21 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		)
 	}
 
-	bridge, err := cloudsandboxes.New(ctx, opts.Config.EventAPI.Port)
-	if err != nil {
-		return err
+	if os.Getenv("INNGEST_DEV_FAKE_SANDBOXES") != "" {
+		// Development and test only: a stand-in sandbox API that never runs
+		// commands. See cmd/internal/fakesandboxes.
+		opts.CloudSandboxes = fakesandboxes.New(
+			fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port),
+			consts.DevServerSignalJWTSecret,
+			consts.DevServerEnvID,
+		)
+	} else {
+		bridge, err := cloudsandboxes.New(ctx, opts.Config.EventAPI.Port)
+		if err != nil {
+			return err
+		}
+		opts.CloudSandboxes = bridge
 	}
-	opts.CloudSandboxes = bridge
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", opts.Config.EventAPI.Port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
