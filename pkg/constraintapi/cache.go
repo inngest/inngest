@@ -48,11 +48,15 @@ type constraintCacheItem struct {
 	// capacity manager's idempotency handling to take effect even when the
 	// in-process cache is deployed.
 	addedAt time.Time
+	// requestedAt records when the Acquire that produced this entry was sent.
+	// The entry may reflect any capacity state from then until addedAt, so
+	// releases after requestedAt can make it stale.
+	requestedAt time.Time
 }
 
 type limitingConstraintCacheCutoffKey struct{}
 
-// skipAllCachedExhaustion is a cutoff after any cache entry's addedAt.
+// skipAllCachedExhaustion is a cutoff after any cache entry's requestedAt.
 var skipAllCachedExhaustion = time.Unix(1<<62, 0)
 
 // WithoutLimitingConstraintCacheLookup marks ctx so that Acquire is never
@@ -187,9 +191,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 			continue
 		}
 
-		// Capacity was released after this entry was cached, so it may no
-		// longer be exhausted. The manager's answer refreshes the entry below.
-		if val.addedAt.Before(cutoff) {
+		// Capacity was released after the request behind this entry was sent,
+		// so it may no longer be exhausted. The manager's answer refreshes the
+		// entry below.
+		if val.requestedAt.Before(cutoff) {
 			metrics.HistogramConstraintAPILimitingConstraintCacheTTL(ctx, item.TTL(), metrics.HistogramOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
@@ -258,6 +263,7 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		Tags:    tags,
 	})
 
+	requestedAt := l.clock.Now()
 	res, err := l.manager.Acquire(ctx, req)
 	if err != nil {
 		return nil, err
@@ -291,9 +297,10 @@ func (l *constraintCache) Acquire(ctx context.Context, req *CapacityAcquireReque
 		l.cache.Set(
 			cacheKey,
 			&constraintCacheItem{
-				retryAfter: res.RetryAfter,
-				constraint: ci,
-				addedAt:    l.clock.Now(),
+				retryAfter:  res.RetryAfter,
+				constraint:  ci,
+				addedAt:     l.clock.Now(),
+				requestedAt: requestedAt,
 			},
 			cacheTTL,
 		)

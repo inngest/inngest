@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -1384,6 +1385,75 @@ func TestCache(t *testing.T) {
 				require.Len(t, deps.lifecycles.AcquireCalls, 2)
 			},
 		},
+		{
+			name: "should skip exhaustion requested before the cutoff but cached after it",
+			run: func(ctx context.Context, t *testing.T, deps deps) {
+				accountConcurrency := ConstraintItem{
+					Kind: ConstraintKindConcurrency,
+					Concurrency: &ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				}
+				config := ConstraintConfig{
+					FunctionVersion: 1,
+					Concurrency: ConcurrencyConfig{
+						AccountConcurrency: 1,
+					},
+				}
+				delayed := &afterAcquireManager{CapacityManager: deps.cm}
+				cache := NewConstraintCache(
+					WithConstraintCacheClock(deps.clock),
+					WithConstraintCacheManager(delayed),
+					WithConstraintCacheEnable(func(ctx context.Context, accountID, envID, functionID uuid.UUID) (enable bool, minTTL, maxTTL time.Duration) {
+						return true, MinCacheTTL, MaxCacheTTL
+					}),
+				)
+				acquire := func(ctx context.Context, key string) *CapacityAcquireResponse {
+					res, err := cache.Acquire(ctx, &CapacityAcquireRequest{
+						AccountID:            accountID,
+						EnvID:                envID,
+						FunctionID:           fnID,
+						Source:               LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+						IdempotencyKey:       "acq-" + key,
+						Configuration:        config,
+						Constraints:          []ConstraintItem{accountConcurrency},
+						Amount:               1,
+						LeaseIdempotencyKeys: []string{"item-" + key},
+						CurrentTime:          deps.clock.Now(),
+						Duration:             3 * time.Second,
+						MaximumLifetime:      time.Minute,
+					})
+					require.NoError(t, err)
+					return res
+				}
+
+				held := acquire(ctx, "held")
+				require.Len(t, held.Leases, 1)
+
+				// Another caller reaches the manager and is denied while the slot is
+				// held, but its answer is cached only after the slot is released and
+				// a woken scan starts.
+				var cutoff time.Time
+				delayed.after = func() {
+					delayed.after = nil
+					_, err := deps.cm.Release(ctx, &CapacityReleaseRequest{
+						AccountID:      accountID,
+						IdempotencyKey: "release-held",
+						LeaseID:        held.Leases[0].LeaseID,
+						Source:         LeaseSource{Service: ServiceAPI, Location: CallerLocationItemLease, RunProcessingMode: RunProcessingModeBackground},
+					})
+					require.NoError(t, err)
+					deps.clock.(*clockwork.FakeClock).Advance(time.Millisecond)
+					cutoff = deps.clock.Now()
+				}
+				res := acquire(WithoutLimitingConstraintCacheLookup(ctx), "in-flight")
+				require.Len(t, res.Leases, 0)
+				require.False(t, cutoff.IsZero())
+
+				res = acquire(WithoutLimitingConstraintCacheBefore(ctx, cutoff), "woken")
+				require.Len(t, res.Leases, 1, "an answer requested before the release must not block the woken caller")
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -1434,4 +1504,19 @@ func TestCache(t *testing.T) {
 			})
 		})
 	}
+}
+
+// afterAcquireManager calls after when the wrapped Acquire returns, before the
+// cache sees the response.
+type afterAcquireManager struct {
+	CapacityManager
+	after func()
+}
+
+func (m *afterAcquireManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
+	res, err := m.CapacityManager.Acquire(ctx, req)
+	if m.after != nil {
+		m.after()
+	}
+	return res, err
 }
