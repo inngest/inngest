@@ -314,8 +314,8 @@ func openQuackChunked(chunkSize, rowLimit int) func(testing.TB) spanInserter {
 // AppendRequest has no wire-level column-name matching, only positional
 // types, so this must stay in lockstep with spanColumns.
 var quackAppendColumns = []driver.QuackColumnKind{
-	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
-	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampMS, driver.QuackColumnTimestampMS, // app_id, function_id, name, start_time, end_time
+	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
+	driver.QuackColumnUUID, driver.QuackColumnUUID, driver.QuackColumnVarchar, driver.QuackColumnTimestampTZ, driver.QuackColumnTimestampTZ, // app_id, function_id, name, start_time, end_time
 	driver.QuackColumnVarchar, driver.QuackColumnVarchar, driver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
 	driver.QuackColumnJSON, driver.QuackColumnJSON, driver.QuackColumnJSON, // attributes, output, input
 }

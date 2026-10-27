@@ -579,7 +579,7 @@ func TestGetTraceRunsPaginatesWithCursor(t *testing.T) {
 
 	runIDs := make([]ulid.ULID, 5)
 	for i := range runIDs {
-		// Well-separated (whole seconds apart) so TIMESTAMP_MS truncation
+		// Well-separated (whole seconds apart) so ms truncation
 		// never ties two runs' queued_at.
 		ts := now.Add(time.Duration(i) * time.Second)
 		runIDs[i] = ulid.MustNew(ulid.Timestamp(ts), rand.Reader)

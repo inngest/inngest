@@ -18,7 +18,7 @@ const (
 	QuackColumnUUID        = quack.ColumnUUID
 	QuackColumnVarchar     = quack.ColumnVarchar
 	QuackColumnJSON        = quack.ColumnJSON
-	QuackColumnTimestampMS = quack.ColumnTimestampMS
+	QuackColumnTimestampTZ = quack.ColumnTimestampTZ
 	QuackColumnBool        = quack.ColumnBool
 	QuackColumnBigint      = quack.ColumnBigint
 )

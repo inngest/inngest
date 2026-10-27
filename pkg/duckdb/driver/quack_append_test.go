@@ -41,14 +41,14 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".append_t "+
-		"(id UUID, name VARCHAR, attrs JSON, ts TIMESTAMP_MS);")
+		"(id UUID, name VARCHAR, attrs JSON, ts TIMESTAMPTZ);")
 	require.NoError(t, err)
 
 	id := uuid.New()
 	ts := time.UnixMilli(1_700_000_000_000).UTC()
 
 	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "append_t",
-		[]QuackColumnKind{QuackColumnUUID, QuackColumnVarchar, QuackColumnJSON, QuackColumnTimestampMS})
+		[]QuackColumnKind{QuackColumnUUID, QuackColumnVarchar, QuackColumnJSON, QuackColumnTimestampTZ})
 	require.NoError(t, err)
 
 	require.NoError(t, appender.AppendRow(id.String(), "hello", `{"a":1}`, ts))

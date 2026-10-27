@@ -50,8 +50,8 @@ type Timings struct {
 // migrations.
 var (
 	runColumns = []duckdbdriver.QuackColumnKind{
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, queued_at
-		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // scheduled_at, started_at, ended_at
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, queued_at
+		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // scheduled_at, started_at, ended_at
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
 		duckdbdriver.QuackColumnVarchar,                                                          // status
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, inputs, output
@@ -64,33 +64,33 @@ var (
 		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, // app_id, app_name, function_id, function_slug
 		duckdbdriver.QuackColumnVarchar,                                          // name
-		duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnTimestampMS, // start_time, end_time
+		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
 		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, internal_id, received_at
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, internal_id, received_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // source, source_id, event_id, event_name
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
+		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
 		duckdbdriver.QuackColumnTimestampMS, // bucket_at
 	}
 	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
 	// (BOOLEAN) have no native duckdbdriver.QuackColumnKind — see that type's own
-	// doc comment: only UUID/VARCHAR/JSON/TIMESTAMP_MS exist — so they're
+	// doc comment: only UUID/VARCHAR/JSON/TIMESTAMPTZ exist — so they're
 	// sent as QuackColumnVarchar text (see metadataRowValues) and rely on
 	// DuckDB's Appender doing implicit VARCHAR->INTEGER/BOOLEAN casting, the
 	// same mechanism already relied on (and verified against a real
 	// duckdb-quack server) for event_ids' VARCHAR->LIST casting above.
 	metadataColumns = []duckdbdriver.QuackColumnKind{
-		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
+		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // span_id, scope
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
-		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampMS, // values, created_at
+		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
 	}
 )
 
