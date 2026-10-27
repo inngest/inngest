@@ -384,6 +384,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
 		queue.WithCapacityManager(cm),
 		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		queue.WithCapacityReleaseWakeEnabled(func(context.Context, uuid.UUID) bool {
+			return true
+		}),
 	}
 
 	services = append(services, constraintapi.NewLeaseScavengerService(cm, consts.ConstraintAPIScavengerTick))
