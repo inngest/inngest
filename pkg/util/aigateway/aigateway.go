@@ -1,6 +1,7 @@
 package aigateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -96,7 +97,13 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 
 func parseOpenAIInput(req Request) (ParsedInferenceRequest, error) {
 	rf := OpenAIChatCompletionRequest{}
-	if err := json.Unmarshal(req.Body, &rf); err != nil {
+
+	// Decode numbers as json.Number so that values inside `any` fields, such
+	// as large integers in a tool's schema, are not rounded via float64 when
+	// they are re-marshalled below.
+	dec := json.NewDecoder(bytes.NewReader(req.Body))
+	dec.UseNumber()
+	if err := dec.Decode(&rf); err != nil {
 		return ParsedInferenceRequest{}, err
 	}
 

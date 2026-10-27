@@ -133,6 +133,17 @@ func TestParseInput(t *testing.T) {
 		require.EqualValues(t, test.expected, out, test.description)
 	}
 
+	t.Run("tool schema numbers are not rounded", func(t *testing.T) {
+		// 2^53 + 1 cannot be represented as a float64.
+		out, err := ParseInput(Request{
+			Format: FormatOpenAIChat,
+			Body:   json.RawMessage(`{"model":"gpt-4o","messages":[],"tools":[{"type":"function","function":{"name":"a","parameters":{"enum":[9007199254740993]}}}]}`),
+		})
+		require.NoError(t, err)
+		require.Len(t, out.Tools, 1)
+		require.Equal(t, `{"enum":[9007199254740993]}`, string(out.Tools[0].Parameters))
+	})
+
 	t.Run("invalid json returns an error", func(t *testing.T) {
 		for _, format := range []string{FormatOpenAIChat, FormatAnthropic} {
 			_, err := ParseInput(Request{Format: format, Body: json.RawMessage(`{not json`)})
