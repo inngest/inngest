@@ -31,7 +31,7 @@ func TestDualWriteThenDuckDBQueryRoundTrip(t *testing.T) {
 	queuedAt := time.Now().UTC()
 	// Explicitly well-separated (10ms apart) rather than relying on
 	// time.Now() calls made microseconds apart in a fast synchronous test:
-	// inngest.runs' TIMESTAMP_MS columns truncate to millisecond precision,
+	// inngest.runs' timestamps are truncated to millisecond precision,
 	// so queued_at/started_at/ended_at landing in the same millisecond
 	// bucket would make GetTraceRun's "latest row" ordering
 	// (COALESCE(ended_at, started_at, queued_at) DESC) genuinely tied —

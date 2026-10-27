@@ -84,3 +84,35 @@ func TestOpenWithQuackConnsRunsQueriesConcurrently(t *testing.T) {
 	require.Greater(t, atomic.LoadInt64(&peak), int64(1),
 		"at least two queries must have been observed running at the same time; QuackConns did not produce real concurrency")
 }
+
+// TestQuackConnsUseUTC proves bootstrapTimeZoneLocked's SET GLOBAL reaches
+// every pooled quack connection, not just the primary session.
+func TestQuackConnsUseUTC(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	db, err := Open(t.Context(), Options{
+		BinaryPath: binPath,
+		DBFile:     ":memory:",
+		QuackAddr:  &addr,
+		QuackConns: 3,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	db.SetMaxOpenConns(3)
+
+	conns := make([]interface{ Close() error }, 0, 3)
+	for range 3 {
+		c, err := db.Conn(t.Context())
+		require.NoError(t, err)
+		conns = append(conns, c)
+
+		var tz string
+		require.NoError(t, c.QueryRowContext(t.Context(), "SELECT current_setting('TimeZone');").Scan(&tz))
+		require.Equal(t, "UTC", tz)
+	}
+	for _, c := range conns {
+		require.NoError(t, c.Close())
+	}
+}
