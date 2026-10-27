@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRetireFunctionSemaphore(t *testing.T) {
-	for _, name := range []string{"positive legacy usage", "zero usage", "missing usage", "live lease", "expired lease", "missing lease details", "missing request", "malformed request", "other function lease", "other function references bucket", "lease bound"} {
+func TestInspectFunctionLeases(t *testing.T) {
+	for _, name := range []string{"positive legacy usage", "zero usage", "missing usage", "live lease", "expired lease", "missing lease details", "missing request", "malformed request", "other function lease", "unindexed lease", "lease bound"} {
 		t.Run(name, func(t *testing.T) {
 			cm, r, client, _ := newSemaphoreTestEnv(t)
 			ctx := context.Background()
@@ -40,12 +40,14 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 				requestID := ulid.Make()
 				r.HSet(cm.keyLeaseDetails(account, lease), "req", requestID.String())
 				request := map[string]any{"f": fn.String(), "s": []any{}}
-				if name == "other function lease" || name == "other function references bucket" {
+				if name == "other function lease" {
 					request["f"] = uuid.New().String()
-					wantErr = name != "other function lease"
+					wantErr = false
 				}
-				if name == "other function references bucket" {
-					request["s"] = []any{map[string]any{"k": 4, "sem": map[string]any{"k": key}}}
+				if name == "unindexed lease" {
+					_, err := r.ZRem(cm.keyAccountLeases(account), lease.String())
+					require.NoError(t, err)
+					wantErr = false // Index inspection alone cannot discover this holder.
 				}
 				encoded, err := json.Marshal(request)
 				require.NoError(t, err)
@@ -66,14 +68,23 @@ func TestRetireFunctionSemaphore(t *testing.T) {
 					}
 				}
 			}
-			err := RetireFunctionSemaphoreBucket(ctx, client, account, fn, expression, bucket)
+			err := CheckFunctionLeasesDrained(ctx, client, account, fn)
 			if wantErr {
 				require.Error(t, err)
-				require.True(t, r.Exists(key))
 			} else {
 				require.NoError(t, err)
+				require.NoError(t, CheckFunctionLeasesDrained(ctx, client, account, fn))
+			}
+			if name == "missing usage" {
 				require.False(t, r.Exists(key))
-				require.NoError(t, RetireFunctionSemaphoreBucket(ctx, client, account, fn, expression, bucket))
+			} else {
+				value, err := r.Get(key)
+				require.NoError(t, err)
+				want := "1"
+				if name == "zero usage" {
+					want = "0"
+				}
+				require.Equal(t, want, value, "inspection never changes usage counters")
 			}
 			value, err := r.Get(other)
 			require.NoError(t, err)
@@ -94,7 +105,7 @@ func TestRetirementRefusesAnExpiredLeaseUntilReleased(t *testing.T) {
 	res := acquireWithSemaphore(t, cm, clock, account, env, fn, ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseManual}}}, []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}, "acquire-retirement")
 	require.Len(t, res.Leases, 1)
 	clock.Advance(time.Minute)
-	require.Error(t, RetireFunctionSemaphoreBucket(ctx, client, account, fn, expression, bucket), "expired is still releasable")
+	require.Error(t, CheckFunctionLeasesDrained(ctx, client, account, fn), "expired is still releasable")
 	key := semaphoreUsageKey(account, sem.ID, bucket)
 	value, err := r.Get(key)
 	require.NoError(t, err)
@@ -105,8 +116,10 @@ func TestRetirementRefusesAnExpiredLeaseUntilReleased(t *testing.T) {
 	value, err = r.Get(key)
 	require.NoError(t, err)
 	require.Equal(t, "1", value, "normal lease release preserves manual holds")
-	require.NoError(t, RetireFunctionSemaphoreBucket(ctx, client, account, fn, expression, bucket))
+	require.NoError(t, CheckFunctionLeasesDrained(ctx, client, account, fn))
 	_, releaseErr = cm.Release(ctx, &CapacityReleaseRequest{IdempotencyKey: "late-scavenger", AccountID: account, LeaseID: lease, Source: LeaseSource{Service: ServiceConstraintScavenger, Location: CallerLocationLeaseScavenge}})
 	require.NoError(t, releaseErr)
-	require.False(t, r.Exists(key), "a deleted lease cannot later decrement or recreate the retired counter")
+	value, err = r.Get(key)
+	require.NoError(t, err)
+	require.Equal(t, "1", value, "inspection preserves the old manual hold")
 }

@@ -68,9 +68,6 @@ type retirementShard struct {
 func (q *retirementShard) MaintenanceLeaseCount(context.Context, queue.Scope) (int64, error) {
 	return 0, nil
 }
-func (q *retirementShard) CheckMaintenancePartitionEmpty(context.Context, queue.Scope) error {
-	return nil
-}
 func (q *retirementShard) DequeueMaintenance(ctx context.Context, item queue.QueueItem) error {
 	if q.beforeDequeue != nil {
 		q.beforeDequeue()

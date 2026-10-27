@@ -1,6 +1,7 @@
--- Maintenance-only. Do not add this check to normal acquire/release scripts.
-local prefix, functionID, mode = ARGV[1], ARGV[2], ARGV[3]
-local limit = tonumber(ARGV[4])
+-- Read-only maintenance inspection; not proof that unindexed holders are absent.
+-- Do not add this check to normal acquire/release scripts.
+local prefix, functionID = ARGV[1], ARGV[2]
+local limit = tonumber(ARGV[3])
 if redis.call("ZCARD", KEYS[1]) > limit then
   return redis.error_reply("ERR account lease inventory exceeds maintenance bound")
 end
@@ -19,21 +20,5 @@ for _, lease in ipairs(leases) do
   if request.f == functionID then
     return redis.error_reply("ERR function still has releasable capacity leases")
   end
-  if mode == "retire" then
-    if type(request.s) ~= "table" then return redis.error_reply("ERR lease constraints are unknown") end
-    for _, constraint in ipairs(request.s) do
-      if constraint.k == 4 then
-        if type(constraint.sem) ~= "table" or type(constraint.sem.k) ~= "string" then
-          return redis.error_reply("ERR lease semaphore is unknown")
-        end
-        if constraint.sem.k == KEYS[2] then
-          return redis.error_reply("ERR another function still references the semaphore bucket")
-        end
-      end
-    end
-  end
-end
-if mode == "retire" then
-  redis.call("DEL", KEYS[2])
 end
 return 1

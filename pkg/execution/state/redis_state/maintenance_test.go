@@ -15,7 +15,7 @@ import (
 )
 
 func TestMaintenanceQueueGuards(t *testing.T) {
-	for _, name := range []string{"unleased edge", "leased start", "expired sleep", "capacity holder", "lease races deletion", "changed job races deletion", "strict backlog read error", "backlog pointer", "normalization work", "far future job"} {
+	for _, name := range []string{"unleased edge", "leased start", "expired sleep", "capacity holder", "lease races deletion", "changed job races deletion"} {
 		t.Run(name, func(t *testing.T) {
 			r, client := initRedis(t)
 			t.Cleanup(client.Close)
@@ -46,22 +46,6 @@ func TestMaintenanceQueueGuards(t *testing.T) {
 				}
 			}
 			switch name {
-			case "strict backlog read error", "backlog pointer", "normalization work", "far future job":
-				require.NoError(t, q.DequeueMaintenance(ctx, *observed))
-				require.NoError(t, q.CheckMaintenancePartitionEmpty(ctx, scope))
-				switch name {
-				case "strict backlog read error":
-					require.NoError(t, r.Set(kg.ShadowPartitionSet(fn.String()), "wrong type"))
-				case "backlog pointer":
-					_, err = r.ZAdd(kg.ShadowPartitionSet(fn.String()), 0, "backlog")
-				case "normalization work":
-					_, err = r.ZAdd(kg.PartitionNormalizeSet(fn.String()), 0, "backlog")
-				case "far future job":
-					_, err = r.ZAdd(kg.FnQueueSet(fn.String()), float64(clock.Now().Add(10*365*24*time.Hour).UnixMilli()), "future")
-				}
-				require.NoError(t, err)
-				require.Error(t, q.CheckMaintenancePartitionEmpty(ctx, scope))
-				return
 			case "capacity holder":
 				observed.CapacityLease = &osqueue.CapacityLease{LeaseID: ulid.Make()}
 				encoded, err := json.Marshal(observed)

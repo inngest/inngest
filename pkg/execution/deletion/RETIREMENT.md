@@ -1,15 +1,16 @@
 # Retiring obsolete maintenance runs
 
 This is **not ordinary cancellation** and does not replace it. These helpers
-exist for an externally held, obsolete internal maintenance workload whose
-old function-level semaphore namespace is no longer used by the current code.
+remove obsolete internal maintenance jobs and run state under an external hold.
+The old function-level semaphore namespace must no longer be used by current
+code. **All semaphore counters and capacity configuration stay untouched.**
 No acquisition/release/scavenger hot path or ownership protocol changes.
 
 1. Save a complete independent inventory and a fixed run-creation cutoff.
    Preserve affected app identities and incoming requests for separately
    authorized replacement reconciliations. Do not replay automatically.
 2. Hold only the target maintenance function. Verify dispatch has stopped,
-   including expired in-progress queue records. Verify all relevant constraint
+   including expired execution leases. Verify all relevant constraint
    shards, including previous routing, have no indexed capacity lease for it.
    Unknown or missing lease details are not proof of absence. The caller must
    keep the hold and prevent old writers/configuration from returning.
@@ -32,26 +33,17 @@ No acquisition/release/scavenger hot path or ownership protocol changes.
    does not prove unknown records outside the supplied inventory disappeared.
    The caller may update maintenance history separately, AFTER verified state
    deletion; do not fabricate missing customer events or trigger parent runs.
-5. ONLY after the old backlog is gone and the function's partition/backlogs
-   are empty, retire its obsolete keyed semaphore usage buckets. Use the strict
-   maintenance empty check: it requires no ready jobs at any timestamp, no
-   backlog/normalization pointers (even empty ones), and no execution leases;
-   Redis errors are blockers. Do not use best-effort backlog counts or status
-   indexes, which classify job kind rather than leases. The dedicated
-   helper checks all account lease entries atomically before each deletion,
-   including expired entries and other functions referencing that bucket.
-   A zero/missing counter never bypasses the check. It does not reset a live
-   counter, delete other namespaces, or reconstruct historical ownership.
-   The inert shared capacity configuration is retained.
-6. Restore the previous hold state. A fresh reconciliation and any saved-event
+5. Restore the previous hold state. A fresh reconciliation and any saved-event
    replay are separate operations requiring verification and authorization.
 
-The lease inspection is bounded to 1,000 indexed leases per account/shard and
-refuses larger or incomplete inventories. Drain/scavenge safely first; do not
-raise limits or delete lease evidence to force a pass. There is no automatic
-override for leased or unclassifiable work. All-shard availability, complete
-inventory, external quiescence, and retirement of the old namespace are real
-operational prerequisites, not guaranteed by an empty run index.
+`CheckFunctionLeasesDrained` is read-only and bounded to 1,000 indexed leases
+per account/shard. Larger or incomplete inventories refuse the check. It cannot
+discover unindexed holders and is NOT proof that a counter is safe to delete.
+No counter-deletion API or separate counter-cleanup phase is provided.
 
-Do not roll back to old writers, resume old-format queued work, or reactivate
-the retired semaphore namespace after removing its usage counters.
+Clearing the obsolete backlog does not require garbage-collecting its unused
+Redis counters. Retaining those counters avoids making assumptions about old
+permit ownership. It does not make rolling back to old writers safe: those
+writers could encounter the retained holds. Do not reactivate the obsolete
+namespace or resume old-format queued work. Complete inventory, all-shard
+availability and external quiescence remain operational prerequisites.
