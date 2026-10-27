@@ -265,7 +265,7 @@ func openJSONLines(rowLimit int) func(testing.TB) spanInserter {
 			tb.Fatalf("opening jsonlines db: %v", err)
 		}
 		tb.Cleanup(func() { _ = db.Close() })
-		if err := duckdb.Migrate(tb.Context(), db, true); err != nil {
+		if err := duckdb.Migrate(tb.Context(), db, duckdb.ModeRawLake); err != nil {
 			tb.Fatalf("migrating jsonlines db: %v", err)
 		}
 		return dbInserter{db: db}
@@ -291,7 +291,7 @@ func openQuack(rowLimit int) func(testing.TB) spanInserter {
 			tb.Fatalf("opening quack db: %v", err)
 		}
 		tb.Cleanup(func() { _ = db.Close() })
-		if err := duckdb.Migrate(tb.Context(), db, true); err != nil {
+		if err := duckdb.Migrate(tb.Context(), db, duckdb.ModeRawLake); err != nil {
 			tb.Fatalf("migrating quack db: %v", err)
 		}
 		return dbInserter{db: db}
@@ -339,7 +339,7 @@ func openQuackAppend(rowLimit int) func(testing.TB) spanInserter {
 			tb.Fatalf("opening quack db: %v", err)
 		}
 		tb.Cleanup(func() { _ = db.Close() })
-		if err := duckdb.Migrate(tb.Context(), db, true); err != nil {
+		if err := duckdb.Migrate(tb.Context(), db, duckdb.ModeRawLake); err != nil {
 			tb.Fatalf("migrating quack db: %v", err)
 		}
 
@@ -404,7 +404,7 @@ func openEmbeddedConnector(tb testing.TB, rowLimit int) (*sql.DB, *duckdbgo.Conn
 		}
 	}
 
-	if err := duckdb.Migrate(tb.Context(), db, true); err != nil {
+	if err := duckdb.Migrate(tb.Context(), db, duckdb.ModeRawLake); err != nil {
 		tb.Fatalf("migrating embedded db: %v", err)
 	}
 	return db, connector

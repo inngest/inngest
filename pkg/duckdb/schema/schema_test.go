@@ -23,7 +23,7 @@ func TestMatchesDuckDBMigrations(t *testing.T) {
 		t.Skipf("duckdb unavailable: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, duckdb.Migrate(t.Context(), db, true))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake))
 
 	for _, tbl := range []Table{Runs, Spans, Events} {
 		t.Run(tbl.Name, func(t *testing.T) {
