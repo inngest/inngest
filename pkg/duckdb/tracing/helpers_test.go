@@ -11,8 +11,8 @@ import (
 )
 
 // newTestDuckDB opens a real duckdb subprocess with no DuckLake attachment —
-// a plain in-memory database, nothing written to disk. Migrate(persist:
-// false) creates the "inngest" schema directly (rather than relying on a
+// a plain in-memory database, nothing written to disk. Migrate(ModeMemory)
+// creates the "inngest" schema directly (rather than relying on a
 // DuckLake ATTACH to alias it) and neuters the DuckLake-only SET
 // SORTED/PARTITIONED BY DDL (see Migrate's doc comment), so every table
 // these tests exercise is a native, non-DuckLake DuckDB table.
@@ -29,7 +29,7 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)
 	}
-	if err := duckdb.Migrate(t.Context(), db, false); err != nil {
+	if err := duckdb.Migrate(t.Context(), db, duckdb.ModeMemory); err != nil {
 		t.Fatalf("migrating duckdb: %v", err)
 	}
 	return db, func() { _ = db.Close() }

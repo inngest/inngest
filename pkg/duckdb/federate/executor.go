@@ -56,7 +56,7 @@ type Query struct {
 	// RowCap bounds each table's delta.
 	RowCap int
 	// RunsCollapsed says the runs lake and delta are already one row per
-	// run, disjoint (cloud: the lake holds exported finals at or below W and
+	// run, disjoint (IE the lake holds exported finals at or below W and
 	// the delta each run's latest row above it, or still open), so nothing
 	// collapses them: the runs view is the plain union rather than
 	// raw_runs, and a top-n cuts no lake side of its own. Leave it unset
