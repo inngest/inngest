@@ -37,6 +37,13 @@ func subscriptionAckID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// subscriptionEventMarkerID is the step ID that records an event as handled by
+// a subscription, so an event that is handled twice is saved once.
+func subscriptionEventMarkerID(key string, eventID string) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s:event:%s", key, eventID)))
+	return hex.EncodeToString(sum[:])
+}
+
 // subscriptionHints remembers the next free message slot per subscription
 // pause, so saving a message does not probe from slot 1 every time. It is only
 // a hint: probing is the source of truth, so a stale or missing hint is safe.
@@ -100,6 +107,14 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		_, err := e.pm.Write(ctx, idx, &pause)
 		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription pause: %w", err)
+		}
+		if len(md.Config.EventIDs) > 0 {
+			// Mark the trigger as handled, in case it also matches.
+			marker := subscriptionEventMarkerID(sub.Key, md.Config.EventIDs[0].String())
+			if _, err := e.smv2.SaveStep(ctx, md.ID, marker, []byte(`{"data":0}`)); err != nil &&
+				!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+				return fmt.Errorf("error marking trigger event: %w", err)
+			}
 		}
 		return answer(map[string]any{"opened": true})
 
@@ -238,6 +253,16 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	data, err := json.Marshal(map[string]any{"data": eventMap})
 	if err != nil {
+		return err
+	}
+
+	// Claim the event first: an event that matches twice (a redelivery, two
+	// executors) is saved once.
+	marker := subscriptionEventMarkerID(key, evt.GetInternalID().String())
+	if _, err := e.smv2.SaveStep(ctx, id, marker, []byte(`{"data":0}`)); err != nil {
+		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+			return nil
+		}
 		return err
 	}
 
