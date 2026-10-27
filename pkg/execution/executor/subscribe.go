@@ -197,6 +197,14 @@ func (e *executor) countSubscriptionMessages(ctx context.Context, id sv2.ID, key
 // resumeSubscriber saves the bytes as the output of the step dataKey and queues
 // the discovery request that lets the run see it. It does not consume the pause.
 func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string, saved []byte) error {
+	// ConsumePause stores what it is given as JSON. Handing it the stored
+	// message back as a map of raw JSON writes the same bytes, so saving it
+	// again is idempotent.
+	var wrapper map[string]json.RawMessage
+	if err := json.Unmarshal(saved, &wrapper); err != nil {
+		return fmt.Errorf("stored subscription message is not JSON: %w", err)
+	}
+
 	clone := *pause
 	clone.ID = uuid.New()
 	clone.DataKey = dataKey
@@ -204,8 +212,7 @@ func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dat
 	clone.Subscribe = nil
 
 	err := e.Resume(ctx, clone, execution.ResumeRequest{
-		// The exact bytes the step holds, so saving them again is idempotent.
-		With:      saved,
+		With:      map[string]any{"data": wrapper["data"]},
 		StepName:  pause.StepName,
 		EventName: derefString(pause.Event),
 	})
