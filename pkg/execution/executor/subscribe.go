@@ -37,6 +37,13 @@ func subscriptionAckID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// subscriptionWaiterID is the step ID that records that the run is blocked
+// waiting for message seq.
+func subscriptionWaiterID(key string, seq int) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s:wait:%d", key, seq)))
+	return hex.EncodeToString(sum[:])
+}
+
 // subscriptionEventMarkerID is the step ID that records an event as handled by
 // a subscription, so an event that is handled twice is saved once.
 func subscriptionEventMarkerID(key string, eventID string) string {
@@ -129,8 +136,24 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		raw, ok := saved[gen.ID]
 		if !ok {
-			// Not here yet. The delivery of message Seq enqueues discovery.
-			return nil
+			// Not here yet. Record that the run is blocked on it, so the
+			// delivery of message Seq queues discovery. Discovery is only
+			// queued for a blocked run: while one is in flight, a second
+			// request would run its steps twice.
+			waiter := subscriptionWaiterID(sub.Key, sub.Seq)
+			if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, []byte(`{"data":1}`)); err != nil &&
+				!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+				return err
+			}
+
+			// The message may have arrived between the check and the marker.
+			saved, err = e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{gen.ID})
+			if err != nil {
+				return err
+			}
+			if raw, ok = saved[gen.ID]; !ok {
+				return nil
+			}
 		}
 
 		// The message arrived before the SDK asked for it. Queue discovery by
@@ -290,6 +313,15 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	subscriptionHints.Store(pause.ID, seq+1)
 
 	l.Debug("subscription message saved", "seq", seq, "step_id", stepID)
+
+	// Only a run that is blocked on this message needs a discovery request.
+	waiter, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{subscriptionWaiterID(key, seq)})
+	if err != nil {
+		return err
+	}
+	if _, blocked := waiter[subscriptionWaiterID(key, seq)]; !blocked {
+		return nil
+	}
 
 	return e.resumeSubscriber(ctx, pause, stepID, data)
 }
