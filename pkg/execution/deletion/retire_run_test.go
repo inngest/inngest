@@ -62,6 +62,23 @@ type retirementShard struct {
 	keepRaw, keepIndex  bool
 	dequeues            int
 	readErr, dequeueErr error
+	beforeDequeue       func()
+}
+
+func (q *retirementShard) MaintenanceLeaseCount(context.Context, queue.Scope) (int64, error) {
+	return 0, nil
+}
+func (q *retirementShard) CheckMaintenancePartitionEmpty(context.Context, queue.Scope) error {
+	return nil
+}
+func (q *retirementShard) DequeueMaintenance(ctx context.Context, item queue.QueueItem) error {
+	if q.beforeDequeue != nil {
+		q.beforeDequeue()
+	}
+	if q.item != nil && (q.item.LeaseID != nil || q.item.CapacityLease != nil) {
+		return errors.New("atomic lease refusal")
+	}
+	return q.Dequeue(ctx, item)
 }
 
 func (q *retirementShard) LoadQueueItem(context.Context, string) (*queue.QueueItem, error) {
@@ -72,6 +89,31 @@ func (q *retirementShard) LoadQueueItem(context.Context, string) (*queue.QueueIt
 		return nil, queue.ErrQueueItemNotFound
 	}
 	return q.item, nil
+}
+
+func TestRetirementLateLeaseAndLegacyEvidence(t *testing.T) {
+	for _, name := range []string{"late lease", "capacity holder", "no legacy evidence"} {
+		t.Run(name, func(t *testing.T) {
+			id := sv2.ID{RunID: ulid.Make(), FunctionID: uuid.New(), Tenant: sv2.Tenant{AccountID: uuid.New(), EnvID: uuid.New(), AppID: uuid.New()}}
+			sem := constraintapi.Semaphore{ID: "retired", Release: constraintapi.SemaphoreReleaseManual}
+			s := &retirementState{md: sv2.Metadata{ID: id, Config: *sv2.InitConfig(&sv2.Config{Semaphores: []constraintapi.Semaphore{sem}})}}
+			q := &retirementShard{count: 1, indexID: "job", item: &queue.QueueItem{ID: "job", FunctionID: id.FunctionID, Data: queue.Item{Kind: queue.KindStart, Identifier: state.Identifier{RunID: id.RunID, WorkflowID: id.FunctionID, AccountID: id.Tenant.AccountID, WorkspaceID: id.Tenant.EnvID, AppID: id.Tenant.AppID}}}}
+			if name == "late lease" {
+				q.beforeDequeue = func() { lease := ulid.Make(); q.item.LeaseID = &lease }
+			}
+			if name == "capacity holder" {
+				q.item.CapacityLease = &queue.CapacityLease{LeaseID: ulid.Make()}
+			}
+			if name == "no legacy evidence" {
+				s.md.Config.Semaphores = nil
+			}
+			_, err := RetireMaintenanceRun(context.Background(), q, s, RunRetirement{ID: id, JobID: "job", Before: time.Now().Add(time.Minute), RetiredSemaphoreID: "retired", RequireRetiredSemaphore: true}, func(context.Context) error { return nil })
+			require.Error(t, err)
+			require.NotNil(t, q.item)
+			require.False(t, s.deleted)
+			require.Zero(t, q.dequeues)
+		})
+	}
 }
 func (q *retirementShard) OutstandingJobCount(context.Context, queue.Scope, ulid.ULID) (int, error) {
 	return q.count, nil
@@ -193,7 +235,9 @@ func TestRetireMaintenanceRun(t *testing.T) {
 			require.NoError(t, err)
 			require.Nil(t, q.item)
 			require.Zero(t, q.count)
-			require.True(t, s.deleted)
+			if name != "already removed" {
+				require.True(t, s.deleted)
+			}
 			// There is deliberately no semaphore manager to call: the counter is
 			// preserved, irrespective of whether the old run actually owned it.
 			_, err = RetireMaintenanceRun(ctx, q, s, req, guard)

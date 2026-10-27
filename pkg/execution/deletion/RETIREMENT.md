@@ -17,16 +17,27 @@ No acquisition/release/scavenger hot path or ownership protocol changes.
    identity and the one-item run index before changing anything; accepts
    missing run metadata/input; refuses any queue lease, other manual semaphore,
    unknown state read, deferred work, or ambiguous/multiple index entries.
+   A shard must implement `queue.MaintenanceShard`; a normal `Dequeue` is never
+   used. Its maintenance script compares the last observed record and refuses
+   any execution/capacity lease or nonempty function lease index atomically
+   with deletion. An expired lease still blocks. A changed/vanished job is an
+   error, not successful retirement. System-queue items are refused.
    It removes the job, verifies BOTH the run index and raw queue record, then
    deletes and verifies metadata/input. It never releases a semaphore or emits
    finish events. Record each result; errors after mutation may leave partial
    progress. Retry only the same manifest after inspecting the failure.
+   Callers can require saved evidence of the retired manual semaphore to exclude
+   modern runs. Already-absent jobs/state return absence, not cancellation proof.
 4. Independently verify queue/status membership and history. A library return
    does not prove unknown records outside the supplied inventory disappeared.
    The caller may update maintenance history separately, AFTER verified state
    deletion; do not fabricate missing customer events or trigger parent runs.
 5. ONLY after the old backlog is gone and the function's partition/backlogs
-   are empty, retire its obsolete keyed semaphore usage buckets. The dedicated
+   are empty, retire its obsolete keyed semaphore usage buckets. Use the strict
+   maintenance empty check: it requires no ready jobs at any timestamp, no
+   backlog/normalization pointers (even empty ones), and no execution leases;
+   Redis errors are blockers. Do not use best-effort backlog counts or status
+   indexes, which classify job kind rather than leases. The dedicated
    helper checks all account lease entries atomically before each deletion,
    including expired entries and other functions referencing that bucket.
    A zero/missing counter never bypasses the check. It does not reset a live

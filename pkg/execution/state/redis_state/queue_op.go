@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -31,6 +32,10 @@ func (q *queue) DequeueByJobID(ctx context.Context, jobID string) error {
 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osqueue.DequeueOptionFn) error {
+	return q.dequeue(ctx, i, scripts["queue/dequeue"], nil, options...)
+}
+
+func (q *queue) dequeue(ctx context.Context, i osqueue.QueueItem, script *rueidis.Lua, extraArgs []string, options ...osqueue.DequeueOptionFn) error {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -113,7 +118,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		return err
 	}
 
-	status, err := scripts["queue/dequeue"].Exec(
+	args = append(args, extraArgs...)
+	status, err := script.Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		q.RedisClient.unshardedRc,
 		keys,
@@ -131,6 +137,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		return nil
 	case 1:
 		return osqueue.ErrQueueItemNotFound
+	case 2:
+		return fmt.Errorf("maintenance dequeue refused a changed or leased job")
 	default:
 		return fmt.Errorf("unknown response dequeueing item: %d", status)
 	}
