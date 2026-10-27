@@ -345,6 +345,9 @@ type SignalOpts struct {
 	Signal     string `json:"signal"`
 	Timeout    string `json:"timeout"`
 	OnConflict string `json:"conflict"`
+	// Inbox marks this wait as a step.subscribe delivery: the signal is
+	// the inbox key and a queued message resumes it.
+	Inbox *InboxOpts `json:"inbox,omitempty"`
 }
 
 func (s *SignalOpts) UnmarshalAny(a any) error {
@@ -751,4 +754,10 @@ func (l *lenient[T]) UnmarshalJSON(byt []byte) error {
 		l.Value = zero
 	}
 	return nil
+}
+
+// InboxOpts are the step.subscribe options carried on a WaitForSignal opcode.
+type InboxOpts struct {
+	// Key is the inbox key (the signal is "inbox:" + Key).
+	Key string `json:"key"`
 }
