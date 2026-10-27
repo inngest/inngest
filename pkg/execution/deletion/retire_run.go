@@ -19,6 +19,8 @@ var ErrRunRetirementUnsafe = errors.New("maintenance run retirement is unsafe")
 // cancellation: it emits no finish events and never releases a semaphore.
 // The caller must retain the manifest, leave obsolete semaphore counters alone,
 // and arrange any required history update or replacement work.
+// Manual release (the code must explicitly release the slot) describes the old
+// run-scoped slots; saved configuration alone does not prove a slot was acquired.
 type RunRetirement struct {
 	ID                      sv2.ID
 	JobID                   string
@@ -35,9 +37,10 @@ type RunRetirementResult struct {
 }
 
 // RetireMaintenanceRun removes one obsolete maintenance job and its run state.
-// guard must verify an external hold, no executing work or capacity leases, and
-// that the current function no longer acquires RetiredSemaphoreID. Keep the hold
-// until this call finishes. Never use this API for ordinary customer runs.
+// guard must verify that an operator has paused the function, no work is
+// executing or retains capacity leases, and the current function no longer
+// acquires RetiredSemaphoreID. The operator must keep the function paused until
+// this call finishes. Never use this API for ordinary customer runs.
 // Failed/uncertain reads refuse cleanup; partial deletion is safe to retry with
 // the same manifest. Missing metadata/input are allowed, not fabricated.
 func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2.RunService, req RunRetirement, guard func(context.Context) error) (*RunRetirementResult, error) {
@@ -131,7 +134,7 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 			found = found || (req.RetiredSemaphoreID != "" && sem.ID == req.RetiredSemaphoreID && sem.Release == constraintapi.SemaphoreReleaseManual)
 		}
 		if !found {
-			return nil, fmt.Errorf("%w: no retired manual semaphore evidence", ErrRunRetirementUnsafe)
+			return nil, fmt.Errorf("%w: no retired manual-release semaphore evidence", ErrRunRetirementUnsafe)
 		}
 	}
 	maintenance, ok := shard.(queue.MaintenanceShard)
@@ -183,7 +186,7 @@ func metadataAbsent(err error) bool {
 func checkRetiredSemaphores(semaphores []constraintapi.Semaphore, retired string) error {
 	for _, sem := range semaphores {
 		if sem.Release == constraintapi.SemaphoreReleaseManual && (retired == "" || sem.ID != retired) {
-			return fmt.Errorf("%w: manual semaphore is not retired", ErrRunRetirementUnsafe)
+			return fmt.Errorf("%w: manual-release semaphore is not retired", ErrRunRetirementUnsafe)
 		}
 	}
 	return nil
