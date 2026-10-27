@@ -51,6 +51,13 @@ func subscriptionEventMarkerID(key string, eventID string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// subscriptionEventSlotID is the step ID that records which slot an event was
+// saved to.
+func subscriptionEventSlotID(key string, eventID string) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s:slot:%s", key, eventID)))
+	return hex.EncodeToString(sum[:])
+}
+
 // subscriptionHints remembers the next free message slot per subscription
 // pause, so saving a message does not probe from slot 1 every time. It is only
 // a hint: probing is the source of truth, so a stale or missing hint is safe.
@@ -62,7 +69,7 @@ func subscriptionPauseID(runID string, key string) uuid.UUID {
 
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
 // subscription: open, next, poll and close.
-func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts) error {
+func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
 	sub := opts.Subscribe
 	if sub.Key == "" {
 		return fmt.Errorf("subscription key is empty")
@@ -99,7 +106,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// A subscription lives as long as the run.
 			Expires:     state.Time(now.Add(consts.MaxWaitForEventTimeout)),
 			Event:       &opts.Event,
-			Expression:  opts.If,
+			Expression:  expr,
 			MaxAttempts: runCtx.MaxAttempts(),
 			Subscribe:   &state.PauseSubscribe{Key: sub.Key},
 			CreatedAt:   now,
@@ -293,44 +300,76 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	key := pause.Subscribe.Key
 	eventMap := evt.GetEvent().Map()
 
+	// SaveStep writes to the run's hashes whether or not the run still
+	// exists, so check first: a finished run cannot take the message.
+	if exists, err := e.smv2.Exists(ctx, id); err != nil {
+		return err
+	} else if !exists {
+		subscriptionHints.Delete(pause.ID)
+		return state.ErrRunNotFound
+	}
+
 	data, err := json.Marshal(map[string]any{"data": eventMap})
 	if err != nil {
 		return err
 	}
 
 	// Claim the event first: an event that matches twice (a redelivery, two
-	// executors) is saved once.
+	// executors) is saved once. The slot it was saved to is recorded after, so
+	// a retry of an interrupted delivery can still wake the run.
 	marker := subscriptionEventMarkerID(key, evt.GetInternalID().String())
+	slotMarker := subscriptionEventSlotID(key, evt.GetInternalID().String())
+
+	var seq int
 	if _, err := e.smv2.SaveStep(ctx, id, marker, []byte(`{"data":0}`)); err != nil {
-		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-			return nil
-		}
-		return err
-	}
-
-	seq := 1
-	if hint, ok := subscriptionHints.Load(pause.ID); ok {
-		seq = hint.(int)
-	}
-
-	var stepID string
-	for ; ; seq++ {
-		stepID = subscriptionStepID(key, seq)
-		_, err := e.smv2.SaveStep(ctx, id, stepID, data)
-		if errors.Is(err, state.ErrDuplicateResponse) {
-			// Another message has this slot.
-			continue
-		}
-		if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
-			// A finished run (state deleted) cannot take the message. The
-			// finalizer re-emits unread messages, so this one is handled there
-			// or has been dropped with the run.
+		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 			return err
 		}
-		break
-	}
-	subscriptionHints.Store(pause.ID, seq+1)
 
+		// Already claimed. If it was saved, make sure the run was woken; if
+		// the claimant has not finished, fail so the event is retried.
+		saved, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{slotMarker})
+		if err != nil {
+			return err
+		}
+		raw, ok := saved[slotMarker]
+		if !ok {
+			return fmt.Errorf("subscription message is being saved by another handler")
+		}
+		var slot struct {
+			Data int `json:"data"`
+		}
+		if err := json.Unmarshal(raw, &slot); err != nil || slot.Data < 1 {
+			return nil
+		}
+		seq = slot.Data
+	} else {
+		seq = 1
+		if hint, ok := subscriptionHints.Load(pause.ID); ok {
+			seq = hint.(int)
+		}
+
+		for ; ; seq++ {
+			_, err := e.smv2.SaveStep(ctx, id, subscriptionStepID(key, seq), data)
+			if errors.Is(err, state.ErrDuplicateResponse) {
+				// Another message has this slot.
+				continue
+			}
+			if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
+				return err
+			}
+			break
+		}
+		subscriptionHints.Store(pause.ID, seq+1)
+
+		slotData, _ := json.Marshal(map[string]any{"data": seq})
+		if _, err := e.smv2.SaveStep(ctx, id, slotMarker, slotData); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+			return err
+		}
+	}
+
+	stepID := subscriptionStepID(key, seq)
 	l.Debug("subscription message saved", "seq", seq, "step_id", stepID)
 
 	// Only a run that is blocked on this message needs a discovery request.
@@ -363,6 +402,7 @@ func (e *executor) unreadSubscriptionEvents(ctx context.Context, id sv2.ID) ([]e
 			continue
 		}
 		key := pause.Subscribe.Key
+		subscriptionHints.Delete(pause.ID)
 
 		saved, err := e.countSubscriptionMessages(ctx, id, key)
 		if err != nil {

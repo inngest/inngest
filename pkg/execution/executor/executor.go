@@ -5745,10 +5745,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
 
-	if opts.Subscribe != nil {
-		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts)
-	}
-
 	if opts.If != nil {
 		if err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If); err != nil {
 			if errors.Is(err, expressions.ErrValidationFailed) {
@@ -5818,6 +5814,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		if err := gen.SetOpt("if", interpolated); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
+	}
+
+	if opts.Subscribe != nil {
+		// step.subscribe shares the expression handling above.
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts, expr)
 	}
 
 	opcode := gen.Op.String()
