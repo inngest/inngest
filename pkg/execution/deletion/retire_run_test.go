@@ -133,7 +133,7 @@ func (q *retirementShard) Dequeue(context.Context, queue.QueueItem, ...queue.Deq
 }
 
 func TestRetireMaintenanceRun(t *testing.T) {
-	for _, name := range []string{"success", "legacy counter not released", "missing metadata", "missing input", "both missing", "already removed", "inventoried orphan", "wrong tenant", "wrong metadata", "expired lease", "current job", "future run", "unknown manual semaphore", "extra index item", "wrong indexed item", "queue read error", "state read error", "input read error", "deferred work", "deferred work without metadata", "defer read error", "dequeue error", "raw verification", "index verification", "delete error", "hold lost", "no guard"} {
+	for _, name := range []string{"success", "legacy counter not released", "missing metadata", "missing input", "both missing", "already removed", "inventoried orphan", "wrong tenant", "wrong metadata", "expired lease", "current job", "future run", "unknown manual-release semaphore", "extra index item", "wrong indexed item", "queue read error", "state read error", "input read error", "deferred work", "deferred work without metadata", "defer read error", "dequeue error", "raw verification", "index verification", "delete error", "function no longer paused", "no guard"} {
 		t.Run(name, func(t *testing.T) {
 			id := sv2.ID{RunID: ulid.Make(), FunctionID: uuid.New(), Tenant: sv2.Tenant{AccountID: uuid.New(), EnvID: uuid.New(), AppID: uuid.New()}}
 			sem := constraintapi.Semaphore{ID: constraintapi.SemaphoreIDFnKey(id.FunctionID, "event.data.app_id"), Release: constraintapi.SemaphoreReleaseManual, Weight: 1}
@@ -143,8 +143,8 @@ func TestRetireMaintenanceRun(t *testing.T) {
 			calls := 0
 			guard := func(context.Context) error {
 				calls++
-				if name == "hold lost" && calls > 1 {
-					return errors.New("hold lost")
+				if name == "function no longer paused" && calls > 1 {
+					return errors.New("function no longer paused")
 				}
 				return nil
 			}
@@ -189,7 +189,7 @@ func TestRetireMaintenanceRun(t *testing.T) {
 				ctx = queue.WithJobID(ctx, "job")
 			case "future run":
 				req.Before = time.Now().Add(-time.Hour)
-			case "unknown manual semaphore":
+			case "unknown manual-release semaphore":
 				req.RetiredSemaphoreID = "different"
 			case "extra index item":
 				q.count = 2

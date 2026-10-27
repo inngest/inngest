@@ -115,11 +115,11 @@ func TestRetirementRefusesAnExpiredLeaseUntilReleased(t *testing.T) {
 	require.NoError(t, releaseErr)
 	value, err = r.Get(key)
 	require.NoError(t, err)
-	require.Equal(t, "1", value, "normal lease release preserves manual holds")
+	require.Equal(t, "1", value, "normal lease release preserves slots reserved for the function run")
 	require.NoError(t, CheckFunctionLeasesDrained(ctx, client, account, fn))
 	_, releaseErr = cm.Release(ctx, &CapacityReleaseRequest{IdempotencyKey: "late-scavenger", AccountID: account, LeaseID: lease, Source: LeaseSource{Service: ServiceConstraintScavenger, Location: CallerLocationLeaseScavenge}})
 	require.NoError(t, releaseErr)
 	value, err = r.Get(key)
 	require.NoError(t, err)
-	require.Equal(t, "1", value, "inspection preserves the old manual hold")
+	require.Equal(t, "1", value, "inspection preserves the old slot reserved for the function run")
 }
