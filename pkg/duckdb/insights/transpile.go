@@ -65,7 +65,6 @@ var pipeline = []stage{
 	stageExtractQueryInfo,
 	stageBuildColumnHints,
 	stageRewriteArrayOfStructAccess,
-	stageCastTZFunctions,
 	stageRemapTables,
 	stageAddDefaultLimit,
 }
@@ -106,14 +105,6 @@ func stageRewriteArrayOfStructAccess(ps *pipelineState) error {
 	diags, err := rewriteArrayOfStructAccess(ps.stmt, ps.ctes, nil)
 	ps.diagnostics = append(ps.diagnostics, diags...)
 	return err
-}
-
-// stageCastTZFunctions runs after stageRewriteArrayOfStructAccess (hints
-// and array-of-struct rewriting are unaffected either way, but this keeps
-// every AST-rewrite stage grouped together) and before stageRemapTables.
-func stageCastTZFunctions(ps *pipelineState) error {
-	ps.diagnostics = append(ps.diagnostics, rewriteTZFunctions(ps.stmt)...)
-	return nil
 }
 
 func stageRemapTables(ps *pipelineState) error {

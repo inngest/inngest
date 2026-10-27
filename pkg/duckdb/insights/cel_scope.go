@@ -116,9 +116,9 @@ func celColumnEqHandler(column string) celFieldHandler {
 }
 
 // celColumnTimestampHandler builds a handler for a field registered via Add
-// that targets a TIMESTAMP_MS column directly. DuckDB has no BIGINT->
-// TIMESTAMP_MS cast, so the column (not the int64-milliseconds CEL literal)
-// is converted, via epoch_ms, rather than the other way around.
+// that targets a TIMESTAMPTZ column directly. The column (not the
+// int64-milliseconds CEL literal) is converted, via epoch_ms, rather than the
+// other way around.
 func celColumnTimestampHandler(column string) celFieldHandler {
 	return func(ident string, literal any, op string) ([]sq.Expression, error) {
 		ts, ok := literal.(int64)
