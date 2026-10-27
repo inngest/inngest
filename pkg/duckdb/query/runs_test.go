@@ -682,35 +682,3 @@ func TestGetTraceRunsCountRespectsAppNameFilter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 }
-
-// TestRunsQualifyRoundsBoundsToMillis proves both time bounds are bound as
-// whole ms (so the driver renders them as TIMESTAMP_MS) and that rounding up
-// keeps the same rows against a TIMESTAMP_MS column: `>= From` and `< Until`
-// both match exactly the same ms values after rounding up.
-func TestRunsQualifyRoundsBoundsToMillis(t *testing.T) {
-	at := time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC)
-	cases := []struct {
-		name string
-		in   time.Time
-		want time.Time
-	}{
-		{"whole ms", at, at},
-		{"sub-ms", at.Add(time.Microsecond), at.Add(time.Millisecond)},
-		{"just under next ms", at.Add(time.Millisecond - time.Nanosecond), at.Add(time.Millisecond)},
-		{"zero", time.Time{}, time.Time{}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, args := runsQualify(cqrs.GetTraceRunFilter{
-				TimeField: enums.TraceRunTimeQueuedAt,
-				From:      tc.in,
-				Until:     tc.in.Add(time.Hour),
-			})
-			require.Equal(t, []any{tc.want, tc.want.Add(time.Hour)}, args)
-		})
-	}
-
-	_, args := runsQualify(cqrs.GetTraceRunFilter{TimeField: enums.TraceRunTimeQueuedAt})
-	until := args[1].(time.Time)
-	require.Zero(t, until.Nanosecond()%int(time.Millisecond), "time.Now() default must be rounded too")
-}

@@ -12,26 +12,21 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
-// timestampLayout is the layout every time.Time is encoded with. Microsecond
-// precision is load-bearing, not cosmetic: the spec's append-only,
-// no-correlation-state design has readers reconstruct a run's sequencing "from
-// timestamps at query time", so a step's scheduled/started/finished rows —
-// which in a fast dev run all land inside the same second — must remain
-// orderable. DuckDB's TIMESTAMP type is microsecond-precision and round-trips
-// this layout exactly (verified against the real binary); it renders a
-// zero-fraction timestamp back without the fractional part, which the
-// read-side layout list in store.go's AsTimestamp already handles.
-const timestampLayout = "2006-01-02 15:04:05.000000"
-
-// timestampMSLayout is the layout a whole-millisecond time.Time is encoded
-// with, as a TIMESTAMP_MS literal. Every time column in the schema is
-// TIMESTAMP_MS (migrations/000001_baseline.sql), and comparing one against a
-// microsecond TIMESTAMP literal makes DuckDB cast the column instead
-// (`CAST(ended_at AS TIMESTAMP) >= ...`), which costs per row and keeps
-// DuckLake from pruning files on the column's min/max stats. A TIMESTAMP_MS
-// literal compares against the column as-is, and against a TIMESTAMP column
-// DuckDB casts the literal, so this is lossless either way.
-const timestampMSLayout = "2006-01-02 15:04:05.000"
+// timestampLayout is the layout every time.Time is encoded with, as a
+// TIMESTAMP_MS literal truncated to whole milliseconds. Every time column in
+// the schema is TIMESTAMP_MS (migrations/000001_baseline.sql), so this is
+// the precision every bound value is stored or compared at anyway, and
+// truncating here (rather than relying on the cast) keeps comparisons from
+// mixing precisions. A microsecond TIMESTAMP literal against a TIMESTAMP_MS
+// column makes DuckDB cast the column instead (`CAST(ended_at AS TIMESTAMP)
+// >= ...`), which costs per row and keeps DuckLake from pruning files on the
+// column's min/max stats. Against a TIMESTAMP column DuckDB casts the
+// literal, so callers that need sub-ms precision there must not bind a
+// time.Time.
+//
+// NOTE: since the value is truncated, `col >= ?` w/ a sub-ms bound also
+// matches the ms the bound falls in.
+const timestampLayout = "2006-01-02 15:04:05.000"
 
 // encodeLiteral converts a bound driver.Value into DuckDB SQL literal text.
 // This exists because the stdio/JSON-lines transport has no wire-level
@@ -94,10 +89,7 @@ func encodeLiteral(v driver.Value) (string, error) {
 		sb.WriteString("'::BLOB")
 		return sb.String(), nil
 	case time.Time:
-		if val.Nanosecond()%int(time.Millisecond) == 0 {
-			return "TIMESTAMP_MS '" + val.UTC().Format(timestampMSLayout) + "'", nil
-		}
-		return "TIMESTAMP '" + val.UTC().Format(timestampLayout) + "'", nil
+		return "TIMESTAMP_MS '" + val.UTC().Truncate(time.Millisecond).Format(timestampLayout) + "'", nil
 	case []string:
 		// DuckDB's array literal syntax (['a', 'b']) — no cast needed; the
 		// target column's declared type (e.g. VARCHAR[]) is enough for

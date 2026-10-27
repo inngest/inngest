@@ -41,9 +41,9 @@ func TestEncodeLiteral(t *testing.T) {
 			"TIMESTAMP_MS '2026-01-02 03:04:05.123'",
 		},
 		{
-			"time.Time with sub-millisecond precision",
-			time.Date(2026, 1, 2, 3, 4, 5, 123456000, time.UTC),
-			"TIMESTAMP '2026-01-02 03:04:05.123456'",
+			"time.Time with sub-millisecond precision is truncated",
+			time.Date(2026, 1, 2, 3, 4, 5, 123999999, time.UTC),
+			"TIMESTAMP_MS '2026-01-02 03:04:05.123'",
 		},
 		{
 			"time.Time in another zone",
@@ -99,52 +99,9 @@ func TestInterpolateRejectsMismatchedPlaceholderCount(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestTimestampRoundTripPreservesMicroseconds is the real-binary proof behind
-// timestampLayout: three timestamps inside the same second must come back
-// distinct and in order, since the dual-write schema's append-only rows carry
-// no sequence number and readers order them by timestamp alone.
-func TestTimestampRoundTripPreservesMicroseconds(t *testing.T) {
-	binPath := RequireDuckDBBinary(t)
-
-	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (label VARCHAR, ts_at TIMESTAMP);")
-	require.NoError(t, err)
-
-	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	for i, label := range []string{"scheduled", "started", "finished"} {
-		_, err = db.ExecContext(t.Context(),
-			"INSERT INTO ts (label, ts_at) VALUES (?, ?);",
-			label, base.Add(time.Duration(i+1)*time.Microsecond),
-		)
-		require.NoError(t, err)
-	}
-
-	rows, err := db.QueryContext(t.Context(), "SELECT label FROM ts ORDER BY ts_at ASC;")
-	require.NoError(t, err)
-	defer rows.Close()
-
-	var ordered []string
-	for rows.Next() {
-		var label string
-		require.NoError(t, rows.Scan(&label))
-		ordered = append(ordered, label)
-	}
-	require.NoError(t, rows.Err())
-	require.Equal(t, []string{"scheduled", "started", "finished"}, ordered)
-
-	// And the distinct-count proves the microseconds weren't truncated away.
-	var distinct int
-	require.NoError(t,
-		db.QueryRowContext(t.Context(), "SELECT count(DISTINCT ts_at) FROM ts;").Scan(&distinct))
-	require.Equal(t, 3, distinct)
-}
-
-// TestTimestampMSLiteral is the real-binary proof behind timestampMSLayout: a
-// whole-ms bound has the TIMESTAMP_MS columns' own type (so filtering one
-// doesn't cast the column), round trips
+// TestTimestampMSLiteral is the real-binary proof behind timestampLayout: a
+// bound time has the TIMESTAMP_MS columns' own type (so filtering one doesn't
+// cast the column), is truncated to whole ms, round trips
 // through both column types, and still works w/ interval arithmetic and
 // time_bucket.
 func TestTimestampMSLiteral(t *testing.T) {
@@ -170,12 +127,16 @@ func TestTimestampMSLiteral(t *testing.T) {
 
 	// The driver can't run EXPLAIN (it DESCRIBEs every query), so this
 	// checks the bound types instead: same type as the column -> no cast.
-	var msType, usType string
+	var typ string
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT typeof(?);", at).Scan(&typ))
+	require.Equal(t, "TIMESTAMP_MS", typ)
+
+	// A sub-ms bound matches the ms it falls in, on either column type.
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT typeof(?), typeof(?);", at, at.Add(time.Microsecond),
-	).Scan(&msType, &usType))
-	require.Equal(t, "TIMESTAMP_MS", msType)
-	require.Equal(t, "TIMESTAMP", usType)
+		"SELECT count(*) FROM ts WHERE ms = ? AND us = ?;",
+		at.Add(999*time.Microsecond), at.Add(time.Microsecond),
+	).Scan(&n))
+	require.Equal(t, 1, n)
 }
 
 // TestJSONRawMessageRoundTripsIntoVariantColumn is the real-binary proof
