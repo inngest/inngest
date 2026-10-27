@@ -1926,7 +1926,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get an event"
-      description: "Gets an event by its internal ID. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
+      description: "Gets an event by its internal ID. Internal inngest/ events are not returned. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
       tags: "Events"
       tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
@@ -4295,7 +4295,7 @@ message ResumeFunctionResponse {
 message ListEventsRequest {
   optional string cursor = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Opaque pagination cursor from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages."
+      description: "ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages."
     }
   ];
   optional int32 limit = 2 [
@@ -4306,22 +4306,22 @@ message ListEventsRequest {
   ];
   optional google.protobuf.Timestamp from = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Inclusive received-time lower bound. Defaults to one hour before the current time, even when until is provided. Must not be after until. The effective window is returned in metadata.timeRange."
+      description: "Inclusive received-time lower bound. Defaults to one hour before until, or one hour before the current time if until is omitted. Must not be after until. The effective window is returned in metadata.timeRange."
     }
   ];
   optional google.protobuf.Timestamp until = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Inclusive received-time upper bound. Defaults to the current time. The effective window is returned in metadata.timeRange."
+      description: "Inclusive received-time upper bound. Defaults to the current time. When from is omitted, it defaults to one hour before this bound. The effective window is returned in metadata.timeRange."
     }
   ];
   repeated string name = 5 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Exact event names to include. Repeat to match any of several names."
+      description: "Exact event names to include. Repeat to match any of up to 20 names, with up to 256 characters each and no backslashes or control characters."
     }
   ];
   repeated string include = 6 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional event expansions. Use payload to return the stored event JSON."
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads."
       enum: "payload"
     }
   ];
@@ -4335,7 +4335,7 @@ message GetEventRequest {
   ];
   repeated string include = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional event expansions. Use payload to return the stored event JSON. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan."
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan."
       enum: "payload"
     }
   ];
@@ -4378,7 +4378,7 @@ message Event {
   optional string version = 7;
   google.protobuf.Struct payload = 8 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Stored event JSON (name, data, user, ts, id, v). Present only with include=payload."
+      description: "Stored event JSON (name, data, user, ts, id, v). Present only with include=payload. Payloads can contain personal data and be large, so request them only when needed. Numbers in payloads are JSON float64, so integers above 2^53 may lose precision."
     }
   ];
 }

@@ -10695,28 +10695,28 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"functionId\"t\n" +
 	"\x16ResumeFunctionResponse\x12$\n" +
 	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xf2\b\n" +
-	"\x11ListEventsRequest\x12\x99\x01\n" +
-	"\x06cursor\x18\x01 \x01(\tB|\x92Ay2wOpaque pagination cursor from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages.H\x00R\x06cursor\x88\x01\x01\x12\x8f\x02\n" +
-	"\x05limit\x18\x02 \x01(\x05B\xf3\x01\x92A\xef\x012\xe8\x01Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 20; otherwise the default is 40. Zero uses the default. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.:\x0240H\x01R\x05limit\x88\x01\x01\x12\xfd\x01\n" +
-	"\x04from\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\xc7\x01\x92A\xc3\x012\xc0\x01Inclusive received-time lower bound. Defaults to one hour before the current time, even when until is provided. Must not be after until. The effective window is returned in metadata.timeRange.H\x02R\x04from\x88\x01\x01\x12\xb6\x01\n" +
-	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x7f\x92A|2zInclusive received-time upper bound. Defaults to the current time. The effective window is returned in metadata.timeRange.H\x03R\x05until\x88\x01\x01\x12\\\n" +
-	"\x04name\x18\x05 \x03(\tBH\x92AE2CExact event names to include. Repeat to match any of several names.R\x04name\x12p\n" +
-	"\ainclude\x18\x06 \x03(\tBV\x92AS2GOptional event expansions. Use payload to return the stored event JSON.\xf2\x02\apayloadR\aincludeB\t\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc7\v\n" +
+	"\x11ListEventsRequest\x12\x9f\x01\n" +
+	"\x06cursor\x18\x01 \x01(\tB\x81\x01\x92A~2|ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages.H\x00R\x06cursor\x88\x01\x01\x12\x8f\x02\n" +
+	"\x05limit\x18\x02 \x01(\x05B\xf3\x01\x92A\xef\x012\xe8\x01Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 20; otherwise the default is 40. Zero uses the default. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.:\x0240H\x01R\x05limit\x88\x01\x01\x12\x8e\x02\n" +
+	"\x04from\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\xd8\x01\x92A\xd4\x012\xd1\x01Inclusive received-time lower bound. Defaults to one hour before until, or one hour before the current time if until is omitted. Must not be after until. The effective window is returned in metadata.timeRange.H\x02R\x04from\x88\x01\x01\x12\xfa\x01\n" +
+	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\xc2\x01\x92A\xbe\x012\xbb\x01Inclusive received-time upper bound. Defaults to the current time. When from is omitted, it defaults to one hour before this bound. The effective window is returned in metadata.timeRange.H\x03R\x05until\x88\x01\x01\x12\xa9\x01\n" +
+	"\x04name\x18\x05 \x03(\tB\x94\x01\x92A\x90\x012\x8d\x01Exact event names to include. Repeat to match any of up to 20 names, with up to 256 characters each and no backslashes or control characters.R\x04name\x12\x9b\x02\n" +
+	"\ainclude\x18\x06 \x03(\tB\x80\x02\x92A\xfc\x012\xef\x01Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.\xf2\x02\apayloadR\aincludeB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
-	"\x06_until\"\xab\x02\n" +
+	"\x06_until\"\xd3\x03\n" +
 	"\x0fGetEventRequest\x12O\n" +
-	"\bevent_id\x18\x01 \x01(\tB4\x92A12/Internal event ULID, also used by GetEventRuns.R\aeventId\x12\xc6\x01\n" +
-	"\ainclude\x18\x02 \x03(\tB\xab\x01\x92A\xa7\x012\x9a\x01Optional event expansions. Use payload to return the stored event JSON. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.\xf2\x02\apayloadR\ainclude\"\x8f\x01\n" +
+	"\bevent_id\x18\x01 \x01(\tB4\x92A12/Internal event ULID, also used by GetEventRuns.R\aeventId\x12\xee\x02\n" +
+	"\ainclude\x18\x02 \x03(\tB\xd3\x02\x92A\xcf\x022\xc2\x02Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.\xf2\x02\apayloadR\ainclude\"\x8f\x01\n" +
 	"\x12ListEventsResponse\x12!\n" +
 	"\x04data\x18\x01 \x03(\v2\r.api.v2.EventR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
 	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"k\n" +
 	"\x10GetEventResponse\x12!\n" +
 	"\x04data\x18\x01 \x01(\v2\r.api.v2.EventR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xbf\x05\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xe6\x06\n" +
 	"\x05Event\x12D\n" +
 	"\x02id\x18\x01 \x01(\tB4\x92A12/Internal event ULID, also used by GetEventRuns.R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12;\n" +
@@ -10726,8 +10726,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"occurredAt\x12q\n" +
 	"\x06source\x18\x05 \x01(\v2\x13.api.v2.EventSourceBD\x92AA2?Event source, when available. Usually absent in the dev server.R\x06source\x12\\\n" +
 	"\x0fidempotency_key\x18\x06 \x01(\tB3\x92A02.Sender-supplied event ID used for idempotency.R\x0eidempotencyKey\x12\x1d\n" +
-	"\aversion\x18\a \x01(\tH\x00R\aversion\x88\x01\x01\x12\x8b\x01\n" +
-	"\apayload\x18\b \x01(\v2\x17.google.protobuf.StructBX\x92AU2SStored event JSON (name, data, user, ts, id, v). Present only with include=payload.R\apayloadB\n" +
+	"\aversion\x18\a \x01(\tH\x00R\aversion\x88\x01\x01\x12\xb2\x02\n" +
+	"\apayload\x18\b \x01(\v2\x17.google.protobuf.StructB\xfe\x01\x92A\xfa\x012\xf7\x01Stored event JSON (name, data, user, ts, id, v). Present only with include=payload. Payloads can contain personal data and be large, so request them only when needed. Numbers in payloads are JSON float64, so integers above 2^53 may lose precision.R\apayloadB\n" +
 	"\n" +
 	"\b_version\"K\n" +
 	"\vEventSource\x12\x13\n" +
@@ -10825,7 +10825,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xf7\xe3\x01\n" +
+	"\x04INFO\x10\x032\xa2\xe4\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -11364,10 +11364,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\vList events\x1a\xa0\x03Lists events in descending internal-ID order, excluding internal inngest/ events. Time filters use received time; client-seeded IDs can differ from received-time order. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x14\b\x01\x12\x10events:read:list\x82\xd3\xe4\x93\x02\t\x12\a/events\x12\xbf\x03\n" +
-	"\bGetEvent\x12\x17.api.v2.GetEventRequest\x1a\x18.api.v2.GetEventResponse\"\xff\x02\x92A\xca\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x14\b\x01\x12\x10events:read:list\x82\xd3\xe4\x93\x02\t\x12\a/events\x12\xea\x03\n" +
+	"\bGetEvent\x12\x17.api.v2.GetEventRequest\x1a\x18.api.v2.GetEventResponse\"\xaa\x03\x92A\xf5\x02\n" +
 	"\x06Events\n" +
-	"\x04Beta\x12\fGet an event\x1a\x99\x02Gets an event by its internal ID. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention.b\x10\n" +
+	"\x04Beta\x12\fGet an event\x1a\xc4\x02Gets an event by its internal ID. Internal inngest/ events are not returned. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fevents:read:get\x82\xd3\xe4\x93\x02\x14\x12\x12/events/{event_id}\x12\x9b\t\n" +

@@ -103,6 +103,7 @@ type WorkspaceEventsOpts struct {
 	// cutoff will not be loaded.
 	Oldest                time.Time
 	IncludeInternalEvents bool
+	OmitEventData         bool // skips loading event payloads when not needed
 }
 
 func (o *WorkspaceEventsOpts) Validate() error {

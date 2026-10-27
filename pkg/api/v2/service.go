@@ -137,13 +137,6 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	gwmux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newResponseEnumMarshaler()),
 		runtime.WithErrorHandler(base.CustomErrorHandler()),
-		runtime.WithRoutingErrorHandler(func(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, status int) {
-			// an empty path parameter must not create a method match
-			if status == http.StatusMethodNotAllowed && strings.HasSuffix(r.URL.Path, "/") {
-				status = http.StatusNotFound
-			}
-			runtime.DefaultRoutingErrorHandler(ctx, mux, marshaler, w, r, status)
-		}),
 		runtime.SetQueryParameterParser(&runtime.DefaultQueryParser{RejectUnknownFields: true}),
 		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
 			// forward standard headers

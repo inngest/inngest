@@ -274,6 +274,26 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
+func TestEventReadHelp(t *testing.T) {
+	for _, name := range []string{"list-events", "get-event"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			require.NoError(t, cmd.Run(t.Context(), []string{"api", name, "--help"}))
+			require.Contains(t, out.String(), "Payloads can contain personal data and be large, so request them only when needed.")
+			require.Contains(t, out.String(), "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+			if name == "list-events" {
+				require.Contains(t, out.String(), "up to 20 names, with up to 256 characters each and no backslashes or control characters")
+				require.Contains(t, out.String(), "ID of the last returned event from the previous response.")
+				require.Contains(t, out.String(), "Defaults to one hour before until, or one hour before the current time if until is omitted.")
+			} else {
+				require.Contains(t, out.String(), "Internal inngest/ events are not returned.")
+			}
+		})
+	}
+}
+
 func TestDeprecatedEndpointFlagsAreHidden(t *testing.T) {
 	var trace endpoint
 	for _, ep := range discoverEndpoints() {

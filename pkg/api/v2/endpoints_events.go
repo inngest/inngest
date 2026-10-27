@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/logger"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -50,10 +53,22 @@ func (s *Service) ListEvents(ctx context.Context, req *apiv2.ListEventsRequest) 
 	if limit < 1 || limit > maxLimit {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, fmt.Sprintf("Limit must be between 1 and %d", maxLimit))
 	}
+	if len(req.GetName()) > 20 {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "At most 20 event names are allowed")
+	}
+	for _, name := range req.GetName() {
+		if len(name) == 0 || len(name) > 256 {
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event names must be between 1 and 256 bytes")
+		}
+		if strings.ContainsRune(name, '\\') || strings.ContainsFunc(name, unicode.IsControl) {
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event names must not contain backslashes or control characters")
+		}
+	}
 	opts := &cqrs.WorkspaceEventsOpts{
 		Limit:                 limit + 1,
 		Names:                 req.GetName(),
 		IncludeInternalEvents: false,
+		OmitEventData:         !includePayload,
 	}
 	if req.GetCursor() != "" {
 		cursor, err := ulid.ParseStrict(req.GetCursor())
@@ -75,6 +90,9 @@ func (s *Service) ListEvents(ctx context.Context, req *apiv2.ListEventsRequest) 
 	}
 	if until != nil {
 		opts.Newest = *until
+		if from == nil {
+			opts.Oldest = until.Add(-time.Hour)
+		}
 	}
 	if from != nil && until != nil && from.After(*until) {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "from must not be after until")
@@ -85,6 +103,7 @@ func (s *Service) ListEvents(ctx context.Context, req *apiv2.ListEventsRequest) 
 
 	events, err := s.events.GetEvents(ctx, opts)
 	if err != nil {
+		logger.From(ctx).Error("unable to fetch events", "error", err)
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch events")
 	}
 	page := &apiv2.Page{Limit: int32(limit), HasMore: len(events) > limit}
@@ -131,7 +150,11 @@ func (s *Service) GetEvent(ctx context.Context, req *apiv2.GetEventRequest) (*ap
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Event not found")
 	}
 	if err != nil {
+		logger.From(ctx).Error("unable to fetch event", "error", err)
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch event")
+	}
+	if strings.HasPrefix(evt.EventName, "inngest/") {
+		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Event not found")
 	}
 	data, err := toAPIEvent(evt, includePayload)
 	if err != nil {

@@ -271,6 +271,16 @@ func TestEventReadTools(t *testing.T) {
 		schema := InputSchema(endpoint)
 		include := schema["properties"].(map[string]any)["include"].(map[string]any)
 		require.Equal(t, []string{"payload"}, include["items"].(map[string]any)["enum"])
+		require.Contains(t, include["description"], "Payloads can contain personal data and be large, so request them only when needed.")
+		require.Contains(t, include["description"], "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+		properties := schema["properties"].(map[string]any)
+		if tc.method == "ListEvents" {
+			require.Contains(t, properties["name"].(map[string]any)["description"], "up to 20 names, with up to 256 characters each and no backslashes or control characters")
+			require.Contains(t, properties["cursor"].(map[string]any)["description"], "ID of the last returned event from the previous response.")
+			require.Contains(t, properties["from"].(map[string]any)["description"], "Defaults to one hour before until, or one hour before the current time if until is omitted.")
+		} else {
+			require.Contains(t, tool.Description, "Internal inngest/ events are not returned.")
+		}
 		req, err := Request(t.Context(), endpoint, tc.args, Options{})
 		require.NoError(t, err)
 		require.Equal(t, http.MethodGet, req.Method)

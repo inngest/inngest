@@ -1,17 +1,22 @@
 package apiv2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/logger"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -69,6 +74,8 @@ func TestListEventsOptions(t *testing.T) {
 			}
 			if tc.req.From != nil {
 				require.Equal(t, tc.req.From.AsTime(), received.Oldest)
+			} else if tc.req.Until != nil {
+				require.Equal(t, tc.req.Until.AsTime().Add(-time.Hour), received.Oldest)
 			} else {
 				require.WithinRange(t, received.Oldest, before.Add(-time.Hour), time.Now().Add(-time.Hour))
 			}
@@ -83,6 +90,150 @@ func TestListEventsOptions(t *testing.T) {
 			require.False(t, resp.Page.HasMore)
 			require.Nil(t, resp.Page.Cursor)
 		})
+	}
+}
+
+func TestListEventsNames(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		names []string
+		valid bool
+	}{
+		{"omitted", nil, true},
+		{"quotes unicode and slash", []string{"app/it's ok", "café/注文"}, true},
+		{"20 names", strings.Split(strings.Repeat("event,", 19)+"event", ","), true},
+		{"21 names", strings.Split(strings.Repeat("event,", 20)+"event", ","), false},
+		{"256 bytes", []string{strings.Repeat("a", 256)}, true},
+		{"257 bytes", []string{strings.Repeat("a", 257)}, false},
+		{"256 unicode bytes", []string{strings.Repeat("é", 128)}, true},
+		{"258 unicode bytes", []string{strings.Repeat("é", 129)}, false},
+		{"empty", []string{""}, false},
+		{"empty after valid", []string{"app/valid", ""}, false},
+		{"backslash", []string{`app\event`}, false},
+		{"injection", []string{`x\')) OR 1=1 --`}, false},
+		{"nul", []string{"app/\x00event"}, false},
+		{"newline", []string{"app/\nevent"}, false},
+		{"tab", []string{"app/\tevent"}, false},
+		{"delete", []string{"app/\x7fevent"}, false},
+		{"unicode control", []string{"app/\u0085event"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			provider := testEventProvider{list: func(_ context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+				calls++
+				require.Equal(t, tc.names, opts.Names)
+				return []*cqrs.Event{{ID: ulid.MustParse("01J00000000000000000000000"), EventName: "app/it's ok", ReceivedAt: time.Now()}}, nil
+			}}
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Events: provider}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v2/events?"+url.Values{"name": tc.names}.Encode(), nil))
+			if !tc.valid {
+				require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+				require.Contains(t, rec.Body.String(), `"code":"invalid_field_format"`)
+				require.Zero(t, calls)
+				return
+			}
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), `"name":"app/it's ok"`)
+			require.Equal(t, 1, calls)
+		})
+	}
+}
+
+func TestListEventsOmitEventData(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		include []string
+		omit    bool
+	}{
+		{"default", nil, true},
+		{"payload", []string{"payload"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := NewService(ServiceOptions{Events: testEventProvider{list: func(_ context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+				require.Equal(t, tc.omit, opts.OmitEventData)
+				return []*cqrs.Event{{ID: ulid.Make(), EventName: "app/event", ReceivedAt: time.Now(), EventData: map[string]any{"message": "hello"}}}, nil
+			}}})
+			resp, err := svc.ListEvents(t.Context(), &apiv2.ListEventsRequest{Include: tc.include})
+			require.NoError(t, err)
+			require.Len(t, resp.Data, 1)
+			require.Equal(t, "app/event", resp.Data[0].Name)
+			if tc.omit {
+				require.Nil(t, resp.Data[0].Payload)
+			} else {
+				require.Equal(t, map[string]any{"message": "hello"}, resp.Data[0].Payload.AsMap()["data"])
+			}
+		})
+	}
+}
+
+func TestGetEventExcludesInternalEvents(t *testing.T) {
+	id := ulid.Make()
+	missing := NewService(ServiceOptions{Events: testEventProvider{get: func(context.Context, ulid.ULID) (*cqrs.Event, error) {
+		return nil, ErrEventNotFound
+	}}})
+	_, notFound := missing.GetEvent(t.Context(), &apiv2.GetEventRequest{EventId: id.String()})
+	requireAPIError(t, notFound, http.StatusNotFound, "not_found")
+	for _, tc := range []struct {
+		name     string
+		internal bool
+	}{
+		{"inngest/function.finished", true},
+		{"inngest/", true},
+		{"app/it's ok", false},
+		{"inngest-custom/event", false},
+	} {
+		for _, include := range [][]string{nil, {"payload"}} {
+			t.Run(fmt.Sprintf("%s/%v", tc.name, include), func(t *testing.T) {
+				svc := NewService(ServiceOptions{Events: testEventProvider{get: func(_ context.Context, got ulid.ULID) (*cqrs.Event, error) {
+					require.Equal(t, id, got)
+					return &cqrs.Event{ID: id, EventName: tc.name, ReceivedAt: time.Now(), EventData: map[string]any{"output": "private"}}, nil
+				}}})
+				resp, err := svc.GetEvent(t.Context(), &apiv2.GetEventRequest{EventId: id.String(), Include: include})
+				if tc.internal {
+					requireAPIError(t, err, http.StatusNotFound, "not_found")
+					require.Equal(t, notFound.Error(), err.Error())
+					require.Nil(t, resp)
+					return
+				}
+				require.NoError(t, err)
+				require.Equal(t, id.String(), resp.Data.Id)
+				require.Equal(t, tc.name, resp.Data.Name)
+			})
+		}
+	}
+}
+
+func TestEventReadProviderErrorsLogged(t *testing.T) {
+	var logs bytes.Buffer
+	ctx := logger.WithStdlib(t.Context(), logger.FromSlog(slog.New(slog.NewJSONHandler(&logs, nil)), slog.LevelInfo))
+	providerErr := errors.New("database unavailable")
+	evt := &cqrs.Event{EventName: "private-event-name", EventData: map[string]any{"secret": "private-payload"}}
+	svc := NewService(ServiceOptions{Events: testEventProvider{
+		get: func(context.Context, ulid.ULID) (*cqrs.Event, error) { return evt, providerErr },
+		list: func(context.Context, *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+			return []*cqrs.Event{evt}, providerErr
+		},
+	}})
+	for _, list := range []bool{true, false} {
+		logs.Reset()
+		var err error
+		message := "unable to fetch event"
+		if list {
+			_, err = svc.ListEvents(ctx, &apiv2.ListEventsRequest{})
+			message = "unable to fetch events"
+		} else {
+			_, err = svc.GetEvent(ctx, &apiv2.GetEventRequest{EventId: ulid.Make().String()})
+		}
+		requireAPIError(t, err, http.StatusInternalServerError, "internal_error")
+		require.NotContains(t, err.Error(), providerErr.Error())
+		var entry map[string]any
+		require.NoError(t, json.Unmarshal(logs.Bytes(), &entry))
+		require.Equal(t, message, entry["msg"])
+		require.Equal(t, "database unavailable", entry["error"])
+		require.NotContains(t, logs.String(), "private-event-name")
+		require.NotContains(t, logs.String(), "private-payload")
 	}
 }
 
@@ -265,7 +416,7 @@ func TestHTTPGateway_EventRoutes(t *testing.T) {
 		}
 	}
 	for path, status := range map[string]int{
-		"/events/":                           http.StatusNotFound,
+		"/events/":                           http.StatusNotImplemented,
 		"/events/01J00000000000000000000000": http.StatusNotImplemented,
 	} {
 		rec := httptest.NewRecorder()
