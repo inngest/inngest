@@ -117,7 +117,28 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 			return nil, fmt.Errorf("%w: run index does not match manifest", ErrRunRetirementUnsafe)
 		}
 	}
+	checkpoint := queue.MaintenanceRetirement{
+		AccountID: id.Tenant.AccountID, EnvID: id.Tenant.EnvID, AppID: id.Tenant.AppID,
+		FunctionID: id.FunctionID, RunID: id.RunID, JobID: req.JobID,
+		BeforeMS: req.Before.UnixMilli(), RetiredSemaphoreID: req.RetiredSemaphoreID,
+	}
+	checkpoints, checkpointSupported := shard.(queue.MaintenanceRetirementStore)
+	var saved *queue.MaintenanceRetirement
+	if req.RequireRetiredSemaphore && checkpointSupported {
+		saved, err = checkpoints.LoadMaintenanceRetirement(ctx, req.JobID)
+		if err != nil {
+			return nil, err
+		}
+		if saved != nil && *saved != checkpoint {
+			return nil, fmt.Errorf("%w: retirement checkpoint does not match manifest", ErrRunRetirementUnsafe)
+		}
+	}
 	if result.Metadata == nil && result.Item == nil && !result.InputFound {
+		if saved != nil && !req.DryRun {
+			if err := checkpoints.DeleteMaintenanceRetirement(ctx, checkpoint); err != nil {
+				return nil, err
+			}
+		}
 		return result, nil // idempotent absence is not a new cancellation
 	}
 	if req.RequireRetiredSemaphore {
@@ -133,7 +154,7 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 		for _, sem := range semaphores {
 			found = found || (req.RetiredSemaphoreID != "" && sem.ID == req.RetiredSemaphoreID && sem.Release == constraintapi.SemaphoreReleaseManual)
 		}
-		if !found {
+		if !found && saved == nil {
 			return nil, fmt.Errorf("%w: no retired manual-release semaphore evidence", ErrRunRetirementUnsafe)
 		}
 	}
@@ -145,8 +166,18 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 	if req.DryRun {
 		return result, nil
 	}
+	if req.RequireRetiredSemaphore && !checkpointSupported {
+		return nil, fmt.Errorf("%w: shard cannot preserve retirement inspection evidence", ErrRunRetirementUnsafe)
+	}
 	if err := guard(ctx); err != nil {
 		return nil, err
+	}
+	if req.RequireRetiredSemaphore {
+		// Persist only after every inspection/guard has passed, before deleting
+		// the job or metadata that may hold the last live semaphore evidence.
+		if err := checkpoints.SaveMaintenanceRetirement(ctx, checkpoint); err != nil {
+			return nil, err
+		}
 	}
 	if result.Item != nil {
 		// A vanished/changed record is not proof that this caller retired it.
@@ -175,6 +206,11 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 	}
 	if _, err := store.LoadEvents(ctx, id); !errors.Is(err, state.ErrEventNotFound) && !metadataAbsent(err) {
 		return nil, fmt.Errorf("%w: input remains or cannot be checked: %v", ErrRunRetirementUnsafe, err)
+	}
+	if req.RequireRetiredSemaphore {
+		if err := checkpoints.DeleteMaintenanceRetirement(ctx, checkpoint); err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }

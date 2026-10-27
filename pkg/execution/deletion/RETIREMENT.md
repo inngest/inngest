@@ -34,8 +34,17 @@ prove that the run acquired a slot.
    finish events. Record each result; errors after mutation may leave partial
    progress. Retry only the same manifest after inspecting the failure.
    Callers can require saved evidence of the retired manual-release semaphore
-   to exclude modern runs. Already-absent jobs/state return absence, not
-   cancellation proof.
+   to exclude modern runs. In that mode, the shard must also implement
+   `queue.MaintenanceRetirementStore`: after inspection and before mutation,
+   cleanup saves a checkpoint outside run state containing the exact tenant,
+   function, run/job, cutoff and retired semaphore ID. This preserves verified
+   evidence if queue removal succeeds but state deletion fails (including a
+   partial deletion that removes metadata). Only the same manifest can reuse
+   it; all current identity, lease, deferred-work and pause checks still apply.
+   Dry runs never create/remove checkpoints. Failed operations retain theirs
+   without expiry until a successful retry verifies removal and deletes the
+   checkpoint; account for these records before abandoning a failed cleanup.
+   Already-absent jobs/state return absence, not cancellation proof.
 4. Independently verify queue/status membership and history. A library return
    does not prove unknown records outside the supplied inventory disappeared.
    The caller may update maintenance history separately, AFTER verified state

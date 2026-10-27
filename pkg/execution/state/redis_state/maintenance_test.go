@@ -14,6 +14,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMaintenanceRetirementCheckpoint(t *testing.T) {
+	r, client := initRedis(t)
+	t.Cleanup(client.Close)
+	_, shard := newQueue(t, client)
+	q := shard.(*queue)
+	ctx := context.Background()
+	checkpoint := osqueue.MaintenanceRetirement{AccountID: uuid.New(), EnvID: uuid.New(), AppID: uuid.New(), FunctionID: uuid.New(), RunID: ulid.Make(), JobID: "job", BeforeMS: time.Now().UnixMilli(), RetiredSemaphoreID: "retired"}
+	loaded, err := q.LoadMaintenanceRetirement(ctx, checkpoint.JobID)
+	require.NoError(t, err)
+	require.Nil(t, loaded)
+	require.NoError(t, q.SaveMaintenanceRetirement(ctx, checkpoint))
+	require.NoError(t, q.SaveMaintenanceRetirement(ctx, checkpoint))
+	loaded, err = q.LoadMaintenanceRetirement(ctx, checkpoint.JobID)
+	require.NoError(t, err)
+	require.Equal(t, checkpoint, *loaded)
+	other := checkpoint
+	other.RunID = ulid.Make()
+	require.Error(t, q.SaveMaintenanceRetirement(ctx, other))
+	require.Error(t, q.DeleteMaintenanceRetirement(ctx, other))
+	loaded, err = q.LoadMaintenanceRetirement(ctx, checkpoint.JobID)
+	require.NoError(t, err)
+	require.Equal(t, checkpoint, *loaded, "conflicting operations must preserve the original evidence")
+	require.NoError(t, q.DeleteMaintenanceRetirement(ctx, checkpoint))
+	require.NoError(t, q.DeleteMaintenanceRetirement(ctx, checkpoint))
+	loaded, err = q.LoadMaintenanceRetirement(ctx, checkpoint.JobID)
+	require.NoError(t, err)
+	require.Nil(t, loaded)
+	require.NoError(t, r.Set(q.maintenanceRetirementKey(checkpoint.JobID), "not JSON"))
+	_, err = q.LoadMaintenanceRetirement(ctx, checkpoint.JobID)
+	require.Error(t, err, "malformed checkpoints must fail closed")
+}
+
 func TestMaintenanceQueueGuards(t *testing.T) {
 	for _, name := range []string{"unleased edge", "leased start", "expired sleep", "capacity holder", "lease races deletion", "changed job races deletion"} {
 		t.Run(name, func(t *testing.T) {

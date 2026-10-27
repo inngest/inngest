@@ -81,3 +81,62 @@ func (q *queue) DequeueMaintenance(ctx context.Context, expected osqueue.QueueIt
 }
 
 var _ osqueue.MaintenanceShard = (*queue)(nil)
+
+// These checkpoints live outside run state so a partially successful state
+// deletion cannot erase the evidence needed to finish that same manifest.
+var maintenanceRetirementScript = rueidis.NewLuaScript(`
+local existing = redis.call("GET", KEYS[1])
+if existing and existing ~= ARGV[1] then return 1 end
+if ARGV[2] == "save" then
+  redis.call("SET", KEYS[1], ARGV[1])
+else
+  redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
+func (q *queue) LoadMaintenanceRetirement(ctx context.Context, jobID string) (*osqueue.MaintenanceRetirement, error) {
+	rc := q.RedisClient.unshardedRc
+	raw, err := rc.Do(ctx, rc.B().Get().Key(q.maintenanceRetirementKey(jobID)).Build()).ToString()
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var checkpoint osqueue.MaintenanceRetirement
+	if err := json.Unmarshal([]byte(raw), &checkpoint); err != nil {
+		return nil, err
+	}
+	return &checkpoint, nil
+}
+
+func (q *queue) SaveMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement) error {
+	return q.updateMaintenanceRetirement(ctx, checkpoint, "save")
+}
+
+func (q *queue) DeleteMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement) error {
+	return q.updateMaintenanceRetirement(ctx, checkpoint, "delete")
+}
+
+func (q *queue) maintenanceRetirementKey(jobID string) string {
+	return q.RedisClient.kg.QueueItem() + ":maintenance-retirement:" + jobID
+}
+
+func (q *queue) updateMaintenanceRetirement(ctx context.Context, checkpoint osqueue.MaintenanceRetirement, operation string) error {
+	raw, err := json.Marshal(checkpoint)
+	if err != nil {
+		return err
+	}
+	result, err := maintenanceRetirementScript.Exec(ctx, q.RedisClient.unshardedRc,
+		[]string{q.maintenanceRetirementKey(checkpoint.JobID)}, []string{string(raw), operation}).AsInt64()
+	if err != nil {
+		return err
+	}
+	if result != 0 {
+		return fmt.Errorf("maintenance retirement checkpoint belongs to a different manifest")
+	}
+	return nil
+}
+
+var _ osqueue.MaintenanceRetirementStore = (*queue)(nil)

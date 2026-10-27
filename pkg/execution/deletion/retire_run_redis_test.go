@@ -2,6 +2,7 @@ package deletion
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"testing"
@@ -45,13 +46,29 @@ func TestRetirementRedisIntegration(t *testing.T) {
 	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unsharded.Queue())
 	item, err := shard.EnqueueItem(ctx, queue.QueueItem{ID: ulid.Make().String(), FunctionID: id.FunctionID, WorkspaceID: id.Tenant.EnvID, Data: queue.Item{Kind: queue.KindStart, Identifier: state.Identifier{RunID: id.RunID, WorkflowID: id.FunctionID, AccountID: id.Tenant.AccountID, WorkspaceID: id.Tenant.EnvID, AppID: id.Tenant.AppID, Semaphores: []constraintapi.Semaphore{sem}}, Semaphores: []constraintapi.Semaphore{sem}}}, time.Now(), queue.EnqueueOpts{})
 	require.NoError(t, err)
-	s := &retirementState{md: sv2.Metadata{ID: id, Config: *sv2.InitConfig(&sv2.Config{Semaphores: []constraintapi.Semaphore{sem}})}}
+	failure := errors.New("state deletion unavailable")
+	s := &retirementState{absent: true, deleteErr: failure}
 	guard := func(ctx context.Context) error {
 		return constraintapi.CheckFunctionLeasesDrained(ctx, client, id.Tenant.AccountID, id.FunctionID)
 	}
-	request := RunRetirement{ID: id, JobID: item.ID, Before: time.Now(), RetiredSemaphoreID: sem.ID}
+	request := RunRetirement{ID: id, JobID: item.ID, Before: time.Now(), RetiredSemaphoreID: sem.ID, RequireRetiredSemaphore: true}
+	_, err = RetireMaintenanceRun(ctx, shard, s, request, guard)
+	require.ErrorIs(t, err, failure)
+	_, err = shard.LoadQueueItem(ctx, item.ID)
+	require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
+	// Recreate the shard wrapper: retry evidence must survive outside the
+	// previous caller's memory and the already-removed queue job.
+	shard = redis_state.NewQueueShard(consts.DefaultQueueShardName, unsharded.Queue())
+	checkpoints := shard.(queue.MaintenanceRetirementStore)
+	checkpoint, err := checkpoints.LoadMaintenanceRetirement(ctx, item.ID)
+	require.NoError(t, err)
+	require.NotNil(t, checkpoint)
+	s.deleteErr = nil
 	_, err = RetireMaintenanceRun(ctx, shard, s, request, guard)
 	require.NoError(t, err)
+	checkpoint, err = checkpoints.LoadMaintenanceRetirement(ctx, item.ID)
+	require.NoError(t, err)
+	require.Nil(t, checkpoint)
 	value, err := client.Do(ctx, client.B().Get().Key(usage).Build()).ToString()
 	require.NoError(t, err)
 	require.Equal(t, "1", value, "retirement must not decrement an uncertain legacy permit")
