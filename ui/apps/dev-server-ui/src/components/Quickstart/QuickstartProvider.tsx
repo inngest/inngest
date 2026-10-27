@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createDevServerURL } from '@/hooks/useFeatureFlags';
+import { useLocation } from '@tanstack/react-router';
 import { useInfoQuery } from '@/store/devApi';
 import { useQuickstartTracking } from './useQuickstartTracking';
 import {
@@ -25,6 +26,7 @@ import {
 } from './state';
 
 function useQuickstartState() {
+  const pathname = useLocation({ select: (location) => location.pathname });
   const info = useInfoQuery();
   const [server, setServer] = useState('');
   const track = useQuickstartTracking(server);
@@ -103,32 +105,40 @@ function useQuickstartState() {
   );
 
   useEffect(() => {
-    if (completion || !server || run?.status !== 'COMPLETED') return;
-    const value: Completion = {
-      version: 1,
-      server,
-      completedAt: run.endedAt || new Date().toISOString(),
-      appID: run.appID,
-      functionID: run.function.id,
-      runID: run.id,
-    };
-    // Historical runs establish returning-user state, not new conversions.
-    if (attempt)
-      track(
-        'first_run_completed',
-        {
-          path: attempt.mode === 'agent' ? 'agent' : 'manual',
-        },
-        true,
-      );
-    setCompletion(value);
-    try {
-      localStorage.setItem(storageKey(server), JSON.stringify(value));
-    } catch {
-      /* In-memory fallback. */
+    if (!server || !run) return;
+    if (!completion && run.status === 'COMPLETED') {
+      const value: Completion = {
+        version: 1,
+        server,
+        completedAt: run.endedAt || new Date().toISOString(),
+        appID: run.appID,
+        functionID: run.function.id,
+        runID: run.id,
+      };
+      // Historical runs establish returning-user state, not new conversions.
+      if (attempt)
+        track(
+          'first_run_completed',
+          { path: attempt.mode === 'agent' ? 'agent' : 'manual' },
+          true,
+        );
+      setCompletion(value);
+      try {
+        localStorage.setItem(storageKey(server), JSON.stringify(value));
+      } catch {
+        /* In-memory fallback. */
+      }
     }
-    setAttempt(null);
-  }, [server, run, completion, setAttempt, attempt, track]);
+    // Keep the run available for the initial handoff, then release finished
+    // attempts so reopening Quickstart can invoke again, including after failure.
+    if (
+      attempt &&
+      pathname !== '/' &&
+      ['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED'].includes(run.status)
+    ) {
+      setAttempt(null);
+    }
+  }, [server, run, completion, setAttempt, attempt, track, pathname]);
 
   return {
     server,

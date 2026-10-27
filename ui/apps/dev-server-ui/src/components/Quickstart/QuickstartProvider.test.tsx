@@ -5,6 +5,7 @@ import { Home } from '@/routes/index';
 import { storageKey, type QuickstartRun } from './state';
 
 const fixtures = vi.hoisted(() => ({
+  pathname: '/',
   info: {} as any,
   apps: {} as any,
   runs: {} as any,
@@ -27,6 +28,7 @@ vi.mock('@/store/generated', () => ({
 }));
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => () => ({ useSearch: () => fixtures.search }),
+  useLocation: () => fixtures.pathname,
   Navigate: () => <div>Runs destination</div>,
 }));
 vi.mock('@/components/Layout/Layout', () => ({
@@ -69,6 +71,7 @@ beforeEach(() => {
   fixtures.runsHook.mockClear();
   fixtures.track.mockClear();
   fixtures.search = {};
+  fixtures.pathname = '/';
   fixtures.info = { data: { isSingleNodeService: false } };
   fixtures.apps = {
     data: {
@@ -275,3 +278,68 @@ it('observes another invocation from the reopened guide without clearing complet
   expect(state.completion?.runID).toBe(run.id);
   expect(fixtures.track).not.toHaveBeenCalled();
 });
+
+it.each(['FAILED', 'CANCELLED', 'SKIPPED'])(
+  'releases a %s attempt after the run handoff so reopening quickstart can retry',
+  (status) => {
+    const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
+    sessionStorage.setItem(
+      `${storageKey(server)}:attempt`,
+      JSON.stringify(attempt),
+    );
+    fixtures.runs.data.runs.edges = [{ node: { ...run, status } }];
+    const view = render(<TestApp />);
+    expect(state.attempt).toEqual(attempt);
+    expect(state.run?.id).toBe(run.id);
+    fixtures.pathname = '/runs';
+    view.rerender(<TestApp />);
+    expect(state.attempt).toBeNull();
+    expect(sessionStorage.getItem(`${storageKey(server)}:attempt`)).toBeNull();
+    expect(state.completion).toBeNull();
+    expect(fixtures.track).not.toHaveBeenCalled();
+    fixtures.pathname = '/';
+    view.rerender(<TestApp />);
+    expect(state.run).toBeUndefined();
+    expect(screen.getByText('Quickstart screen')).toBeTruthy();
+  },
+);
+
+it.each(['QUEUED', 'RUNNING'])(
+  'keeps observing a %s attempt on Runs',
+  (status) => {
+    const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
+    sessionStorage.setItem(
+      `${storageKey(server)}:attempt`,
+      JSON.stringify(attempt),
+    );
+    fixtures.pathname = '/runs';
+    fixtures.runs.data.runs.edges = [{ node: { ...run, status } }];
+    render(<TestApp />);
+    expect(state.attempt).toEqual(attempt);
+    expect(state.completion).toBeNull();
+  },
+);
+
+it.each(['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED'])(
+  'clears a later %s attempt while retaining the original completion',
+  (status) => {
+    fixtures.search = { quickstart: true };
+    fixtures.runs.data.runs.edges = [{ node: run }];
+    const view = render(<TestApp />);
+    const original = localStorage.getItem(storageKey(server));
+    const startedAt = '2026-10-27T12:00:00Z';
+    act(() => state.setAttempt({ functionID: 'fn-1', startedAt }));
+    fixtures.runs.data.runs.edges = [
+      { node: { ...run, id: 'later-run', status, queuedAt: startedAt } },
+    ];
+    view.rerender(<TestApp />);
+    expect(state.run?.id).toBe('later-run');
+    expect(state.attempt).not.toBeNull();
+    fixtures.pathname = '/runs';
+    view.rerender(<TestApp />);
+    expect(state.attempt).toBeNull();
+    expect(state.completion?.runID).toBe(run.id);
+    expect(localStorage.getItem(storageKey(server))).toBe(original);
+    expect(fixtures.track).not.toHaveBeenCalled();
+  },
+);

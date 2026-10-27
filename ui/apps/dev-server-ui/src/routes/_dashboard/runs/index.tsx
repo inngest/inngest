@@ -1,4 +1,5 @@
 import SendEventButton from '@/components/Event/SendEventButton';
+import { LinkedRunDetails } from '@/components/Runs/LinkedRunDetails';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import { useInfoQuery } from '@/store/devApi';
@@ -225,6 +226,12 @@ function RunsComponent() {
             />
           </div>
         }
+      />
+      <LinkedRunDetails
+        runID={runID || undefined}
+        runs={runs}
+        getTrigger={getTrigger}
+        pollInterval={autoRefresh ? pollInterval : 0}
       />
       <RunsPage
         initialExpandedRunID={runID || undefined}
