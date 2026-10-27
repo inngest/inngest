@@ -14,7 +14,6 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
@@ -249,6 +248,10 @@ type Pause struct {
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
 
+	// Subscribe, when set, makes this a step.subscribe pause: matching events
+	// are saved to the run as numbered messages and the pause is not consumed.
+	Subscribe *PauseSubscribe `json:"sub,omitempty"`
+
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
@@ -264,6 +267,12 @@ type Pause struct {
 	// timeframes are based on this timestamp (previously only available as the
 	// sort score in pause indexes).
 	CreatedAt time.Time `json:"ca"`
+}
+
+// PauseSubscribe describes a step.subscribe subscription.
+type PauseSubscribe struct {
+	// Key is the unhashed subscription ID.
+	Key string `json:"key"`
 }
 
 // CreatedAfter reports whether this pause was created after the given

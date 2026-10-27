@@ -3359,6 +3359,24 @@ func (e *executor) handlePause(
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
 		}
 
+		if pause.Subscribe != nil {
+			// step.subscribe: save the event as a message and keep the pause.
+			err := e.deliverSubscription(ctx, evt, pause, l)
+			if errors.Is(err, state.ErrRunNotFound) {
+				// The run is gone, so the message cannot be saved to it. Hand
+				// the event to the thread's next run instead of dropping it.
+				e.reemitSubscriptionEvent(ctx, sv2.IDFromPause(*pause), evt.GetEvent())
+				cleanup(ctx)
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("error delivering subscription message: %w", err)
+			}
+
+			atomic.AddInt32(&res[1], 1)
+			return nil
+		}
+
 		resumeData := pause.GetResumeData(evt.GetEvent())
 
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
@@ -5725,6 +5743,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
+	}
+
+	if opts.Subscribe != nil {
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts)
 	}
 
 	if opts.If != nil {

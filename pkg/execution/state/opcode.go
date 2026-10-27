@@ -605,6 +605,36 @@ type WaitForEventOpts struct {
 	If      *string `json:"if"`
 	// Event is taken from GeneratorOpcode.Name if this is empty.
 	Event string `json:"event"`
+	// Subscribe marks this op as part of a step.subscribe subscription: a
+	// persistent pause that is not consumed when an event matches.
+	Subscribe *SubscribeOpts `json:"subscribe,omitempty"`
+}
+
+// Modes of a subscription op.
+const (
+	// SubscribeOpen creates the subscription pause.
+	SubscribeOpen = "open"
+	// SubscribeNext waits for message Seq.
+	SubscribeNext = "next"
+	// SubscribePoll answers message Seq now, or null when it has not arrived.
+	SubscribePoll = "poll"
+	// SubscribeAck records that the run received message Seq. Messages that
+	// were saved but never acked are handed to the next run of the thread.
+	SubscribeAck = "ack"
+	// SubscribeClose deletes the subscription pause and reports how many
+	// messages were saved.
+	SubscribeClose = "close"
+)
+
+// SubscribeOpts are the step.subscribe options carried on a WaitForEvent op.
+type SubscribeOpts struct {
+	// Key is the unhashed subscription ID. Message k is saved as the step
+	// sha1("<Key>:<k>"), the same ID the SDK gives its k-th next() step.
+	Key string `json:"key"`
+	// Mode is one of the Subscribe* constants.
+	Mode string `json:"mode"`
+	// Seq is the message a next or poll op asks for, starting at 1.
+	Seq int `json:"seq,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {
