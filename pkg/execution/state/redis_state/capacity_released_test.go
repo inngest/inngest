@@ -32,7 +32,10 @@ func TestQueueCapacityReleased(t *testing.T) {
 	defer rc.Close()
 
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
-	_, shard := newQueue(t, rc, osqueue.WithClock(clock))
+	_, shard := newQueue(t, rc,
+		osqueue.WithClock(clock),
+		osqueue.WithCapacityReleaseWakeEnabled(func(context.Context, uuid.UUID) bool { return true }),
+	)
 	notifier, ok := shard.(osqueue.CapacityReleaseNotifier)
 	require.True(t, ok)
 
@@ -122,6 +125,8 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 		otherExecutor bool
 		// wakeDisabled turns the account's capacity release wake off.
 		wakeDisabled bool
+		// gateUnset leaves the capacity release wake gate unconfigured.
+		gateUnset bool
 		// fifo leases items sequentially instead of in parallel.
 		fifo     bool
 		expected int
@@ -132,6 +137,7 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 		{name: "process item notifies the shard", processItem: true, expected: 6},
 		{name: "other executor with a stale cache", notify: true, otherExecutor: true, expected: 6},
 		{name: "disabled for the account parks the partition", notify: true, wakeDisabled: true, expected: 0},
+		{name: "unset gate parks the partition", notify: true, gateUnset: true, expected: 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -185,10 +191,12 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 				osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 					return config
 				}),
-				osqueue.WithCapacityReleaseWakeEnabled(func(_ context.Context, id uuid.UUID) bool {
+			}
+			if !tc.gateUnset {
+				opts = append(opts, osqueue.WithCapacityReleaseWakeEnabled(func(_ context.Context, id uuid.UUID) bool {
 					require.Equal(t, accountID, id)
 					return !tc.wakeDisabled
-				}),
+				}))
 			}
 			if !tc.fifo {
 				opts = append(opts, osqueue.WithDisableFifoForFunctions(map[string]struct{}{fnID.String(): {}}))

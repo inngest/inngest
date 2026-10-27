@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sync/atomic"
 	"time"
 
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -143,7 +144,7 @@ func (q *queue) CapacityReleased(ctx context.Context, i osqueue.QueueItem) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CapacityReleased"), redis_telemetry.ScopeQueue)
 
 	accountID := i.Data.Identifier.AccountID
-	if q.CapacityReleaseWakeEnabled != nil && !q.CapacityReleaseWakeEnabled(ctx, accountID) {
+	if q.CapacityReleaseWakeEnabled == nil || !q.CapacityReleaseWakeEnabled(ctx, accountID) {
 		return
 	}
 
@@ -166,9 +167,18 @@ func (q *queue) CapacityReleased(ctx context.Context, i osqueue.QueueItem) {
 		args,
 	).AsInt64()
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn("error waking partition after capacity release", "error", err, "partition_id", partition.PartitionID)
+		// This runs for every confirmed release, so log at most once per second.
+		now := q.Clock.Now().UnixNano()
+		last := lastCapacityReleasedWarn.Load()
+		if now-last >= int64(time.Second) && lastCapacityReleasedWarn.CompareAndSwap(last, now) {
+			logger.StdlibLogger(ctx).Warn("error waking partition after capacity release", "error", err, "partition_id", partition.PartitionID)
+		}
 	}
 }
+
+// lastCapacityReleasedWarn holds the unix nanos of the last CapacityReleased
+// error log.
+var lastCapacityReleasedWarn atomic.Int64
 
 var _ osqueue.CapacityReleaseNotifier = (*queue)(nil)
 

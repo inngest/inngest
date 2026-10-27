@@ -797,7 +797,7 @@ func WithBypassArchivedWorkspaceAppSemaphore(f BypassArchivedWorkspaceAppSemapho
 }
 
 // WithCapacityReleaseWakeEnabled gates CapacityReleaseNotifier wakes per
-// account. When unset, wakes are enabled for every account.
+// account. When unset, wakes are disabled for every account.
 func WithCapacityReleaseWakeEnabled(f CapacityReleaseWakeEnabled) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityReleaseWakeEnabled = f
