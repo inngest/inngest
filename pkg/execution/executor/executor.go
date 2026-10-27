@@ -4810,6 +4810,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		Identifier:            sv2.V1FromMetadata(*runCtx.Metadata()),
 		PriorityFactor:        runCtx.PriorityFactor(),
 		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Semaphores:            stepSemaphores(*runCtx.Metadata()),
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload: queue.PayloadEdge{
