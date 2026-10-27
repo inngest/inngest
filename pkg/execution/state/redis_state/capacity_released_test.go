@@ -208,7 +208,8 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 			require.NoError(t, err)
 
 			var p osqueue.QueuePartition
-			for i := 0; i < 100; i++ {
+			const queued = 100
+			for i := 0; i < queued; i++ {
 				item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
 					FunctionID:  fnID,
 					WorkspaceID: envID,
@@ -238,7 +239,6 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 			// Fill all six slots; the response caches the key as exhausted.
 			require.NoError(t, processor.ProcessPartition(ctx, &p, 0, false, dispatch))
 			require.Len(t, dispatched, 6)
-			coldAcquires := counted.acquires.Load()
 
 			if tc.otherExecutor {
 				// A second executor caches its own denial while the key is full,
@@ -299,10 +299,16 @@ func TestCapacityReleasedRefillsCachedPartition(t *testing.T) {
 			require.NoError(t, processor.ProcessPartition(ctx, &p, 0, false, dispatch))
 			require.Len(t, dispatched, tc.expected)
 			acquires := counted.acquires.Load() - before
-			t.Logf("retry dispatched=%d authoritative_acquires=%d cold_acquires=%d", len(dispatched), acquires, coldAcquires)
-			// Skipping stale exhaustion must not cost more than scanning with an
-			// empty cache: exhaustion cached during the retry is still honored.
-			require.LessOrEqual(t, acquires, coldAcquires)
+			t.Logf("retry dispatched=%d authoritative_acquires=%d", len(dispatched), acquires)
+			// Exhaustion cached during the retry is still honored. A FIFO scan
+			// stops calling once the key refills; a parallel scan's concurrent
+			// leases can't see each other's results, but each item calls at most
+			// once instead of again in the random-offset pass.
+			maxAcquires := int64(queued)
+			if tc.fifo {
+				maxAcquires = int64(tc.expected)
+			}
+			require.LessOrEqual(t, acquires, maxAcquires)
 
 			if tc.expected == 0 {
 				require.Equal(t, before, counted.acquires.Load(), "the retry is answered entirely by the stale cache")
