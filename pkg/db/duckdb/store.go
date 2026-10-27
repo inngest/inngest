@@ -200,7 +200,7 @@ func AsTimestamp(v any) (time.Time, error) {
 	case time.Time:
 		return t, nil
 	case string:
-		for _, layout := range []string{"2006-01-02 15:04:05.999999", "2006-01-02 15:04:05", time.RFC3339} {
+		for _, layout := range []string{"2006-01-02 15:04:05.999999-07", "2006-01-02 15:04:05.999999", "2006-01-02 15:04:05", time.RFC3339} {
 			if ts, err := time.Parse(layout, t); err == nil {
 				return ts, nil
 			}

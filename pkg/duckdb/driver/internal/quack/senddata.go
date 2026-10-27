@@ -48,8 +48,8 @@ func sendDataColumnType(k ColumnKind) (string, error) {
 		return "UUID", nil
 	case ColumnVarchar, ColumnJSON:
 		return "VARCHAR", nil
-	case ColumnTimestampMS:
-		return "TIMESTAMP_MS", nil
+	case ColumnTimestampTZ:
+		return "TIMESTAMPTZ", nil
 	case ColumnBool:
 		return "BOOLEAN", nil
 	case ColumnBigint:

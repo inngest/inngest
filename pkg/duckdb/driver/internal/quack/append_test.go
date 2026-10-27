@@ -33,7 +33,7 @@ func TestQuackEncodeDataChunkDecodesBackToOriginalValues(t *testing.T) {
 	ts1 := time.UnixMilli(1_700_000_000_123).UTC()
 	ts2 := time.UnixMilli(1_800_000_000_456).UTC()
 
-	cols := []ColumnKind{ColumnUUID, ColumnVarchar, ColumnJSON, ColumnTimestampMS}
+	cols := []ColumnKind{ColumnUUID, ColumnVarchar, ColumnJSON, ColumnTimestampTZ}
 	rows := [][]any{
 		{id1.String(), "span-a", `{"k":"v","n":1}`, ts1},
 		{nil, nil, nil, nil},

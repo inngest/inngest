@@ -33,12 +33,17 @@ func TestEncodeLiteral(t *testing.T) {
 		{
 			"time.Time",
 			time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-			"TIMESTAMP '2026-01-02 03:04:05.000000'",
+			"TIMESTAMPTZ '2026-01-02 03:04:05.000+00'",
 		},
 		{
-			"time.Time with sub-second precision",
-			time.Date(2026, 1, 2, 3, 4, 5, 123456000, time.UTC),
-			"TIMESTAMP '2026-01-02 03:04:05.123456'",
+			"time.Time with sub-ms precision is truncated",
+			time.Date(2026, 1, 2, 3, 4, 5, 123999999, time.UTC),
+			"TIMESTAMPTZ '2026-01-02 03:04:05.123+00'",
+		},
+		{
+			"time.Time in another zone",
+			time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("x", -5*3600)),
+			"TIMESTAMPTZ '2026-01-02 08:04:05.000+00'",
 		},
 		{"string slice", []string{"a", "b"}, "['a', 'b']"},
 		{"string slice with single quote", []string{"O'Brien"}, "['O''Brien']"},
@@ -84,47 +89,44 @@ func TestInterpolateRejectsMismatchedPlaceholderCount(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestTimestampRoundTripPreservesMicroseconds is the real-binary proof behind
-// timestampLayout: three timestamps inside the same second must come back
-// distinct and in order, since the dual-write schema's append-only rows carry
-// no sequence number and readers order them by timestamp alone.
-func TestTimestampRoundTripPreservesMicroseconds(t *testing.T) {
+// TestTimestampTZBinding is the real-binary proof behind timestampLayout: the
+// session is pinned to UTC, a bound time.Time is TIMESTAMPTZ (the columns'
+// own type, so filtering one doesn't cast it), and it round trips truncated
+// to whole ms.
+func TestTimestampTZBinding(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 
 	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (label VARCHAR, ts_at TIMESTAMP);")
+	var tz string
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT current_setting('TimeZone');").Scan(&tz))
+	require.Equal(t, "UTC", tz)
+
+	at := time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC)
+
+	// The driver can't run EXPLAIN (it DESCRIBEs every query), so this
+	// checks the bound type instead: same type as the column -> no cast.
+	var typ string
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT typeof(?);", at).Scan(&typ))
+	require.Equal(t, "TIMESTAMP WITH TIME ZONE", typ)
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (ts_at TIMESTAMPTZ);")
+	require.NoError(t, err)
+	_, err = db.ExecContext(t.Context(), "INSERT INTO ts VALUES (?);", at.Add(999*time.Microsecond))
 	require.NoError(t, err)
 
-	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	for i, label := range []string{"scheduled", "started", "finished"} {
-		_, err = db.ExecContext(t.Context(),
-			"INSERT INTO ts (label, ts_at) VALUES (?, ?);",
-			label, base.Add(time.Duration(i+1)*time.Microsecond),
-		)
-		require.NoError(t, err)
-	}
+	var got time.Time
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT ts_at FROM ts;").Scan(&got))
+	require.True(t, at.Equal(got), "want %s, got %s", at, got)
 
-	rows, err := db.QueryContext(t.Context(), "SELECT label FROM ts ORDER BY ts_at ASC;")
-	require.NoError(t, err)
-	defer rows.Close()
-
-	var ordered []string
-	for rows.Next() {
-		var label string
-		require.NoError(t, rows.Scan(&label))
-		ordered = append(ordered, label)
-	}
-	require.NoError(t, rows.Err())
-	require.Equal(t, []string{"scheduled", "started", "finished"}, ordered)
-
-	// And the distinct-count proves the microseconds weren't truncated away.
-	var distinct int
-	require.NoError(t,
-		db.QueryRowContext(t.Context(), "SELECT count(DISTINCT ts_at) FROM ts;").Scan(&distinct))
-	require.Equal(t, 3, distinct)
+	var n int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*) FROM ts WHERE ts_at = ? AND ts_at >= ? - INTERVAL 1 HOUR AND time_bucket(INTERVAL 6 HOUR, ts_at) = ? AND ts_at::DATE = DATE '2026-01-02';",
+		at, at, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
+	).Scan(&n))
+	require.Equal(t, 1, n)
 }
 
 // TestJSONRawMessageRoundTripsIntoVariantColumn is the real-binary proof

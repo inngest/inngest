@@ -303,6 +303,10 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 		return err
 	}
 
+	if err := p.bootstrapTimeZoneLocked(ctx); err != nil {
+		return err
+	}
+
 	if err := p.bootstrapStateDirLocked(ctx); err != nil {
 		return err
 	}
@@ -515,6 +519,17 @@ func generateQuackToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+// bootstrapTimeZoneLocked assumes mu is already held. It pins the
+// subprocess's TimeZone to UTC on every spawn, since DuckDB otherwise
+// defaults to the host's local zone. Every time column is TIMESTAMPTZ (see
+// literal.go's timestampLayout), and the session TimeZone decides how those
+// render, how a naive TIMESTAMP compares against them, and which calendar
+// date_trunc/time_bucket/::DATE use. TimeZone is a GLOBAL setting, so this
+// also covers every quack connection to this process.
+func (p *process) bootstrapTimeZoneLocked(ctx context.Context) error {
+	return p.bootstrapExecLocked(ctx, "time zone", []string{"SET GLOBAL TimeZone = 'UTC';"})
 }
 
 // bootstrapStateDirLocked assumes mu is already held. It is a no-op unless
