@@ -2,7 +2,7 @@ import { cleanup, render, screen, act } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QuickstartProvider, useQuickstart } from './QuickstartProvider';
 import { Home } from '@/routes/index';
-import { storageKey, type QuickstartRun } from './state';
+import { storageKey, type Attempt, type QuickstartRun } from './state';
 
 const fixtures = vi.hoisted(() => ({
   pathname: '/',
@@ -51,6 +51,18 @@ const run: QuickstartRun = {
   endedAt: '2026-10-23T12:00:02Z',
   function: { id: 'fn-1', name: 'Hello', slug: 'app-hello' },
 };
+const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
+function saveAttempt(overrides: Partial<Attempt> = {}) {
+  const value = { ...attempt, ...overrides };
+  sessionStorage.setItem(
+    `${storageKey(server)}:attempt`,
+    JSON.stringify(value),
+  );
+  return value;
+}
+function setRuns(...runs: QuickstartRun[]) {
+  fixtures.runs.data.runs.edges = runs.map((node) => ({ node }));
+}
 let state: ReturnType<typeof useQuickstart>;
 function Probe() {
   state = useQuickstart();
@@ -96,7 +108,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 it('sends returning users with a retained successful run directly to Runs', () => {
-  fixtures.runs.data.runs.edges = [{ node: run }];
+  setRuns(run);
   render(<TestApp />);
   expect(screen.getByText('Runs destination')).toBeTruthy();
   expect(state.completion?.runID).toBe(run.id);
@@ -105,12 +117,7 @@ it('sends returning users with a retained successful run directly to Runs', () =
 it('keeps the current success visible but routes to Runs on the next entry', () => {
   const view = render(<TestApp />);
   expect(screen.getByText('Quickstart screen')).toBeTruthy();
-  fixtures.runs = {
-    ...fixtures.runs,
-    data: {
-      runs: { edges: [{ node: run }], pageInfo: { hasNextPage: false } },
-    },
-  };
+  setRuns(run);
   view.rerender(<TestApp />);
   expect(screen.getByText('Quickstart screen')).toBeTruthy();
   expect(state.completion?.runID).toBe(run.id);
@@ -136,12 +143,8 @@ it('allows explicit reopening without deleting the completion marker', () => {
   expect(state.completion?.runID).toBe(run.id);
 });
 it('restores an in-flight attempt without invoking again or completing on failure', () => {
-  const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
-  sessionStorage.setItem(
-    `${storageKey(server)}:attempt`,
-    JSON.stringify(attempt),
-  );
-  fixtures.runs.data.runs.edges = [{ node: { ...run, status: 'FAILED' } }];
+  saveAttempt();
+  setRuns({ ...run, status: 'FAILED' });
   render(<TestApp />);
   expect(state.attempt).toEqual(attempt);
   expect(state.completion).toBeNull();
@@ -187,15 +190,7 @@ it('shows the error recovery screen when apps cannot be loaded', () => {
 
 it('observes agent runs after prompt handoff and ignores older successful runs', () => {
   fixtures.apps.data.apps = [];
-  const attempt = {
-    mode: 'agent',
-    functionID: '',
-    startedAt: '2026-10-23T12:00:00Z',
-  };
-  sessionStorage.setItem(
-    `${storageKey(server)}:attempt`,
-    JSON.stringify(attempt),
-  );
+  saveAttempt({ mode: 'agent', functionID: '' });
   const view = render(<TestApp />);
   expect(state.ready).toBe(true);
   fixtures.apps.data.apps = [
@@ -206,9 +201,7 @@ it('observes agent runs after prompt handoff and ignores older successful runs',
       functions: [{ id: 'fn-1', name: 'Hello', slug: 'app-hello' }],
     },
   ];
-  fixtures.runs.data.runs.edges = [
-    { node: { ...run, queuedAt: '2026-10-23T11:00:00Z' } },
-  ];
+  setRuns({ ...run, queuedAt: '2026-10-23T11:00:00Z' });
   view.rerender(<TestApp />);
   expect(state.completion).toBeNull();
   expect(state.attempt?.functionID).toBe('fn-1');
@@ -220,7 +213,7 @@ it('observes agent runs after prompt handoff and ignores older successful runs',
     }),
     expect.anything(),
   );
-  fixtures.runs.data.runs.edges = [{ node: run }];
+  setRuns(run);
   view.rerender(<TestApp />);
   expect(state.completion?.runID).toBe(run.id);
   expect(fixtures.track).toHaveBeenCalledWith('cli/onboarding.action', {
@@ -233,20 +226,13 @@ it('observes agent runs after prompt handoff and ignores older successful runs',
   expect(fixtures.track).toHaveBeenCalledTimes(1);
 });
 it('requires a function choice for agent handoff when multiple functions register', () => {
-  sessionStorage.setItem(
-    `${storageKey(server)}:attempt`,
-    JSON.stringify({
-      mode: 'agent',
-      functionID: '',
-      startedAt: '2026-10-23T12:00:00Z',
-    }),
-  );
+  saveAttempt({ mode: 'agent', functionID: '' });
   fixtures.apps.data.apps[0].functions.push({
     id: 'fn-2',
     name: 'Other',
     slug: 'app-other',
   });
-  fixtures.runs.data.runs.edges = [{ node: run }];
+  setRuns(run);
   render(<TestApp />);
   expect(state.ready).toBe(true);
   expect(state.completion).toBeNull();
@@ -258,7 +244,7 @@ it('requires a function choice for agent handoff when multiple functions registe
 
 it('reopens the guide when a historical completion is found before its marker is saved', () => {
   fixtures.search = { quickstart: true };
-  fixtures.runs.data.runs.edges = [{ node: run }];
+  setRuns(run);
   render(<TestApp />);
   expect(screen.getByText('Setup guide')).toBeTruthy();
   expect(state.completion?.runID).toBe(run.id);
@@ -266,7 +252,7 @@ it('reopens the guide when a historical completion is found before its marker is
 
 it('observes another invocation from the reopened guide without clearing completion or counting another conversion', () => {
   fixtures.search = { quickstart: true };
-  fixtures.runs.data.runs.edges = [{ node: run }];
+  setRuns(run);
   render(<TestApp />);
   act(() =>
     state.setAttempt({ functionID: 'fn-1', startedAt: '2026-10-27T12:00:00Z' }),
@@ -282,12 +268,8 @@ it('observes another invocation from the reopened guide without clearing complet
 it.each(['FAILED', 'CANCELLED', 'SKIPPED'])(
   'releases a %s attempt after the run handoff so reopening quickstart can retry',
   (status) => {
-    const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
-    sessionStorage.setItem(
-      `${storageKey(server)}:attempt`,
-      JSON.stringify(attempt),
-    );
-    fixtures.runs.data.runs.edges = [{ node: { ...run, status } }];
+    saveAttempt();
+    setRuns({ ...run, status });
     const view = render(<TestApp />);
     expect(state.attempt).toEqual(attempt);
     expect(state.run?.id).toBe(run.id);
@@ -307,13 +289,9 @@ it.each(['FAILED', 'CANCELLED', 'SKIPPED'])(
 it.each(['QUEUED', 'RUNNING'])(
   'keeps observing a %s attempt on Runs',
   (status) => {
-    const attempt = { functionID: 'fn-1', startedAt: '2026-10-23T12:00:00Z' };
-    sessionStorage.setItem(
-      `${storageKey(server)}:attempt`,
-      JSON.stringify(attempt),
-    );
+    saveAttempt();
     fixtures.pathname = '/runs';
-    fixtures.runs.data.runs.edges = [{ node: { ...run, status } }];
+    setRuns({ ...run, status });
     render(<TestApp />);
     expect(state.attempt).toEqual(attempt);
     expect(state.completion).toBeNull();
@@ -324,14 +302,12 @@ it.each(['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED'])(
   'clears a later %s attempt while retaining the original completion',
   (status) => {
     fixtures.search = { quickstart: true };
-    fixtures.runs.data.runs.edges = [{ node: run }];
+    setRuns(run);
     const view = render(<TestApp />);
     const original = localStorage.getItem(storageKey(server));
     const startedAt = '2026-10-27T12:00:00Z';
     act(() => state.setAttempt({ functionID: 'fn-1', startedAt }));
-    fixtures.runs.data.runs.edges = [
-      { node: { ...run, id: 'later-run', status, queuedAt: startedAt } },
-    ];
+    setRuns({ ...run, id: 'later-run', status, queuedAt: startedAt });
     view.rerender(<TestApp />);
     expect(state.run?.id).toBe('later-run');
     expect(state.attempt).not.toBeNull();

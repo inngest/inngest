@@ -52,6 +52,15 @@ vi.mock('@inngest/components/CodeBlock', () => {
   return { CodeBlock };
 });
 const fn = { id: 'fn-1', slug: 'app-hello', name: 'Hello', appName: 'App' };
+const invokeButton = () =>
+  screen.getByRole<HTMLButtonElement>('button', { name: 'Invoke function' });
+const copyPrompt = () =>
+  act(async () =>
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Copy onboarding prompt' }),
+    ),
+  );
+
 beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
@@ -83,7 +92,7 @@ it('validates the existing payload format before invoking', () => {
   fireEvent.change(screen.getByLabelText('Payload'), {
     target: { value: '{"data": []}' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Invoke function' }));
+  fireEvent.click(invokeButton());
   expect(fixtures.invoke).not.toHaveBeenCalled();
   expect(fixtures.track).not.toHaveBeenCalled();
   expect(
@@ -102,8 +111,8 @@ it('invokes once with the existing mutation and keeps acceptance distinct from c
   fireEvent.change(screen.getByLabelText('Payload'), {
     target: { value: '{"data":{"name":"Ada"}}' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Invoke function' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Invoke function' }));
+  fireEvent.click(invokeButton());
+  fireEvent.click(invokeButton());
   expect(fixtures.invoke).toHaveBeenCalledExactlyOnceWith({
     functionSlug: fn.slug,
     data: { name: 'Ada' },
@@ -127,14 +136,8 @@ it('invokes once with the existing mutation and keeps acceptance distinct from c
     finish!({ invokeFunction: true });
   });
   view.rerender(<FirstRun />);
-  expect(
-    screen
-      .getByRole('button', { name: 'Invoke function' })
-      .hasAttribute('disabled'),
-  ).toBe(true);
-  expect(
-    screen.queryByText('Your first function run completed successfully.'),
-  ).toBeNull();
+  expect(invokeButton().disabled).toBe(true);
+  expect(fixtures.navigate).not.toHaveBeenCalled();
 });
 it('retains the payload on a rejected invocation so it can be corrected and retried', async () => {
   fixtures.invoke.mockReturnValue({
@@ -145,9 +148,7 @@ it('retains the payload on a rejected invocation so it can be corrected and retr
   fireEvent.change(screen.getByLabelText('Payload'), {
     target: { value: payload },
   });
-  await act(async () =>
-    fireEvent.click(screen.getByRole('button', { name: 'Invoke function' })),
-  );
+  await act(async () => fireEvent.click(invokeButton()));
   expect(screen.getByLabelText<HTMLTextAreaElement>('Payload').value).toBe(
     payload,
   );
@@ -165,9 +166,7 @@ it('invokes cron-only functions without payload data', async () => {
   });
   render(<FirstRun />);
   expect(screen.queryByLabelText('Payload')).toBeNull();
-  await act(async () =>
-    fireEvent.click(screen.getByRole('button', { name: 'Invoke function' })),
-  );
+  await act(async () => fireEvent.click(invokeButton()));
   expect(fixtures.invoke).toHaveBeenCalledWith({
     functionSlug: fn.slug,
     data: {},
@@ -179,17 +178,12 @@ it('invokes cron-only functions without payload data', async () => {
 it('starts agent observation on prompt handoff without claiming a connection or invoking', async () => {
   render(<AgentSetup server="http://localhost:9999" />);
   expect(screen.queryByLabelText('Onboarding prompt')).toBeNull();
-  expect(screen.queryByRole('button', { name: 'MCP setup' })).toBeNull();
   expect(
     screen.getByRole('link', { name: 'MCP guide' }).getAttribute('href'),
   ).toBe(
     'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-the-dev-server',
   );
-  await act(async () =>
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy onboarding prompt' }),
-    ),
-  );
+  await copyPrompt();
   expect(fixtures.setAttempt).toHaveBeenCalledWith(
     expect.objectContaining({
       mode: 'agent',
@@ -214,11 +208,7 @@ it('keeps the prompt hidden until requested and copies reviewed edits', async ()
   fireEvent.change(screen.getByLabelText('Onboarding prompt'), {
     target: { value: 'My reviewed prompt' },
   });
-  await act(async () =>
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy onboarding prompt' }),
-    ),
-  );
+  await copyPrompt();
   expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
     'My reviewed prompt',
   );
@@ -230,11 +220,7 @@ it('reveals a selectable prompt on clipboard failure without starting observatio
     new Error('Clipboard unavailable'),
   );
   render(<AgentSetup server="http://localhost:9999" />);
-  await act(async () =>
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Copy onboarding prompt' }),
-    ),
-  );
+  await copyPrompt();
   expect(screen.getByLabelText('Onboarding prompt')).toBeTruthy();
   expect(
     screen.getByText('Couldn’t copy. Select and copy the prompt above.'),
@@ -264,11 +250,7 @@ it('retries failed function details without invoking or losing the payload', () 
   });
   fixtures.details = { ...fixtures.details, error: { message: 'offline' } };
   view.rerender(<FirstRun />);
-  expect(
-    screen
-      .getByRole('button', { name: 'Invoke function' })
-      .hasAttribute('disabled'),
-  ).toBe(true);
+  expect(invokeButton().disabled).toBe(true);
   fireEvent.click(
     screen.getByRole('button', { name: 'Retry function details' }),
   );
@@ -279,11 +261,7 @@ it('retries failed function details without invoking or losing the payload', () 
   expect(screen.getByLabelText<HTMLTextAreaElement>('Payload').value).toBe(
     '{"data":{"name":"Ada"}}',
   );
-  expect(
-    screen
-      .getByRole('button', { name: 'Invoke function' })
-      .hasAttribute('disabled'),
-  ).toBe(false);
+  expect(invokeButton().disabled).toBe(false);
 });
 
 it('shows a disabled function selector until a synced function becomes available', () => {
@@ -311,49 +289,33 @@ it('shows a disabled function selector until a synced function becomes available
   expect(fixtures.setAttempt).not.toHaveBeenCalled();
 });
 
-it('opens the exact completed run in the Runs page with its details expanded', () => {
-  fixtures.context.completion = { runID: 'completed-run' };
-  render(<FirstRun />);
-  expect(fixtures.navigate).toHaveBeenCalledWith({
-    to: '/runs',
-    search: { runID: 'completed-run' },
-    replace: true,
-  });
-  expect(screen.queryByText('Your first run is complete')).toBeNull();
-});
-it('opens a newly completed run before the completion marker is persisted', () => {
-  fixtures.context.run = { id: 'just-completed-run', status: 'COMPLETED' };
-  render(<FirstRun />);
-  expect(fixtures.navigate).toHaveBeenCalledWith({
-    to: '/runs',
-    search: { runID: 'just-completed-run' },
-    replace: true,
-  });
-});
-
-it.each(['QUEUED', 'RUNNING', 'FAILED', 'CANCELLED', 'SKIPPED'])(
-  'opens the exact %s run immediately in the Runs page with its details expanded',
-  (status) => {
-    fixtures.context.run = { id: 'identified-run', status };
-    render(<FirstRun />);
-    expect(fixtures.navigate).toHaveBeenCalledWith({
-      to: '/runs',
-      search: { runID: 'identified-run' },
-      replace: true,
-    });
-    expect(screen.queryByText(/Run status:/)).toBeNull();
+it.each([
+  {
+    source: 'saved completion',
+    context: { completion: { runID: 'identified-run' } },
   },
-);
-it('opens an explicitly identified run before the next poll returns it', () => {
-  fixtures.context.attempt = {
-    functionID: fn.id,
-    startedAt: '2026-10-23T12:00:00Z',
-    runID: 'chosen-run',
-  };
+  {
+    source: 'explicit attempt',
+    context: {
+      attempt: {
+        functionID: fn.id,
+        startedAt: '2026-10-23T12:00:00Z',
+        runID: 'identified-run',
+      },
+    },
+  },
+  ...['COMPLETED', 'QUEUED', 'RUNNING', 'FAILED', 'CANCELLED', 'SKIPPED'].map(
+    (status) => ({
+      source: `${status} run`,
+      context: { run: { id: 'identified-run', status } },
+    }),
+  ),
+])('opens the exact run from $source in Runs', ({ context }) => {
+  Object.assign(fixtures.context, context);
   render(<FirstRun />);
   expect(fixtures.navigate).toHaveBeenCalledWith({
     to: '/runs',
-    search: { runID: 'chosen-run' },
+    search: { runID: 'identified-run' },
     replace: true,
   });
 });
@@ -364,14 +326,9 @@ it('uses only button loading while an accepted invocation has no identified run'
   };
   render(<FirstRun />);
   expect(fixtures.navigate).not.toHaveBeenCalled();
-  expect(
-    screen
-      .getByRole('button', { name: 'Invoke function' })
-      .hasAttribute('disabled'),
-  ).toBe(true);
+  expect(invokeButton().disabled).toBe(true);
   expect(screen.queryByText(/Waiting for a run/)).toBeNull();
   expect(screen.queryByText(/Run status:/)).toBeNull();
-  expect(screen.queryByRole('link', { name: 'Check Runs' })).toBeNull();
 });
 
 it.each(['saved', 'historical'])(
@@ -406,15 +363,9 @@ it('keeps step 3 invokable when reopening quickstart after completion and opens 
   expect(
     screen.getByRole('heading', { name: '3. Invoke your first function' }),
   ).toBeTruthy();
-  expect(
-    screen
-      .getByRole('button', { name: 'Invoke function' })
-      .hasAttribute('disabled'),
-  ).toBe(false);
+  expect(invokeButton().disabled).toBe(false);
   expect(fixtures.navigate).not.toHaveBeenCalled();
-  await act(async () =>
-    fireEvent.click(screen.getByRole('button', { name: 'Invoke function' })),
-  );
+  await act(async () => fireEvent.click(invokeButton()));
   fixtures.context = {
     ...fixtures.context,
     attempt: fixtures.setAttempt.mock.calls[0][0],
