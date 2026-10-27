@@ -20,16 +20,18 @@ var ErrRunRetirementUnsafe = errors.New("maintenance run retirement is unsafe")
 // The caller must retain the manifest, retire the obsolete semaphore namespace
 // separately, and arrange any required history update or replacement work.
 type RunRetirement struct {
-	ID                 sv2.ID
-	JobID              string
-	Before             time.Time
-	RetiredSemaphoreID string
-	DryRun             bool
+	ID                      sv2.ID
+	JobID                   string
+	Before                  time.Time
+	RetiredSemaphoreID      string
+	RequireRetiredSemaphore bool
+	DryRun                  bool
 }
 
 type RunRetirementResult struct {
-	Metadata *sv2.Metadata    `json:"metadata,omitempty"`
-	Item     *queue.QueueItem `json:"item,omitempty"`
+	Metadata   *sv2.Metadata    `json:"metadata,omitempty"`
+	Item       *queue.QueueItem `json:"item,omitempty"`
+	InputFound bool             `json:"input_found"`
 }
 
 // RetireMaintenanceRun removes one obsolete maintenance job and its run state.
@@ -71,12 +73,14 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 	if len(defers) != 0 {
 		return nil, fmt.Errorf("%w: run has deferred work", ErrRunRetirementUnsafe)
 	}
-	if _, err := store.LoadEvents(ctx, id); err != nil && !errors.Is(err, state.ErrEventNotFound) && !metadataAbsent(err) {
+	_, err = store.LoadEvents(ctx, id)
+	result.InputFound = err == nil
+	if err != nil && !errors.Is(err, state.ErrEventNotFound) && !metadataAbsent(err) {
 		return nil, err
 	}
 	item, err := shard.LoadQueueItem(ctx, req.JobID)
 	if err == nil {
-		if item == nil || item.ID != req.JobID || item.FunctionID != id.FunctionID || sv2.IDFromV1(item.Data.Identifier) != id || item.LeaseID != nil || item.ID == queue.JobIDFromContext(ctx) {
+		if item == nil || item.ID != req.JobID || item.FunctionID != id.FunctionID || sv2.IDFromV1(item.Data.Identifier) != id || item.LeaseID != nil || item.CapacityLease != nil || item.QueueName != nil || item.ID == queue.JobIDFromContext(ctx) {
 			return nil, fmt.Errorf("%w: wrong identity or leased/executing job", ErrRunRetirementUnsafe)
 		}
 		switch item.Data.Kind {
@@ -110,6 +114,30 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 			return nil, fmt.Errorf("%w: run index does not match manifest", ErrRunRetirementUnsafe)
 		}
 	}
+	if result.Metadata == nil && result.Item == nil && !result.InputFound {
+		return result, nil // idempotent absence is not a new cancellation
+	}
+	if req.RequireRetiredSemaphore {
+		var semaphores []constraintapi.Semaphore
+		if result.Metadata != nil {
+			semaphores = append(semaphores, result.Metadata.Config.Semaphores...)
+		}
+		if result.Item != nil {
+			semaphores = append(semaphores, result.Item.Data.Semaphores...)
+			semaphores = append(semaphores, result.Item.Data.Identifier.Semaphores...)
+		}
+		found := false
+		for _, sem := range semaphores {
+			found = found || (req.RetiredSemaphoreID != "" && sem.ID == req.RetiredSemaphoreID && sem.Release == constraintapi.SemaphoreReleaseManual)
+		}
+		if !found {
+			return nil, fmt.Errorf("%w: no retired manual semaphore evidence", ErrRunRetirementUnsafe)
+		}
+	}
+	maintenance, ok := shard.(queue.MaintenanceShard)
+	if result.Item != nil && !ok {
+		return nil, fmt.Errorf("%w: shard lacks atomic maintenance dequeue", ErrRunRetirementUnsafe)
+	}
 	// Inspect first; no permit-release or ordinary finalization path is called.
 	if req.DryRun {
 		return result, nil
@@ -118,7 +146,8 @@ func RetireMaintenanceRun(ctx context.Context, shard queue.QueueShard, store sv2
 		return nil, err
 	}
 	if result.Item != nil {
-		if err := shard.Dequeue(ctx, *result.Item); err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
+		// A vanished/changed record is not proof that this caller retired it.
+		if err := maintenance.DequeueMaintenance(ctx, *result.Item); err != nil {
 			return nil, err
 		}
 	}
