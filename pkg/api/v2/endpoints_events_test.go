@@ -273,7 +273,7 @@ func TestHTTPGateway_EventRoutes(t *testing.T) {
 		require.Equal(t, status, rec.Code, rec.Body.String())
 	}
 	denied, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{AuthzMiddleware: func(http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "Access denied", 403) })
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "Access denied", http.StatusForbidden) })
 	}})
 	require.NoError(t, err)
 	for _, prefix := range []string{"", "/v2", "/api/v2"} {
