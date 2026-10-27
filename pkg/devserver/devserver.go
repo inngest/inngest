@@ -667,7 +667,8 @@ func start(ctx context.Context, opts StartOpts) error {
 			TracerProvider:    tp,
 			State:             smv2,
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
-			SignalJWTSecret:   consts.DevServerSignalJWTSecret,
+			// Must match the secret the fake sandbox API signs with (cmd/devserver).
+			SignalJWTSecret: consts.DevServerSignalJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),

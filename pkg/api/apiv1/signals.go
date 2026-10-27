@@ -3,6 +3,8 @@ package apiv1
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -63,7 +65,20 @@ func (a router) receiveScopedSignal(w http.ResponseWriter, r *http.Request) {
 
 	data := ReceiveSignalRequest{}
 	body := http.MaxBytesReader(w, r.Body, maxScopedSignalBodyBytes)
-	if err := json.NewDecoder(body).Decode(&data); err != nil {
+	decoder := json.NewDecoder(body)
+	err = decoder.Decode(&data)
+	if err == nil {
+		// Reject trailing data after the one JSON value.
+		if _, extra := decoder.Token(); extra != io.EOF {
+			err = errors.New("unexpected data after signal body")
+		}
+	}
+	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusRequestEntityTooLarge, "Signal body is too large"))
+			return
+		}
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid signal data"))
 		return
 	}

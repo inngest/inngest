@@ -186,3 +186,13 @@ func TestCountsRequestsByRoute(t *testing.T) {
 	require.Equal(t, float64(2), data["total"])
 	require.Equal(t, float64(1), data["byRoute"].(map[string]any)["POST /v2/sandboxes/{id}/processes"])
 }
+
+func TestHostileScriptsDoNotPanic(t *testing.T) {
+	h := New("http://127.0.0.1:1", []byte("s"), uuid.New())
+	for _, command := range []string{"flood -1", "flood 99999999999", "sleep NaN", "sleep -5", "sleep 1e12", "nonsense"} {
+		sb, pid := start(t, h, command, nil)
+		code, res := call(t, h, "POST", "/v2/sandboxes/"+sb+"/processes/"+pid+"/wait?timeout=5s", nil)
+		require.Equal(t, http.StatusOK, code, command)
+		require.NotNil(t, res["data"], command)
+	}
+}

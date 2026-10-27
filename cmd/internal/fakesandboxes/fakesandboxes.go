@@ -37,6 +37,9 @@ const (
 	retryWindow = time.Hour
 	// maxRetryDelay caps the supervisor's backoff.
 	maxRetryDelay = 2 * time.Second
+	// maxSleepSeconds and maxFloodKiB bound what a script statement may do.
+	maxSleepSeconds = 3600
+	maxFloodKiB     = 1024
 )
 
 // Server serves the sandbox routes the SDK uses.
@@ -293,9 +296,11 @@ func (s *Server) waitProcess(w http.ResponseWriter, r *http.Request) {
 	if err != nil || timeout <= 0 {
 		timeout = 30 * time.Second
 	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
 	case <-p.done:
-	case <-time.After(timeout):
+	case <-timer.C:
 		writeError(w, http.StatusGatewayTimeout, "sandbox_process_wait_timed_out", "Timed out waiting for sandbox process")
 		return
 	case <-r.Context().Done():
@@ -375,16 +380,21 @@ run:
 		arg = strings.TrimSpace(arg)
 		switch verb {
 		case "sleep":
-			if seconds, err := strconv.ParseFloat(arg, 64); err == nil {
+			if seconds, err := strconv.ParseFloat(arg, 64); err == nil && seconds >= 0 && seconds <= maxSleepSeconds {
 				time.Sleep(time.Duration(seconds * float64(time.Second)))
 			}
 		case "echo":
-			s.append(p, &p.stdout, arg+"\n")
+			s.append(&p.stdout, arg+"\n")
 		case "err":
-			s.append(p, &p.stderr, arg+"\n")
+			s.append(&p.stderr, arg+"\n")
 		case "flood":
-			kib, _ := strconv.Atoi(arg)
-			s.append(p, &p.stdout, strings.Repeat("0123456789abcdef", 64*kib))
+			kib, err := strconv.Atoi(arg)
+			if err != nil || kib < 0 || kib > maxFloodKiB {
+				s.append(&p.stderr, "fake sandbox: invalid statement "+statement+"\n")
+				exit = 127
+				break run
+			}
+			s.append(&p.stdout, strings.Repeat("0123456789abcdef", 64*kib))
 		case "probe":
 			probe = true
 		case "exit":
@@ -397,7 +407,7 @@ run:
 			}
 			break run
 		default:
-			s.append(p, &p.stderr, "fake sandbox: unknown statement "+statement+"\n")
+			s.append(&p.stderr, "fake sandbox: unknown statement "+statement+"\n")
 			exit = 127
 			break run
 		}
@@ -426,7 +436,7 @@ run:
 	s.post(token, signalID, payload, true)
 }
 
-func (s *Server) append(p *process, buf *[]byte, text string) {
+func (s *Server) append(buf *[]byte, text string) {
 	s.mu.Lock()
 	*buf = append(*buf, text...)
 	s.mu.Unlock()

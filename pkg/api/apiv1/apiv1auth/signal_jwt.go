@@ -24,9 +24,9 @@ type SignalClaims struct {
 	jwt.RegisteredClaims
 
 	// Env is the environment UUID the signal is sent into.
-	Env uuid.UUID
+	Env uuid.UUID `json:"env"`
 	// SignalID is the only signal the token may send.
-	SignalID string
+	SignalID string `json:"signal_id"`
 }
 
 // CreateSignalJWT creates a token that can send signalID into envID until

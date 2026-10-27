@@ -111,6 +111,13 @@ func TestReceiveScopedSignal(t *testing.T) {
 		h, exec := setup(true)
 		big := `{"signal":"build:1","data":"` + strings.Repeat("a", maxScopedSignalBodyBytes) + `"}`
 		res := scopedSignalRequest(t, h, valid(t, "build:1", time.Now().Add(time.Hour)), big)
+		require.Equal(t, http.StatusRequestEntityTooLarge, res.Code)
+		require.Empty(t, exec.calls)
+	})
+
+	t.Run("rejects data after the body", func(t *testing.T) {
+		h, exec := setup(true)
+		res := scopedSignalRequest(t, h, valid(t, "build:1", time.Now().Add(time.Hour)), `{"signal":"build:1","data":{}} garbage`)
 		require.Equal(t, http.StatusBadRequest, res.Code)
 		require.Empty(t, exec.calls)
 	})
