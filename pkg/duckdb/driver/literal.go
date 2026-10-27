@@ -13,20 +13,24 @@ import (
 )
 
 // timestampLayout is the layout every time.Time is encoded with, as a
-// TIMESTAMP_MS literal truncated to whole milliseconds. Every time column in
-// the schema is TIMESTAMP_MS (migrations/000001_baseline.sql), so this is
-// the precision every bound value is stored or compared at anyway, and
-// truncating here (rather than relying on the cast) keeps comparisons from
-// mixing precisions. A microsecond TIMESTAMP literal against a TIMESTAMP_MS
-// column makes DuckDB cast the column instead (`CAST(ended_at AS TIMESTAMP)
-// >= ...`), which costs per row and keeps DuckLake from pruning files on the
-// column's min/max stats. Against a TIMESTAMP column DuckDB casts the
-// literal, so callers that need sub-ms precision there must not bind a
-// time.Time.
+// TIMESTAMPTZ literal truncated to whole milliseconds w/ an explicit UTC
+// offset.
 //
-// NOTE: since the value is truncated, `col >= ?` w/ a sub-ms bound also
-// matches the ms the bound falls in.
-const timestampLayout = "2006-01-02 15:04:05.000"
+// Every time column is TIMESTAMPTZ (migrations/000001_baseline.sql) and every
+// session runs w/ TimeZone = 'UTC' (see process.go's bootstrapTimeZoneLocked),
+// so a bound time compares against the columns w/o casting them. A
+// TIMESTAMP-typed bound against a TIMESTAMPTZ column (or the reverse) makes
+// DuckDB cast the column instead (`CAST(ended_at AS TIMESTAMP WITH TIME ZONE)
+// >= ...`), which costs per row and keeps DuckLake from pruning files on the
+// column's min/max stats. now()/current_timestamp are TIMESTAMPTZ too, so
+// hand-written `ended_at >= now() - INTERVAL 1 DAY` doesn't cast either.
+//
+// Values are truncated to ms to match what we store: ClickHouse's
+// DateTime64(3) for anything that came through the lake, and the ms-precision
+// keyset cursors in duckdbquery (encodeRunsCursor), which would skip rows
+// that differ only below a ms. The explicit +00 offset means the session's
+// TimeZone never shifts a bound.
+const timestampLayout = "2006-01-02 15:04:05.000-07"
 
 // encodeLiteral converts a bound driver.Value into DuckDB SQL literal text.
 // This exists because the stdio/JSON-lines transport has no wire-level
@@ -89,7 +93,7 @@ func encodeLiteral(v driver.Value) (string, error) {
 		sb.WriteString("'::BLOB")
 		return sb.String(), nil
 	case time.Time:
-		return "TIMESTAMP_MS '" + val.UTC().Truncate(time.Millisecond).Format(timestampLayout) + "'", nil
+		return "TIMESTAMPTZ '" + val.UTC().Truncate(time.Millisecond).Format(timestampLayout) + "'", nil
 	case []string:
 		// DuckDB's array literal syntax (['a', 'b']) — no cast needed; the
 		// target column's declared type (e.g. VARCHAR[]) is enough for

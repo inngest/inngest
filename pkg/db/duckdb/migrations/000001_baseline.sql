@@ -3,12 +3,12 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
 	run_id VARCHAR NOT NULL,
-  queued_at TIMESTAMP_MS NOT NULL,
+  queued_at TIMESTAMPTZ NOT NULL,
   -- When the run was due to start, fixed at schedule time (from run state;
   -- queued_at for a run whose state predates it).
-  scheduled_at TIMESTAMP_MS NOT NULL,
-  started_at TIMESTAMP_MS NULL,
-  ended_at TIMESTAMP_MS NULL,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  started_at TIMESTAMPTZ NULL,
+  ended_at TIMESTAMPTZ NULL,
   app_id UUID NOT NULL,
   app_name VARCHAR NOT NULL,
 	function_id UUID NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   account_id     UUID NOT NULL,
   env_id         UUID NOT NULL,
   run_id         VARCHAR NOT NULL,
-  run_queued_at  TIMESTAMP_MS NOT NULL,
+  run_queued_at  TIMESTAMPTZ NOT NULL,
   -- TODO: decide whether we can add app/function ids here
   -- span_id is the run/step/request span this metadata annotates (the
   -- "parent" every metadata span is created under) -- the join key onto
@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   kind           VARCHAR NOT NULL,
   is_user        BOOLEAN NOT NULL,
   values         VARIANT NOT NULL,
-  created_at     TIMESTAMP_MS NOT NULL
+  created_at     TIMESTAMPTZ NOT NULL
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind)};
@@ -106,14 +106,14 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
 	run_id VARCHAR NOT NULL,
-  run_queued_at TIMESTAMP_MS NOT NULL,
+  run_queued_at TIMESTAMPTZ NOT NULL,
   app_id UUID NOT NULL,
   app_name VARCHAR NOT NULL,
 	function_id UUID NOT NULL,
   function_slug VARCHAR NOT NULL,
   name VARCHAR NOT NULL,
-  start_time TIMESTAMP_MS NOT NULL,
-  end_time TIMESTAMP_MS NOT NULL,
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
   trace_id VARCHAR NOT NULL,
   span_id VARCHAR NOT NULL,
   parent_span_id VARCHAR,
@@ -170,14 +170,14 @@ CREATE TABLE IF NOT EXISTS inngest.events (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
   internal_id VARCHAR NOT NULL,
-  received_at TIMESTAMP_MS NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL,
   source VARCHAR NOT NULL,
   source_id VARCHAR NULL,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
   event_data VARIANT NOT NULL DEFAULT '{}',
   event_v VARCHAR NOT NULL,
-  event_ts TIMESTAMP_MS NOT NULL,
+  event_ts TIMESTAMPTZ NOT NULL,
   event_meta VARIANT NOT NULL DEFAULT '{}'
 );
 -- +goose ENVSUB ON

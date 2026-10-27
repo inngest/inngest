@@ -123,11 +123,11 @@ var runQuackColumnKinds = []driver.QuackColumnKind{
 	driver.QuackColumnUUID,        // account_id
 	driver.QuackColumnVarchar,     // run_id
 	driver.QuackColumnVarchar,     // status
-	driver.QuackColumnTimestampMS, // queued_at
-	driver.QuackColumnTimestampMS, // started_at
-	driver.QuackColumnTimestampMS, // ended_at
+	driver.QuackColumnTimestampTZ, // queued_at
+	driver.QuackColumnTimestampTZ, // started_at
+	driver.QuackColumnTimestampTZ, // ended_at
 	driver.QuackColumnJSON,        // attributes
-	driver.QuackColumnTimestampMS, // updated_at
+	driver.QuackColumnTimestampTZ, // updated_at
 }
 
 // runQuackMergeColumns is runColumns named for QuackMergeConfig's On/
@@ -137,11 +137,11 @@ var runQuackMergeColumns = []driver.QuackMergeColumn{
 	{Name: "account_id", Kind: driver.QuackColumnUUID},
 	{Name: "run_id", Kind: driver.QuackColumnVarchar},
 	{Name: "status", Kind: driver.QuackColumnVarchar},
-	{Name: "queued_at", Kind: driver.QuackColumnTimestampMS},
-	{Name: "started_at", Kind: driver.QuackColumnTimestampMS},
-	{Name: "ended_at", Kind: driver.QuackColumnTimestampMS},
+	{Name: "queued_at", Kind: driver.QuackColumnTimestampTZ},
+	{Name: "started_at", Kind: driver.QuackColumnTimestampTZ},
+	{Name: "ended_at", Kind: driver.QuackColumnTimestampTZ},
 	{Name: "attributes", Kind: driver.QuackColumnJSON},
-	{Name: "updated_at", Kind: driver.QuackColumnTimestampMS},
+	{Name: "updated_at", Kind: driver.QuackColumnTimestampTZ},
 }
 
 // mergeAppenderBatch upserts events into table via QuackMergeAppender —

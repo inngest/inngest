@@ -33,27 +33,17 @@ func TestEncodeLiteral(t *testing.T) {
 		{
 			"time.Time",
 			time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-			"TIMESTAMP_MS '2026-01-02 03:04:05.000'",
+			"TIMESTAMPTZ '2026-01-02 03:04:05.000+00'",
 		},
 		{
-			"time.Time with whole milliseconds",
-			time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC),
-			"TIMESTAMP_MS '2026-01-02 03:04:05.123'",
-		},
-		{
-			"time.Time with sub-millisecond precision is truncated",
+			"time.Time with sub-ms precision is truncated",
 			time.Date(2026, 1, 2, 3, 4, 5, 123999999, time.UTC),
-			"TIMESTAMP_MS '2026-01-02 03:04:05.123'",
+			"TIMESTAMPTZ '2026-01-02 03:04:05.123+00'",
 		},
 		{
 			"time.Time in another zone",
 			time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("x", -5*3600)),
-			"TIMESTAMP_MS '2026-01-02 08:04:05.000'",
-		},
-		{
-			"zero time.Time",
-			time.Time{},
-			"TIMESTAMP_MS '0001-01-01 00:00:00.000'",
+			"TIMESTAMPTZ '2026-01-02 08:04:05.000+00'",
 		},
 		{"string slice", []string{"a", "b"}, "['a', 'b']"},
 		{"string slice with single quote", []string{"O'Brien"}, "['O''Brien']"},
@@ -99,42 +89,42 @@ func TestInterpolateRejectsMismatchedPlaceholderCount(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestTimestampMSLiteral is the real-binary proof behind timestampLayout: a
-// bound time has the TIMESTAMP_MS columns' own type (so filtering one doesn't
-// cast the column), is truncated to whole ms, round trips
-// through both column types, and still works w/ interval arithmetic and
-// time_bucket.
-func TestTimestampMSLiteral(t *testing.T) {
+// TestTimestampTZBinding is the real-binary proof behind timestampLayout: the
+// session is pinned to UTC, a bound time.Time is TIMESTAMPTZ (the columns'
+// own type, so filtering one doesn't cast it), and it round trips truncated
+// to whole ms.
+func TestTimestampTZBinding(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 
 	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (ms TIMESTAMP_MS, us TIMESTAMP);")
-	require.NoError(t, err)
+	var tz string
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT current_setting('TimeZone');").Scan(&tz))
+	require.Equal(t, "UTC", tz)
 
 	at := time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC)
-	_, err = db.ExecContext(t.Context(), "INSERT INTO ts VALUES (?, ?);", at, at)
+
+	// The driver can't run EXPLAIN (it DESCRIBEs every query), so this
+	// checks the bound type instead: same type as the column -> no cast.
+	var typ string
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT typeof(?);", at).Scan(&typ))
+	require.Equal(t, "TIMESTAMP WITH TIME ZONE", typ)
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (ts_at TIMESTAMPTZ);")
 	require.NoError(t, err)
+	_, err = db.ExecContext(t.Context(), "INSERT INTO ts VALUES (?);", at.Add(999*time.Microsecond))
+	require.NoError(t, err)
+
+	var got time.Time
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT ts_at FROM ts;").Scan(&got))
+	require.True(t, at.Equal(got), "want %s, got %s", at, got)
 
 	var n int
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT count(*) FROM ts WHERE ms = ? AND us = ? AND ms >= ? - INTERVAL 1 HOUR AND time_bucket(INTERVAL 6 HOUR, ?) <= ms;",
-		at, at, at, at,
-	).Scan(&n))
-	require.Equal(t, 1, n)
-
-	// The driver can't run EXPLAIN (it DESCRIBEs every query), so this
-	// checks the bound types instead: same type as the column -> no cast.
-	var typ string
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT typeof(?);", at).Scan(&typ))
-	require.Equal(t, "TIMESTAMP_MS", typ)
-
-	// A sub-ms bound matches the ms it falls in, on either column type.
-	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT count(*) FROM ts WHERE ms = ? AND us = ?;",
-		at.Add(999*time.Microsecond), at.Add(time.Microsecond),
+		"SELECT count(*) FROM ts WHERE ts_at = ? AND ts_at >= ? - INTERVAL 1 HOUR AND time_bucket(INTERVAL 6 HOUR, ts_at) = ? AND ts_at::DATE = DATE '2026-01-02';",
+		at, at, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
 	).Scan(&n))
 	require.Equal(t, 1, n)
 }

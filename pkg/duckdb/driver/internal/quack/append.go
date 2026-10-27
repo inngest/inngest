@@ -29,7 +29,7 @@ import (
 // PrepareResponse's chunks get.
 //
 // Type coverage is scoped to exactly what inngest.run_trace_spans uses today
-// (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMP_MS), plus BOOLEAN and
+// (UUID, VARCHAR, VARCHAR-aliased-JSON, TIMESTAMPTZ), plus BOOLEAN and
 // BIGINT for federate's Arrow ingestion — extend as new callers need new
 // types.
 
@@ -45,8 +45,9 @@ const (
 	// ColumnJSON accepts a string of raw JSON text (stored verbatim,
 	// not re-marshaled) or nil — the VARCHAR-aliased-"JSON" wire shape.
 	ColumnJSON
-	// ColumnTimestampMS accepts a time.Time or nil.
-	ColumnTimestampMS
+	// ColumnTimestampTZ accepts a time.Time or nil, truncated to whole ms
+	// (see driver's timestampLayout for why).
+	ColumnTimestampTZ
 	// ColumnBool accepts a bool or nil.
 	ColumnBool
 	// ColumnBigint accepts an int64 (or any Go integer type) or nil.
@@ -72,9 +73,9 @@ func (k ColumnKind) wireID() (id byte, alias string) {
 		return logicalTypeBoolean, ""
 	case ColumnBigint:
 		return logicalTypeBigInt, ""
-	default: // ColumnVarchar, ColumnTimestampMS
-		if k == ColumnTimestampMS {
-			return logicalTypeTimestampMs, ""
+	default: // ColumnVarchar, ColumnTimestampTZ
+		if k == ColumnTimestampTZ {
+			return logicalTypeTimestampTZ, ""
 		}
 		return logicalTypeVarchar, ""
 	}
@@ -167,14 +168,14 @@ func encodeVectorColumn(w *writer, kind ColumnKind, rows [][]any, colIdx int) er
 			copy(data[i*16:], wire[:])
 		}
 		w.writeData(data)
-	case ColumnTimestampMS:
+	case ColumnTimestampTZ:
 		w.writeFieldID(102)
 		data := make([]byte, n*8)
 		for i, row := range rows {
 			if row[colIdx] == nil {
 				continue
 			}
-			micros, err := valueToTimestampMS(row[colIdx])
+			micros, err := valueToTimestampTZ(row[colIdx])
 			if err != nil {
 				return err
 			}
@@ -266,12 +267,13 @@ func valueToUUID(v any) (uuid.UUID, error) {
 	}
 }
 
-func valueToTimestampMS(v any) (int64, error) {
+func valueToTimestampTZ(v any) (int64, error) {
 	t, ok := v.(timeLike)
 	if !ok {
 		return 0, fmt.Errorf("expected time.Time, got %T", v)
 	}
-	return t.UnixMilli(), nil
+	// TIMESTAMPTZ is microseconds since the epoch, truncated to whole ms.
+	return t.UnixMilli() * 1000, nil
 }
 
 func valueToInt64(v any) (int64, error) {
