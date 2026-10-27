@@ -717,6 +717,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Functions:           functionProvider,
 		FunctionPauser:      functionProvider,
 		Runs:                NewRunProvider(dbcqrs, exec),
+		Events:              NewEventProvider(dbcqrs),
 		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
 			return !functionProvider.pauses.get(id).IsZero()
 		}),

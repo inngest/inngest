@@ -1287,3 +1287,52 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandReadsEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name, path string
+		args       []string
+		query      url.Values
+	}{
+		{"list-events", "/api/v2/events", []string{"--name", "order/placed", "--name", "order/paid", "--include", "payload", "--limit", "20", "--cursor", "01J00000000000000000000000", "--from", "2026-10-27T11:00:00Z", "--until", "2026-10-27T12:00:00Z"}, url.Values{"name": {"order/placed", "order/paid"}, "include": {"payload"}, "limit": {"20"}, "cursor": {"01J00000000000000000000000"}, "from": {"2026-10-27T11:00:00Z"}, "until": {"2026-10-27T12:00:00Z"}}},
+		{"get-event", "/api/v2/events/01J00000000000000000000000", []string{"01J00000000000000000000000", "--include", "payload"}, url.Values{"include": {"payload"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				require.Equal(t, http.MethodGet, r.Method)
+				require.Equal(t, tc.path, r.URL.Path)
+				require.Equal(t, tc.query, r.URL.Query())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := append([]string{"api", tc.name, "--api-host", srv.URL}, tc.args...)
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, 1, calls)
+			require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`, out.String())
+		})
+	}
+}
+
+func TestListEventsAcceptsLargePayloadPage(t *testing.T) {
+	event := `{"id":"01J00000000000000000000000","name":"large","payload":{"name":"large","data":{"value":"` + strings.Repeat("x", 3*1024*1024-1024) + `"}}}`
+	body := `{"data":[` + strings.TrimSuffix(strings.Repeat(event+",", 9), ",") + `],"page":{"hasMore":false,"limit":20}}`
+	require.Greater(t, len(body), maxResponseBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v2/events", r.URL.Path)
+		require.Equal(t, "payload", r.URL.Query().Get("include"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	cmd := Command()
+	var out bytes.Buffer
+	cmd.Writer = &out
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "list-events", "--api-host", srv.URL, "--include", "payload", "--raw"}))
+	require.Equal(t, body+"\n", out.String())
+}

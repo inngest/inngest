@@ -253,3 +253,35 @@ func endpointByMethod(t *testing.T, method string) apiv2endpoint.Endpoint {
 	t.Fatalf("endpoint %s not found", method)
 	return apiv2endpoint.Endpoint{}
 }
+
+func TestEventReadTools(t *testing.T) {
+	for _, tc := range []struct {
+		method, name, path string
+		args               map[string]any
+	}{
+		{"ListEvents", "list_events", "/api/v2/events", map[string]any{"name": []any{"order/placed", "order/paid"}, "include": []any{"payload"}, "limit": 20, "from": "2026-10-27T11:00:00Z", "until": "2026-10-27T12:00:00Z", "cursor": "01J00000000000000000000000"}},
+		{"GetEvent", "get_event", "/api/v2/events/01J00000000000000000000000", map[string]any{"eventId": "01J00000000000000000000000", "include": []any{"payload"}}},
+	} {
+		endpoint := endpointByMethod(t, tc.method)
+		tool := Tool(endpoint)
+		require.Equal(t, tc.name, tool.Name)
+		require.True(t, tool.Annotations.ReadOnlyHint)
+		require.True(t, tool.Annotations.IdempotentHint)
+		require.False(t, *tool.Annotations.DestructiveHint)
+		schema := InputSchema(endpoint)
+		include := schema["properties"].(map[string]any)["include"].(map[string]any)
+		require.Equal(t, []string{"payload"}, include["items"].(map[string]any)["enum"])
+		req, err := Request(t.Context(), endpoint, tc.args, Options{})
+		require.NoError(t, err)
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, tc.path, req.URL.Path)
+		require.Equal(t, []string{"payload"}, req.URL.Query()["include"])
+		if tc.method == "ListEvents" {
+			require.Equal(t, []string{"order/placed", "order/paid"}, req.URL.Query()["name"])
+			require.Equal(t, "20", req.URL.Query().Get("limit"))
+			require.Equal(t, "2026-10-27T11:00:00Z", req.URL.Query().Get("from"))
+			require.Equal(t, "2026-10-27T12:00:00Z", req.URL.Query().Get("until"))
+			require.Equal(t, "01J00000000000000000000000", req.URL.Query().Get("cursor"))
+		}
+	}
+}

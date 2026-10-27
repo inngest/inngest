@@ -57,6 +57,8 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	require.Contains(t, names, "create_replay")
 	require.Contains(t, names, "pause_function")
 	require.Contains(t, names, "resume_function")
+	require.Contains(t, names, "list_events")
+	require.Contains(t, names, "get_event")
 	for method := range unsupportedDevServerMCPMethods {
 		// The dev server keeps its older send_event tool for eventIdSeed support.
 		if method == "SendEvent" {
@@ -280,4 +282,36 @@ func listMCPTools(t *testing.T, handler http.Handler) []listedMCPTool {
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	return response.Result.Tools
+}
+
+func TestMCPEventReadCalls(t *testing.T) {
+	calls := []string{}
+	handler := NewMCPHandler(nil, nil, 0, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "payload", r.URL.Query().Get("include"))
+		calls = append(calls, r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000","name":"order/placed","payload":{"name":"order/placed","data":{"ok":true}}}}`))
+	}))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "event-test", Version: "1"}, nil)
+	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: srv.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	defer session.Close()
+	for _, tc := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"list_events", map[string]any{"include": []string{"payload"}, "name": []string{"order/placed"}}},
+		{"get_event", map[string]any{"include": []string{"payload"}, "eventId": "01J00000000000000000000000"}},
+	} {
+		result, err := session.CallTool(t.Context(), &mcp.CallToolParams{Name: tc.name, Arguments: tc.args})
+		require.NoError(t, err)
+		require.False(t, result.IsError)
+		data := result.StructuredContent.(map[string]any)["data"].(map[string]any)
+		require.Equal(t, "01J00000000000000000000000", data["id"])
+		require.Equal(t, true, data["payload"].(map[string]any)["data"].(map[string]any)["ok"])
+	}
+	require.Equal(t, []string{"/api/v2/events", "/api/v2/events/01J00000000000000000000000"}, calls)
 }
