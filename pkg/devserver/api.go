@@ -171,6 +171,10 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	// Not user-toggleable: reflects whether --duckdb dual-write actually
 	// started, which is what gates the insights GQL field.
 	features["duckdb-insights"] = a.devserver.DuckDB != nil
+	// Also not user-toggleable: whether runs/events are actually read from
+	// DuckDB (--duckdb-reads on top of a started dual-write), which is what
+	// gates CEL event search.
+	features["duckdb-reads"] = a.devserver.DuckDB != nil && a.devserver.Opts.EnableDuckDBReads
 
 	//
 	// inngest feature flags are a map of arbitrary key value
