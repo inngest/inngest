@@ -29,7 +29,7 @@ INSERT INTO inngest.runs
   (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs, sessions)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', '[{"name": "e1", "data": {}}]', %s);`, sessions),
 		consts.DevServerAccountID.String(), consts.DevServerEnvID.String(), runID, queuedAt, queuedAt,
-		appID.String(), "app", functionID.String(), "fn", status,
+		appID.String(), "app", functionID.String(), "app-fn", status,
 	)
 	require.NoError(t, err)
 }
@@ -102,6 +102,8 @@ func TestListSessions_ReturnsGroupsForKey(t *testing.T) {
 	require.Equal(t, int32(1), byID["u1"].FailedRunCount)
 	require.Len(t, byID["u1"].Functions, 1)
 	require.Equal(t, "fn", byID["u1"].Functions[0].Id)
+	require.Equal(t, "app-fn", byID["u1"].Functions[0].GetSlug())
+	require.Equal(t, "app", byID["u1"].Functions[0].App.Id)
 	require.Equal(t, int32(1), byID["u2"].RunCount)
 }
 
@@ -130,5 +132,7 @@ func TestListSessionRuns_ReturnsMatchingRuns(t *testing.T) {
 	require.Len(t, resp.Data, 1)
 	require.Equal(t, "r1", resp.Data[0].Id)
 	require.Equal(t, "fn", resp.Data[0].Function.Id)
+	require.Equal(t, "app-fn", resp.Data[0].Function.GetSlug())
+	require.Equal(t, "app", resp.Data[0].Function.App.Id)
 	require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
 }
