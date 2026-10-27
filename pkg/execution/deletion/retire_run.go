@@ -17,8 +17,8 @@ var ErrRunRetirementUnsafe = errors.New("maintenance run retirement is unsafe")
 
 // RunRetirement is an inventoried, single-job maintenance run. This is NOT
 // cancellation: it emits no finish events and never releases a semaphore.
-// The caller must retain the manifest, retire the obsolete semaphore namespace
-// separately, and arrange any required history update or replacement work.
+// The caller must retain the manifest, leave obsolete semaphore counters alone,
+// and arrange any required history update or replacement work.
 type RunRetirement struct {
 	ID                      sv2.ID
 	JobID                   string

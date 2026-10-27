@@ -52,32 +52,6 @@ func (q *queue) MaintenanceLeaseCount(ctx context.Context, scope osqueue.Scope) 
 	return rc.Do(ctx, rc.B().Zcard().Key(q.RedisClient.kg.PartitionScavengerIndex(scope.FunctionID.String())).Build()).AsInt64()
 }
 
-var maintenanceEmptyScript = rueidis.NewLuaScript(`
-for _, key in ipairs(KEYS) do
-  if redis.call("ZCARD", key) ~= 0 then return 0 end
-end
-return 1
-`)
-
-func (q *queue) CheckMaintenancePartitionEmpty(ctx context.Context, scope osqueue.Scope) error {
-	if scope.FunctionID == uuid.Nil {
-		return fmt.Errorf("maintenance function scope is required")
-	}
-	kg, fn := q.RedisClient.kg, scope.FunctionID.String()
-	// Require no ready jobs at ANY time, no backlog pointers (even empty ones),
-	// no normalization work, and no leases. Wrong types/read errors propagate.
-	empty, err := maintenanceEmptyScript.Exec(ctx, q.RedisClient.unshardedRc, []string{
-		kg.FnQueueSet(fn), kg.ShadowPartitionSet(fn), kg.PartitionNormalizeSet(fn), kg.PartitionScavengerIndex(fn),
-	}, nil).AsInt64()
-	if err != nil {
-		return fmt.Errorf("strict maintenance partition read: %w", err)
-	}
-	if empty != 1 {
-		return fmt.Errorf("maintenance partition or backlog is not empty")
-	}
-	return nil
-}
-
 func (q *queue) DequeueMaintenance(ctx context.Context, expected osqueue.QueueItem) error {
 	rc := q.RedisClient.unshardedRc
 	raw, err := rc.Do(ctx, rc.B().Hget().Key(q.RedisClient.kg.QueueItem()).Field(expected.ID).Build()).ToString()
