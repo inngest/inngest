@@ -219,11 +219,23 @@ func sessionsPage(limit int, hasMore bool, nextCursor string) *apiv2.Page {
 	return page
 }
 
+// toAPIFunctionRef builds IDs the same way /v2/runs does (functionRefID and
+// appRefID in endpoints_runs.go): the function ID w/o its app prefix, the
+// full slug in Slug, and the app's name (its UUID if it has none). Runs only
+// carry the stored slug, so there's no configured slug to prefer here.
 func toAPIFunctionRef(fn dashboards.FunctionRef) *apiv2.FunctionRef {
-	return &apiv2.FunctionRef{
-		Id:  fn.Slug,
-		App: &apiv2.AppRef{Id: fn.AppID.String()},
+	appID := fn.AppName
+	if appID == "" {
+		appID = fn.AppID.String()
 	}
+	ref := &apiv2.FunctionRef{
+		Id:  PublicFunctionID(fn.AppName, fn.Slug, ""),
+		App: &apiv2.AppRef{Id: appID},
+	}
+	if fn.Slug != "" {
+		ref.Slug = new(fn.Slug)
+	}
+	return ref
 }
 
 func toAPISessionGroup(group dashboards.SessionGroup) *apiv2.SessionGroup {
