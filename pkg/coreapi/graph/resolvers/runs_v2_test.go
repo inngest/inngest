@@ -74,3 +74,35 @@ func TestRunFunctionRunV2ConversionMatchesMakeFunctionRunV2(t *testing.T) {
 	require.Equal(t, run.AppID, want.AppID)
 	require.Equal(t, models.FunctionRunStatusCompleted, want.Status)
 }
+
+func TestMakeFunctionRunV2EndedAt(t *testing.T) {
+	endedAt := time.Now().Add(time.Second).Truncate(time.Millisecond)
+	cases := []struct {
+		status    enums.RunStatus
+		wantEnded bool
+	}{
+		{enums.RunStatusCompleted, true},
+		{enums.RunStatusFailed, true},
+		{enums.RunStatusCancelled, true},
+		{enums.RunStatusSkipped, true},
+		{enums.RunStatusRunning, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.status.String(), func(t *testing.T) {
+			got, err := models.MakeFunctionRunV2(&cqrs.TraceRun{
+				RunID:     ulid.MustNew(ulid.Now(), nil).String(),
+				QueuedAt:  time.Now(),
+				Status:    tc.status,
+				StartedAt: time.Now(),
+				EndedAt:   endedAt,
+			})
+			require.NoError(t, err)
+			if !tc.wantEnded {
+				require.Nil(t, got.EndedAt)
+				return
+			}
+			require.NotNil(t, got.EndedAt)
+			require.True(t, endedAt.Equal(*got.EndedAt))
+		})
+	}
+}
