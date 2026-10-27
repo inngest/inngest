@@ -383,6 +383,21 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Forward message to the gateway if the request wasn't already running
 	var routedInstanceID string
 	if leaseID != nil {
+		forwardAttempted := false
+		defer func() {
+			// A routing/assignment rejection must not make the next dispatch
+			// wait for SDK work that was never sent. Preserve the lease once
+			// forwarding starts, since an error may still mean SDK delivery.
+			if forwardAttempted {
+				return
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if err := i.stateManager.ReleaseRequestLease(cleanupCtx, opts.EnvID, opts.Data.RequestId, *leaseID); err != nil {
+				l.ReportError(err, "could not release unsent request lease")
+			}
+		}()
+
 		// Determine the most suitable connection
 		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
@@ -446,6 +461,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			// Forward now awaits the SDK to ack a job, so an error means that it's likely
 			// safe to retry through a different route (in case workers/gateways are unavailable)
+			forwardAttempted = true
 			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 			if err == nil {
 				break
