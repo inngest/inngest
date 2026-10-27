@@ -1,22 +1,17 @@
 #!/usr/bin/env bash
 #
-# Bumps the pinned DuckDB CLI build in pkg/duckdb/driver/pinned.go to whatever
-# DuckDB's staging server currently reports as the latest alpha build (or to
-# an explicit "<commit>/<version>" passed as the first argument, e.g.
-# "d54cbbe3df/v2.0.0" for a release branch build),
-# re-downloading each platform's release archive to recompute
-# pinnedChecksums. Regenerates pinned.go wholesale (rather than patching it
-# in place) so the file always matches its own generator.
-#
-# See pinned.go's PinnedVersion doc comment for why this package pins a
-# nightly/staged build instead of a tagged GA release, and why nightly
-# builds can be garbage-collected out from under a stale pin.
+# Bumps the pinned DuckDB CLI build in pkg/duckdb/driver/pinned.go to DuckDB's
+# latest GitHub release (or to an explicit tag passed as the first argument,
+# e.g. "v2.0.0"), re-downloading each platform's release archive to recompute
+# pinnedChecksums and checking them against the digests GitHub publishes for
+# the release. Regenerates pinned.go wholesale (rather than patching it in
+# place) so the file always matches its own generator.
 
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 target="${repo_root}/pkg/duckdb/driver/pinned.go"
-staging_base="https://duckdb-staging.duckdb.org"
+api="https://api.github.com/repos/duckdb/duckdb/releases"
 
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -27,22 +22,22 @@ sha256_of() {
 }
 
 if [[ $# -gt 0 ]]; then
-    latest="$1"
+    release_url="${api}/tags/$1"
 else
-    echo "Fetching ${staging_base}/latest_alpha_version.txt"
-    latest="$(curl -sSfL "${staging_base}/latest_alpha_version.txt")"
+    release_url="${api}/latest"
 fi
-commit="${latest%%/*}"
-version="${latest#*/}"
 
-if [[ -z "${commit}" || -z "${version}" || "${commit}" == "${latest}" ]]; then
-    echo "error: expected <commit>/<version>, got: ${latest}" >&2
+echo "Fetching ${release_url}"
+release="$(curl -sSfL -H "Accept: application/vnd.github+json" "${release_url}")"
+version="$(jq -r .tag_name <<<"${release}")"
+if [[ "$(jq -r .prerelease <<<"${release}")" != "false" || "$(jq -r .draft <<<"${release}")" != "false" ]]; then
+    echo "error: ${version} is a prerelease or draft, pin a GA release" >&2
     exit 1
 fi
 
-echo "Latest staged build: ${version} (commit ${commit})"
+echo "Release: ${version}"
 
-base_url="${staging_base}/${commit}/${version}/duckdb/duckdb/github_release/"
+base_url="https://github.com/duckdb/duckdb/releases/download/${version}/"
 assets=(
     "duckdb-cli-osx-universal.tar.gz"
     "duckdb-cli-linux-amd64.tar.gz"
@@ -57,7 +52,17 @@ declare -A checksums
 for asset in "${assets[@]}"; do
     echo "Downloading ${asset}"
     curl -sSfL "${base_url}${asset}" -o "${workdir}/${asset}"
-    checksums["${asset}"]="$(sha256_of "${workdir}/${asset}")"
+    sum="$(sha256_of "${workdir}/${asset}")"
+    published="$(jq -r --arg n "${asset}" '.assets[] | select(.name == $n) | .digest // ""' <<<"${release}")"
+    if [[ -z "${published}" ]]; then
+        echo "error: ${version} has no published digest for ${asset}" >&2
+        exit 1
+    fi
+    if [[ "${published}" != "sha256:${sum}" ]]; then
+        echo "error: ${asset} hashes to sha256:${sum}, but ${version} publishes ${published}" >&2
+        exit 1
+    fi
+    checksums["${asset}"]="${sum}"
 done
 
 echo "Writing ${target}"
@@ -66,37 +71,16 @@ cat >"${target}" <<EOF
 
 package driver
 
-// PinnedVersion is the DuckDB CLI build this package downloads and runs
-// against. It is a specific nightly/staged build (not a tagged GA release):
-// duckdb doesn't publish stable-channel installers for the version this
-// driver targets, so EnsureBinary (download.go) fetches it from DuckDB's
-// staging distribution server instead — see pinnedStagedCommit and
-// defaultInstallBaseURL.
+// PinnedVersion is the DuckDB CLI release this package downloads and runs
+// against: a tagged GitHub release, which EnsureBinary (download.go) fetches
+// from defaultInstallBaseURL.
 const PinnedVersion = "${version}"
 
-// pinnedStagedCommit is the (10-character, matching DuckDB's own install
-// script convention) commit hash PinnedVersion was built from, required to
-// address it on the staging server — a bare version string isn't enough to
-// resolve a nightly build's URL. \`duckdb --version\` prints this hash
-// alongside the version (e.g. "v2.1.0-alpha40409 (Unknown Version)
-// ecf3b9fcf1").
-//
-// Nightly builds are not retained indefinitely; if the staging server has
-// since garbage-collected this commit, run
-// scripts/update-duckdb-version.sh to bump PinnedVersion,
-// pinnedStagedCommit, and pinnedChecksums together to a build that's still
-// available.
-const pinnedStagedCommit = "${commit}"
-
 // pinnedChecksums are the SHA256 digests of each pinned-version release
-// archive EnsureBinary might download, keyed by asset name. Unlike a tagged
-// GA release, DuckDB's nightly/staged channel publishes no official
-// checksums at all — these were computed by downloading each archive once
-// at pin time and hashing it locally. That still lets EnsureBinary fail
-// closed on corruption or tampering in transit after this point, the same
-// trust model as vendoring a dependency and recording its hash yourself; it
-// is not a third-party attestation the way a GA release's published
-// checksum would be.
+// archive EnsureBinary might download, keyed by asset name. They were
+// computed by downloading each archive at pin time and checked against the
+// digests GitHub publishes for the release, so EnsureBinary fails closed on
+// corruption or tampering in transit.
 var pinnedChecksums = map[string]string{
 	"duckdb-cli-osx-universal.tar.gz": "${checksums[duckdb-cli-osx-universal.tar.gz]}",
 	"duckdb-cli-linux-amd64.tar.gz":   "${checksums[duckdb-cli-linux-amd64.tar.gz]}",
@@ -108,7 +92,7 @@ EOF
 gofmt -w "${target}"
 
 echo
-echo "Pinned DuckDB build updated to ${version} (commit ${commit})."
+echo "Pinned DuckDB release updated to ${version}."
 echo "Review the diff, then run:"
 echo "  go build ./pkg/duckdb/driver/..."
 echo "  go test ./pkg/duckdb/driver/..."
