@@ -23,6 +23,16 @@ import (
 // read-side layout list in store.go's AsTimestamp already handles.
 const timestampLayout = "2006-01-02 15:04:05.000000"
 
+// timestampMSLayout is the layout a whole-millisecond time.Time is encoded
+// with, as a TIMESTAMP_MS literal. Every time column in the schema is
+// TIMESTAMP_MS (migrations/000001_baseline.sql), and comparing one against a
+// microsecond TIMESTAMP literal makes DuckDB cast the column instead
+// (`CAST(ended_at AS TIMESTAMP) >= ...`), which costs per row and keeps
+// DuckLake from pruning files on the column's min/max stats. A TIMESTAMP_MS
+// literal compares against the column as-is, and against a TIMESTAMP column
+// DuckDB casts the literal, so this is lossless either way.
+const timestampMSLayout = "2006-01-02 15:04:05.000"
+
 // encodeLiteral converts a bound driver.Value into DuckDB SQL literal text.
 // This exists because the stdio/JSON-lines transport has no wire-level
 // parameter binding — every bound value must be safely quoted/escaped as
@@ -84,6 +94,9 @@ func encodeLiteral(v driver.Value) (string, error) {
 		sb.WriteString("'::BLOB")
 		return sb.String(), nil
 	case time.Time:
+		if val.Nanosecond()%int(time.Millisecond) == 0 {
+			return "TIMESTAMP_MS '" + val.UTC().Format(timestampMSLayout) + "'", nil
+		}
 		return "TIMESTAMP '" + val.UTC().Format(timestampLayout) + "'", nil
 	case []string:
 		// DuckDB's array literal syntax (['a', 'b']) — no cast needed; the

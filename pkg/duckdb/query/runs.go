@@ -170,7 +170,10 @@ func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	if until.IsZero() {
 		until = time.Now()
 	}
-	args = append(args, filter.From, until)
+	// Rounding both bounds up to whole ms is exact against the TIMESTAMP_MS
+	// columns and lets the driver bind them as TIMESTAMP_MS literals (see
+	// its timestampMSLayout), which time.Now() alone never would.
+	args = append(args, ceilMillis(filter.From), ceilMillis(until))
 
 	// is_deferred is BOOLEAN NOT NULL DEFAULT FALSE (migrations/
 	// 000001_baseline.sql) -- every non-deferred row is an explicit FALSE,
@@ -184,6 +187,14 @@ func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	}
 
 	return strings.Join(where, " AND "), args
+}
+
+// ceilMillis rounds t up to the next whole millisecond.
+func ceilMillis(t time.Time) time.Time {
+	if r := t.Truncate(time.Millisecond); !r.Equal(t) {
+		return r.Add(time.Millisecond)
+	}
+	return t
 }
 
 // buildRunsCursorSeek decodes a request cursor (if any) into the

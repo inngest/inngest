@@ -33,12 +33,27 @@ func TestEncodeLiteral(t *testing.T) {
 		{
 			"time.Time",
 			time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-			"TIMESTAMP '2026-01-02 03:04:05.000000'",
+			"TIMESTAMP_MS '2026-01-02 03:04:05.000'",
 		},
 		{
-			"time.Time with sub-second precision",
+			"time.Time with whole milliseconds",
+			time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC),
+			"TIMESTAMP_MS '2026-01-02 03:04:05.123'",
+		},
+		{
+			"time.Time with sub-millisecond precision",
 			time.Date(2026, 1, 2, 3, 4, 5, 123456000, time.UTC),
 			"TIMESTAMP '2026-01-02 03:04:05.123456'",
+		},
+		{
+			"time.Time in another zone",
+			time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("x", -5*3600)),
+			"TIMESTAMP_MS '2026-01-02 08:04:05.000'",
+		},
+		{
+			"zero time.Time",
+			time.Time{},
+			"TIMESTAMP_MS '0001-01-01 00:00:00.000'",
 		},
 		{"string slice", []string{"a", "b"}, "['a', 'b']"},
 		{"string slice with single quote", []string{"O'Brien"}, "['O''Brien']"},
@@ -125,6 +140,42 @@ func TestTimestampRoundTripPreservesMicroseconds(t *testing.T) {
 	require.NoError(t,
 		db.QueryRowContext(t.Context(), "SELECT count(DISTINCT ts_at) FROM ts;").Scan(&distinct))
 	require.Equal(t, 3, distinct)
+}
+
+// TestTimestampMSLiteral is the real-binary proof behind timestampMSLayout: a
+// whole-ms bound has the TIMESTAMP_MS columns' own type (so filtering one
+// doesn't cast the column), round trips
+// through both column types, and still works w/ interval arithmetic and
+// time_bucket.
+func TestTimestampMSLiteral(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+
+	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE ts (ms TIMESTAMP_MS, us TIMESTAMP);")
+	require.NoError(t, err)
+
+	at := time.Date(2026, 1, 2, 3, 4, 5, 123000000, time.UTC)
+	_, err = db.ExecContext(t.Context(), "INSERT INTO ts VALUES (?, ?);", at, at)
+	require.NoError(t, err)
+
+	var n int
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT count(*) FROM ts WHERE ms = ? AND us = ? AND ms >= ? - INTERVAL 1 HOUR AND time_bucket(INTERVAL 6 HOUR, ?) <= ms;",
+		at, at, at, at,
+	).Scan(&n))
+	require.Equal(t, 1, n)
+
+	// The driver can't run EXPLAIN (it DESCRIBEs every query), so this
+	// checks the bound types instead: same type as the column -> no cast.
+	var msType, usType string
+	require.NoError(t, db.QueryRowContext(t.Context(),
+		"SELECT typeof(?), typeof(?);", at, at.Add(time.Microsecond),
+	).Scan(&msType, &usType))
+	require.Equal(t, "TIMESTAMP_MS", msType)
+	require.Equal(t, "TIMESTAMP", usType)
 }
 
 // TestJSONRawMessageRoundTripsIntoVariantColumn is the real-binary proof
