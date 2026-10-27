@@ -749,15 +749,6 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 		}
 	}
 
-	// Run-end handoff: if the run belonged to an agent thread and its inbox
-	// holds messages that were never delivered, start the next run for the
-	// thread from the same trigger event. Idempotent on the inbox head.
-	if opts.Status() == enums.StepStatusCompleted && len(inputEvents) > 0 {
-		if handoff := e.inboxHandoffEvent(opts.Metadata.ID.Tenant.EnvID, inputEvents[0], now); handoff != nil {
-			freshEvents = append(freshEvents, *handoff)
-		}
-	}
-
 	// Append extra events (e.g. inngest/deferred.schedule) AFTER the invoke
 	// goroutine loop so they aren't dispatched to HandleInvokeFinish.
 	freshEvents = append(freshEvents, extraEvents...)

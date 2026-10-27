@@ -214,8 +214,6 @@ func (a *router) setup() {
 			}
 
 			r.Post("/signals", a.receiveSignal)
-			r.Post("/inbox/{key}/messages", a.appendInbox)
-			r.Get("/inbox/{key}", a.getInbox)
 
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)

@@ -5506,16 +5506,6 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		)
 	})
 
-	if opts.Inbox != nil && opts.Inbox.Key != "" {
-		// step.subscribe: a message may have been queued before this wait
-		// existed, so try to deliver it now.
-		wsID := runCtx.Metadata().ID.Tenant.EnvID
-		_, derr := e.DeliverInbox(ctx, wsID, opts.Inbox.Key)
-		if derr != nil {
-			e.log.Error("error delivering queued inbox message", "error", derr, "key", opts.Inbox.Key)
-		}
-	}
-
 	return err
 }
 
