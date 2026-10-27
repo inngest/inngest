@@ -118,7 +118,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		// A queued item that fires when the subscription expires. It keeps the
 		// run holding its function singleton while it waits: the singleton lock
 		// is released once the run has no queued items.
-		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID)
+		jobID := fmt.Sprintf("%s-%s-expiry", md.IdempotencyKey(), gen.ID)
 		expiry := queue.Item{
 			JobID:                 &jobID,
 			WorkspaceID:           md.ID.Tenant.EnvID,
