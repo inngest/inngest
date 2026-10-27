@@ -115,6 +115,25 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription pause: %w", err)
 		}
+		// A queued item that fires when the subscription expires. It keeps the
+		// run holding its function singleton while it waits: the singleton lock
+		// is released once the run has no queued items.
+		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID)
+		expiry := queue.Item{
+			JobID:                 &jobID,
+			WorkspaceID:           md.ID.Tenant.EnvID,
+			GroupID:               runCtx.GroupID(),
+			Kind:                  queue.KindPause,
+			Identifier:            sv2.V1FromMetadata(*md),
+			PriorityFactor:        runCtx.PriorityFactor(),
+			CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+			Payload:               queue.PayloadPauseTimeout{PauseID: pauseID, Pause: pause},
+			Metadata:              make(map[string]any),
+		}
+		if err := e.queue.Enqueue(ctx, expiry, pause.Expires.Time(), queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+			return fmt.Errorf("error enqueueing subscription expiry: %w", err)
+		}
+
 		if len(md.Config.EventIDs) > 0 {
 			// Mark the trigger as handled, in case it also matches.
 			marker := subscriptionEventMarkerID(sub.Key, md.Config.EventIDs[0].String())
