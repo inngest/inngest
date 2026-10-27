@@ -13,7 +13,7 @@ import (
 // same bytes as the row encoder for the same values, across every kind,
 // NULLs, chunk boundaries, and NULL rows that still carry string bytes.
 func TestEncodeVectorsMatchesRows(t *testing.T) {
-	kinds := []ColumnKind{ColumnUUID, ColumnVarchar, ColumnJSON, ColumnTimestampMS, ColumnBool, ColumnBigint}
+	kinds := []ColumnKind{ColumnUUID, ColumnVarchar, ColumnJSON, ColumnTimestampTZ, ColumnBool, ColumnBigint}
 	for _, n := range []int{1, 7, StandardVectorSize, StandardVectorSize + 1, 5000} {
 		for _, nullBytes := range []bool{false, true} {
 			r := rand.New(rand.NewSource(int64(n)))
@@ -34,7 +34,7 @@ func TestEncodeVectorsMatchesRows(t *testing.T) {
 						if !null {
 							rows[i][c] = id
 						}
-					case ColumnTimestampMS:
+					case ColumnTimestampTZ:
 						ms := r.Int63n(4_000_000_000_000)
 						v.Int64s = append(v.Int64s, ms)
 						if !null {

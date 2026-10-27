@@ -12,7 +12,8 @@ import (
 // every value in an interface. Only the field matching Kind is read:
 //
 //   - ColumnUUID: UUIDs
-//   - ColumnTimestampMS: Int64s, as Unix milliseconds
+//   - ColumnTimestampTZ: Int64s, as Unix milliseconds (sent as TIMESTAMPTZ
+//     microseconds)
 //   - ColumnBigint: Int64s
 //   - ColumnBool: Bools
 //   - ColumnVarchar, ColumnJSON: Bytes and Ends; row i's bytes are
@@ -35,7 +36,7 @@ func (v Vector) Len() int {
 	switch v.Kind {
 	case ColumnUUID:
 		return len(v.UUIDs)
-	case ColumnTimestampMS, ColumnBigint:
+	case ColumnTimestampTZ, ColumnBigint:
 		return len(v.Int64s)
 	case ColumnBool:
 		return len(v.Bools)
@@ -131,14 +132,18 @@ func encodeTypedVector(w *writer, v Vector, start, end int) error {
 			copy(data[i*16:], wire[:])
 		}
 		w.writeData(data)
-	case ColumnTimestampMS, ColumnBigint:
+	case ColumnTimestampTZ, ColumnBigint:
+		scale := int64(1)
+		if v.Kind == ColumnTimestampTZ {
+			scale = 1000
+		}
 		w.writeFieldID(102)
 		data := make([]byte, n*8)
 		for i := range n {
 			if v.null(start + i) {
 				continue
 			}
-			putLE64(data[i*8:i*8+8], uint64(v.Int64s[start+i]))
+			putLE64(data[i*8:i*8+8], uint64(v.Int64s[start+i]*scale))
 		}
 		w.writeData(data)
 	case ColumnBool:

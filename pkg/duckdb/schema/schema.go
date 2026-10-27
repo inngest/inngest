@@ -38,7 +38,7 @@ func (t Type) DuckDBType() string {
 	case TypeJSON:
 		return "JSON"
 	case TypeTimestamp:
-		return "TIMESTAMP_MS"
+		return "TIMESTAMP WITH TIME ZONE"
 	case TypeBool:
 		return "BOOLEAN"
 	case TypeBigint:
