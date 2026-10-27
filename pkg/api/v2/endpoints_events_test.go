@@ -93,6 +93,53 @@ func TestListEventsOptions(t *testing.T) {
 	}
 }
 
+func TestListEventsTimestampBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		from    string
+		until   string
+		message string
+	}{
+		{"from zero", "0001-01-01T00:00:00Z", "", "from must not be the zero time"},
+		{"until zero", "", "0001-01-01T00:00:00Z", "until must not be the zero time"},
+		{"both zero", "0001-01-01T00:00:00Z", "0001-01-01T00:00:00Z", "from must not be the zero time"},
+		{"valid nonzero", "1970-01-01T00:00:00Z", "1970-01-01T01:00:00Z", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			var received cqrs.WorkspaceEventsOpts
+			provider := testEventProvider{list: func(_ context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+				calls++
+				received = *opts
+				return []*cqrs.Event{{ID: ulid.MustParse("01J00000000000000000000000"), EventName: "app/event", ReceivedAt: time.Unix(0, 0)}}, nil
+			}}
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Events: provider}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			query := url.Values{}
+			if tc.from != "" {
+				query.Set("from", tc.from)
+			}
+			if tc.until != "" {
+				query.Set("until", tc.until)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v2/events?"+query.Encode(), nil))
+			if tc.message != "" {
+				require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+				require.Contains(t, rec.Body.String(), `"code":"invalid_field_format"`)
+				require.Contains(t, rec.Body.String(), tc.message)
+				require.Zero(t, calls)
+				return
+			}
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), `"name":"app/event"`)
+			require.Equal(t, 1, calls)
+			require.Equal(t, tc.from, received.Oldest.Format(time.RFC3339))
+			require.Equal(t, tc.until, received.Newest.Format(time.RFC3339))
+		})
+	}
+}
+
 func TestListEventsNames(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

@@ -81,9 +81,15 @@ func (s *Service) ListEvents(ctx context.Context, req *apiv2.ListEventsRequest) 
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
+	if from != nil && from.IsZero() {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "from must not be the zero time")
+	}
 	until, err := optionalTimestamp(req.GetUntil(), "until")
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+	if until != nil && until.IsZero() {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "until must not be the zero time")
 	}
 	if from != nil {
 		opts.Oldest = *from
