@@ -326,24 +326,27 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 			return err
 		}
 
-		// Already claimed. If it was saved, make sure the run was woken; if
-		// the claimant has not finished, fail so the event is retried.
+		// Already claimed. If it was saved, make sure the run was woken.
 		saved, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{slotMarker})
 		if err != nil {
 			return err
 		}
 		raw, ok := saved[slotMarker]
-		if !ok {
-			return fmt.Errorf("subscription message is being saved by another handler")
+		if ok {
+			var slot struct {
+				Data int `json:"data"`
+			}
+			if err := json.Unmarshal(raw, &slot); err != nil || slot.Data < 1 {
+				return nil
+			}
+			seq = slot.Data
 		}
-		var slot struct {
-			Data int `json:"data"`
-		}
-		if err := json.Unmarshal(raw, &slot); err != nil || slot.Data < 1 {
-			return nil
-		}
-		seq = slot.Data
-	} else {
+	}
+
+	if seq == 0 {
+		// Not saved yet: either the first delivery, or a retry of one that was
+		// interrupted. Probing is idempotent: the slot that already holds this
+		// event answers ErrIdempotentResponse, and other slots are skipped.
 		seq = 1
 		if hint, ok := subscriptionHints.Load(pause.ID); ok {
 			seq = hint.(int)

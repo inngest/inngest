@@ -216,6 +216,12 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		return nil
 	}
 	if err := e.finalizeEvents(ctx, opts, append(deferEvents, unreadEvents...)); err != nil {
+		// A retried Finalize finds the state gone, so hand the unread messages
+		// over now.
+		e.republishSubscriptionEvents(ctx, opts.Metadata.ID, unreadEvents)
+		if len(unreadEvents) > 0 && e.finishHandler != nil {
+			_ = e.finishHandler(context.WithoutCancel(ctx), opts.Metadata.ID, unreadEvents)
+		}
 		if releaseErr := finalizationClaim.Release(ctx); releaseErr != nil {
 			logger.StdlibLogger(ctx).Warn(
 				"error releasing finalization claim after failed publish",
