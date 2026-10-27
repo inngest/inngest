@@ -7,6 +7,7 @@ export const clientFeatureFlags = [
   'dedicated-slack-channel',
   // Dev-server only: served by the devserver's /dev features map, not LaunchDarkly.
   'duckdb-insights',
+  'duckdb-reads',
   'enable-step-metadata',
   'hobby-execution-limit-ui',
   'incident-banner',
