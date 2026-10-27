@@ -29,7 +29,7 @@ func TestQueryInsights_NonFiniteFloatIsCountedAsOK(t *testing.T) {
 		t.Skipf("opening quack duckdb: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeMemory))
 
 	reader := sdkmetric.NewManualReader()
 	orig := otel.GetMeterProvider()

@@ -188,7 +188,11 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		return nil, nil, nil
 	}
 
-	if err := duckdb.Migrate(ctx, db, persist); err != nil {
+	mode := duckdb.ModeMemory
+	if persist {
+		mode = duckdb.ModeRawLake
+	}
+	if err := duckdb.Migrate(ctx, db, mode); err != nil {
 		l.Warn("failed to migrate duckdb staging schema; dual-write disabled", "error", err)
 		_ = db.Close()
 		return nil, nil, nil
