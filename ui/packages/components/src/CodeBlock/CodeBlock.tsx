@@ -62,6 +62,7 @@ interface CodeBlockProps {
   resize?: boolean;
   alwaysFullHeight?: boolean;
   loading?: boolean;
+  copyButton?: React.ReactNode;
 }
 
 export function CodeBlock({
@@ -73,6 +74,7 @@ export function CodeBlock({
   resize = false,
   alwaysFullHeight = false,
   loading = false,
+  copyButton,
 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(MAX_HEIGHT);
@@ -299,13 +301,15 @@ export function CodeBlock({
                         kind="secondary"
                       />
                     ))}
-                    <CopyButton
-                      size="small"
-                      code={content}
-                      isCopying={isCopying}
-                      handleCopyClick={handleCopyClick}
-                      appearance="outlined"
-                    />
+                    {copyButton ?? (
+                      <CopyButton
+                        size="small"
+                        code={content}
+                        isCopying={isCopying}
+                        handleCopyClick={handleCopyClick}
+                        appearance="outlined"
+                      />
+                    )}
                     <Button
                       icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
                       onClick={handleWrapText}

@@ -58,12 +58,29 @@ const CommandBlock = ({
       return;
     }
 
-    monaco.editor.defineTheme('inngest-theme', {
-      base: dark ? 'vs-dark' : 'vs',
-      inherit: true,
-      rules: dark ? createRules(true) : createRules(false),
-      colors: dark ? createColors(true) : createColors(false),
-    });
+    const applyTheme = () => {
+      // Stylesheets can finish loading after Monaco initializes on a cold page.
+      // Keep its built-in colors until tokens exist, then resolve the real theme.
+      const themeRoot = dark
+        ? document.querySelector('.dark') || document.documentElement
+        : document.documentElement;
+      const tokensReady = !!getComputedStyle(themeRoot)
+        .getPropertyValue('--color-background-codeEditor')
+        .trim();
+      monaco.editor.defineTheme('inngest-theme', {
+        base: dark ? 'vs-dark' : 'vs',
+        inherit: true,
+        rules: tokensReady ? createRules(dark) : [],
+        colors: tokensReady ? createColors(dark) : {},
+      });
+    };
+    applyTheme();
+    const onStylesheetLoad = (event: Event) => {
+      if (event.target instanceof HTMLLinkElement && event.target.rel === 'stylesheet') {
+        applyTheme();
+      }
+    };
+    document.addEventListener('load', onStylesheetLoad, true);
 
     monaco.languages.register({ id: 'shell' });
     monaco.languages.setMonarchTokensProvider('shell', shellLanguageTokens);
@@ -81,6 +98,7 @@ const CommandBlock = ({
       noSyntaxValidation: true,
       noSuggestionDiagnostics: true,
     });
+    return () => document.removeEventListener('load', onStylesheetLoad, true);
   }, [monaco, dark]);
 
   const handleEditorDidMount = (editor: MonacoEditorType) => {

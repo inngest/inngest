@@ -732,3 +732,12 @@ export const GET_EVENT_RUNS = gql`
     }
   }
 `;
+
+// Local onboarding observes existing run state; invocation still uses InvokeFunction.
+export const QUICKSTART_RUNS = gql`query QuickstartRuns($functionIDs: [UUID!]!, $from: Time!, $status: [FunctionRunStatus!]) {
+  runs(first: 20, filter: { functionIDs: $functionIDs, from: $from, status: $status, timeField: QUEUED_AT },
+    orderBy: [{ field: QUEUED_AT, direction: DESC }]) {
+    edges { node { id appID status queuedAt endedAt function { id name slug } } }
+    pageInfo { hasNextPage }
+  }
+}`;

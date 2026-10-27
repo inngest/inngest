@@ -72,6 +72,7 @@ function RunsComponent() {
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
+  const [runID] = useSearchParam('runID');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
 
@@ -226,6 +227,7 @@ function RunsComponent() {
         }
       />
       <RunsPage
+        initialExpandedRunID={runID || undefined}
         apps={appsRes.data?.apps || []}
         data={runs ?? []}
         defaultVisibleColumns={[

@@ -1226,3 +1226,12 @@ export type GetEventV2RunsQueryVariables = Exact<{
 
 
 export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string }, trace: { __typename?: 'RunTraceSpan', skipReason: string | null, skipExistingRunID: string | null } | null }> } };
+
+export type QuickstartRunsQueryVariables = Exact<{
+  functionIDs: Array<Scalars['UUID']> | Scalars['UUID'];
+  from: Scalars['Time'];
+  status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+}>;
+
+
+export type QuickstartRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', id: any, appID: any, status: FunctionRunStatus, queuedAt: any, endedAt: any | null, function: { __typename?: 'Function', id: string, name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean } } };

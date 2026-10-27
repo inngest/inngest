@@ -50,6 +50,7 @@ import type { Run, ViewScope } from './types';
 
 type Props = {
   data: Run[];
+  initialExpandedRunID?: string;
   toolbarActions?: React.ReactNode;
   renderRunAction?: React.ComponentProps<typeof RunDetailsV4>['renderRunAction'];
   defaultVisibleColumns?: ColumnID[];
@@ -89,6 +90,7 @@ export function RunsPage({
   defaultVisibleColumns,
   getTrigger,
   data,
+  initialExpandedRunID,
   features,
   hasMore,
   isLoadingInitial,
@@ -470,6 +472,7 @@ export function RunsPage({
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         <RunsTable
           data={data}
+          initialExpandedRunID={initialExpandedRunID}
           isLoading={isLoadingInitial}
           error={error}
           onRefresh={onRefresh}

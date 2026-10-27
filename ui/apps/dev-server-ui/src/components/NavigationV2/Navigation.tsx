@@ -1,6 +1,6 @@
 import { useAppsSyncingError } from '@/hooks/useAppsSyncingError';
 import NavSection from './NavSection';
-import { ai, setup, workflow } from './navItems';
+import { ai, workflow } from './navItems';
 
 export default function Navigation({ collapsed }: { collapsed: boolean }) {
   const hasSyncingError = useAppsSyncingError();
@@ -18,7 +18,6 @@ export default function Navigation({ collapsed }: { collapsed: boolean }) {
         first
       />
       <NavSection group={ai} collapsed={collapsed} />
-      <NavSection group={setup} collapsed={collapsed} />
     </div>
   );
 }

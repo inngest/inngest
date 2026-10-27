@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react';
-import { MCPIcon } from '@inngest/components/icons/sections/AI';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
@@ -42,9 +41,4 @@ export const ai: NavGroupConfig = {
     { label: 'Experiments', href: '/ai/experiments', Icon: ExperimentsIcon },
     { label: 'Scores', href: '/ai/scores', Icon: ScoresIcon },
   ],
-};
-
-export const setup: NavGroupConfig = {
-  heading: 'Setup',
-  items: [{ label: 'MCP', href: '/mcp/setup', Icon: MCPIcon }],
 };

@@ -1,6 +1,7 @@
 # GraphQL generated files
 **/src/gql/
 **/src/store/generated.ts
+apps/dev-server-ui/src/store/generated-types.ts
 
 routeTree.gen.ts
 
