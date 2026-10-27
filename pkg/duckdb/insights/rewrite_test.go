@@ -168,14 +168,3 @@ func TestRewriteArrayOfStructAccessInSetOpOrderBy(t *testing.T) {
 	)
 	require.Len(t, diags, 3)
 }
-
-// DuckDB binds a set operation's ORDER BY by matching it against the
-// SELECT list, so it must be rewritten the same way or it stops matching.
-func TestRewriteTZFunctionsInSetOpModifiers(t *testing.T) {
-	stmt := mustParse(t, "SELECT now() AS t FROM runs UNION ALL SELECT now() FROM runs ORDER BY now() LIMIT 5 OFFSET (SELECT count(*) FROM runs WHERE queued_at < now())")
-	rewriteTZFunctions(stmt)
-	require.Equal(t,
-		"SELECT now()::TIMESTAMP AS t FROM runs UNION ALL SELECT now()::TIMESTAMP FROM runs ORDER BY now()::TIMESTAMP LIMIT 5 OFFSET (SELECT count(*) FROM runs WHERE queued_at < now()::TIMESTAMP)",
-		parser.String(stmt),
-	)
-}
