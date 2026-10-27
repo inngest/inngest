@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/execution"
@@ -128,4 +129,42 @@ func TestReceiveScopedSignal(t *testing.T) {
 		res := scopedSignalRequest(t, r, "anything", `{"signal":"x"}`)
 		require.Equal(t, http.StatusNotFound, res.Code)
 	})
+}
+
+func TestReceiveScopedSignalRejectsForgedTokens(t *testing.T) {
+	secret := []byte("test-secret")
+	exec := &fakeSignalExecutor{matched: true}
+	r := chi.NewRouter()
+	AddRoutes(r, Opts{Executor: exec, SignalJWTSecret: secret})
+	body := `{"signal":"build:1","data":{}}`
+
+	good, err := apiv1auth.CreateSignalJWT(secret, uuid.New(), "build:1", time.Now().Add(time.Hour))
+	require.NoError(t, err)
+
+	t.Run("tampered signature", func(t *testing.T) {
+		require.Equal(t, http.StatusUnauthorized, scopedSignalRequest(t, r, good[:len(good)-2]+"xx", body).Code)
+	})
+
+	t.Run("alg none", func(t *testing.T) {
+		unsigned := jwt.NewWithClaims(jwt.SigningMethodNone, apiv1auth.SignalClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    apiv1auth.SignalClaimsIssuer,
+				Subject:   apiv1auth.SignalClaimsSubject,
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+			},
+			Env:      uuid.New(),
+			SignalID: "build:1",
+		})
+		token, err := unsigned.SignedString(jwt.UnsafeAllowNoneSignatureType)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusUnauthorized, scopedSignalRequest(t, r, token, body).Code)
+	})
+
+	t.Run("nil environment", func(t *testing.T) {
+		token, err := apiv1auth.CreateSignalJWT(secret, uuid.Nil, "build:1", time.Now().Add(time.Hour))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusUnauthorized, scopedSignalRequest(t, r, token, body).Code)
+	})
+
+	require.Empty(t, exec.calls)
 }

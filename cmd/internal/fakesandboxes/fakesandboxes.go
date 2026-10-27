@@ -40,7 +40,12 @@ const (
 	// maxSleepSeconds and maxFloodKiB bound what a script statement may do.
 	maxSleepSeconds = 3600
 	maxFloodKiB     = 1024
+	maxStatements   = 64
+	maxBodyBytes    = 1 << 20
 )
+
+// signalClient bounds each send so a stalled API cannot leak a supervisor.
+var signalClient = &http.Client{Timeout: 10 * time.Second}
 
 // Server serves the sandbox routes the SDK uses.
 type Server struct {
@@ -155,7 +160,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&body); err != nil || body.Name == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "name is required")
 		return
 	}
@@ -243,7 +248,7 @@ func (s *Server) startProcess(w http.ResponseWriter, r *http.Request) {
 		Command  []string `json:"command"`
 		SignalID *string  `json:"signalId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Command) == 0 {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&body); err != nil || len(body.Command) == 0 {
 		writeError(w, http.StatusBadRequest, "invalid_request", "command is required")
 		return
 	}
@@ -362,6 +367,9 @@ func script(command []string) []string {
 	}
 	var statements []string
 	for _, line := range strings.FieldsFunc(text, func(r rune) bool { return r == ';' || r == '\n' }) {
+		if len(statements) == maxStatements {
+			break
+		}
 		if line = strings.TrimSpace(line); line != "" {
 			statements = append(statements, line)
 		}
@@ -493,7 +501,7 @@ func (s *Server) post(token, signalID string, payload map[string]any, retry bool
 		if err == nil {
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("Content-Type", "application/json")
-			if res, err := http.DefaultClient.Do(req); err == nil {
+			if res, err := signalClient.Do(req); err == nil {
 				status = res.StatusCode
 				_, _ = io.Copy(io.Discard, res.Body)
 				_ = res.Body.Close()

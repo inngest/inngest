@@ -17,8 +17,9 @@ import (
 
 // maxScopedSignalBodyBytes bounds the body of a token-authenticated signal. The
 // token holder is not a trusted API client, so the body is capped well below
-// the general request limits.
-const maxScopedSignalBodyBytes = 64 * 1024
+// the general request limits. Two 8 KiB output tails can grow to about 96 KiB
+// once JSON escapes control characters, so the cap leaves room for that.
+const maxScopedSignalBodyBytes = 256 * 1024
 
 type ReceiveSignalRequest struct {
 	Signal string          `json:"signal"`
@@ -70,7 +71,10 @@ func (a router) receiveScopedSignal(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		// Reject trailing data after the one JSON value.
 		if _, extra := decoder.Token(); extra != io.EOF {
-			err = errors.New("unexpected data after signal body")
+			err = extra
+			if err == nil {
+				err = errors.New("unexpected data after signal body")
+			}
 		}
 	}
 	if err != nil {
