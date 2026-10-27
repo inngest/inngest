@@ -22,7 +22,7 @@ func quackKind(t schema.Type) driver.QuackColumnKind {
 	case schema.TypeJSON:
 		return driver.QuackColumnJSON
 	case schema.TypeTimestamp:
-		return driver.QuackColumnTimestampMS
+		return driver.QuackColumnTimestampTZ
 	case schema.TypeBool:
 		return driver.QuackColumnBool
 	case schema.TypeBigint:

@@ -227,7 +227,7 @@ func keyList(q AggregateQuery) []string {
 	for i, k := range q.GroupBy {
 		expr := quoteIdent(k.Column)
 		if k.Bucket > 0 {
-			expr = fmt.Sprintf("CAST(time_bucket(INTERVAL %d SECOND, %s) AS TIMESTAMP_MS)", int64(k.Bucket/time.Second), expr)
+			expr = fmt.Sprintf("CAST(time_bucket(INTERVAL %d SECOND, %s) AS TIMESTAMPTZ)", int64(k.Bucket/time.Second), expr)
 		}
 		out[i] = expr + " AS " + quoteIdent(k.As)
 	}

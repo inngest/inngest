@@ -61,7 +61,7 @@ var (
 		duckdbdriver.QuackColumnVarchar,     // defer_parent_fn_slug
 		duckdbdriver.QuackColumnVarchar,     // defer_parent_run_ids — VARCHAR[], same array-literal text as event_ids
 		duckdbdriver.QuackColumnVarchar,     // trace_id
-		duckdbdriver.QuackColumnTimestampMS, // bucket_at
+		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	spanColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, run_id, run_queued_at
@@ -70,13 +70,13 @@ var (
 		duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnTimestampTZ, // start_time, end_time
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // trace_id, span_id, parent_span_id
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnJSON, // attributes, output, input
-		duckdbdriver.QuackColumnTimestampMS, // bucket_at
+		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	eventColumns = []duckdbdriver.QuackColumnKind{
 		duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnUUID, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, // account_id, env_id, internal_id, received_at
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // source, source_id, event_id, event_name
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnTimestampTZ, duckdbdriver.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
-		duckdbdriver.QuackColumnTimestampMS, // bucket_at
+		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
 	// (BOOLEAN) have no native duckdbdriver.QuackColumnKind — see that type's own
