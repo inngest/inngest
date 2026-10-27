@@ -67,8 +67,8 @@ func TestVerifyChecksumMismatchFails(t *testing.T) {
 }
 
 // buildFakeArchive builds a .tar.gz archive containing one entry, mirroring
-// the shape of a real duckdb-cli-<dist>.tar.gz release from the nightly
-// channel (a single top-level file, no directory prefix).
+// the shape of a real duckdb-cli-<dist>.tar.gz release from GitHub
+// (a single top-level file, no directory prefix).
 func buildFakeArchive(t *testing.T, entryName string, contents []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -156,7 +156,7 @@ func TestEnsureBinaryPublicWrapperUsesCache(t *testing.T) {
 	}
 }
 
-// testInstallServer stands in for the nightly distribution server, serving
+// testInstallServer stands in for the GitHub release downloads, serving
 // archive at <server>/<assetName>, so these tests never hit the real
 // network.
 func testInstallServer(t *testing.T, assetName string, archive []byte) (baseURL string) {
