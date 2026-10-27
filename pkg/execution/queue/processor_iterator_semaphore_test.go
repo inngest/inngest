@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,8 +35,8 @@ func semaphoreTestItem(accountID, envID, fnID uuid.UUID, at time.Time, sems ...c
 }
 
 // semaphoreLeaser mimics queueProcessor.LeaseItem for items whose semaphores are
-// in exhausted.  an exhausted app semaphore stops the iterator, an exhausted fn
-// semaphore skips the item, anything else is dispatched.
+// in exhausted.  an exhausted semaphore skips the item, anything else is
+// dispatched.
 func semaphoreLeaser(exhausted map[string]constraintapi.SemaphoreConstraint, calls *int32) QueueItemLeaser {
 	return mockQueueItemLeaser{
 		fn: func(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
@@ -50,11 +49,7 @@ func semaphoreLeaser(exhausted map[string]constraintapi.SemaphoreConstraint, cal
 				}
 			}
 			if len(hit) > 0 {
-				res := LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited, ExhaustedSemaphores: hit}
-				if hasAppSemaphore(hit) {
-					return res, fmt.Errorf("semaphore hit: %w", ErrProcessNoUserConstraintCapacity)
-				}
-				return res, nil
+				return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited, ExhaustedSemaphores: hit}, nil
 			}
 
 			_, err := dispatch(ctx, ProcessItem{I: *req.Item})
@@ -63,7 +58,10 @@ func semaphoreLeaser(exhausted map[string]constraintapi.SemaphoreConstraint, cal
 	}
 }
 
-func TestProcessorIteratorStopsOnExhaustedAppSemaphore(t *testing.T) {
+// an app that moves from connect to serve keeps the app semaphore on items of
+// runs started under connect, while items of new runs carry none.  the exhausted
+// app semaphore must not block those items.
+func TestProcessorIteratorMemoizesExhaustedAppSemaphore(t *testing.T) {
 	ctx := context.Background()
 
 	accountID, envID, fnID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -88,9 +86,12 @@ func TestProcessorIteratorStopsOnExhaustedAppSemaphore(t *testing.T) {
 		opts:      opts,
 	}
 
-	items := make([]*QueueItem, 5)
-	for i := range items {
-		items[i] = semaphoreTestItem(accountID, envID, fnID, at, appSem)
+	items := []*QueueItem{
+		semaphoreTestItem(accountID, envID, fnID, at, appSem), // exhausted, one round trip
+		semaphoreTestItem(accountID, envID, fnID, at),         // no semaphore, dispatched
+		semaphoreTestItem(accountID, envID, fnID, at, appSem), // memo hit, no round trip
+		semaphoreTestItem(accountID, envID, fnID, at, appSem), // memo hit, no round trip
+		semaphoreTestItem(accountID, envID, fnID, at),         // no semaphore, dispatched
 	}
 
 	var calls int32
@@ -110,15 +111,16 @@ func TestProcessorIteratorStopsOnExhaustedAppSemaphore(t *testing.T) {
 
 	require.NoError(t, iter.Iterate(ctx))
 
-	// the first item stops the pass.  no other item reaches the leaser.
-	require.Equal(t, int32(1), atomic.LoadInt32(&calls))
-	require.Equal(t, int32(1), iter.CtrConcurrency.Load())
-	require.Equal(t, int32(0), iter.CtrSuccess.Load())
+	// items 1, 2 and 5 reach the leaser.  items 3 and 4 are answered by the memo.
+	require.Equal(t, int32(3), atomic.LoadInt32(&calls))
+	require.Equal(t, int32(3), iter.CtrConcurrency.Load())
+	require.Equal(t, int32(2), iter.CtrSuccess.Load())
 	require.True(t, iter.IsSemaphoreLimitOnly.Load())
 	require.True(t, iter.IsRequeuable())
+	require.Len(t, mockProc.workers, 2)
 
-	// the remaining four items are bulk stamped like a concurrency limit.
-	require.Equal(t, int32(4), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+	// the pass is not stopped, so no remaining items are bulk stamped.
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
 }
 
 func TestProcessorIteratorMemoizesExhaustedFnSemaphores(t *testing.T) {
