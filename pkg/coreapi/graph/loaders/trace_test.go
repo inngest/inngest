@@ -15,8 +15,6 @@ import (
 )
 
 func TestStepStatusToGQL(t *testing.T) {
-	tr := &traceReader{}
-
 	tests := []struct {
 		name     string
 		input    enums.StepStatus
@@ -39,14 +37,14 @@ func TestStepStatusToGQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status := tt.input
-			result := tr.stepStatusToGQL(&status)
+			result := stepStatusToGQL(&status)
 			require.NotNil(t, result, "stepStatusToGQL should not return nil for %s", tt.name)
 			assert.Equal(t, tt.expected, *result)
 		})
 	}
 
 	t.Run("nil input", func(t *testing.T) {
-		result := tr.stepStatusToGQL(nil)
+		result := stepStatusToGQL(nil)
 		assert.Nil(t, result)
 	})
 }
@@ -105,13 +103,46 @@ func TestConvertRunSpanToGQL_CustomConcurrencyKeys(t *testing.T) {
 		Attributes:  &meta.ExtractedValues{CustomConcurrencyKeys: &keys},
 	}
 
-	result, err := (&traceReader{}).convertRunSpanToGQL(context.Background(), span)
-	require.NoError(t, err)
-	assert.Equal(t, keys, result.CustomConcurrencyKeys)
+	for name, convert := range runConverters {
+		t.Run(name, func(t *testing.T) {
+			result, err := convert(context.Background(), span)
+			require.NoError(t, err)
+			assert.Equal(t, keys, result.CustomConcurrencyKeys)
+		})
+	}
+}
+
+// TestConvertRunSpanToGQL_MetadataIsUser checks both converters map isUser,
+// so a user and an internal kind w/ the same prefix-stripped name (as DuckDB
+// returns them) stay distinct.
+func TestConvertRunSpanToGQL_MetadataIsUser(t *testing.T) {
+	converters := map[string]func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error){
+		"dynamic": convertDynamicRunSpanToGQL,
+		"flat":    convertFlatRunSpanToGQL,
+	}
+	for name, convert := range converters {
+		t.Run(name, func(t *testing.T) {
+			span := &cqrs.OtelSpan{
+				RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun},
+				Attributes:  &meta.ExtractedValues{},
+				Metadata: []*cqrs.SpanMetadata{
+					{Scope: enums.MetadataScopeRun, Kind: "score", IsUser: true, Values: metadata.Values{}},
+					{Scope: enums.MetadataScopeRun, Kind: "score", IsUser: false, Values: metadata.Values{}},
+				},
+			}
+
+			result, err := convert(context.Background(), span)
+			require.NoError(t, err)
+			require.Len(t, result.Metadata, 2)
+			assert.Equal(t, metadata.Kind("score"), result.Metadata[0].Kind)
+			assert.True(t, result.Metadata[0].IsUser)
+			assert.Equal(t, metadata.Kind("score"), result.Metadata[1].Kind)
+			assert.False(t, result.Metadata[1].IsUser)
+		})
+	}
 }
 
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
-	tr := &traceReader{}
 	ctx := context.Background()
 
 	t.Run("leaf userland span is preserved", func(t *testing.T) {
@@ -129,7 +160,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "leaf userland span should not be dropped")
 		assert.True(t, result.ChildrenSpans[0].IsUserland)
@@ -160,7 +191,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "should collapse to grandchild")
 		assert.Equal(t, "GET", result.ChildrenSpans[0].Name)
@@ -190,7 +221,7 @@ func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "should keep the userland span")
 		assert.Equal(t, "my-span", result.ChildrenSpans[0].Name)
@@ -204,7 +235,7 @@ func TestConvertRunSpan(t *testing.T) {
 	status := enums.StepStatusCompleted
 	queuedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 
-	result, err := ConvertRunSpan(context.Background(), &cqrs.OtelSpan{
+	result, err := convertDynamicRunSpanToGQL(context.Background(), &cqrs.OtelSpan{
 		RawOtelSpan: cqrs.RawOtelSpan{
 			Name:      meta.SpanNameRun,
 			SpanID:    "run-span",
@@ -224,7 +255,6 @@ func TestConvertRunSpan(t *testing.T) {
 }
 
 func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
-	tr := &traceReader{}
 	ctx := context.Background()
 	now := time.Now()
 
@@ -271,7 +301,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "only the visible step child")
 		assert.Len(t, result.ChildrenSpans[0].Metadata, 1, "step should have promoted metadata")
@@ -316,7 +346,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 2, "two visible step children")
 
@@ -376,7 +406,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 
 		// Find the visible step span (not the discovery)
@@ -423,7 +453,7 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, span)
+		result, err := convertDynamicRunSpanToGQL(ctx, span)
 		require.NoError(t, err)
 		require.Len(t, result.ChildrenSpans, 1, "only the visible step")
 		assert.Empty(t, result.ChildrenSpans[0].Metadata, "step should not have trailing discovery metadata")
@@ -431,7 +461,6 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 }
 
 func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
-	tr := &traceReader{}
 	ctx := context.Background()
 
 	completed := enums.StepStatusCompleted
@@ -470,7 +499,7 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, discovery)
+		result, err := convertDynamicRunSpanToGQL(ctx, discovery)
 		require.NoError(t, err)
 		assert.Equal(t, FinalizationSpanName, result.Name)
 		assert.Nil(t, result.StepID, "finalization group must not carry a step ID")
@@ -492,7 +521,7 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 			},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, discovery)
+		result, err := convertDynamicRunSpanToGQL(ctx, discovery)
 		require.NoError(t, err)
 		assert.Equal(t, FinalizationSpanName, result.Name)
 		assert.Nil(t, result.StepID)
@@ -514,7 +543,7 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 			Children: []*cqrs.OtelSpan{child},
 		}
 
-		result, err := tr.convertRunSpanToGQL(ctx, step)
+		result, err := convertDynamicRunSpanToGQL(ctx, step)
 		require.NoError(t, err)
 		assert.Equal(t, "my-step", result.Name)
 		require.NotNil(t, result.StepID)

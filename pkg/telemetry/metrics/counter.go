@@ -789,6 +789,17 @@ func IncrMetadataSpansTotal(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+// IncrMetadataNonSetOpsTotal records a metadata write that came in w/ an op
+// other than set. Every metadata span is written as a set regardless.
+func IncrMetadataNonSetOpsTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_non_set_ops_total",
+		Description: "Total number of metadata writes received w/ an op other than set",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConstraintAPIScavengerTotalAccountsCounter(ctx context.Context, count int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, count, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -1086,6 +1097,37 @@ func IncrDefersRejectedCounter(ctx context.Context, reason string, opts CounterO
 		PkgName:     opts.PkgName,
 		MetricName:  "defers_rejected_total",
 		Description: "Total number of defers soft-rejected at write time, tagged by reason",
+		Tags:        opts.Tags,
+	})
+}
+
+// IncrMetadataLegacySplitsTotal records a legacy multi key inngest.score or
+// inngest.warnings write that got split into one span per score/warning.
+func IncrMetadataLegacySplitsTotal(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "metadata_legacy_splits_total",
+		Description: "Total number of legacy multi key score/warning metadata writes split into per name kinds",
+		Tags:        opts.Tags,
+	})
+}
+
+// IncrInsightsQueryCounter records one duckdbInsightsQuery GQL call, tagged
+// by status ("ok", "parse_error", "validation_error", "execution_error") --
+// the only per-query observability this resolver has today, so this and the
+// two insights histograms (HistogramInsightsQueryDuration/RowCount) are
+// meant to answer "is this new query surface being abused/regressing" from
+// one place rather than requiring a log dive.
+func IncrInsightsQueryCounter(ctx context.Context, status string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+	opts.Tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "insights_query_total",
+		Description: "Total number of insights queries executed, tagged by outcome status",
 		Tags:        opts.Tags,
 	})
 }

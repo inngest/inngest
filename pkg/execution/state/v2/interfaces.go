@@ -61,6 +61,10 @@ type RunService interface {
 	// version after communicating with the SDK.
 	UpdateMetadata(ctx context.Context, id ID, config MutableConfig) error
 	// SaveStep saves step output for the given run ID and step ID.
+	//
+	// If the step already has exactly this output, this returns ErrIdempotentResponse
+	// (w/ an accurate hasPending) and nothing new is written.  Callers should
+	// generally treat that as already saved.
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
 	// SavePending saves pending step IDs for the given run ID.
 	SavePending(ctx context.Context, id ID, pending []string) error

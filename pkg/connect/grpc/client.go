@@ -75,13 +75,8 @@ func (m *GRPCClientManager[T]) GetOrCreateClient(ctx context.Context, key string
 	}
 	m.mu.RUnlock()
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if client, exists := m.clients[key]; exists {
-		return client, nil
-	}
-
+	// Dial and ping without holding the map lock so an unreachable peer cannot
+	// block lookups or client creation for unrelated peers.
 	m.logger.Info("grpc client not found, creating one dynamically", "key", key)
 
 	conn, err := m.dialer(grpcURL, grpcLib.WithTransportCredentials(insecure.NewCredentials()))
@@ -109,8 +104,18 @@ func (m *GRPCClientManager[T]) GetOrCreateClient(ctx context.Context, key string
 		return zero, fmt.Errorf("unexpected ping response from %s: %s", grpcURL, result.GetMessage())
 	}
 
+	m.mu.Lock()
+	if existing, exists := m.clients[key]; exists {
+		m.mu.Unlock()
+		if closeErr := conn.Close(); closeErr != nil {
+			m.logger.Error("failed to close duplicate grpc connection", "url", grpcURL, "error", closeErr)
+		}
+		return existing, nil
+	}
+
 	m.clients[key] = client
 	m.connections[key] = conn
+	m.mu.Unlock()
 	return client, nil
 }
 

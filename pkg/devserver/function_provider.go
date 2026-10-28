@@ -5,17 +5,21 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
 type cqrsFunctionProvider struct {
-	reader functionProviderReader
-	apps   cqrs.AppReader
+	reader   functionProviderReader
+	apps     cqrs.AppReader
+	pauses   *functionPauses
+	unpauser queue.Unpauser
 }
 
 type functionProviderReader interface {
@@ -26,21 +30,50 @@ type functionProviderReader interface {
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
 // app-scoped slug or UUID using the given function reader.
-func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
+func NewFunctionProvider(reader functionProviderReader, pauses *functionPauses, unpauser queue.Unpauser) *cqrsFunctionProvider {
+	if pauses == nil {
+		pauses = &functionPauses{}
+	}
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {
 		apps = appReader
 	}
 
 	return &cqrsFunctionProvider{
-		reader: reader,
-		apps:   apps,
+		reader:   reader,
+		apps:     apps,
+		pauses:   pauses,
+		unpauser: unpauser,
 	}
+}
+
+func (p *cqrsFunctionProvider) PauseFunction(_ context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+	fn.PausedAt = p.pauses.pause(fn.ID)
+	return fn, nil
+}
+
+func (p *cqrsFunctionProvider) ResumeFunction(ctx context.Context, fn inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+	if p.unpauser == nil {
+		return inngest.DeployedFunction{}, fmt.Errorf("queue unpauser is not configured")
+	}
+	// Always wake the queue so a retry can recover a failed wake.
+	if err := p.pauses.resume(fn.ID, func() error {
+		return p.unpauser.UnpauseFunction(ctx, consts.DefaultQueueShardName, queue.Scope{
+			AccountID: fn.AccountID, EnvID: fn.EnvironmentID, FunctionID: fn.ID,
+		})
+	}); err != nil {
+		return inngest.DeployedFunction{}, err
+	}
+	fn.PausedAt = time.Time{}
+	return fn, nil
 }
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
 	if fnID, err := uuid.Parse(identifier); err == nil {
 		if fn, err := p.reader.GetFunctionByInternalUUID(ctx, fnID); err == nil {
+			if fn.EnvID != uuid.Nil && fn.EnvID != consts.DevServerEnvID {
+				return inngest.DeployedFunction{}, apiv2.ErrFunctionNotFound
+			}
 			return p.toDeployedFunction(ctx, fn)
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return inngest.DeployedFunction{}, err
@@ -53,6 +86,10 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	}
 	for _, fn := range fns {
 		if fn.Slug == identifier || fn.ID.String() == identifier {
+			// The single-tenant local store represents its environment as nil.
+			if fn.EnvID != uuid.Nil && fn.EnvID != consts.DevServerEnvID {
+				continue
+			}
 			return p.toDeployedFunction(ctx, fn)
 		}
 	}
@@ -64,7 +101,13 @@ func (p *cqrsFunctionProvider) GetFunctionByApp(ctx context.Context, appID strin
 	if err != nil {
 		return inngest.DeployedFunction{}, err
 	}
-	return p.findFunctionInApp(ctx, fns, appID, functionID)
+	local := make([]*cqrs.Function, 0, len(fns))
+	for _, fn := range fns {
+		if fn.EnvID == uuid.Nil || fn.EnvID == consts.DevServerEnvID {
+			local = append(local, fn)
+		}
+	}
+	return p.findFunctionInApp(ctx, local, appID, functionID)
 }
 
 func (p *cqrsFunctionProvider) GetFunctions(ctx context.Context, appID string, opts apiv2.GetFunctionsOpts) (*apiv2.GetFunctionsResult, error) {
@@ -161,6 +204,8 @@ func (p *cqrsFunctionProvider) toDeployedFunction(ctx context.Context, fn *cqrs.
 		AccountID:     consts.DevServerAccountID,
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,
+		PausedAt:      p.pauses.get(fn.ID),
+		ArchivedAt:    fn.ArchivedAt,
 	}, nil
 }
 
@@ -178,6 +223,7 @@ func (p *cqrsFunctionProvider) toDeployedFunctionWithAppName(fn *cqrs.Function, 
 		AccountID:     consts.DevServerAccountID,
 		EnvironmentID: consts.DevServerEnvID,
 		Function:      *inngestFn,
+		PausedAt:      p.pauses.get(fn.ID),
 		ArchivedAt:    fn.ArchivedAt,
 	}, nil
 }

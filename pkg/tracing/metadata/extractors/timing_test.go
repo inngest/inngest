@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/inngest/go-httpstat"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
@@ -15,11 +14,6 @@ import (
 func TestTimingMetadata_Kind(t *testing.T) {
 	md := TimingMetadata{}
 	assert.Equal(t, metadata.Kind("inngest.timing"), md.Kind())
-}
-
-func TestTimingMetadata_Op(t *testing.T) {
-	md := TimingMetadata{}
-	assert.Equal(t, enums.MetadataOpcodeMerge, md.Op())
 }
 
 func TestTimingMetadata_Serialize(t *testing.T) {

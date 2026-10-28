@@ -45,6 +45,11 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// CapacityReleaseWakeEnabled controls whether Redis partitions are woken, and
+// skip cached constraint exhaustion on their next scan, after capacity is
+// released for an account.
+type CapacityReleaseWakeEnabled func(ctx context.Context, accountID uuid.UUID) bool
+
 // BypassArchivedWorkspaceAppSemaphore reports whether the app semaphore may be
 // omitted so an item for an archived workspace can reach executor cleanup.
 type BypassArchivedWorkspaceAppSemaphore func(ctx context.Context, accountID, workspaceID uuid.UUID) bool
@@ -597,6 +602,7 @@ type QueueOptions struct {
 	AcquireCapacityLeaseOnBacklogRefill bool
 	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
 	BypassArchivedWorkspaceAppSemaphore BypassArchivedWorkspaceAppSemaphore
+	CapacityReleaseWakeEnabled          CapacityReleaseWakeEnabled
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -787,6 +793,14 @@ func WithDisableSemaphoreConstraintChecks(f DisableSemaphoreConstraintChecks) Qu
 func WithBypassArchivedWorkspaceAppSemaphore(f BypassArchivedWorkspaceAppSemaphore) QueueOpt {
 	return func(q *QueueOptions) {
 		q.BypassArchivedWorkspaceAppSemaphore = f
+	}
+}
+
+// WithCapacityReleaseWakeEnabled gates CapacityReleaseNotifier wakes per
+// account. When unset, wakes are disabled for every account.
+func WithCapacityReleaseWakeEnabled(f CapacityReleaseWakeEnabled) QueueOpt {
+	return func(q *QueueOptions) {
+		q.CapacityReleaseWakeEnabled = f
 	}
 }
 

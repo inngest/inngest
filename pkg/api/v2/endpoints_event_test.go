@@ -341,3 +341,47 @@ func TestHTTPGateway_SendEventBodyLimitDoesNotApplyToOtherRoutes(t *testing.T) {
 
 	require.NotEqual(t, http.StatusRequestEntityTooLarge, recorder.Code)
 }
+
+func TestHTTPGateway_RequestBodyLimitsNormalizePaths(t *testing.T) {
+	for _, tc := range []struct {
+		path  string
+		body  string
+		limit int
+	}{
+		{"/api/v2/events/", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
+		{"/v2/events", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
+		{"/v2/apps/my-app/functions/orders-created/replays", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
+		{"/api/v2/apps/my-app/functions/orders-created/replays/", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
+	} {
+		for _, streamed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/streamed=%t", tc.path, streamed), func(t *testing.T) {
+				sender := &testEventSender{}
+				provider := &mockReplayProvider{}
+				handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send, Replays: provider}, HTTPHandlerOptions{})
+				require.NoError(t, err)
+				req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(strings.Repeat(" ", tc.limit)+tc.body))
+				if streamed {
+					req.ContentLength = -1
+				}
+				req.Header.Set("Content-Type", "application/json")
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, req)
+				require.Equal(t, http.StatusRequestEntityTooLarge, recorder.Code, recorder.Body.String())
+				require.Nil(t, sender.event)
+				require.Empty(t, provider.Calls)
+			})
+		}
+	}
+}
+
+func TestHTTPGateway_TrailingSlashRemainsNotFound(t *testing.T) {
+	sender := &testEventSender{}
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/events/", strings.NewReader(`{"name":"test/event"}`))
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+	require.Nil(t, sender.event)
+}

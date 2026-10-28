@@ -396,6 +396,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     metadata {
       scope
       kind
+      isUser
       values
       updatedAt
     }
@@ -407,6 +408,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     stepID
     stepOp
     stepType
+    groupKind
+    origin
     stepInfo {
       __typename
       ... on InvokeStepInfo {
@@ -443,6 +446,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
   }
 `;
 
+// Deep enough for three levels of span groups:
+// run → group → group → group → step → attempt → userland → userland.
 export const GET_RUN = gql`
   query GetRun($runID: String!) {
     run(runID: $runID) {
@@ -466,6 +471,15 @@ export const GET_RUN = gql`
               ...TraceDetails
               childrenSpans {
                 ...TraceDetails
+                childrenSpans {
+                  ...TraceDetails
+                  childrenSpans {
+                    ...TraceDetails
+                    childrenSpans {
+                      ...TraceDetails
+                    }
+                  }
+                }
               }
             }
           }
@@ -715,6 +729,43 @@ export const GET_EVENT_RUNS = gql`
           skipReason
           skipExistingRunID
         }
+      }
+    }
+  }
+`;
+
+export const EXECUTE_INSIGHTS_QUERY = gql`
+  query ExecuteInsightsQuery($sql: String!) {
+    insights(sql: $sql) {
+      columns {
+        name
+        type
+        pathHints {
+          path {
+            key
+            wildcard
+          }
+          hint
+        }
+      }
+      rows
+      info {
+        primaryTable
+        tables
+        limited
+      }
+      diagnostics {
+        start {
+          line
+          column
+        }
+        end {
+          line
+          column
+        }
+        severity
+        code
+        message
       }
     }
   }

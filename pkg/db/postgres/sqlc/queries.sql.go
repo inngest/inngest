@@ -2601,16 +2601,26 @@ INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, stat
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT(id) DO UPDATE SET
     name = CASE WHEN excluded.name = '' THEN apps.name ELSE excluded.name END,
-    sdk_language = excluded.sdk_language,
-    sdk_version = excluded.sdk_version,
-    framework = excluded.framework,
-    metadata = excluded.metadata,
-    status = excluded.status,
-    error = excluded.error,
-    checksum = excluded.checksum,
+    -- Placeholder (name='') hitting an active named row must not blank the
+    -- registration. The checksum short-circuit then returns without writing
+    -- these columns back. An archived row takes the incoming values; error
+    -- and checksum below also drop so revival cannot short-circuit.
+    sdk_language = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.sdk_language ELSE excluded.sdk_language END,
+    sdk_version  = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.sdk_version ELSE excluded.sdk_version END,
+    framework    = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.framework ELSE excluded.framework END,
+    metadata     = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.metadata ELSE excluded.metadata END,
+    status       = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.status ELSE excluded.status END,
+    error = CASE
+      WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.error
+      ELSE excluded.error
+    END,
+    checksum = CASE
+      WHEN excluded.checksum = '' AND apps.archived_at IS NULL THEN apps.checksum
+      ELSE excluded.checksum
+    END,
     archived_at = NULL,
-    "method" = excluded.method,
-    app_version = excluded.app_version,
+    "method" = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.method ELSE excluded.method END,
+    app_version = CASE WHEN excluded.name = '' AND apps.name <> '' AND apps.archived_at IS NULL THEN apps.app_version ELSE excluded.app_version END,
     url = excluded.url
 RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version
 `

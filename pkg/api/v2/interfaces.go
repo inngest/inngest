@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	v2pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
@@ -85,6 +86,12 @@ type EventPublisher interface {
 }
 
 type EventSender func(context.Context, *event.Event) (string, error)
+
+type FunctionPauser interface {
+	// idempotent pause and resume; may apply asynchronously
+	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+	ResumeFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
+}
 
 type GetRunOpts struct {
 	IncludeOutput bool
@@ -165,6 +172,27 @@ type GetRunsResult struct {
 	Runs    []*RunListItem
 	Cursor  string
 	HasMore bool
+}
+
+type CreateReplayOpts struct {
+	AppID      string
+	Name       string
+	FunctionID string
+	From       time.Time
+	Until      time.Time
+	Statuses   []enums.ReplayRunStatus
+}
+
+type ReplayResult struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+type ReplayProvider interface {
+	// CreateReplay starts a replay for one function in the authenticated environment.
+	// Cloud uses the existing function replay worker. Local work is asynchronous,
+	// in memory, and lost on restart. Retrying creation creates another replay.
+	CreateReplay(ctx context.Context, opts CreateReplayOpts) (ReplayResult, error)
 }
 
 type RunProvider interface {

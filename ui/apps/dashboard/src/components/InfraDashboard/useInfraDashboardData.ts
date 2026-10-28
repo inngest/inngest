@@ -3,6 +3,7 @@ import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient, useQuery } from 'urql';
 
 import {
+  displayPlanName,
   pickSelfServePlans,
   type SelfServePlan,
 } from '@/components/Billing/Plans/utils';
@@ -357,7 +358,7 @@ export function useInfraDashboardData(
       isEnterprisePlan: isEnterprisePlanName(
         currentPlan.data?.account.plan?.name,
       ),
-      planName: currentPlan.data?.account.plan?.name ?? 'Plan',
+      planName: displayPlanName(currentPlan.data?.account.plan?.name ?? 'Plan'),
       placeholders: INFRA_DASHBOARD_PLACEHOLDERS,
       proPlan: selfServePlans.pro,
       sdkRequests:

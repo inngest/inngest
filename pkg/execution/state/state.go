@@ -85,6 +85,9 @@ const (
 	InngestErrStateOverflowed = "InngestErrStateOverflowed"
 	// InngestErrTimeoutTooLong is the public error code for ErrTimeoutTooLong
 	InngestErrTimeoutTooLong = "InngestErrTimeoutTooLong"
+	// InngestErrInternal is the public error code for runs that can't
+	// continue because of a system error.
+	InngestErrInternal = "InngestErrInternal"
 )
 
 // Identifier represents the unique identifier for a workflow run.

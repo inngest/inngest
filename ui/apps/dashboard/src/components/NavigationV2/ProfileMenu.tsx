@@ -1,3 +1,11 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuItemClassName,
+  menuPanelClassName,
+  menuSeparatorClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import { useNavigate } from '@tanstack/react-router';
 import { RiUserLine, RiUserSharedLine } from '@remixicon/react';
@@ -11,10 +19,10 @@ type Props = React.PropsWithChildren<{
   isMarketplace: boolean;
 }>;
 
-const itemClassName =
-  'text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]';
+const itemClassName = headlessMenuItemClassName;
 
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
+  const keyboardNavigation = useMenuInputModality();
   const navigate = useNavigate();
 
   return (
@@ -23,17 +31,26 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
         <Listbox.Button className="bg-canvasMuted/75 border border-subtle text-subtle flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full text-xs uppercase ring-0">
           {children}
         </Listbox.Button>
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute right-0 top-full z-50 mt-2 w-[220px] rounded border ring-0 focus:outline-none">
+        <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute right-0 top-full z-50 mt-2 w-[220px]',
+          )}
+        >
           <Listbox.Option
             disabled
             value="themeMode"
-            className="text-muted mx-2 my-2 flex h-8 items-center justify-between px-2 text-[13px]"
+            className={cn(
+              menuItemClassName,
+              'text-muted min-h-10 justify-between',
+            )}
           >
             <div>Theme</div>
             <ModeSwitch />
           </Listbox.Option>
 
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
 
           <Listbox.Option
             className={itemClassName}
@@ -57,10 +74,10 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             <div>Switch account</div>
           </Listbox.Option>
 
-          <hr className="border-subtle" />
+          <hr className={menuSeparatorClassName} />
 
           <Listbox.Option
-            className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+            className={cn(headlessMenuItemClassName)}
             value="signOut"
           >
             <SignOutButton isMarketplace={isMarketplace} />

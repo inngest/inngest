@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -192,6 +193,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// Create a new trace that may have a link to a previous one
 	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
@@ -209,102 +211,100 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		)
 	})
 
-	// Create a new channel which holds all event IDs as a slice.
+	// Handle every event even if some fail, matching Cloud. ids has one entry
+	// per event in the order they were sent, with "" for each event that
+	// failed, and the response reports the first failure.
 	var (
-		max    int
-		ids    = make([]string, consts.MaxEvents)
-		idChan = make(chan struct {
-			int
-			string
-		})
+		max      int
+		ids      = make([]string, consts.MaxEvents)
+		status   = http.StatusOK
+		firstErr error
 	)
 	eg.Go(func() error {
-		for item := range idChan {
-			if max < item.int {
-				max = item.int
-			}
-			ids[item.int] = item.string
-		}
-		return nil
-	})
-
-	// Process those incoming events
-	eg.Go(func() error {
-		// Close the idChan so that we stop appending to the ID slice.
-		defer close(idChan)
-
 		index := 0
 		for s := range stream {
 			index++
+			if max < s.N {
+				max = s.N
+			}
+
 			evt := event.Event{}
 			if err := json.Unmarshal(s.Item, &evt); err != nil {
 				return err
 			}
 
-			ts := time.Now()
-			sessionsMetrics, err := event.NormalizeInbound(ctx, &evt, ts)
+			id, code, err := a.receiveOne(ctx, r, &evt, index)
 			if err != nil {
-				return err
+				if firstErr == nil {
+					status, firstErr = code, err
+				}
+				continue
 			}
-			metrics.IncrEventSessionsResolvedCounter(
-				ctx,
-				"ingest",
-				sessionsMetrics.Manual,
-				sessionsMetrics.Propagated,
-				sessionsMetrics.Nulling,
-				metrics.CounterOpt{PkgName: metricsPkgName},
-			)
-
-			ctx, span := itrace.UserTracer().Provider().
-				Tracer(consts.OtelScopeEvent).
-				Start(ctx, consts.OtelSpanEvent,
-					trace.WithTimestamp(ts),
-					trace.WithNewRoot(),
-					trace.WithLinks(trace.LinkFromContext(ctx)),
-				)
-			defer span.End()
-
-			seed := event.SeededIDFromString(
-				r.Header.Get(headers.HeaderEventIDSeed),
-				index,
-			)
-			id, err := a.handler(ctx, &evt, seed)
-			if err != nil {
-				a.log.Error("error handling event", "error", err, "event", evt.Name)
-				return err
-			}
-			idChan <- struct {
-				int
-				string
-			}{s.N, id}
+			ids[s.N] = id
 		}
-
 		return nil
 	})
 
-	err := eg.Wait()
-	cancel()
+	// A body that fails to parse stops the batch, since the events after it
+	// can't be read.
+	if err := eg.Wait(); err != nil && firstErr == nil {
+		status, firstErr = http.StatusBadRequest, err
+	}
 
 	if max+1 > len(ids) {
 		max = len(ids) - 1
 	}
 
-	if err != nil {
-		w.WriteHeader(400)
-		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-			IDs:    ids[0 : max+1],
-			Status: 400,
-			Error:  err.Error(),
-		})
-
-		return
-	}
-
-	w.WriteHeader(200)
-	_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
+	resp := apiutil.EventAPIResponse{
 		IDs:    ids[0 : max+1],
-		Status: 200,
-	})
+		Status: status,
+	}
+	if firstErr != nil {
+		resp.Error = firstErr.Error()
+	}
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// receiveOne normalizes and handles a single event from an ingest batch,
+// returning its internal ID or the status code to report if it fails.
+func (a API) receiveOne(ctx context.Context, r *http.Request, evt *event.Event, index int) (string, int, error) {
+	ts := time.Now()
+	sessionsMetrics, err := event.NormalizeInbound(ctx, evt, ts)
+	if err != nil {
+		if errors.Is(err, event.ErrInternalEventName) {
+			return "", http.StatusBadRequest, err
+		}
+		return "", http.StatusNotAcceptable, err
+	}
+	metrics.IncrEventSessionsResolvedCounter(
+		ctx,
+		"ingest",
+		sessionsMetrics.Manual,
+		sessionsMetrics.Propagated,
+		sessionsMetrics.Nulling,
+		metrics.CounterOpt{PkgName: metricsPkgName},
+	)
+
+	ctx, span := itrace.UserTracer().Provider().
+		Tracer(consts.OtelScopeEvent).
+		Start(ctx, consts.OtelSpanEvent,
+			trace.WithTimestamp(ts),
+			trace.WithNewRoot(),
+			trace.WithLinks(trace.LinkFromContext(ctx)),
+		)
+	defer span.End()
+
+	seed := event.SeededIDFromString(
+		r.Header.Get(headers.HeaderEventIDSeed),
+		index,
+	)
+	id, err := a.handler(ctx, evt, seed)
+	if err != nil {
+		a.log.Error("error handling event", "error", err, "event", evt.Name)
+		return "", http.StatusInternalServerError, err
+	}
+	return id, 0, nil
 }
 
 // Invoke creates an event to invoke a specific function.

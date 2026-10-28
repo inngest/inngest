@@ -128,6 +128,18 @@ type SyncLifecycleListener interface {
 		now time.Time,
 	)
 
+	// OnFunctionSkipped is called synchronously when a function run is
+	// skipped (paused, draining, singleton, backlog size limit, etc). A
+	// skipped run never reaches OnFunctionScheduled, so this is the only hook
+	// it fires. now is the caller's own "this just happened" timestamp -- see
+	// OnFunctionFinished.
+	OnFunctionSkipped(
+		ctx context.Context,
+		md statev2.Metadata,
+		s SkipState,
+		now time.Time,
+	)
+
 	// OnStepScheduled is called synchronously when a new step is scheduled.
 	// now is the caller's own "this just happened" timestamp — see
 	// OnFunctionFinished.
@@ -357,11 +369,10 @@ type SyncLifecycleListener interface {
 // Parent is the run/step/request span this metadata annotates -- its own
 // span ID (recoverable via tracing.SpanContextFromMetadata, the same helper
 // the real TracerProvider uses) is the join key onto
-// inngest.run_trace_spans.span_id. Op (metadata.Opcode --
-// merge/set/delete/add) is deliberately not carried here: this dual-write
-// path stores each emission as a standalone row and leaves later readers to
-// collapse to the latest one per (run_id, span_id, kind), rather than
-// replicating the production pipeline's per-key, op-aware fragment folding.
+// inngest.run_trace_spans.span_id. Op isn't carried here since every
+// metadata write is a set (see pkg/tracing.CreateMetadataSpanFromValues), so
+// each emission is the full value for its kind and readers can just collapse
+// to the latest one per (run_id, span_id, kind).
 type MetadataEntry struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID
@@ -434,6 +445,9 @@ func (NoopSyncLifecycleListener) OnFunctionFinished(context.Context, statev2.Met
 }
 
 func (NoopSyncLifecycleListener) OnFunctionCancelled(context.Context, statev2.Metadata, CancelRequest, []json.RawMessage, time.Time) {
+}
+
+func (NoopSyncLifecycleListener) OnFunctionSkipped(context.Context, statev2.Metadata, SkipState, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnStepScheduled(context.Context, statev2.Metadata, queue.Item, *string, time.Time) {

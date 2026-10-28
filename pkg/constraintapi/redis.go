@@ -23,6 +23,14 @@ const (
 	OperationIdempotencyTTL       = 5 * time.Second
 	CheckIdempotencyTTL           = 5 * time.Second
 	ConstraintCheckIdempotencyTTL = 5 * time.Minute
+
+	// ScheduleConstraintCheckIdempotencyTTL must outlast delivery retry backoff
+	// so failed run creation can retry without consuming rate limits
+	// again. Cloud's 600s maximum_backoff is configured in the infra repository at
+	// prod/live/inngest/gcp/pubsub/inbound-events/terragrunt.hcl. Keep this window
+	// above that backoff when changing either setting; delivery can still be delayed
+	// beyond its configured backoff, so this is bounded protection, not a guarantee.
+	ScheduleConstraintCheckIdempotencyTTL = 30 * time.Minute
 )
 
 var enableDebugLogs = false
@@ -51,9 +59,10 @@ type redisCapacityManager struct {
 
 	lifecycles []ConstraintAPILifecycleHooks
 
-	operationIdempotencyTTL       time.Duration
-	constraintCheckIdempotencyTTL time.Duration
-	checkIdempotencyTTL           time.Duration
+	operationIdempotencyTTL               time.Duration
+	constraintCheckIdempotencyTTL         time.Duration
+	scheduleConstraintCheckIdempotencyTTL time.Duration
+	checkIdempotencyTTL                   time.Duration
 }
 
 type RedisCapacityManagerOption func(m *redisCapacityManager)
@@ -100,9 +109,21 @@ func WithOperationIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	}
 }
 
+// WithConstraintCheckIdempotencyTTL overrides retry-marker retention for all
+// callers, including scheduling requests with rate-limit constraints.
+// Apply WithScheduleConstraintCheckIdempotencyTTL afterward to override only those requests.
 func WithConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) {
 		m.constraintCheckIdempotencyTTL = ttl
+		m.scheduleConstraintCheckIdempotencyTTL = ttl
+	}
+}
+
+// WithScheduleConstraintCheckIdempotencyTTL overrides retry-marker retention for
+// scheduling requests that include a rate-limit constraint.
+func WithScheduleConstraintCheckIdempotencyTTL(ttl time.Duration) RedisCapacityManagerOption {
+	return func(m *redisCapacityManager) {
+		m.scheduleConstraintCheckIdempotencyTTL = ttl
 	}
 }
 
@@ -128,9 +149,10 @@ func NewRedisCapacityManager(
 	options ...RedisCapacityManagerOption,
 ) (*redisCapacityManager, error) {
 	manager := &redisCapacityManager{
-		operationIdempotencyTTL:       OperationIdempotencyTTL,
-		constraintCheckIdempotencyTTL: ConstraintCheckIdempotencyTTL,
-		checkIdempotencyTTL:           CheckIdempotencyTTL,
+		operationIdempotencyTTL:               OperationIdempotencyTTL,
+		constraintCheckIdempotencyTTL:         ConstraintCheckIdempotencyTTL,
+		scheduleConstraintCheckIdempotencyTTL: ScheduleConstraintCheckIdempotencyTTL,
+		checkIdempotencyTTL:                   CheckIdempotencyTTL,
 	}
 
 	for _, rcmo := range options {

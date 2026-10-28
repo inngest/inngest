@@ -1,10 +1,4 @@
-import {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useState,
-} from 'react';
+import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
@@ -16,11 +10,12 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { renderRunAIDebug } from '@/components/RunDetails/RunAIDebug';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { RunsOrderByField } from '@/gql/graphql';
 import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
-import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
+import { RunAIAssist } from './AIAssist/RunAIAssist';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { runsInsightsHref } from './runsInsights';
@@ -193,10 +188,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     // Not needed with new hook, but keeping for compatibility
   }, []);
 
-  // The concurrency banner doesn't poll, so it piggybacks on the same refresh
-  // funnel the header button and the imperative ref both go through.
-  const [refreshNonce, setRefreshNonce] = useState(0);
-
   const onRefresh = useCallback(() => {
     if (metadataError) {
       const refetch = scope === 'fn' ? functionRefetch : appsRefetch;
@@ -204,7 +195,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     }
     reset();
     if (!search) countRefetch();
-    setRefreshNonce((n) => n + 1);
   }, [
     appsRefetch,
     countRefetch,
@@ -228,18 +218,32 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       : runsInsightsHref({
           envSlug: environment.slug,
           celQuery: search ?? '',
-          functionSlug: scope === 'fn' ? functionInsightsSlug ?? null : null,
+          functionSlug: scope === 'fn' ? (functionInsightsSlug ?? null) : null,
         });
 
   return (
     <RunsPage
+      renderRunAction={renderRunAIDebug}
+      toolbarActions={
+        <RunAIAssist
+          key={`${environment.id}:${functionSlug ?? 'env'}`}
+          scope={scope}
+          environmentSlug={environment.slug}
+          environmentID={environment.id}
+          apps={appsRes.data?.env?.apps}
+          functionAppID={functionData?.workspace.workflow?.app.externalID}
+          functionSlug={
+            scope === 'fn' ? functionData?.workspace.workflow?.slug : undefined
+          }
+          metadataLoading={isRestRunsMetadataLoading}
+          metadataError={Boolean(metadataError)}
+          onRetry={onRefresh}
+        />
+      }
       apps={appsRes.data?.env?.apps.map((app) => ({
         id: app.id,
         name: app.externalID,
       }))}
-      banner={
-        <AccountConcurrencyBanner refreshNonce={refreshNonce} scope={scope} />
-      }
       data={runs}
       features={{
         history: features.data?.history ?? 7,

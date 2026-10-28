@@ -465,45 +465,8 @@ fragmentLoop:
 		}
 	}
 
-	newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
-	if err != nil {
-		return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
-	}
-
-	if newSpan.Attributes.DynamicStatus != nil {
-		newSpan.Status = *newSpan.Attributes.DynamicStatus
-	}
-
-	if newSpan.Attributes.AppID != nil {
-		newSpan.AppID = *newSpan.Attributes.AppID
-	}
-
-	if newSpan.Attributes.FunctionID != nil {
-		newSpan.FunctionID = *newSpan.Attributes.FunctionID
-	}
-
-	if newSpan.Attributes.RunID != nil {
-		newSpan.RunID = *newSpan.Attributes.RunID
-	}
-
-	if newSpan.Attributes.DebugRunID != nil {
-		newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
-	}
-
-	if newSpan.Attributes.DebugSessionID != nil {
-		newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
-	}
-
-	if newSpan.Attributes.StartedAt != nil {
-		newSpan.StartTime = *newSpan.Attributes.StartedAt
-	}
-
-	if newSpan.Attributes.EndedAt != nil {
-		newSpan.EndTime = *newSpan.Attributes.EndedAt
-	}
-
-	if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
-		newSpan.MarkedAsDropped = true
+	if err := cqrs.ApplyExtractedSpanAttributes(ctx, newSpan); err != nil {
+		return nil, err
 	}
 
 	// If this span has finished, set a preliminary output ID.
@@ -803,6 +766,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
+// rollupSpanMetadataFromFragments folds a (span, kind)'s metadata fragments in
+// order. New writes are always set (see tracing.CreateMetadataSpanFromValues),
+// so the latest fragment wins. The other ops are legacy, but stored fragments
+// still carry them so Combine keeps folding them.
 func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
 	ret := &cqrs.SpanMetadata{
 		Values:    metadata.Values{},
@@ -876,6 +843,7 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 	}
 
+	ret.IsUser = ret.Kind.IsUser()
 	return ret, nil
 }
 
@@ -1651,6 +1619,9 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
+	if opts.CEL != "" {
+		return nil, fmt.Errorf("CEL event search requires --duckdb")
+	}
 	if opts.Cursor == nil {
 		opts.Cursor = &endULID
 	}
@@ -1717,6 +1688,9 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts cqrs.WorkspaceEventsOpts) (int64, error) {
 	if err := opts.Validate(); err != nil {
 		return 0, err
+	}
+	if opts.CEL != "" {
+		return 0, fmt.Errorf("CEL event search requires --duckdb")
 	}
 
 	// We don't want to consider cursor pagination for total count, so overwrite input param
@@ -2286,39 +2260,11 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	}
 
 	so := &cqrs.SpanOutput{}
-
 	for _, row := range rows {
-		if len(row.Input) > 0 {
-			so.Input = row.Input
-		}
-
-		if len(row.Output) > 0 {
-			var m map[string]any
-
-			so.Data = row.Output
-			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-				// NOTE: By default, we wrap errors and data.  However, unforutnately
-				// step.waitForEvent is _not_ wrapped, so we check to see if there's
-				// both "data" and "name";  if so, we return the data wholesale.
-				if isWaitForEventOutput(m) {
-					return so, nil
-				}
-
-				if errData, ok := m["error"]; ok {
-					so.IsError = true
-					so.Data, _ = json.Marshal(errData)
-				} else if successData, ok := m["data"]; ok {
-					so.Data, _ = json.Marshal(successData)
-				} else {
-					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-
-					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
-				}
-			}
+		if cqrs.UnwrapSpanOutputEnvelope(so, row.Output, row.Input) {
+			break
 		}
 	}
-
 	return so, nil
 }
 
@@ -3601,7 +3547,7 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 		return []*cqrs.TraceRun{}, nil
 	}
 
-	if err := w.loadSpanRunPageDetails(ctx, h, pageRows); err != nil {
+	if err := w.loadSpanRunPageDetails(ctx, h, pageRows, opt.IncludeSkipped); err != nil {
 		return nil, err
 	}
 
@@ -3708,6 +3654,7 @@ func (w wrapper) loadSpanRunPageDetails(
 	ctx context.Context,
 	h driverhelp.DialectHelpers,
 	pageRows []spanRunRow,
+	includeSkipped bool,
 ) error {
 	l := logger.StdlibLogger(ctx)
 
@@ -3734,14 +3681,14 @@ func (w wrapper) loadSpanRunPageDetails(
 			sq.C("run_id").In(runIDs),
 			sq.C("dynamic_span_id").In(dynamicSpanIDs),
 		).
-		Where(
-			sq.C("debug_run_id").IsNull(),
-			sq.Or(
-				sq.C("status").IsNull(),
-				sq.C("status").Neq(enums.RunStatusSkipped.String()),
-			),
-		).
+		Where(sq.C("debug_run_id").IsNull()).
 		GroupBy("spans.run_id", "spans.dynamic_span_id")
+	if !includeSkipped {
+		q = q.Where(sq.Or(
+			sq.C("status").IsNull(),
+			sq.C("status").Neq(enums.RunStatusSkipped.String()),
+		))
+	}
 
 	sqlQuery, args, err := q.ToSQL()
 	if err != nil {
@@ -3836,11 +3783,13 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers)
 	preds := []sq.Expression{
 		sq.I("spans.name").Eq(meta.SpanNameRun),
 		sq.I("spans.debug_run_id").IsNull(),
-		sq.Or(
+		sq.I("spans.start_time").Lte(opt.Filter.Until.UTC()),
+	}
+	if !opt.IncludeSkipped {
+		preds = append(preds, sq.Or(
 			sq.I("spans.status").IsNull(),
 			sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
-		),
-		sq.I("spans.start_time").Lte(opt.Filter.Until.UTC()),
+		))
 	}
 	if opt.Filter.AccountID != uuid.Nil {
 		preds = append(preds, sq.I("spans.account_id").Eq(opt.Filter.AccountID))
@@ -3935,7 +3884,7 @@ func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageC
 		return preds
 	}
 
-	cursorTime := time.UnixMicro(fieldCursor.Value).UTC()
+	cursorTime := spanRunCursorTime(fieldCursor)
 	direction := enums.TraceRunOrderDesc
 	for _, order := range opt.Order {
 		if (fieldName == "end_time" && order.Field == enums.TraceRunTimeEndedAt) ||
@@ -4077,6 +4026,24 @@ func scanSpanRunRow(rows *sql.Rows) (spanRunRow, error) {
 	return row, err
 }
 
+func spanRunTimeCursor(field string, timestamp time.Time) cqrs.TraceCursor {
+	return cqrs.TraceCursor{
+		Field: field, Value: timestamp.UnixMicro(),
+		NanosecondRemainder: int64(timestamp.Nanosecond()) % int64(time.Microsecond),
+	}
+}
+
+// spanRunCursorTime decodes a client-supplied cursor. The nanosecond remainder
+// is only meaningful in [0, 1000); anything else is ignored so a crafted cursor
+// cannot move the page boundary by more than the sub-microsecond remainder.
+func spanRunCursorTime(cursor *cqrs.TraceCursor) time.Time {
+	ns := cursor.NanosecondRemainder
+	if ns < 0 || ns >= int64(time.Microsecond) {
+		ns = 0
+	}
+	return time.UnixMicro(cursor.Value).Add(time.Duration(ns)).UTC()
+}
+
 func convertSpanRunRow(
 	ctx context.Context,
 	row spanRunRow,
@@ -4141,10 +4108,10 @@ func convertSpanRunRow(
 		for field := range cursorLayout.Cursors {
 			switch field {
 			case "start_time":
-				c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: startTime.UnixMicro()}
+				c.Cursors[field] = spanRunTimeCursor(field, startTime)
 			case "end_time":
 				if endTime != nil {
-					c.Cursors[field] = cqrs.TraceCursor{Field: field, Value: endTime.UnixMicro()}
+					c.Cursors[field] = spanRunTimeCursor(field, *endTime)
 				}
 			}
 		}
@@ -4178,6 +4145,11 @@ func convertSpanRunRow(
 		traceRun.FunctionName = *row.FunctionName
 	}
 	attrs := decodeSpanAttributes(row.Attributes)
+	if reason, ok := stringAttribute(attrs, meta.Attrs.SkipReason.Key()); ok {
+		if parsed, err := enums.SkipReasonString(reason); err == nil {
+			traceRun.SkipReason = &parsed
+		}
+	}
 	if batchID, ok := stringAttribute(attrs, meta.Attrs.BatchID.Key()); ok {
 		if parsed, err := ulid.Parse(batchID); err == nil {
 			traceRun.BatchID = &parsed
@@ -4255,12 +4227,14 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		filter = append(filter, sq.I("spans.function_id").In(opt.Filter.FunctionID))
 	}
 	// Status filters use final run status; this only excludes skipped span rows.
-	// Skipped runs should only be visible in event-scoped queries, not the runs list.
+	// Replay selection may opt into skipped runs; ordinary run lists omit them.
 	// status is nullable in spans, so we must also accept NULL.
-	filter = append(filter, sq.Or(
-		sq.I("spans.status").IsNull(),
-		sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
-	))
+	if !opt.IncludeSkipped {
+		filter = append(filter, sq.Or(
+			sq.I("spans.status").IsNull(),
+			sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
+		))
+	}
 
 	// cursor
 	resCursorLayout := &cqrs.TracePageCursor{
@@ -4323,8 +4297,7 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 			if cursor := reqCursor.Find(field); cursor != nil {
 				// Build cursor condition for this field
-				// Convert int64 microseconds to time.Time in UTC for spans table comparison
-				cursorTime := time.UnixMicro(cursor.Value).UTC()
+				cursorTime := spanRunCursorTime(cursor)
 				var baseCondition sq.Expression
 				if o.Direction == enums.TraceRunOrderAsc {
 					baseCondition = sq.C(field).Gt(cursorTime)
@@ -4348,7 +4321,7 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 					}
 
 					if nextCursor := reqCursor.Find(nextField); nextCursor != nil {
-						nextCursorTime := time.UnixMicro(nextCursor.Value).UTC()
+						nextCursorTime := spanRunCursorTime(nextCursor)
 						if opt.Order[j].Direction == enums.TraceRunOrderAsc {
 							equalityConditions = append(equalityConditions, sq.C(nextField).Gt(nextCursorTime))
 						} else {
@@ -4385,11 +4358,4 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 // needsEventJoin checks if CEL expression references event.* fields
 func needsEventJoin(cel string) bool {
 	return strings.Contains(cel, "event.")
-}
-
-func isWaitForEventOutput(o map[string]any) bool {
-	_, name := o["name"]
-	_, data := o["data"]
-	_, ts := o["ts"]
-	return name && data && ts
 }

@@ -82,6 +82,12 @@ type devserver struct {
 
 	Data cqrs.Manager
 
+	// DuckDB is the dual-write DuckDB connection (see setupDualWrite in
+	// devserver.go) -- nil unless --duckdb dual-write started
+	// successfully. Used by devapi.Info to report the "duckdb-insights"
+	// feature flag.
+	DuckDB *sql.DB
+
 	stepLimitOverrides      map[string]int
 	stateSizeLimitOverrides map[string]int
 
@@ -299,6 +305,12 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		sk = *d.Opts.SigningKey
 	}
 
+	// -u URLs must be pinged once even when --no-poll and the saved app has
+	// no error. The startup upsert used to force that ping by writing
+	// error=unreachable; a named row now keeps its stored error, so the
+	// first ping is tracked here instead of on the row.
+	pendingFirstSync := map[string]struct{}{}
+
 	// Initially, add every app started with the `-u` flag
 	for _, url := range d.Opts.URLs {
 		// URLs must contain a protocol. If not, add http since very few apps
@@ -311,6 +323,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		// stripped and localhost variants are unified before deriving the
 		// placeholder app ID.
 		url = util.NormalizeAppURL(url, false)
+		pendingFirstSync[url] = struct{}{}
 
 		// Create a new app which holds the error message.
 		params := cqrs.UpsertAppParams{
@@ -343,7 +356,11 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
-				if !d.Opts.Poll && len(app.Error.String) == 0 {
+				_, firstSync := pendingFirstSync[app.Url]
+				if firstSync {
+					delete(pendingFirstSync, app.Url)
+				}
+				if !shouldPollSDK(d.Opts.Poll, app.Error.String, firstSync) {
 					continue
 				}
 
@@ -382,6 +399,16 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 		<-time.After(pollInterval)
 	}
+}
+
+// shouldPollSDK reports whether this iteration should ask the SDK to sync.
+// firstSync is the one startup ping for an explicit -u URL. After that,
+// --no-poll skips apps whose saved error is empty.
+func shouldPollSDK(poll bool, appError string, firstSync bool) bool {
+	if firstSync {
+		return true
+	}
+	return poll || len(appError) > 0
 }
 
 func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event.SeededID) (string, error) {

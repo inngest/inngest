@@ -967,9 +967,32 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 	return enums.SkipReasonFunctionBacklogSizeLimitHit, nil
 }
 
+func isExecutorInvocation(evt event.Event) bool {
+	if evt.Name != event.InvokeFnName {
+		return false
+	}
+
+	md, err := evt.InngestMetadata()
+	if err != nil {
+		return false
+	}
+
+	return md.RunID() != nil &&
+		md.SourceAppID != "" &&
+		md.SourceFnID != ""
+}
+
 func (e *executor) checkExecutionCap(ctx context.Context, req execution.ScheduleRequest) enums.SkipReason {
 	if e.accountExecutionCap == nil {
 		return enums.SkipReasonNone
+	}
+
+	for _, tracked := range req.Events {
+		if isExecutorInvocation(tracked.GetEvent()) {
+			// One step invoke exempts the whole batch. Eligibility follows the event,
+			// including historical resends and function reruns using that input.
+			return enums.SkipReasonNone
+		}
 	}
 
 	decision := e.accountExecutionCap(ctx, req.AccountID)
@@ -1468,6 +1491,16 @@ func (e *executor) schedule(
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
+			// A scheduling retry may already own the singleton lock. Do not release
+			// or cancel that run before Create applies state idempotency below.
+			// Keep scheduling so a retry can still enqueue a previously created run.
+			var existing *sv2.IdempotencyEntry
+			if req.Function.Singleton.Mode == enums.SingletonModeCancel {
+				existing, err = e.smv2.LookupIdempotency(ctx, metadata.ID, key)
+				if err != nil {
+					return nil, nil, fmt.Errorf("error checking singleton scheduling idempotency: %w", err)
+				}
+			}
 			// Attempt to early handle function singletons when in skip mode. Function runs may still
 			// fail to enqueue later when attempting to atomically acquire the function mutex.
 			//
@@ -1476,11 +1509,14 @@ func (e *executor) schedule(
 			// the lock becomes available to any competing run. If a faster run acquires it before
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
-			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, queue.Scope{
-				AccountID:  req.AccountID,
-				EnvID:      req.WorkspaceID,
-				FunctionID: req.Function.ID,
-			}, singletonKey, *req.Function.Singleton)
+			var singletonRunID *ulid.ULID
+			if existing == nil {
+				singletonRunID, err = e.singletonMgr.HandleSingleton(ctx, queue.Scope{
+					AccountID:  req.AccountID,
+					EnvID:      req.WorkspaceID,
+					FunctionID: req.Function.ID,
+				}, singletonKey, *req.Function.Singleton)
+			}
 			if err != nil {
 				return nil, nil, err
 			}
@@ -2001,16 +2037,23 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
+	skip := execution.SkipState{
+		Reason: reason,
+		Events: evts,
+	}
+	if len(req.Events) > 0 {
+		skip.CronSchedule = req.Events[0].GetEvent().CronSchedule()
+	}
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
-				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-					Reason:       reason,
-					Events:       evts,
-				})
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, skip)
 			})
 	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionSkipped", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionSkipped(ctx, metadata, skip, syncNow)
+	})
 	return nil, nil, SkippedError{Reason: reason}
 }
 
@@ -2110,7 +2153,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				AccountID: id.AccountID,
 			},
 		}, edge.Outgoing, []byte("null"))
-		if !errors.Is(err, state.ErrDuplicateResponse) && err != nil {
+		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) && err != nil {
 			return nil, err
 		}
 		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
@@ -4051,6 +4094,13 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if errors.Is(err, state.ErrStateOverflowed) {
 			return err
 		}
+		// NoRetry/RetryAt are the SDK's preferences for the step, eg. the Go SDK
+		// sets NoRetry for every OpcodeStepFailed.  They must not hide system
+		// failures (eg. enqueueing the next discovery step) that always retry,
+		// as NeverRetryError would mask the retry marker and strand the run.
+		if queue.IsAlwaysRetryable(err) {
+			return err
+		}
 		if resp.NoRetry {
 			return queue.NeverRetryError(err)
 		}
@@ -4271,7 +4321,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 
 			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
 
-			return err
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
@@ -4290,6 +4340,18 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	})
 
 	return nil
+}
+
+// retryableEnqueueError marks a failure to enqueue a run's next discovery item
+// as always retryable.  The step's output is already saved by this point, so
+// the failure is ours (eg. a canceled context while selecting a queue shard)
+// and must not consume the function's retry budget.  If it did, functions w/
+// low retry counts permanently fail the edge job and the run is left Running
+// w/ nothing in the queue.  Retrying is safe as discovery job IDs are
+// deterministic, so a retry after a partially successful enqueue dedupes via
+// ErrQueueItemExists.
+func retryableEnqueueError(err error) error {
+	return queue.AlwaysRetryError(fmt.Errorf("error enqueueing discovery step: %w", err))
 }
 
 // sanitizeLogValue strips CR/LF from a user-supplied string before logging
@@ -4536,7 +4598,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	}
 
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -4609,6 +4671,11 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		if errors.Is(err, queue.ErrQueueItemExists) {
 			span.Drop()
 			return nil
+		}
+		if err != nil {
+			span.Drop()
+			logger.StdlibLogger(ctx).Error("error scheduling step failure queue item", "error", err)
+			return retryableEnqueueError(err)
 		}
 
 		_ = span.Send()
@@ -5049,7 +5116,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -5226,7 +5293,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 	// Save the output as the step result.
 	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, resp.Body)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
@@ -5731,9 +5798,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		}
 		expr = &interpolated
 
-		// Update the generator to use the interpolated data, ensuring history is updated.
-		opts.If = expr
-		gen.Opts = opts
+		// Update the generator to use the interpolated data, ensuring history
+		// is updated. Only `if` changes, so the SDK's other opts survive.
+		if err := gen.SetOpt("if", interpolated); err != nil {
+			return fmt.Errorf("error updating wait for event opts: %w", err)
+		}
 	}
 
 	opcode := gen.Op.String()
@@ -5975,7 +6044,7 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
 	if enableInstrumentation {
@@ -6433,6 +6502,19 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 
 func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
+		// gen.Metadata is SDK-supplied, so it gets the same reserved-kind and
+		// score value checks as checkpoints and the metadata API. extra is
+		// server-generated and may use kinds SDKs cannot set.
+		if err := md.ValidateAllowed(); err != nil {
+			e.log.Warn("invalid metadata in generator opcode",
+				"error", err,
+				"run_id", runCtx.Metadata().ID.RunID,
+				"step_id", sanitizeLogValue(gen.ID),
+				"metadata_kind", sanitizeLogValue(md.Kind().String()),
+			)
+			continue
+		}
+
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
 			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}

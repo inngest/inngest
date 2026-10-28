@@ -1,0 +1,55 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/timestamp.proto";
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+message Build {
+  string id = 1;
+  string name = 2;
+  string tag = 3;
+  string architecture = 4;
+  // pending (uploading), uploaded (queued/processing), ready, or failed.
+  string status = 5;
+  string artifact_digest = 6;
+  string error = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+}
+
+// runtime config such as ENV and CMD comes from the image archive.
+message CreateBuildRequest {
+  // A workspace-local name, without an account or inngest/ prefix.
+  string name = 1;
+  string tag = 2;
+  string architecture = 3;
+  int64 upload_size_bytes = 4;
+  // Lowercase SHA256 of the uploaded archive bytes.  commit fails when the
+  // uploaded bytes have a different hash.
+  string upload_sha256 = 5;
+}
+message CreateBuildResponse {
+  Build data = 1;
+  // send the archive in a PUT request body with every header in
+  // upload_headers.  set Content-Length to upload_size_bytes.  storage
+  // rejects a request that changes a header or the length.
+  string upload_url = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  // send each header with its exact value.  the server can add a header,
+  // such as a checksum of the archive, without a client change.
+  map<string, string> upload_headers = 4;
+}
+message CommitBuildRequest {
+  string build_id = 1;
+  // Must match the name used when creating the build.
+  string name = 2;
+}
+message GetBuildRequest { string build_id = 1; }
+message CancelBuildRequest { string build_id = 1; }
+message BuildResponse { Build data = 1; }
+message ListBuildsRequest {}
+message ListBuildsResponse {
+  // The most recent 100 builds in the selected workspace.
+  repeated Build data = 1;
+}

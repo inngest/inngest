@@ -128,7 +128,11 @@ type Loaders struct {
 
 func NewLoaders(params LoaderParams) *Loaders {
 	loaders := &Loaders{}
-	tr := &traceReader{loaders: loaders, reader: params.DB}
+	convert := convertDynamicRunSpanToGQL
+	if fs, ok := params.DB.(flatSpanSource); ok && fs.FlatSpans() {
+		convert = convertFlatRunSpanToGQL
+	}
+	tr := &traceReader{reader: params.DB, convertRunSpanToGQL: convert}
 	er := &eventReader{loaders: loaders, reader: params.DB}
 	dr := &deferReader{reader: params.DB}
 

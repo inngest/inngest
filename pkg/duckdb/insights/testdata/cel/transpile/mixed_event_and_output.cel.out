@@ -1,0 +1,14 @@
+INPUT
+event.name == "x" && output.ok == true
+
+EVENT SQL
+((x::JSON->>?) = ?)
+
+EVENT ARGS
+[$.name x]
+
+OUTPUT SQL
+((output::JSON->>?) = ?)
+
+OUTPUT ARGS
+[$.data.ok true]

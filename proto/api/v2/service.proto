@@ -5,6 +5,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
+import "api/v2/image.proto";
 import "third_party/google/api/annotations.proto";
 import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
@@ -42,6 +43,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Runs"         description: "Inspect function runs" }
   tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
+  tags: { name: "Builds"       description: "Build images for sandboxes and compute" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
@@ -1069,6 +1071,51 @@ service V2 {
     };
   }
 
+  rpc CreateReplay(CreateReplayRequest) returns (CreateReplayResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/replays"
+      body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:replay"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create replay"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Creates an asynchronous replay for matching runs of one function. Cloud bounds have millisecond precision: from rounds down; until includes the end of its millisecond. Dev server bounds are inclusive at stored timestamp precision. Dev server replays run in memory and are lost on restart. Requests are not idempotent: retrying creates another replay. In Inngest Cloud, replays are listed on the function's Replays page in the dashboard. Scheduling is best effort and does not preserve event order."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "201"
+        value: {
+          description: "Replay successfully created"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2CreateReplayResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid input data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc Rerun(RerunRequest) returns (RerunResponse) {
     option (google.api.http) = {
       post: "/runs/{run_id}/rerun"
@@ -1156,6 +1203,53 @@ service V2 {
           value: {}
         }
       }
+    };
+  }
+
+  rpc CreateBuild(CreateBuildRequest) returns (CreateBuildResponse) {
+    option (google.api.http) = { post: "/builds/{name}" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a build"
+      description: "Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to start conversion. Requires image-build access."
+      tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CommitBuild(CommitBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { post: "/builds/{name}/{build_id}/commit" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit an upload and start the build"
+      tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetBuild(GetBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { get: "/builds/{build_id}" };
+    option (authz) = { require_authz: true permission: "images:read:get" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a build"
+      tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListBuilds(ListBuildsRequest) returns (ListBuildsResponse) {
+    option (google.api.http) = { get: "/builds" };
+    option (authz) = { require_authz: true permission: "images:read:list" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List recent workspace builds"
+      tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CancelBuild(CancelBuildRequest) returns (BuildResponse) {
+    option (google.api.http) = { post: "/builds/{build_id}/cancel" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:cancel" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel an unfinished build"
+      tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
 
@@ -1732,6 +1826,50 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function"
       description: "Fetches function configuration and status details for a function within an app"
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc PauseFunction(PauseFunctionRequest) returns (PauseFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/pause"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:pause"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Pause a function"
+      description: "Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function."
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ResumeFunction(ResumeFunctionRequest) returns (ResumeFunctionResponse) {
+    option (google.api.http) = {
+      post: "/apps/{app_id}/functions/{function_id}/resume"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:resume"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume a function"
+      description: "Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false. The dev server still wakes the queue so retries can recover a failed wake. Send no request body. In Cloud, the response reflects the requested state; the resume can take up to a minute to apply. A future scheduled pause returns 409 and is left unchanged. New runs skipped while paused are not recreated. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, resume clears the pause after waking the queue; a failed wake leaves the pause in place. Queued runs can then start. No bulk resume; call once per function."
       tags: "Functions"
       tags: "Beta"
       security: {
@@ -2775,6 +2913,9 @@ message TraceSpanMetadata {
   string kind = 2;
   map<string, string> values = 3;
   google.protobuf.Timestamp updated_at = 4;
+  // Whether kind is user-defined. kind may be returned without its
+  // userland/inngest prefix, so this tells a user kind from an internal one.
+  bool is_user = 5;
 }
 
 message TraceSpan {
@@ -2791,6 +2932,15 @@ message TraceSpan {
   optional google.protobuf.Struct output = 11;
   repeated TraceSpanMetadata metadata = 12;
   repeated TraceSpan children = 13;
+  // The kind of step this span is, such as "RUN" or "SLEEP". "SPAN_GROUP"
+  // marks a virtual span grouping the steps called inside an SDK span group.
+  optional string step_type = 14;
+  // The kind its caller gave a span group, such as "job" or "agent". Absent
+  // for steps and for groups without one.
+  optional string group_kind = 15;
+  // The library that created this step or span group on the user's behalf,
+  // as "<package>@<version>", such as "@inngest/ci@0.1.0". Absent otherwise.
+  optional string origin = 16;
 }
 
 message FunctionTrace {
@@ -4089,4 +4239,123 @@ message CancelRunData {
 message RunDeferredFrom {
   string function_slug = 1;
   optional string function_name = 2;
+}
+
+message PauseFunctionRequest {
+  // App ID.
+  string app_id = 1;
+  // Function ID.
+  string function_id = 2;
+}
+
+message PauseFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ResumeFunctionRequest {
+  // App ID.
+  string app_id = 1;
+  // Function ID.
+  string function_id = 2;
+}
+
+message ResumeFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message CreateReplayRequest {
+  string app_id = 6 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK app ID containing the function"
+      example: "\"my-app\""
+    }
+  ];
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters"
+      example: "\"Replay cancelled orders\""
+    }
+  ];
+  string function_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range"
+    }
+  ];
+  google.protobuf.Timestamp until = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400."
+    }
+  ];
+  repeated string statuses = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
+}
+
+message CreateReplayResponse {
+  Replay data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Replay {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay ID"
+      example: "\"550e8400-e29b-41d4-a716-446655440000\""
+    }
+  ];
+  google.protobuf.Timestamp created_at = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Time the replay was created"
+    }
+  ];
+  string name = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay name, between 3 and 64 characters. Echoes the request after trimming surrounding whitespace."
+    }
+  ];
+  string function_id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK function ID within the app. Legacy app-prefixed function IDs are also accepted (at most 256 bytes)."
+    }
+  ];
+  google.protobuf.Timestamp from = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the queued-at time range. Echoes the request timestamp normalized to UTC."
+    }
+  ];
+  google.protobuf.Timestamp until = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the queued-at time range. May equal from. Values up to 5 seconds in the future are accepted for clock skew and clamped to the current server time; later values return HTTP 400. Echoes the request timestamp normalized to UTC and clamped when necessary."
+    }
+  ];
+  repeated string statuses = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run statuses to replay. Accepts ALL, COMPLETED, FAILED, CANCELLED, or SKIPPED_PAUSED. ALL cannot be combined with another status. Between 1 and 5 values are required, including duplicates; exceeding this limit returns HTTP 400. Echoes the normalized request with surrounding whitespace trimmed, values uppercased, and duplicates removed."
+      enum: "ALL"
+      enum: "COMPLETED"
+      enum: "FAILED"
+      enum: "CANCELLED"
+      enum: "SKIPPED_PAUSED"
+    }
+  ];
 }

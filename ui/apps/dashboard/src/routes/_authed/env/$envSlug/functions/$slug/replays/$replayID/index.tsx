@@ -2,6 +2,7 @@ import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { StatusCell } from '@inngest/components/Table/Cell';
 import { Time } from '@inngest/components/Time';
+import { ReplayStatus } from '@inngest/components/types/replay';
 import { formatMilliseconds } from '@inngest/components/utils/date';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -27,7 +28,7 @@ function ReplayDetailsPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-6 pb-4 pt-16">
+    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 pb-4 pt-16">
       <div className="text-muted text-xs uppercase">Replay ID: {replayID}</div>
       {isLoading ? (
         <Skeleton className="mb-5 h-9 w-1/2 py-1" />
@@ -35,13 +36,22 @@ function ReplayDetailsPage() {
         <div className="py-1 text-2xl">{replay?.name}</div>
       )}
       {replay && (
-        <StatusCell
-          size="small"
-          status={replay.status}
-          label={
-            replay.status === 'ENDED' ? 'Queuing complete' : 'Queuing runs'
-          }
-        />
+        <div>
+          <StatusCell
+            size="small"
+            status={replay.status}
+            label={
+              replay.status === ReplayStatus.Failed
+                ? 'Failed'
+                : replay.status === ReplayStatus.Ended
+                ? 'Queuing complete'
+                : 'Queuing runs'
+            }
+          />
+          {replay.error && (
+            <p className="text-error mt-2 text-sm">{replay.error}</p>
+          )}
+        </div>
       )}
       <AppDetailsCard title="Replay information" className="mt-9">
         <AppDetailsCard.Item

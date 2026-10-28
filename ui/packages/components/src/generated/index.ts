@@ -4,9 +4,16 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
-// The score kind is the constant `inngest.score`; user-supplied score
-// names are the keys of the values map, not a kind suffix.
-export type SpanMetadataKindInngestScore = typeof KindInngestScore;
+// Scores are either one kind per name (`inngest.score.<name>` w/
+// `{value}`) or the legacy `inngest.score` kind keyed by score name.
+export type SpanMetadataKindInngestScore =
+  | typeof KindInngestScore
+  | `${typeof KindPrefixInngestScore}${string}`;
+// Warnings are either one kind per code (`inngest.warning.<code>`) or
+// the legacy `inngest.warnings` kind keyed by code.
+export type SpanMetadataKindInngestWarnings =
+  | typeof KindInngestWarnings
+  | `${typeof KindPrefixInngestWarning}${string}`;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestAISummary
@@ -15,13 +22,81 @@ export type SpanMetadataKind =
   | typeof KindInngestResponseHeaders
   | typeof KindInngestTiming
   | typeof KindInngestExperiment
-  | typeof KindInngestWarnings
+  | typeof KindInngestSandbox
+  | SpanMetadataKindInngestWarnings
   | SpanMetadataKindInngestScore
   | SpanMetadataKindUserland;
 
 //////////
 // source: types_gen.go
 
+/**
+ * From kind.go
+ * Scores & warnings get one kind per score name / warning code so each can be
+ * replaced on its own (IE `inngest.score.<name>`, `inngest.warning.<code>`).
+ */
+export const KindPrefixInngestScore = 'inngest.score.';
+/**
+ * From kind.go
+ */
+export const KindPrefixInngestWarning = 'inngest.warning.';
+/**
+ * From sandbox.go
+ */
+export const KindInngestSandbox = 'inngest.sandbox';
+/**
+ * From sandbox.go
+ * SandboxMetadata describes a step that acted on an Inngest sandbox. The SDK
+ * emits it, one entry per step attempt with the attempt's full value set, as
+ * merges never clear a key. Values stay flat (scalars and string arrays) so
+ * they round-trip through ClickHouse JSON and DuckDB VARIANT storage.
+ */
+export interface SandboxMetadata {
+  /**
+   * Version of this shape. Currently 1.
+   */
+  version: number /* int */;
+  /**
+   * Action is the sandbox API operation, like "exec" or "snapshot.create".
+   */
+  action: string;
+  /**
+   * Method is the SDK method the user called, like "commands.run".
+   */
+  method: string;
+  /**
+   * SandboxID identifies the machine and is shared by every step on it. A
+   * failed create has only the name.
+   */
+  sandbox_id?: string;
+  sandbox_name?: string;
+  /**
+   * SourceSnapshotID is the snapshot a created sandbox was cloned from.
+   */
+  source_snapshot_id?: string;
+  /**
+   * Command is the argv that ran; CommandDisplay is the shell string the user
+   * wrote, if any. CommandTruncated is true when either was cut short.
+   */
+  command?: string[];
+  command_display?: string;
+  command_truncated?: boolean;
+  cwd?: string;
+  process_id?: string;
+  process_state?: string;
+  exit_code?: number /* int */;
+  termination_signal?: number /* int */;
+  /**
+   * OutputTruncated is true when captured stdout/stderr was cut short.
+   */
+  output_truncated?: boolean;
+  snapshot_id?: string;
+  snapshot_status?: string;
+  /**
+   * ErrorCode is the sandbox API's error code when the step failed.
+   */
+  error_code?: string;
+}
 /**
  * From score.go
  */

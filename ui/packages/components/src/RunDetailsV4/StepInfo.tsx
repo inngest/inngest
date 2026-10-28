@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { looksLikeAIOutput } from '../AI/utils';
+import { Alert } from '../Alert';
 import { Button } from '../Button/Button';
 import {
   CodeElement,
@@ -14,6 +15,7 @@ import {
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
+import { hasMetadataKind } from '../RunDetailsShared/metadataKind';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -27,20 +29,28 @@ import { IO } from './IO';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
-import { formatDuration, maybeBooleanToString, type StepInfoType } from './runDetailsUtils';
+import {
+  firstStepID,
+  formatDuration,
+  maybeBooleanToString,
+  type StepInfoType,
+} from './runDetailsUtils';
 import {
   isExperimentMetadata,
   isScoreMetadata,
+  isSpanGroup,
   isStepInfoInvoke,
   isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
+  isWarningMetadata,
   type SpanMetadataScope,
   type StepInfoInvoke,
   type StepInfoSignal,
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
+import { getStepWarnings } from './warnings';
 
 const STEP_OP_LABELS: Record<string, string> = {
   RUN: 'step.run',
@@ -210,16 +220,18 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
-  const showRerunFromStep = !isDurableEndpoint && !debug && runID && trace.stepID;
+  const spanGroup = isSpanGroup(trace);
+  const rerunStepID = spanGroup ? firstStepID(trace) : trace.stepID;
+  const showRerunFromStep = !isDurableEndpoint && !debug && runID && rerunStepID;
   const editableInput =
     trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
 
   const showAINudge =
     Boolean(result?.data && looksLikeAIOutput(result.data)) &&
-    !trace.metadata?.some((md) => md.kind === KindInngestAI);
+    !trace.metadata?.some((md) => hasMetadataKind(md, KindInngestAI));
 
-  const responseHeaderMetadata = trace.metadata?.filter(
-    (md) => md.kind === 'inngest.response_headers'
+  const responseHeaderMetadata = trace.metadata?.filter((md) =>
+    hasMetadataKind(md, 'inngest.response_headers')
   );
 
   // TODO: remove metadata handling once all response header
@@ -248,11 +260,14 @@ export const StepInfo = ({
   const nonHeaderMetadata = metadataIsEnabled
     ? trace.metadata?.filter(
         (md) =>
-          md.kind !== 'inngest.response_headers' &&
+          !hasMetadataKind(md, 'inngest.response_headers') &&
+          !isWarningMetadata(md) &&
           !isScoreMetadata(md) &&
           !isExperimentMetadata(md)
       ) ?? []
     : [];
+
+  const warnings = getStepWarnings(trace.metadata);
 
   const scoreMetadataList = trace.metadata?.filter(isScoreMetadata) ?? [];
 
@@ -314,14 +329,14 @@ export const StepInfo = ({
               kind="primary"
               appearance="outlined"
               size="medium"
-              label="Rerun from step"
+              label={spanGroup ? 'Rerun from start of span' : 'Rerun from step'}
               onClick={() => setRerunModalOpen(true)}
             />
             <RerunModal
               open={rerunModalOpen}
               setOpen={setRerunModalOpen}
               runID={runID}
-              stepID={trace.stepID!}
+              stepID={rerunStepID!}
               input={prettyInput || result?.input || ''}
               editableInput={editableInput}
             />
@@ -369,6 +384,12 @@ export const StepInfo = ({
             </ElementWrapper>
           )}
 
+          {trace.origin && (
+            <ElementWrapper label="Added by">
+              <TextElement>{trace.origin}</TextElement>
+            </ElementWrapper>
+          )}
+
           {stepKindInfo}
 
           {experimentMetadata && (
@@ -389,6 +410,23 @@ export const StepInfo = ({
               <IDElement>{trace.debugRunID}</IDElement>
             </ElementWrapper>
           )}
+        </div>
+      )}
+
+      {expanded && warnings.length > 0 && (
+        <div className="px-4" data-testid="step-warnings">
+          <Alert severity="warning">
+            <p className="text-sm font-medium">
+              {warnings.length === 1 ? 'Warning' : `${warnings.length} warnings`}
+            </p>
+            <ul className="mt-1 max-h-40 list-none space-y-1 overflow-y-auto text-sm">
+              {warnings.map(({ key, message }) => (
+                <li key={key} title={key} className="break-words">
+                  {message}
+                </li>
+              ))}
+            </ul>
+          </Alert>
         </div>
       )}
 

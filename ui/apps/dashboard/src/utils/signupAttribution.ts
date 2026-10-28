@@ -19,7 +19,14 @@ const fields = {
   first_landing_url: 'firstLandingUrl',
 } as const;
 
+// GA4 web stream shared by www.inngest.com and app.inngest.com.
+const GA4_SESSION_COOKIE = '_ga_4YPM75W7D9';
+
+const CLICK_ID_PATTERN = /^[A-Za-z0-9_-]{1,512}$/;
+
 const readCookie = (name: string): string | undefined => {
+  if (typeof document === 'undefined') return undefined;
+
   const prefix = `${name}=`;
   return document.cookie
     .split(';')
@@ -28,15 +35,7 @@ const readCookie = (name: string): string | undefined => {
     ?.slice(prefix.length);
 };
 
-/**
- * Writes the first-touch cookie from the current URL when none exists.
- *
- * The website writes the same cookie on www.inngest.com. Campaign links that
- * redirect straight to app.inngest.com skip the website, so without this the
- * campaign never reaches sign-up. Only runs when the URL carries utm
- * parameters, so a plain visit does not claim first touch ahead of a later
- * campaign visit. Never overwrites an existing cookie.
- */
+// Capture campaign links that land on the dashboard without visiting the website.
 export const ensureFirstTouch = (): void => {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
@@ -73,6 +72,16 @@ export const ensureFirstTouch = (): void => {
   }
 };
 
+const readUrlParam = (name: string): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+
+  try {
+    return new URLSearchParams(window.location.search).get(name) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const getSignupAttribution = (): Record<string, string> => {
   if (typeof document === 'undefined') return {};
 
@@ -100,6 +109,80 @@ export const getSignupAttribution = (): Record<string, string> => {
   }
 };
 
+/** `_ga` is `GA1.<n>.<random>.<timestamp>`; the client ID is the last two parts. */
+export const parseGaClientId = (
+  value: string | undefined,
+): string | undefined => value?.match(/^GA\d+\.\d+\.(\d+\.\d+)$/)?.[1];
+
+// GA4 uses GS1 positional fields or GS2 named fields.
+export const parseGaSessionId = (
+  value: string | undefined,
+): string | undefined => {
+  if (!value) return undefined;
+
+  if (value.startsWith('GS2.')) {
+    const segments = value.split('.').slice(2).join('.').split('$');
+    return segments.map((s) => s.match(/^s(\d+)$/)?.[1]).find(Boolean);
+  }
+  if (value.startsWith('GS1.')) {
+    return value.match(/^GS1\.\d+\.(\d+)\./)?.[1];
+  }
+  return undefined;
+};
+
+// Ignore invalid dates so malformed cookies cannot break the auth forms.
+export const parseGclCookie = (
+  value: string | undefined,
+): { clickId: string; clickedAtMs?: number } | undefined => {
+  const match = value?.match(/^GCL\.(\d+)\.(.+)$/);
+  if (!match || !CLICK_ID_PATTERN.test(match[2])) return undefined;
+  const clickedAtMs = Number(match[1]) * 1000;
+  return {
+    clickId: match[2],
+    clickedAtMs: Number.isNaN(new Date(clickedAtMs).getTime())
+      ? undefined
+      : clickedAtMs,
+  };
+};
+
+export const getGoogleAttribution = (): Record<string, string> => {
+  const attribution: Record<string, string> = {};
+
+  const gaClientId = parseGaClientId(readCookie('_ga'));
+  if (gaClientId) attribution.gaClientId = gaClientId;
+
+  const gaSessionId = parseGaSessionId(readCookie(GA4_SESSION_COOKIE));
+  if (gaSessionId) attribution.gaSessionId = gaSessionId;
+
+  // Prefer the current click over cookies from a previous visit.
+  const urlClickIds = Object.fromEntries(
+    (['gclid', 'gbraid', 'wbraid'] as const).flatMap((key) => {
+      const value = readUrlParam(key);
+      return value && CLICK_ID_PATTERN.test(value) ? [[key, value]] : [];
+    }),
+  );
+
+  let clickedAtMs: number | undefined;
+  if (Object.keys(urlClickIds).length > 0) {
+    Object.assign(attribution, urlClickIds);
+    clickedAtMs = Date.now();
+  } else {
+    const gclid = parseGclCookie(readCookie('_gcl_aw'));
+    const gbraid = parseGclCookie(readCookie('_gcl_gb'));
+    if (gclid) attribution.gclid = gclid.clickId;
+    if (gbraid) attribution.gbraid = gbraid.clickId;
+    const times = [gclid?.clickedAtMs, gbraid?.clickedAtMs].filter(
+      (t): t is number => typeof t === 'number' && t > 0,
+    );
+    if (times.length > 0) clickedAtMs = Math.max(...times);
+  }
+  if (clickedAtMs && !Number.isNaN(new Date(clickedAtMs).getTime())) {
+    attribution.clickTs = new Date(clickedAtMs).toISOString();
+  }
+
+  return attribution;
+};
+
 export const getSignupMetadata = (): Record<string, string> => {
   if (typeof document === 'undefined') return {};
 
@@ -110,5 +193,6 @@ export const getSignupMetadata = (): Record<string, string> => {
   return {
     ...(anonymousID && { anonymousID }),
     ...getSignupAttribution(),
+    ...getGoogleAttribution(),
   };
 };

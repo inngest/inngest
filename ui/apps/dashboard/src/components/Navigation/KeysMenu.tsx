@@ -1,3 +1,9 @@
+import { useMenuInputModality } from '@inngest/components/DropdownMenu/useMenuInputModality';
+import {
+  headlessMenuItemClassName,
+  menuPanelClassName,
+} from '@inngest/components/DropdownMenu/menuStyles';
+import { cn } from '@inngest/components/utils/classNames';
 import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
 import { RiKey2Line } from '@remixicon/react';
@@ -13,6 +19,7 @@ export default function KeysMenu({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
+  const keyboardNavigation = useMenuInputModality();
   return (
     <Listbox>
       <Listbox.Button as="div" className="group">
@@ -25,10 +32,16 @@ export default function KeysMenu({
         />
       </Listbox.Button>
       <div className="relative">
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute left-0 z-50 ml-1 w-[137px] gap-y-0.5 rounded border">
+        <Listbox.Options
+          data-keyboard-navigation={keyboardNavigation}
+          className={cn(
+            menuPanelClassName,
+            'dropdown-focus absolute left-0 z-50 ml-1 w-[137px]',
+          )}
+        >
           <Link to={pathCreator.keys({ envSlug: activeEnv.slug })}>
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="eventKeys"
             >
               Event keys
@@ -37,7 +50,7 @@ export default function KeysMenu({
 
           <Link to={pathCreator.signingKeys({ envSlug: activeEnv.slug })}>
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              className={cn(headlessMenuItemClassName)}
               value="signingKeys"
             >
               Signing keys

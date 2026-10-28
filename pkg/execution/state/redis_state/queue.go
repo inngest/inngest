@@ -1188,6 +1188,7 @@ func (q *queue) PartitionLease(
 		if result[0] > p.Last {
 			p.Last = result[0]
 		}
+		p.CapacityReleased = len(result) > 1 && result[1] == 1
 
 		return &leaseID, nil
 	}

@@ -27,7 +27,9 @@ export type SpanMetadataKind =
   | `inngest.http`
   | `inngest.ai`
   | `inngest.score`
+  | `inngest.score.${string}`
   | `inngest.warnings`
+  | `inngest.warning.${string}`
   | SpanMetadataKindUserland;
 
 export type SpanMetadataKindUserland = `userland.${string}`;
@@ -45,6 +47,8 @@ export type SpanMetadata =
 export type SpanMetadataInngestAI = {
   scope: 'step_attempt' | 'extended_trace';
   kind: 'inngest.ai';
+  // See canonicalMetadataKind: absent from APIs that only return full kinds.
+  isUser?: boolean | null;
   updatedAt: string;
   values: AIMetadata;
 };
@@ -52,6 +56,7 @@ export type SpanMetadataInngestAI = {
 export type SpanMetadataInngestHTTP = {
   scope: 'extended_trace';
   kind: 'inngest.http';
+  isUser?: boolean | null;
   updatedAt: string;
   values: {
     method: string;
@@ -67,14 +72,16 @@ export type SpanMetadataInngestHTTP = {
 
 export type SpanMetadataInngestWarnings = {
   scope: SpanMetadataScope;
-  kind: 'inngest.warnings';
+  kind: 'inngest.warnings' | `inngest.warning.${string}`;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, string>;
 };
 
 export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
-  kind: 'inngest.score';
+  kind: 'inngest.score' | `inngest.score.${string}`;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, number | boolean>;
 };
@@ -82,6 +89,7 @@ export type SpanMetadataInngestScore = {
 export type SpanMetadataUserland = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindUserland;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, unknown>;
 };
@@ -89,6 +97,7 @@ export type SpanMetadataUserland = {
 export type SpanMetadataUnknown = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKind;
+  isUser?: boolean | null;
   updatedAt: string;
   values: Record<string, unknown>;
 };

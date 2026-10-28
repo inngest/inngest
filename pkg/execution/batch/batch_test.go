@@ -168,7 +168,7 @@ func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
 	require.Equal(t, batchID.String(), bulkResult.BatchID)
 	require.Equal(t, "append", bulkResult.Status)
 	require.Equal(t, 1, bulkResult.Committed)
-	items, err := bm.RetrieveItems(ctx, functionID, batchID)
+	items, err := bm.RetrieveItems(ctx, accountID, functionID, batchID)
 	require.NoError(t, err)
 	require.Len(t, items, 3)
 	require.Equal(t, []string{"legacy", "append", "bulk-append"}, []string{
@@ -1098,7 +1098,7 @@ func TestStartExecution(t *testing.T) {
 		res := appendItem(t)
 		batchID := ulid.MustParse(res.BatchID)
 
-		status, err := bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
+		status, err := bm.StartExecution(ctx, uuid.Nil, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 
@@ -1106,7 +1106,7 @@ func TestStartExecution(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEqual(t, res.BatchID, pointer)
 
-		status, err = bm.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
+		status, err = bm.StartExecution(ctx, uuid.Nil, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusStarted.String(), status)
 
@@ -1120,7 +1120,7 @@ func TestStartExecution(t *testing.T) {
 		overflowID := ulid.Make().String()
 		require.NoError(t, r.Set(res.BatchPointerKey, overflowID))
 
-		status, err := bm.StartExecution(ctx, fnID, ulid.MustParse(res.BatchID), res.BatchPointerKey)
+		status, err := bm.StartExecution(ctx, uuid.Nil, fnID, ulid.MustParse(res.BatchID), res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +66,6 @@ func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 	require.Len(t, md, 1, "Expected exactly one metadata item")
 
 	assert.Equal(t, metadata.Kind("inngest.ai"), md[0].Kind())
-	assert.Equal(t, enums.MetadataOpcodeMerge, md[0].Op())
 
 	// Verify the extracted data content
 	raw, err := md[0].Serialize()
@@ -231,7 +229,6 @@ func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {
 	require.Len(t, md, 1, "Expected exactly one metadata item")
 
 	assert.Equal(t, metadata.Kind("inngest.ai"), md[0].Kind())
-	assert.Equal(t, enums.MetadataOpcodeMerge, md[0].Op())
 
 	// Serialize and verify the content
 	raw, err := md[0].Serialize()

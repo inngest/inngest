@@ -41,8 +41,9 @@ func (k *TraceRequestKey) String() string {
 }
 
 type traceReader struct {
-	loaders *Loaders
-	reader  cqrs.TraceReader
+	reader cqrs.TraceReader
+
+	convertRunSpanToGQL func(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error)
 }
 
 // just run id
@@ -85,7 +86,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
+func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	if op == nil {
 		return nil
 	}
@@ -114,7 +115,7 @@ func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	return nil
 }
 
-func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
+func stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
 	if status == nil {
 		return nil
 	}
@@ -146,12 +147,13 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+
 	status := models.RunTraceSpanStatusRunning
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
-		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
+		if gqlStatus := stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
 			status = *gqlStatus
 		}
 	}
@@ -224,6 +226,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.CustomConcurrencyKeys = *span.Attributes.CustomConcurrencyKeys
 	}
 
+	if span.Attributes.StepSpanPath != nil {
+		gqlSpan.SpanPath = *span.Attributes.StepSpanPath
+	}
+	gqlSpan.Origin = span.Attributes.StepOrigin
+
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
 		gqlSpan.SkipReason = &reason
@@ -243,7 +250,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
-		gqlSpan.StepOp = tr.opcodeToGQL(span.Attributes.StepOp)
+		gqlSpan.StepOp = opcodeToGQL(span.Attributes.StepOp)
 	}
 
 	if span.Attributes.StepID != nil {
@@ -341,7 +348,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		for i, cs := range span.Children {
-			child, err := tr.convertRunSpanToGQL(ctx, cs)
+			child, err := convertDynamicRunSpanToGQL(ctx, cs)
 			if err != nil {
 				return nil, fmt.Errorf("error converting child span: %w", err)
 			}
@@ -435,6 +442,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					if child.StepID != nil && *child.StepID != "" {
 						gqlSpan.StepID = child.StepID
 					}
+					if child.SpanPath != nil {
+						gqlSpan.SpanPath = child.SpanPath
+					}
+					if child.Origin != nil {
+						gqlSpan.Origin = child.Origin
+					}
 					if child.StepInfo != nil {
 						gqlSpan.StepInfo = child.StepInfo
 					}
@@ -500,6 +513,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
 			}
+
+			GroupBySpanPath(gqlSpan)
 		}
 
 		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
@@ -571,14 +586,24 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.EndedAt = nil
 	}
 
-	for _, md := range span.Metadata {
-		gqlSpan.Metadata = append(gqlSpan.Metadata, &models.SpanMetadata{
+	gqlSpan.Metadata = append(gqlSpan.Metadata, spanMetadataToGQL(span.Metadata)...)
+
+	return gqlSpan, nil
+}
+
+// spanMetadataToGQL maps a span's metadata to GQL as-is. Kinds keep whatever
+// prefix the store returned (full on the cqrs path, stripped on DuckDB's), so
+// IsUser is what tells a user kind from an internal one w/ the same name.
+func spanMetadataToGQL(mds []*cqrs.SpanMetadata) []*models.SpanMetadata {
+	out := make([]*models.SpanMetadata, 0, len(mds))
+	for _, md := range mds {
+		out = append(out, &models.SpanMetadata{
 			Kind:      md.Kind,
+			IsUser:    md.IsUser,
 			Scope:     md.Scope,
 			Values:    md.Values,
 			UpdatedAt: md.UpdatedAt,
 		})
 	}
-
-	return gqlSpan, nil
+	return out
 }

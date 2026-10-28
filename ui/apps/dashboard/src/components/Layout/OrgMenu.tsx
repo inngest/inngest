@@ -21,6 +21,7 @@ import {
   RiPlugLine,
 } from '@remixicon/react';
 
+import { displayPlanName } from '@/components/Billing/Plans/utils';
 import type { FileRouteTypes } from '@/routeTree.gen';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
@@ -70,7 +71,8 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
     variables: {},
     skip: !open,
   });
-  const planName = data?.account.plan?.name;
+  const rawPlanName = data?.account.plan?.name;
+  const planName = rawPlanName && displayPlanName(rawPlanName);
 
   const onboardingTo = pathCreator.onboardingSteps({
     step: nextStep ? nextStep.name : lastCompletedStep?.name,
@@ -117,7 +119,7 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
                 button's own. */}
             <DropdownMenuItem
               asChild
-              className="text-basis p-0"
+              className="p-0"
               onSelect={() =>
                 navigate({
                   to: '/billing/plans' as FileRouteTypes['to'],
