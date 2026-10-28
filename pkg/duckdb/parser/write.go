@@ -494,7 +494,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *WindowSpec:
 		sw.windowSpec(v)
 	case *DotExpr:
-		sw.indirectionBase(v.X)
+		sw.indirectionBase(v.X, true)
 		sw.str(".")
 		writeIdentPart(sw, v.Field)
 	case *SliceExpr:
@@ -517,13 +517,29 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	}
 }
 
-// indirectionBase prints the operand of a field access or method call. A
-// bare Ident there only comes from parenthesized source (`(t).x`, since an
-// unparenthesized `t.x` is a single two-part Ident), and printed flat it
-// would merge into the dotted name: `(t).x`, a struct field, would reparse
-// as column x of table t, and `(x).f(1)` as a schema-qualified function.
-func (sw *sqlWriter) indirectionBase(x Expr) {
-	if _, ok := x.(*Ident); ok {
+// indirectionBase prints the operand of a field access or method call
+// (field) or a subscript (!field), parenthesizing the shapes that would
+// otherwise absorb the indirection:
+//   - A bare Ident under a field access only comes from parenthesized
+//     source (`(t).x`, since an unparenthesized `t.x` is a single two-part
+//     Ident), and printed flat it would merge into the dotted name: `(t).x`,
+//     a struct field, would reparse as column x of table t, and `(x).f(1)`
+//     as a schema-qualified function.
+//   - A number would lex its trailing dot as a decimal point: `(1).x` as
+//     `1. AS x`.
+//   - A `::` cast's Type would take the indirection as part of the type:
+//     `(a::INT)[1]` as a cast to `INT[1]`, `(a::t).k` as a cast to `t.k`.
+func (sw *sqlWriter) indirectionBase(x Expr, field bool) {
+	parens := false
+	switch v := x.(type) {
+	case *CastExpr:
+		parens = !v.TryCast
+	case *Ident:
+		parens = field
+	case *Literal:
+		parens = field && v.Kind == LitNumber
+	}
+	if parens {
 		sw.str("(")
 		sw.exprTop(x)
 		sw.str(")")
@@ -659,7 +675,7 @@ func (sw *sqlWriter) listExpr(l *ListExpr) {
 // (an element). A step implies a stop colon in the grammar; checking the
 // other fields too keeps a hand-built AST printing a valid slice.
 func (sw *sqlWriter) sliceExpr(s *SliceExpr) {
-	sw.exprAtLeast(s.X, precAtom)
+	sw.indirectionBase(s.X, false)
 	sw.str("[")
 	if s.Start != nil {
 		sw.exprTop(s.Start)
@@ -715,7 +731,7 @@ func (sw *sqlWriter) listComprehensionExpr(l *ListComprehensionExpr) {
 
 func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 	if f.Receiver != nil {
-		sw.indirectionBase(f.Receiver)
+		sw.indirectionBase(f.Receiver, true)
 		sw.str(".")
 	}
 	// Function names skip writeIdentPart's keyword check: keyword-named
