@@ -12,3 +12,8 @@ const (
 	FnDeferScheduleName = InternalNamePrefix + "deferred.schedule"
 	HttpRequestName     = InternalNamePrefix + "http.request"
 )
+
+// SubscriptionWaitName names the index of the pauses a run blocks on while it
+// waits for the next message of a step.subscribe subscription. No event has
+// this name.
+const SubscriptionWaitName = InternalNamePrefix + "subscription.wait"

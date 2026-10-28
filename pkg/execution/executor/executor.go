@@ -3579,6 +3579,12 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// A subscription pause lives as long as the run: its expiry is not a timeout
+	// the run waits on, and a closed subscription has nothing to resume.
+	if pause.Subscribe != nil {
+		return nil
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -3932,7 +3938,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if e.shards != nil {
+		if e.shards != nil && !isSubscriptionWaitPause(&pause) {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shards.Resolve(ctx, queue.Scope{

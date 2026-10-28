@@ -31,6 +31,11 @@ func SkipFlushing(index Index, pauses []*state.Pause) bool {
 		// flush this block for fast O(1) lookups.
 		return true
 	}
+	if index.EventName == consts.SubscriptionWaitName {
+		// A run blocked on a subscription is woken through an O(1) lookup by ID
+		// and its pause is short-lived: never flush this index.
+		return true
+	}
 
 	return slices.ContainsFunc(pauses, func(s *state.Pause) bool {
 		// NOTE: If this pause has a correlation ID, ignore the block flushing for this index.

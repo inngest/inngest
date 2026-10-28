@@ -65,15 +65,16 @@ func subscriptionStepID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionWaitEvent names the index of the pauses that block a run waiting
-// for a message. No event has this name, so events never match them: the
-// delivery of a message consumes them.
-const subscriptionWaitEvent = "inngest/subscription.wait"
-
 // subscriptionWaitPauseID is the ID of the pause a run blocks on while it waits
-// for the next message of a subscription. There is at most one.
-func subscriptionWaitPauseID(runID string, key string) uuid.UUID {
-	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-wait:%s", runID, key))
+// for message seq of a subscription. It is made of the sequence number so that
+// consuming one wait never deletes the next, whichever is written first.
+func subscriptionWaitPauseID(runID string, key string, seq int) uuid.UUID {
+	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-wait:%s:%d", runID, key, seq))
+}
+
+// subscriptionExpiryJobID is the queue job that expires a subscription pause.
+func subscriptionExpiryJobID(md *sv2.Metadata, pauseID uuid.UUID) string {
+	return fmt.Sprintf("%s-subscription-expiry-%s", md.IdempotencyKey(), pauseID)
 }
 
 func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
@@ -147,7 +148,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		// A queued item that fires when the subscription expires. It keeps the
 		// run holding its function singleton while it waits: the singleton lock
 		// is released once the run has no queued items.
-		jobID := fmt.Sprintf("%s-%s-expiry", md.IdempotencyKey(), gen.ID)
+		jobID := subscriptionExpiryJobID(md, pauseID)
 		expiry := queue.Item{
 			JobID:                 &jobID,
 			WorkspaceID:           md.ID.Tenant.EnvID,
@@ -173,8 +174,8 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		// The run blocks on a pause that the delivery of the next message
 		// consumes, like waitForEvent. The run only wakes when it is blocked: a
 		// wake while a request is executing would run its steps twice.
-		waitIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: subscriptionWaitEvent}
-		waitID := subscriptionWaitPauseID(runID, sub.Key)
+		waitIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
+		waitID := subscriptionWaitPauseID(runID, sub.Key, sub.Seq)
 		opcode := gen.Op.String()
 		wait := state.Pause{
 			ID:           waitID,
@@ -186,36 +187,17 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			StepName:     gen.UserDefinedName(),
 			Opcode:       &opcode,
 			Expires:      state.Time(e.now().Add(consts.MaxWaitForEventTimeout)),
-			Event:        new(subscriptionWaitEvent),
+			Event:        new(consts.SubscriptionWaitName),
 			DataKey:      gen.ID,
 			MaxAttempts:  runCtx.MaxAttempts(),
 			ParallelMode: gen.ParallelMode(),
 			CreatedAt:    e.now(),
-			// The message the run waits for, so a redelivered event is only a wake
-			// when that message exists.
-			Metadata: map[string]any{"seq": sub.Seq},
+			// The subscription and the message the run waits for, so a redelivered
+			// event is only a wake when that message exists.
+			Metadata: map[string]any{"key": sub.Key, "seq": sub.Seq},
 		}
-		_, err := e.pm.Write(ctx, waitIdx, &wait)
-		if errors.Is(err, state.ErrPauseAlreadyExists) {
-			// The same wait is written again when the op is sent again. A wait
-			// for another step is stale: replace it.
-			existing, lookupErr := e.pm.PauseByID(ctx, waitIdx, waitID)
-			switch {
-			case errors.Is(lookupErr, state.ErrPauseNotFound) || (lookupErr == nil && existing == nil):
-				// Consumed between the write and the lookup: write it again.
-				_, err = e.pm.Write(ctx, waitIdx, &wait)
-			case lookupErr != nil:
-				return fmt.Errorf("error loading subscription wait pause: %w", lookupErr)
-			case existing.DataKey != gen.ID:
-				if err := e.pm.Delete(ctx, waitIdx, *existing); err != nil {
-					return fmt.Errorf("error replacing subscription wait pause: %w", err)
-				}
-				_, err = e.pm.Write(ctx, waitIdx, &wait)
-			default:
-				err = nil
-			}
-		}
-		if err != nil {
+		// The same wait is written again when the op is sent again.
+		if _, err := e.pm.Write(ctx, waitIdx, &wait); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription wait pause: %w", err)
 		}
 
@@ -228,7 +210,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if len(ids) < sub.Seq {
 			return nil
 		}
-		return e.wakeSubscriber(ctx, md.ID, sub.Key, ids[sub.Seq-1], false)
+		return e.consumeWait(ctx, md.ID, sub.Key, &wait, false)
 
 	case state.SubscribePoll:
 		ids, err := messages()
@@ -263,6 +245,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			if e.exprAggregator != nil {
 				_ = e.exprAggregator.RemovePause(ctx, pause)
 			}
+			e.dequeueSubscriptionExpiry(ctx, md, pauseID)
 		}
 
 		ids, err := messages()
@@ -290,20 +273,77 @@ func waitSeq(pause *state.Pause) int {
 	return 0
 }
 
-// wakeSubscriber consumes the pause a run is blocked on, if there is one, so the
-// run sees the message. Its output is the ID of the message step.
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string, verify bool) error {
-	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionWaitEvent}
-	pause, err := e.pm.PauseByID(ctx, waitIdx, subscriptionWaitPauseID(id.RunID.String(), key))
-	if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
-		return nil
+// isSubscriptionWaitPause reports whether a pause is the one a run blocks on while it
+// waits for a subscription message. It has no timeout job.
+func isSubscriptionWaitPause(pause *state.Pause) bool {
+	return pause.Event != nil && *pause.Event == consts.SubscriptionWaitName
+}
+
+// dequeueSubscriptionExpiry removes the queue job that would expire a subscription
+// pause, once the pause is closed.
+func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metadata, pauseID uuid.UUID) {
+	if e.shards == nil {
+		return
 	}
+
+	shard, err := e.shards.Resolve(ctx, queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, nil)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("could not find shard to dequeue the subscription expiry", "error", err)
+		return
+	}
+
+	err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
+		ID:         queue.HashID(ctx, subscriptionExpiryJobID(md, pauseID)),
+		FunctionID: md.ID.FunctionID,
+		Data: queue.Item{
+			Kind:       queue.KindPause,
+			Identifier: sv2.V1FromMetadata(*md),
+		},
+	})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
+		logger.StdlibLogger(ctx).Error("error dequeueing the subscription expiry", "error", err)
+	}
+}
+
+// wakeSubscriber wakes the run if it is blocked on this subscription: it finds
+// the wait pause among the run's pauses. There is at most one.
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, verify bool) error {
+	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
+
+	pauseIDs, err := e.pm.PauseIDsForRun(ctx, id.RunID)
 	if err != nil {
 		return err
 	}
 
+	for _, pauseID := range pauseIDs {
+		pause, err := e.pm.PauseByID(ctx, waitIdx, pauseID)
+		if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if waitKey, _ := pause.Metadata["key"].(string); waitKey != key {
+			continue
+		}
+
+		return e.consumeWait(ctx, id, key, pause, verify)
+	}
+
+	return nil
+}
+
+// consumeWait consumes a wait pause so the run sees the message it waits for.
+// Its output names that message's position. With verify, the pause is only
+// consumed when that message exists: a redelivered event may be an old one.
+func (e *executor) consumeWait(ctx context.Context, id sv2.ID, key string, pause *state.Pause, verify bool) error {
+	awaited := waitSeq(pause)
+
 	if verify {
-		awaited := waitSeq(pause)
 		if awaited == 0 {
 			return nil
 		}
@@ -316,8 +356,8 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, me
 		}
 	}
 
-	err = e.Resume(ctx, *pause, execution.ResumeRequest{
-		With:     map[string]any{"data": messageID},
+	err := e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     map[string]any{"data": map[string]any{"seq": awaited}},
 		StepName: pause.StepName,
 	})
 	if errors.Is(err, state.ErrPauseLeased) || errors.Is(err, state.ErrPauseNotFound) {
@@ -365,5 +405,5 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	// A new message is the one a blocked run waits for. A redelivery may be an
 	// old message, so it only wakes a run whose awaited message exists.
-	return e.wakeSubscriber(ctx, id, key, messageID, redelivered)
+	return e.wakeSubscriber(ctx, id, key, redelivered)
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/stretchr/testify/require"
@@ -98,4 +99,27 @@ func TestWaitSeq(t *testing.T) {
 	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": float64(3)}}))
 	require.Equal(t, 0, waitSeq(&state.Pause{}))
 	require.Equal(t, 0, waitSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
+}
+
+// The wait pause of every message has its own ID: consuming one deletes it by
+// ID after queuing discovery, so a run that already wrote the wait for the next
+// message must not have it deleted by the cleanup of the previous one.
+func TestSubscriptionWaitPauseIDs(t *testing.T) {
+	first := subscriptionWaitPauseID("run", "inbox", 1)
+
+	require.Equal(t, first, subscriptionWaitPauseID("run", "inbox", 1))
+	require.NotEqual(t, first, subscriptionWaitPauseID("run", "inbox", 2))
+	require.NotEqual(t, first, subscriptionWaitPauseID("run", "other", 1))
+	require.NotEqual(t, first, subscriptionWaitPauseID("run2", "inbox", 1))
+	require.NotEqual(t, first, subscriptionPauseID("run", "inbox", 0))
+}
+
+func TestSubscriptionWaitPause(t *testing.T) {
+	event := consts.SubscriptionWaitName
+
+	require.True(t, isSubscriptionWaitPause(&state.Pause{Event: &event}))
+	require.False(t, isSubscriptionWaitPause(&state.Pause{}))
+
+	other := "agent/message"
+	require.False(t, isSubscriptionWaitPause(&state.Pause{Event: &other}))
 }
