@@ -17,6 +17,7 @@ package dashboards
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -70,6 +71,19 @@ const (
 	maxLimit     = 100
 )
 
+// Get's resource limits, mirroring pkg/duckdb/insights' Execute
+// (executeTimeout/maxConcurrentExecutes): Get runs on the same *sql.DB, so
+// the same connection pool and DuckDB subprocess dual-write uses, and an
+// unbounded backlog of dashboard queries would starve it. A separate pool of
+// slots from Insights', so neither can lock the other out. Vars rather than
+// consts only so tests can shrink them.
+const maxConcurrentGets = 4
+
+var (
+	getTimeout = 30 * time.Second
+	getSlots   = make(chan struct{}, maxConcurrentGets)
+)
+
 // Get runs the registry query for one key. An unrecognized key returns
 // (nil, nil) rather than erroring -- keys are plain strings nothing
 // upstream validates ahead of time, matching the reference Get's own
@@ -89,8 +103,21 @@ func Get(ctx context.Context, db *sql.DB, scope Scope, key string) (*Result, err
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 
+	// One deadline covers waiting for a slot and running, like Execute.
+	ctx, cancel := context.WithTimeout(ctx, getTimeout)
+	defer cancel()
+	select {
+	case getSlots <- struct{}{}:
+		defer func() { <-getSlots }()
+	case <-ctx.Done():
+		return nil, fmt.Errorf("dashboard query (%s): too many dashboard queries are already running: %w", key, ctx.Err())
+	}
+
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("dashboard query (%s): exceeded the %s time limit: %w", key, getTimeout, err)
+		}
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 	defer rows.Close()
