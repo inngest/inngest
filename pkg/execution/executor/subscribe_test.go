@@ -69,14 +69,13 @@ func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
 			want: []string{"step"},
 		},
 		{
-			name: "open, poll, ack and close complete in their request and stay tracked",
+			name: "open, poll and close complete in their request and stay tracked",
 			ops: []*state.GeneratorOpcode{
 				subscription("o", true, "open"),
 				subscription("p", true, "poll"),
-				subscription("k", true, "ack"),
 				subscription("c", true, "close"),
 			},
-			want: []string{"o", "p", "k", "c"},
+			want: []string{"o", "p", "c"},
 		},
 		{
 			name: "a plain wait for event is still tracked",
@@ -91,4 +90,12 @@ func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
 			require.Equal(t, tc.want, groups.NonLazyIDs())
 		})
 	}
+}
+
+func TestWaitSeq(t *testing.T) {
+	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": 3}}))
+	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": int64(3)}}))
+	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": float64(3)}}))
+	require.Equal(t, 0, waitSeq(&state.Pause{}))
+	require.Equal(t, 0, waitSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
 }

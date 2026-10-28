@@ -200,12 +200,18 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// The same wait is written again when the op is sent again. A wait
 			// for another step is stale: replace it.
 			existing, lookupErr := e.pm.PauseByID(ctx, waitIdx, waitID)
-			if lookupErr == nil && existing != nil && existing.DataKey != gen.ID {
+			switch {
+			case errors.Is(lookupErr, state.ErrPauseNotFound) || (lookupErr == nil && existing == nil):
+				// Consumed between the write and the lookup: write it again.
+				_, err = e.pm.Write(ctx, waitIdx, &wait)
+			case lookupErr != nil:
+				return fmt.Errorf("error loading subscription wait pause: %w", lookupErr)
+			case existing.DataKey != gen.ID:
 				if err := e.pm.Delete(ctx, waitIdx, *existing); err != nil {
 					return fmt.Errorf("error replacing subscription wait pause: %w", err)
 				}
 				_, err = e.pm.Write(ctx, waitIdx, &wait)
-			} else {
+			default:
 				err = nil
 			}
 		}
@@ -269,6 +275,21 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
+// waitSeq is the message a wait pause waits for, or 0 when the pause does not say.
+// The metadata is a JSON number once it has been stored.
+func waitSeq(pause *state.Pause) int {
+	switch seq := pause.Metadata["seq"].(type) {
+	case int:
+		return seq
+	case int64:
+		return int(seq)
+	case float64:
+		return int(seq)
+	}
+
+	return 0
+}
+
 // wakeSubscriber consumes the pause a run is blocked on, if there is one, so the
 // run sees the message. Its output is the ID of the message step.
 func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string, verify bool) error {
@@ -282,12 +303,15 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, me
 	}
 
 	if verify {
-		awaited, _ := pause.Metadata["seq"].(float64)
+		awaited := waitSeq(pause)
+		if awaited == 0 {
+			return nil
+		}
 		stack, err := e.smv2.LoadStack(ctx, id)
 		if err != nil {
 			return err
 		}
-		if float64(len(subscriptionMessageIDs(stack, key))) < awaited {
+		if len(subscriptionMessageIDs(stack, key)) < awaited {
 			return nil
 		}
 	}
