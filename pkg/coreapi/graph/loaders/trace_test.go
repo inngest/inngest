@@ -50,8 +50,6 @@ func TestStepStatusToGQL(t *testing.T) {
 }
 
 func TestOpcodeToGQL(t *testing.T) {
-	tr := &traceReader{}
-
 	tests := []struct {
 		name     string
 		input    enums.Opcode
@@ -68,7 +66,7 @@ func TestOpcodeToGQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			op := tt.input
-			result := tr.opcodeToGQL(&op)
+			result := opcodeToGQL(&op)
 			require.NotNil(t, result, "opcodeToGQL should not return nil for %s", tt.name)
 			assert.Equal(t, tt.expected, *result)
 		})
