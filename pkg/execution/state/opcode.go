@@ -618,8 +618,8 @@ const (
 	SubscribeNext = "next"
 	// SubscribePoll answers message Seq now, or null when it has not arrived.
 	SubscribePoll = "poll"
-	// SubscribeAck records that the run received message Seq. Messages that
-	// were saved but never acked are handed to the next run of the thread.
+	// SubscribeAck records that the run handled message Seq. The record is
+	// bookkeeping: nothing is re-sent for messages that were never acked.
 	SubscribeAck = "ack"
 	// SubscribeClose deletes the subscription pause and reports how many
 	// messages were saved.

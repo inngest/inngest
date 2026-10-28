@@ -3363,7 +3363,8 @@ func (e *executor) handlePause(
 			// step.subscribe: save the event as a message and keep the pause.
 			err := e.deliverSubscription(ctx, evt, pause, l)
 			if errors.Is(err, state.ErrRunNotFound) {
-				// The run is gone, so the message cannot be saved to it.
+				// The run is gone, so the message cannot be saved to it. It is dropped:
+				// nothing is re-sent for a run that has finished.
 				cleanup(ctx)
 				return nil
 			}
