@@ -97,6 +97,9 @@ func TestRestrictExternalAccessKeepsDuckLakeWorking(t *testing.T) {
 				QuackAddr:              &addr,
 				QuackConns:             4,
 				RestrictExternalAccess: true,
+				// What devserver runs w/, so dual-write's DuckLake ops are
+				// covered under the limits too.
+				ResourceLimits: DefaultResourceLimits(),
 			})
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = db.Close() })
@@ -162,4 +165,52 @@ func TestRestrictExternalAccessOffByDefault(t *testing.T) {
 	_, rows, err := p.Exec(t.Context(), "SELECT current_setting('enable_external_access') AS v;")
 	require.NoError(t, err)
 	require.Equal(t, true, rows[0].Get("v"))
+}
+
+func TestResourceLimitStmts(t *testing.T) {
+	stmts, err := resourceLimitStmts(ResourceLimits{})
+	require.NoError(t, err)
+	require.Empty(t, stmts)
+
+	stmts, err = resourceLimitStmts(ResourceLimits{MemoryLimit: "1GiB", Threads: 3, MaxTempDirectorySize: "2GiB"})
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"SET GLOBAL memory_limit='1GiB';",
+		"SET GLOBAL max_temp_directory_size='2GiB';",
+		"SET GLOBAL threads=3;",
+	}, stmts)
+}
+
+// TestResourceLimitsAppliedUnderSandbox proves the limits land (and are
+// re-applied after a crash-triggered respawn) alongside the sandbox, and are
+// visible from every connection since they're GLOBAL.
+func TestResourceLimitsAppliedUnderSandbox(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	limits := &ResourceLimits{MemoryLimit: "512MiB", Threads: 2, MaxTempDirectorySize: "1GiB"}
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr,
+		withRestrictExternalAccess(true), withResourceLimits(limits))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(context.Background()) })
+
+	const q = "SELECT current_setting('memory_limit') AS m, current_setting('threads') AS t, current_setting('max_temp_directory_size') AS d;"
+	check := func(execer sqlExecer) {
+		t.Helper()
+		_, rows, err := execer.Exec(t.Context(), q)
+		require.NoError(t, err)
+		require.Equal(t, "512.0 MiB", rows[0].Get("m"))
+		require.EqualValues(t, 2, rows[0].Get("t"))
+		require.Equal(t, "1.0 GiB", rows[0].Get("d"))
+	}
+	check(p)
+	pooled, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+	check(pooled)
+
+	require.NoError(t, p.restart(t.Context()))
+	check(p)
+	_, _, err = p.Exec(t.Context(), "SELECT getenv('HOME') AS v;")
+	require.ErrorContains(t, err, "getenv is disabled")
 }
