@@ -85,6 +85,10 @@ type process struct {
 	// at the end of every spawn's bootstrap — see
 	// Options.RestrictExternalAccess and bootstrapSandboxLocked.
 	restrictExternalAccess bool
+	// resourceLimits, when non-nil, caps DuckDB's memory/threads/temp
+	// spill at the end of every spawn's bootstrap -- see
+	// Options.ResourceLimits and bootstrapResourceLimitsLocked.
+	resourceLimits *ResourceLimits
 
 	procCtx    context.Context
 	procCancel context.CancelFunc
@@ -320,6 +324,10 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	}
 
 	if err := p.startQuackLocked(ctx); err != nil {
+		return err
+	}
+
+	if err := p.bootstrapResourceLimitsLocked(ctx); err != nil {
 		return err
 	}
 
@@ -1301,6 +1309,16 @@ type Options struct {
 	// caller's; statements that need external access after bootstrap (a
 	// later INSTALL/LOAD/ATTACH) will fail.
 	RestrictExternalAccess bool
+
+	// ResourceLimits, when non-nil, caps DuckDB's memory_limit, threads,
+	// and max_temp_directory_size on every spawn (see
+	// bootstrapResourceLimitsLocked). Leave nil for DuckDB's own defaults
+	// (80% of RAM, every core, 90% of free disk). Like
+	// RestrictExternalAccess, these are GLOBAL to the subprocess, so they
+	// bound every connection's statements together, not just the caller's.
+	// DefaultResourceLimits is a conservative starting point for a handle
+	// that also runs Insights.
+	ResourceLimits *ResourceLimits
 }
 
 // Connector implements database/sql/driver.Connector over one supervised
@@ -1329,6 +1347,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			withLocalExtensionPaths(c.opts.LocalExtensionPaths),
 			withQuackServeToken(c.opts.QuackServeToken),
 			withRestrictExternalAccess(c.opts.RestrictExternalAccess),
+			withResourceLimits(c.opts.ResourceLimits),
 		)
 		if err != nil {
 			return nil, err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -92,5 +93,84 @@ func sandboxStmts(duckLake *DuckLakeOptions) ([]string, error) {
 		stmts = append(stmts, fmt.Sprintf("SET allowed_directories=%s;", lit))
 	}
 	stmts = append(stmts, "SET enable_external_access=false;")
+	return stmts, nil
+}
+
+// ResourceLimits caps the DuckDB subprocess's resource use -- see
+// Options.ResourceLimits. A zero field leaves that setting at DuckDB's own
+// default.
+type ResourceLimits struct {
+	// MemoryLimit is DuckDB's memory_limit (e.g. "2GiB"). NOTE: it only
+	// bounds the buffer manager, so it doesn't stop every runaway statement
+	// (one huge repeat()/lpad()/range() value is allocated outside it, see
+	// pkg/duckdb/insights' size guard), but it does make big joins/sorts/
+	// aggregates spill or fail instead of taking the host's RAM.
+	MemoryLimit string
+	// Threads is DuckDB's threads.
+	Threads int
+	// MaxTempDirectorySize is DuckDB's max_temp_directory_size (e.g.
+	// "4GiB"), bounding how much a statement over MemoryLimit can spill to
+	// disk.
+	MaxTempDirectorySize string
+}
+
+// DefaultResourceLimits returns conservative limits for a subprocess that
+// both dual-writes and runs Insights queries. The limits are per-process,
+// so a heavy Insights query and dual-write's own writes share them: they're
+// sized for dev-scale data, leaving dual-write's small batched INSERTs
+// plenty of headroom while keeping a runaway query from taking the whole
+// machine. Fixed sizes rather than a percentage of RAM because DuckDB only
+// accepts "N%" for memory_limit in newer releases (1.5.5 rejects it).
+func DefaultResourceLimits() *ResourceLimits {
+	return &ResourceLimits{
+		MemoryLimit:          "2GiB",
+		Threads:              max(1, min(4, runtime.NumCPU()/2)),
+		MaxTempDirectorySize: "4GiB",
+	}
+}
+
+// withResourceLimits sets resourceLimits on a process being constructed --
+// see Options.ResourceLimits.
+func withResourceLimits(limits *ResourceLimits) processOption {
+	return func(p *process) { p.resourceLimits = limits }
+}
+
+// bootstrapResourceLimitsLocked assumes mu is already held. It is a no-op
+// unless the caller set Options.ResourceLimits. Every setting is GLOBAL
+// (there is no per-connection memory/thread limit in DuckDB) and, unlike
+// the sandbox, stays changeable afterwards, so it runs before
+// bootstrapSandboxLocked only for tidiness. Insights can't change them back
+// since it only ever runs a validated SELECT.
+func (p *process) bootstrapResourceLimitsLocked(ctx context.Context) error {
+	if p.resourceLimits == nil {
+		return nil
+	}
+	stmts, err := resourceLimitStmts(*p.resourceLimits)
+	if err != nil {
+		return err
+	}
+	return p.bootstrapExecLocked(ctx, "resource limits", stmts)
+}
+
+// resourceLimitStmts builds the SET GLOBAL statements for limits' non-zero
+// fields.
+func resourceLimitStmts(limits ResourceLimits) ([]string, error) {
+	var stmts []string
+	for _, s := range []struct{ name, value string }{
+		{"memory_limit", limits.MemoryLimit},
+		{"max_temp_directory_size", limits.MaxTempDirectorySize},
+	} {
+		if s.value == "" {
+			continue
+		}
+		lit, err := encodeLiteral(s.value)
+		if err != nil {
+			return nil, fmt.Errorf("duckdb: encoding %s: %w", s.name, err)
+		}
+		stmts = append(stmts, fmt.Sprintf("SET GLOBAL %s=%s;", s.name, lit))
+	}
+	if limits.Threads > 0 {
+		stmts = append(stmts, fmt.Sprintf("SET GLOBAL threads=%d;", limits.Threads))
+	}
 	return stmts, nil
 }
