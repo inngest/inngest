@@ -153,6 +153,8 @@ func binaryExprType(b *parser.BinaryExpr, scope *tableScope) ColumnType {
 		return ColumnTypeString
 	case "->":
 		return ColumnTypeJSON
+	case "COLLATE":
+		return inferType(b.Left, scope)
 	case "+", "-", "*", "/", "%", "^", "//":
 		if inferType(b.Left, scope) == ColumnTypeDatetime || inferType(b.Right, scope) == ColumnTypeDatetime {
 			return ColumnTypeDatetime

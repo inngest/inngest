@@ -368,6 +368,15 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 	case *parser.ListComprehensionExpr:
 		v.err = v.checkListComprehension(x)
 		return nil
+	case *parser.BinaryExpr:
+		// "x COLLATE nocase": the parser represents the collation name as
+		// an Ident on the right, which isn't a column reference, so only
+		// the collated operand is checked (DuckDB rejects an unknown
+		// collation itself).
+		if strings.EqualFold(x.Op, "COLLATE") {
+			parser.Walk(v, x.Left)
+			return nil
+		}
 	case *parser.Parameter:
 		// remapTables binds every macro call's (account_id, env_id) to
 		// anonymous "?" placeholders, positionally. A user's own "?" would
@@ -510,34 +519,34 @@ func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 // bogus_alias.*" or "SELECT * EXCLUDE (nonexistent_column)" would
 // otherwise reach remapTables/DuckDB completely unvalidated.
 func (v *exprValidator) checkStar(s *parser.StarExpr) error {
-	var tables []logicalTable
-	switch len(s.Qualifier) {
-	case 0:
-		for _, name := range v.scope.names() {
-			if tbl, ok := v.scope.lookup(name); ok {
-				tables = append(tables, tbl)
-			}
-		}
-	case 1:
-		tbl, ok := v.scope.lookup(s.Qualifier[0])
-		if !ok {
-			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
-		}
-		tables = []logicalTable{tbl}
-	default:
+	if len(s.Qualifier) > 1 {
 		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported qualifier %q", strings.Join(s.Qualifier, "."))}
 	}
+	entries, ok := v.scope.starEntries(s.Qualifier)
+	if !ok {
+		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
+	}
 
-	for _, exclude := range s.Exclude {
+	// A qualified entry ("t.col") must name one of the tables this star
+	// expands over, matching DuckDB ("SELECT a.* EXCLUDE (b.k)" is a
+	// binder error).
+	for _, raw := range s.Exclude {
+		x, ok := parseExcludeName(raw)
+		if !ok {
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported EXCLUDE entry %q", raw)}
+		}
 		found := false
-		for _, tbl := range tables {
-			if _, ok := tbl.column(exclude); ok {
+		for _, e := range entries {
+			if x.qualifier != "" && !strings.EqualFold(x.qualifier, e.alias) {
+				continue
+			}
+			if _, ok := e.table.column(x.column); ok {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", exclude)}
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", raw)}
 		}
 	}
 	return nil

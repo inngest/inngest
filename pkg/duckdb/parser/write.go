@@ -600,7 +600,7 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 		sw.str(" EXCLUDE (")
 		for i, e := range s.Exclude {
 			sw.sep(i, ", ")
-			writeIdentPart(sw, e)
+			writeDottedName(sw, SplitExcludeName(e))
 		}
 		sw.str(")")
 	}
