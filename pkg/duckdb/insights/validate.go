@@ -69,7 +69,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 			if err != nil {
 				return nil, nil, err
 			}
-			merged[cte.Name] = tbl
+			merged[strings.ToLower(cte.Name)] = tbl
 		}
 		ctes = merged
 	}
@@ -185,7 +185,7 @@ func selectAliases(stmt *parser.SelectStatement) map[string]bool {
 	aliases := make(map[string]bool, len(stmt.Columns))
 	for _, item := range stmt.Columns {
 		if item.Alias != "" {
-			aliases[item.Alias] = true
+			aliases[strings.ToLower(item.Alias)] = true
 		}
 	}
 	return aliases
@@ -198,7 +198,7 @@ func isAliasOnlyReference(e parser.Expr, aliases map[string]bool, scope *tableSc
 	if !ok || len(id.Parts) != 1 {
 		return false
 	}
-	return aliases[id.Parts[0]] && scope.columnCount(id.Parts[0]) == 0
+	return aliases[strings.ToLower(id.Parts[0])] && scope.columnCount(id.Parts[0]) == 0
 }
 
 // collectExprs gathers every top-level expression stmt's clauses carry,
@@ -349,7 +349,7 @@ type exprValidator struct {
 }
 
 func (v *exprValidator) isBound(name string) bool {
-	return slices.Contains(v.boundVars, name)
+	return slices.ContainsFunc(v.boundVars, func(b string) bool { return strings.EqualFold(b, name) })
 }
 
 func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
@@ -446,7 +446,7 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 		return nil
 	}
 	if tbl, ok := v.scope.lookup(id.Parts[0]); ok {
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok {
 			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unknown column %q on table %q", id.Parts[1], id.Parts[0])}
 		}
@@ -531,7 +531,7 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 	for _, exclude := range s.Exclude {
 		found := false
 		for _, tbl := range tables {
-			if _, ok := tbl.columns[exclude]; ok {
+			if _, ok := tbl.column(exclude); ok {
 				found = true
 				break
 			}
