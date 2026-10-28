@@ -11,18 +11,24 @@ import (
 	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
-// Execute's resource limits. The connection pool behind Execute's *sql.DB is
-// shared with dual-write (devserver's dualWriteQuackConns, 16), so Insights
-// takes only a fraction of it; LIMIT (defaultInsightsLimit) already bounds
+// Execute's resource limits. LIMIT (defaultInsightsLimit) already bounds
 // rows, and maxResultBytes bounds their size (e.g. one repeat('a', 2e9)
 // cell). Vars rather than consts only so tests can shrink them.
-const maxConcurrentExecutes = 4
-
 var (
 	executeTimeout       = 30 * time.Second
 	maxResultBytes int64 = 32 << 20
-	executeSlots         = make(chan struct{}, maxConcurrentExecutes)
 )
+
+// errExecuteTimeout is the cause Execute's own executeTimeout deadline
+// cancels its ctx with, so a caller's own cancellation or (shorter)
+// deadline isn't reported as one of Execute's limits.
+var errExecuteTimeout = errors.New("insights: execute timeout")
+
+// hitExecuteTimeout reports whether ctx ended because of Execute's own
+// executeTimeout rather than its caller.
+func hitExecuteTimeout(ctx context.Context) bool {
+	return errors.Is(context.Cause(ctx), errExecuteTimeout)
+}
 
 // limitError rewrites err into a user-facing message when it was caused by
 // one of Execute's own limits rather than by the query itself.
@@ -30,7 +36,7 @@ func limitError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, driver.ErrResultTooLarge):
 		return fmt.Errorf("query result exceeds the %d MiB limit; select fewer columns or rows: %w", maxResultBytes>>20, err)
-	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+	case hitExecuteTimeout(ctx):
 		return fmt.Errorf("query exceeded the %s time limit: %w", executeTimeout, err)
 	}
 	return err
@@ -111,23 +117,13 @@ type Result struct {
 // past its reconciled column count) gets no hint at all rather than a
 // panic or guess.
 //
-// Every call is bounded (see executeTimeout, maxConcurrentExecutes,
-// maxResultBytes): Insights shares its *sql.DB, and so its connection pool
-// and DuckDB subprocess, with dual-write.
+// Every call is bounded (see executeTimeout, maxResultBytes): Insights
+// shares its *sql.DB, and so its DuckDB subprocess, with dual-write.
 func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, error) {
-	// One deadline covers waiting for a slot and running, so a backlog of
-	// queued queries can't grow without bound either. The driver turns the
-	// deadline into a real DuckDB interrupt (quack sends a CancelRequest),
-	// not just an abandoned wait.
-	ctx, cancel := context.WithTimeout(ctx, executeTimeout)
+	// The driver turns the deadline into a real DuckDB interrupt (quack
+	// sends a CancelRequest), not just an abandoned wait.
+	ctx, cancel := context.WithTimeoutCause(ctx, executeTimeout, errExecuteTimeout)
 	defer cancel()
-
-	select {
-	case executeSlots <- struct{}{}:
-		defer func() { <-executeSlots }()
-	case <-ctx.Done():
-		return nil, &ExecutionError{Err: fmt.Errorf("too many Insights queries are already running; try again shortly"), Start: tr.Start, End: tr.End}
-	}
 
 	ctx = driver.WithMaxResultBytes(ctx, maxResultBytes)
 

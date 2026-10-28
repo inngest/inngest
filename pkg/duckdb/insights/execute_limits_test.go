@@ -94,18 +94,18 @@ func TestExecuteRejectsOversizedResult(t *testing.T) {
 	require.Len(t, res.Rows, 1)
 }
 
-// TestExecuteCapsConcurrency: with every slot taken, a query waits only
-// until its own deadline, then fails without touching the database.
-func TestExecuteCapsConcurrency(t *testing.T) {
+// TestExecuteCallerCancellationIsNotATimeLimit: a caller that gives up
+// first gets its own ctx error back, not Execute's "time limit" message
+// (TestExecuteTimesOutAndInterrupts covers Execute's own deadline).
+func TestExecuteCallerCancellationIsNotATimeLimit(t *testing.T) {
 	db := newTestQuackDuckDB(t)
-	insights.SetExecuteTimeout(t, 200*time.Millisecond)
-	insights.OccupyExecuteSlots(t)
 
 	tr, err := insights.Transpile("SELECT 1 AS one", uuid.New(), uuid.New())
 	require.NoError(t, err)
 
-	_, err = insights.Execute(context.Background(), db, tr)
-	var eerr *insights.ExecutionError
-	require.ErrorAs(t, err, &eerr)
-	require.ErrorContains(t, err, "too many Insights queries")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = insights.Execute(ctx, db, tr)
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotContains(t, err.Error(), "time limit")
 }
