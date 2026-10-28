@@ -172,23 +172,67 @@ func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]log
 }
 
 func (s *tableScope) lookup(alias string) (logicalTable, bool) {
+	e, ok := s.lookupEntry(alias)
+	return e.table, ok
+}
+
+func (s *tableScope) lookupEntry(alias string) (scopeEntry, bool) {
 	for _, e := range s.entries {
 		if strings.EqualFold(e.alias, alias) {
-			return e.table, true
+			return e, true
 		}
 	}
 	if s.outer != nil {
-		return s.outer.lookup(alias)
+		return s.outer.lookupEntry(alias)
 	}
-	return logicalTable{}, false
+	return scopeEntry{}, false
 }
 
-func (s *tableScope) names() []string {
-	names := make([]string, len(s.entries))
-	for i, e := range s.entries {
-		names[i] = e.alias
+// starEntries returns the scope entries a star with this qualifier expands
+// over: every local entry, in FROM order, for a bare "*", or just the
+// qualified one for "t.*" (false when t isn't in scope).
+func (s *tableScope) starEntries(qualifier []string) ([]scopeEntry, bool) {
+	switch len(qualifier) {
+	case 0:
+		return s.entries, true
+	case 1:
+		e, ok := s.lookupEntry(qualifier[0])
+		if !ok {
+			return nil, false
+		}
+		return []scopeEntry{e}, true
+	default:
+		return nil, false
 	}
-	return names
+}
+
+// excludeName is one parsed EXCLUDE list entry: column, optionally
+// qualified by a table alias ("t.col"), which then only excludes that
+// table's own copy of the column.
+type excludeName struct {
+	qualifier, column string
+}
+
+// parseExcludeName parses one raw EXCLUDE entry (parser.SplitExcludeName).
+// ok is false for anything past "t.col".
+func parseExcludeName(raw string) (excludeName, bool) {
+	switch parts := parser.SplitExcludeName(raw); len(parts) {
+	case 1:
+		return excludeName{column: parts[0]}, true
+	case 2:
+		return excludeName{qualifier: parts[0], column: parts[1]}, true
+	default:
+		return excludeName{}, false
+	}
+}
+
+// matches reports whether this EXCLUDE entry removes column name of the
+// scope entry aliased alias.
+func (x excludeName) matches(alias, name string) bool {
+	if !strings.EqualFold(x.column, name) {
+		return false
+	}
+	return x.qualifier == "" || strings.EqualFold(x.qualifier, alias)
 }
 
 // uniqueColumn returns name's knownColumn only when exactly one table in

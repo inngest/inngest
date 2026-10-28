@@ -538,3 +538,41 @@ func TestValidateIdentifiersCaseInsensitive(t *testing.T) {
 		})
 	}
 }
+
+// The parser represents "x COLLATE nocase"'s collation as an Ident, which
+// isn't a column reference.
+func TestValidateAcceptsCollate(t *testing.T) {
+	for _, q := range []string{
+		"SELECT status COLLATE nocase FROM runs",
+		"SELECT run_id FROM runs ORDER BY status COLLATE nocase",
+		`SELECT run_id FROM runs WHERE status COLLATE "nocase.noaccent" = 'completed'`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	// The collated operand itself is still checked.
+	_, _, _, err := validate(mustParse(t, "SELECT nope COLLATE nocase FROM runs"))
+	require.ErrorContains(t, err, `unknown column "nope"`)
+}
+
+func TestValidateStarExcludeQualified(t *testing.T) {
+	for _, q := range []string{
+		"SELECT * EXCLUDE (runs.run_id) FROM runs",
+		`SELECT * EXCLUDE ("R"."run_id") FROM runs r`,
+		"SELECT * EXCLUDE (e.run_id) FROM runs JOIN extended_trace_spans e ON runs.run_id = e.run_id",
+		"SELECT r.* EXCLUDE (r.run_id) FROM runs r",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	for _, q := range []string{
+		// DuckDB: Column "events.id" in EXCLUDE list not found in runs.
+		"SELECT runs.* EXCLUDE (events.id) FROM runs, events",
+		"SELECT * EXCLUDE (runs.id) FROM runs, events",
+		"SELECT * EXCLUDE (bogus.run_id) FROM runs",
+		"SELECT * EXCLUDE (a.b.c) FROM runs",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.Error(t, err, q)
+	}
+}

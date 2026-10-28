@@ -589,3 +589,11 @@ func TestBuildColumnHintsEventIDsExplicitHintSingleIndex(t *testing.T) {
 	hints := hintsFor(t, "SELECT event_ids[1] FROM runs")
 	require.Equal(t, []ColumnHint{HintEventID}, hints)
 }
+
+// A qualified EXCLUDE entry only drops that table's own copy of the column.
+func TestBuildColumnHintsStarExcludeQualified(t *testing.T) {
+	require.Equal(t,
+		[]ColumnHint{HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintRunID, HintNone, HintAppID, HintFunctionID, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone},
+		hintsFor(t, "SELECT * EXCLUDE (m.run_id) FROM metadata m JOIN extended_trace_spans e ON m.run_id = e.run_id"),
+	)
+}
