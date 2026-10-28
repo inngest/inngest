@@ -656,3 +656,31 @@ func TestBuildColumnHintsStarAfterSemiJoin(t *testing.T) {
 	want := hintsFor(t, "SELECT * FROM runs r JOIN metadata m USING (run_id)")
 	require.Equal(t, want, got)
 }
+
+// A merged USING column resolves the way DuckDB projects it (checked
+// against a real duckdb): the left copy for INNER/LEFT, the right copy for
+// RIGHT, and COALESCE(left, right) for FULL, which only keeps a hint both
+// sides agree on. A bare reference and "*" agree.
+func TestBuildColumnHintsMergedUsingColumn(t *testing.T) {
+	const events = "(SELECT id AS run_id FROM events) e USING (run_id)"
+	for typ, want := range map[string]ColumnHint{
+		"JOIN":             HintRunID,
+		"LEFT JOIN":        HintRunID,
+		"RIGHT JOIN":       HintEventID,
+		"RIGHT OUTER JOIN": HintEventID,
+		"FULL JOIN":        HintNone,
+	} {
+		bare := hintsFor(t, "SELECT run_id FROM runs r "+typ+" "+events)
+		require.Equal(t, []ColumnHint{want}, bare, typ)
+		star := hintsFor(t, "SELECT * FROM runs r "+typ+" "+events)
+		require.Equal(t, want, star[0], typ)
+	}
+
+	// NATURAL joins merge the same way.
+	require.Equal(t, []ColumnHint{HintEventID}, hintsFor(t, "SELECT run_id FROM runs r NATURAL RIGHT JOIN (SELECT id AS run_id FROM events) e"))
+	// FULL keeps a hint both sides agree on.
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT run_id FROM metadata m FULL JOIN extended_trace_spans e USING (run_id)"))
+	// A multi-way merge folds left to right.
+	require.Equal(t, []ColumnHint{HintEventID}, hintsFor(t, "SELECT run_id FROM runs a JOIN runs b USING (run_id) RIGHT JOIN "+events))
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT run_id FROM runs a RIGHT JOIN "+events+" FULL JOIN runs b USING (run_id)"))
+}
