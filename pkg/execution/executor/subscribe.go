@@ -167,8 +167,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// queued for a blocked run: while one is in flight, a second
 			// request would run its steps twice.
 			waiter := subscriptionWaiterID(sub.Key, sub.Seq)
-			waiting := []byte(fmt.Sprintf(`{"data":%d}`, int(gen.ParallelMode())))
-			if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, waiting); err != nil &&
+			if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, []byte(`{"data":1}`)); err != nil &&
 				!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 				return err
 			}
@@ -189,7 +188,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if err != nil || pause == nil {
 			return fmt.Errorf("subscription pause not found: %w", err)
 		}
-		return e.resumeSubscriber(ctx, pause, gen.ID, raw, gen.ParallelMode())
+		return e.resumeSubscriber(ctx, pause, gen.ID, raw)
 
 	case state.SubscribeAck:
 		if gen.ID != subscriptionAckID(sub.Key, sub.Seq) {
@@ -261,7 +260,7 @@ func (e *executor) countSubscriptionMessages(ctx context.Context, id sv2.ID, key
 
 // resumeSubscriber saves the bytes as the output of the step dataKey and queues
 // the discovery request that lets the run see it. It does not consume the pause.
-func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string, saved []byte, mode enums.ParallelMode) error {
+func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string, saved []byte) error {
 	// ConsumePause stores what it is given as JSON. Handing it the stored
 	// message back as a map of raw JSON writes the same bytes, so saving it
 	// again is idempotent.
@@ -275,9 +274,6 @@ func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dat
 	clone.DataKey = dataKey
 	clone.Outgoing = dataKey
 	clone.Subscribe = nil
-	// The mode of the wait being woken decides whether discovery is queued while
-	// other waits of the run are pending: a race wakes on the first.
-	clone.ParallelMode = mode
 
 	err := e.Resume(ctx, clone, execution.ResumeRequest{
 		With:      map[string]any{"data": wrapper["data"]},
@@ -288,18 +284,6 @@ func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dat
 		return nil
 	}
 	return err
-}
-
-// waiterParallelMode reads the parallel mode a wait was recorded with.
-func waiterParallelMode(waiting []byte) enums.ParallelMode {
-	var waiter struct {
-		Data int `json:"data"`
-	}
-	if err := json.Unmarshal(waiting, &waiter); err != nil {
-		return enums.ParallelModeNone
-	}
-
-	return enums.ParallelMode(waiter.Data)
 }
 
 func derefString(s *string) string {
@@ -396,12 +380,11 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	if err != nil {
 		return err
 	}
-	waiting, blocked := waiter[subscriptionWaiterID(key, seq)]
-	if !blocked {
+	if _, blocked := waiter[subscriptionWaiterID(key, seq)]; !blocked {
 		return nil
 	}
 
-	return e.resumeSubscriber(ctx, pause, stepID, data, waiterParallelMode(waiting))
+	return e.resumeSubscriber(ctx, pause, stepID, data)
 }
 
 var subscriptionReemitDelays = []time.Duration{0, time.Second, 3 * time.Second, 8 * time.Second}
