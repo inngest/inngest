@@ -132,8 +132,7 @@ func (g OpcodeGroups) All() []OpcodeGroup {
 // Trade-off: in a batch that mixes a next-message wait with another step (for
 // example from Promise.all), a message that arrives while the other step runs
 // queues discovery before that step finishes, because the wait no longer holds
-// the pending set open. A batch of only next-message waits is unaffected. A pending subscription wait would hold back the
-// discovery of every other step the run completes while it waits.
+// the pending set open. A batch of only next-message waits is unaffected.
 func isSubscriptionWait(op *state.GeneratorOpcode) bool {
 	if op == nil || op.Op != enums.OpcodeWaitForEvent {
 		return false
