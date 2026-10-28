@@ -19,6 +19,7 @@ import {
   borderColor,
 } from '@/utils/tailwind';
 import type { EntityLookup, EntityType } from './Dashboard';
+import { formatTooltipTimestamp } from './tooltipTimestamp';
 
 // Type assertion for extended colors that aren't in DefaultColors
 const extendedColors = colors as typeof colors & {
@@ -130,7 +131,7 @@ const tooltipFormatter = (params: any) => {
 
   return observed[0]
     ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${
-        observed[0].axisValue
+        formatTooltipTimestamp(observed[0].axisValue)
       }</div>${observed
         .sort((a: any, b: any) => b.value - a.value)
         .map((p: any) => formatDimension(p))
