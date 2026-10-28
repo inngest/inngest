@@ -25,6 +25,7 @@ const GetFunctionsUsageDocument = graphql(`
           name
           isPaused
           isArchived
+          isDraining
           triggers {
             type
             value
