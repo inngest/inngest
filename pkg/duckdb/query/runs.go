@@ -203,30 +203,38 @@ func buildRunsCursorSeek(cursorStr, orderCol, orderDir string) (string, []any, e
 	if tc == nil || cur.ID == "" {
 		return "", nil, nil
 	}
+	where, args := runsSeek(orderCol, orderDir, time.UnixMilli(tc.Value), cur.ID)
+	return where, args, nil
+}
+
+// runsSeek is the keyset-pagination predicate for rows after (val, runID)
+// in (orderCol orderDir, run_id ASC) order.
+func runsSeek(orderCol, orderDir string, val time.Time, runID string) (string, []any) {
 	cmp := ">"
 	if orderDir == "DESC" {
 		cmp = "<"
 	}
-	val := time.UnixMilli(tc.Value)
-	return fmt.Sprintf("(%s %s ? OR (%s = ? AND run_id > ?))", orderCol, cmp, orderCol), []any{val, val, cur.ID}, nil
+	return fmt.Sprintf("(%s %s ? OR (%s = ? AND run_id > ?))", orderCol, cmp, orderCol), []any{val, val, runID}
+}
+
+func runOrderTime(run *cqrs.TraceRun, orderCol string) time.Time {
+	switch orderCol {
+	case "started_at":
+		return run.StartedAt
+	case "ended_at":
+		return run.EndedAt
+	default:
+		return run.QueuedAt
+	}
 }
 
 // encodeRunsCursor builds the per-row response cursor for keyset
 // pagination, matching buildRunsCursorSeek's decode shape exactly.
 func encodeRunsCursor(run *cqrs.TraceRun, orderCol string) (string, error) {
-	var fieldTime time.Time
-	switch orderCol {
-	case "started_at":
-		fieldTime = run.StartedAt
-	case "ended_at":
-		fieldTime = run.EndedAt
-	default:
-		fieldTime = run.QueuedAt
-	}
 	c := cqrs.TracePageCursor{
 		ID: run.RunID,
 		Cursors: map[string]cqrs.TraceCursor{
-			orderCol: {Field: orderCol, Value: fieldTime.UnixMilli()},
+			orderCol: {Field: orderCol, Value: runOrderTime(run, orderCol).UnixMilli()},
 		},
 	}
 	return c.Encode()
@@ -302,14 +310,71 @@ func eventCELArrayMatchClause(fragment string) string {
 	return fmt.Sprintf(`len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: %s)) > 0`, fragment)
 }
 
-// GetTraceRuns pushes filter.CEL down into the SQL query rather than
-// fetching a candidate set and post-filtering in Go: event.* predicates
-// become an inputs-array match in the pre-collapse WHERE (see
+// runsQuery is the WHERE/QUALIFY halves of a runs query for one
+// cqrs.GetTraceRunOpt, plus the Go matcher every row it selects still has
+// to pass (nil when opt has no CEL filter).
+type runsQuery struct {
+	preWhere    string
+	preArgs     []any
+	qualify     string
+	qualifyArgs []any
+	matcher     *runCELMatcher
+}
+
+// buildRunsQuery converts filter.CEL into SQL: event.* predicates become an
+// inputs-array match in the pre-collapse WHERE (see
 // eventCELArrayMatchClause); output.*/error.* predicates are appended to
 // the QUALIFY clause. A CEL string mixing both kinds is only divided along
 // its top-level && conjuncts; a conjunct mixing both (e.g. an || across
 // them) lands whole in the QUALIFY half, which matches its event.* parts
-// against inputs itself — see pkg/duckdb/insights' celExprsToSQL.
+// against inputs itself -- see pkg/duckdb/insights' celExprsToSQL.
+//
+// That SQL is only a superset of what filter.CEL means (see celmatch.go),
+// so callers must also check each row against the returned matcher.
+func buildRunsQuery(ctx context.Context, filter cqrs.GetTraceRunFilter) (runsQuery, error) {
+	expHandler, err := run.NewExpressionHandler(ctx, run.WithExpressionHandlerBlob(filter.CEL, "\n"))
+	if err != nil {
+		return runsQuery{}, fmt.Errorf("duckdbquery: parsing CEL filter: %w", err)
+	}
+
+	q := runsQuery{}
+	q.preWhere, q.preArgs = latestRunsWhere(filter)
+	q.qualify, q.qualifyArgs = runsQualify(filter)
+
+	eventFilters, err := CELEventFilters(ctx, expHandler.EventExprList)
+	if err != nil {
+		return runsQuery{}, fmt.Errorf("duckdbquery: converting event CEL filter: %w", err)
+	}
+	if eventFrag, eventArgs, err := RenderWhereSQL(eventFilters); err != nil {
+		return runsQuery{}, fmt.Errorf("duckdbquery: rendering event CEL filter: %w", err)
+	} else if eventFrag != "" {
+		q.preWhere += " AND " + eventCELArrayMatchClause(eventFrag)
+		q.preArgs = append(q.preArgs, eventArgs...)
+	}
+
+	outputFilters, err := CELOutputFilters(ctx, expHandler.OutputExprList)
+	if err != nil {
+		return runsQuery{}, fmt.Errorf("duckdbquery: converting output CEL filter: %w", err)
+	}
+	if outputFrag, outputArgs, err := RenderWhereSQL(outputFilters); err != nil {
+		return runsQuery{}, fmt.Errorf("duckdbquery: rendering output CEL filter: %w", err)
+	} else if outputFrag != "" {
+		q.qualify += " AND " + outputFrag
+		q.qualifyArgs = append(q.qualifyArgs, outputArgs...)
+	}
+
+	q.matcher, err = newRunCELMatcher(ctx, expHandler)
+	if err != nil {
+		return runsQuery{}, err
+	}
+	return q, nil
+}
+
+// GetTraceRuns pages through runs in (TimeField, run_id) order. Without a
+// CEL filter, LIMIT is pushed down directly. With one, the SQL is only a
+// prefilter (see buildRunsQuery), so candidates are fetched in
+// keyset-paginated batches and re-checked in Go until opt.Items runs match
+// or the candidates run out.
 func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	resolvedFilter, noMatch, err := m.resolveAppAndFunctionFilters(ctx, opt.Filter)
 	if err != nil {
@@ -320,34 +385,9 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 	}
 	opt.Filter = resolvedFilter
 
-	expHandler, err := run.NewExpressionHandler(ctx, run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"))
+	rq, err := buildRunsQuery(ctx, opt.Filter)
 	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: parsing CEL filter: %w", err)
-	}
-
-	preWhere, preArgs := latestRunsWhere(opt.Filter)
-	qualify, qualifyArgs := runsQualify(opt.Filter)
-
-	eventFilters, err := CELEventFilters(ctx, expHandler.EventExprList)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: converting event CEL filter: %w", err)
-	}
-	if eventFrag, eventArgs, err := RenderWhereSQL(eventFilters); err != nil {
-		return nil, fmt.Errorf("duckdbquery: rendering event CEL filter: %w", err)
-	} else if eventFrag != "" {
-		preWhere += " AND " + eventCELArrayMatchClause(eventFrag)
-		preArgs = append(preArgs, eventArgs...)
-	}
-
-	outputFilters, err := CELOutputFilters(ctx, expHandler.OutputExprList)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: converting output CEL filter: %w", err)
-	}
-	if outputFrag, outputArgs, err := RenderWhereSQL(outputFilters); err != nil {
-		return nil, fmt.Errorf("duckdbquery: rendering output CEL filter: %w", err)
-	} else if outputFrag != "" {
-		qualify += " AND " + outputFrag
-		qualifyArgs = append(qualifyArgs, outputArgs...)
+		return nil, err
 	}
 
 	orderCol := strings.ToLower(opt.Filter.TimeField.String())
@@ -365,54 +405,125 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 	if err != nil {
 		return nil, err
 	}
+
+	// The query fetches Items+1 rows when it can push LIMIT down, but like
+	// the SQL manager this returns at most Items: callers detect a next page
+	// themselves (the GQL resolver compares len to Items; the REST run
+	// provider asks for Limit+1).
+	var limit uint
+	if opt.Items > 0 {
+		limit = opt.Items + 1
+		if rq.matcher != nil {
+			limit = celCandidateBatch(opt.Items)
+		}
+	}
+
+	var out []*cqrs.TraceRun
+	for {
+		scanned, last, err := m.getTraceRunsBatch(ctx, opt, rq, orderCol, orderDir, seekWhere, seekArgs, limit, &out)
+		if err != nil {
+			return nil, err
+		}
+		full := opt.Items > 0 && uint(len(out)) >= opt.Items
+		if full || rq.matcher == nil || limit == 0 || scanned < limit {
+			return out, nil
+		}
+		// Seek from the last candidate's exact order value rather than its
+		// millisecond-truncated response cursor, so no candidate between two
+		// batches is skipped.
+		seekWhere, seekArgs = runsSeek(orderCol, orderDir, runOrderTime(last, orderCol), last.RunID)
+	}
+}
+
+// getTraceRunsBatch runs one GetTraceRuns query (at most limit rows, or
+// all of them when limit is 0) after seekWhere, appending each row that
+// passes rq.matcher to out until out holds opt.Items runs. Returns how many
+// candidate rows it scanned and the last one.
+func (m *Manager) getTraceRunsBatch(ctx context.Context, opt cqrs.GetTraceRunOpt, rq runsQuery, orderCol, orderDir, seekWhere string, seekArgs []any, limit uint, out *[]*cqrs.TraceRun) (uint, *cqrs.TraceRun, error) {
+	qualify := rq.qualify
+	qualifyArgs := append([]any{}, rq.qualifyArgs...)
 	if seekWhere != "" {
 		qualify += " AND " + seekWhere
 		qualifyArgs = append(qualifyArgs, seekArgs...)
 	}
 
+	cols := runColumns
+	if rq.matcher != nil {
+		cols += ", inputs"
+	}
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s.runs WHERE %s QUALIFY %s ORDER BY %s %s, run_id ASC",
-		runColumns, driver.DuckLakeAlias, preWhere, qualify, orderCol, orderDir,
+		cols, driver.DuckLakeAlias, rq.preWhere, qualify, orderCol, orderDir,
 	)
-	args := append(preArgs, qualifyArgs...)
-	// Every CEL predicate is applied in SQL above, so LIMIT can always be
-	// pushed down.
-	if opt.Items > 0 {
+	args := append(append([]any{}, rq.preArgs...), qualifyArgs...)
+	if limit > 0 {
 		query += " LIMIT ?"
-		args = append(args, opt.Items+1)
+		args = append(args, limit)
 	}
 	query += ";"
 
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: querying trace runs: %w", err)
+		return 0, nil, fmt.Errorf("duckdbquery: querying trace runs: %w", err)
 	}
 	defer rows.Close()
 
-	var out []*cqrs.TraceRun
+	var (
+		scanned uint
+		last    *cqrs.TraceRun
+	)
 	for rows.Next() {
-		trun, err := scanTraceRun(rows)
-		if err != nil {
-			return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
+		var (
+			trun *cqrs.TraceRun
+			err  error
+		)
+		if rq.matcher != nil {
+			var rawInputs any
+			trun, err = scanTraceRun(rows, &rawInputs)
+			if err != nil {
+				return 0, nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
+			}
+			scanned++
+			last = trun
+			ok, err := rq.matchRow(ctx, rawInputs, trun.Output)
+			if err != nil {
+				return 0, nil, err
+			}
+			if !ok {
+				continue
+			}
+		} else {
+			trun, err = scanTraceRun(rows)
+			if err != nil {
+				return 0, nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
+			}
+			scanned++
+			last = trun
 		}
 
 		trun.Cursor, err = encodeRunsCursor(trun, orderCol)
 		if err != nil {
-			return nil, fmt.Errorf("duckdbquery: encoding run cursor: %w", err)
+			return 0, nil, fmt.Errorf("duckdbquery: encoding run cursor: %w", err)
 		}
-		out = append(out, trun)
-		// The query fetches Items+1 rows, but like the SQL manager this
-		// returns at most Items: callers detect a next page themselves (the
-		// GQL resolver compares len to Items; the REST run provider asks for
-		// Limit+1).
-		if opt.Items > 0 && uint(len(out)) >= opt.Items {
+		*out = append(*out, trun)
+		if opt.Items > 0 && uint(len(*out)) >= opt.Items {
 			break
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("duckdbquery: reading trace run rows: %w", err)
+		return 0, nil, fmt.Errorf("duckdbquery: reading trace run rows: %w", err)
 	}
-	return out, nil
+	return scanned, last, nil
+}
+
+// matchRow checks one candidate row's scanned inputs column and output
+// against rq.matcher.
+func (rq runsQuery) matchRow(ctx context.Context, rawInputs any, output []byte) (bool, error) {
+	inputs, err := asJSON(rawInputs, "inputs")
+	if err != nil {
+		return false, err
+	}
+	return rq.matcher.match(ctx, inputs, output)
 }
 
 func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
@@ -425,34 +536,14 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	}
 	opt.Filter = resolvedFilter
 
-	expHandler, err := run.NewExpressionHandler(ctx, run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"))
+	rq, err := buildRunsQuery(ctx, opt.Filter)
 	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: parsing CEL filter: %w", err)
+		return 0, err
 	}
+	args := append(append([]any{}, rq.preArgs...), rq.qualifyArgs...)
 
-	preWhere, preArgs := latestRunsWhere(opt.Filter)
-	qualify, qualifyArgs := runsQualify(opt.Filter)
-
-	eventFilters, err := CELEventFilters(ctx, expHandler.EventExprList)
-	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: converting event CEL filter: %w", err)
-	}
-	if eventFrag, eventArgs, err := RenderWhereSQL(eventFilters); err != nil {
-		return 0, fmt.Errorf("duckdbquery: rendering event CEL filter: %w", err)
-	} else if eventFrag != "" {
-		preWhere += " AND " + eventCELArrayMatchClause(eventFrag)
-		preArgs = append(preArgs, eventArgs...)
-	}
-
-	outputFilters, err := CELOutputFilters(ctx, expHandler.OutputExprList)
-	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: converting output CEL filter: %w", err)
-	}
-	if outputFrag, outputArgs, err := RenderWhereSQL(outputFilters); err != nil {
-		return 0, fmt.Errorf("duckdbquery: rendering output CEL filter: %w", err)
-	} else if outputFrag != "" {
-		qualify += " AND " + outputFrag
-		qualifyArgs = append(qualifyArgs, outputArgs...)
+	if rq.matcher != nil {
+		return m.countTraceRunsInGo(ctx, rq, args)
 	}
 
 	// COUNT(*) with no GROUP BY can't reference raw columns even inside
@@ -461,10 +552,8 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	// and the outer query only aggregates its already-filtered output.
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) AS c FROM (SELECT run_id FROM %s.runs WHERE %s QUALIFY %s);",
-		driver.DuckLakeAlias, preWhere, qualify,
+		driver.DuckLakeAlias, rq.preWhere, rq.qualify,
 	)
-	args := append(preArgs, qualifyArgs...)
-
 	n, err := scanCount(m.db.QueryRowContext(ctx, query, args...))
 	if err != nil {
 		return 0, fmt.Errorf("duckdbquery: querying trace run count: %w", err)
@@ -472,9 +561,47 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	return int(n), nil
 }
 
+// countTraceRunsInGo counts the runs rq selects that also pass rq.matcher,
+// which (unlike rq's SQL) can't be pushed into a COUNT(*).
+func (m *Manager) countTraceRunsInGo(ctx context.Context, rq runsQuery, args []any) (int, error) {
+	query := fmt.Sprintf(
+		"SELECT inputs, output FROM %s.runs WHERE %s QUALIFY %s;",
+		driver.DuckLakeAlias, rq.preWhere, rq.qualify,
+	)
+	rows, err := m.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("duckdbquery: querying trace run count: %w", err)
+	}
+	defer rows.Close()
+
+	n := 0
+	for rows.Next() {
+		var rawInputs, rawOutput any
+		if err := rows.Scan(&rawInputs, &rawOutput); err != nil {
+			return 0, fmt.Errorf("duckdbquery: scanning trace run count row: %w", err)
+		}
+		output, err := asJSON(rawOutput, "output")
+		if err != nil {
+			return 0, err
+		}
+		ok, err := rq.matchRow(ctx, rawInputs, output)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			n++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("duckdbquery: reading trace run count rows: %w", err)
+	}
+	return n, nil
+}
+
 // scanTraceRun scans one row of a runColumns-shaped SELECT into a
-// *cqrs.TraceRun. Destination order must match runColumns exactly.
-func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
+// *cqrs.TraceRun. Destination order must match runColumns exactly; extra
+// receives any columns selected after runColumns.
+func scanTraceRun(rows *sql.Rows, extra ...any) (*cqrs.TraceRun, error) {
 	var (
 		rawAccountID, rawEnvID, rawAppID, rawFunctionID any
 		runID                                           string
@@ -483,11 +610,12 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		rawOutput, rawEventIDs, rawIsDeferred           any
 		traceID                                         sql.NullString
 	)
-	if err := rows.Scan(
+	dest := append([]any{
 		&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &runID,
 		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs, &rawIsDeferred,
 		&traceID,
-	); err != nil {
+	}, extra...)
+	if err := rows.Scan(dest...); err != nil {
 		return nil, err
 	}
 
