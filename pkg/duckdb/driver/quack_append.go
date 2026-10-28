@@ -151,7 +151,7 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 		}
 	case *process:
 		var err error
-		sess, err = s.currentQuackSession()
+		sess, err = s.currentQuackSession(ctx)
 		if err != nil {
 			return nil, err
 		}
