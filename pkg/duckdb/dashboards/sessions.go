@@ -113,10 +113,8 @@ func buildSessionKeysSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -156,10 +154,8 @@ func buildSessionsSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -200,10 +196,8 @@ func buildSessionRunsSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -228,8 +222,9 @@ type sessionCursor struct {
 // with the row/group identifier as the final tiebreak. Reuses
 // cqrs.TracePageCursor (the same codec pkg/cqrs/duckdbquery's own runs/
 // events pagination already uses) rather than a bespoke cursor type per
-// entry. Returns nil, nil for the first page (no cursor, or nothing under
-// this field).
+// entry. Returns nil, nil for the first page (no cursor). A cursor that
+// decodes but isn't keyed on field (e.g. a sessions cursor sent to session
+// runs) is an *InvalidArgumentError, not a silent restart at page 1.
 func decodeSessionCursor(cursorStr, field string) (*sessionCursor, error) {
 	if cursorStr == "" {
 		return nil, nil
@@ -240,7 +235,7 @@ func decodeSessionCursor(cursorStr, field string) (*sessionCursor, error) {
 	}
 	tc := cur.Find(field)
 	if tc == nil || cur.ID == "" {
-		return nil, nil
+		return nil, invalidArgumentf("invalid cursor: not a cursor for this listing")
 	}
 	return &sessionCursor{at: time.UnixMilli(tc.Value), id: cur.ID}, nil
 }
