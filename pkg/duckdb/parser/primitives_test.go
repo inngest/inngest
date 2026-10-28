@@ -190,3 +190,21 @@ func TestSkipSQLTrivia(t *testing.T) {
 	pos := SkipSQLTrivia(input, 0)
 	require.Equal(t, "select", input[pos:])
 }
+
+func TestNumberLiteralUnderscoreSeparators(t *testing.T) {
+	cases := []struct{ sql, want string }{
+		{"SELECT 1_000", "SELECT 1_000"},
+		{"SELECT 1_000.000_1", "SELECT 1_000.000_1"},
+		{"SELECT 1e1_0", "SELECT 1e1_0"},
+		{"SELECT .5_5", "SELECT .5_5"},
+		// Like DuckDB, a '_' not between two digits ends the number.
+		{"SELECT 1__0", "SELECT 1 AS __0"},
+		{"SELECT 1_", "SELECT 1 AS _"},
+		{"SELECT 1_e1", "SELECT 1 AS _e1"},
+	}
+	for _, c := range cases {
+		stmt, err := ParseString(c.sql)
+		require.NoError(t, err, c.sql)
+		require.Equal(t, c.want, String(stmt), c.sql)
+	}
+}
