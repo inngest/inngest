@@ -494,3 +494,22 @@ func TestValidateChecksSetOpModifiers(t *testing.T) {
 		})
 	}
 }
+
+// A user-written parameter would collide with the "?" placeholders
+// remapTables binds the macro calls' (account_id, env_id) to.
+func TestValidateRejectsParameters(t *testing.T) {
+	queries := []string{
+		"SELECT ? FROM runs",
+		"SELECT run_id FROM runs WHERE run_id = $1",
+		"SELECT run_id FROM runs WHERE run_id = $name",
+		"SELECT run_id FROM runs WHERE run_id IN (SELECT ? FROM events)",
+		"SELECT run_id FROM runs LIMIT ?",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "query parameters are not supported")
+		})
+	}
+}

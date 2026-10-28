@@ -368,6 +368,13 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 	case *parser.ListComprehensionExpr:
 		v.err = v.checkListComprehension(x)
 		return nil
+	case *parser.Parameter:
+		// remapTables binds every macro call's (account_id, env_id) to
+		// anonymous "?" placeholders, positionally. A user's own "?" would
+		// shift those bindings, and "$1"/"$name" could read them back, so
+		// user-written parameters are rejected outright (nothing could
+		// bind them anyway).
+		v.err = &ValidationError{Pos: x.Pos(), End: x.End(), Message: "query parameters are not supported"}
 	case *parser.SelectStatement:
 		// A subquery (scalar, IN, EXISTS) — validated with
 		// its own FROM scope plus any CTEs visible here, chained to this
