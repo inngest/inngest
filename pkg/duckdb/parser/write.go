@@ -157,6 +157,24 @@ func binaryPrec(op string) int {
 	}
 }
 
+// endsInEscape reports whether e, printed flat, ends in a LIKE's ESCAPE
+// operand. EscapeClause takes a whole ComparisonExpression, so a comparison
+// printed after it would join the escape: `(a LIKE b ESCAPE c) = d` printed
+// flat reparses as `a LIKE b ESCAPE (c = d)`. Only a comparison's own right
+// operand can be a flat LikeExpr (every tighter operator parenthesizes
+// one), so that's the only spine to follow.
+func endsInEscape(e Expr) bool {
+	switch v := e.(type) {
+	case *LikeExpr:
+		return v.Escape != nil
+	case *BinaryExpr:
+		if binaryPrec(v.Op) == precComparison && prec(v.Right) > precComparison {
+			return endsInEscape(v.Right)
+		}
+	}
+	return false
+}
+
 // exprAtLeast prints e, parenthesizing it if its precedence is lower than
 // minPrec — i.e. if printing it flat at this position would reparse with
 // different grouping than the tree actually has.
@@ -309,7 +327,13 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *BinaryExpr:
 		requireOp(v.Op)
 		p := binaryPrec(v.Op)
-		sw.exprAtLeast(v.Left, p)
+		if p == precComparison && endsInEscape(v.Left) {
+			sw.str("(")
+			sw.exprTop(v.Left)
+			sw.str(")")
+		} else {
+			sw.exprAtLeast(v.Left, p)
+		}
 		sw.str(" ")
 		sw.str(v.Op)
 		sw.str(" ")
