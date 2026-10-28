@@ -4,6 +4,9 @@ import { FirstRun } from '@/components/Quickstart/FirstRun';
 import { useQuickstart } from '@/components/Quickstart/QuickstartProvider';
 import { useQuickstartTracking } from '@/components/Quickstart/useQuickstartTracking';
 
+export const isRunsListRequested = (search: Record<string, unknown>) =>
+  search.showAllRuns === true || search.showAllRuns === 'true';
+
 export function RunsOnboarding({
   runID,
   showAllRuns = false,
@@ -39,9 +42,6 @@ export function RunsOnboarding({
   return (
     <main className="mx-auto w-full max-w-[648px] px-6 py-12 space-y-6">
       <FirstRun />
-      <Link href="/runs?showAllRuns=true" target="_self">
-        View all runs
-      </Link>
       <p className="text-muted text-sm">
         Need the setup guide or agent prompt?{' '}
         <Link href="/?quickstart=true" target="_self">

@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { RunsOnboarding } from './RunsOnboarding';
+import { RunsOnboarding, isRunsListRequested } from './RunsOnboarding';
 
 const fixtures = vi.hoisted(() => ({ state: {} as any, track: vi.fn() }));
 vi.mock('@/components/Quickstart/QuickstartProvider', () => ({
@@ -33,9 +33,6 @@ it('focuses a synced app on invocation and keeps the full Quickstart accessible'
   expect(
     screen.getByRole('link', { name: 'Open Quickstart' }).getAttribute('href'),
   ).toBe('/?quickstart=true');
-  expect(
-    screen.getByRole('link', { name: 'View all runs' }).getAttribute('href'),
-  ).toBe('/runs?showAllRuns=true');
   expect(fixtures.track.mock.calls).toEqual([
     ['viewed', { entry_stage: 'run' }, true],
     ['app_ready', {}, true],
@@ -86,5 +83,23 @@ it.each([true, false])(
     expect(screen.queryByText('Existing function invocation')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
     expect(fixtures.track).not.toHaveBeenCalled();
+  },
+);
+
+it.each([
+  { query: '?showAllRuns=true', list: true },
+  { query: '?showAllRuns=%22true%22', list: true },
+  { query: '?showAllRuns=false', list: false },
+  { query: '', list: false },
+])(
+  'honors the Runs route search parser for $query',
+  async ({ query, list }) => {
+    const { defaultParseSearch } = await import('@tanstack/react-router');
+    const showAllRuns = isRunsListRequested(defaultParseSearch(query));
+    render(
+      <RunsOnboarding showAllRuns={showAllRuns}>{content}</RunsOnboarding>,
+    );
+    expect(!!screen.queryByText('Existing runs list and details')).toBe(list);
+    expect(!!screen.queryByText('Existing function invocation')).toBe(!list);
   },
 );

@@ -383,7 +383,7 @@ it('keeps step 3 invokable when reopening quickstart after completion and opens 
 });
 
 it.each(['', fn.id])(
-  'allows switching agent observation for function %j to manual invocation without an error',
+  'keeps invocation available while observing an agent for function %j',
   async (functionID) => {
     fixtures.context.attempt = {
       mode: 'agent',
@@ -394,31 +394,47 @@ it.each(['', fn.id])(
       unwrap: async () => ({ invokeFunction: true }),
     });
     const view = render(<FirstRun />);
-    expect(invokeButton().disabled).toBe(!!functionID);
-    expect(
-      screen.getByText(
-        'Pause your agent before switching to avoid duplicate runs.',
-      ),
-    ).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Switch to manual invocation' }),
-    );
-    expect(fixtures.setAttempt).toHaveBeenLastCalledWith(null);
-    expect(fixtures.invoke).not.toHaveBeenCalled();
-    fixtures.context.attempt = null;
-    view.rerender(<FirstRun />);
     expect(invokeButton().disabled).toBe(false);
     expect(
       screen.getByRole<HTMLButtonElement>('button', { name: /^Function / })
         .disabled,
     ).toBe(false);
+    expect(screen.getAllByRole('link', { name: 'View all runs' })).toHaveLength(
+      1,
+    );
     expect(
       screen.queryByRole('button', { name: 'Switch to manual invocation' }),
     ).toBeNull();
+    expect(screen.queryByText(/Pause your agent/)).toBeNull();
+    expect(fixtures.invoke).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(invokeButton()));
+    expect(fixtures.invoke).toHaveBeenCalledTimes(1);
+    const attempt = fixtures.setAttempt.mock.calls[0][0];
+    expect(attempt.mode).toBeUndefined();
+    expect(attempt.functionID).toBe(fn.id);
+    fixtures.context.attempt = attempt;
+    view.rerender(<FirstRun />);
+    expect(invokeButton().disabled).toBe(true);
+    fireEvent.click(invokeButton());
     expect(fixtures.invoke).toHaveBeenCalledTimes(1);
   },
 );
+
+it('opens an identified agent run automatically from the full guide', () => {
+  fixtures.context.attempt = {
+    mode: 'agent',
+    functionID: fn.id,
+    startedAt: '2026-10-23T12:00:00Z',
+  };
+  fixtures.context.run = { id: 'agent-run', status: 'RUNNING' };
+  render(<FirstRun showSetupGuide />);
+  expect(fixtures.navigate).toHaveBeenCalledWith({
+    to: '/runs',
+    search: { runID: 'agent-run' },
+    replace: true,
+  });
+  expect(fixtures.invoke).not.toHaveBeenCalled();
+});
 
 it('links to the full runs list after an uncertain invocation without automatically resending', async () => {
   fixtures.invoke.mockReturnValue({
@@ -431,9 +447,15 @@ it('links to the full runs list after an uncertain invocation without automatica
   fixtures.context.attempt = fixtures.setAttempt.mock.calls[0][0];
   view.rerender(<FirstRun />);
   expect(
-    screen.getByRole('link', { name: 'Check Runs' }).getAttribute('href'),
+    screen.getByRole('link', { name: 'View all runs' }).getAttribute('href'),
   ).toBe('/runs?showAllRuns=true');
   expect(fixtures.setAttempt).not.toHaveBeenCalledWith(null);
-  fireEvent.click(invokeButton());
+  expect(invokeButton().disabled).toBe(true);
+  fireEvent.click(
+    screen.getByRole('button', {
+      name: 'I checked Runs — allow another invocation',
+    }),
+  );
+  expect(fixtures.setAttempt).toHaveBeenLastCalledWith(null);
   expect(fixtures.invoke).toHaveBeenCalledTimes(1);
 });

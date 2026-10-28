@@ -1,6 +1,9 @@
 import SendEventButton from '@/components/Event/SendEventButton';
 import { LinkedRunDetails } from '@/components/Runs/LinkedRunDetails';
-import { RunsOnboarding } from '@/components/Runs/RunsOnboarding';
+import {
+  RunsOnboarding,
+  isRunsListRequested,
+} from '@/components/Runs/RunsOnboarding';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import { useInfoQuery } from '@/store/devApi';
@@ -32,7 +35,7 @@ import {
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { parseCelSearchError } from '@inngest/components/utils/searchErrorParser';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useSearch } from '@tanstack/react-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // Dev mode polls aggressively so iterations feel instant; serve (single-node
@@ -76,7 +79,7 @@ function RunsComponent() {
     isFunctionTimeField,
   );
   const [excludeDeferred] = useBooleanSearchParam('excludeDeferred');
-  const [showAllRuns] = useBooleanSearchParam('showAllRuns');
+  const showAllRuns = useSearch({ strict: false, select: isRunsListRequested });
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');

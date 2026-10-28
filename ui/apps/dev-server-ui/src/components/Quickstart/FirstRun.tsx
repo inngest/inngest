@@ -55,8 +55,12 @@ export function FirstRun({
   const [error, setError] = useState('');
   const [invoke, invocation] = useInvokeFunctionMutation();
   const submitting = useRef(false);
-  const currentAttempt = !showSetupGuide || attempt?.startedAt === invokedAt;
-  const pending = currentAttempt && !!attempt?.functionID;
+  const currentAttempt =
+    attempt?.mode === 'agent' ||
+    !showSetupGuide ||
+    attempt?.startedAt === invokedAt;
+  const pending =
+    currentAttempt && !!attempt?.functionID && attempt.mode !== 'agent';
   const runID = showSetupGuide
     ? currentAttempt
       ? attempt?.runID || run?.id
@@ -197,19 +201,6 @@ export function FirstRun({
                 Cron functions without event triggers run without payload data.
               </p>
             ))}
-          <Button
-            label="Invoke function"
-            aria-label="Invoke function"
-            loading={invocation.isLoading || pending}
-            disabled={
-              (!!completion && !showSetupGuide) ||
-              !!functionError ||
-              !details ||
-              pending ||
-              invocation.isLoading
-            }
-            onClick={submit}
-          />
         </>
       )}
       {error && <Alert severity="error">{error}</Alert>}
@@ -242,32 +233,37 @@ export function FirstRun({
           </Select.Options>
         </Select>
       )}
-      {(attempt?.mode === 'agent' ||
-        (attempt?.functionID && (error || runs.isError))) && (
+      {functions.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
-          {attempt?.mode === 'agent' && (
-            <p className="text-muted w-full text-sm">
-              Pause your agent before switching to avoid duplicate runs.
-            </p>
-          )}
-          <Link href="/runs?showAllRuns=true" target="_self">
-            Check Runs
-          </Link>
           <Button
-            kind="secondary"
-            appearance="outlined"
-            label={
-              attempt?.mode === 'agent'
-                ? 'Switch to manual invocation'
-                : 'I checked Runs — allow another invocation'
+            label="Invoke function"
+            aria-label="Invoke function"
+            loading={invocation.isLoading || pending}
+            disabled={
+              (!!completion && !showSetupGuide) ||
+              !!functionError ||
+              !details ||
+              pending ||
+              invocation.isLoading
             }
-            disabled={invocation.isLoading}
-            onClick={() => {
-              setAttempt(null);
-              setError('');
-            }}
+            onClick={submit}
           />
+          <Link href="/runs?showAllRuns=true" target="_self">
+            View all runs
+          </Link>
         </div>
+      )}
+      {pending && (error || runs.isError) && (
+        <Button
+          kind="secondary"
+          appearance="outlined"
+          label="I checked Runs — allow another invocation"
+          disabled={invocation.isLoading}
+          onClick={() => {
+            setAttempt(null);
+            setError('');
+          }}
+        />
       )}
     </section>
   );
