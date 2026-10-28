@@ -231,8 +231,10 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			DataKey:      gen.ID,
 			MaxAttempts:  runCtx.MaxAttempts(),
 			ParallelMode: gen.ParallelMode(),
-			CreatedAt:    e.now(),
-			Metadata:     map[string]any{"key": sub.Key, "seq": sub.Seq},
+			// Like waitForEvent: the wake joins the batch's shared discovery.
+			ParallelCoalesceKey: group.ParallelCoalesceKey,
+			CreatedAt:           e.now(),
+			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq},
 		}
 		if _, err := e.pm.Write(ctx, parkIdx, &park); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription park: %w", err)
@@ -248,10 +250,19 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		// Still waiting: the marker is written, and a delivery wakes it. A copy of
 		// this park woken in the meantime has its answer saved: nothing to do.
-		if parkStateOf(stack, sub.Key, gen.ID, sub.Seq) != parkReady {
+		switch parkStateOf(stack, sub.Key, gen.ID, sub.Seq) {
+		case parkAnswered:
+			// An earlier copy was answered between the first read and the write,
+			// so the marker just written belongs to a park that is over. Remove it:
+			// a later message would consume it and queue a stale discovery.
+			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+				return fmt.Errorf("error deleting stale subscription park: %w", err)
+			}
 			return nil
+		case parkReady:
+			return e.consumeWait(ctx, &park)
 		}
-		return e.consumeWait(ctx, &park)
+		return nil
 
 	case state.SubscribePoll:
 		ids, err := messages()
