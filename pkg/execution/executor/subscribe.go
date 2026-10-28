@@ -191,8 +191,25 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			MaxAttempts:  runCtx.MaxAttempts(),
 			ParallelMode: gen.ParallelMode(),
 			CreatedAt:    e.now(),
+			// The message the run waits for, so a redelivered event is only a wake
+			// when that message exists.
+			Metadata: map[string]any{"seq": sub.Seq},
 		}
-		if _, err := e.pm.Write(ctx, waitIdx, &wait); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+		_, err := e.pm.Write(ctx, waitIdx, &wait)
+		if errors.Is(err, state.ErrPauseAlreadyExists) {
+			// The same wait is written again when the op is sent again. A wait
+			// for another step is stale: replace it.
+			existing, lookupErr := e.pm.PauseByID(ctx, waitIdx, waitID)
+			if lookupErr == nil && existing != nil && existing.DataKey != gen.ID {
+				if err := e.pm.Delete(ctx, waitIdx, *existing); err != nil {
+					return fmt.Errorf("error replacing subscription wait pause: %w", err)
+				}
+				_, err = e.pm.Write(ctx, waitIdx, &wait)
+			} else {
+				err = nil
+			}
+		}
+		if err != nil {
 			return fmt.Errorf("error saving subscription wait pause: %w", err)
 		}
 
@@ -205,7 +222,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if len(ids) < sub.Seq {
 			return nil
 		}
-		return e.wakeSubscriber(ctx, md.ID, sub.Key, ids[sub.Seq-1])
+		return e.wakeSubscriber(ctx, md.ID, sub.Key, ids[sub.Seq-1], false)
 
 	case state.SubscribePoll:
 		ids, err := messages()
@@ -230,7 +247,10 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 	case state.SubscribeClose:
 		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
-		if err == nil && pause != nil {
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return fmt.Errorf("error loading subscription pause: %w", err)
+		}
+		if pause != nil {
 			if err := e.pm.Delete(ctx, idx, *pause); err != nil {
 				return fmt.Errorf("error deleting subscription pause: %w", err)
 			}
@@ -251,7 +271,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 // wakeSubscriber consumes the pause a run is blocked on, if there is one, so the
 // run sees the message. Its output is the ID of the message step.
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string) error {
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string, verify bool) error {
 	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionWaitEvent}
 	pause, err := e.pm.PauseByID(ctx, waitIdx, subscriptionWaitPauseID(id.RunID.String(), key))
 	if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
@@ -259,6 +279,17 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, me
 	}
 	if err != nil {
 		return err
+	}
+
+	if verify {
+		awaited, _ := pause.Metadata["seq"].(float64)
+		stack, err := e.smv2.LoadStack(ctx, id)
+		if err != nil {
+			return err
+		}
+		if float64(len(subscriptionMessageIDs(stack, key))) < awaited {
+			return nil
+		}
 	}
 
 	err = e.Resume(ctx, *pause, execution.ResumeRequest{
@@ -269,13 +300,6 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, me
 		return nil
 	}
 	return err
-}
-
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // deliverSubscription saves an event that matched a subscription pause as a
@@ -307,12 +331,15 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	// The same event saves the same bytes under the same ID: a redelivery is
 	// the message it already is.
 	messageID := subscriptionMessageID(key, eventID)
-	if _, err := e.smv2.SaveStep(ctx, id, messageID, data); err != nil &&
-		!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
+	redelivered := err != nil
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
-	l.Debug("subscription message saved", "message_id", messageID)
+	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return e.wakeSubscriber(ctx, id, key, messageID)
+	// A new message is the one a blocked run waits for. A redelivery may be an
+	// old message, so it only wakes a run whose awaited message exists.
+	return e.wakeSubscriber(ctx, id, key, messageID, redelivered)
 }
