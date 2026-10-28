@@ -8,7 +8,10 @@ import (
 
 	sq "github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
+	"github.com/google/cel-go/common"
+	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
+	celparser "github.com/google/cel-go/parser"
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/expressions"
 )
@@ -97,6 +100,12 @@ func celExprsToSQL(ctx context.Context, exprs []string, convert func(root *expr.
 		if tree.HasMacros {
 			return nil, fmt.Errorf("insights: macros are not supported in CEL expression %q", celExpr)
 		}
+		// expr's tree can't represent a ! over && / || faithfully (see
+		// celNegatesLogic), so such an expression gets no SQL prefilter at
+		// all and is left entirely to the caller's Go post-filter.
+		if celNegatesLogic(celExpr) {
+			continue
+		}
 
 		filter, err := convert(&tree.Root)
 		if err != nil {
@@ -108,6 +117,49 @@ func celExprsToSQL(ctx context.Context, exprs []string, convert func(root *expr.
 	}
 
 	return filters, nil
+}
+
+// celNegatesLogic reports whether celExpr has a ! with a && or || anywhere
+// under it. expr's parser pushes a ! down onto each leaf (flipping its
+// operator) but never swaps && and ||, so !(a == 1 && b == 2) comes back as
+// a != 1 && b != 2, which is narrower than the real expression. The SQL
+// built from expr's tree is only ever used as a superset prefilter (callers
+// re-check every candidate in Go), so rather than reconstructing the
+// negation this just reports it, and the expression goes unconstrained. An
+// expression cel-go itself can't parse is reported too, to stay on the safe
+// side.
+func celNegatesLogic(celExpr string) bool {
+	parsed, errs := celparser.Parse(common.NewTextSource(celExpr))
+	if errs != nil && len(errs.GetErrors()) > 0 {
+		return true
+	}
+	var walk func(e celast.Expr, negated bool) bool
+	walk = func(e celast.Expr, negated bool) bool {
+		switch e.Kind() {
+		case celast.CallKind:
+			call := e.AsCall()
+			switch call.FunctionName() {
+			case operators.LogicalNot:
+				negated = true
+			case operators.LogicalAnd, operators.LogicalOr:
+				if negated {
+					return true
+				}
+			}
+			if call.IsMemberFunction() && walk(call.Target(), negated) {
+				return true
+			}
+			for _, arg := range call.Args() {
+				if walk(arg, negated) {
+					return true
+				}
+			}
+		case celast.SelectKind:
+			return walk(e.AsSelect().Operand(), negated)
+		}
+		return false
+	}
+	return walk(parsed.Expr(), false)
 }
 
 // celNodeToSQL converts n into one SQL expression, following expr.Node's
@@ -278,14 +330,21 @@ func isEventPredicateIdent(ident string) bool {
 }
 
 func isOutputPredicateIdent(ident string) bool {
-	return strings.HasPrefix(ident, "output.") || strings.HasPrefix(ident, "error.")
+	return ident == "output" || ident == "error" ||
+		strings.HasPrefix(ident, "output.") || strings.HasPrefix(ident, "error.")
 }
 
 // celFieldConverter converts one CEL leaf predicate into DuckDB SQL by
 // resolving it against scope and handing off to whatever handler it's
-// registered to. An ident with no registration is silently dropped.
+// registered to. An ident with no registration is silently dropped, as is
+// a comparison between two fields (e.g. event.data.a == event.data.b),
+// which expr reports via LiteralIdent with a nil Literal.
+//
+// Every handler only has to produce a superset of what the leaf means
+// (callers re-check every candidate in Go), so any shape a handler can't
+// convert soundly is dropped (an empty result) rather than an error.
 func celFieldConverter(n *expr.Node, scope *celFieldScope) ([]sq.Expression, error) {
-	if !n.HasPredicate() {
+	if !n.HasPredicate() || n.Predicate.LiteralIdent != nil {
 		return []sq.Expression{}, nil
 	}
 
@@ -327,6 +386,15 @@ func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expr
 	jsonPath := celJSONPath(fieldPath)
 	textExpr := fmt.Sprintf("(%s->>?)", expr)
 
+	// Comparing ->>'s text form is looser than CEL's typed comparison (the
+	// string "1" passes == 1, the string "true" passes == true), which is
+	// fine for ==/</> since it only widens the match. It isn't for !=: CEL's
+	// a != "1" holds for {"a":1} and for a missing a, but the text form
+	// would exclude both, so a non-null != is left unconstrained.
+	if op == operators.NotEquals && literal != nil {
+		return []sq.Expression{}, nil
+	}
+
 	switch v := literal.(type) {
 	case string:
 		return handleStringOp(sq.L(textExpr, jsonPath), v, op)
@@ -345,7 +413,8 @@ func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expr
 	case nil:
 		return handleNullOp(fmt.Sprintf("(%s->?)", expr), jsonPath, op)
 	default:
-		return nil, fmt.Errorf("unsupported literal type: %T", literal)
+		// e.g. a bytes, uint, or map literal
+		return []sq.Expression{}, nil
 	}
 }
 
@@ -402,21 +471,21 @@ func writeJSONPathMember(b *strings.Builder, name string) {
 var jsonPathIdentRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // handleNullOp creates SQL filters for JSON null comparison in DuckDB.
-// json_type() returns SQL NULL both for a missing key and for an explicit
-// JSON null (verified against v2.1.0), unlike SQLite/Postgres where it
-// returns "null" only for an explicit JSON null — so it can't tell the two
-// apart. Comparing the extracted JSON value directly against 'null'::JSON
-// works instead, and keeps "missing key matches neither == null nor !=
-// null" via SQL's three-valued logic (NULL = 'null'::JSON is NULL either
-// way).
+// pkg/expressions' evaluator treats a missing field as null (a == null
+// holds for a missing a, a != null doesn't), so == null has to match both
+// an explicit JSON null and a missing key (SQL NULL from ->), while != null
+// only matches a present, non-null value (SQL's three-valued logic drops the
+// missing key, since NULL != 'null'::JSON is NULL). json_type() can't be
+// used to tell the two apart: it returns SQL NULL for both (verified
+// against v2.1.0).
 func handleNullOp(jsonExpr string, jsonPath string, op string) ([]sq.Expression, error) {
 	switch op {
 	case operators.Equals:
-		return []sq.Expression{sq.L(fmt.Sprintf("%s = 'null'::JSON", jsonExpr), jsonPath)}, nil
+		return []sq.Expression{sq.L(fmt.Sprintf("(%s IS NULL OR %s = 'null'::JSON)", jsonExpr, jsonExpr), jsonPath, jsonPath)}, nil
 	case operators.NotEquals:
 		return []sq.Expression{sq.L(fmt.Sprintf("%s != 'null'::JSON", jsonExpr), jsonPath)}, nil
 	}
-	return nil, fmt.Errorf("unsupported null operator: %s (only == and != are supported for null)", op)
+	return []sq.Expression{}, nil
 }
 
 func handleStringOp(expr exp.LiteralExpression, value string, op string) ([]sq.Expression, error) {
@@ -426,7 +495,8 @@ func handleStringOp(expr exp.LiteralExpression, value string, op string) ([]sq.E
 	case operators.NotEquals:
 		return []sq.Expression{expr.Neq(value)}, nil
 	}
-	return nil, fmt.Errorf("unsupported string operator: %s", op)
+	// e.g. a string <, or in
+	return []sq.Expression{}, nil
 }
 
 func handleNumericOp(expr exp.LiteralExpression, value any, op string) ([]sq.Expression, error) {
@@ -444,7 +514,8 @@ func handleNumericOp(expr exp.LiteralExpression, value any, op string) ([]sq.Exp
 	case operators.LessEquals:
 		return []sq.Expression{expr.Lte(value)}, nil
 	}
-	return nil, fmt.Errorf("unsupported numeric operator: %s", op)
+	// e.g. in
+	return []sq.Expression{}, nil
 }
 
 // renderedWhereSQLPrefix is the fixed, deterministic prefix RenderWhereSQL's

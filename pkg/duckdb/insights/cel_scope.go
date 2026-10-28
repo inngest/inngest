@@ -104,12 +104,15 @@ func celWildJSONFieldHandler(base, celPrefix, fixedJSONPrefix string) celFieldHa
 // celColumnEqHandler builds a handler for a field registered via Add that
 // targets a plain typed column directly (no JSON extraction) — only ==/!=
 // are supported, matching pkg/run.EventFieldConverter's own event.id/name/v
-// contract for the equivalent SQLite/Postgres column search.
+// contract for the equivalent SQLite/Postgres column search. A non-string
+// literal (which CEL would never match against a string field anyways) is
+// left unconstrained rather than failing the whole query, since the result
+// is only a prefilter (see celFieldConverter).
 func celColumnEqHandler(column string) celFieldHandler {
 	return func(ident string, literal any, op string) ([]sq.Expression, error) {
 		v, ok := literal.(string)
 		if !ok {
-			return nil, fmt.Errorf("expects %q to be a string: %v", ident, literal)
+			return []sq.Expression{}, nil
 		}
 		return handleStringOp(sq.L(column), v, op)
 	}
@@ -118,12 +121,13 @@ func celColumnEqHandler(column string) celFieldHandler {
 // celColumnTimestampHandler builds a handler for a field registered via Add
 // that targets a TIMESTAMPTZ column directly. The column (not the
 // int64-milliseconds CEL literal) is converted, via epoch_ms, rather than the
-// other way around.
+// other way around. Any other literal type is left unconstrained, same as
+// celColumnEqHandler.
 func celColumnTimestampHandler(column string) celFieldHandler {
 	return func(ident string, literal any, op string) ([]sq.Expression, error) {
 		ts, ok := literal.(int64)
 		if !ok {
-			return nil, fmt.Errorf("expects %q to be an integer: %v", ident, literal)
+			return []sq.Expression{}, nil
 		}
 		return handleNumericOp(sq.L(fmt.Sprintf("epoch_ms(%s)", column)), ts, op)
 	}
