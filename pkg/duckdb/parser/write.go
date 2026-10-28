@@ -457,6 +457,9 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		// prefix in SubqueryExpression, reachable wherever a NOT keyword
 		// can't parse as LogicalNotExpression (`x IS DISTINCT FROM NOT
 		// (SELECT ...)`).
+		if v.Array {
+			sw.str("ARRAY")
+		}
 		if v.Not {
 			sw.str("NOT ")
 		}
@@ -667,11 +670,15 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 
 // listExpr prints both ListExpr shapes: Paren=false is a bracketed array
 // literal ("[a, b]"), Paren=true is a parenthesized tuple / grouping-parens
-// literal ("(a, b)" or "()" — see adaptParenthesisExpression).
+// literal ("(a, b)" or "()" — see adaptParenthesisExpression). A one-element
+// tuple keeps its trailing comma: `(a)` would reparse as grouping parens.
 func (sw *sqlWriter) listExpr(l *ListExpr) {
 	if l.Paren {
 		sw.str("(")
 		sw.exprListTop(l.Elems)
+		if len(l.Elems) == 1 {
+			sw.str(",")
+		}
 		sw.str(")")
 		return
 	}

@@ -535,3 +535,24 @@ func TestWriteSpecialFunctions(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteKeepsArraySubqueryFrameExcludeAndTuples checks shapes the
+// adapter used to drop: ARRAY(SELECT ...) is a list, not a scalar
+// subquery; a window frame's two-word EXCLUDE options; a one-element tuple.
+func TestWriteKeepsArraySubqueryFrameExcludeAndTuples(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"array subquery", "SELECT ARRAY(SELECT 1)", "SELECT ARRAY(SELECT 1)"},
+		{"array subquery subscript", "SELECT ARRAY(SELECT a FROM t)[1]", "SELECT ARRAY(SELECT a FROM t)[1]"},
+		{"exclude current row", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE CURRENT ROW) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE CURRENT ROW) FROM t"},
+		{"exclude no others", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE NO OTHERS) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE NO OTHERS) FROM t"},
+		{"exclude group", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE GROUP) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE GROUP) FROM t"},
+		{"exclude ties", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE TIES) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE TIES) FROM t"},
+		{"one-element tuple", "SELECT (1,)", "SELECT (1,)"},
+		{"two-element tuple", "SELECT (1, 2,)", "SELECT (1, 2)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}

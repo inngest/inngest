@@ -250,10 +250,16 @@ type SubqueryExpr struct {
 	Select *SelectStatement
 	Exists bool
 	Not    bool
+	// Array is `ARRAY(SELECT ...)`: the subquery's rows collected into a
+	// list, not a scalar subquery. Never set alongside Exists/Not.
+	Array bool
 }
 
 func (s *SubqueryExpr) Children() []Node { return []Node{s.Select} }
 func (s *SubqueryExpr) String() string {
+	if s.Array {
+		return "SubqueryExpr(array=true)"
+	}
 	return fmt.Sprintf("SubqueryExpr(exists=%v,not=%v)", s.Exists, s.Not)
 }
 

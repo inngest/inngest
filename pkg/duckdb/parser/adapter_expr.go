@@ -1047,7 +1047,7 @@ func (a *adapter) adaptListExpression(n *peg.Node) Expr {
 	if alt.Name == "ArrayParensSelect" {
 		// 'ARRAY' Parens(SelectStatementInternal)
 		sub := a.adaptParenSelect(body(body(alt).Children[1]))
-		return &SubqueryExpr{baseExpr: a.at(n), Select: sub}
+		return &SubqueryExpr{baseExpr: a.at(n), Select: sub, Array: true}
 	}
 	// ArrayBoundedListExpression <- 'ARRAY'? BoundedListExpression ; BoundedListExpression <- '[' List(Expression)? ']'
 	bseq := body(body(alt).Children[1])
@@ -1198,8 +1198,19 @@ func (a *adapter) adaptFrameClause(n *peg.Node) *FrameClause {
 		fc.Start = a.adaptFrameBound(body(alt)) // SingleFrameExtent <- FrameBound
 	}
 	if exc, ok := present(seq.Children[2]); ok {
-		// WindowExcludeClause <- 'EXCLUDE' WindowExcludeElement
-		fc.Exclude = literalText(body(exc).Children[1])
+		// WindowExcludeClause <- 'EXCLUDE' WindowExcludeElement ;
+		// WindowExcludeElement <- ExcludeCurrentRow / ExcludeGroup / ExcludeTies / ExcludeNoOthers.
+		// CURRENT ROW and NO OTHERS are two-token Seqs literalText can't read.
+		switch el := choice(body(body(exc).Children[1])); el.Name {
+		case "ExcludeCurrentRow":
+			fc.Exclude = "CURRENT ROW"
+		case "ExcludeGroup":
+			fc.Exclude = "GROUP"
+		case "ExcludeTies":
+			fc.Exclude = "TIES"
+		default: // ExcludeNoOthers
+			fc.Exclude = "NO OTHERS"
+		}
 	}
 	return fc
 }
