@@ -20,14 +20,15 @@ func TestCELEventAndOutputFiltersMatchWholeExpression(t *testing.T) {
 	defer cleanup()
 	ctx := t.Context()
 
-	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE cel_runs (id INTEGER, inputs JSON, output JSON);`)
+	// VARIANT, like inngest.runs' own inputs/output columns.
+	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE cel_runs (id INTEGER, inputs VARIANT, output VARIANT);`)
 	require.NoError(t, err)
-	_, err = db.ExecContext(ctx, `INSERT INTO cel_runs VALUES
+	_, err = db.ExecContext(ctx, `INSERT INTO cel_runs SELECT id, inputs::JSON, output::JSON FROM (VALUES
 		(1, '[{"name":"x","data":{"a":1}}]', '{"data":{"ok":false}}'),
 		(2, '[{"name":"y","data":{"a":2}}]', '{"data":{"ok":true}}'),
 		(3, '[{"name":"x"}]', '{"data":{"ok":true}}'),
 		(4, '[{"name":"z"}]', '{"data":{"ok":false}}'),
-		(5, '[{"name":"x","data":{"a":2}},{"name":"y","data":{"a":1}}]', '{"data":{"ok":false}}');`)
+		(5, '[{"name":"x","data":{"a":2}},{"name":"y","data":{"a":1}}]', '{"data":{"ok":false}}')) v(id, inputs, output);`)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -56,7 +57,7 @@ func TestCELEventAndOutputFiltersMatchWholeExpression(t *testing.T) {
 			require.NoError(t, err)
 			if eventFrag != "" {
 				// Mirrors pkg/duckdb/query's eventCELArrayMatchClause.
-				where = append(where, fmt.Sprintf(`len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: %s)) > 0`, eventFrag))
+				where = append(where, fmt.Sprintf(`len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: %s)) > 0`, eventFrag))
 				args = append(args, eventArgs...)
 			}
 

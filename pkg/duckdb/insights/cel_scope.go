@@ -28,7 +28,7 @@ type celFieldScope = trie.Trie[[]string, string, celFieldHandler]
 //
 // event.* (including event.data.*) predicates are converted against "x", a
 // lambda parameter the caller supplies by wrapping the resulting SQL
-// fragment in list_filter(json_transform(inputs, '["JSON"]'), lambda x:
+// fragment in list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x:
 // <fragment>) — see eventCELArrayMatchClause in runs.go.
 // inngest.runs.inputs is a JSON array of the run's triggering event(s)
 // (plural for a batch trigger), each JSON-encoded like pkg/event.Event's
@@ -54,7 +54,7 @@ var runsInputsCELScope = trie.New[[]string, string, celFieldHandler]().
 // caller (see celExprsToSQL). It must stay equivalent to pkg/duckdb/
 // query's eventCELArrayMatchClause, which applies the same match to
 // CELEventFilters' result.
-const runsInputsMatchSQL = `len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ?)) > 0`
+const runsInputsMatchSQL = `len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: ?)) > 0`
 
 // eventsTableCELScope backs CELEventTableFilters (used by
 // pkg/cqrs/duckdbquery.GetEventsByExpressions to search inngest.events
