@@ -590,6 +590,9 @@ func TestWriteSpecialFunctions(t *testing.T) {
 	cases := []struct{ name, sql, want string }{
 		{"coalesce", "SELECT coalesce(a, b) FROM t", "SELECT COALESCE(a, b) FROM t"},
 		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, "SELECT COALESCE(a) FROM t"},
+		{"quoted coalesce w/o args", `SELECT "coalesce"() FROM t`, `SELECT "coalesce"() FROM t`},
+		{"quoted coalesce window", `SELECT "coalesce"(a) OVER () FROM t`, `SELECT "coalesce"(a) OVER () FROM t`},
+		{"quoted coalesce distinct", `SELECT "coalesce"(DISTINCT a) FROM t`, `SELECT "coalesce"(DISTINCT a) FROM t`},
 		{"nullif", "SELECT NULLIF(a, b) FROM t", `SELECT "nullif"(a, b) FROM t`},
 		{"extract keyword", "SELECT EXTRACT(year FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
 		{"extract plural keyword", "SELECT EXTRACT(years FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
@@ -663,5 +666,41 @@ func TestWriteQuantifiedSubqueryOperand(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			requireWriteRoundTrip(t, c.sql, c.want)
 		})
+	}
+}
+
+// TestWriteRoundTripsEveryKeywordAsFunctionName checks every vendored
+// keyword, called as a quoted function in each call shape, either fails to
+// parse or writes and reparses to the same AST, so syntaxFunctionNames (and
+// the COALESCE special case) can't drift from the grammar.
+func TestWriteRoundTripsEveryKeywordAsFunctionName(t *testing.T) {
+	_, kl, err := grammar.Load()
+	require.NoError(t, err)
+	shapes := []string{
+		`SELECT "%[1]s"(x) FROM t`,
+		`SELECT "%[1]s"() FROM t`,
+		`SELECT "%[1]s"(x, y) FROM t`,
+		`SELECT "%[1]s"(DISTINCT x ORDER BY y) FILTER (WHERE z) FROM t`,
+		`SELECT "%[1]s"(x) OVER () FROM t`,
+		`SELECT s."%[1]s"(x) FROM t`,
+		`SELECT (x)."%[1]s"(y) FROM t`,
+		`SELECT * FROM "%[1]s"(x)`,
+	}
+	for _, list := range [][]string{kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName} {
+		for _, kw := range list {
+			for _, shape := range shapes {
+				src := fmt.Sprintf(shape, strings.ToLower(kw))
+				stmt, err := ParseString(src)
+				if err != nil {
+					var perr *ParseError
+					require.ErrorAs(t, err, &perr, src)
+					continue
+				}
+				out := String(stmt)
+				reparsed, err := ParseString(out)
+				require.NoError(t, err, "%s: reparsing %q", src, out)
+				require.Equal(t, Dump(stmt), Dump(reparsed), "%s: %q", src, out)
+			}
+		}
 	}
 }
