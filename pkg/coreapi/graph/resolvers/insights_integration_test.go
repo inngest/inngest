@@ -341,3 +341,32 @@ func insertRunRowEndedAt(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, r
 	)
 	require.NoError(t, err)
 }
+
+// TestInsightsEncodesUnrepresentableNumbers matches the REST endpoint's
+// TestQueryInsights_EncodesUnrepresentableNumbers: non-finite floats and
+// integers past 2^53 come back as strings, and the row marshals w/o
+// MarshalUnknown panicking. Quack transport, like production.
+func TestInsightsEncodesUnrepresentableNumbers(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+
+	result, err := qr.Insights(context.Background(),
+		"SELECT 'inf'::DOUBLE AS a, '-inf'::DOUBLE AS b, 'nan'::DOUBLE AS c, 9007199254740993::BIGINT AS d, 42::BIGINT AS e")
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+	require.Equal(t, []any{"Infinity", "-Infinity", "NaN", "9007199254740993", int64(42)}, result.Rows[0])
+
+	raw, err := json.Marshal(result.Rows)
+	require.NoError(t, err)
+	require.JSONEq(t, `[["Infinity","-Infinity","NaN","9007199254740993",42]]`, string(raw))
+}

@@ -15,11 +15,10 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
-// TestQueryInsights_ConversionErrorIsNotCountedAsOK: a query that executes
-// but whose rows can't be converted (a NaN json.Marshal can't encode, over
-// quack since jsonlines doesn't surface a real float NaN) fails the request,
-// so its metrics must say so too.
-func TestQueryInsights_ConversionErrorIsNotCountedAsOK(t *testing.T) {
+// TestQueryInsights_NonFiniteFloatIsCountedAsOK: a NaN (over quack, since
+// jsonlines doesn't surface a real float NaN) used to fail row conversion;
+// it now encodes as "NaN", so the query succeeds and its metrics say so.
+func TestQueryInsights_NonFiniteFloatIsCountedAsOK(t *testing.T) {
 	binPath, err := exec.LookPath("duckdb")
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
@@ -38,8 +37,10 @@ func TestQueryInsights_ConversionErrorIsNotCountedAsOK(t *testing.T) {
 	t.Cleanup(func() { otel.SetMeterProvider(orig) })
 
 	service := NewService(ServiceOptions{DuckDB: db})
-	_, err = service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SELECT 'NaN'::DOUBLE AS x FROM runs UNION ALL SELECT 'NaN'::DOUBLE AS x"})
-	require.Error(t, err)
+	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SELECT 'NaN'::DOUBLE AS x FROM runs UNION ALL SELECT 'NaN'::DOUBLE AS x"})
+	require.NoError(t, err)
+	require.Len(t, resp.Data.Rows, 1)
+	require.Equal(t, "NaN", resp.Data.Rows[0].Values[0].GetStringValue())
 
 	var data metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &data))
@@ -57,5 +58,5 @@ func TestQueryInsights_ConversionErrorIsNotCountedAsOK(t *testing.T) {
 			}
 		}
 	}
-	require.Equal(t, map[string]int64{"internal_error": 1}, statuses)
+	require.Equal(t, map[string]int64{"ok": 1}, statuses)
 }
