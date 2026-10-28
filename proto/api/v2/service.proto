@@ -3696,6 +3696,29 @@ message QueryInsightsData {
       description: "Any non-fatal diagnostics related to the insights query execution"
     }
   ];
+  InsightsQueryInfo info = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Which tables the query read and whether its result was capped by the default row limit"
+    }
+  ];
+}
+
+message InsightsQueryInfo {
+  optional string primary_table = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The table the query's outermost FROM reads, if there is exactly one"
+    }
+  ];
+  repeated string tables = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Every table the query reads"
+    }
+  ];
+  bool limited = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether a default LIMIT was applied because the query had none"
+    }
+  ];
 }
 
 message InsightsOutputColumn {
@@ -3709,6 +3732,47 @@ message InsightsOutputColumn {
       description: "Data type of the column (e.g., 'string', 'number', 'boolean')"
     }
   ];
+  repeated InsightsPathHint path_hints = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "What kind of ID each JSON path into this column's values holds (an empty path is the column's own value), e.g. runs.inputs' [*].id path holds event IDs. Empty when the column isn't traceable to a known table column."
+    }
+  ];
+}
+
+message InsightsPathHint {
+  repeated InsightsPathSegment path = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Path into the column's value; empty for the column's own value"
+    }
+  ];
+  InsightsColumnHint hint = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "What the value at path holds"
+    }
+  ];
+}
+
+message InsightsPathSegment {
+  optional string key = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Object key, unset when wildcard is true"
+    }
+  ];
+  bool wildcard = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Every element of an array"
+    }
+  ];
+}
+
+enum InsightsColumnHint {
+  INSIGHTS_COLUMN_HINT_UNSPECIFIED = 0;
+  INSIGHTS_COLUMN_HINT_APP_ID = 1;
+  INSIGHTS_COLUMN_HINT_FUNCTION_ID = 2;
+  INSIGHTS_COLUMN_HINT_RUN_ID = 3;
+  INSIGHTS_COLUMN_HINT_EVENT_ID = 4;
+  // A session reference: a {key, id} object, not a bare ID string.
+  INSIGHTS_COLUMN_HINT_SESSION = 5;
 }
 
 enum InsightsOutputColumnType {
@@ -3723,7 +3787,7 @@ enum InsightsOutputColumnType {
 message InsightsRow {
   repeated google.protobuf.Value values = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)"
+      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.). Values that JSON numbers can't carry exactly are strings: NaN/Infinity/-Infinity, and integers outside +-(2^53 - 1)."
     }
   ];
 }

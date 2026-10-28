@@ -312,3 +312,28 @@ func TestInsightsRunsLatestRowTiebreak(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, [][]any{{"r1", "Running"}, {"r2", "Running"}}, result.Rows)
 }
+
+// TestInsightsExecutionErrorNamesLogicalTables matches the REST endpoint's
+// test of the same name: DuckDB's error text about the rewritten SQL reads
+// as the logical table names.
+func TestInsightsExecutionErrorNamesLogicalTables(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+
+	result, err := qr.Insights(context.Background(), "SELECT length(queued_at) FROM runs")
+	require.NoError(t, err)
+	require.Len(t, result.Diagnostics, 1)
+	require.Contains(t, result.Diagnostics[0].Message, "length(TIMESTAMP WITH TIME ZONE)")
+	require.NotContains(t, result.Diagnostics[0].Message, "insights_runs")
+	require.NotContains(t, result.Diagnostics[0].Message, "LINE 1")
+}
