@@ -388,6 +388,21 @@ func TestWritePivotEnumAndValueList(t *testing.T) {
 	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))", "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))")
 }
 
+// TestWritePivotTupleAndTypedValues checks the PIVOT IN entries that can't
+// hide an expression but aren't plain literals (tuples for a multi-column
+// FOR, typed literals, casts of literals) parse and print verbatim.
+func TestWritePivotTupleAndTypedValues(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT * FROM t PIVOT (sum(v) FOR (a, b) IN ((1, 2)))",
+		"SELECT * FROM t PIVOT (sum(v) FOR (a, b) IN ((1, -2), (1, (2)), ('x', DATE '2024-01-01') AS c))",
+		"SELECT * FROM t PIVOT (sum(v) FOR a IN ((1,)))",
+		"SELECT * FROM t PIVOT (sum(v) FOR d IN (DATE '2024-01-01', TIMESTAMP '2024-01-01 00:00:00' AS x))",
+		"SELECT * FROM t PIVOT (sum(v) FOR d IN ('2024-01-01'::DATE, CAST('2024-01-02' AS DATE), TRY_CAST('3' AS INT)))",
+	} {
+		requireWriteRoundTrip(t, sql, sql)
+	}
+}
+
 // TestRejectsExpressionsInRawTextFields checks the fields kept as source
 // text (PivotColumn.In, CastExpr.Type, TypeLiteral.Type) only ever hold
 // literals and names: Walk can't see into them, so an expression there
@@ -396,6 +411,11 @@ func TestRejectsExpressionsInRawTextFields(t *testing.T) {
 	for _, c := range []struct{ sql, msg string }{
 		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ((SELECT 1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
 		{"SELECT * FROM t PIVOT (sum(x) FOR y IN (f(1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR (y, z) IN ((1, f(2))))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR (y, z) IN ((1, (SELECT 2))))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN (CAST((SELECT 1) AS INT)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ([1, f(2)]))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ('1'::VARCHAR((SELECT 1))))", "A type modifier other than a number or string literal is not supported"},
 		{"SELECT x::VARCHAR((SELECT 1)) FROM t", "A type modifier other than a number or string literal is not supported"},
 		{"SELECT x::INT[(SELECT 1)] FROM t", "A type modifier other than a number or string literal is not supported"},
 		{"SELECT CAST(x AS VARCHAR(f(1))) FROM t", "A type modifier other than a number or string literal is not supported"},

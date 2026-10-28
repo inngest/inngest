@@ -65,16 +65,32 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 }
 
 // isPivotValue reports whether a PIVOT IN entry is a literal, a signed
-// number or a bare name. In keeps entries as source text, which Walk can't
-// see into, so anything that could hide a subquery or function call is
-// rejected rather than passed through unchecked.
+// number, a bare name, a typed literal (`DATE '2024-01-01'`), a cast of one
+// of those, or a tuple of them (multi-column `FOR (a, b) IN ((1, 2))`). In
+// keeps entries as source text, which Walk can't see into, so anything that
+// could hide a subquery or function call is rejected rather than passed
+// through unchecked. Type names are already checked for hidden expressions
+// when they're adapted (typeText), so a cast or typed literal only
+// needs its operand checked.
 func isPivotValue(e Expr) bool {
 	switch v := e.(type) {
-	case *Literal, *Ident:
+	case *Literal, *Ident, *TypeLiteral:
 		return true
 	case *UnaryExpr:
 		lit, ok := v.X.(*Literal)
 		return (v.Op == "-" || v.Op == "+") && !v.Postfix && ok && lit.Kind == LitNumber
+	case *CastExpr:
+		return isPivotValue(v.X)
+	case *ListExpr:
+		if !v.Paren {
+			return false
+		}
+		for _, elem := range v.Elems {
+			if !isPivotValue(elem) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
