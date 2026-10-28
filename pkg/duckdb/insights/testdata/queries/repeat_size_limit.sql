@@ -1,0 +1,1 @@
+SELECT repeat('x', 1500000000) AS s
