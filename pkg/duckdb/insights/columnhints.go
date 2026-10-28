@@ -298,7 +298,7 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 	entries, _ := scope.starEntries(star.Qualifier)
 	var out []starColumn
 	for i, e := range entries {
-		if bare && e.starHidden {
+		if e.hidden() {
 			continue
 		}
 		for _, name := range e.table.columnOrder {

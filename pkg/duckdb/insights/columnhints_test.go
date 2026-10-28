@@ -648,3 +648,11 @@ func TestBuildColumnHintsTopNAggregatesAreLists(t *testing.T) {
 	}
 	require.Equal(t, [][]PathHint{{{Hint: HintRunID}}}, pathHintsFor(t, "SELECT max(run_id) FROM runs"))
 }
+
+// A later join only sees a SEMI/ANTI join's left side, so its "*" is just
+// runs + metadata with run_id merged once.
+func TestBuildColumnHintsStarAfterSemiJoin(t *testing.T) {
+	got := hintsFor(t, "SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)")
+	want := hintsFor(t, "SELECT * FROM runs r JOIN metadata m USING (run_id)")
+	require.Equal(t, want, got)
+}

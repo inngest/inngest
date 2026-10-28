@@ -29,10 +29,15 @@ func (e *ValidationError) Error() string {
 type scopeEntry struct {
 	alias string
 	table logicalTable
-	// starHidden marks the right side of a SEMI/ANTI join, whose columns
-	// a bare "*" doesn't project (DuckDB only returns the left side's).
-	starHidden bool
+	// hiddenBy is the SEMI/ANTI join whose right side this entry is on:
+	// DuckDB only exposes that join's left side, so the entry is only
+	// visible inside hiddenBy's own ON condition (onScope) and nowhere
+	// else (a later join, "*", a bare or qualified reference, a LATERAL
+	// subquery).
+	hiddenBy *parser.JoinRef
 }
+
+func (e scopeEntry) hidden() bool { return e.hiddenBy != nil }
 
 // usingColumn is one table's copy of a column a JOIN ... USING (or a
 // NATURAL join) merged: entry indexes tableScope.entries, column is
@@ -118,20 +123,18 @@ func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable, d
 // entries are in scope (left is entries[lo:mid], right entries[mid:hi]):
 // each USING (or NATURAL join's shared) column must exist, unambiguously,
 // on both sides -- the same binder errors DuckDB reports -- and is merged
-// into one using set; a SEMI/ANTI join's right side is hidden from "*".
+// into one using set; a SEMI/ANTI join's right side is then hidden from
+// everything but r's own ON condition.
 func (s *tableScope) addJoinColumns(r *parser.JoinRef, lo, mid, hi int) error {
 	typ := strings.ToUpper(r.Type)
-	if strings.Contains(typ, "SEMI") || strings.Contains(typ, "ANTI") {
-		for i := mid; i < hi; i++ {
-			s.entries[i].starHidden = true
-		}
-	}
-
 	names := r.Using
 	if strings.HasPrefix(typ, "NATURAL") {
 		names = nil
 		seen := map[string]bool{}
 		for _, e := range s.entries[lo:mid] {
+			if e.hidden() {
+				continue
+			}
 			for _, name := range e.table.columnOrder {
 				key := strings.ToLower(name)
 				if seen[key] {
@@ -156,16 +159,51 @@ func (s *tableScope) addJoinColumns(r *parser.JoinRef, lo, mid, hi int) error {
 		}
 		s.mergeUsing(left, right)
 	}
+
+	if strings.Contains(typ, "SEMI") || strings.Contains(typ, "ANTI") {
+		for i := mid; i < hi; i++ {
+			// An entry an inner SEMI/ANTI join already hid stays hidden
+			// by that join, so r's own ON can't see it either.
+			if !s.entries[i].hidden() {
+				s.entries[i].hiddenBy = r
+			}
+		}
+	}
 	return nil
 }
 
-// sideColumns returns every copy of column name among entries[lo:hi],
-// collapsing copies an earlier USING/NATURAL join already merged into
-// one (the first).
+// onScope returns the scope r's ON condition is checked against: s itself,
+// except that a SEMI/ANTI join's own right side (hidden from everything
+// else) is visible.
+func (s *tableScope) onScope(r *parser.JoinRef) *tableScope {
+	var out *tableScope
+	for i, e := range s.entries {
+		if e.hiddenBy != r {
+			continue
+		}
+		if out == nil {
+			c := *s
+			c.entries = append([]scopeEntry(nil), s.entries...)
+			out = &c
+		}
+		out.entries[i].hiddenBy = nil
+	}
+	if out == nil {
+		return s
+	}
+	return out
+}
+
+// sideColumns returns every visible copy of column name among
+// entries[lo:hi], collapsing copies an earlier USING/NATURAL join already
+// merged into one (the first).
 func (s *tableScope) sideColumns(lo, hi int, name string) []usingColumn {
 	var out []usingColumn
 	sets := map[int]bool{}
 	for i := lo; i < hi; i++ {
+		if s.entries[i].hidden() {
+			continue
+		}
 		if _, ok := s.entries[i].table.column(name); !ok {
 			continue
 		}
@@ -304,7 +342,7 @@ func (s *tableScope) lookup(alias string) (logicalTable, bool) {
 
 func (s *tableScope) lookupEntry(alias string) (scopeEntry, bool) {
 	for _, e := range s.entries {
-		if strings.EqualFold(e.alias, alias) {
+		if !e.hidden() && strings.EqualFold(e.alias, alias) {
 			return e, true
 		}
 	}
@@ -315,8 +353,9 @@ func (s *tableScope) lookupEntry(alias string) (scopeEntry, bool) {
 }
 
 // starEntries returns the scope entries a star with this qualifier expands
-// over: every local entry, in FROM order, for a bare "*", or just the
-// qualified one for "t.*" (false when t isn't in scope).
+// over: every local entry, in FROM order, for a bare "*" (callers skip
+// hidden ones themselves, since entry indexes key tableScope.using), or
+// just the qualified one for "t.*" (false when t isn't in scope).
 func (s *tableScope) starEntries(qualifier []string) ([]scopeEntry, bool) {
 	switch len(qualifier) {
 	case 0:
@@ -377,7 +416,7 @@ func (x excludeName) matches(alias, name string) bool {
 func (s *tableScope) uniqueColumn(name string) (knownColumn, bool) {
 	var found knownColumn
 	for _, e := range s.entries {
-		if col, ok := e.table.column(name); ok {
+		if col, ok := e.table.column(name); ok && !e.hidden() {
 			found = col
 		}
 	}

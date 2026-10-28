@@ -105,17 +105,53 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 	// reuse it for traversals that must still see every expression.
 	skipAliasExprs := groupByOrderByAliasExprs(stmt, scope)
 
+	// A SEMI/ANTI join's ON is the only place its right side is visible
+	// (tableScope.onScope), so it gets its own validator.
+	onScopes := joinOnScopes(stmt.From, scope)
+
 	v := &exprValidator{scope: scope, ctes: ctes, diags: diags}
 	for _, n := range collectExprs(stmt) {
 		if skipAliasExprs[n] {
 			continue
 		}
-		parser.Walk(v, n)
-		if v.err != nil {
-			return nil, nil, v.err
+		nv := v
+		if os, ok := onScopes[n]; ok {
+			nv = &exprValidator{scope: os, ctes: ctes, diags: diags}
+		}
+		parser.Walk(nv, n)
+		if nv.err != nil {
+			return nil, nil, nv.err
 		}
 	}
 	return scope, ctes, nil
+}
+
+// joinOnScopes maps every JOIN ON expression in from whose scope differs
+// from scope itself (a SEMI/ANTI join's, see tableScope.onScope) to that
+// scope.
+func joinOnScopes(from *parser.FromClause, scope *tableScope) map[parser.Node]*tableScope {
+	if from == nil {
+		return nil
+	}
+	out := map[parser.Node]*tableScope{}
+	var walk func(parser.TableRef)
+	walk = func(ref parser.TableRef) {
+		r, ok := ref.(*parser.JoinRef)
+		if !ok {
+			return
+		}
+		if r.On != nil {
+			if os := scope.onScope(r); os != scope {
+				out[r.On] = os
+			}
+		}
+		walk(r.Left)
+		walk(r.Right)
+	}
+	for _, ref := range from.Refs {
+		walk(ref)
+	}
+	return out
 }
 
 // validateSetOpModifiers checks a set operation's own ORDER BY/LIMIT/OFFSET
@@ -543,7 +579,7 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 		}
 		found := false
 		for _, e := range entries {
-			if x.qualifier != "" && !strings.EqualFold(x.qualifier, e.alias) {
+			if e.hidden() || x.qualifier != "" && !strings.EqualFold(x.qualifier, e.alias) {
 				continue
 			}
 			if _, ok := e.table.column(x.column); ok {
