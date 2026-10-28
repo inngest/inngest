@@ -744,17 +744,7 @@ func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 		sw.indirectionBase(f.Receiver, true)
 		sw.str(".")
 	}
-	// Function names skip writeIdentPart's keyword check: keyword-named
-	// functions (left, right, ...) are spelled bare in DuckDB, and quoting
-	// them would needlessly depend on quoted function-name resolution.
-	for i, p := range f.Name {
-		sw.sep(i, ".")
-		if isSimpleIdent(p) {
-			sw.str(p)
-		} else {
-			writeIdentPart(sw, p)
-		}
-	}
+	sw.functionName(f)
 	sw.str("(")
 	if f.Distinct {
 		sw.str("DISTINCT ")
@@ -794,6 +784,54 @@ func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 	}
 	if f.Over != nil {
 		sw.windowSpec(f.Over)
+	}
+}
+
+// syntaxFunctionNames are the words that, followed by '(', start a
+// SingleExpression alternative tried before FunctionExpression (a
+// SpecialFunctionExpression, CAST, GROUPING, INTERVAL, a subquery, ...).
+// A function by one of these names has to be quoted or it reparses as that
+// syntax instead: `"nullif"(x)` printed bare is a NULLIF missing its second
+// argument, `"position"(b, a)` a POSITION missing its IN.
+var syntaxFunctionNames = map[string]bool{
+	"ARRAY": true, "CASE": true, "CAST": true, "COALESCE": true, "COLUMNS": true, "EXISTS": true,
+	"EXTRACT": true, "GROUPING": true, "GROUPING_ID": true, "INTERVAL": true,
+	"LAMBDA": true, "NOT": true, "NULLIF": true, "OVERLAY": true, "POSITION": true,
+	"ROW": true, "SUBSTRING": true, "TRIM": true, "TRY": true, "TRY_CAST": true,
+	"UNPACK": true,
+}
+
+// functionName prints f's name so it reparses as a call to the same
+// function. An unqualified name is quoted unless FunctionName accepts it
+// bare (keyword-named functions like left/right are spelled bare in
+// DuckDB, but `"not"(x)` printed bare is `NOT x`) and no earlier syntax
+// claims it (see syntaxFunctionNames). A qualified name's first part is a
+// CatalogName/SchemaName, quoted like any identifier; the rest are
+// Reserved* names that take any keyword.
+func (sw *sqlWriter) functionName(f *FunctionExpr) {
+	if f.Receiver != nil || len(f.Name) > 1 {
+		for i, p := range f.Name {
+			sw.sep(i, ".")
+			if i == 0 && f.Receiver == nil || !isSimpleIdent(p) {
+				writeIdentPart(sw, p)
+			} else {
+				sw.str(p)
+			}
+		}
+		return
+	}
+	if len(f.Name) == 0 {
+		panic("duckdb/parser: Write: FunctionExpr with no name")
+	}
+	p := f.Name[0]
+	up := strings.ToUpper(p)
+	switch {
+	case isSimpleIdent(p) && !syntaxFunctionNames[up] && isFuncNameIdent(p):
+		sw.str(p)
+	default:
+		sw.str(`"`)
+		sw.str(strings.ReplaceAll(p, `"`, `""`))
+		sw.str(`"`)
 	}
 }
 

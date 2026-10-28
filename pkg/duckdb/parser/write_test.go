@@ -476,3 +476,27 @@ func TestWriteParenthesizesCastUnderIndirection(t *testing.T) {
 	require.True(t, ok, "got %T", stmt.Columns[0].Expr)
 	require.Equal(t, "INT[][1]", cast.Type)
 }
+
+// TestWriteQuotesKeywordFunctionNames checks a function whose name is a
+// keyword FunctionName rejects, or that starts some other syntax, is
+// quoted, so it reparses as a call to that same function.
+func TestWriteQuotesKeywordFunctionNames(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"reserved keyword", `SELECT "not"(x) FROM t`, `SELECT "not"(x) FROM t`},
+		{"interval", `SELECT "interval"(x) FROM t`, `SELECT "interval"(x) FROM t`},
+		{"distinct", `SELECT "distinct"(x) FROM t`, `SELECT "distinct"(x) FROM t`},
+		{"grouping_id", `SELECT "grouping_id"(x) FROM t`, `SELECT "grouping_id"(x) FROM t`},
+		{"special function syntax", `SELECT "position"(a, b) FROM t`, `SELECT "position"(a, b) FROM t`},
+		{"func-name keyword stays bare", "SELECT left(a, 1), right(a, 1) FROM t", "SELECT left(a, 1), right(a, 1) FROM t"},
+		{"keyword schema", `SELECT "select".f(x) FROM t`, `SELECT "select".f(x) FROM t`},
+		{"keyword after schema stays bare", `SELECT s."not"(x) FROM t`, `SELECT s.not(x) FROM t`},
+		{"keyword method stays bare", "SELECT (x).not(1) FROM t", "SELECT (x).not(1) FROM t"},
+		{"case-sensitive name", `SELECT "Foo"(x) FROM t`, `SELECT Foo(x) FROM t`},
+		{"non-identifier name", `SELECT "a b"(x) FROM t`, `SELECT "a b"(x) FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
