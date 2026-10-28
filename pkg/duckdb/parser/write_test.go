@@ -451,3 +451,18 @@ func TestWriteParenthesizesIdentUnderFieldAccess(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteKeepsSubqueryNot checks a SubqueryExpr's own NOT prefix is
+// printed when it isn't also EXISTS.
+func TestWriteKeepsSubqueryNot(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"not subquery", "SELECT TRUE IS NOT DISTINCT FROM NOT (SELECT TRUE)", "SELECT TRUE IS NOT DISTINCT FROM NOT (SELECT TRUE)"},
+		{"not exists", "SELECT TRUE IS DISTINCT FROM NOT EXISTS (SELECT TRUE)", "SELECT TRUE IS DISTINCT FROM NOT EXISTS (SELECT TRUE)"},
+		{"under prefix", "SELECT -NOT (SELECT 1)", "SELECT -NOT (SELECT 1)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
