@@ -67,8 +67,8 @@ export const dateFormat = (dateString: string, diff: number) => {
   return d < 6000 // a minute
     ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-    ? lightFormat(date, 'HH:mm')
-    : lightFormat(date, 'MM/dd:HH');
+      ? lightFormat(date, 'HH:mm')
+      : lightFormat(date, 'MM/dd:HH');
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -243,9 +243,11 @@ export const mapEntityLines = (
   {
     areaStyle,
     connectNulls = false,
+    nameBy = 'entity',
   }: {
     areaStyle?: { opacity: number };
     connectNulls?: boolean;
+    nameBy?: 'entity' | 'tag';
   } = {},
 ) => {
   const dark = isDark();
@@ -257,9 +259,8 @@ export const mapEntityLines = (
 
   // Create series with names first
   const seriesWithNames = metrics.map((f, index) => {
-    // For worker metrics, use tagValue as the series name if available
-    const seriesName =
-      f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
+    const entityName = entities[f.id]?.name || f.id || `Series ${index + 1}`;
+    const seriesName = nameBy === 'tag' ? f.tagValue || entityName : entityName;
 
     return {
       metric: f,
