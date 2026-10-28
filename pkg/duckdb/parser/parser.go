@@ -68,6 +68,14 @@ func isFuncNameIdent(s string) bool {
 	return keywordSets.allowedAsIdentifier([]byte(strings.ToUpper(s)), CategoryFuncName)
 }
 
+// isEmptyQuotedIdent reports whether src has an empty `""` identifier at
+// pos, which the identifier primitives refuse to match (see
+// scanQuotedIdentifier), so a parse that fails there gets DuckDB's own
+// error message instead of a generic one.
+func isEmptyQuotedIdent(src string, pos int) bool {
+	return pos >= 0 && strings.HasPrefix(src[min(pos, len(src)):], `""`) && !strings.HasPrefix(src[min(pos, len(src)):], `"""`)
+}
+
 // MaxSQLBytes is the longest input ParseString accepts. Parse cost (time,
 // and memo/slab memory preallocated in proportion to input length) grows
 // with input size — a 64KiB query already takes a few hundred MB of
@@ -139,6 +147,8 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 		}
 		if errors.Is(parseErr, peg.ErrTooDeep) {
 			msg = "query is nested too deeply"
+		} else if perr != nil && isEmptyQuotedIdent(trimmed, perr.Pos) {
+			msg = "zero-length delimited identifier"
 		}
 		return nil, &ParseError{Pos: pos, Message: msg}
 	}
