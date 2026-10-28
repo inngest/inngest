@@ -192,8 +192,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			MaxAttempts:  runCtx.MaxAttempts(),
 			ParallelMode: gen.ParallelMode(),
 			CreatedAt:    e.now(),
-			// The subscription and the message the run waits for, so a redelivered
-			// event is only a wake when that message exists.
+			// The subscription and the message the run waits for.
 			Metadata: map[string]any{"key": sub.Key, "seq": sub.Seq},
 		}
 		// The same wait is written again when the op is sent again.
@@ -210,7 +209,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if len(ids) < sub.Seq {
 			return nil
 		}
-		return e.consumeWait(ctx, md.ID, sub.Key, &wait, false)
+		return e.consumeWait(ctx, &wait)
 
 	case state.SubscribePoll:
 		ids, err := messages()
@@ -309,52 +308,37 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 	}
 }
 
-// wakeSubscriber wakes the run if it is blocked on this subscription: it finds
-// the wait pause among the run's pauses. There is at most one.
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, verify bool) error {
-	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
-
-	pauseIDs, err := e.pm.PauseIDsForRun(ctx, id.RunID)
+// wakeSubscriber wakes the run if it is blocked on this subscription. A message
+// that has just been saved wakes the wait for its own position, so the wait
+// pause is looked up by the ID of that position. A redelivered old message finds
+// no wait for its position, and wakes nothing.
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) error {
+	stack, err := e.smv2.LoadStack(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	for _, pauseID := range pauseIDs {
-		pause, err := e.pm.PauseByID(ctx, waitIdx, pauseID)
-		if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if waitKey, _ := pause.Metadata["key"].(string); waitKey != key {
-			continue
-		}
-
-		return e.consumeWait(ctx, id, key, pause, verify)
+	position := len(subscriptionMessageIDs(stack, key))
+	if position == 0 {
+		return nil
 	}
 
-	return nil
+	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
+	pause, err := e.pm.PauseByID(ctx, waitIdx, subscriptionWaitPauseID(id.RunID.String(), key, position))
+	if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return e.consumeWait(ctx, pause)
 }
 
 // consumeWait consumes a wait pause so the run sees the message it waits for.
-// Its output names that message's position. With verify, the pause is only
-// consumed when that message exists: a redelivered event may be an old one.
-func (e *executor) consumeWait(ctx context.Context, id sv2.ID, key string, pause *state.Pause, verify bool) error {
+// Its output names that message's position.
+func (e *executor) consumeWait(ctx context.Context, pause *state.Pause) error {
 	awaited := waitSeq(pause)
-
-	if verify {
-		if awaited == 0 {
-			return nil
-		}
-		stack, err := e.smv2.LoadStack(ctx, id)
-		if err != nil {
-			return err
-		}
-		if len(subscriptionMessageIDs(stack, key)) < awaited {
-			return nil
-		}
-	}
 
 	err := e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:     map[string]any{"data": map[string]any{"seq": awaited}},
@@ -403,7 +387,5 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	// A new message is the one a blocked run waits for. A redelivery may be an
-	// old message, so it only wakes a run whose awaited message exists.
-	return e.wakeSubscriber(ctx, id, key, redelivered)
+	return e.wakeSubscriber(ctx, id, key)
 }
