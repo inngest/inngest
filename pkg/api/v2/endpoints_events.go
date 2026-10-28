@@ -23,7 +23,7 @@ import (
 const (
 	defaultEventsLimit    = 40
 	maxEventsLimit        = cqrs.MaxEvents - 1
-	maxEventsPayloadLimit = 20
+	maxEventsPayloadLimit = 5
 )
 
 func (s *Service) ListEvents(ctx context.Context, req *apiv2.ListEventsRequest) (*apiv2.ListEventsResponse, error) {

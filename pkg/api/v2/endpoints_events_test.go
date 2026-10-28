@@ -47,9 +47,9 @@ func TestListEventsOptions(t *testing.T) {
 		{"default", &apiv2.ListEventsRequest{}, 40},
 		{"zero", &apiv2.ListEventsRequest{Limit: new(int32(0))}, 40},
 		{"maximum", &apiv2.ListEventsRequest{Limit: new(int32(50))}, 50},
-		{"payload default", &apiv2.ListEventsRequest{Include: []string{"payload"}}, 20},
-		{"payload zero", &apiv2.ListEventsRequest{Limit: new(int32(0)), Include: []string{"payload"}}, 20},
-		{"payload maximum", &apiv2.ListEventsRequest{Limit: new(int32(20)), Include: []string{"payload"}}, 20},
+		{"payload default", &apiv2.ListEventsRequest{Include: []string{"payload"}}, 5},
+		{"payload zero", &apiv2.ListEventsRequest{Limit: new(int32(0)), Include: []string{"payload"}}, 5},
+		{"payload maximum", &apiv2.ListEventsRequest{Limit: new(int32(5)), Include: []string{"payload"}}, 5},
 		{"filters", &apiv2.ListEventsRequest{Cursor: new(id.String()), From: timestamppb.New(from), Until: timestamppb.New(until), Name: []string{"order/placed", "order/paid"}}, 40},
 		{"equal bounds", &apiv2.ListEventsRequest{From: timestamppb.New(from), Until: timestamppb.New(from)}, 40},
 		{"historical until", &apiv2.ListEventsRequest{Until: timestamppb.New(now.Add(-24 * time.Hour))}, 40},
@@ -288,7 +288,7 @@ func TestEventReadValidation(t *testing.T) {
 	now := timestamppb.Now()
 	for _, req := range []*apiv2.ListEventsRequest{
 		{Limit: new(int32(-1))}, {Limit: new(int32(51))},
-		{Limit: new(int32(21)), Include: []string{"payload"}},
+		{Limit: new(int32(6)), Include: []string{"payload"}},
 		{Cursor: new("bad")}, {Cursor: new("01J0000000000000000000000!")},
 		{From: &timestamppb.Timestamp{Seconds: 253402300800}},
 		{Until: &timestamppb.Timestamp{Nanos: -1}},
@@ -298,6 +298,9 @@ func TestEventReadValidation(t *testing.T) {
 		svc := NewService(ServiceOptions{Events: testEventProvider{}})
 		_, err := svc.ListEvents(t.Context(), req)
 		requireAPIError(t, err, 400, "invalid_field_format")
+		if req.GetLimit() == 6 {
+			require.Contains(t, err.Error(), "Limit must be between 1 and 5")
+		}
 	}
 	for _, req := range []*apiv2.GetEventRequest{
 		{}, {EventId: "bad"}, {EventId: "01J0000000000000000000000!"},

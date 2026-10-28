@@ -66,15 +66,24 @@ func TestEventProviderSQLite(t *testing.T) {
 
 	all, err := svc.ListEvents(t.Context(), &pb.ListEventsRequest{From: from, Until: until, Include: []string{"payload"}})
 	require.NoError(t, err)
-	require.Len(t, all.Data, 7)
+	require.Len(t, all.Data, 5)
 	require.Equal(t, ids[6].String(), all.Data[0].Id)
 	require.Equal(t, float64(6), all.Data[0].Payload.AsMap()["data"].(map[string]any)["position"])
 	require.Nil(t, all.Data[0].Source)
-	require.Nil(t, all.Page.Cursor)
-	require.False(t, all.Page.HasMore)
+	require.Equal(t, ids[2].String(), *all.Page.Cursor)
+	require.True(t, all.Page.HasMore)
 	for _, evt := range all.Data {
 		require.NotEqual(t, "inngest/function.finished", evt.Name)
 	}
+
+	last, err := svc.ListEvents(t.Context(), &pb.ListEventsRequest{From: from, Until: until, Cursor: all.Page.Cursor, Include: []string{"payload"}})
+	require.NoError(t, err)
+	require.Len(t, last.Data, 2)
+	require.Equal(t, ids[1].String(), last.Data[0].Id)
+	require.Equal(t, ids[0].String(), last.Data[1].Id)
+	require.Equal(t, float64(1), last.Data[0].Payload.AsMap()["data"].(map[string]any)["position"])
+	require.Nil(t, last.Page.Cursor)
+	require.False(t, last.Page.HasMore)
 
 	// seeded ids can be older than their received time
 	_, err = db.ExecContext(t.Context(), "UPDATE events SET received_at = ? WHERE internal_id = ?", now.Add(time.Minute), ids[0])

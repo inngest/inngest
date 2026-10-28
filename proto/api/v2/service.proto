@@ -4300,7 +4300,7 @@ message ListEventsRequest {
   ];
   optional int32 limit = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 20; otherwise the default is 40. Zero uses the default. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan."
+      description: "Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 5; otherwise the default is 40. Zero uses the default. Events can be up to 5 MiB in Cloud (less on lower plans)."
       default: "40"
     }
   ];
@@ -4335,7 +4335,7 @@ message GetEventRequest {
   ];
   repeated string include = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan."
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Events can be up to 5 MiB in Cloud (less on lower plans)."
       enum: "payload"
     }
   ];

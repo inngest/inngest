@@ -10695,10 +10695,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"functionId\"t\n" +
 	"\x16ResumeFunctionResponse\x12$\n" +
 	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc7\v\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xad\v\n" +
 	"\x11ListEventsRequest\x12\x9f\x01\n" +
-	"\x06cursor\x18\x01 \x01(\tB\x81\x01\x92A~2|ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages.H\x00R\x06cursor\x88\x01\x01\x12\x8f\x02\n" +
-	"\x05limit\x18\x02 \x01(\x05B\xf3\x01\x92A\xef\x012\xe8\x01Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 20; otherwise the default is 40. Zero uses the default. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.:\x0240H\x01R\x05limit\x88\x01\x01\x12\x8e\x02\n" +
+	"\x06cursor\x18\x01 \x01(\tB\x81\x01\x92A~2|ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages.H\x00R\x06cursor\x88\x01\x01\x12\xf5\x01\n" +
+	"\x05limit\x18\x02 \x01(\x05B\xd9\x01\x92A\xd5\x012\xce\x01Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 5; otherwise the default is 40. Zero uses the default. Events can be up to 5 MiB in Cloud (less on lower plans).:\x0240H\x01R\x05limit\x88\x01\x01\x12\x8e\x02\n" +
 	"\x04from\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\xd8\x01\x92A\xd4\x012\xd1\x01Inclusive received-time lower bound. Defaults to one hour before until, or one hour before the current time if until is omitted. Must not be after until. The effective window is returned in metadata.timeRange.H\x02R\x04from\x88\x01\x01\x12\xfa\x01\n" +
 	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\xc2\x01\x92A\xbe\x012\xbb\x01Inclusive received-time upper bound. Defaults to the current time. When from is omitted, it defaults to one hour before this bound. The effective window is returned in metadata.timeRange.H\x03R\x05until\x88\x01\x01\x12\xa9\x01\n" +
 	"\x04name\x18\x05 \x03(\tB\x94\x01\x92A\x90\x012\x8d\x01Exact event names to include. Repeat to match any of up to 20 names, with up to 256 characters each and no backslashes or control characters.R\x04name\x12\x9b\x02\n" +
@@ -10706,10 +10706,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
-	"\x06_until\"\xd3\x03\n" +
+	"\x06_until\"\xba\x03\n" +
 	"\x0fGetEventRequest\x12O\n" +
-	"\bevent_id\x18\x01 \x01(\tB4\x92A12/Internal event ULID, also used by GetEventRuns.R\aeventId\x12\xee\x02\n" +
-	"\ainclude\x18\x02 \x03(\tB\xd3\x02\x92A\xcf\x022\xc2\x02Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Ingestion allows at most 3 MiB per event, with lower limits depending on the plan.\xf2\x02\apayloadR\ainclude\"\x8f\x01\n" +
+	"\bevent_id\x18\x01 \x01(\tB4\x92A12/Internal event ULID, also used by GetEventRuns.R\aeventId\x12\xd5\x02\n" +
+	"\ainclude\x18\x02 \x03(\tB\xba\x02\x92A\xb6\x022\xa9\x02Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Events can be up to 5 MiB in Cloud (less on lower plans).\xf2\x02\apayloadR\ainclude\"\x8f\x01\n" +
 	"\x12ListEventsResponse\x12!\n" +
 	"\x04data\x18\x01 \x03(\v2\r.api.v2.EventR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +

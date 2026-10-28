@@ -259,7 +259,7 @@ func TestEventReadTools(t *testing.T) {
 		method, name, path string
 		args               map[string]any
 	}{
-		{"ListEvents", "list_events", "/api/v2/events", map[string]any{"name": []any{"order/placed", "order/paid"}, "include": []any{"payload"}, "limit": 20, "from": "2026-10-27T11:00:00Z", "until": "2026-10-27T12:00:00Z", "cursor": "01J00000000000000000000000"}},
+		{"ListEvents", "list_events", "/api/v2/events", map[string]any{"name": []any{"order/placed", "order/paid"}, "include": []any{"payload"}, "limit": 5, "from": "2026-10-27T11:00:00Z", "until": "2026-10-27T12:00:00Z", "cursor": "01J00000000000000000000000"}},
 		{"GetEvent", "get_event", "/api/v2/events/01J00000000000000000000000", map[string]any{"eventId": "01J00000000000000000000000", "include": []any{"payload"}}},
 	} {
 		endpoint := endpointByMethod(t, tc.method)
@@ -275,10 +275,13 @@ func TestEventReadTools(t *testing.T) {
 		require.Contains(t, include["description"], "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
 		properties := schema["properties"].(map[string]any)
 		if tc.method == "ListEvents" {
+			require.Contains(t, properties["limit"].(map[string]any)["description"], "With include=payload the maximum and default are 5")
+			require.Contains(t, properties["limit"].(map[string]any)["description"], "Events can be up to 5 MiB in Cloud (less on lower plans).")
 			require.Contains(t, properties["name"].(map[string]any)["description"], "up to 20 names, with up to 256 characters each and no backslashes or control characters")
 			require.Contains(t, properties["cursor"].(map[string]any)["description"], "ID of the last returned event from the previous response.")
 			require.Contains(t, properties["from"].(map[string]any)["description"], "Defaults to one hour before until, or one hour before the current time if until is omitted.")
 		} else {
+			require.Contains(t, include["description"], "Events can be up to 5 MiB in Cloud (less on lower plans).")
 			require.Contains(t, tool.Description, "Internal inngest/ events are not returned.")
 		}
 		req, err := Request(t.Context(), endpoint, tc.args, Options{})
@@ -288,7 +291,7 @@ func TestEventReadTools(t *testing.T) {
 		require.Equal(t, []string{"payload"}, req.URL.Query()["include"])
 		if tc.method == "ListEvents" {
 			require.Equal(t, []string{"order/placed", "order/paid"}, req.URL.Query()["name"])
-			require.Equal(t, "20", req.URL.Query().Get("limit"))
+			require.Equal(t, "5", req.URL.Query().Get("limit"))
 			require.Equal(t, "2026-10-27T11:00:00Z", req.URL.Query().Get("from"))
 			require.Equal(t, "2026-10-27T12:00:00Z", req.URL.Query().Get("until"))
 			require.Equal(t, "01J00000000000000000000000", req.URL.Query().Get("cursor"))

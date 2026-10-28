@@ -283,7 +283,9 @@ func TestEventReadHelp(t *testing.T) {
 			require.NoError(t, cmd.Run(t.Context(), []string{"api", name, "--help"}))
 			require.Contains(t, out.String(), "Payloads can contain personal data and be large, so request them only when needed.")
 			require.Contains(t, out.String(), "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+			require.Contains(t, out.String(), "Events can be up to 5 MiB in Cloud (less on lower plans).")
 			if name == "list-events" {
+				require.Contains(t, out.String(), "With include=payload the maximum and default are 5")
 				require.Contains(t, out.String(), "up to 20 names, with up to 256 characters each and no backslashes or control characters")
 				require.Contains(t, out.String(), "ID of the last returned event from the previous response.")
 				require.Contains(t, out.String(), "Defaults to one hour before until, or one hour before the current time if until is omitted.")
@@ -1314,7 +1316,7 @@ func TestCommandReadsEvents(t *testing.T) {
 		args       []string
 		query      url.Values
 	}{
-		{"list-events", "/api/v2/events", []string{"--name", "order/placed", "--name", "order/paid", "--include", "payload", "--limit", "20", "--cursor", "01J00000000000000000000000", "--from", "2026-10-27T11:00:00Z", "--until", "2026-10-27T12:00:00Z"}, url.Values{"name": {"order/placed", "order/paid"}, "include": {"payload"}, "limit": {"20"}, "cursor": {"01J00000000000000000000000"}, "from": {"2026-10-27T11:00:00Z"}, "until": {"2026-10-27T12:00:00Z"}}},
+		{"list-events", "/api/v2/events", []string{"--name", "order/placed", "--name", "order/paid", "--include", "payload", "--limit", "5", "--cursor", "01J00000000000000000000000", "--from", "2026-10-27T11:00:00Z", "--until", "2026-10-27T12:00:00Z"}, url.Values{"name": {"order/placed", "order/paid"}, "include": {"payload"}, "limit": {"5"}, "cursor": {"01J00000000000000000000000"}, "from": {"2026-10-27T11:00:00Z"}, "until": {"2026-10-27T12:00:00Z"}}},
 		{"get-event", "/api/v2/events/01J00000000000000000000000", []string{"01J00000000000000000000000", "--include", "payload"}, url.Values{"include": {"payload"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1340,8 +1342,11 @@ func TestCommandReadsEvents(t *testing.T) {
 }
 
 func TestListEventsAcceptsLargePayloadPage(t *testing.T) {
-	event := `{"id":"01J00000000000000000000000","name":"large","payload":{"name":"large","data":{"value":"` + strings.Repeat("x", 3*1024*1024-1024) + `"}}}`
-	body := `{"data":[` + strings.TrimSuffix(strings.Repeat(event+",", 9), ",") + `],"page":{"hasMore":false,"limit":20}}`
+	senderID := strings.Repeat("s", 1024*1024)
+	payload := `{"name":"large","id":"` + senderID + `","data":{"value":"` + strings.Repeat("x", 4*1024*1024-1024) + `"}}`
+	require.Less(t, len(payload), 5*1024*1024)
+	event := `{"id":"01J00000000000000000000000","name":"large","idempotencyKey":"` + senderID + `","payload":` + payload + `}`
+	body := `{"data":[` + strings.TrimSuffix(strings.Repeat(event+",", 5), ",") + `],"page":{"hasMore":false,"limit":5}}`
 	require.Greater(t, len(body), maxResponseBytes)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v2/events", r.URL.Path)
