@@ -384,9 +384,9 @@ type ComplexityRoot struct {
 		RunTraceSpanOutputByID func(childComplexity int, outputID string) int
 		RunTrigger             func(childComplexity int, runID string) int
 		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) int
-		SessionKeys            func(childComplexity int, search *string) int
-		SessionRuns            func(childComplexity int, sessionKey string, sessionID string, timeRange *models.TimeRangeInput) int
-		Sessions               func(childComplexity int, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput) int
+		SessionKeys            func(childComplexity int, search *string, first int, after *string) int
+		SessionRuns            func(childComplexity int, sessionKey string, sessionID string, timeRange *models.TimeRangeInput, first int, after *string) int
+		Sessions               func(childComplexity int, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput, first int, after *string) int
 		Stream                 func(childComplexity int, query models.StreamQuery) int
 		WorkerConnection       func(childComplexity int, connectionID ulid.ULID) int
 		WorkerConnections      func(childComplexity int, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) int
@@ -591,9 +591,19 @@ type ComplexityRoot struct {
 		SessionKey     func(childComplexity int) int
 	}
 
+	SessionGroupsConnection struct {
+		Nodes    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
 	SessionKey struct {
 		CreatedAt  func(childComplexity int) int
 		SessionKey func(childComplexity int) int
+	}
+
+	SessionKeysConnection struct {
+		Nodes    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	SessionRun struct {
@@ -604,6 +614,11 @@ type ComplexityRoot struct {
 		QueuedAt     func(childComplexity int) int
 		StartedAt    func(childComplexity int) int
 		Status       func(childComplexity int) int
+	}
+
+	SessionRunsConnection struct {
+		Nodes    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
 	}
 
 	SingletonConfiguration struct {
@@ -784,9 +799,9 @@ type QueryResolver interface {
 	RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error)
 	RunTrace(ctx context.Context, runID string) (*models.RunTraceSpan, error)
 	Insights(ctx context.Context, sql string) (*models.InsightsQueryResult, error)
-	SessionKeys(ctx context.Context, search *string) ([]*models.SessionKey, error)
-	Sessions(ctx context.Context, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput) ([]*models.SessionGroup, error)
-	SessionRuns(ctx context.Context, sessionKey string, sessionID string, timeRange *models.TimeRangeInput) ([]*models.SessionRun, error)
+	SessionKeys(ctx context.Context, search *string, first int, after *string) (*models.SessionKeysConnection, error)
+	Sessions(ctx context.Context, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput, first int, after *string) (*models.SessionGroupsConnection, error)
+	SessionRuns(ctx context.Context, sessionKey string, sessionID string, timeRange *models.TimeRangeInput, first int, after *string) (*models.SessionRunsConnection, error)
 	WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error)
 	WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error)
 }
@@ -2474,7 +2489,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.SessionKeys(childComplexity, args["search"].(*string)), true
+		return e.complexity.Query.SessionKeys(childComplexity, args["search"].(*string), args["first"].(int), args["after"].(*string)), true
 
 	case "Query.sessionRuns":
 		if e.complexity.Query.SessionRuns == nil {
@@ -2486,7 +2501,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.SessionRuns(childComplexity, args["sessionKey"].(string), args["sessionId"].(string), args["timeRange"].(*models.TimeRangeInput)), true
+		return e.complexity.Query.SessionRuns(childComplexity, args["sessionKey"].(string), args["sessionId"].(string), args["timeRange"].(*models.TimeRangeInput), args["first"].(int), args["after"].(*string)), true
 
 	case "Query.sessions":
 		if e.complexity.Query.Sessions == nil {
@@ -2498,7 +2513,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Sessions(childComplexity, args["sessionKey"].(string), args["sessionIdSearch"].(*string), args["timeRange"].(*models.TimeRangeInput)), true
+		return e.complexity.Query.Sessions(childComplexity, args["sessionKey"].(string), args["sessionIdSearch"].(*string), args["timeRange"].(*models.TimeRangeInput), args["first"].(int), args["after"].(*string)), true
 
 	case "Query.stream":
 		if e.complexity.Query.Stream == nil {
@@ -3425,6 +3440,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SessionGroup.SessionKey(childComplexity), true
 
+	case "SessionGroupsConnection.nodes":
+		if e.complexity.SessionGroupsConnection.Nodes == nil {
+			break
+		}
+
+		return e.complexity.SessionGroupsConnection.Nodes(childComplexity), true
+
+	case "SessionGroupsConnection.pageInfo":
+		if e.complexity.SessionGroupsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.SessionGroupsConnection.PageInfo(childComplexity), true
+
 	case "SessionKey.createdAt":
 		if e.complexity.SessionKey.CreatedAt == nil {
 			break
@@ -3438,6 +3467,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SessionKey.SessionKey(childComplexity), true
+
+	case "SessionKeysConnection.nodes":
+		if e.complexity.SessionKeysConnection.Nodes == nil {
+			break
+		}
+
+		return e.complexity.SessionKeysConnection.Nodes(childComplexity), true
+
+	case "SessionKeysConnection.pageInfo":
+		if e.complexity.SessionKeysConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.SessionKeysConnection.PageInfo(childComplexity), true
 
 	case "SessionRun.endedAt":
 		if e.complexity.SessionRun.EndedAt == nil {
@@ -3487,6 +3530,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SessionRun.Status(childComplexity), true
+
+	case "SessionRunsConnection.nodes":
+		if e.complexity.SessionRunsConnection.Nodes == nil {
+			break
+		}
+
+		return e.complexity.SessionRunsConnection.Nodes(childComplexity), true
+
+	case "SessionRunsConnection.pageInfo":
+		if e.complexity.SessionRunsConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.SessionRunsConnection.PageInfo(childComplexity), true
 
 	case "SingletonConfiguration.key":
 		if e.complexity.SingletonConfiguration.Key == nil {
@@ -3999,17 +4056,27 @@ input RerunFromStepInput {
 
   insights(sql: String!): InsightsQueryResult!
 
-  sessionKeys(search: String): [SessionKey!]!
+  # Sessions pagination matches /v2/sessions: first is 1-100 (default
+  # 20), after is the previous page's pageInfo.endCursor.
+  sessionKeys(
+    search: String
+    first: Int! = 20
+    after: String
+  ): SessionKeysConnection!
   sessions(
     sessionKey: String!
     sessionIdSearch: String
     timeRange: TimeRangeInput
-  ): [SessionGroup!]!
+    first: Int! = 20
+    after: String
+  ): SessionGroupsConnection!
   sessionRuns(
     sessionKey: String!
     sessionId: String!
     timeRange: TimeRangeInput
-  ): [SessionRun!]!
+    first: Int! = 20
+    after: String
+  ): SessionRunsConnection!
 
   workerConnections(
     first: Int! = 100
@@ -5019,6 +5086,24 @@ type SessionRun {
   startedAt: Time
   endedAt: Time
 }
+
+# One page of a Sessions listing. pageInfo.hasNextPage/endCursor are
+# /v2/sessions' page.hasMore/page.cursor; hasPreviousPage/startCursor are
+# always false/null (forward-only, like REST).
+type SessionKeysConnection {
+  nodes: [SessionKey!]!
+  pageInfo: PageInfo!
+}
+
+type SessionGroupsConnection {
+  nodes: [SessionGroup!]!
+  pageInfo: PageInfo!
+}
+
+type SessionRunsConnection {
+  nodes: [SessionRun!]!
+  pageInfo: PageInfo!
+}
 `, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -5501,6 +5586,24 @@ func (ec *executionContext) field_Query_sessionKeys_args(ctx context.Context, ra
 		}
 	}
 	args["search"] = arg0
+	var arg1 int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg1, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg1
+	var arg2 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg2, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg2
 	return args, nil
 }
 
@@ -5534,6 +5637,24 @@ func (ec *executionContext) field_Query_sessionRuns_args(ctx context.Context, ra
 		}
 	}
 	args["timeRange"] = arg2
+	var arg3 int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg4, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg4
 	return args, nil
 }
 
@@ -5567,6 +5688,24 @@ func (ec *executionContext) field_Query_sessions_args(ctx context.Context, rawAr
 		}
 	}
 	args["timeRange"] = arg2
+	var arg3 int
+	if tmp, ok := rawArgs["first"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+		arg3, err = ec.unmarshalNInt2int(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["first"] = arg3
+	var arg4 *string
+	if tmp, ok := rawArgs["after"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+		arg4, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["after"] = arg4
 	return args, nil
 }
 
@@ -16740,7 +16879,7 @@ func (ec *executionContext) _Query_sessionKeys(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SessionKeys(rctx, fc.Args["search"].(*string))
+		return ec.resolvers.Query().SessionKeys(rctx, fc.Args["search"].(*string), fc.Args["first"].(int), fc.Args["after"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16752,9 +16891,9 @@ func (ec *executionContext) _Query_sessionKeys(ctx context.Context, field graphq
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*models.SessionKey)
+	res := resTmp.(*models.SessionKeysConnection)
 	fc.Result = res
-	return ec.marshalNSessionKey2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeyᚄ(ctx, field.Selections, res)
+	return ec.marshalNSessionKeysConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeysConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_sessionKeys(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16765,12 +16904,12 @@ func (ec *executionContext) fieldContext_Query_sessionKeys(ctx context.Context, 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "sessionKey":
-				return ec.fieldContext_SessionKey_sessionKey(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_SessionKey_createdAt(ctx, field)
+			case "nodes":
+				return ec.fieldContext_SessionKeysConnection_nodes(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_SessionKeysConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type SessionKey", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type SessionKeysConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -16801,7 +16940,7 @@ func (ec *executionContext) _Query_sessions(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Sessions(rctx, fc.Args["sessionKey"].(string), fc.Args["sessionIdSearch"].(*string), fc.Args["timeRange"].(*models.TimeRangeInput))
+		return ec.resolvers.Query().Sessions(rctx, fc.Args["sessionKey"].(string), fc.Args["sessionIdSearch"].(*string), fc.Args["timeRange"].(*models.TimeRangeInput), fc.Args["first"].(int), fc.Args["after"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16813,9 +16952,9 @@ func (ec *executionContext) _Query_sessions(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*models.SessionGroup)
+	res := resTmp.(*models.SessionGroupsConnection)
 	fc.Result = res
-	return ec.marshalNSessionGroup2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionGroupᚄ(ctx, field.Selections, res)
+	return ec.marshalNSessionGroupsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionGroupsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_sessions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16826,22 +16965,12 @@ func (ec *executionContext) fieldContext_Query_sessions(ctx context.Context, fie
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "sessionKey":
-				return ec.fieldContext_SessionGroup_sessionKey(ctx, field)
-			case "sessionId":
-				return ec.fieldContext_SessionGroup_sessionId(ctx, field)
-			case "runCount":
-				return ec.fieldContext_SessionGroup_runCount(ctx, field)
-			case "failedRunCount":
-				return ec.fieldContext_SessionGroup_failedRunCount(ctx, field)
-			case "failureRate":
-				return ec.fieldContext_SessionGroup_failureRate(ctx, field)
-			case "lastActiveAt":
-				return ec.fieldContext_SessionGroup_lastActiveAt(ctx, field)
-			case "functions":
-				return ec.fieldContext_SessionGroup_functions(ctx, field)
+			case "nodes":
+				return ec.fieldContext_SessionGroupsConnection_nodes(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_SessionGroupsConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type SessionGroup", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type SessionGroupsConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -16872,7 +17001,7 @@ func (ec *executionContext) _Query_sessionRuns(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SessionRuns(rctx, fc.Args["sessionKey"].(string), fc.Args["sessionId"].(string), fc.Args["timeRange"].(*models.TimeRangeInput))
+		return ec.resolvers.Query().SessionRuns(rctx, fc.Args["sessionKey"].(string), fc.Args["sessionId"].(string), fc.Args["timeRange"].(*models.TimeRangeInput), fc.Args["first"].(int), fc.Args["after"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -16884,9 +17013,9 @@ func (ec *executionContext) _Query_sessionRuns(ctx context.Context, field graphq
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*models.SessionRun)
+	res := resTmp.(*models.SessionRunsConnection)
 	fc.Result = res
-	return ec.marshalNSessionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunᚄ(ctx, field.Selections, res)
+	return ec.marshalNSessionRunsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunsConnection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_sessionRuns(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -16897,22 +17026,12 @@ func (ec *executionContext) fieldContext_Query_sessionRuns(ctx context.Context, 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_SessionRun_id(ctx, field)
-			case "functionSlug":
-				return ec.fieldContext_SessionRun_functionSlug(ctx, field)
-			case "eventName":
-				return ec.fieldContext_SessionRun_eventName(ctx, field)
-			case "status":
-				return ec.fieldContext_SessionRun_status(ctx, field)
-			case "queuedAt":
-				return ec.fieldContext_SessionRun_queuedAt(ctx, field)
-			case "startedAt":
-				return ec.fieldContext_SessionRun_startedAt(ctx, field)
-			case "endedAt":
-				return ec.fieldContext_SessionRun_endedAt(ctx, field)
+			case "nodes":
+				return ec.fieldContext_SessionRunsConnection_nodes(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_SessionRunsConnection_pageInfo(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type SessionRun", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type SessionRunsConnection", field.Name)
 		},
 	}
 	defer func() {
@@ -23117,6 +23236,120 @@ func (ec *executionContext) fieldContext_SessionGroup_functions(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _SessionGroupsConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *models.SessionGroupsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionGroupsConnection_nodes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nodes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.SessionGroup)
+	fc.Result = res
+	return ec.marshalNSessionGroup2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionGroupᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionGroupsConnection_nodes(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionGroupsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sessionKey":
+				return ec.fieldContext_SessionGroup_sessionKey(ctx, field)
+			case "sessionId":
+				return ec.fieldContext_SessionGroup_sessionId(ctx, field)
+			case "runCount":
+				return ec.fieldContext_SessionGroup_runCount(ctx, field)
+			case "failedRunCount":
+				return ec.fieldContext_SessionGroup_failedRunCount(ctx, field)
+			case "failureRate":
+				return ec.fieldContext_SessionGroup_failureRate(ctx, field)
+			case "lastActiveAt":
+				return ec.fieldContext_SessionGroup_lastActiveAt(ctx, field)
+			case "functions":
+				return ec.fieldContext_SessionGroup_functions(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SessionGroup", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionGroupsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *models.SessionGroupsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionGroupsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionGroupsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionGroupsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SessionKey_sessionKey(ctx context.Context, field graphql.CollectedField, obj *models.SessionKey) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SessionKey_sessionKey(ctx, field)
 	if err != nil {
@@ -23200,6 +23433,110 @@ func (ec *executionContext) fieldContext_SessionKey_createdAt(ctx context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionKeysConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *models.SessionKeysConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionKeysConnection_nodes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nodes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.SessionKey)
+	fc.Result = res
+	return ec.marshalNSessionKey2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeyᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionKeysConnection_nodes(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionKeysConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sessionKey":
+				return ec.fieldContext_SessionKey_sessionKey(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_SessionKey_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SessionKey", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionKeysConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *models.SessionKeysConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionKeysConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionKeysConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionKeysConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -23499,6 +23836,120 @@ func (ec *executionContext) fieldContext_SessionRun_endedAt(ctx context.Context,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionRunsConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *models.SessionRunsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionRunsConnection_nodes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nodes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.SessionRun)
+	fc.Result = res
+	return ec.marshalNSessionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionRunsConnection_nodes(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionRunsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SessionRun_id(ctx, field)
+			case "functionSlug":
+				return ec.fieldContext_SessionRun_functionSlug(ctx, field)
+			case "eventName":
+				return ec.fieldContext_SessionRun_eventName(ctx, field)
+			case "status":
+				return ec.fieldContext_SessionRun_status(ctx, field)
+			case "queuedAt":
+				return ec.fieldContext_SessionRun_queuedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_SessionRun_startedAt(ctx, field)
+			case "endedAt":
+				return ec.fieldContext_SessionRun_endedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SessionRun", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionRunsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *models.SessionRunsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionRunsConnection_pageInfo(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PageInfo, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.PageInfo)
+	fc.Result = res
+	return ec.marshalNPageInfo2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐPageInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionRunsConnection_pageInfo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionRunsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			case "hasPreviousPage":
+				return ec.fieldContext_PageInfo_hasPreviousPage(ctx, field)
+			case "startCursor":
+				return ec.fieldContext_PageInfo_startCursor(ctx, field)
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -32395,6 +32846,41 @@ func (ec *executionContext) _SessionGroup(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var sessionGroupsConnectionImplementors = []string{"SessionGroupsConnection"}
+
+func (ec *executionContext) _SessionGroupsConnection(ctx context.Context, sel ast.SelectionSet, obj *models.SessionGroupsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sessionGroupsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SessionGroupsConnection")
+		case "nodes":
+
+			out.Values[i] = ec._SessionGroupsConnection_nodes(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "pageInfo":
+
+			out.Values[i] = ec._SessionGroupsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var sessionKeyImplementors = []string{"SessionKey"}
 
 func (ec *executionContext) _SessionKey(ctx context.Context, sel ast.SelectionSet, obj *models.SessionKey) graphql.Marshaler {
@@ -32415,6 +32901,41 @@ func (ec *executionContext) _SessionKey(ctx context.Context, sel ast.SelectionSe
 		case "createdAt":
 
 			out.Values[i] = ec._SessionKey_createdAt(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var sessionKeysConnectionImplementors = []string{"SessionKeysConnection"}
+
+func (ec *executionContext) _SessionKeysConnection(ctx context.Context, sel ast.SelectionSet, obj *models.SessionKeysConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sessionKeysConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SessionKeysConnection")
+		case "nodes":
+
+			out.Values[i] = ec._SessionKeysConnection_nodes(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "pageInfo":
+
+			out.Values[i] = ec._SessionKeysConnection_pageInfo(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -32480,6 +33001,41 @@ func (ec *executionContext) _SessionRun(ctx context.Context, sel ast.SelectionSe
 
 			out.Values[i] = ec._SessionRun_endedAt(ctx, field, obj)
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var sessionRunsConnectionImplementors = []string{"SessionRunsConnection"}
+
+func (ec *executionContext) _SessionRunsConnection(ctx context.Context, sel ast.SelectionSet, obj *models.SessionRunsConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sessionRunsConnectionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SessionRunsConnection")
+		case "nodes":
+
+			out.Values[i] = ec._SessionRunsConnection_nodes(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "pageInfo":
+
+			out.Values[i] = ec._SessionRunsConnection_pageInfo(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -35015,6 +35571,20 @@ func (ec *executionContext) marshalNSessionGroup2ᚖgithubᚗcomᚋinngestᚋinn
 	return ec._SessionGroup(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNSessionGroupsConnection2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionGroupsConnection(ctx context.Context, sel ast.SelectionSet, v models.SessionGroupsConnection) graphql.Marshaler {
+	return ec._SessionGroupsConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSessionGroupsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionGroupsConnection(ctx context.Context, sel ast.SelectionSet, v *models.SessionGroupsConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SessionGroupsConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNSessionKey2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeyᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.SessionKey) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -35069,6 +35639,20 @@ func (ec *executionContext) marshalNSessionKey2ᚖgithubᚗcomᚋinngestᚋinnge
 	return ec._SessionKey(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNSessionKeysConnection2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeysConnection(ctx context.Context, sel ast.SelectionSet, v models.SessionKeysConnection) graphql.Marshaler {
+	return ec._SessionKeysConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSessionKeysConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionKeysConnection(ctx context.Context, sel ast.SelectionSet, v *models.SessionKeysConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SessionKeysConnection(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNSessionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.SessionRun) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -35121,6 +35705,20 @@ func (ec *executionContext) marshalNSessionRun2ᚖgithubᚗcomᚋinngestᚋinnge
 		return graphql.Null
 	}
 	return ec._SessionRun(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNSessionRunsConnection2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunsConnection(ctx context.Context, sel ast.SelectionSet, v models.SessionRunsConnection) graphql.Marshaler {
+	return ec._SessionRunsConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSessionRunsConnection2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSessionRunsConnection(ctx context.Context, sel ast.SelectionSet, v *models.SessionRunsConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SessionRunsConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, v interface{}) (models.SingletonMode, error) {

@@ -440,9 +440,19 @@ type SessionGroup struct {
 	Functions      []*SessionFunction `json:"functions"`
 }
 
+type SessionGroupsConnection struct {
+	Nodes    []*SessionGroup `json:"nodes"`
+	PageInfo *PageInfo       `json:"pageInfo"`
+}
+
 type SessionKey struct {
 	SessionKey string    `json:"sessionKey"`
 	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type SessionKeysConnection struct {
+	Nodes    []*SessionKey `json:"nodes"`
+	PageInfo *PageInfo     `json:"pageInfo"`
 }
 
 type SessionRun struct {
@@ -453,6 +463,11 @@ type SessionRun struct {
 	QueuedAt     time.Time  `json:"queuedAt"`
 	StartedAt    *time.Time `json:"startedAt,omitempty"`
 	EndedAt      *time.Time `json:"endedAt,omitempty"`
+}
+
+type SessionRunsConnection struct {
+	Nodes    []*SessionRun `json:"nodes"`
+	PageInfo *PageInfo     `json:"pageInfo"`
 }
 
 type SingletonConfiguration struct {

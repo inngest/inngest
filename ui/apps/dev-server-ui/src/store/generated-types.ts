@@ -452,7 +452,7 @@ export enum InsightsColumnHint {
   EventId = 'EVENT_ID',
   FunctionId = 'FUNCTION_ID',
   RunId = 'RUN_ID',
-  Session = 'SESSION'
+  Session = 'SESSION',
 }
 
 export enum InsightsColumnType {
@@ -461,7 +461,7 @@ export enum InsightsColumnType {
   Json = 'JSON',
   Number = 'NUMBER',
   String = 'STRING',
-  Unknown = 'UNKNOWN'
+  Unknown = 'UNKNOWN',
 }
 
 export type InsightsDiagnostic = {
@@ -482,7 +482,7 @@ export type InsightsDiagnosticPosition = {
 export enum InsightsDiagnosticSeverity {
   Error = 'ERROR',
   Info = 'INFO',
-  Warning = 'WARNING'
+  Warning = 'WARNING',
 }
 
 export type InsightsPathHint = {
@@ -606,9 +606,9 @@ export type Query = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsV2Connection;
-  sessionKeys: Array<SessionKey>;
-  sessionRuns: Array<SessionRun>;
-  sessions: Array<SessionGroup>;
+  sessionKeys: SessionKeysConnection;
+  sessionRuns: SessionRunsConnection;
+  sessions: SessionGroupsConnection;
   stream: Array<StreamItem>;
   workerConnection: Maybe<ConnectV1WorkerConnection>;
   workerConnections: ConnectV1WorkerConnectionsConnection;
@@ -648,11 +648,9 @@ export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
 };
 
-
 export type QueryInsightsArgs = {
   sql: Scalars['String'];
 };
-
 
 export type QueryRunArgs = {
   runID: Scalars['String'];
@@ -677,20 +675,23 @@ export type QueryRunsArgs = {
   orderBy: Array<RunsV2OrderBy>;
 };
 
-
 export type QuerySessionKeysArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   search: InputMaybe<Scalars['String']>;
 };
 
-
 export type QuerySessionRunsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   sessionId: Scalars['String'];
   sessionKey: Scalars['String'];
   timeRange: InputMaybe<TimeRangeInput>;
 };
 
-
 export type QuerySessionsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   sessionIdSearch: InputMaybe<Scalars['String']>;
   sessionKey: Scalars['String'];
   timeRange: InputMaybe<TimeRangeInput>;
@@ -982,10 +983,22 @@ export type SessionGroup = {
   sessionKey: Scalars['String'];
 };
 
+export type SessionGroupsConnection = {
+  __typename?: 'SessionGroupsConnection';
+  nodes: Array<SessionGroup>;
+  pageInfo: PageInfo;
+};
+
 export type SessionKey = {
   __typename?: 'SessionKey';
   createdAt: Scalars['Time'];
   sessionKey: Scalars['String'];
+};
+
+export type SessionKeysConnection = {
+  __typename?: 'SessionKeysConnection';
+  nodes: Array<SessionKey>;
+  pageInfo: PageInfo;
 };
 
 export type SessionRun = {
@@ -997,6 +1010,12 @@ export type SessionRun = {
   queuedAt: Scalars['Time'];
   startedAt: Maybe<Scalars['Time']>;
   status: Scalars['String'];
+};
+
+export type SessionRunsConnection = {
+  __typename?: 'SessionRunsConnection';
+  nodes: Array<SessionRun>;
+  pageInfo: PageInfo;
 };
 
 export type SingletonConfiguration = {
@@ -2798,5 +2817,46 @@ export type ExecuteInsightsQueryQueryVariables = Exact<{
   sql: Scalars['String'];
 }>;
 
-
-export type ExecuteInsightsQueryQuery = { __typename?: 'Query', insights: { __typename?: 'InsightsQueryResult', rows: Array<Array<any | null>>, columns: Array<{ __typename?: 'InsightsQueryColumn', name: string, type: InsightsColumnType, pathHints: Array<{ __typename?: 'InsightsPathHint', hint: InsightsColumnHint, path: Array<{ __typename?: 'InsightsPathSegment', key: string | null, wildcard: boolean }> }> }>, info: { __typename?: 'InsightsQueryInfo', primaryTable: string | null, tables: Array<string>, limited: boolean }, diagnostics: Array<{ __typename?: 'InsightsDiagnostic', severity: InsightsDiagnosticSeverity, code: string, message: string, start: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number }, end: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number } }> } };
+export type ExecuteInsightsQueryQuery = {
+  __typename?: 'Query';
+  insights: {
+    __typename?: 'InsightsQueryResult';
+    rows: Array<Array<any | null>>;
+    columns: Array<{
+      __typename?: 'InsightsQueryColumn';
+      name: string;
+      type: InsightsColumnType;
+      pathHints: Array<{
+        __typename?: 'InsightsPathHint';
+        hint: InsightsColumnHint;
+        path: Array<{
+          __typename?: 'InsightsPathSegment';
+          key: string | null;
+          wildcard: boolean;
+        }>;
+      }>;
+    }>;
+    info: {
+      __typename?: 'InsightsQueryInfo';
+      primaryTable: string | null;
+      tables: Array<string>;
+      limited: boolean;
+    };
+    diagnostics: Array<{
+      __typename?: 'InsightsDiagnostic';
+      severity: InsightsDiagnosticSeverity;
+      code: string;
+      message: string;
+      start: {
+        __typename?: 'InsightsDiagnosticPosition';
+        line: number;
+        column: number;
+      };
+      end: {
+        __typename?: 'InsightsDiagnosticPosition';
+        line: number;
+        column: number;
+      };
+    }>;
+  };
+};
