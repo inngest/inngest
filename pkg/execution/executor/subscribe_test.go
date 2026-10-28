@@ -109,3 +109,24 @@ func TestParkStateOf(t *testing.T) {
 	answered := append(slices.Clone(after), step)
 	require.Equal(t, parkAnswered, parkStateOf(answered, "inbox", step, 2))
 }
+
+// Two deliveries of one burst: the first wakes the run, which reads both messages
+// and parks for the third; the second delivery then finds that new marker and
+// must leave it, because its message is not saved yet. A marker whose park is
+// already answered is left too.
+func TestMarkersToWake(t *testing.T) {
+	one := subscriptionMessageID("inbox", "evt-1")
+	two := subscriptionMessageID("inbox", "evt-2")
+	three := subscriptionMessageID("inbox", "evt-3")
+	marker := func(step string, seq int) *state.Pause {
+		return &state.Pause{Outgoing: step, Metadata: map[string]any{"seq": seq}}
+	}
+
+	parkedForThree := marker("park-3", 3)
+
+	require.Empty(t, markersToWake([]*state.Pause{parkedForThree}, []string{one, two}, "inbox"))
+	require.Equal(t, []*state.Pause{parkedForThree}, markersToWake([]*state.Pause{parkedForThree}, []string{one, two, three}, "inbox"))
+
+	answered := marker("park-1", 1)
+	require.Empty(t, markersToWake([]*state.Pause{answered}, []string{one, "park-1"}, "inbox"))
+}

@@ -392,37 +392,52 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 	}
 }
 
-// wakeSubscriber wakes the run if it is parked on this subscription. A new
-// message wakes the marker without reading the stack. A redelivered event is a
-// message that is already saved, so it only wakes a run whose awaited message
-// exists.
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, redelivered bool) error {
+// wakeSubscriber wakes the run if it is parked on this subscription. A delivery
+// to a busy run finds no marker and costs nothing more. When there is a marker it
+// reads the stack once: a marker whose park is already answered is skipped, and
+// so is one that awaits a message that is not saved yet (another delivery of the
+// same burst saved its message first and the run has since parked for the
+// next).
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) error {
 	parked, err := e.parkedMarkers(ctx, id, key)
 	if err != nil {
 		return err
 	}
+	if len(parked) == 0 {
+		return nil
+	}
 
-	for _, pause := range parked {
-		if pause == nil {
-			continue
-		}
+	stack, err := e.smv2.LoadStack(ctx, id)
+	if err != nil {
+		return err
+	}
 
-		if redelivered {
-			stack, err := e.smv2.LoadStack(ctx, id)
-			if err != nil {
-				return err
-			}
-			if len(subscriptionMessageIDs(stack, key)) < parkSeq(pause) {
-				continue
-			}
-		}
-
+	for _, pause := range markersToWake(parked, stack, key) {
 		if err := e.consumePark(ctx, pause); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// markersToWake picks the markers a delivery may consume: those whose awaited
+// message is saved and whose park is not answered yet.
+func markersToWake(parked []*state.Pause, stack []string, key string) []*state.Pause {
+	saved := len(subscriptionMessageIDs(stack, key))
+
+	var ready []*state.Pause
+	for _, pause := range parked {
+		if pause.Outgoing != "" && slices.Contains(stack, pause.Outgoing) {
+			continue
+		}
+		if saved < parkSeq(pause) {
+			continue
+		}
+		ready = append(ready, pause)
+	}
+
+	return ready
 }
 
 // parkedMarkers returns the markers of the run's parks on a subscription.
@@ -503,5 +518,5 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return e.wakeSubscriber(ctx, id, key, redelivered)
+	return e.wakeSubscriber(ctx, id, key)
 }
