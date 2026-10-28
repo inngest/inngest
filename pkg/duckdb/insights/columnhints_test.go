@@ -254,6 +254,17 @@ func TestBuildColumnHintsJSONPathBracketForms(t *testing.T) {
 	}
 }
 
+// TestBuildColumnPathHintsIndexDoesNotCollect checks that a numeric index
+// picks one element: unlike "[*]", the result isn't an array, so it gets
+// no {wc} entry.
+func TestBuildColumnPathHintsIndexDoesNotCollect(t *testing.T) {
+	root := PathHint{Path: []PathSegment{}, Hint: HintEventID}
+	require.Equal(t, [][]PathHint{{root}},
+		pathHintsFor(t, "SELECT inputs ->> '$[0].id' FROM runs"))
+	require.Equal(t, [][]PathHint{{root, hint(HintEventID, wc)}},
+		pathHintsFor(t, "SELECT inputs ->> '$[*].id' FROM runs"))
+}
+
 func TestBuildColumnHintsNoHintForAmbiguousJoin(t *testing.T) {
 	// run_id exists on both runs and extended_trace_spans -- a bare
 	// reference in a joined query can't resolve to exactly one.

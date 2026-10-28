@@ -168,9 +168,13 @@ func pathsEqual(a, b []PathSegment) bool {
 // otherwise answer: DuckDB itself already draws this line based on the
 // "$" prefix, so this function just mirrors that rule instead of
 // guessing from the string's own shape.
-func queryPath(path string) []PathSegment {
+//
+// collects reports whether the path has a real "[*]", IE DuckDB collects
+// every match into an array. A numeric index matches like "[*]" but picks
+// one element, so it doesn't collect.
+func queryPath(path string) (segs []PathSegment, collects bool) {
 	if !strings.HasPrefix(path, "$") {
-		return []PathSegment{seg(path)}
+		return []PathSegment{seg(path)}, false
 	}
 	return parseJSONPath(strings.TrimPrefix(path, "$"))
 }
@@ -187,17 +191,17 @@ func queryPath(path string) []PathSegment {
 // any one element has its array's element hints. A quoted key ('["a.b"]')
 // is a named field. Any other bracket form is taken whole as one segment,
 // which no pathHints key matches, so it just gets no hint.
-func parseJSONPath(p string) []PathSegment {
-	var segs []PathSegment
+func parseJSONPath(p string) (segs []PathSegment, collects bool) {
 	for len(p) > 0 {
 		switch {
 		case strings.HasPrefix(p, "[*]"):
 			segs = append(segs, wc)
+			collects = true
 			p = p[len("[*]"):]
 		case strings.HasPrefix(p, "["):
 			end := strings.IndexByte(p, ']')
 			if end < 0 {
-				return append(segs, seg(p))
+				return append(segs, seg(p)), collects
 			}
 			segs = append(segs, bracketSegment(p[1:end]))
 			p = p[end+1:]
@@ -212,7 +216,7 @@ func parseJSONPath(p string) []PathSegment {
 			p = p[end:]
 		}
 	}
-	return segs
+	return segs, collects
 }
 
 // bracketSegment is the segment for a "[...]" JSONPath token's contents
