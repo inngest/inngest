@@ -45,12 +45,15 @@ func TestFinalizeEventSeed(t *testing.T) {
 // pending after a message won, would hold back the discovery of every step the
 // run completes afterwards.
 func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
-	wait := func(id string, subscribe bool) *state.GeneratorOpcode {
+	subscription := func(id string, subscribe bool, mode string) *state.GeneratorOpcode {
 		opts := map[string]any{"event": "agent/message", "timeout": ""}
 		if subscribe {
-			opts["subscribe"] = map[string]any{"key": "inbox:0", "mode": "next", "seq": 1}
+			opts["subscribe"] = map[string]any{"key": "inbox:0", "mode": mode, "seq": 1}
 		}
 		return &state.GeneratorOpcode{ID: id, Op: enums.OpcodeWaitForEvent, Opts: opts}
+	}
+	wait := func(id string, subscribe bool) *state.GeneratorOpcode {
+		return subscription(id, subscribe, "next")
 	}
 
 	cases := []struct {
@@ -70,6 +73,16 @@ func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
 				{ID: "step", Op: enums.OpcodeStepPlanned},
 			},
 			want: []string{"step"},
+		},
+		{
+			name: "open, poll, ack and close complete in their request and stay tracked",
+			ops: []*state.GeneratorOpcode{
+				subscription("o", true, "open"),
+				subscription("p", true, "poll"),
+				subscription("k", true, "ack"),
+				subscription("c", true, "close"),
+			},
+			want: []string{"o", "p", "k", "c"},
 		},
 		{
 			name: "a plain wait for event is still tracked",

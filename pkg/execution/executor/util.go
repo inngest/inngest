@@ -123,10 +123,11 @@ func (g OpcodeGroups) All() []OpcodeGroup {
 	return []OpcodeGroup{g.PriorityGroup, g.OtherGroup}
 }
 
-// isSubscriptionWait reports whether the op is a wait of a step.subscribe
-// subscription. It has no queue item and no timeout: it is woken by the
-// delivery of a message and lasts as long as the run, so it must never be
-// tracked as a pending step. A pending subscription wait would hold back the
+// isSubscriptionWait reports whether the op is the wait for the next message of
+// a step.subscribe subscription. It has no queue item and no timeout: it is
+// woken by the delivery of a message and lasts as long as the run, so it must
+// never be tracked as a pending step. The other subscription ops (open, poll,
+// ack, close) complete in the request that reports them and stay tracked. A pending subscription wait would hold back the
 // discovery of every other step the run completes while it waits.
 func isSubscriptionWait(op *state.GeneratorOpcode) bool {
 	if op == nil || op.Op != enums.OpcodeWaitForEvent {
@@ -134,7 +135,7 @@ func isSubscriptionWait(op *state.GeneratorOpcode) bool {
 	}
 
 	opts, err := op.WaitForEventOpts()
-	return err == nil && opts != nil && opts.Subscribe != nil
+	return err == nil && opts != nil && opts.Subscribe != nil && opts.Subscribe.Mode == state.SubscribeNext
 }
 
 // NonLazyIDs returns the step IDs of "non-lazy" op. Distinguishing between lazy
