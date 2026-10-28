@@ -190,3 +190,32 @@ func TestSessions_CallerErrorsAre400s(t *testing.T) {
 		require.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
 }
+
+// TestSessions_CursorFromAnotherListingIs400 covers a cursor that decodes
+// fine but belongs to a different listing (here a sessions cursor sent to
+// session runs), which used to silently restart at page 1.
+func TestSessions_CursorFromAnotherListingIs400(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	insertSessionRun(t, db, appID, functionID, "r1", "user", "u1", "Completed", now.Add(-2*time.Minute))
+	insertSessionRun(t, db, appID, functionID, "r2", "user", "u2", "Completed", now.Add(-time.Minute))
+
+	limit := int32(1)
+	sessions, err := service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{SessionKey: "user", Limit: &limit})
+	require.NoError(t, err)
+	require.True(t, sessions.Page.HasMore)
+	require.NotNil(t, sessions.Page.Cursor)
+
+	_, err = service.ListSessionRuns(context.Background(), &apiv2.ListSessionRunsRequest{
+		SessionKey: "user", SessionId: "u1", Cursor: sessions.Page.Cursor,
+	})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "Invalid cursor")
+
+	_, err = service.ListSessionKeys(context.Background(), &apiv2.ListSessionKeysRequest{Cursor: sessions.Page.Cursor})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
