@@ -19,9 +19,13 @@ import (
 type WriteToNextFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 // NewMigratingBatchManager creates a BatchManager that migrates batching state
-// from current to next. Each append goes to exactly one cluster, chosen per
-// account by writeToNext, and reads always cover both clusters so batches drain
-// from whichever cluster created them.
+// from current to next.
+// - Each append goes to exactly one cluster, the account's
+// primary, chosen by writeToNext.
+// - Reads (RetrieveItems, StartExecution, GetBatchInfo) check
+// the primary first and fall back to the other cluster only when the batch is
+// not there, so batches drain from whichever cluster created them.
+// - Deletes always run on both clusters: DeleteKeys and DeleteBatch.
 //
 // current is required. If next is nil, current is returned directly with zero
 // overhead. If writeToNext is nil, every append goes to current.
@@ -83,7 +87,7 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, f
 	if err != nil || result != enums.BatchStatusAbsent.String() {
 		return result, err
 	}
-	logger.StdlibLogger(ctx).Warn("batch absent in primary cluster, falling back for StartExecution",
+	logger.StdlibLogger(ctx).Debug("batch absent in primary cluster, falling back for StartExecution",
 		"account_id", accountID,
 		"function_id", functionID,
 		"batch_id", batchID,
@@ -100,7 +104,7 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 	if err != nil || len(items) > 0 {
 		return items, err
 	}
-	logger.StdlibLogger(ctx).Warn("batch empty in primary cluster, falling back for RetrieveItems",
+	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for RetrieveItems",
 		"account_id", accountID,
 		"function_id", functionID,
 		"batch_id", batchID,
@@ -170,7 +174,7 @@ func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts)
 	if err != nil || (result != nil && result.Scheduled) {
 		return result, err
 	}
-	logger.StdlibLogger(ctx).Warn("no batch scheduled from primary cluster, falling back for RunBatch",
+	logger.StdlibLogger(ctx).Debug("no batch scheduled from primary cluster, falling back for RunBatch",
 		"account_id", opts.AccountID,
 		"function_id", opts.FunctionID,
 		"batch_key", opts.BatchKey,
