@@ -145,6 +145,9 @@ export function SessionRuns({
     data: runs = [],
     isPending,
     isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
     error,
     refetch,
   } = useSessionRuns({ sessionKey, sessionId, startTime, endTime });
@@ -246,7 +249,17 @@ export function SessionRuns({
                 />
               )}
             />
-            <div className="flex flex-col items-center pt-2">
+            <div className="flex flex-col items-center gap-2 pt-2">
+              {hasNextPage && (
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  label="Load more"
+                  onClick={() => fetchNextPage()}
+                  loading={isFetchingNextPage}
+                  disabled={isFetchingNextPage}
+                />
+              )}
               <Button
                 kind="secondary"
                 appearance="outlined"

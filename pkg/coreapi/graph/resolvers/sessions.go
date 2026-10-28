@@ -30,9 +30,12 @@ import (
 // A nil qr.DuckDB means Sessions requires --duckdb dual-write to be
 // enabled, the same "not wired up" contract Query.insights uses.
 
-func (qr *queryResolver) SessionKeys(ctx context.Context, search *string) ([]*models.SessionKey, error) {
+func (qr *queryResolver) SessionKeys(ctx context.Context, search *string, first int, after *string) (*models.SessionKeysConnection, error) {
 	if qr.DuckDB == nil {
 		return nil, fmt.Errorf("sessions requires dual-write (--duckdb) to be enabled")
+	}
+	if err := validateSessionsFirst(first); err != nil {
+		return nil, err
 	}
 
 	var query string
@@ -42,24 +45,31 @@ func (qr *queryResolver) SessionKeys(ctx context.Context, search *string) ([]*mo
 
 	result, err := dashboards.ListSessionKeys(ctx, qr.DuckDB, consts.DevServerAccountID, consts.DevServerEnvID, dashboards.SessionKeysOpts{
 		Search: query,
+		Cursor: derefString(after),
+		Limit:  first,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	out := make([]*models.SessionKey, len(result.Keys))
+	var endCursor string
 	for i, key := range result.Keys {
 		out[i] = &models.SessionKey{
 			SessionKey: key.Key,
 			CreatedAt:  key.CreatedAt,
 		}
+		endCursor = key.Cursor
 	}
-	return out, nil
+	return &models.SessionKeysConnection{Nodes: out, PageInfo: sessionsPageInfo(result.HasMore, endCursor)}, nil
 }
 
-func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput) ([]*models.SessionGroup, error) {
+func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput, first int, after *string) (*models.SessionGroupsConnection, error) {
 	if qr.DuckDB == nil {
 		return nil, fmt.Errorf("sessions requires dual-write (--duckdb) to be enabled")
+	}
+	if err := validateSessionsFirst(first); err != nil {
+		return nil, err
 	}
 
 	var idSearch string
@@ -73,6 +83,8 @@ func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessio
 		IDSearch: idSearch,
 		From:     from,
 		Until:    until,
+		Cursor:   derefString(after),
+		Limit:    first,
 	})
 	if err != nil {
 		return nil, err
@@ -84,7 +96,9 @@ func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessio
 	}
 
 	out := make([]*models.SessionGroup, len(result.Sessions))
+	var endCursor string
 	for i, group := range result.Sessions {
+		endCursor = group.Cursor
 		functions := make([]*models.SessionFunction, len(group.Functions))
 		for j, fn := range group.Functions {
 			functions[j] = &models.SessionFunction{Slug: fn.Slug, Name: functionNames(fn.Slug)}
@@ -100,27 +114,34 @@ func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessio
 			Functions:      functions,
 		}
 	}
-	return out, nil
+	return &models.SessionGroupsConnection{Nodes: out, PageInfo: sessionsPageInfo(result.HasMore, endCursor)}, nil
 }
 
-func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, sessionID string, timeRange *models.TimeRangeInput) ([]*models.SessionRun, error) {
+func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, sessionID string, timeRange *models.TimeRangeInput, first int, after *string) (*models.SessionRunsConnection, error) {
 	if qr.DuckDB == nil {
 		return nil, fmt.Errorf("sessions requires dual-write (--duckdb) to be enabled")
+	}
+	if err := validateSessionsFirst(first); err != nil {
+		return nil, err
 	}
 
 	from, until := sessionTimeRange(timeRange)
 	result, err := dashboards.ListSessionRuns(ctx, qr.DuckDB, consts.DevServerAccountID, consts.DevServerEnvID, dashboards.SessionRunsOpts{
-		Key:   sessionKey,
-		ID:    sessionID,
-		From:  from,
-		Until: until,
+		Key:    sessionKey,
+		ID:     sessionID,
+		From:   from,
+		Until:  until,
+		Cursor: derefString(after),
+		Limit:  first,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	out := make([]*models.SessionRun, len(result.Runs))
+	var endCursor string
 	for i, run := range result.Runs {
+		endCursor = run.Cursor
 		sr := &models.SessionRun{
 			ID:           run.RunID,
 			FunctionSlug: run.Function.Slug,
@@ -141,7 +162,39 @@ func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, ses
 		}
 		out[i] = sr
 	}
-	return out, nil
+	return &models.SessionRunsConnection{Nodes: out, PageInfo: sessionsPageInfo(result.HasMore, endCursor)}, nil
+}
+
+// maxSessionsFirst matches /v2/sessions' max page size
+// (pkg/api/v2/endpoints_sessions.go), which also errors rather than
+// clamping an out-of-range limit.
+const maxSessionsFirst = 100
+
+func validateSessionsFirst(first int) error {
+	if first < 1 {
+		return fmt.Errorf("first must be at least 1")
+	}
+	if first > maxSessionsFirst {
+		return fmt.Errorf("first cannot exceed %d", maxSessionsFirst)
+	}
+	return nil
+}
+
+// sessionsPageInfo builds a forward-only PageInfo, matching REST's
+// sessionsPage: the cursor is only set when there's a next page.
+func sessionsPageInfo(hasMore bool, endCursor string) *models.PageInfo {
+	info := &models.PageInfo{HasNextPage: hasMore}
+	if hasMore && endCursor != "" {
+		info.EndCursor = &endCursor
+	}
+	return info
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // sessionFunctionNames returns a lookup from function slug to its
