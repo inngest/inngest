@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -22,17 +22,46 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-// subscriptionStepID is the state step ID of message seq of a subscription.
-// The SDK gives its seq-th next() step the same ID, so a message that arrived
-// before the SDK asks for it is already the step's memoized output.
-func subscriptionStepID(key string, seq int) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%d", key, seq)))
+// A step.subscribe subscription keeps its pause when an event matches and saves
+// the event as a step of the run. The step ID is made of the subscription and
+// the event ID, so saving the same event twice is one message and two events
+// never contend for a slot. The run's stack (the order steps were saved in) is
+// the order of the messages: the SDK reads them from there.
+
+// subscriptionMessagePrefix starts the ID of every message step. The SDK looks
+// for it in the stack.
+const subscriptionMessagePrefix = "inngest-sub:"
+
+func subscriptionKeyHash(key string) string {
+	sum := sha1.Sum([]byte(key))
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionAckID is the step ID of the ack of message seq.
-func subscriptionAckID(key string, seq int) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:ack:%d", key, seq)))
+// subscriptionMessageID is the step ID of the message an event is in a
+// subscription.
+func subscriptionMessageID(key string, eventID string) string {
+	return subscriptionMessagePrefix + subscriptionKeyHash(key) + ":" + eventID
+}
+
+// subscriptionMessageIDs returns the message step IDs of a subscription in
+// stack order.
+func subscriptionMessageIDs(stack []string, key string) []string {
+	prefix := subscriptionMessagePrefix + subscriptionKeyHash(key) + ":"
+
+	var ids []string
+	for _, id := range stack {
+		if strings.HasPrefix(id, prefix) {
+			ids = append(ids, id)
+		}
+	}
+
+	return ids
+}
+
+// subscriptionStepID is the step ID of the wait for message seq. The SDK gives
+// its blocking next() the same ID.
+func subscriptionStepID(key string, seq int) string {
+	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%d", key, seq)))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -43,27 +72,8 @@ func subscriptionWaiterID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionEventMarkerID is the step ID that records an event as handled by
-// a subscription, so an event that is handled twice is saved once.
-func subscriptionEventMarkerID(key string, eventID string) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:event:%s", key, eventID)))
-	return hex.EncodeToString(sum[:])
-}
-
-// subscriptionEventSlotID is the step ID that records which slot an event was
-// saved to.
-func subscriptionEventSlotID(key string, eventID string) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:slot:%s", key, eventID)))
-	return hex.EncodeToString(sum[:])
-}
-
-// subscriptionHints remembers the next free message slot per subscription
-// pause, so saving a message does not probe from slot 1 every time. It is only
-// a hint: probing is the source of truth, so a stale or missing hint is safe.
-var subscriptionHints sync.Map
-
-func subscriptionPauseID(runID string, key string) uuid.UUID {
-	return inngest.DeterministicSha1UUID(runID + ":subscription:" + key)
+func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
+	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
 }
 
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
@@ -76,7 +86,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 	md := runCtx.Metadata()
 	runID := md.ID.RunID.String()
-	pauseID := subscriptionPauseID(runID, sub.Key)
+	pauseID := subscriptionPauseID(runID, sub.Key, sub.Stream)
 	idx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: opts.Event}
 
 	// answer completes the op right away with the given output.
@@ -88,6 +98,15 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		gen.Op = enums.OpcodeStepRun
 		gen.Data = byt
 		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
+	}
+
+	// messages are the subscription's message step IDs in stack order.
+	messages := func() ([]string, error) {
+		stack, err := e.smv2.LoadStack(ctx, md.ID)
+		if err != nil {
+			return nil, err
+		}
+		return subscriptionMessageIDs(stack, sub.Key), nil
 	}
 
 	switch sub.Mode {
@@ -140,14 +159,6 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return fmt.Errorf("error enqueueing subscription expiry: %w", err)
 		}
 
-		if len(md.Config.EventIDs) > 0 {
-			// Mark the trigger as handled, in case it also matches.
-			marker := subscriptionEventMarkerID(sub.Key, md.Config.EventIDs[0].String())
-			if _, err := e.smv2.SaveStep(ctx, md.ID, marker, []byte(`{"data":0}`)); err != nil &&
-				!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-				return fmt.Errorf("error marking trigger event: %w", err)
-			}
-		}
 		return answer(map[string]any{"opened": true})
 
 	case state.SubscribeNext:
@@ -155,60 +166,49 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
 		}
 
-		saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{gen.ID})
+		// Record that the run is blocked on message Seq, so the delivery of
+		// that message queues discovery. Discovery is only queued for a blocked
+		// run: while a request is in flight, a second one would run its steps
+		// twice.
+		waiter := subscriptionWaiterID(sub.Key, sub.Seq)
+		if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, []byte(`{"data":1}`)); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+			return err
+		}
+
+		// The message may have arrived before the SDK asked: then there is
+		// nobody to deliver it, so wake the run now.
+		ids, err := messages()
 		if err != nil {
 			return err
 		}
-		raw, ok := saved[gen.ID]
-		if !ok {
-			// Not here yet. Record that the run is blocked on it, so the
-			// delivery of message Seq queues discovery. Discovery is only
-			// queued for a blocked run: while one is in flight, a second
-			// request would run its steps twice.
-			waiter := subscriptionWaiterID(sub.Key, sub.Seq)
-			if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, []byte(`{"data":1}`)); err != nil &&
-				!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-				return err
-			}
-
-			// The message may have arrived between the check and the marker.
-			saved, err = e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{gen.ID})
-			if err != nil {
-				return err
-			}
-			if raw, ok = saved[gen.ID]; !ok {
-				return nil
-			}
+		if len(ids) < sub.Seq {
+			return nil
 		}
 
-		// The message arrived before the SDK asked for it. Queue discovery by
-		// resuming with the saved data; saving it again is idempotent.
 		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
 		if err != nil || pause == nil {
 			return fmt.Errorf("subscription pause not found: %w", err)
 		}
-		return e.resumeSubscriber(ctx, pause, gen.ID, raw)
-
-	case state.SubscribeAck:
-		if gen.ID != subscriptionAckID(sub.Key, sub.Seq) {
-			return fmt.Errorf("subscription step ID does not match ack %d", sub.Seq)
-		}
-		return answer(true)
+		return e.resumeSubscriber(ctx, pause, gen.ID)
 
 	case state.SubscribePoll:
-		id := subscriptionStepID(sub.Key, sub.Seq)
-		saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{id})
+		ids, err := messages()
 		if err != nil {
 			return err
 		}
-		raw, ok := saved[id]
-		if !ok {
+		if len(ids) < sub.Seq {
 			return answer(nil)
+		}
+
+		saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{ids[sub.Seq-1]})
+		if err != nil {
+			return err
 		}
 		var stored struct {
 			Data any `json:"data"`
 		}
-		if err := json.Unmarshal(raw, &stored); err != nil {
+		if err := json.Unmarshal(saved[ids[sub.Seq-1]], &stored); err != nil {
 			return err
 		}
 		return answer(stored.Data)
@@ -223,51 +223,20 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 				_ = e.exprAggregator.RemovePause(ctx, pause)
 			}
 		}
-		subscriptionHints.Delete(pauseID)
 
-		count, err := e.countSubscriptionMessages(ctx, md.ID, sub.Key)
+		ids, err := messages()
 		if err != nil {
 			return err
 		}
-		return answer(map[string]any{"count": count})
+		return answer(map[string]any{"count": len(ids)})
 	}
 
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
-// countSubscriptionMessages is how many messages the subscription has saved.
-func (e *executor) countSubscriptionMessages(ctx context.Context, id sv2.ID, key string) (int, error) {
-	const batch = 32
-	count := 0
-	for {
-		ids := make([]string, batch)
-		for i := range ids {
-			ids[i] = subscriptionStepID(key, count+i+1)
-		}
-		saved, err := e.smv2.LoadStepsWithIDs(ctx, id, ids)
-		if err != nil {
-			return 0, err
-		}
-		for i := range ids {
-			if _, ok := saved[ids[i]]; !ok {
-				return count + i, nil
-			}
-		}
-		count += batch
-	}
-}
-
-// resumeSubscriber saves the bytes as the output of the step dataKey and queues
-// the discovery request that lets the run see it. It does not consume the pause.
-func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string, saved []byte) error {
-	// ConsumePause stores what it is given as JSON. Handing it the stored
-	// message back as a map of raw JSON writes the same bytes, so saving it
-	// again is idempotent.
-	var wrapper map[string]json.RawMessage
-	if err := json.Unmarshal(saved, &wrapper); err != nil {
-		return fmt.Errorf("stored subscription message is not JSON: %w", err)
-	}
-
+// resumeSubscriber answers the wait step dataKey and queues the discovery
+// request that lets the run see the new message. It does not consume the pause.
+func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string) error {
 	clone := *pause
 	clone.ID = uuid.New()
 	clone.DataKey = dataKey
@@ -275,7 +244,7 @@ func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dat
 	clone.Subscribe = nil
 
 	err := e.Resume(ctx, clone, execution.ResumeRequest{
-		With:      map[string]any{"data": wrapper["data"]},
+		With:      map[string]any{"data": nil},
 		StepName:  pause.StepName,
 		EventName: derefString(pause.Event),
 	})
@@ -292,96 +261,66 @@ func derefString(s *string) string {
 	return *s
 }
 
-// deliverSubscription saves an event that matched a subscription pause as the
-// next numbered message of the run and queues discovery. The pause stays.
+// deliverSubscription saves an event that matched a subscription pause as a
+// message of the run and wakes the run if it is blocked on that message. The
+// pause stays.
 func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEvent, pause *state.Pause, l logger.Logger) error {
 	id := sv2.IDFromPause(*pause)
 	key := pause.Subscribe.Key
-	eventMap := evt.GetEvent().Map()
+	eventID := evt.GetInternalID().String()
+
+	// The event that started the run is its first message, not a match.
+	if pause.TriggeringEventID != nil && *pause.TriggeringEventID == eventID {
+		return nil
+	}
 
 	// SaveStep writes to the run's hashes whether or not the run still
 	// exists, so check first: a finished run cannot take the message.
 	if exists, err := e.smv2.Exists(ctx, id); err != nil {
 		return err
 	} else if !exists {
-		subscriptionHints.Delete(pause.ID)
 		return state.ErrRunNotFound
 	}
 
-	data, err := json.Marshal(map[string]any{"data": eventMap})
+	data, err := json.Marshal(map[string]any{"data": evt.GetEvent().Map()})
 	if err != nil {
 		return err
 	}
 
-	// Claim the event first: an event that matches twice (a redelivery, two
-	// executors) is saved once. The slot it was saved to is recorded after, so
-	// a retry of an interrupted delivery can still wake the run.
-	marker := subscriptionEventMarkerID(key, evt.GetInternalID().String())
-	slotMarker := subscriptionEventSlotID(key, evt.GetInternalID().String())
-
-	var seq int
-	if _, err := e.smv2.SaveStep(ctx, id, marker, []byte(`{"data":0}`)); err != nil {
-		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-			return err
-		}
-
-		// Already claimed. If it was saved, make sure the run was woken.
-		saved, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{slotMarker})
-		if err != nil {
-			return err
-		}
-		raw, ok := saved[slotMarker]
-		if ok {
-			var slot struct {
-				Data int `json:"data"`
-			}
-			if err := json.Unmarshal(raw, &slot); err != nil || slot.Data < 1 {
-				return nil
-			}
-			seq = slot.Data
-		}
+	// The same event saves the same bytes under the same ID: a redelivery is
+	// the message it already is.
+	messageID := subscriptionMessageID(key, eventID)
+	if _, err := e.smv2.SaveStep(ctx, id, messageID, data); err != nil &&
+		!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
 	}
 
-	if seq == 0 {
-		// Not saved yet: either the first delivery, or a retry of one that was
-		// interrupted. Probing is idempotent: the slot that already holds this
-		// event answers ErrIdempotentResponse, and other slots are skipped.
-		seq = 1
-		if hint, ok := subscriptionHints.Load(pause.ID); ok {
-			seq = hint.(int)
-		}
-
-		for ; ; seq++ {
-			_, err := e.smv2.SaveStep(ctx, id, subscriptionStepID(key, seq), data)
-			if errors.Is(err, state.ErrDuplicateResponse) {
-				// Another message has this slot.
-				continue
-			}
-			if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
-				return err
-			}
+	// The message's position is its place among the subscription's messages in
+	// the stack. Only a run blocked on exactly that message needs waking.
+	stack, err := e.smv2.LoadStack(ctx, id)
+	if err != nil {
+		return err
+	}
+	position := 0
+	for i, existing := range subscriptionMessageIDs(stack, key) {
+		if existing == messageID {
+			position = i + 1
 			break
 		}
-		subscriptionHints.Store(pause.ID, seq+1)
-
-		slotData, _ := json.Marshal(map[string]any{"data": seq})
-		if _, err := e.smv2.SaveStep(ctx, id, slotMarker, slotData); err != nil &&
-			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-			return err
-		}
 	}
+	if position == 0 {
+		return fmt.Errorf("subscription message %s is not in the stack", messageID)
+	}
+	l.Debug("subscription message saved", "position", position, "message_id", messageID)
 
-	stepID := subscriptionStepID(key, seq)
-	l.Debug("subscription message saved", "seq", seq, "step_id", stepID)
-
-	// Only a run that is blocked on this message needs a discovery request.
-	waiter, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{subscriptionWaiterID(key, seq)})
+	waiter := subscriptionWaiterID(key, position)
+	blocked, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{waiter})
 	if err != nil {
 		return err
 	}
-	if _, blocked := waiter[subscriptionWaiterID(key, seq)]; !blocked {
+	if _, ok := blocked[waiter]; !ok {
 		return nil
 	}
 
-	return e.resumeSubscriber(ctx, pause, stepID, data)
+	return e.resumeSubscriber(ctx, pause, subscriptionStepID(key, position))
 }
