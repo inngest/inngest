@@ -621,3 +621,35 @@ func TestValidateChecksUsingColumns(t *testing.T) {
 		require.NoError(t, err, q)
 	}
 }
+
+// DuckDB only exposes a SEMI/ANTI join's left side: its right side is
+// visible inside that join's own ON and nowhere else (checked against a
+// real duckdb).
+func TestValidateSemiAntiJoinHidesRightSide(t *testing.T) {
+	for _, q := range []string{
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)",
+		"SELECT * FROM runs r ANTI JOIN extended_trace_spans e ON r.run_id = e.run_id NATURAL JOIN metadata m",
+		"SELECT run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id",
+		"SELECT run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)",
+		// The ON can still see both sides, and a hidden alias can be reused.
+		"SELECT r.run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id AND e.span_id IS NOT NULL",
+		"SELECT e.span_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN extended_trace_spans e ON r.run_id = e.run_id",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	for q, msg := range map[string]string{
+		"SELECT e.run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                        `unknown table "e"`,
+		"SELECT r.run_id FROM runs r ANTI JOIN extended_trace_spans e ON r.run_id = e.run_id WHERE e.span_id IS NULL":                `unknown table "e"`,
+		"SELECT e.* FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                             `unknown table "e"`,
+		"SELECT span_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                         `unknown column "span_id"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m ON e.run_id = m.run_id":        `unknown table "e"`,
+		"SELECT * EXCLUDE (e.span_id) FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                           `unknown column "e.span_id" in EXCLUDE`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON run_id = 'x'":                                                      `ambiguous column "run_id"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id, LATERAL (SELECT e.span_id AS s) l":            `unknown table "e"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id WHERE EXISTS (SELECT 1 WHERE e.span_id = 'x')": `unknown table "e"`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, msg, q)
+	}
+}

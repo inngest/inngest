@@ -156,11 +156,13 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 		}
 		if r.On != nil {
 			// r.On is evaluated against both sides of the join together —
-			// resolveScope on r itself gives exactly that combined scope.
+			// resolveScope on r itself gives exactly that combined scope
+			// (onScope re-exposes a SEMI/ANTI join's own right side).
 			scope, err := resolveScope(&parser.FromClause{Refs: []parser.TableRef{r}}, ctes, nil)
 			if err != nil {
 				return diagnostics, err
 			}
+			scope = scope.onScope(r)
 			scope.outer = outer
 			rw := &arrayOfStructRewriter{scope: scope, ctes: ctes}
 			r.On = rw.rewrite(r.On)
