@@ -339,9 +339,9 @@ func literalColumnType(kind parser.LiteralKind) ColumnType {
 // 'sum', 'string_agg', 'bit_and') to args[0] -- statically typeable only
 // when that name is a literal string constant (by far the common case:
 // written directly in the query, not built from an expression). Recurses
-// into functionReturnType with the resolved name and args[0] alone, so
-// e.g. list_aggregate(x, 'string_agg') reports the same type STRING_AGG(x)
-// would, reusing that function's own returnType instead of duplicating it.
+// into functionReturnType with the resolved name and args w/o the name, so
+// e.g. list_aggregate(x, 'string_agg', ',') reports the same type
+// STRING_AGG(x, ',') would, reusing that function's own returnType instead of duplicating it.
 //
 // A dynamic (non-literal) name is genuinely unknowable without asking
 // DuckDB -- reported as ColumnTypeUnknown with no diagnostic, not guessed.
@@ -367,7 +367,9 @@ func listAggregateReturnType(name string, args []parser.Expr, scope *tableScope)
 	if lit.Kind != parser.LitString {
 		return ColumnTypeUnknown, nil, []Diagnostic{wrongArgTypeDiagnostic(name, 2, ColumnTypeString, literalColumnType(lit.Kind))}
 	}
-	return functionReturnType(strings.ToLower(lit.Text), args[:1], scope)
+	// The list and any arguments after the name are the aggregate's own.
+	aggArgs := append([]parser.Expr{args[0]}, args[2:]...)
+	return functionReturnType(strings.ToLower(lit.Text), aggArgs, scope)
 }
 
 // allowedFunctions is the conservative starting function allowlist. Keys
