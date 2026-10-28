@@ -506,15 +506,18 @@ func (p *process) recoverQuack(ctx context.Context, gen uint64, cause error) err
 // openQuackConn, this bypasses p.exec's restart-on-crash handling: a crash
 // mid-append surfaces as a plain error, not a transparent retry. Returns an
 // error if the primary connection is still jsonlines (Options.QuackAddr
-// unset, or the quack bootstrap hasn't swapped p.sess yet).
-func (p *process) currentQuackSession() (*quack.Session, error) {
+// unset, or the quack bootstrap hasn't swapped p.sess yet). An abandoned
+// session is replaced first, like before any other statement.
+func (p *process) currentQuackSession(ctx context.Context) (*quack.Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	sess, ok := p.sess.(*quack.Session)
-	if !ok {
+	if _, ok := p.sess.(*quack.Session); !ok {
 		return nil, fmt.Errorf("duckdb: quack appender requires a quack-transport connection (Options.QuackAddr)")
 	}
-	return sess, nil
+	if err := p.replaceAbandonedQuackSessionLocked(ctx); err != nil {
+		return nil, err
+	}
+	return p.sess.(*quack.Session), nil
 }
 
 // generateQuackToken returns a random hex auth token for one quack_serve
@@ -908,7 +911,10 @@ func (p *process) Query(ctx context.Context, sqlText string) (cols []string, typ
 // tearing down the pool while this call is in flight) can never observe or
 // produce a half-restarted process.
 func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) error {
-	err := fn()
+	err := p.replaceAbandonedQuackSessionLocked(ctx)
+	if err == nil {
+		err = fn()
+	}
 	if err == nil {
 		return nil
 	}
@@ -929,17 +935,17 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 	// result.ErrSessionDesynced.
 	if !errors.Is(err, result.ErrSessionDesynced) && ctx.Err() != nil {
 		// The caller's own context ended (cancelled or timed out), and the
-		// transport in use doesn't leave anything behind that needs fixing
-		// for that: quack's HTTP transport is a self-contained request per
-		// statement, so an aborted request doesn't desync anything for a
-		// later request on this same connection, or for any other caller
-		// sharing it — verified empirically (a fresh query on the same
-		// connection succeeds in ~1ms after an abort). quack.Session.Query's
-		// own watchForCancel already sent the server a real CancelRequest
-		// for this statement the moment ctx ended (verified empirically to
-		// actually stop the abandoned query's CPU usage server-side, not
-		// just abandon the wait for it — see encodeQuackCancelRequest's doc
-		// comment), so there's nothing left for a restart to clean up here.
+		// transport in use doesn't leave anything behind that a restart
+		// would fix: quack's HTTP transport is a self-contained request per
+		// statement, so an aborted request doesn't desync anything for any
+		// other caller. quack.Session.Query's own watchForCancel already
+		// sent the server a real CancelRequest for this statement the moment
+		// ctx ended (verified empirically to actually stop the abandoned
+		// query's CPU usage server-side for an interruptible statement, see
+		// encodeCancelRequest's doc comment) and marked the session
+		// Abandoned, so the next statement runs on a fresh quack connection
+		// (replaceAbandonedQuackSessionLocked) rather than queueing behind
+		// the abandoned one or catching its late interrupt.
 		// Restarting the whole subprocess would actively hurt a caller
 		// sharing this connection with another workload (dual-write, say):
 		// every other in-flight or queued statement gets torn down for a
@@ -963,6 +969,32 @@ func (p *process) runWithRestartLocked(ctx context.Context, fn func() error) err
 	}
 
 	return fn()
+}
+
+// replaceAbandonedQuackSessionLocked assumes mu is already held. If p.sess
+// is a quack.Session whose last statement was abandoned mid-flight (see
+// quack.Session.Abandoned), it handshakes a replacement against the live
+// listener, so the next statement neither queues behind the abandoned one
+// server-side nor catches its late interrupt. A failed handshake is
+// returned like any other transport failure, so runWithRestartLocked's
+// usual restart policy applies to it.
+func (p *process) replaceAbandonedQuackSessionLocked(ctx context.Context) error {
+	old, ok := p.sess.(*quack.Session)
+	if !ok || !old.Abandoned() {
+		return nil
+	}
+	ep := p.quackEP.Load()
+	if ep == nil {
+		return errQuackUnavailable
+	}
+	sess, err := quack.NewSession(ctx, ep.listenURL, ep.token)
+	if err != nil {
+		return fmt.Errorf("duckdb: replacing abandoned quack session: %w", err)
+	}
+	logger.StdlibLogger(ctx).Debug("duckdb: replaced quack session after an abandoned statement",
+		"transport", "quack", "abandoned_connection_id", old.ConnectionID(), "connection_id", sess.ConnectionID())
+	p.sess = sess
+	return nil
 }
 
 // restartAfterFailureLocked assumes mu is already held. err is the failure

@@ -183,3 +183,47 @@ func processCPUSeconds(t *testing.T, pid int) float64 {
 	}
 	return secs
 }
+
+// TestQuackAbandonedStatementDoesNotBlockNextStatement pins that a statement
+// which ignores its CancelRequest doesn't poison the connection it ran on.
+// A constant-folded levenshtein runs inside the server's PREPARE handler,
+// which neither reacts to Interrupt() nor answers the CancelRequest until
+// it finishes (~9s here). Reusing that quack connection used to queue the
+// next statement behind it, and then fail it w/ the late "Interrupted!".
+// Both the primary connection (process) and a pooled one must instead move
+// to a fresh quack connection.
+func TestQuackAbandonedStatementDoesNotBlockNextStatement(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	pooled, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+
+	const stuckSQL = "SELECT levenshtein(repeat('a', 80000), repeat('b', 80000)) AS d;"
+	for name, execer := range map[string]sqlExecer{"primary": p, "pooled": pooled} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+			defer cancel()
+			start := time.Now()
+			_, _, _, err := execer.Query(ctx, stuckSQL)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			require.Less(t, time.Since(start), 2*time.Second, "an abandoned statement must not block its caller on the cancel")
+
+			start = time.Now()
+			_, _, rows, err := execer.Query(t.Context(), "SELECT 1 AS ok;")
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+			require.Less(t, time.Since(start), 2*time.Second, "the next statement must not queue behind the abandoned one")
+		})
+	}
+
+	p.mu.Lock()
+	disabled := p.disabled
+	p.mu.Unlock()
+	require.False(t, disabled)
+}

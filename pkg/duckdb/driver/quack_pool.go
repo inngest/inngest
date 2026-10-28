@@ -97,7 +97,14 @@ func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) e
 		}
 		c.sess, c.gen = sess, ep.gen
 	}
-	return c.gen, fn(c.sess)
+	err = fn(c.sess)
+	if c.sess.Abandoned() {
+		// fn's statement was given up on mid-flight, so this server
+		// connection may still be running it (see quack.Session.Abandoned).
+		// Re-handshake on the next statement instead of reusing it.
+		c.sess = nil
+	}
+	return c.gen, err
 }
 
 // currentSession returns a session against the live listener,
