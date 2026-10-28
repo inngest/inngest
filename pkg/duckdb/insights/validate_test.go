@@ -598,3 +598,26 @@ func TestValidateStarExcludeQualified(t *testing.T) {
 		require.Error(t, err, q)
 	}
 }
+
+// Each USING column must exist, unambiguously, on both sides of its join
+// (DuckDB's own binder errors).
+func TestValidateChecksUsingColumns(t *testing.T) {
+	for q, msg := range map[string]string{
+		"SELECT * FROM runs JOIN events USING (bogus)":                                                         `column "bogus" does not exist on left side of join`,
+		"SELECT * FROM runs JOIN events USING (run_id)":                                                        `column "run_id" does not exist on right side of join`,
+		"SELECT * FROM runs r JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata USING (run_id)": `ambiguous column "run_id" on left side of join`,
+		"SELECT * FROM runs r JOIN extended_trace_spans e ON r.run_id = e.run_id NATURAL JOIN metadata":        `ambiguous column "run_id" on left side of join`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, msg, q)
+	}
+	for _, q := range []string{
+		// A merged column isn't ambiguous.
+		"SELECT run_id, span_id FROM metadata JOIN extended_trace_spans USING (run_id, span_id)",
+		"SELECT run_id FROM metadata m NATURAL JOIN extended_trace_spans e",
+		"SELECT run_id FROM runs JOIN extended_trace_spans USING (RUN_ID) JOIN metadata USING (run_id)",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+}

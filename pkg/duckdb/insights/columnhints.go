@@ -287,12 +287,31 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 		return false
 	}
 
+	// A bare "*" also applies the FROM clause's own join semantics,
+	// matching DuckDB's star expansion: a SEMI/ANTI join's right side
+	// isn't projected, and each USING/NATURAL-merged column is projected
+	// once, at its first copy not excluded by EXCLUDE (so "EXCLUDE (a.k)"
+	// moves k to b's position rather than dropping it). "t.*" is just t's
+	// own columns.
+	bare := len(star.Qualifier) == 0
+	emitted := map[int]bool{}
 	entries, _ := scope.starEntries(star.Qualifier)
 	var out []starColumn
-	for _, e := range entries {
+	for i, e := range entries {
+		if bare && e.starHidden {
+			continue
+		}
 		for _, name := range e.table.columnOrder {
 			if isExcluded(e.alias, name) {
 				continue
+			}
+			if bare {
+				if id, ok := scope.using[usingColumn{entry: i, column: strings.ToLower(name)}]; ok {
+					if emitted[id] {
+						continue
+					}
+					emitted[id] = true
+				}
 			}
 			col, _ := e.table.column(name)
 			out = append(out, starColumn{name: name, col: col})

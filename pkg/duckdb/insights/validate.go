@@ -292,8 +292,8 @@ func groupByItemExprs(item parser.GroupByItem) []parser.Expr {
 
 // collectFromExprs walks ref's JOIN tree collecting every ON expression —
 // USING column lists aren't Exprs (they're plain strings), so they're
-// checked directly against scope in resolveScope's caller-agnostic
-// addRef; here we only need ON.
+// checked against each side of the join by resolveScope itself
+// (tableScope.addJoinColumns, scope.go); here we only need ON.
 func collectFromExprs(from *parser.FromClause) []parser.Expr {
 	if from == nil {
 		return nil
