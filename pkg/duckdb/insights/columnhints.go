@@ -272,30 +272,29 @@ type starColumn struct {
 // columnOrder, in scope order for a bare "*", or just the qualified
 // table's for "t.*".
 func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
-	excluded := map[string]bool{}
-	for _, c := range star.Exclude {
-		excluded[strings.ToLower(c)] = true
-	}
-
-	var tables []logicalTable
-	if len(star.Qualifier) == 1 {
-		if tbl, ok := scope.lookup(star.Qualifier[0]); ok {
-			tables = []logicalTable{tbl}
-		}
-	} else {
-		for _, name := range scope.names() {
-			tbl, _ := scope.lookup(name)
-			tables = append(tables, tbl)
+	var excluded []excludeName
+	for _, raw := range star.Exclude {
+		if x, ok := parseExcludeName(raw); ok {
+			excluded = append(excluded, x)
 		}
 	}
+	isExcluded := func(alias, name string) bool {
+		for _, x := range excluded {
+			if x.matches(alias, name) {
+				return true
+			}
+		}
+		return false
+	}
 
+	entries, _ := scope.starEntries(star.Qualifier)
 	var out []starColumn
-	for _, tbl := range tables {
-		for _, name := range tbl.columnOrder {
-			if excluded[strings.ToLower(name)] {
+	for _, e := range entries {
+		for _, name := range e.table.columnOrder {
+			if isExcluded(e.alias, name) {
 				continue
 			}
-			col, _ := tbl.column(name)
+			col, _ := e.table.column(name)
 			out = append(out, starColumn{name: name, col: col})
 		}
 	}
