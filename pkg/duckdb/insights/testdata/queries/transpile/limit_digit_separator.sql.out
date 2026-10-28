@@ -1,0 +1,14 @@
+{
+  "sql": "SELECT run_id FROM inngest.insights_runs(?, ?) AS runs LIMIT 1_000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "columnHints": [
+    3
+  ]
+}
