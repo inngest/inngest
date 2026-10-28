@@ -76,6 +76,30 @@ func (a *adapter) at(n *peg.Node) baseExpr {
 
 func (a *adapter) rawText(n *peg.Node) string { return strings.TrimSpace(a.src[n.Start:n.End]) }
 
+// typeText returns a Type node's source text, after checking every
+// expression inside it (type modifiers like VARCHAR(10), array bounds like
+// INT[3]) is a plain number or string literal. CastExpr.Type and
+// TypeLiteral.Type are raw text that Walk can't see into, so a modifier
+// that could hide a subquery or function call (`x::VARCHAR((SELECT ...))`)
+// is rejected rather than passed through unchecked.
+func (a *adapter) typeText(n *peg.Node) string {
+	a.checkTypeExprs(n)
+	return a.rawText(n)
+}
+
+func (a *adapter) checkTypeExprs(n *peg.Node) {
+	if n.Kind == peg.KindRule && n.Name == "Expression" {
+		lit, ok := a.adaptExpression(n).(*Literal)
+		if !ok || lit.Kind != LitNumber && lit.Kind != LitString {
+			a.unsupported(n, "A type modifier other than a number or string literal")
+		}
+		return
+	}
+	for _, c := range n.Children {
+		a.checkTypeExprs(c)
+	}
+}
+
 // body unwraps a KindRule wrapper to reveal the Expr its body produced.
 func body(n *peg.Node) *peg.Node {
 	if n.Kind == peg.KindRule && len(n.Children) == 1 {
@@ -444,7 +468,7 @@ func (a *adapter) adaptIndirection(x Expr, n *peg.Node) Expr {
 	case "CastOperator":
 		// '::' Type
 		seq := body(alt)
-		return &CastExpr{baseExpr: a.at(n), X: x, Type: a.rawText(seq.Children[1])}
+		return &CastExpr{baseExpr: a.at(n), X: x, Type: a.typeText(seq.Children[1])}
 	case "DotOperator":
 		inner := choice(body(alt)) // DotMethodOperator / DotColumnOperator
 		if inner.Name == "DotMethodOperator" {
@@ -760,7 +784,7 @@ func (a *adapter) adaptIntervalLiteral(n *peg.Node) Expr {
 func (a *adapter) adaptTypeLiteral(n *peg.Node) Expr {
 	// TypeLiteral <- Type StringLiteral
 	seq := body(n)
-	return &TypeLiteral{baseExpr: a.at(n), Type: a.rawText(seq.Children[0]), Value: seq.Children[1].Value}
+	return &TypeLiteral{baseExpr: a.at(n), Type: a.typeText(seq.Children[0]), Value: seq.Children[1].Value}
 }
 
 func (a *adapter) adaptCaseExpression(n *peg.Node) Expr {
@@ -844,7 +868,7 @@ func (a *adapter) adaptCastExpressionCall(n *peg.Node) Expr {
 	seq := body(n)
 	tryCast := choice(body(seq.Children[0])).Name == "TryCastKeyword"
 	argsSeq := body(body(seq.Children[1]).Children[1])
-	return &CastExpr{baseExpr: a.at(n), X: a.adaptExpression(argsSeq.Children[0]), Type: a.rawText(argsSeq.Children[2]), TryCast: tryCast}
+	return &CastExpr{baseExpr: a.at(n), X: a.adaptExpression(argsSeq.Children[0]), Type: a.typeText(argsSeq.Children[2]), TryCast: tryCast}
 }
 
 func (a *adapter) adaptGroupingExpression(n *peg.Node) Expr {
