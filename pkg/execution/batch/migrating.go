@@ -130,7 +130,10 @@ func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uui
 	if err != nil || (info != nil && info.BatchID != "") {
 		return info, err
 	}
-	logger.StdlibLogger(ctx).Warn("no batch in next cluster, falling back to current for GetBatchInfo",
+	// GetBatchInfo has no account to pick a primary, so it always probes next
+	// first. Falling back to current is the expected path for accounts still
+	// writing there, so it is not worth a warning.
+	logger.StdlibLogger(ctx).Debug("no batch in next cluster, falling back to current for GetBatchInfo",
 		"function_id", functionID,
 		"batch_key", batchKey,
 	)

@@ -87,7 +87,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchFull, res.Status)
 
-				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.BatchID))
+				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(res.BatchID))
 				require.NoError(t, err)
 				require.Len(t, items, 3)
 				require.Equal(t, first.EventID, items[0].EventID)
@@ -119,7 +119,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.Equal(t, 5, res.Committed)
 				require.Equal(t, 2, res.OverflowCount)
 
-				overflow, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(res.NextBatchID))
+				overflow, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(res.NextBatchID))
 				require.NoError(t, err)
 				require.Len(t, overflow, 2)
 
@@ -135,15 +135,15 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				batchID := ulid.MustParse(res.BatchID)
 
-				status, err := bm.StartExecution(ctx, fn.ID, batchID, res.BatchPointerKey)
+				status, err := bm.StartExecution(ctx, uuid.Nil, fn.ID, batchID, res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusReady.String(), status)
 
-				status, err = bm.StartExecution(ctx, fn.ID, batchID, res.BatchPointerKey)
+				status, err = bm.StartExecution(ctx, uuid.Nil, fn.ID, batchID, res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusStarted.String(), status)
 
-				status, err = bm.StartExecution(ctx, fn.ID, ulid.Make(), res.BatchPointerKey)
+				status, err = bm.StartExecution(ctx, uuid.Nil, fn.ID, ulid.Make(), res.BatchPointerKey)
 				require.NoError(t, err)
 				require.Equal(t, enums.BatchStatusAbsent.String(), status)
 			})
@@ -166,7 +166,7 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, deleted.Deleted)
 
-				items, err := bm.RetrieveItems(ctx, fn.ID, ulid.MustParse(info.BatchID))
+				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(info.BatchID))
 				require.NoError(t, err)
 				require.Empty(t, items)
 

@@ -405,10 +405,6 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
-	if status == enums.BatchStatusStarted.String() {
-		// batch already started, abort
-		return nil
-	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
 		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
