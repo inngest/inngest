@@ -135,6 +135,10 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		// defense in depth behind insights' validator. Left off for a
 		// Postgres catalog, which hasn't been verified under the sandbox.
 		RestrictExternalAccess: duckLake == nil || duckLake.PostgresCatalogURI == "",
+		// Also bound memory/threads/temp spill, so a heavy Insights query
+		// can't take the whole machine (these are per-process, so they're
+		// shared w/ dual-write's own writes).
+		ResourceLimits: driver.DefaultResourceLimits(),
 	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)

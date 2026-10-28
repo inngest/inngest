@@ -38,6 +38,7 @@ func newTestQuackDuckDB(t *testing.T) *sql.DB {
 		},
 		QuackAddr:              &addr,
 		RestrictExternalAccess: true,
+		ResourceLimits:         driver.DefaultResourceLimits(),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
