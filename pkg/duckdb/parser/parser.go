@@ -59,6 +59,15 @@ func isNonIdentKeyword(s string) bool {
 	return false
 }
 
+// isFuncNameIdent reports whether s, spelled bare, lexes as a FunctionName
+// (an identifier, or a keyword the function-name category allows).
+func isFuncNameIdent(s string) bool {
+	if _, err := loadPegParser(); err != nil {
+		return false
+	}
+	return keywordSets.allowedAsIdentifier([]byte(strings.ToUpper(s)), CategoryFuncName)
+}
+
 // MaxSQLBytes is the longest input ParseString accepts. Parse cost (time,
 // and memo/slab memory preallocated in proportion to input length) grows
 // with input size — a 64KiB query already takes a few hundred MB of
