@@ -238,7 +238,7 @@ func TestDeleteManager(t *testing.T) {
 		batchID := ulid.MustParse(result.BatchID)
 
 		// Verify batch was created by checking if items can be retrieved
-		items, err := batchManager.RetrieveItems(ctx, functionID, batchID)
+		items, err := batchManager.RetrieveItems(ctx, accountID, functionID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, eventID, items[0].EventID)
@@ -282,7 +282,7 @@ func TestDeleteManager(t *testing.T) {
 		require.NoError(t, err, "DeleteQueueItem should succeed for KindScheduleBatch")
 
 		// Verify batch was also deleted by trying to retrieve items
-		items, err = batchManager.RetrieveItems(ctx, functionID, batchID)
+		items, err = batchManager.RetrieveItems(ctx, accountID, functionID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 0, "Batch should be deleted")
 	})

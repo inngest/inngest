@@ -1,0 +1,1 @@
+SELECT (attributes -> '_inngest.defer.parent_run_ids')[1] FROM extended_trace_spans

@@ -396,6 +396,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     metadata {
       scope
       kind
+      isUser
       values
       updatedAt
     }
@@ -741,3 +742,39 @@ export const QUICKSTART_RUNS = gql`query QuickstartRuns($functionIDs: [UUID!]!, 
     pageInfo { hasNextPage }
   }
 }`;
+export const EXECUTE_INSIGHTS_QUERY = gql`
+  query ExecuteInsightsQuery($sql: String!) {
+    insights(sql: $sql) {
+      columns {
+        name
+        type
+        pathHints {
+          path {
+            key
+            wildcard
+          }
+          hint
+        }
+      }
+      rows
+      info {
+        primaryTable
+        tables
+        limited
+      }
+      diagnostics {
+        start {
+          line
+          column
+        }
+        end {
+          line
+          column
+        }
+        severity
+        code
+        message
+      }
+    }
+  }
+`;

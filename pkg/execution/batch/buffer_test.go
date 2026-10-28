@@ -948,7 +948,7 @@ func TestBufferedBatchFull(t *testing.T) {
 		// Retrieve items using the batch ID from one of the results.
 		batchID, err := ulid.Parse(results[0].BatchID)
 		require.NoError(t, err)
-		items, err := buffered.RetrieveItems(context.Background(), fnId, batchID)
+		items, err := buffered.RetrieveItems(context.Background(), uuid.Nil, fnId, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 5, "filled batch should have 5 items")
 	})
@@ -1266,7 +1266,7 @@ func TestBufferedOverflowScheduling(t *testing.T) {
 	require.NotEqual(t, full.BatchID, next.BatchID)
 	require.WithinDuration(t, time.Now().Add(time.Minute), q.items[1].at, 5*time.Second)
 
-	items, err := buffered.RetrieveItems(ctx, fnID, next.BatchID)
+	items, err := buffered.RetrieveItems(ctx, uuid.Nil, fnID, next.BatchID)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 }

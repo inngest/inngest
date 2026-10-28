@@ -1,9 +1,20 @@
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
+
 import { useAppsSyncingError } from '@/hooks/useAppsSyncingError';
 import NavSection from './NavSection';
-import { ai, workflow } from './navItems';
+import { ai, insightsNavItem, sessionsNavItem, workflow } from './navItems';
 
 export default function Navigation({ collapsed }: { collapsed: boolean }) {
   const hasSyncingError = useAppsSyncingError();
+  const { booleanFlag } = useBooleanFlag();
+  const { value: insightsEnabled } = booleanFlag('duckdb-insights', false);
+
+  const workflowGroup = insightsEnabled
+    ? {
+        ...workflow,
+        items: [...workflow.items, sessionsNavItem, insightsNavItem],
+      }
+    : workflow;
 
   return (
     <div
@@ -12,7 +23,7 @@ export default function Navigation({ collapsed }: { collapsed: boolean }) {
       }`}
     >
       <NavSection
-        group={workflow}
+        group={workflowGroup}
         collapsed={collapsed}
         errors={{ '/apps': hasSyncingError }}
         first

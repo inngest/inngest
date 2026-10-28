@@ -220,6 +220,7 @@ const GetFunctionDocument = graphql(`
           }
         }
         keyQueuesEnabled
+        isDraining
       }
     }
   }

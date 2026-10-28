@@ -1,0 +1,39 @@
+-- SELECT * FROM
+ERROR: 1:14: unexpected trailing input
+
+-- SELECT (1 +
+ERROR: 1:12: unexpected trailing input
+
+-- SELECT 'unterminated
+ERROR: 1:8: unexpected trailing input
+
+-- SELEC * FROM t
+ERROR: 1:1: failed to parse SelectStatement
+
+-- SELECT * FROM t WHERE a =
+ERROR: 1:26: unexpected trailing input
+
+-- SELECT * FROM t GROUP BY
+ERROR: 1:25: unexpected trailing input
+
+-- SELECT * REPLACE (a + 1 AS a) FROM t
+ERROR: duckdb/parser: * REPLACE (...) is not yet supported
+
+-- SELECT * RENAME (a AS b) FROM t
+ERROR: duckdb/parser: * RENAME (...) is not yet supported
+
+-- SELECT * FROM t TABLESAMPLE 10%
+ERROR: duckdb/parser: TABLESAMPLE is not yet supported (see Task 10)
+
+-- SELECT ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+ERROR: 1:202: query is nested too deeply
+
+-- SELECT a OPERATOR(+) b FROM t
+ERROR: duckdb/parser: OPERATOR(...) is not supported
+
+-- SELECT OPERATOR(-) 1
+ERROR: duckdb/parser: OPERATOR(...) is not supported
+
+-- SELECT a OPERATOR(pg_catalog.||) b FROM t;
+ERROR: duckdb/parser: OPERATOR(...) is not supported
+
