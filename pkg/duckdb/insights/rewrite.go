@@ -35,7 +35,7 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 			if err != nil {
 				return diagnostics, err
 			}
-			merged[cte.Name] = tbl
+			merged[strings.ToLower(cte.Name)] = tbl
 		}
 		mergedCTEs = merged
 	}
@@ -336,7 +336,7 @@ func (r *arrayOfStructRewriter) rewriteIdent(id *parser.Ident) (parser.Expr, boo
 		if !ok {
 			return nil, false
 		}
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok || !col.arrayOfStructs {
 			return nil, false
 		}

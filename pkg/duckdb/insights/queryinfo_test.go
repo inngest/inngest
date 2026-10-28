@@ -38,3 +38,10 @@ func TestExtractQueryInfoSetOpModifierSubquery(t *testing.T) {
 	info := extractQueryInfo(stmt)
 	require.Equal(t, []string{"runs", "events"}, info.Tables)
 }
+
+func TestExtractQueryInfoCaseInsensitive(t *testing.T) {
+	stmt := mustParse(t, `WITH X AS (SELECT run_id FROM RUNS) SELECT * FROM x JOIN "Events" ON x.run_id = "Events".id`)
+	info := extractQueryInfo(stmt)
+	require.Equal(t, "runs", info.PrimaryTable)
+	require.Equal(t, []string{"runs", "events"}, info.Tables)
+}

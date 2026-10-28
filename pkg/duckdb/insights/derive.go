@@ -1,6 +1,10 @@
 package insights
 
-import "github.com/inngest/inngest/pkg/duckdb/parser"
+import (
+	"strings"
+
+	"github.com/inngest/inngest/pkg/duckdb/parser"
+)
 
 // deriveTable validates stmt (a CTE body or a FROM-clause subquery) with
 // its own scope — built from its own FROM clause plus ctes, per standard
@@ -95,10 +99,11 @@ func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explici
 	var order []string
 	cols := map[string]knownColumn{}
 	add := func(name string, kc knownColumn) {
-		if _, exists := cols[name]; !exists {
+		key := strings.ToLower(name)
+		if _, exists := cols[key]; !exists {
 			order = append(order, name)
 		}
-		cols[name] = kc
+		cols[key] = kc
 	}
 
 	for _, item := range stmt.Columns {
@@ -123,8 +128,9 @@ func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explici
 		if i >= len(order) || override == order[i] {
 			continue
 		}
-		cols[override] = cols[order[i]]
-		delete(cols, order[i])
+		kc := cols[strings.ToLower(order[i])]
+		delete(cols, strings.ToLower(order[i]))
+		cols[strings.ToLower(override)] = kc
 		order[i] = override
 	}
 

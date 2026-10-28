@@ -74,3 +74,26 @@ func TestRemapTablesRewritesSetOpModifierSubqueries(t *testing.T) {
 		parser.String(stmt),
 	)
 }
+
+// DuckDB resolves table names case-insensitively, quoted or not, so a
+// differently-cased reference to a logical table must still become its
+// macro call -- left bare, it would skip env/account scoping.
+func TestRemapTablesCaseInsensitive(t *testing.T) {
+	cases := map[string]string{
+		"SELECT run_id FROM RUNS":                                                           "SELECT run_id FROM inngest.insights_runs(?, ?) AS RUNS",
+		`SELECT run_id FROM "Runs"`:                                                         `SELECT run_id FROM inngest.insights_runs(?, ?) AS Runs`,
+		"SELECT * FROM Runs r JOIN EVENTS e ON r.run_id = e.id":                             "SELECT * FROM inngest.insights_runs(?, ?) AS r INNER JOIN inngest.insights_events(?, ?) AS e ON r.run_id = e.id",
+		"WITH R AS (SELECT run_id FROM RUNS) SELECT * FROM r":                               "WITH R AS (SELECT run_id FROM inngest.insights_runs(?, ?) AS RUNS) SELECT * FROM r",
+		"WITH Runs AS (SELECT 1 AS x) SELECT * FROM RUNS":                                   "WITH Runs AS (SELECT 1 AS x) SELECT * FROM RUNS",
+		"SELECT run_id FROM runs WHERE run_id IN (SELECT run_id FROM Extended_Trace_Spans)": "SELECT run_id FROM inngest.insights_runs(?, ?) AS runs WHERE run_id IN (SELECT run_id FROM inngest.insights_extended_trace_spans(?, ?) AS Extended_Trace_Spans)",
+	}
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			stmt := mustParse(t, in)
+			_, _, _, err := validate(stmt)
+			require.NoError(t, err)
+			remapTables(stmt, testAccountID, testEnvID)
+			require.Equal(t, want, parser.String(stmt))
+		})
+	}
+}
