@@ -10,11 +10,24 @@ import (
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/insights"
+	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/duckdb/tracing"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
+
+// init plugs insights' CEL-to-SQL conversion into the duckdb read path's
+// CEL search (see query.CELEventFilters' doc comment). It lives here, not
+// in an init() in pkg/duckdb/insights, since that would need insights to
+// import query and query's own tests already import insights.
+func init() {
+	query.CELEventTableFilters = insights.CELEventTableFilters
+	query.CELEventFilters = insights.CELEventFilters
+	query.CELOutputFilters = insights.CELOutputFilters
+	query.RenderWhereSQL = insights.RenderWhereSQL
+}
 
 // dualWriteQuackConns is the *sql.DB connection cap setupDualWrite opens
 // with (driver.Options.QuackConns), shared by dual-write's own writes and
