@@ -127,3 +127,68 @@ type scheduledAtSkippedLifecycle struct {
 func (l *scheduledAtSkippedLifecycle) OnFunctionSkipped(_ context.Context, _ execution.ScheduleRequest, md sv2.Metadata, _ enums.SkipReason) {
 	l.done <- md
 }
+
+// TestScheduleSkipCallsSyncListenerInline proves a skipped run reaches sync
+// listeners: skips return before OnFunctionScheduled, so without
+// OnFunctionSkipped a sync listener never sees the run at all.
+func TestScheduleSkipCallsSyncListenerInline(t *testing.T) {
+	now := time.Now().Truncate(time.Millisecond)
+	listener := &skippedSyncLifecycle{}
+	e := &executor{
+		log:               logger.From(context.Background()),
+		clock:             clockwork.NewFakeClockAt(now),
+		tracerProvider:    newRecordingTracerProvider(),
+		conditionalTracer: telemetrytrace.NoopConditionalTracer(),
+		syncLifecycles:    []execution.SyncLifecycleListener{listener},
+	}
+
+	pausedAt := now.Add(-time.Minute)
+	eventID := ulid.Make()
+	req := execution.ScheduleRequest{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		AppID:       uuid.New(),
+		Function: inngest.Function{
+			ID:              uuid.New(),
+			FunctionVersion: 1,
+			Name:            "skipped",
+		},
+		FunctionPausedAt: &pausedAt,
+		Events: []event.TrackedEvent{
+			event.InternalEvent{
+				ID: eventID,
+				Event: event.Event{
+					ID:        eventID.String(),
+					Name:      "test/schedule",
+					Timestamp: now.UnixMilli(),
+					Data:      map[string]any{},
+				},
+			},
+		},
+	}
+
+	runID := ulid.MustNew(ulid.Timestamp(now), nil)
+	_, _, err := e.schedule(context.Background(), req, runID, "test-key", false, nil)
+	require.ErrorIs(t, err, ErrFunctionSkipped)
+
+	// No wait needed: the sync listener runs inline before schedule returns.
+	require.Equal(t, 1, listener.calls)
+	require.Equal(t, runID, listener.md.ID.RunID)
+	require.Equal(t, enums.SkipReasonFunctionPaused, listener.skip.Reason)
+	require.Len(t, listener.skip.Events, 1)
+	require.True(t, now.Equal(listener.now), "expected %s, got %s", now, listener.now)
+}
+
+type skippedSyncLifecycle struct {
+	execution.NoopSyncLifecycleListener
+
+	calls int
+	md    sv2.Metadata
+	skip  execution.SkipState
+	now   time.Time
+}
+
+func (l *skippedSyncLifecycle) OnFunctionSkipped(_ context.Context, md sv2.Metadata, s execution.SkipState, now time.Time) {
+	l.calls++
+	l.md, l.skip, l.now = md, s, now
+}
