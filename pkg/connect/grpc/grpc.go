@@ -262,11 +262,13 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 
 	// A broken connection fails every call on it, so drop the cached client and
 	// let the next Forward dial a fresh one. Skip this when the caller gave up.
+	// Calls on a dead connection time out at staggered times, so only remove the
+	// client this call used, never a fresh one dialed in the meantime.
 	if err != nil && ctx.Err() == nil {
 		switch status.Code(err) {
 		case grpcCodes.Unavailable, grpcCodes.DeadlineExceeded:
 			logger.StdlibLogger(ctx).Warn("removing grpc client after transport failure", "gatewayID", gatewayID.String(), "err", err)
-			i.grpcClientManager.RemoveClient(gatewayID.String())
+			i.grpcClientManager.RemoveClientIfCurrent(gatewayID.String(), grpcClient)
 		}
 	}
 

@@ -123,6 +123,24 @@ func (m *GRPCClientManager[T]) RemoveClient(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.removeClientLocked(key)
+}
+
+// RemoveClientIfCurrent removes the client for key only while it is still the
+// given client, so a caller holding a stale client cannot evict a replacement
+// that another caller has already dialed.
+func (m *GRPCClientManager[T]) RemoveClientIfCurrent(key string, client T) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if existing, exists := m.clients[key]; !exists || any(existing) != any(client) {
+		return
+	}
+
+	m.removeClientLocked(key)
+}
+
+func (m *GRPCClientManager[T]) removeClientLocked(key string) {
 	if conn, exists := m.connections[key]; exists {
 		if err := conn.Close(); err != nil {
 			m.logger.Error("failed to close grpc connection", "url", key, "error", err)

@@ -254,6 +254,43 @@ func TestForwardRemovesClientOnTransportFailure(t *testing.T) {
 	}
 }
 
+func TestRemoveClientIfCurrent(t *testing.T) {
+	ctx, _, bufDialer, _, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	clients := NewGRPCClientManager(connectpb.NewConnectGatewayClient, WithDialer[connectpb.ConnectGatewayClient](bufDialer))
+
+	stale, err := clients.GetOrCreateClient(ctx, "gateway", "bufnet")
+	require.NoError(t, err)
+
+	clients.RemoveClient("gateway")
+	fresh, err := clients.GetOrCreateClient(ctx, "gateway", "bufnet")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		client        connectpb.ConnectGatewayClient
+		expectRemoved bool
+	}{
+		{name: "stale client keeps replacement", client: stale},
+		{name: "current client is removed", client: fresh, expectRemoved: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clients.RemoveClientIfCurrent("gateway", tt.client)
+
+			current, err := clients.GetClient(ctx, "gateway")
+			if tt.expectRemoved {
+				require.ErrorIs(t, err, ErrGatewayNotFound)
+			} else {
+				require.NoError(t, err)
+				require.Same(t, fresh, current)
+			}
+		})
+	}
+}
+
 func TestConnectToGateways(t *testing.T) {
 	ctx, mockServer, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
 	defer cleanup()
