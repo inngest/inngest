@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/stretchr/testify/require"
 )
@@ -33,64 +32,6 @@ func TestSubscriptionMessages(t *testing.T) {
 	require.Equal(t, []string{second, first}, subscriptionMessageIDs(stack, "inbox"))
 	require.Equal(t, []string{subscriptionMessageID("other", "evt-9")}, subscriptionMessageIDs(stack, "other"))
 	require.Empty(t, subscriptionMessageIDs(stack, "missing"))
-}
-
-// A subscription wait has no queue item and lasts as long as the run, so it is
-// never tracked as a pending step: otherwise the wait of another stream, still
-// pending after a message won, would hold back the discovery of every step the
-// run completes afterwards.
-func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
-	subscription := func(id string, subscribe bool, mode string) *state.GeneratorOpcode {
-		opts := map[string]any{"event": "agent/message", "timeout": ""}
-		if subscribe {
-			opts["subscribe"] = map[string]any{"key": "inbox:0", "mode": mode, "seq": 1}
-		}
-		return &state.GeneratorOpcode{ID: id, Op: enums.OpcodeWaitForEvent, Opts: opts}
-	}
-	wait := func(id string, subscribe bool) *state.GeneratorOpcode {
-		return subscription(id, subscribe, "park")
-	}
-
-	cases := []struct {
-		name string
-		ops  []*state.GeneratorOpcode
-		want []string
-	}{
-		{
-			name: "two subscription waits track nothing",
-			ops:  []*state.GeneratorOpcode{wait("a", true), wait("b", true)},
-			want: []string{},
-		},
-		{
-			name: "a subscription wait beside a step",
-			ops: []*state.GeneratorOpcode{
-				wait("a", true),
-				{ID: "step", Op: enums.OpcodeStepPlanned},
-			},
-			want: []string{"step"},
-		},
-		{
-			name: "open, poll and close complete in their request and stay tracked",
-			ops: []*state.GeneratorOpcode{
-				subscription("o", true, "open"),
-				subscription("p", true, "poll"),
-				subscription("c", true, "close"),
-			},
-			want: []string{"o", "p", "c"},
-		},
-		{
-			name: "a plain wait for event is still tracked",
-			ops:  []*state.GeneratorOpcode{wait("plain", false), wait("a", true)},
-			want: []string{"plain"},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			groups := opGroups(tc.ops)
-			require.Equal(t, tc.want, groups.NonLazyIDs())
-		})
-	}
 }
 
 func TestWaitSeq(t *testing.T) {
