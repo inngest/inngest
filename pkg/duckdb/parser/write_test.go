@@ -439,3 +439,36 @@ func TestWriteKeepsSubqueryNot(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteParenthesizesCastUnderIndirection checks a `::` cast keeps its
+// parens under a subscript or field access, since its Type would otherwise
+// take the indirection as part of the type (`a::INT[1]` is a cast to an
+// array type). A number under a field access needs them too, or its dot
+// lexes as a decimal point.
+func TestWriteParenthesizesCastUnderIndirection(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"subscript of cast", "SELECT (a::INT)[1] FROM t", "SELECT (a::INT)[1] FROM t"},
+		{"subscript of CAST call", "SELECT CAST(a AS INT)[1] FROM t", "SELECT (a::INT)[1] FROM t"},
+		{"subscript of array cast", "SELECT (a::INT[])[1] FROM t", "SELECT (a::INT[])[1] FROM t"},
+		{"field of cast", "SELECT (a::t).k FROM t", "SELECT (a::t).k FROM t"},
+		{"method on cast", "SELECT (a::t).f(1) FROM t", "SELECT (a::t).f(1) FROM t"},
+		{"subscript of try_cast stays flat", "SELECT TRY_CAST(a AS INT)[1] FROM t", "SELECT TRY_CAST(a AS INT)[1] FROM t"},
+		{"cast of cast stays flat", "SELECT (a::INT)::TEXT FROM t", "SELECT a::INT::TEXT FROM t"},
+		{"array type with a bound", "SELECT a::INT[][1] FROM t", "SELECT a::INT[][1] FROM t"},
+		{"field of number", "SELECT (1).x", "SELECT (1).x"},
+		{"subscript of number stays flat", "SELECT (1)[1]", "SELECT 1[1]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+
+	// The whole `INT[][1]` is the cast's type, matching DuckDB, not a
+	// subscript of a cast to `INT[]`.
+	stmt, err := ParseString("SELECT a::INT[][1] FROM t")
+	require.NoError(t, err)
+	cast, ok := stmt.Columns[0].Expr.(*CastExpr)
+	require.True(t, ok, "got %T", stmt.Columns[0].Expr)
+	require.Equal(t, "INT[][1]", cast.Type)
+}
