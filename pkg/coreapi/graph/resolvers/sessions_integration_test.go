@@ -66,6 +66,10 @@ func TestSessionsEndToEnd(t *testing.T) {
 	insertGQLSessionRun(t, db, appID, functionID, "r1", "user", "u1", "Completed", now)
 	insertGQLSessionRun(t, db, appID, functionID, "r2", "user", "u1", "Failed", now)
 	insertGQLSessionRun(t, db, appID, functionID, "r3", "org", "o1", "Completed", now)
+	// Older sessions under the same key, so Sessions has >1 group to page
+	// through (ordered by last activity, so u1, u2, u3).
+	insertGQLSessionRun(t, db, appID, functionID, "r4", "user", "u2", "Completed", now.Add(-time.Minute))
+	insertGQLSessionRun(t, db, appID, functionID, "r5", "user", "u3", "Completed", now.Add(-2*time.Minute))
 
 	t.Run("SessionKeys", func(t *testing.T) {
 		keys, err := qr.SessionKeys(t.Context(), nil, 20, nil)
@@ -82,8 +86,9 @@ func TestSessionsEndToEnd(t *testing.T) {
 	t.Run("Sessions", func(t *testing.T) {
 		conn, err := qr.Sessions(t.Context(), "user", nil, nil, 20, nil)
 		require.NoError(t, err)
+		require.False(t, conn.PageInfo.HasNextPage)
 		groups := conn.Nodes
-		require.Len(t, groups, 1)
+		require.Len(t, groups, 3)
 		require.Equal(t, "u1", groups[0].SessionID)
 		require.Equal(t, 2, groups[0].RunCount)
 		require.Equal(t, 1, groups[0].FailedRunCount)
@@ -119,6 +124,29 @@ func TestSessionsEndToEnd(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 2, total)
 		}
+
+		var (
+			sessionIDs []string
+			after      *string
+		)
+		for page := 0; ; page++ {
+			require.Less(t, page, 3, "too many Sessions pages")
+			conn, err := qr.Sessions(t.Context(), "user", nil, nil, 1, after)
+			require.NoError(t, err)
+			require.Len(t, conn.Nodes, 1)
+			sessionIDs = append(sessionIDs, conn.Nodes[0].SessionID)
+			if page < 2 {
+				require.True(t, conn.PageInfo.HasNextPage)
+				require.NotNil(t, conn.PageInfo.EndCursor)
+				require.NotEqual(t, derefString(after), *conn.PageInfo.EndCursor)
+				after = conn.PageInfo.EndCursor
+				continue
+			}
+			require.False(t, conn.PageInfo.HasNextPage)
+			require.Nil(t, conn.PageInfo.EndCursor)
+			break
+		}
+		require.Equal(t, []string{"u1", "u2", "u3"}, sessionIDs)
 
 		keys, err := qr.SessionKeys(t.Context(), nil, 1, nil)
 		require.NoError(t, err)
