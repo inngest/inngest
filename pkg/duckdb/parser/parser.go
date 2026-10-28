@@ -78,8 +78,9 @@ func isEmptyQuotedIdent(src string, pos int) bool {
 
 // MaxSQLBytes is the longest input ParseString accepts, rejected up front
 // rather than parsed. Memory is bounded separately by maxParseEntries,
-// which a dense input reaches well before this; this mainly bounds the
-// work of scanning trivia (whitespace, comments) that creates no entries.
+// which a dense input can reach before this (see there for which shapes
+// fit); this mainly bounds the work of scanning trivia (whitespace,
+// comments) that creates no entries.
 const MaxSQLBytes = 64 << 10
 
 // maxRuleDepth caps nested grammar-rule invocations (peg.Parser.MaxDepth).
@@ -90,12 +91,14 @@ const MaxSQLBytes = 64 << 10
 const maxRuleDepth = 4096
 
 // maxParseEntries caps the packrat memo entries plus CST nodes one parse
-// may create (peg.Parser.MaxEntries). Realistic queries use 10-30 per
-// input byte, so this admits typical queries of tens of KB, while a dense
-// worst case (`SELECT a, a, ...`, ~100 per byte) is cut off around 10KB
-// instead of allocating ~10KB of memo/slab memory per input byte up to
-// MaxSQLBytes (~2GB).
-const maxParseEntries = 512 << 10
+// may create (peg.Parser.MaxEntries), at ~150-190 bytes allocated each
+// (~190MB at the cap). An IN list of IDs or numbers takes 4-14 per input
+// byte, so one up to MaxSQLBytes fits; a list of small numbers (`1, 2,
+// ...`, ~22 per byte) fits up to ~45KB, and a wide SELECT list or long AND
+// chain (~20-23 per byte) up to ~45-50KB. A dense worst case (`SELECT a, a,
+// ...`, ~72 per byte) is cut off around 14KB instead of allocating ~770MB
+// at MaxSQLBytes.
+const maxParseEntries = 1 << 20
 
 // errPrefix starts every non-ParseError error ParseString returns.
 const errPrefix = "duckdb/parser: "
