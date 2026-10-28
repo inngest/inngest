@@ -1,0 +1,26 @@
+{
+  "sql": "SELECT max(run_id, 3) AS ids, arg_max(function_id, queued_at, 2) AS fns, max(run_id) AS last_id FROM inngest.insights_runs(?, ?) AS runs LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    0,
+    0,
+    3
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:106",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

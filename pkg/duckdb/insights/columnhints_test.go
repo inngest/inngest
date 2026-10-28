@@ -633,3 +633,18 @@ func TestBuildColumnHintsStarOverSemiAntiJoin(t *testing.T) {
 	// POSITIONAL/CROSS/ON joins project both sides in full.
 	require.Len(t, hintsFor(t, "SELECT * FROM metadata POSITIONAL JOIN extended_trace_spans"), 22)
 }
+
+// max(x, n) & co return a LIST of x's own values, so x's hint describes
+// each element ([*]), not the result's root.
+func TestBuildColumnHintsTopNAggregatesAreLists(t *testing.T) {
+	for _, q := range []string{
+		"SELECT max(run_id, 3) FROM runs",
+		"SELECT min(run_id, 3) FROM runs",
+		"SELECT arg_max(run_id, queued_at, 3) FROM runs",
+		"SELECT arg_min(run_id, queued_at, 3) FROM runs",
+		"SELECT quantile_disc(run_id, [0.5]) FROM runs",
+	} {
+		require.Equal(t, [][]PathHint{{{Path: []PathSegment{wc}, Hint: HintRunID}}}, pathHintsFor(t, q), q)
+	}
+	require.Equal(t, [][]PathHint{{{Hint: HintRunID}}}, pathHintsFor(t, "SELECT max(run_id) FROM runs"))
+}
