@@ -33,7 +33,7 @@ function alert(overrides: Partial<ConcurrencyAlert>): ConcurrencyAlert {
     limit: 1500,
     minutesRemaining: 42,
     usedRatio: 0.5,
-    linkProps: (surface) => ({ to: `/link/${surface}` }),
+    linkProps: { to: '/link/card', onClick: vi.fn() },
     ...overrides,
   };
 }
@@ -77,7 +77,12 @@ describe('ConcurrencyAlertCard', () => {
   });
 
   it('links the collapsed card', () => {
-    mocks.useConcurrencyAlert.mockReturnValue(alert({ state: 'limited' }));
+    mocks.useConcurrencyAlert.mockReturnValue(
+      alert({
+        state: 'limited',
+        linkProps: { to: '/link/card-collapsed', onClick: vi.fn() },
+      }),
+    );
     render(<ConcurrencyAlertCard collapsed />);
 
     expect(

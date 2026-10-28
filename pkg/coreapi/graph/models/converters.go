@@ -132,7 +132,7 @@ func MakeFunctionRunV2(run *cqrs.TraceRun) (*FunctionRunV2, error) {
 		sourceID = &run.SourceID
 	}
 	switch status {
-	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled:
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusSkipped:
 		if run.EndedAt.UnixMilli() > 0 {
 			endedAt = &run.EndedAt
 		}

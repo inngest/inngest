@@ -1,0 +1,8 @@
+INPUT
+(event.name == "x" && (event.data.a == 1 || event.data.a == 3)) || event.name == "z"
+
+EVENTS SQL
+(((event_name = ?) AND ((TRY_CAST((event_data::JSON->>?) AS DOUBLE) = ?) OR (TRY_CAST((event_data::JSON->>?) AS DOUBLE) = ?))) OR (event_name = ?))
+
+EVENTS ARGS
+[x $.a 1 $.a 3 z]

@@ -22,9 +22,7 @@ export function buildRunDebugPrompt(context: RunDebugContext) {
   };
   return {
     summary: [
-      `${context.accountName || context.accountID} / ${
-        context.environmentLabel
-      }`,
+      `${context.accountName || context.accountID} / ${context.environmentLabel}`,
       context.functionName,
     ]
       .filter(Boolean)

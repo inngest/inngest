@@ -75,7 +75,7 @@ func parseHeading(line string) (string, bool) {
 	title = strings.Trim(title, "# ")
 	title = strings.ToLower(title)
 	switch title {
-	case "description", "release note", "release notes", "migration note", "migration notes":
+	case "description", "release note", "release notes", "migration note", "migration notes", "how to revert":
 		return strings.TrimSuffix(title, "s"), true
 	default:
 		return "", false

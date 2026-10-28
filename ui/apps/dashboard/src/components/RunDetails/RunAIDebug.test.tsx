@@ -121,7 +121,13 @@ describe('Cloud run debugging', () => {
       screen.getByRole<HTMLButtonElement>('button', { name: 'Copy prompt' })
         .disabled,
     ).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Claude' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Claude Code' }),
+    );
     const guide = screen.getByRole<HTMLAnchorElement>('link', {
       name: 'Full setup guide',
     });

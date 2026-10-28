@@ -149,30 +149,38 @@ describe('Runs AI popover', () => {
     });
     expect(copy.hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/Clear CEL search/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'ChatGPT / Codex' }), {
+      button: 0,
+      ctrlKey: false,
+    });
     expect(
       screen.getByRole('region', { name: 'Connection instructions' }),
     ).toBeTruthy();
     expect(
       screen
-        .getByRole('link', { name: 'Full setup guide' })
+        .getByRole('link', { name: 'Connect Inngest' })
         .getAttribute('href'),
     ).toBe(
-      'https://www.inngest.com/docs/ai-dev-tools/mcp#connect-to-inngest-cloud',
+      'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
     );
     expect(
       screen
         .getByRole('link', { name: 'Available MCP tools' })
         .getAttribute('href'),
     ).toBe('https://www.inngest.com/docs/ai-dev-tools/mcp#available-mcp-tools');
-    for (const name of ['Full setup guide', 'Available MCP tools']) {
+    for (const name of ['Connect Inngest', 'Available MCP tools']) {
       const link = screen.getByRole('link', { name });
       expect(link.getAttribute('target')).toBe('_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     }
-    expect(onAction).toHaveBeenCalledWith({
+    expect(
+      screen
+        .getByRole('tab', { name: 'ChatGPT / Codex' })
+        .getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(onAction).not.toHaveBeenCalledWith({
       action: 'setup_clicked',
-      client: 'codex_cli',
+      client: 'chatgpt_codex',
     });
     expect(onAction).not.toHaveBeenCalledWith({
       action: 'prompt_copy_clicked',
@@ -187,15 +195,53 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
-    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Claude' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    const directory = screen.getByRole('link', {
+      name: 'Connect Inngest',
+    });
+    expect(directory.getAttribute('href')).toBe(
+      'https://claude.ai/directory/inngest',
+    );
+    expect(directory.getAttribute('target')).toBe('_blank');
+    expect(
+      screen.queryByRole('button', { name: 'Copy setup command' }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Inngest' }));
+    expect(onAction).toHaveBeenCalledWith({
+      action: 'setup_opened',
+      client: 'claude',
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Claude Code' }),
+    );
     expect(
       screen.getByText(
-        'claude mcp add --transport http inngest-cloud https://api.inngest.com/mcp',
+        'claude plugin install inngest@anthropic-plugin-directory',
       ),
     ).toBeTruthy();
     expect(screen.getByText('/mcp')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    expect(screen.getByText('plugin:inngest:inngest-cloud')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Full setup guide' })
+        .getAttribute('href'),
+    ).toBe(
+      'https://www.inngest.com/docs/ai-dev-tools/agent-skills#claude-code-plugin',
+    );
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'ChatGPT / Codex' }), {
+      button: 0,
+      ctrlKey: false,
+    });
     expect(screen.queryByText(/claude mcp add/)).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Copy setup command' }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Codex CLI' }),
+    );
     expect(screen.getByText(/codex mcp login inngest-cloud/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Copy setup command' }));
     await waitFor(() =>
@@ -208,16 +254,98 @@ describe('Runs AI popover', () => {
       'codex mcp add inngest-cloud --url https://api.inngest.com/mcp\ncodex mcp login inngest-cloud',
     );
     expect(screen.getByLabelText('Prompt preview')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Codex CLI' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'ChatGPT / Codex' }), {
+      button: 0,
+      ctrlKey: false,
+    });
     expect(
       screen.queryByRole('region', { name: 'Connection instructions' }),
-    ).toBeNull();
+    ).toBeTruthy();
+  });
+
+  it.each(['discovery', 'debug'] as const)(
+    'offers a single ChatGPT / Codex plugin option in the %s popover without changing the prompt',
+    (mode) => {
+      const { onAction } = mount(
+        mode === 'debug'
+          ? {
+              mode: 'debug',
+              context: {
+                accountID: 'account-1',
+                accountName: 'Example',
+                environmentSlug: 'production',
+                environmentLabel: 'production',
+                runID: 'run-1',
+                functionName: 'Example function',
+              },
+            }
+          : {},
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: mode === 'debug' ? 'Debug with AI' : 'Find runs with AI',
+        }),
+      );
+      const prompt = screen.getByRole<HTMLTextAreaElement>('textbox', {
+        name: 'Prompt preview',
+      }).value;
+      fireEvent.mouseDown(
+        screen.getByRole('tab', { name: 'ChatGPT / Codex' }),
+        { button: 0, ctrlKey: false },
+      );
+      const link = screen.getByRole('link', {
+        name: 'Connect Inngest',
+      });
+      expect(link.getAttribute('href')).toBe(
+        'https://chatgpt.com/plugins/plugin_asdk_app_6abe99ad4764819183b795f0d74e5216',
+      );
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      fireEvent.click(screen.getByRole('button', { name: 'Connect Inngest' }));
+      expect(
+        screen
+          .getByRole('tab', { name: 'ChatGPT / Codex' })
+          .getAttribute('aria-selected'),
+      ).toBe('true');
+      expect(onAction).toHaveBeenCalledWith({
+        action: 'setup_opened',
+        client: 'chatgpt_codex',
+      });
+      expect(
+        screen.queryByRole('button', { name: 'Copy setup command' }),
+      ).toBeNull();
+      expect(
+        screen.getByRole<HTMLTextAreaElement>('textbox', {
+          name: 'Prompt preview',
+        }).value,
+      ).toBe(prompt);
+    },
+  );
+
+  it('keeps staging on the correct MCP backend rather than recommending production plugins', () => {
+    mount({ endpoint: 'https://api.inngest.net/mcp' });
+    open();
+    expect(screen.queryByRole('tab', { name: 'ChatGPT / Codex' })).toBeNull();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Claude Code' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(
+      screen.getByText(
+        'claude mcp add --transport http inngest-cloud https://api.inngest.net/mcp',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/claude plugin install/)).toBeNull();
+    expect(screen.getByText('inngest-cloud')).toBeTruthy();
   });
 
   it('offers a generic endpoint for other tools without hiding the prompt', () => {
     mount({ endpoint: 'https://api.example.test/mcp' });
     open();
-    fireEvent.click(screen.getByRole('button', { name: 'Other tools' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Other tools' }), {
+      button: 0,
+      ctrlKey: false,
+    });
     expect(screen.getByText('https://api.example.test/mcp')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Copy server URL' }),
@@ -233,7 +361,10 @@ describe('Runs AI popover', () => {
     });
     const { onAction } = mount();
     open();
-    fireEvent.click(screen.getByRole('button', { name: 'Other tools' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Other tools' }), {
+      button: 0,
+      ctrlKey: false,
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Copy server URL' }));
     await screen.findByText('Couldn’t copy. Select and copy the text above.');
     expect(onAction).toHaveBeenCalledWith({

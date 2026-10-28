@@ -1,0 +1,57 @@
+-- SELECT CASE WHEN a > 0 THEN 'pos' WHEN a < 0 THEN 'neg' ELSE 'zero' END FROM t
+SelectStatement
+  SelectItem()
+    CaseExpr
+      CaseWhen
+        BinaryExpr(>)
+          Ident(a)
+          Literal(1,0)
+        Literal(0,pos)
+      CaseWhen
+        BinaryExpr(<)
+          Ident(a)
+          Literal(1,0)
+        Literal(0,neg)
+      Literal(0,zero)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT CAST(a AS INTEGER) FROM t
+SelectStatement
+  SelectItem()
+    CastExpr(INTEGER,try=false)
+      Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT a::VARCHAR FROM t
+SelectStatement
+  SelectItem()
+    CastExpr(VARCHAR,try=false)
+      Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+
+-- SELECT INTERVAL '1' DAY, INTERVAL 2 HOUR, INTERVAL (n) DAY, INTERVAL (1 + 2) DAY, INTERVAL (-1) DAY FROM t;
+SelectStatement
+  SelectItem()
+    IntervalExpr(DAY)
+      Literal(0,1)
+  SelectItem()
+    IntervalExpr(HOUR)
+      Literal(1,2)
+  SelectItem()
+    IntervalExpr(DAY)
+      Ident(n)
+  SelectItem()
+    IntervalExpr(DAY)
+      BinaryExpr(+)
+        Literal(1,1)
+        Literal(1,2)
+  SelectItem()
+    IntervalExpr(DAY)
+      UnaryExpr(-)
+        Literal(1,1)
+  FromClause
+    BaseTableRef(t,alias=)
+

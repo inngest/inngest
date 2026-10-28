@@ -15,10 +15,7 @@ export const normalizeEmail = (email: string): string => {
   if (at < 0) return normalized;
   const domain = normalized.slice(at + 1);
   if (domain !== 'gmail.com' && domain !== 'googlemail.com') return normalized;
-  return `${normalized
-    .slice(0, at)
-    .split('+')[0]
-    .replace(/\./g, '')}@${domain}`;
+  return `${normalized.slice(0, at).split('+')[0].replace(/\./g, '')}@${domain}`;
 };
 
 export const sha256Hex = async (value: string): Promise<string | undefined> => {

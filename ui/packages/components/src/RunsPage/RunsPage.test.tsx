@@ -53,17 +53,11 @@ describe('RunsPage progressive search actions', () => {
 
   it('forwards the optional Cloud action to expanded row details', () => {
     const renderRunAction = vi.fn(() => null);
-    render(
-      <TooltipProvider>
-        <RunsPage {...baseProps} renderRunAction={renderRunAction} />
-      </TooltipProvider>
-    );
+    render(<TooltipProvider><RunsPage {...baseProps} renderRunAction={renderRunAction} /></TooltipProvider>);
     const renderDetails = mocks.table.mock.lastCall?.[0].renderSubComponent;
     render(renderDetails({ id: 'run-1' } as Run));
     expect(mocks.details.mock.lastCall?.[0]).toMatchObject({
-      runID: 'run-1',
-      standalone: false,
-      renderRunAction,
+      runID: 'run-1', standalone: false, renderRunAction,
     });
   });
 

@@ -36,14 +36,14 @@ const limitedStyles = {
 };
 
 export function ConcurrencyAlertCard({ collapsed }: { collapsed: boolean }) {
-  const alert = useConcurrencyAlert();
+  const alert = useConcurrencyAlert(collapsed ? 'card-collapsed' : 'card');
   if (!alert) return <ExecutionLimitCard collapsed={collapsed} />;
 
   if (collapsed) {
     const boosted = alert.state === 'boosted';
     return (
       <MenuItem
-        {...alert.linkProps('card-collapsed')}
+        {...alert.linkProps}
         className={cn(
           'border',
           boosted ? boostedStyles.card : limitedStyles.collapsed,
@@ -79,7 +79,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
       footerClassName={boostedStyles.divider}
       footer={
         <Link
-          {...alert.linkProps('card')}
+          {...alert.linkProps}
           className={cn('gap-0.5 text-xs leading-5', boostedStyles.link)}
           iconAfter={arrow}
         >
@@ -123,7 +123,7 @@ function LimitedCard({ alert }: { alert: ConcurrencyAlert }) {
       kind="warning"
       footer={
         <Link
-          {...alert.linkProps('card')}
+          {...alert.linkProps}
           className={cn('gap-0.5 text-xs leading-5', limitedStyles.link)}
           iconAfter={arrow}
         >

@@ -43,7 +43,7 @@ beforeEach(() => {
     class {
       observe() {}
       disconnect() {}
-    },
+    }
   );
   mocks.run = {
     id: 'run-1',
@@ -68,13 +68,13 @@ describe('run details action slot', () => {
           runID="run-1"
           getTrigger={vi.fn()}
           renderRunAction={renderRunAction}
-        />,
+        />
       );
       expect(renderRunAction).toHaveBeenCalledWith(mocks.run, standalone);
       expect(
-        screen.getByRole('button', { name: 'Debug with AI' }),
+        screen.getByRole('button', { name: 'Debug with AI' })
       ).toBeTruthy();
-    },
+    }
   );
 
   it.each(['public', 'loading', 'stale'] as const)(
@@ -90,12 +90,12 @@ describe('run details action slot', () => {
           getTrigger={vi.fn()}
           readOnly={state === 'public'}
           renderRunAction={renderRunAction}
-        />,
+        />
       );
       expect(renderRunAction).not.toHaveBeenCalled();
       expect(
-        screen.queryByRole('button', { name: 'Debug with AI' }),
+        screen.queryByRole('button', { name: 'Debug with AI' })
       ).toBeNull();
-    },
+    }
   );
 });

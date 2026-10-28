@@ -2,12 +2,12 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import ReloadClerkAndRedirect from './ReloadClerkAndRedirect';
-
 const mocks = vi.hoisted(() => ({ useUser: vi.fn() }));
 
 vi.mock('@clerk/tanstack-react-start', () => ({ useUser: mocks.useUser }));
 vi.mock('@/components/Icons/LoadingIcon', () => ({ default: () => null }));
+
+import ReloadClerkAndRedirect from './ReloadClerkAndRedirect';
 
 const REDIRECT_URL = '/onboarding';
 

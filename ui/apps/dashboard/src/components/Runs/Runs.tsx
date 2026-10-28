@@ -218,7 +218,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       : runsInsightsHref({
           envSlug: environment.slug,
           celQuery: search ?? '',
-          functionSlug: scope === 'fn' ? functionInsightsSlug ?? null : null,
+          functionSlug: scope === 'fn' ? (functionInsightsSlug ?? null) : null,
         });
 
   return (

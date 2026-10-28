@@ -41,6 +41,15 @@ if existing == nil then
     return 1
 end
 
+-- Capacity was released while this partition was leased, so the scan may have
+-- been answered by stale cached exhaustion. Don't park the partition behind a
+-- forced backoff; the next lease consumes the flag and asks the Constraint API.
+-- Unleased pushbacks (paused or migrating functions) keep their force.
+local leased = existing.leaseID ~= nil and existing.leaseID ~= cjson.null
+if forceAt == 1 and leased and existing.capacityReleased == true then
+    forceAt = 0
+end
+
 -- Always reset lease ID so next caller can lease partition
 existing.leaseID = nil
 

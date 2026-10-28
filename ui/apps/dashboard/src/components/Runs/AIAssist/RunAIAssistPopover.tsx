@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import Tabs from '@inngest/components/Tabs/Tabs';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { Textarea } from '@inngest/components/Forms/Textarea';
@@ -23,12 +24,17 @@ import type { RunAIAction } from './tracking';
 
 const clients = [
   {
+    id: 'codex',
+    label: 'ChatGPT / Codex',
+    tracking: 'codex_cli',
+    Icon: IconOpenAI,
+  },
+  {
     id: 'claude',
-    label: 'Claude Code',
+    label: 'Claude',
     tracking: 'claude_code',
     Icon: IconClaude,
   },
-  { id: 'codex', label: 'Codex CLI', tracking: 'codex_cli', Icon: IconOpenAI },
   { id: 'other', label: 'Other tools', tracking: 'other', Icon: RiAppsLine },
 ] as const;
 
@@ -52,11 +58,9 @@ export function RunAIAssistPopover({
   endpoint,
   mode,
 }: Props) {
+  const productionCloud = endpoint === 'https://api.inngest.com/mcp';
   const [open, setOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<SetupClient | null>(
-    null,
-  );
-  const setupID = useId();
+  const [selectedClient, setSelectedClient] = useState<SetupClient>('codex');
   const [previewTime, setPreviewTime] = useState(() => new Date());
   const viewed = useRef(false);
   const debugging = mode === 'debug';
@@ -83,8 +87,8 @@ export function RunAIAssistPopover({
   const message = metadataLoading
     ? 'Preparing prompt…'
     : metadataError
-    ? 'Unable to load page context. Retry to prepare a prompt.'
-    : result.error;
+      ? 'Unable to load page context. Retry to prepare a prompt.'
+      : result.error;
 
   async function copyPrompt() {
     if (blocked || copyState === 'copying') return;
@@ -137,39 +141,51 @@ export function RunAIAssistPopover({
             ? 'Connect your AI tool to investigate this run.'
             : 'Connect your AI tool to find runs and inspect traces.'}
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-1.5 min-[420px]:grid-cols-3">
-          {clients.map(({ id, label, tracking, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-expanded={selectedClient === id}
-              aria-controls={selectedClient === id ? setupID : undefined}
-              className={`text-basis hover:bg-canvasSubtle inline-flex items-center justify-center gap-1 whitespace-nowrap rounded border px-2 py-1.5 text-xs ${
-                selectedClient === id
-                  ? 'border-contrast bg-canvasSubtle'
-                  : 'border-muted bg-canvasBase'
-              }`}
-              onClick={() => {
-                setSelectedClient(selectedClient === id ? null : id);
-                if (selectedClient !== id)
-                  onAction({ action: 'setup_clicked', client: tracking });
-              }}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </button>
+        <Tabs
+          value={selectedClient}
+          className="mt-3"
+          onValueChange={(value) => {
+            const client = clients.find(({ id }) => id === value)!;
+            setSelectedClient(client.id);
+            onAction({
+              action: 'setup_clicked',
+              client:
+                productionCloud && client.id === 'codex'
+                  ? 'chatgpt_codex'
+                  : productionCloud && client.id === 'claude'
+                    ? 'claude'
+                    : client.tracking,
+            });
+          }}
+        >
+          <Tabs.List aria-label="AI tool">
+            {clients.map(({ id, label, Icon }) => (
+              <Tabs.Tab
+                key={id}
+                value={id}
+                title={
+                  !productionCloud && id === 'codex'
+                    ? 'Codex'
+                    : !productionCloud && id === 'claude'
+                      ? 'Claude Code'
+                      : label
+                }
+                iconBefore={<Icon className="h-4 w-4" />}
+                className={`min-w-0 gap-1 border-r-0 px-2 text-xs ${productionCloud && id === 'codex' ? 'flex-[1.4]' : ''}`}
+              />
+            ))}
+          </Tabs.List>
+          {clients.map(({ id }) => (
+            <Tabs.Content key={id} value={id}>
+              <RunAISetup
+                key={`${id}:${endpoint}`}
+                client={id}
+                endpoint={endpoint}
+                onAction={onAction}
+              />
+            </Tabs.Content>
           ))}
-        </div>
-        {selectedClient && (
-          <div id={setupID}>
-            <RunAISetup
-              key={`${selectedClient}:${endpoint}`}
-              client={selectedClient}
-              endpoint={endpoint}
-              onAction={onAction}
-            />
-          </div>
-        )}
+        </Tabs>
         <hr className="border-subtle my-4" />
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-basis text-xs font-medium">

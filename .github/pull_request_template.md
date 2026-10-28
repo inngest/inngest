@@ -7,6 +7,11 @@
 <!-- User-facing release note. Use "None" if this does not need release notes. -->
 None.
 
+## How to revert
+
+<!-- How to undo this safely if it causes problems: plain revert, flag/config to flip, or extra steps (migrations, data, deploy order). -->
+Revert this PR.
+
 ## Migration note
 
 <!-- Upgrade, deployment, config, schema, or compatibility notes. Use "None" if none. -->

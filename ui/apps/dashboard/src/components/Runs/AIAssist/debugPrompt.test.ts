@@ -24,7 +24,9 @@ describe('failed run debugging prompt', () => {
       runId: 'run-1',
       functionName: 'Create chat completion',
     });
-    expect(summary).toBe('Example / production · Create chat completion');
+    expect(summary).toBe(
+      'Example / production · Create chat completion',
+    );
     expect(prompt).toContain('fetch_account');
     expect(prompt).toContain('get_run and get_run_trace');
     expect(prompt).toContain('include: ["output"]');

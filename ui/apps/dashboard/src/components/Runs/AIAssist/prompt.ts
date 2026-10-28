@@ -69,9 +69,7 @@ export function buildRunDiscoveryPrompt(
   }
   if (blocked.length) {
     return {
-      error: `AI prompts currently support basic filters. Clear ${[
-        ...new Set(blocked),
-      ].join(', ')} to copy a prompt.`,
+      error: `AI prompts currently support basic filters. Clear ${[...new Set(blocked)].join(', ')} to copy a prompt.`,
     };
   }
   if (!context.account || !context.environmentSlug) {
@@ -93,8 +91,8 @@ export function buildRunDiscoveryPrompt(
     from = relative
       ? subtractDuration(snapshotTime, parseDuration(relative))
       : start
-      ? new Date(start)
-      : subtractDuration(snapshotTime, parseDuration(DEFAULT_TIME));
+        ? new Date(start)
+        : subtractDuration(snapshotTime, parseDuration(DEFAULT_TIME));
     until = params.get('end') ? new Date(params.get('end')!) : snapshotTime;
     if (
       !Number.isFinite(from.getTime()) ||
@@ -151,7 +149,7 @@ export function buildRunDiscoveryPrompt(
   };
 
   const relativeRange = !params.get('end')
-    ? params.get('last') ?? (!params.get('start') ? DEFAULT_TIME : undefined)
+    ? (params.get('last') ?? (!params.get('start') ? DEFAULT_TIME : undefined))
     : undefined;
   const rangeLabel = relativeRange
     ? `Last ${
@@ -164,15 +162,9 @@ export function buildRunDiscoveryPrompt(
               )
               .join(' ')
       }`
-    : `${formatInTimeZone(
-        from,
-        'UTC',
-        'MMM d, yyyy HH:mm',
-      )} – ${formatInTimeZone(until, 'UTC', 'MMM d, yyyy HH:mm')} UTC`;
+    : `${formatInTimeZone(from, 'UTC', 'MMM d, yyyy HH:mm')} – ${formatInTimeZone(until, 'UTC', 'MMM d, yyyy HH:mm')} UTC`;
   const summary = [
-    `${context.account} / ${
-      context.environmentLabel ?? context.environmentSlug
-    }`,
+    `${context.account} / ${context.environmentLabel ?? context.environmentSlug}`,
     selectedStatuses.length
       ? selectedStatuses
           .map((status) => status[0] + status.slice(1).toLowerCase())

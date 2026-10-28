@@ -2,8 +2,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useSignupMetadata } from './useSignupMetadata';
-
 const mocks = vi.hoisted(() => ({
   current: {} as Record<string, string>,
   getSignupMetadata: vi.fn(),
@@ -12,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./signupAttribution', () => ({
   getSignupMetadata: mocks.getSignupMetadata,
 }));
+
+import { useSignupMetadata } from './useSignupMetadata';
 
 const gaIds = { gaClientId: '123.456', gaSessionId: '789' };
 
