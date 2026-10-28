@@ -44,7 +44,7 @@ testdata/queries/transpile/*.out  their expected Transpile() output (goldie)
 ```
 
 Physical schema this package reads from: six `CREATE MACRO ... AS TABLE`
-statements in `pkg/db/duckdb/migrations/000004_insights_views.sql`.
+statements in `pkg/db/duckdb/migrations/000002_insights_views.sql`.
 
 ## Architecture, in one pass
 
