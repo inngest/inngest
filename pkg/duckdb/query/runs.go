@@ -129,20 +129,34 @@ func (m *Manager) resolveAppAndFunctionFilters(ctx context.Context, filter cqrs.
 	return resolved, false, nil
 }
 
+// latestRunOrder is the order every runs query picks a run_id's latest
+// lifecycle row by -- see runsQualify's doc comment.
+const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
+				ended_at IS NOT NULL DESC,
+				CASE
+					WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2
+					WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1
+					ELSE 0
+				END DESC,
+				status DESC`
+
 // runsQualify builds the QUALIFY clause every runs query uses to collapse
 // each run_id's lifecycle rows down to its latest one and apply
 // status/time-range filtering against that row — those columns vary across
 // a run's lifecycle rows, so they must be evaluated together with the
 // row-ranking window function, not a separate WHERE.
 //
-// Tiebreak by COALESCE(ended_at, started_at, queued_at) DESC: a batch flush
+// Ordered by COALESCE(ended_at, started_at, queued_at) DESC: a batch flush
 // writes all of a run's lifecycle rows in one INSERT, so no insert-time
 // column could order them; COALESCE picks the furthest lifecycle state each
-// row's own columns encode.
+// row's own columns encode. Timestamps are ms precision so rows can still
+// tie (a Queued and a Running row in the same ms), so the rest of the order
+// prefers the furthest-along row, matching the inngest.insights_runs macro
+// and dashboards.latestRunOrder.
 func runsQualify(filter cqrs.GetTraceRunFilter) (string, []any) {
 	where := []string{
 		`ROW_NUMBER() OVER (
-			PARTITION BY run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC
+			PARTITION BY run_id ORDER BY ` + latestRunOrder + `
 		 ) = 1`,
 	}
 	args := []any{}
@@ -242,8 +256,8 @@ func encodeRunsCursor(run *cqrs.TraceRun, orderCol string) (string, error) {
 
 func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s.runs WHERE run_id = ? ORDER BY COALESCE(ended_at, started_at, queued_at) DESC LIMIT 1;",
-		runColumns, driver.DuckLakeAlias,
+		"SELECT %s FROM %s.runs WHERE run_id = ? ORDER BY %s LIMIT 1;",
+		runColumns, driver.DuckLakeAlias, latestRunOrder,
 	)
 	rows, err := m.db.QueryContext(ctx, query, id.RunID.String())
 	if err != nil {
@@ -269,10 +283,10 @@ func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.UL
 		`SELECT %s FROM %s.runs
 		 WHERE list_contains(event_ids, ?)
 		 QUALIFY ROW_NUMBER() OVER (
-			PARTITION BY run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC
+			PARTITION BY run_id ORDER BY %s
 		 ) = 1
 		 ORDER BY queued_at ASC;`,
-		runColumns, driver.DuckLakeAlias,
+		runColumns, driver.DuckLakeAlias, latestRunOrder,
 	)
 
 	rows, err := m.db.QueryContext(ctx, query, triggerID.String())

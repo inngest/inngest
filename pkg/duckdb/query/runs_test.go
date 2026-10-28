@@ -682,3 +682,68 @@ func TestGetTraceRunsCountRespectsAppNameFilter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 }
+
+// A Running row whose started_at equals queued_at (same ms) ties the Queued
+// row on COALESCE(ended_at, started_at, queued_at), so every runs query must
+// still pick Running regardless of insert order.
+func TestLatestRunRowTiebreaksOnLifecycleStage(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	queuedAt := time.Now().UTC().Add(-time.Minute).Truncate(time.Millisecond)
+	queued := enums.StepStatusQueued
+	running := enums.StepStatusRunning
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	var runIDs []ulid.ULID
+	for _, runningFirst := range []bool{true, false} {
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDs = append(runIDs, runID)
+		insertQueued := func() {
+			seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &queued, nil, nil, nil)
+		}
+		insertRunning := func() {
+			seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &running, &queuedAt, nil, nil)
+		}
+		if runningFirst {
+			insertRunning()
+			insertQueued()
+		} else {
+			insertQueued()
+			insertRunning()
+		}
+		_, err := m.db.ExecContext(ctx, "UPDATE inngest.runs SET event_ids = [?] WHERE run_id = ?;", eventID.String(), runID.String())
+		require.NoError(t, err)
+	}
+
+	for _, runID := range runIDs {
+		run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+		require.NoError(t, err)
+		require.Equal(t, enums.RunStatusRunning, run.Status, "GetTraceRun %s", runID)
+	}
+
+	byTrigger, err := m.GetTraceRunsByTriggerID(ctx, eventID)
+	require.NoError(t, err)
+	require.Len(t, byTrigger, 2)
+	for _, run := range byTrigger {
+		require.Equal(t, enums.RunStatusRunning, run.Status, "GetTraceRunsByTriggerID %s", run.RunID)
+	}
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: envID,
+			From:        queuedAt.Add(-time.Hour),
+			Until:       queuedAt.Add(time.Hour),
+		},
+		Items: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+	for _, run := range runs {
+		require.Equal(t, enums.RunStatusRunning, run.Status, "GetTraceRuns %s", run.RunID)
+	}
+}
