@@ -370,10 +370,16 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 		return nil
 	case *parser.BinaryExpr:
 		// "x COLLATE nocase": the parser represents the collation name as
-		// an Ident on the right, which isn't a column reference, so only
-		// the collated operand is checked (DuckDB rejects an unknown
-		// collation itself).
+		// an Ident on the right (dotted for "nocase.noaccent"), which isn't
+		// a column reference, so only the collated operand is checked
+		// (DuckDB rejects an unknown collation itself). Any other right
+		// operand (a subquery, a function call, ...) isn't a collation
+		// name at all and is rejected rather than skipped.
 		if strings.EqualFold(x.Op, "COLLATE") {
+			if _, ok := x.Right.(*parser.Ident); !ok {
+				v.err = &ValidationError{Pos: x.Pos(), End: x.End(), Message: "unsupported COLLATE expression"}
+				return nil
+			}
 			parser.Walk(v, x.Left)
 			return nil
 		}
