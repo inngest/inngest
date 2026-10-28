@@ -73,22 +73,23 @@ func TestExecuteTimesOutAndInterrupts(t *testing.T) {
 }
 
 // TestExecuteRejectsOversizedResult: LIMIT bounds rows, not bytes, so one
-// huge cell would otherwise be buffered whole. This goes through Transpile
-// and the default limits, end to end.
+// huge cell would otherwise be buffered whole. The oversized query skips
+// Transpile, whose own size guard (sizelimit.go) would reject its repeat
+// before Execute's limit ever came into play; the small one goes through
+// Transpile and the default limits, end to end.
 func TestExecuteRejectsOversizedResult(t *testing.T) {
 	db := newTestQuackDuckDB(t)
 
-	tr, err := insights.Transpile(fmt.Sprintf("SELECT repeat('a', %d) AS big", insights.MaxResultBytes()+1), uuid.New(), uuid.New())
-	require.NoError(t, err)
-
-	_, err = insights.Execute(context.Background(), db, tr)
+	_, err := insights.Execute(context.Background(), db, &insights.TranspileResult{
+		SQL: fmt.Sprintf("SELECT repeat('a', %d) AS big;", insights.MaxResultBytes()+1),
+	})
 	var eerr *insights.ExecutionError
 	require.ErrorAs(t, err, &eerr)
 	require.ErrorIs(t, err, driver.ErrResultTooLarge)
 	require.ErrorContains(t, err, "MiB limit")
 
 	// A result under the limit still runs.
-	tr, err = insights.Transpile("SELECT repeat('a', 1000) AS small", uuid.New(), uuid.New())
+	tr, err := insights.Transpile("SELECT repeat('a', 1000) AS small", uuid.New(), uuid.New())
 	require.NoError(t, err)
 	res, err := insights.Execute(context.Background(), db, tr)
 	require.NoError(t, err)
