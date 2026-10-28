@@ -312,15 +312,23 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 // that has just been saved wakes the wait for its own position, so the wait
 // pause is looked up by the ID of that position. A redelivered old message finds
 // no wait for its position, and wakes nothing.
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) error {
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string) error {
 	stack, err := e.smv2.LoadStack(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	position := len(subscriptionMessageIDs(stack, key))
+	// The place of this message among the subscription's, not how many there are:
+	// deliveries that race each see every message saved so far.
+	position := 0
+	for i, existing := range subscriptionMessageIDs(stack, key) {
+		if existing == messageID {
+			position = i + 1
+			break
+		}
+	}
 	if position == 0 {
-		return nil
+		return fmt.Errorf("subscription message %s is not in the stack", messageID)
 	}
 
 	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
@@ -387,5 +395,5 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return e.wakeSubscriber(ctx, id, key)
+	return e.wakeSubscriber(ctx, id, key, messageID)
 }
