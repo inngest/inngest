@@ -114,12 +114,12 @@ it('sends returning users with a retained successful run directly to Runs', () =
   expect(state.completion?.runID).toBe(run.id);
   expect(fixtures.track).not.toHaveBeenCalled();
 });
-it('keeps the current success visible but routes to Runs on the next entry', () => {
+it('keeps a synced app on Runs as its first success is persisted', () => {
   const view = render(<TestApp />);
-  expect(screen.getByText('Quickstart screen')).toBeTruthy();
+  expect(screen.getByText('Runs destination')).toBeTruthy();
   setRuns(run);
   view.rerender(<TestApp />);
-  expect(screen.getByText('Quickstart screen')).toBeTruthy();
+  expect(screen.getByText('Runs destination')).toBeTruthy();
   expect(state.completion?.runID).toBe(run.id);
   view.unmount();
   render(<TestApp />);
@@ -282,7 +282,7 @@ it.each(['FAILED', 'CANCELLED', 'SKIPPED'])(
     fixtures.pathname = '/';
     view.rerender(<TestApp />);
     expect(state.run).toBeUndefined();
-    expect(screen.getByText('Quickstart screen')).toBeTruthy();
+    expect(screen.getByText('Runs destination')).toBeTruthy();
   },
 );
 
@@ -319,3 +319,20 @@ it.each(['COMPLETED', 'FAILED', 'CANCELLED', 'SKIPPED'])(
     expect(fixtures.track).not.toHaveBeenCalled();
   },
 );
+
+it('moves from setup to Runs when an app registers an eligible function', () => {
+  const apps = fixtures.apps.data.apps;
+  fixtures.apps.data.apps = [];
+  const view = render(<TestApp />);
+  expect(screen.getByText('Quickstart screen')).toBeTruthy();
+  fixtures.apps.data.apps = apps;
+  view.rerender(<TestApp />);
+  expect(screen.getByText('Runs destination')).toBeTruthy();
+});
+
+it('keeps the full guide available for a synced app before its first success', () => {
+  fixtures.search = { quickstart: true };
+  render(<TestApp />);
+  expect(screen.getByText('Setup guide')).toBeTruthy();
+  expect(state.completion).toBeNull();
+});

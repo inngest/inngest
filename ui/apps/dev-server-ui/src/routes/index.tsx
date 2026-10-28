@@ -21,7 +21,7 @@ export const Route = createFileRoute('/')({
 
 export function Home() {
   const { quickstart } = Route.useSearch();
-  const { ready, completion, info, run } = useQuickstart();
+  const { ready, completion, info, run, functions } = useQuickstart();
   // Decide once on entry: explicitly reopening a completed guide must not redirect.
   const [destination, setDestination] = useState<
     'quickstart' | 'guide' | 'runs'
@@ -32,12 +32,16 @@ export function Home() {
         info.data?.isSingleNodeService ||
           ((completion || run?.status === 'COMPLETED') && !quickstart)
           ? 'runs'
-          : quickstart && (completion || run?.status === 'COMPLETED')
+          : quickstart
           ? 'guide'
           : 'quickstart',
       );
   }, [ready, destination, completion, quickstart, info.data, run?.status]);
-  if (info.data?.isSingleNodeService || destination === 'runs')
+  if (
+    info.data?.isSingleNodeService ||
+    destination === 'runs' ||
+    (ready && !quickstart && functions.length > 0)
+  )
     return <Navigate to="/runs" replace />;
   return (
     <TooltipProvider delayDuration={0}>

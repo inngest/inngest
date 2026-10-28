@@ -1,5 +1,6 @@
 import SendEventButton from '@/components/Event/SendEventButton';
 import { LinkedRunDetails } from '@/components/Runs/LinkedRunDetails';
+import { RunsOnboarding } from '@/components/Runs/RunsOnboarding';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import { useInfoQuery } from '@/store/devApi';
@@ -227,48 +228,50 @@ function RunsComponent() {
           </div>
         }
       />
-      <LinkedRunDetails
-        runID={runID || undefined}
-        runs={runs}
-        getTrigger={getTrigger}
-        pollInterval={autoRefresh ? pollInterval : 0}
-      />
-      <RunsPage
-        initialExpandedRunID={runID || undefined}
-        apps={appsRes.data?.apps || []}
-        data={runs ?? []}
-        defaultVisibleColumns={[
-          'status',
-          'id',
-          'trigger',
-          'function',
-          'queuedAt',
-          'endedAt',
-        ]}
-        features={{
-          history: Number.MAX_SAFE_INTEGER,
-          isDeferred: true,
-        }}
-        hasMore={hasNextPage ?? false}
-        isLoadingInitial={isFetching && runs === undefined}
-        isLoadingMore={isFetching && runs !== undefined}
-        onScrollToTop={onScrollToTop}
-        onRefresh={onRefresh}
-        getTrigger={getTrigger}
-        pollInterval={pollInterval}
-        scope="env"
-        totalCount={totalCount}
-        searchError={searchError}
-        searchLimit={1000}
-        infiniteScrollTrigger={(containerRef) => (
-          <InfiniteScrollTrigger
-            onIntersect={fetchNextPage}
-            hasMore={hasNextPage ?? false}
-            isLoading={isFetching}
-            root={containerRef}
-          />
-        )}
-      />
+      <RunsOnboarding runID={runID || undefined}>
+        <LinkedRunDetails
+          runID={runID || undefined}
+          runs={runs}
+          getTrigger={getTrigger}
+          pollInterval={autoRefresh ? pollInterval : 0}
+        />
+        <RunsPage
+          initialExpandedRunID={runID || undefined}
+          apps={appsRes.data?.apps || []}
+          data={runs ?? []}
+          defaultVisibleColumns={[
+            'status',
+            'id',
+            'trigger',
+            'function',
+            'queuedAt',
+            'endedAt',
+          ]}
+          features={{
+            history: Number.MAX_SAFE_INTEGER,
+            isDeferred: true,
+          }}
+          hasMore={hasNextPage ?? false}
+          isLoadingInitial={isFetching && runs === undefined}
+          isLoadingMore={isFetching && runs !== undefined}
+          onScrollToTop={onScrollToTop}
+          onRefresh={onRefresh}
+          getTrigger={getTrigger}
+          pollInterval={pollInterval}
+          scope="env"
+          totalCount={totalCount}
+          searchError={searchError}
+          searchLimit={1000}
+          infiniteScrollTrigger={(containerRef) => (
+            <InfiniteScrollTrigger
+              onIntersect={fetchNextPage}
+              hasMore={hasNextPage ?? false}
+              isLoading={isFetching}
+              root={containerRef}
+            />
+          )}
+        />
+      </RunsOnboarding>
     </>
   );
 }
