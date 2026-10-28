@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/stretchr/testify/require"
 )
@@ -110,6 +111,14 @@ func TestSessionsEndToEnd(t *testing.T) {
 		require.False(t, second.PageInfo.HasNextPage)
 		require.Nil(t, second.PageInfo.EndCursor)
 		require.NotEqual(t, first.Nodes[0].ID, second.Nodes[0].ID)
+
+		// totalCount is the whole session's, not the page's.
+		cr := r.SessionRunsConnection()
+		for _, page := range []*models.SessionRunsConnection{first, second} {
+			total, err := cr.TotalCount(t.Context(), page)
+			require.NoError(t, err)
+			require.Equal(t, 2, total)
+		}
 
 		keys, err := qr.SessionKeys(t.Context(), nil, 1, nil)
 		require.NoError(t, err)

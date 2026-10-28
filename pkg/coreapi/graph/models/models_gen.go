@@ -465,11 +465,6 @@ type SessionRun struct {
 	EndedAt      *time.Time `json:"endedAt,omitempty"`
 }
 
-type SessionRunsConnection struct {
-	Nodes    []*SessionRun `json:"nodes"`
-	PageInfo *PageInfo     `json:"pageInfo"`
-}
-
 type SingletonConfiguration struct {
 	Mode SingletonMode `json:"mode"`
 	Key  *string       `json:"key,omitempty"`

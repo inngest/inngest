@@ -1016,6 +1016,7 @@ export type SessionRunsConnection = {
   __typename?: 'SessionRunsConnection';
   nodes: Array<SessionRun>;
   pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
 };
 
 export type SingletonConfiguration = {

@@ -63,6 +63,8 @@ var registry = map[string]registryEntry{
 	KeySessionKeys: {build: buildSessionKeysSQL},
 	KeySessions:    {build: buildSessionsSQL},
 	KeySessionRuns: {build: buildSessionRunsSQL},
+
+	KeySessionRunsCount: {build: buildSessionRunsCountSQL},
 }
 
 const (

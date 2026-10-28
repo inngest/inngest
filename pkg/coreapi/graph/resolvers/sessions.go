@@ -162,7 +162,28 @@ func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, ses
 		}
 		out[i] = sr
 	}
-	return &models.SessionRunsConnection{Nodes: out, PageInfo: sessionsPageInfo(result.HasMore, endCursor)}, nil
+	return &models.SessionRunsConnection{
+		Nodes:      out,
+		PageInfo:   sessionsPageInfo(result.HasMore, endCursor),
+		SessionKey: sessionKey,
+		SessionID:  sessionID,
+		From:       from,
+		Until:      until,
+	}, nil
+}
+
+// TotalCount counts the whole session (ignoring the page cursor), and
+// only runs when the field is selected.
+func (r *sessionRunsConnResolver) TotalCount(ctx context.Context, obj *models.SessionRunsConnection) (int, error) {
+	if r.DuckDB == nil {
+		return 0, fmt.Errorf("sessions requires dual-write (--duckdb) to be enabled")
+	}
+	return dashboards.CountSessionRuns(ctx, r.DuckDB, consts.DevServerAccountID, consts.DevServerEnvID, dashboards.SessionRunsOpts{
+		Key:   obj.SessionKey,
+		ID:    obj.SessionID,
+		From:  obj.From,
+		Until: obj.Until,
+	})
 }
 
 // maxSessionsFirst matches /v2/sessions' max page size

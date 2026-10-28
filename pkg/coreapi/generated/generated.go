@@ -61,6 +61,7 @@ type ResolverRoot interface {
 	RunDefer() RunDeferResolver
 	RunDeferredFrom() RunDeferredFromResolver
 	RunsV2Connection() RunsV2ConnectionResolver
+	SessionRunsConnection() SessionRunsConnectionResolver
 	StreamItem() StreamItemResolver
 }
 
@@ -617,8 +618,9 @@ type ComplexityRoot struct {
 	}
 
 	SessionRunsConnection struct {
-		Nodes    func(childComplexity int) int
-		PageInfo func(childComplexity int) int
+		Nodes      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
 	}
 
 	SingletonConfiguration struct {
@@ -816,6 +818,9 @@ type RunDeferredFromResolver interface {
 }
 type RunsV2ConnectionResolver interface {
 	TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error)
+}
+type SessionRunsConnectionResolver interface {
+	TotalCount(ctx context.Context, obj *models.SessionRunsConnection) (int, error)
 }
 type StreamItemResolver interface {
 	InBatch(ctx context.Context, obj *models.StreamItem) (bool, error)
@@ -3545,6 +3550,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SessionRunsConnection.PageInfo(childComplexity), true
 
+	case "SessionRunsConnection.totalCount":
+		if e.complexity.SessionRunsConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.SessionRunsConnection.TotalCount(childComplexity), true
+
 	case "SingletonConfiguration.key":
 		if e.complexity.SingletonConfiguration.Key == nil {
 			break
@@ -5103,6 +5115,8 @@ type SessionGroupsConnection {
 type SessionRunsConnection {
   nodes: [SessionRun!]!
   pageInfo: PageInfo!
+  # Every run in the session for the time range, across all pages.
+  totalCount: Int!
 }
 `, BuiltIn: false},
 }
@@ -17030,6 +17044,8 @@ func (ec *executionContext) fieldContext_Query_sessionRuns(ctx context.Context, 
 				return ec.fieldContext_SessionRunsConnection_nodes(ctx, field)
 			case "pageInfo":
 				return ec.fieldContext_SessionRunsConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_SessionRunsConnection_totalCount(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SessionRunsConnection", field.Name)
 		},
@@ -23950,6 +23966,50 @@ func (ec *executionContext) fieldContext_SessionRunsConnection_pageInfo(ctx cont
 				return ec.fieldContext_PageInfo_endCursor(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionRunsConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *models.SessionRunsConnection) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SessionRunsConnection_totalCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.SessionRunsConnection().TotalCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SessionRunsConnection_totalCount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionRunsConnection",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -33027,15 +33087,35 @@ func (ec *executionContext) _SessionRunsConnection(ctx context.Context, sel ast.
 			out.Values[i] = ec._SessionRunsConnection_nodes(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "pageInfo":
 
 			out.Values[i] = ec._SessionRunsConnection_pageInfo(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
+		case "totalCount":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._SessionRunsConnection_totalCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

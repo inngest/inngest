@@ -14,7 +14,7 @@ export type SessionRun = {
 };
 
 const sessionRunsQuery = `
-  query SessionRuns($sessionKey: String!, $sessionId: String!, $timeRange: TimeRangeInput, $after: String) {
+  query SessionRuns($sessionKey: String!, $sessionId: String!, $timeRange: TimeRangeInput, $after: String, $withTotal: Boolean!) {
     sessionRuns(sessionKey: $sessionKey, sessionId: $sessionId, timeRange: $timeRange, after: $after) {
       nodes {
         id
@@ -29,6 +29,7 @@ const sessionRunsQuery = `
         hasNextPage
         endCursor
       }
+      totalCount @include(if: $withTotal)
     }
   }
 `;
@@ -45,6 +46,8 @@ type SessionRunsQueryResult = {
       endedAt: string | null;
     }>;
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    // Only requested on the first page, since it doesn't change per page.
+    totalCount?: number;
   };
 };
 
@@ -69,6 +72,7 @@ export function useSessionRuns({
           sessionId,
           timeRange: { from: startTime, until: endTime },
           after: pageParam,
+          withTotal: pageParam === null,
         },
       );
       return result.sessionRuns;
@@ -97,5 +101,8 @@ export function useSessionRuns({
     [query.data],
   );
 
-  return { ...query, data };
+  // The whole session's run count (not just the loaded pages).
+  const totalCount = query.data?.pages[0]?.totalCount;
+
+  return { ...query, data, totalCount };
 }

@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
-	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/dashboards"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
@@ -413,6 +413,20 @@ func TestListSessionRuns_Pagination(t *testing.T) {
 	require.False(t, second.HasMore)
 	require.Len(t, second.Runs, 1)
 	require.Equal(t, "r0", second.Runs[0].RunID)
+
+	// The count is the session's total, regardless of page/cursor.
+	count, err := dashboards.CountSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "u1", From: now.Add(-time.Hour), Until: now.Add(time.Hour), Limit: 2,
+		Cursor: first.Runs[len(first.Runs)-1].Cursor,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+
+	count, err = dashboards.CountSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "missing", From: now.Add(-time.Hour), Until: now.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
 }
 
 func TestListSessions_EnvIsolation(t *testing.T) {
