@@ -232,6 +232,39 @@ func TestBuildColumnHintsUnnestOfSingleWildcardJSONPathStillResolves(t *testing.
 		hintsFor(t, "SELECT UNNEST(inputs ->> '$[*].meta.sessions') FROM runs"))
 }
 
+// TestBuildColumnHintsJSONPathBracketForms covers JSONPath bracket tokens
+// other than "[*]": a numeric index reads like "[*]" (any one element has
+// its array's element hints), and anything else must still terminate.
+func TestBuildColumnHintsJSONPathBracketForms(t *testing.T) {
+	cases := []struct {
+		sql  string
+		want ColumnHint
+	}{
+		{"SELECT inputs ->> '$[0].meta.sessions' FROM runs", HintSession},
+		{"SELECT inputs ->> '$[#-1].meta.sessions' FROM runs", HintSession},
+		{"SELECT inputs ->> '$[0].name' FROM runs", HintNone},
+		{`SELECT attributes ->> '$["_inngest.function.slug"]' FROM extended_trace_spans`, HintFunctionID},
+		{"SELECT inputs ->> '$[x].meta.sessions' FROM runs", HintNone},
+		{"SELECT inputs ->> '$[0' FROM runs", HintNone},
+	}
+	for _, c := range cases {
+		t.Run(c.sql, func(t *testing.T) {
+			require.Equal(t, []ColumnHint{c.want}, hintsFor(t, c.sql))
+		})
+	}
+}
+
+// TestBuildColumnPathHintsIndexDoesNotCollect checks that a numeric index
+// picks one element: unlike "[*]", the result isn't an array, so it gets
+// no {wc} entry.
+func TestBuildColumnPathHintsIndexDoesNotCollect(t *testing.T) {
+	root := PathHint{Path: []PathSegment{}, Hint: HintEventID}
+	require.Equal(t, [][]PathHint{{root}},
+		pathHintsFor(t, "SELECT inputs ->> '$[0].id' FROM runs"))
+	require.Equal(t, [][]PathHint{{root, hint(HintEventID, wc)}},
+		pathHintsFor(t, "SELECT inputs ->> '$[*].id' FROM runs"))
+}
+
 func TestBuildColumnHintsNoHintForAmbiguousJoin(t *testing.T) {
 	// run_id exists on both runs and extended_trace_spans -- a bare
 	// reference in a joined query can't resolve to exactly one.

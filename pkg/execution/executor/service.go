@@ -403,13 +403,9 @@ func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
 
 	batchID := opts.BatchID
 
-	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID, opts.BatchPointer)
+	status, err := s.batcher.StartExecution(ctx, opts.AccountID, opts.FunctionID, batchID, opts.BatchPointer)
 	if err != nil {
 		return err
-	}
-	if status == enums.BatchStatusStarted.String() {
-		// batch already started, abort
-		return nil
 	}
 	if status == enums.BatchStatusAbsent.String() {
 		// just attempt clean up, don't care about the result
