@@ -440,3 +440,37 @@ func TestListSessions_EnvIsolation(t *testing.T) {
 	require.Len(t, result.Sessions, 1)
 	require.Equal(t, 1, result.Sessions[0].RunCount, "the other env's run must not be counted")
 }
+
+// TestListSessionRuns_LatestRowTiebreak covers lifecycle rows that tie on
+// COALESCE(ended_at, started_at, queued_at) (ms timestamps make a Queued and
+// a Running row in the same ms common): the furthest-along row must win
+// regardless of insert order.
+func TestListSessionRuns_LatestRowTiebreak(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	run := func(runID, status string, queuedAt time.Time) testRun {
+		return testRun{
+			runID: runID, accountID: accountID, envID: envID, appID: appID, appName: "app", functionID: functionID, functionSlug: "fn",
+			status: status, queuedAt: queuedAt, eventName: "e",
+			sessions: []testSession{{key: "user", id: "u1"}},
+		}
+	}
+	// Running inserted before Queued for r1, after it for r2.
+	insertRun(t, db, run("r1", "Running", now))
+	insertRun(t, db, run("r1", "Queued", now))
+	insertRun(t, db, run("r2", "Queued", now.Add(time.Second)))
+	insertRun(t, db, run("r2", "Running", now.Add(time.Second)))
+
+	result, err := dashboards.ListSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "u1", From: now.Add(-time.Hour), Until: now.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Runs, 2)
+	for _, r := range result.Runs {
+		require.Equal(t, enums.RunStatusRunning, r.Status, r.RunID)
+	}
+}
