@@ -283,7 +283,7 @@ func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
 	require.NoError(t, err)
 	sqlText, args, err := RenderWhereSQL(outputFilters)
 	require.NoError(t, err)
-	assert.Equal(t, `(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
+	assert.Equal(t, `(len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
 	assert.Equal(t, []any{"$.name", "x", "$.data.ok", "true"}, args)
 }
 

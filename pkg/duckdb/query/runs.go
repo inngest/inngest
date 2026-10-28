@@ -295,9 +295,11 @@ func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.UL
 // checks) means every ANDed predicate must hold against the *same* array
 // element — required for a batch trigger, where different events could
 // otherwise each satisfy one predicate without any single event satisfying
-// all of them.
+// all of them. inputs is a VARIANT column, so it's cast to JSON first:
+// json_transform would otherwise stringify it with DuckDB's own struct
+// syntax and fail to parse that (see pkg/duckdb/insights' handleJSONFilter).
 func eventCELArrayMatchClause(fragment string) string {
-	return fmt.Sprintf(`len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: %s)) > 0`, fragment)
+	return fmt.Sprintf(`len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: %s)) > 0`, fragment)
 }
 
 // GetTraceRuns pushes filter.CEL down into the SQL query rather than
