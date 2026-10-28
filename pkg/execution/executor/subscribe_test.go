@@ -48,7 +48,7 @@ func TestSubscriptionWaitsAreNotPendingSteps(t *testing.T) {
 		return &state.GeneratorOpcode{ID: id, Op: enums.OpcodeWaitForEvent, Opts: opts}
 	}
 	wait := func(id string, subscribe bool) *state.GeneratorOpcode {
-		return subscription(id, subscribe, "next")
+		return subscription(id, subscribe, "park")
 	}
 
 	cases := []struct {
@@ -101,16 +101,16 @@ func TestWaitSeq(t *testing.T) {
 	require.Equal(t, 0, waitSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
 }
 
-// The wait pause of every message has its own ID: consuming one deletes it by
-// ID after queuing discovery, so a run that already wrote the wait for the next
-// message must not have it deleted by the cleanup of the previous one.
-func TestSubscriptionWaitPauseIDs(t *testing.T) {
-	first := subscriptionWaitPauseID("run", "inbox", 1)
+// The parked marker alternates between two IDs by the awaited message, so the
+// next park never shares an ID with the marker being cleaned up.
+func TestSubscriptionParkIDs(t *testing.T) {
+	first := subscriptionParkID("run", "inbox", 1)
 
-	require.Equal(t, first, subscriptionWaitPauseID("run", "inbox", 1))
-	require.NotEqual(t, first, subscriptionWaitPauseID("run", "inbox", 2))
-	require.NotEqual(t, first, subscriptionWaitPauseID("run", "other", 1))
-	require.NotEqual(t, first, subscriptionWaitPauseID("run2", "inbox", 1))
+	require.Equal(t, first, subscriptionParkID("run", "inbox", 1))
+	require.Equal(t, first, subscriptionParkID("run", "inbox", 3))
+	require.NotEqual(t, first, subscriptionParkID("run", "inbox", 2))
+	require.NotEqual(t, first, subscriptionParkID("run", "other", 1))
+	require.NotEqual(t, first, subscriptionParkID("run2", "inbox", 1))
 	require.NotEqual(t, first, subscriptionPauseID("run", "inbox", 0))
 }
 

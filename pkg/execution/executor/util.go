@@ -139,7 +139,7 @@ func isSubscriptionWait(op *state.GeneratorOpcode) bool {
 	}
 
 	opts, err := op.WaitForEventOpts()
-	return err == nil && opts != nil && opts.Subscribe != nil && opts.Subscribe.Mode == state.SubscribeNext
+	return err == nil && opts != nil && opts.Subscribe != nil && opts.Subscribe.Mode == state.SubscribePark
 }
 
 // NonLazyIDs returns the step IDs of "non-lazy" op. Distinguishing between lazy

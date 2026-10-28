@@ -614,8 +614,8 @@ type WaitForEventOpts struct {
 const (
 	// SubscribeOpen creates the subscription pause.
 	SubscribeOpen = "open"
-	// SubscribeNext blocks until message Seq exists.
-	SubscribeNext = "next"
+	// SubscribePark parks the run until message Seq exists: the number of messages the SDK has read, plus one.
+	SubscribePark = "park"
 	// SubscribePoll answers message Seq now, or null when it has not arrived.
 	SubscribePoll = "poll"
 	// SubscribeClose deletes the subscription pause and reports how many
