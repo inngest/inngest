@@ -527,3 +527,38 @@ func TestWriteQuotesKeywordFunctionNames(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteSpecialFunctions checks the keyword-argument call forms adapt
+// to the plain function call DuckDB itself desugars them to, and print as
+// that call.
+func TestWriteSpecialFunctions(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"coalesce", "SELECT coalesce(a, b) FROM t", "SELECT COALESCE(a, b) FROM t"},
+		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, "SELECT COALESCE(a) FROM t"},
+		{"nullif", "SELECT NULLIF(a, b) FROM t", `SELECT "nullif"(a, b) FROM t`},
+		{"extract keyword", "SELECT EXTRACT(year FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
+		{"extract plural keyword", "SELECT EXTRACT(years FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
+		{"extract identifier", "SELECT EXTRACT(epoch FROM a) FROM t", "SELECT date_part('epoch', a) FROM t"},
+		{"extract quoted identifier", `SELECT EXTRACT("Foo" FROM a) FROM t`, "SELECT date_part('Foo', a) FROM t"},
+		{"extract string", "SELECT EXTRACT('Epoch' FROM a) FROM t", "SELECT date_part('Epoch', a) FROM t"},
+		{"trim", "SELECT TRIM(a) FROM t", `SELECT "trim"(a) FROM t`},
+		{"trim list", "SELECT TRIM(a, 'x') FROM t", `SELECT "trim"(a, 'x') FROM t`},
+		{"trim both from", "SELECT TRIM(BOTH 'x' FROM a) FROM t", `SELECT "trim"(a, 'x') FROM t`},
+		{"trim from", "SELECT TRIM(FROM a) FROM t", `SELECT "trim"(a) FROM t`},
+		{"trim leading", "SELECT TRIM(LEADING 'x' FROM a) FROM t", "SELECT ltrim(a, 'x') FROM t"},
+		{"trim trailing", "SELECT TRIM(TRAILING FROM a) FROM t", "SELECT rtrim(a) FROM t"},
+		{"trim source then list", "SELECT TRIM('x' FROM a, b) FROM t", `SELECT "trim"(a, b, 'x') FROM t`},
+		{"substring from for", "SELECT SUBSTRING(a FROM 1 FOR 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"substring from", "SELECT SUBSTRING(a FROM 2) FROM t", `SELECT "substring"(a, 2) FROM t`},
+		{"substring for", "SELECT SUBSTRING(a FOR 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"substring list", "SELECT SUBSTRING(a, 1, 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"position", "SELECT POSITION('a' IN b) FROM t", `SELECT "position"(b, 'a') FROM t`},
+		{"overlay", "SELECT OVERLAY(a PLACING b FROM 1 FOR 2) FROM t", `SELECT "overlay"(a, b, 1, 2) FROM t`},
+		{"overlay list", "SELECT OVERLAY(a, b, 1) FROM t", `SELECT "overlay"(a, b, 1) FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}

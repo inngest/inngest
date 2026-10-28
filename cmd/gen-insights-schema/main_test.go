@@ -49,7 +49,7 @@ func TestTableDumpsMatchesRegistry(t *testing.T) {
 
 func TestFunctionDumpsMatchesRegistry(t *testing.T) {
 	fns := functionDumps()
-	require.Len(t, fns, 207)
+	require.Len(t, fns, 212)
 	byName := make(map[string]functionDump, len(fns))
 	for _, fn := range fns {
 		require.NotEmptyf(t, fn.Name, "a function has no name")

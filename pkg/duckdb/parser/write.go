@@ -808,7 +808,7 @@ func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 // syntax instead: `"nullif"(x)` printed bare is a NULLIF missing its second
 // argument, `"position"(b, a)` a POSITION missing its IN.
 var syntaxFunctionNames = map[string]bool{
-	"ARRAY": true, "CASE": true, "CAST": true, "COALESCE": true, "COLUMNS": true, "EXISTS": true,
+	"ARRAY": true, "CASE": true, "CAST": true, "COLUMNS": true, "EXISTS": true,
 	"EXTRACT": true, "GROUPING": true, "GROUPING_ID": true, "INTERVAL": true,
 	"LAMBDA": true, "NOT": true, "NULLIF": true, "OVERLAY": true, "POSITION": true,
 	"ROW": true, "SUBSTRING": true, "TRIM": true, "TRY": true, "TRY_CAST": true,
@@ -822,6 +822,12 @@ var syntaxFunctionNames = map[string]bool{
 // claims it (see syntaxFunctionNames). A qualified name's first part is a
 // CatalogName/SchemaName, quoted like any identifier; the rest are
 // Reserved* names that take any keyword.
+//
+// coalesce is printed as the COALESCE(...) syntax rather than a call:
+// DuckDB has no function by that name (COALESCE is an operator), so the
+// adapter desugars COALESCE(...) into this FunctionExpr and this is its
+// inverse. A source `"coalesce"(x)`, which DuckDB itself would reject as an
+// unknown function, adapts to the same node and so prints as COALESCE too.
 func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	if f.Receiver != nil || len(f.Name) > 1 {
 		for i, p := range f.Name {
@@ -840,6 +846,8 @@ func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	p := f.Name[0]
 	up := strings.ToUpper(p)
 	switch {
+	case up == "COALESCE":
+		sw.str("COALESCE")
 	case isSimpleIdent(p) && !syntaxFunctionNames[up] && isFuncNameIdent(p):
 		sw.str(p)
 	default:
