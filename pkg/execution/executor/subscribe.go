@@ -77,6 +77,8 @@ func subscriptionExpiryJobID(md *sv2.Metadata, pauseID uuid.UUID) string {
 	return fmt.Sprintf("%s-subscription-expiry-%s", md.IdempotencyKey(), pauseID)
 }
 
+// subscriptionPauseID is the ID of the persistent pause of one event (stream) of a
+// subscription.
 func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
 	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
 }
