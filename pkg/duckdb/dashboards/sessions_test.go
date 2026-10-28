@@ -474,3 +474,26 @@ func TestListSessionRuns_LatestRowTiebreak(t *testing.T) {
 		require.Equal(t, enums.RunStatusRunning, r.Status, r.RunID)
 	}
 }
+
+func TestResolveSessionTimeRange(t *testing.T) {
+	now := time.Now().UTC()
+
+	from, until, err := dashboards.ResolveSessionTimeRange(time.Time{}, time.Time{})
+	require.NoError(t, err)
+	require.WithinDuration(t, now, until, time.Minute)
+	require.Equal(t, 7*24*time.Hour, until.Sub(from))
+
+	from, until, err = dashboards.ResolveSessionTimeRange(now.Add(-time.Hour), time.Time{})
+	require.NoError(t, err)
+	require.Equal(t, now.Add(-time.Hour), from)
+	require.WithinDuration(t, now, until, time.Minute)
+
+	from, until, err = dashboards.ResolveSessionTimeRange(time.Time{}, now)
+	require.NoError(t, err)
+	require.Equal(t, now.Add(-7*24*time.Hour), from)
+	require.Equal(t, now, until)
+
+	_, _, err = dashboards.ResolveSessionTimeRange(now, now)
+	var iae *dashboards.InvalidArgumentError
+	require.ErrorAs(t, err, &iae)
+}

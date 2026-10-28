@@ -220,13 +220,13 @@ func (qr *queryResolver) sessionFunctionNames(ctx context.Context) (func(slug st
 	}, nil
 }
 
-// sessionTimeRange applies dashboards' own default window (7 days,
-// matching PR #4530's convention) when the caller specifies no range.
+// sessionTimeRange unpacks input, leaving any unset bound zero for
+// dashboards.ResolveSessionTimeRange to default (until=now, from=7 days
+// before until) -- the same rule /v2/sessions uses.
 func sessionTimeRange(input *models.TimeRangeInput) (from, until time.Time) {
 	if input == nil {
 		return time.Time{}, time.Time{}
 	}
-	until = time.Now()
 	if input.Until != nil {
 		until = *input.Until
 	}
