@@ -172,6 +172,7 @@ type mockConnectGatewayServer struct {
 	connectpb.UnimplementedConnectGatewayServer
 	pingCount    int
 	forwardCount int
+	forwardErr   error
 }
 
 func (m *mockConnectGatewayServer) Ping(ctx context.Context, req *connectpb.PingRequest) (*connectpb.PingResponse, error) {
@@ -181,6 +182,9 @@ func (m *mockConnectGatewayServer) Ping(ctx context.Context, req *connectpb.Ping
 
 func (m *mockConnectGatewayServer) Forward(ctx context.Context, req *connectpb.ForwardRequest) (*connectpb.ForwardResponse, error) {
 	m.forwardCount++
+	if m.forwardErr != nil {
+		return nil, m.forwardErr
+	}
 	return &connectpb.ForwardResponse{Success: true}, nil
 }
 
@@ -195,6 +199,59 @@ func (m *mockConnectGatewayServer) getForwardCount() int {
 func (m *mockConnectGatewayServer) reset() {
 	m.pingCount = 0
 	m.forwardCount = 0
+	m.forwardErr = nil
+}
+
+func TestForwardRemovesClientOnTransportFailure(t *testing.T) {
+	ctx, mockServer, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	gatewayID := ulid.MustNew(ulid.Now(), rand.Reader)
+	err := gatewayManager.UpsertGateway(ctx, &state.Gateway{
+		Id:                gatewayID,
+		Status:            state.GatewayStatusActive,
+		IPAddress:         net.ParseIP("127.0.0.1"),
+		Hostname:          "test-gateway",
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		forwardErr    error
+		expectRemoved bool
+	}{
+		{name: "success keeps client"},
+		{name: "unavailable removes client", forwardErr: status.Error(codes.Unavailable, "connection timed out"), expectRemoved: true},
+		{name: "deadline exceeded removes client", forwardErr: status.Error(codes.DeadlineExceeded, "deadline exceeded"), expectRemoved: true},
+		{name: "other errors keep client", forwardErr: status.Error(codes.Internal, "boom")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockServer.reset()
+			mockServer.forwardErr = tt.forwardErr
+
+			mgr := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer).(*gatewayGRPCManager)
+			require.NoError(t, mgr.ConnectToGateways(ctx))
+
+			err := mgr.Forward(ctx, gatewayID, ulid.MustNew(ulid.Now(), nil), &connectpb.GatewayExecutorRequestData{
+				RequestId: uuid.New().String(),
+			})
+			if tt.forwardErr != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			_, err = mgr.grpcClientManager.GetClient(ctx, gatewayID.String())
+			if tt.expectRemoved {
+				require.ErrorIs(t, err, ErrGatewayNotFound)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestConnectToGateways(t *testing.T) {

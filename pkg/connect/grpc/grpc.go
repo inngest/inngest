@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	grpcLib "google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -21,6 +24,12 @@ const (
 	DefaultConnectGRPCIP           = "127.0.0.1"
 	// MaxMessageSize covers execution requests and SDK replies, including protobuf overhead.
 	MaxMessageSize = 16 * 1024 * 1024
+	// ForwardTimeout bounds a single Forward call to a gateway. The gateway
+	// answers within 5s plus the lease, grace and write timeouts while it waits
+	// for the worker ack, so this only trips when the call is stuck in transport,
+	// e.g. on a dead TCP connection that would otherwise hang until the kernel
+	// gives up (~15m).
+	ForwardTimeout = consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod + 30*time.Second
 )
 
 type GatewayGRPCForwarder interface {
@@ -232,12 +241,25 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 		}
 	}
 
-	reply, err := grpcClient.Forward(ctx, &connectpb.ForwardRequest{
+	forwardCtx, cancel := context.WithTimeout(ctx, ForwardTimeout)
+	defer cancel()
+
+	reply, err := grpcClient.Forward(forwardCtx, &connectpb.ForwardRequest{
 		ConnectionID: connectionID.String(),
 		Data:         data,
 	})
 
 	logger.StdlibLogger(ctx).Trace("grpc message forwarded to connect gateway", "reply", reply, "err", err)
+
+	// A broken connection fails every call on it, so drop the cached client and
+	// let the next Forward dial a fresh one. Skip this when the caller gave up.
+	if err != nil && ctx.Err() == nil {
+		switch status.Code(err) {
+		case grpcCodes.Unavailable, grpcCodes.DeadlineExceeded:
+			logger.StdlibLogger(ctx).Warn("removing grpc client after transport failure", "gatewayID", gatewayID.String(), "err", err)
+			i.grpcClientManager.RemoveClient(gatewayID.String())
+		}
+	}
 
 	success := err == nil && reply != nil && reply.Success
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{

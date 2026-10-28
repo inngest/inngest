@@ -482,6 +482,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				break
 			}
 
+			// A Forward stuck until its timeout outlives the request lease. Re-routing
+			// now would start the work on a new worker while the lease watcher has
+			// already given up on it, so fail and let the step be retried instead.
+			if leaseCtx.Err() != nil {
+				break
+			}
+
 			l.Warn("forward to gateway failed, re-routing", "attempt", forwardAttempt+1, "err", err)
 
 			route, err = routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
