@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"sort"
 	"time"
 )
 
@@ -49,7 +51,7 @@ func workerGroupHashFromConnRequest(req *connect.WorkerConnectRequestData, authR
 func functionConfigHash(appConfig *connect.AppConfiguration) ([]byte, error) {
 	var functionHash []byte
 
-	b, err := jcs.Transform(appConfig.Functions)
+	b, err := canonicalFunctionConfig(appConfig.Functions)
 	if err != nil {
 		return nil, fmt.Errorf("could not canonicalize function config: %w", err)
 	}
@@ -58,6 +60,62 @@ func functionConfigHash(appConfig *connect.AppConfiguration) ([]byte, error) {
 	functionHash = res[:]
 
 	return functionHash, nil
+}
+
+// canonicalFunctionConfig returns the JCS form of the function config with the
+// top-level function list sorted by function ID. SDKs may list the same
+// functions in a different order, which must not produce a different worker
+// group hash: the hash is also the sync idempotency key, so a new order would
+// trigger an unnecessary app sync.
+//
+// Only the top-level list is reordered. Nested lists such as triggers and steps
+// keep the order the SDK sent. A list already sorted by ID canonicalizes to the
+// same bytes as before, so its hash is unchanged.
+func canonicalFunctionConfig(functions []byte) ([]byte, error) {
+	b, err := jcs.Transform(functions)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 || b[0] != '[' {
+		return b, nil
+	}
+
+	// Elements of the canonical list are themselves canonical, and RawMessage
+	// keeps their exact bytes.
+	var items []json.RawMessage
+	if err := json.Unmarshal(b, &items); err != nil {
+		return nil, err
+	}
+
+	type entry struct {
+		id  string
+		raw json.RawMessage
+	}
+	entries := make([]entry, len(items))
+	for i, item := range items {
+		var fn struct {
+			ID string `json:"id"`
+		}
+		// Non-object elements sort first, by their bytes.
+		_ = json.Unmarshal(item, &fn)
+		entries[i] = entry{id: fn.ID, raw: item}
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].id != entries[j].id {
+			return entries[i].id < entries[j].id
+		}
+		return bytes.Compare(entries[i].raw, entries[j].raw) < 0
+	})
+
+	out := make([]byte, 0, len(b))
+	out = append(out, '[')
+	for i, e := range entries {
+		if i > 0 {
+			out = append(out, ',')
+		}
+		out = append(out, e.raw...)
+	}
+	return append(out, ']'), nil
 }
 
 // NewWorkerGroupFromConnRequest instantiates but does not store WorkerGroup for a new session.
