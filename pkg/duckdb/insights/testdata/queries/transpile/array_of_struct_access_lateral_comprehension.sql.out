@@ -1,0 +1,39 @@
+{
+  "sql": "SELECT s.k, [x FOR x IN runs.sessions -\u003e\u003e '$[*].key' IF x IS NOT NULL] AS ks FROM inngest.insights_runs(?, ?) AS runs, LATERAL (SELECT sessions -\u003e\u003e '$[*].key' AS k) AS s LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    0,
+    0
+  ],
+  "diagnostics": [
+    {
+      "start": "1:94",
+      "end": "1:106",
+      "severity": 0,
+      "code": "array-of-struct-access-rewritten",
+      "message": "sessions is an array of structs, not JSON -- rewrote sessions.key to sessions -\u003e\u003e '$[*].key'."
+    },
+    {
+      "start": "1:25",
+      "end": "1:42",
+      "severity": 0,
+      "code": "array-of-struct-access-rewritten",
+      "message": "runs.sessions is an array of structs, not JSON -- rewrote runs.sessions.key to runs.sessions -\u003e\u003e '$[*].key'."
+    },
+    {
+      "start": "1:1",
+      "end": "1:114",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

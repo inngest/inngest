@@ -168,3 +168,27 @@ func TestRewriteArrayOfStructAccessInSetOpOrderBy(t *testing.T) {
 	)
 	require.Len(t, diags, 3)
 }
+
+// Every expression position the parser can produce gets rewritten, a
+// LATERAL subquery against the earlier FROM items it correlates into, and
+// a comprehension-bound variable is never mistaken for the column.
+func TestRewriteArrayOfStructAccessEveryPosition(t *testing.T) {
+	cases := map[string]string{
+		"SELECT s.k FROM runs, LATERAL (SELECT sessions.key AS k) s":                                                     "SELECT s.k FROM runs, LATERAL (SELECT sessions ->> '$[*].key' AS k) AS s",
+		"SELECT s.k FROM runs r JOIN LATERAL (SELECT r.sessions.key AS k) s ON TRUE":                                     "SELECT s.k FROM runs AS r INNER JOIN LATERAL (SELECT r.sessions ->> '$[*].key' AS k) AS s ON TRUE",
+		"SELECT [s FOR s IN runs.sessions.key] AS x FROM runs":                                                           "SELECT [s FOR s IN runs.sessions ->> '$[*].key'] AS x FROM runs",
+		"SELECT [s.key FOR s IN sessions] AS x FROM runs":                                                                "SELECT [s.key FOR s IN sessions] AS x FROM runs",
+		"SELECT [sessions.key FOR sessions IN [1]] AS x FROM runs":                                                       "SELECT [sessions.key FOR sessions IN [1]] AS x FROM runs",
+		"SELECT u.unnest FROM runs, UNNEST(sessions.key) AS u":                                                           "SELECT u.unnest FROM runs, UNNEST(sessions ->> '$[*].key') AS u",
+		"SELECT struct_pack(k := sessions.key) AS s FROM runs":                                                           "SELECT struct_pack(k := sessions ->> '$[*].key') AS s FROM runs",
+		"SELECT GROUPING(len(sessions.key)) AS g FROM runs GROUP BY ROLLUP (len(sessions.key))":                          "SELECT GROUPING(len(sessions ->> '$[*].key')) AS g FROM runs GROUP BY ROLLUP (len(sessions ->> '$[*].key'))",
+		"SELECT count(*) OVER (ORDER BY run_id ROWS BETWEEN len(sessions.key) PRECEDING AND CURRENT ROW) AS c FROM runs": "SELECT count(*) OVER (ORDER BY run_id ROWS BETWEEN len(sessions ->> '$[*].key') PRECEDING AND CURRENT ROW) AS c FROM runs",
+		"SELECT string_agg(run_id, ',' ORDER BY sessions.id) AS s FROM runs":                                             "SELECT string_agg(run_id, ',' ORDER BY sessions ->> '$[*].id') AS s FROM runs",
+	}
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			stmt, _ := mustRewriteArrayOfStructAccess(t, in)
+			require.Equal(t, want, parser.String(stmt))
+		})
+	}
+}
