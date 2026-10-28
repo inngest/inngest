@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -26,18 +27,24 @@ func extractQueryInfo(stmt *parser.SelectStatement) QueryInfo {
 // collectQueryInfo walks stmt — recursing into CTE bodies, UNION/
 // INTERSECT/EXCEPT operands, and FROM-clause subqueries — collecting the
 // real logical tables it touches, deduped, in first-seen order. cteNames
-// tracks CTE names declared at or above this point purely to exclude them
-// from the physical-table list; unlike in validate/remapTables it plays no
-// scoping role, since this function never rejects anything.
+// is the set of CTE names (lowercased) visible at this point, to exclude
+// them from the physical-table list. It's scoped lexically exactly like
+// remapTablesWithCTEs' own map: a WITH clause extends a copy, never the
+// caller's map, and a CTE's body only sees earlier CTEs -- otherwise a CTE
+// declared inside one subquery would hide a same-named real table
+// referenced elsewhere ("SELECT * FROM (WITH runs AS (...) ...) a, runs").
 func collectQueryInfo(stmt *parser.SelectStatement, info *QueryInfo, seen, cteNames map[string]bool) {
 	if stmt == nil {
 		return
 	}
 	if stmt.With != nil {
+		merged := make(map[string]bool, len(cteNames)+len(stmt.With.CTEs))
+		maps.Copy(merged, cteNames)
 		for _, cte := range stmt.With.CTEs {
-			cteNames[strings.ToLower(cte.Name)] = true
-			collectQueryInfo(cte.Select, info, seen, cteNames)
+			collectQueryInfo(cte.Select, info, seen, merged)
+			merged[strings.ToLower(cte.Name)] = true
 		}
+		cteNames = merged
 	}
 	if stmt.SetOp != parser.SetOpNone {
 		collectQueryInfo(stmt.SetLeft, info, seen, cteNames)
