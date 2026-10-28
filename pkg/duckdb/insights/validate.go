@@ -536,8 +536,8 @@ func (v *exprValidator) checkStar(s *parser.StarExpr) error {
 	// A qualified entry ("t.col") must name one of the tables this star
 	// expands over, matching DuckDB ("SELECT a.* EXCLUDE (b.k)" is a
 	// binder error).
-	for _, raw := range s.Exclude {
-		x, ok := parseExcludeName(raw)
+	for i := range s.Exclude {
+		x, raw, ok := parseExcludeName(s, i)
 		if !ok {
 			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported EXCLUDE entry %q", raw)}
 		}

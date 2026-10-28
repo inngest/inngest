@@ -273,8 +273,8 @@ type starColumn struct {
 // table's for "t.*".
 func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 	var excluded []excludeName
-	for _, raw := range star.Exclude {
-		if x, ok := parseExcludeName(raw); ok {
+	for i := range star.Exclude {
+		if x, _, ok := parseExcludeName(star, i); ok {
 			excluded = append(excluded, x)
 		}
 	}
