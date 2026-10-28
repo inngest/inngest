@@ -23,26 +23,62 @@ const (
 )
 
 // DuckDBToColumnType maps a *sql.ColumnType.DatabaseTypeName() string (as
-// DuckDB's driver reports it) to a ColumnType bucket — see docs/plans/010's
-// GQL schema section's mapping table.
+// DuckDB's driver reports it), or a type name as written in a query's own
+// CAST/typed literal (inferType), to a ColumnType bucket -- see
+// docs/plans/010's GQL schema section's mapping table. The latter can be
+// any of DuckDB's aliases (INT, INT8, REAL, STRING, DATETIME, ...) or carry
+// a parameter list (VARCHAR(10), NUMERIC(10,2)), so both are normalized
+// to the canonical name DuckDB itself reports (typeof(NULL::<alias>)).
 func DuckDBToColumnType(duckdbType string) ColumnType {
-	t := strings.ToUpper(duckdbType)
+	t := strings.ToUpper(strings.TrimSpace(duckdbType))
 
 	switch {
-	case t == "VARCHAR", t == "CHAR", t == "BPCHAR", t == "TEXT", t == "UUID":
+	// T[] lists and T[n] fixed-size arrays.
+	case strings.HasSuffix(t, "]"),
+		strings.HasPrefix(t, "STRUCT("), strings.HasPrefix(t, "MAP("), strings.HasPrefix(t, "UNION("):
+		return ColumnTypeJSON
+	case strings.HasPrefix(t, "ENUM("):
+		return ColumnTypeString
+	}
+	if i := strings.IndexByte(t, '('); i >= 0 {
+		t = strings.TrimSpace(t[:i])
+	}
+	if canonical, ok := duckDBTypeAliases[t]; ok {
+		t = canonical
+	}
+
+	switch {
+	case t == "VARCHAR", t == "UUID", t == "BLOB":
 		return ColumnTypeString
 	case t == "BOOLEAN":
 		return ColumnTypeBoolean
-	case t == "DATE", t == "TIME", t == "INTERVAL",
-		strings.HasPrefix(t, "TIMESTAMP"):
+	case t == "DATE", strings.HasPrefix(t, "TIME"), t == "INTERVAL":
 		return ColumnTypeDatetime
-	case t == "JSON", t == "VARIANT", strings.HasSuffix(t, "[]"), strings.HasPrefix(t, "STRUCT("), strings.HasPrefix(t, "MAP("):
+	case t == "JSON", t == "VARIANT":
 		return ColumnTypeJSON
 	case isNumberType(t):
 		return ColumnTypeNumber
 	default:
 		return ColumnTypeUnknown
 	}
+}
+
+// duckDBTypeAliases maps every DuckDB type alias to the canonical name
+// DuckDB reports for it (typeof(NULL::<alias>) against a real duckdb).
+// TIMESTAMP*/TIME* variants (TIMESTAMPTZ, TIMETZ, TIME WITH TIME ZONE,
+// TIMESTAMP_NS, ...) need no entry: they're all DATETIME by prefix.
+var duckDBTypeAliases = map[string]string{
+	"CHAR": "VARCHAR", "BPCHAR": "VARCHAR", "TEXT": "VARCHAR", "STRING": "VARCHAR",
+	"NVARCHAR": "VARCHAR",
+	"BYTEA":    "BLOB", "BINARY": "BLOB", "VARBINARY": "BLOB",
+	"BOOL": "BOOLEAN", "LOGICAL": "BOOLEAN",
+	"INT1": "TINYINT", "INT2": "SMALLINT", "SHORT": "SMALLINT",
+	"INT": "INTEGER", "INT4": "INTEGER", "SIGNED": "INTEGER",
+	"INT8": "BIGINT", "LONG": "BIGINT", "INT128": "HUGEINT",
+	"UINT8": "UTINYINT", "UINT16": "USMALLINT", "UINT32": "UINTEGER", "UINT64": "UBIGINT", "UINT128": "UHUGEINT",
+	"REAL": "FLOAT", "FLOAT4": "FLOAT", "FLOAT8": "DOUBLE", "DOUBLE PRECISION": "DOUBLE",
+	"NUMERIC": "DECIMAL", "VARINT": "BIGNUM",
+	"DATETIME": "TIMESTAMP",
 }
 
 // String is the same label the GQL layer's InsightsColumnType enum uses
@@ -70,7 +106,7 @@ func isNumberType(t string) bool {
 	switch {
 	case t == "TINYINT", t == "SMALLINT", t == "INTEGER", t == "BIGINT", t == "HUGEINT",
 		t == "UTINYINT", t == "USMALLINT", t == "UINTEGER", t == "UBIGINT", t == "UHUGEINT",
-		t == "FLOAT", t == "DOUBLE":
+		t == "FLOAT", t == "DOUBLE", t == "BIGNUM":
 		return true
 	case strings.HasPrefix(t, "DECIMAL"):
 		return true
