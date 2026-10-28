@@ -65,11 +65,15 @@ func subscriptionStepID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionWaiterID is the step ID that records that the run is blocked
-// waiting for message seq.
-func subscriptionWaiterID(key string, seq int) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:wait:%d", key, seq)))
-	return hex.EncodeToString(sum[:])
+// subscriptionWaitEvent names the index of the pauses that block a run waiting
+// for a message. No event has this name, so events never match them: the
+// delivery of a message consumes them.
+const subscriptionWaitEvent = "inngest/subscription.wait"
+
+// subscriptionWaitPauseID is the ID of the pause a run blocks on while it waits
+// for the next message of a subscription. There is at most one.
+func subscriptionWaitPauseID(runID string, key string) uuid.UUID {
+	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-wait:%s", runID, key))
 }
 
 func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
@@ -166,18 +170,34 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
 		}
 
-		// Record that the run is blocked on message Seq, so the delivery of
-		// that message queues discovery. Discovery is only queued for a blocked
-		// run: while a request is in flight, a second one would run its steps
-		// twice.
-		waiter := subscriptionWaiterID(sub.Key, sub.Seq)
-		if _, err := e.smv2.SaveStep(ctx, md.ID, waiter, []byte(`{"data":1}`)); err != nil &&
-			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
-			return err
+		// The run blocks on a pause that the delivery of the next message
+		// consumes, like waitForEvent. The run only wakes when it is blocked: a
+		// wake while a request is executing would run its steps twice.
+		waitIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: subscriptionWaitEvent}
+		waitID := subscriptionWaitPauseID(runID, sub.Key)
+		opcode := gen.Op.String()
+		wait := state.Pause{
+			ID:           waitID,
+			WorkspaceID:  md.ID.Tenant.EnvID,
+			Identifier:   sv2.NewPauseIdentifier(md.ID),
+			GroupID:      runCtx.GroupID(),
+			Outgoing:     gen.ID,
+			Incoming:     edge.Edge.Incoming,
+			StepName:     gen.UserDefinedName(),
+			Opcode:       &opcode,
+			Expires:      state.Time(e.now().Add(consts.MaxWaitForEventTimeout)),
+			Event:        new(subscriptionWaitEvent),
+			DataKey:      gen.ID,
+			MaxAttempts:  runCtx.MaxAttempts(),
+			ParallelMode: gen.ParallelMode(),
+			CreatedAt:    e.now(),
+		}
+		if _, err := e.pm.Write(ctx, waitIdx, &wait); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+			return fmt.Errorf("error saving subscription wait pause: %w", err)
 		}
 
-		// The message may have arrived before the SDK asked: then there is
-		// nobody to deliver it, so wake the run now.
+		// The message may have arrived before the wait existed: then nobody
+		// delivers it, so wake the run now.
 		ids, err := messages()
 		if err != nil {
 			return err
@@ -185,12 +205,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if len(ids) < sub.Seq {
 			return nil
 		}
-
-		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
-		if err != nil || pause == nil {
-			return fmt.Errorf("subscription pause not found: %w", err)
-		}
-		return e.resumeSubscriber(ctx, pause, gen.ID)
+		return e.wakeSubscriber(ctx, md.ID, sub.Key, ids[sub.Seq-1])
 
 	case state.SubscribePoll:
 		ids, err := messages()
@@ -234,19 +249,21 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
-// resumeSubscriber answers the wait step dataKey and queues the discovery
-// request that lets the run see the new message. It does not consume the pause.
-func (e *executor) resumeSubscriber(ctx context.Context, pause *state.Pause, dataKey string) error {
-	clone := *pause
-	clone.ID = uuid.New()
-	clone.DataKey = dataKey
-	clone.Outgoing = dataKey
-	clone.Subscribe = nil
+// wakeSubscriber consumes the pause a run is blocked on, if there is one, so the
+// run sees the message. Its output is the ID of the message step.
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, messageID string) error {
+	waitIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionWaitEvent}
+	pause, err := e.pm.PauseByID(ctx, waitIdx, subscriptionWaitPauseID(id.RunID.String(), key))
+	if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 
-	err := e.Resume(ctx, clone, execution.ResumeRequest{
-		With:      map[string]any{"data": nil},
-		StepName:  pause.StepName,
-		EventName: derefString(pause.Event),
+	err = e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     map[string]any{"data": messageID},
+		StepName: pause.StepName,
 	})
 	if errors.Is(err, state.ErrPauseLeased) || errors.Is(err, state.ErrPauseNotFound) {
 		return nil
@@ -295,32 +312,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		return err
 	}
 
-	// The message's position is its place among the subscription's messages in
-	// the stack. Only a run blocked on exactly that message needs waking.
-	stack, err := e.smv2.LoadStack(ctx, id)
-	if err != nil {
-		return err
-	}
-	position := 0
-	for i, existing := range subscriptionMessageIDs(stack, key) {
-		if existing == messageID {
-			position = i + 1
-			break
-		}
-	}
-	if position == 0 {
-		return fmt.Errorf("subscription message %s is not in the stack", messageID)
-	}
-	l.Debug("subscription message saved", "position", position, "message_id", messageID)
+	l.Debug("subscription message saved", "message_id", messageID)
 
-	waiter := subscriptionWaiterID(key, position)
-	blocked, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{waiter})
-	if err != nil {
-		return err
-	}
-	if _, ok := blocked[waiter]; !ok {
-		return nil
-	}
-
-	return e.resumeSubscriber(ctx, pause, subscriptionStepID(key, position))
+	return e.wakeSubscriber(ctx, id, key, messageID)
 }
