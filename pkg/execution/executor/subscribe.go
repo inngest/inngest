@@ -268,6 +268,18 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		case parkReady:
 			return e.consumePark(ctx, &park)
 		}
+
+		// Still waiting. A subscription closed in the same batch may have run its
+		// close before this marker existed, and then nobody would end this park. A
+		// closed subscription has no pause: end the park now.
+		open, err := e.pm.PauseByID(ctx, idx, pauseID)
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return err
+		}
+		if open == nil {
+			return e.consumePark(ctx, &park)
+		}
+
 		return nil
 
 	case state.SubscribePoll:
@@ -304,6 +316,19 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 				_ = e.exprAggregator.RemovePause(ctx, pause)
 			}
 			e.dequeueSubscriptionExpiry(ctx, md, pauseID)
+		}
+
+		// A read that is still parked (one the function stopped waiting for, such as
+		// a lost race) must not keep the run waiting: end every park now, so the
+		// steps they stand for are answered and discovery can follow the close.
+		parked, err := e.parkedMarkers(ctx, md.ID, sub.Key)
+		if err != nil {
+			return err
+		}
+		for _, marker := range parked {
+			if err := e.consumePark(ctx, marker); err != nil {
+				return err
+			}
 		}
 
 		ids, err := messages()
@@ -372,20 +397,8 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 // message that is already saved, so it only wakes a run whose awaited message
 // exists.
 func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, redelivered bool) error {
-	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionParkIndexName(id.RunID.String(), key)}
-
-	iter, err := e.pm.PausesSince(ctx, parkIdx, time.Time{})
+	parked, err := e.parkedMarkers(ctx, id, key)
 	if err != nil {
-		return err
-	}
-
-	// Normally one marker: the run's current park. A marker already consumed and
-	// not yet deleted may show too; consuming it again is idempotent.
-	var parked []*state.Pause
-	for iter.Next(ctx) {
-		parked = append(parked, iter.Val(ctx))
-	}
-	if err := iter.Error(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
@@ -410,6 +423,30 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, re
 	}
 
 	return nil
+}
+
+// parkedMarkers returns the markers of the run's parks on a subscription.
+// Normally one: the current park. A marker already consumed and not yet deleted
+// may show too; consuming it again is idempotent.
+func (e *executor) parkedMarkers(ctx context.Context, id sv2.ID, key string) ([]*state.Pause, error) {
+	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionParkIndexName(id.RunID.String(), key)}
+
+	iter, err := e.pm.PausesSince(ctx, parkIdx, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	var parked []*state.Pause
+	for iter.Next(ctx) {
+		if pause := iter.Val(ctx); pause != nil {
+			parked = append(parked, pause)
+		}
+	}
+	if err := iter.Error(); err != nil && !errors.Is(err, context.Canceled) {
+		return nil, err
+	}
+
+	return parked, nil
 }
 
 // consumePark consumes a marker so the run sees the message it waits for. Its
