@@ -599,6 +599,7 @@ type QueueOptions struct {
 	PermanentConstraintErrorHandler     PermanentConstraintErrorHandler
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
+	ReleaseCapacityOnItemGone           bool // see WithReleaseCapacityOnItemGone
 	AcquireCapacityLeaseOnBacklogRefill bool
 	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
 	BypassArchivedWorkspaceAppSemaphore BypassArchivedWorkspaceAppSemaphore
@@ -770,6 +771,13 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 	return func(q *QueueOptions) {
 		q.CapacityLeaseExtendInterval = interval
 	}
+}
+
+// WithReleaseCapacityOnItemGone releases newly acquired capacity when the item
+// disappears before its queue lease. It is disabled by default. Reused or
+// idempotently replayed capacity is never released by this cleanup.
+func WithReleaseCapacityOnItemGone(enabled bool) QueueOpt {
+	return func(o *QueueOptions) { o.ReleaseCapacityOnItemGone = enabled }
 }
 
 func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinalityInstrumentation) QueueOpt {
