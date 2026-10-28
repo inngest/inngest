@@ -169,13 +169,6 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
-	// Messages that a step.subscribe subscription saved but the run never read
-	// must not die with the run. Collect them before the state is deleted.
-	unreadEvents, unreadErr := e.unreadSubscriptionEvents(ctx, opts.Metadata.ID)
-	if unreadErr != nil {
-		l.Error("error loading unread subscription messages", "error", unreadErr, "run_id", opts.Metadata.ID.RunID)
-	}
-
 	finalizationClaim := e.claimFinalization(ctx, opts.Metadata)
 
 	// Delete the function state in every case.
@@ -215,13 +208,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	if !finalizationClaim.Claimed() {
 		return nil
 	}
-	if err := e.finalizeEvents(ctx, opts, append(deferEvents, unreadEvents...)); err != nil {
-		// A retried Finalize finds the state gone, so hand the unread messages
-		// over now.
-		e.republishSubscriptionEvents(ctx, opts.Metadata.ID, unreadEvents)
-		if len(unreadEvents) > 0 && e.finishHandler != nil {
-			_ = e.finishHandler(context.WithoutCancel(ctx), opts.Metadata.ID, unreadEvents)
-		}
+	if err := e.finalizeEvents(ctx, opts, deferEvents); err != nil {
 		if releaseErr := finalizationClaim.Release(ctx); releaseErr != nil {
 			logger.StdlibLogger(ctx).Warn(
 				"error releasing finalization claim after failed publish",
@@ -232,7 +219,6 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		}
 		return err
 	}
-	e.republishSubscriptionEvents(ctx, opts.Metadata.ID, unreadEvents)
 	return nil
 }
 

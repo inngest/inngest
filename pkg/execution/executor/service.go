@@ -3,12 +3,10 @@ package executor
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -197,7 +195,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewBaseTrackedEvent(evt, finalizeEventSeed(evt))
+				trackedEvent := event.NewBaseTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
@@ -1227,17 +1225,4 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	l.Trace("promoted queue item")
 
 	return nil
-}
-
-// finalizeEventSeed gives events that a finishing run re-emits (unread
-// step.subscribe messages) an internal ID derived from the event ID, so that
-// publishing them again does not schedule a second run. Internal inngest/*
-// events keep random IDs.
-func finalizeEventSeed(evt event.Event) *event.SeededID {
-	if evt.ID == "" || strings.HasPrefix(evt.Name, "inngest/") || evt.Timestamp <= 0 {
-		return nil
-	}
-
-	sum := sha256.Sum256([]byte(evt.ID))
-	return &event.SeededID{Entropy: sum[:10], Millis: evt.Timestamp}
 }

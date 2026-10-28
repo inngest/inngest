@@ -3363,9 +3363,7 @@ func (e *executor) handlePause(
 			// step.subscribe: save the event as a message and keep the pause.
 			err := e.deliverSubscription(ctx, evt, pause, l)
 			if errors.Is(err, state.ErrRunNotFound) {
-				// The run is gone, so the message cannot be saved to it. Hand
-				// the event to the thread's next run instead of dropping it.
-				e.reemitSubscriptionEvent(ctx, sv2.IDFromPause(*pause), evt.GetEvent())
+				// The run is gone, so the message cannot be saved to it.
 				cleanup(ctx)
 				return nil
 			}
