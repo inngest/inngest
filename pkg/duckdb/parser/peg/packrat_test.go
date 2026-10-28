@@ -251,3 +251,59 @@ Op <- '<' / '<=' / '!'
 	_, err = p.Parse("a !=b", "Cmp")
 	require.Error(t, err)
 }
+
+func TestArenaKeepsHandedOutValuesAcrossChunks(t *testing.T) {
+	a := newArena[int](1)
+	var ptrs []*int
+	var slices [][]int
+	for i := range 3 * maxArenaChunk {
+		ptrs = append(ptrs, a.alloc(i))
+		if i%1000 == 0 {
+			slices = append(slices, a.allocSlice(i, i+1, i+2))
+		}
+	}
+	for i, p := range ptrs {
+		require.Equal(t, i, *p)
+	}
+	for _, s := range slices {
+		require.Equal(t, []int{s[0], s[0] + 1, s[0] + 2}, s)
+		require.Equal(t, 3, cap(s))
+	}
+	require.Equal(t, len(ptrs)+3*len(slices), a.len())
+
+	// A reset arena reuses its chunks instead of allocating new ones.
+	size := a.size()
+	a.reset()
+	require.Zero(t, a.len())
+	for i := range 3 * maxArenaChunk {
+		a.alloc(i)
+	}
+	require.Equal(t, size, a.size())
+
+	// A slice bigger than a chunk gets a chunk of its own.
+	big := a.allocSlice(make([]int, 2*maxArenaChunk)...)
+	require.Len(t, big, 2*maxArenaChunk)
+}
+
+func TestMarkLeafRules(t *testing.T) {
+	g, err := ParseGrammar(`
+Op <- '+' / '-'
+Sign <- Op?
+Expr <- Term (Op Term)*
+Term <- 'x' / '(' Expr ')'
+Wrap <- Parens('x')
+Parens(X) <- '(' X ')'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g}
+	d := p.getDispatch()
+	for name, want := range map[string]bool{"Op": true, "Sign": true, "Expr": false, "Term": false, "Wrap": false, "Parens": false} {
+		require.Equal(t, want, d[name].leaf, name)
+	}
+
+	// Leaf failures aren't memoized, but still fail the same way.
+	_, err = p.Parse("x+(x-x)", "Expr")
+	require.NoError(t, err)
+	_, err = p.Parse("x+(x-", "Expr")
+	require.Error(t, err)
+}

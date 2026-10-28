@@ -120,6 +120,14 @@ type dispatchEntry struct {
 	id   int
 	prim Primitive // set if this name is a primitive.
 	rule *Rule     // set otherwise, if this name is a grammar rule.
+	// leaf is set for a rule that references only primitives and other
+	// leaf rules (no parameterized calls, no recursion), so evaluating it
+	// costs a small constant (bounded by the grammar, not the input). Its
+	// failures aren't memoized: re-running it is about as cheap as the
+	// memo lookup, and failed operator/keyword probes after every operand
+	// (`ComparisonOperator`, `IsNullOperator`, ...) are most of a parse's
+	// memo entries otherwise.
+	leaf bool
 }
 
 func (p *Parser) getDispatch() map[string]dispatchEntry {
@@ -137,6 +145,7 @@ func (p *Parser) getDispatch() map[string]dispatchEntry {
 			d[name] = dispatchEntry{id: nextID, rule: rule}
 			nextID++
 		}
+		markLeafRules(d)
 		p.dispatch = d
 		p.munch = newMunchTable(p.SymbolTokens)
 		p.callSigs = map[*Expr]string{}
@@ -145,6 +154,66 @@ func (p *Parser) getDispatch() map[string]dispatchEntry {
 		}
 	})
 	return p.dispatch
+}
+
+// markLeafRules sets dispatchEntry.leaf for every rule that (transitively)
+// references only primitives and other leaf rules.
+func markLeafRules(d map[string]dispatchEntry) {
+	const (
+		unvisited = iota
+		visiting
+		leaf
+		notLeaf
+	)
+	state := map[string]int{}
+	var visit func(name string) bool
+	var exprLeaf func(expr Expr) bool
+	visit = func(name string) bool {
+		switch state[name] {
+		case visiting, notLeaf:
+			return false // recursive, or already known not to be a leaf.
+		case leaf:
+			return true
+		}
+		entry, ok := d[name]
+		if !ok {
+			return false
+		}
+		if entry.prim != nil {
+			return true
+		}
+		if entry.rule.Param != "" {
+			state[name] = notLeaf
+			return false
+		}
+		state[name] = visiting
+		if exprLeaf(entry.rule.Expr) {
+			state[name] = leaf
+			return true
+		}
+		state[name] = notLeaf
+		return false
+	}
+	exprLeaf = func(expr Expr) bool {
+		switch expr.Kind {
+		case ExprCall:
+			return false
+		case ExprRef:
+			return visit(expr.Ref)
+		}
+		for _, c := range expr.Children {
+			if !exprLeaf(c) {
+				return false
+			}
+		}
+		return true
+	}
+	for name, entry := range d {
+		if entry.rule != nil && visit(name) {
+			entry.leaf = true
+			d[name] = entry
+		}
+	}
 }
 
 // munchTable indexes SymbolTokens by each of their proper prefixes, so
@@ -261,9 +330,8 @@ const preallocInputBytes = 2 << 10
 // nodeSlab/childSlab elements run 7-20x the input length (more for small
 // inputs, where fixed grammar overhead isn't yet amortized; the multipliers
 // undershoot small inputs a bit and target the large end, since that's
-// where a mid-parse regrowth — a full map rehash, or copying an abandoned
-// slab — actually costs something). envSlab (parameterized-rule call
-// frames) and callMemo (evalCall's memo, same call frames plus repeat
+// where a mid-parse regrowth, a full map rehash, actually costs something).
+// envSlab (parameterized-rule call frames) and callMemo (evalCall's memo, same call frames plus repeat
 // lookups) both run much lower, around 0.3-0.6x, since a grammar has only a
 // couple of parameterized rules. The goal is avoiding that regrowth, not
 // eliminating all headroom.
@@ -285,9 +353,9 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 		refMemo:   make(map[refMemoKey]memoEntry, n*12),
 		callMemo:  make(map[callMemoKey]memoEntry, n/2+1),
 		skipCache: skipCache,
-		nodeSlab:  make([]Node, 0, n*8),
-		childSlab: make([]*Node, 0, n*8),
-		envSlab:   make([]env, 0, n/2+1),
+		nodeSlab:  newArena[Node](n * 8),
+		childSlab: newArena[*Node](n * 8),
+		envSlab:   newArena[env](n/2 + 1),
 	}
 	e.newNodeFn = e.newNode
 	return e
@@ -311,9 +379,9 @@ func (e *evaluator) reset(input string) {
 	for i := range e.skipCache {
 		e.skipCache[i] = -1
 	}
-	e.nodeSlab = e.nodeSlab[:0]
-	e.childSlab = e.childSlab[:0]
-	e.envSlab = e.envSlab[:0]
+	e.nodeSlab.reset()
+	e.childSlab.reset()
+	e.envSlab.reset()
 	clear(e.refMemo)
 	clear(e.callMemo)
 }
@@ -374,7 +442,7 @@ const maxRetainedEntries = 64 << 10
 // this session returned before calling this — see the Session doc comment.
 func (s *Session) Release() {
 	if e := s.e; e != nil && (len(e.refMemo)+len(e.callMemo) > maxRetainedEntries ||
-		cap(e.nodeSlab) > maxRetainedEntries || cap(e.childSlab) > maxRetainedEntries ||
+		e.nodeSlab.size() > maxRetainedEntries || e.childSlab.size() > maxRetainedEntries ||
 		cap(e.skipCache) > maxRetainedEntries) {
 		s.e = nil
 	}
@@ -467,18 +535,18 @@ type evaluator struct {
 	skipCache []int
 
 	// nodeSlab/childSlab bump-allocate *Node values and their Children
-	// backing arrays out of a shared, ever-growing slice instead of one
-	// heap allocation per node/slice. A pointer or sub-slice handed out
-	// today stays valid forever: append only ever extends past the
-	// current length, never rewrites an index already handed out, so nothing
-	// already-returned (including memoized results) is ever aliased by a
-	// later write, even across backtracking that abandons a partial match.
-	nodeSlab  []Node
-	childSlab []*Node
+	// backing arrays out of shared arenas instead of one heap allocation
+	// per node/slice. A pointer or sub-slice handed out stays valid until
+	// the next reset: an arena never rewrites an element already handed
+	// out, so nothing already-returned (including memoized results) is ever
+	// aliased by a later write, even across backtracking that abandons a
+	// partial match.
+	nodeSlab  arena[Node]
+	childSlab arena[*Node]
 
 	// envSlab bump-allocates the *env frames evalCall builds for each
 	// parameterized-rule invocation, same rationale as nodeSlab/childSlab.
-	envSlab []env
+	envSlab arena[env]
 
 	// newNodeFn is e.newNode as a func value, computed once instead of at
 	// every primitive call site. A method value like e.newNode allocates a
@@ -500,7 +568,7 @@ func (e *evaluator) enter(pos int) bool {
 		e.abort, e.abortPos = ErrTooDeep, pos
 		return false
 	}
-	if e.maxEntries > 0 && len(e.nodeSlab)+len(e.refMemo)+len(e.callMemo) >= e.maxEntries {
+	if e.maxEntries > 0 && e.nodeSlab.len()+len(e.refMemo)+len(e.callMemo) >= e.maxEntries {
 		e.abort, e.abortPos = ErrTooLarge, pos
 		return false
 	}
@@ -533,14 +601,12 @@ func (e *evaluator) skipPos(pos int) int {
 // newNode hands out a *Node backed by a shared, amortized-growth slab
 // instead of its own heap allocation.
 func (e *evaluator) newNode(n Node) *Node {
-	e.nodeSlab = append(e.nodeSlab, n)
-	return &e.nodeSlab[len(e.nodeSlab)-1]
+	return e.nodeSlab.alloc(n)
 }
 
 // newEnv is newNode's counterpart for the *env frames evalCall builds.
 func (e *evaluator) newEnv(v env) *env {
-	e.envSlab = append(e.envSlab, v)
-	return &e.envSlab[len(e.envSlab)-1]
+	return e.envSlab.alloc(v)
 }
 
 // oneChild wraps a single node in a fresh length-1, cap-1 slice carved from
@@ -549,9 +615,7 @@ func (e *evaluator) newEnv(v env) *env {
 // call unconditionally: n is already fully computed, so this is one atomic
 // append with no recursive call landing in the middle of it.
 func (e *evaluator) oneChild(n *Node) []*Node {
-	e.childSlab = append(e.childSlab, n)
-	i := len(e.childSlab)
-	return e.childSlab[i-1 : i : i]
+	return e.childSlab.allocSlice(n)
 }
 
 // newChildren copies a fully-computed slice of children into the shared
@@ -560,10 +624,7 @@ func (e *evaluator) oneChild(n *Node) []*Node {
 // this must be the only thing appending to childSlab for the duration of the
 // copy.
 func (e *evaluator) newChildren(nodes []*Node) []*Node {
-	start := len(e.childSlab)
-	e.childSlab = append(e.childSlab, nodes...)
-	end := len(e.childSlab)
-	return e.childSlab[start:end:end]
+	return e.childSlab.allocSlice(nodes...)
 }
 
 // argSig identifies a parameterized-rule argument for the memo key, paired
@@ -692,12 +753,15 @@ func (e *evaluator) evalRef(name string, env *env, noSkip bool, pos int) (*Node,
 	}
 	body, next, ok := e.evalExpr(rule.Expr, nil, noSkip, p)
 	e.depth--
-	var result *Node
-	if ok {
-		result = e.newNode(Node{Kind: KindRule, Name: name, Start: p, End: next, Children: e.oneChild(body)})
+	if !ok {
+		if !d.leaf {
+			e.refMemo[key] = memoEntry{}
+		}
+		return nil, 0, false
 	}
-	e.refMemo[key] = memoEntry{node: result, next: next, ok: ok}
-	return result, next, ok
+	result := e.newNode(Node{Kind: KindRule, Name: name, Start: p, End: next, Children: e.oneChild(body)})
+	e.refMemo[key] = memoEntry{node: result, next: next, ok: true}
+	return result, next, true
 }
 
 // evalCall resolves a parameterized-rule invocation (`Name(Arg)`): binds

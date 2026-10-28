@@ -2,6 +2,7 @@
 package parser
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,6 +105,16 @@ func TestParseStringRejectsOversizedParse(t *testing.T) {
 	var perr *ParseError
 	require.ErrorAs(t, err, &perr)
 	require.Equal(t, "query is too large or complex to parse", perr.Message)
+
+	// So is an IN list just under MaxSQLBytes.
+	var in strings.Builder
+	in.WriteString("SELECT * FROM t WHERE x IN (100000")
+	for i := 100001; in.Len() < MaxSQLBytes-16; i++ {
+		fmt.Fprintf(&in, ", %d", i)
+	}
+	in.WriteString(")")
+	_, err = ParseString(in.String())
+	require.NoError(t, err)
 
 	// A realistic large query is well within it.
 	_, err = ParseString("SELECT a" + strings.Repeat(", coalesce(t.b, 'x') + 1 AS c", 200) + " FROM t")
