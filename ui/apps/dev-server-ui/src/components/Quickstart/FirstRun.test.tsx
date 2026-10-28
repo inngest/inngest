@@ -381,3 +381,59 @@ it('keeps step 3 invokable when reopening quickstart after completion and opens 
     replace: true,
   });
 });
+
+it.each(['', fn.id])(
+  'allows switching agent observation for function %j to manual invocation without an error',
+  async (functionID) => {
+    fixtures.context.attempt = {
+      mode: 'agent',
+      functionID,
+      startedAt: '2026-10-23T12:00:00Z',
+    };
+    fixtures.invoke.mockReturnValue({
+      unwrap: async () => ({ invokeFunction: true }),
+    });
+    const view = render(<FirstRun />);
+    expect(invokeButton().disabled).toBe(!!functionID);
+    expect(
+      screen.getByText(
+        'Pause your agent before switching to avoid duplicate runs.',
+      ),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Switch to manual invocation' }),
+    );
+    expect(fixtures.setAttempt).toHaveBeenLastCalledWith(null);
+    expect(fixtures.invoke).not.toHaveBeenCalled();
+    fixtures.context.attempt = null;
+    view.rerender(<FirstRun />);
+    expect(invokeButton().disabled).toBe(false);
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: /^Function / })
+        .disabled,
+    ).toBe(false);
+    expect(
+      screen.queryByRole('button', { name: 'Switch to manual invocation' }),
+    ).toBeNull();
+    await act(async () => fireEvent.click(invokeButton()));
+    expect(fixtures.invoke).toHaveBeenCalledTimes(1);
+  },
+);
+
+it('links to the full runs list after an uncertain invocation without automatically resending', async () => {
+  fixtures.invoke.mockReturnValue({
+    unwrap: async () => {
+      throw new Error('Lost response');
+    },
+  });
+  const view = render(<FirstRun />);
+  await act(async () => fireEvent.click(invokeButton()));
+  fixtures.context.attempt = fixtures.setAttempt.mock.calls[0][0];
+  view.rerender(<FirstRun />);
+  expect(
+    screen.getByRole('link', { name: 'Check Runs' }).getAttribute('href'),
+  ).toBe('/runs?showAllRuns=true');
+  expect(fixtures.setAttempt).not.toHaveBeenCalledWith(null);
+  fireEvent.click(invokeButton());
+  expect(fixtures.invoke).toHaveBeenCalledTimes(1);
+});

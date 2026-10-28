@@ -76,6 +76,7 @@ function RunsComponent() {
     isFunctionTimeField,
   );
   const [excludeDeferred] = useBooleanSearchParam('excludeDeferred');
+  const [showAllRuns] = useBooleanSearchParam('showAllRuns');
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
@@ -234,7 +235,7 @@ function RunsComponent() {
           </div>
         }
       />
-      <RunsOnboarding runID={runID || undefined}>
+      <RunsOnboarding runID={runID || undefined} showAllRuns={showAllRuns}>
         <LinkedRunDetails
           runID={runID || undefined}
           runs={runs}

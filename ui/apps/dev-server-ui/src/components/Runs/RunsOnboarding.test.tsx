@@ -33,6 +33,9 @@ it('focuses a synced app on invocation and keeps the full Quickstart accessible'
   expect(
     screen.getByRole('link', { name: 'Open Quickstart' }).getAttribute('href'),
   ).toBe('/?quickstart=true');
+  expect(
+    screen.getByRole('link', { name: 'View all runs' }).getAttribute('href'),
+  ).toBe('/runs?showAllRuns=true');
   expect(fixtures.track.mock.calls).toEqual([
     ['viewed', { entry_stage: 'run' }, true],
     ['app_ready', {}, true],
@@ -69,3 +72,19 @@ it('waits for completion reconciliation before replacing the runs list', () => {
   expect(screen.getByText('Existing runs list and details')).toBeTruthy();
   expect(fixtures.track).not.toHaveBeenCalled();
 });
+
+it.each([true, false])(
+  'keeps the full runs list accessible during recovery with ready=%s',
+  (ready) => {
+    fixtures.state.ready = ready;
+    fixtures.state.attempt = {
+      functionID: 'fn-1',
+      startedAt: '2026-10-23T12:00:00Z',
+    };
+    render(<RunsOnboarding showAllRuns>{content}</RunsOnboarding>);
+    expect(screen.getByText('Existing runs list and details')).toBeTruthy();
+    expect(screen.queryByText('Existing function invocation')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(fixtures.track).not.toHaveBeenCalled();
+  },
+);

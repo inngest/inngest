@@ -242,15 +242,25 @@ export function FirstRun({
           </Select.Options>
         </Select>
       )}
-      {attempt?.functionID && (error || runs.isError) && (
+      {(attempt?.mode === 'agent' ||
+        (attempt?.functionID && (error || runs.isError))) && (
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/runs" target="_self">
+          {attempt?.mode === 'agent' && (
+            <p className="text-muted w-full text-sm">
+              Pause your agent before switching to avoid duplicate runs.
+            </p>
+          )}
+          <Link href="/runs?showAllRuns=true" target="_self">
             Check Runs
           </Link>
           <Button
             kind="secondary"
             appearance="outlined"
-            label="I checked Runs — allow another invocation"
+            label={
+              attempt?.mode === 'agent'
+                ? 'Switch to manual invocation'
+                : 'I checked Runs — allow another invocation'
+            }
             disabled={invocation.isLoading}
             onClick={() => {
               setAttempt(null);
