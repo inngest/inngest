@@ -60,29 +60,6 @@ const GetFunctionStatusMetrics = graphql(`
       }
     }
     workspace(id: $workspaceId) {
-      completed: scopedMetrics(
-        filter: {
-          name: "function_run_ended_total"
-          scope: $scope
-          groupBy: "status"
-          from: $from
-          functionIDs: $functionIDs
-          appIDs: $appIDs
-          until: $until
-        }
-      ) {
-        metrics {
-          id
-          tagName
-          tagValue
-          data {
-            value
-            bucket
-          }
-        }
-      }
-    }
-    workspace(id: $workspaceId) {
       completedByFunction: scopedMetrics(
         filter: {
           name: "function_run_ended_total"

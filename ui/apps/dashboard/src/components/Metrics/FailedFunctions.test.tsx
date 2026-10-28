@@ -25,9 +25,8 @@ const metric = (id: string, tagValue: string, value: number) => ({
 });
 
 describe('FailedFunctions', () => {
-  it('charts individual failed functions even when the overview is grouped by app', () => {
+  it('charts individual failed functions and excludes other statuses', () => {
     const workspace = {
-      completed: { metrics: [metric('app-a', 'Failed', 10)] },
       completedByFunction: {
         metrics: [
           metric('fn-a', 'Failed', 3),
