@@ -556,3 +556,30 @@ func TestWriteKeepsArraySubqueryFrameExcludeAndTuples(t *testing.T) {
 		})
 	}
 }
+
+// TestWriteStarExcludeNames checks EXCLUDE names are decoded identifiers,
+// not raw source text that Write then quotes again, and that a qualified
+// entry keeps its qualifier.
+func TestWriteStarExcludeNames(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"quoted", `SELECT * EXCLUDE ("Foo", "a""b") FROM t`, `SELECT * EXCLUDE (Foo, "a""b") FROM t`},
+		{"qualified", "SELECT * EXCLUDE (t.a, b.c.d) FROM t", "SELECT * EXCLUDE (t.a, b.c.d) FROM t"},
+		{"keyword", `SELECT * EXCLUDE ("select", t.select) FROM t`, `SELECT * EXCLUDE ("select", t."select") FROM t`},
+		{"single string", "SELECT * EXCLUDE 'a b' FROM t", `SELECT * EXCLUDE ("a b") FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+
+	stmt, err := ParseString(`SELECT * EXCLUDE ("Foo", t.a) FROM t`)
+	require.NoError(t, err)
+	star := stmt.Columns[0].Expr.(*StarExpr)
+	require.Equal(t, []string{"Foo", "a"}, star.Exclude)
+	require.Equal(t, [][]string{{"Foo"}, {"t", "a"}}, star.ExcludeParts)
+
+	// ExcludeParts disagreeing with Exclude is an error, not printed.
+	star.Exclude[1] = "b"
+	require.ErrorContains(t, Write(&strings.Builder{}, stmt), "ExcludeParts doesn't match Exclude")
+}
