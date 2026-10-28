@@ -223,3 +223,34 @@ func TestQueryInsights_RecoversPanics(t *testing.T) {
 		require.Equal(t, codes.Internal, status.Code(err))
 	})
 }
+
+// TestQueryInsights_EncodesUnrepresentableNumbers covers cells JSON (and so
+// structpb) can't carry as-is: non-finite floats and integers past 2^53.
+// Uses a quack-transport connection (production's transport) since the
+// jsonlines one already decodes BIGINT through a float64.
+func TestQueryInsights_EncodesUnrepresentableNumbers(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{
+		Query: "SELECT 'inf'::DOUBLE AS a, '-inf'::DOUBLE AS b, 'nan'::DOUBLE AS c, 9007199254740993::BIGINT AS d, 42::BIGINT AS e",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Data.Rows, 1)
+	v := resp.Data.Rows[0].Values
+	require.Equal(t, "Infinity", v[0].GetStringValue())
+	require.Equal(t, "-Infinity", v[1].GetStringValue())
+	require.Equal(t, "NaN", v[2].GetStringValue())
+	require.Equal(t, "9007199254740993", v[3].GetStringValue())
+	require.Equal(t, float64(42), v[4].GetNumberValue())
+}
