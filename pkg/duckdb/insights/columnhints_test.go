@@ -597,3 +597,39 @@ func TestBuildColumnHintsStarExcludeQualified(t *testing.T) {
 		hintsFor(t, "SELECT * EXCLUDE (m.run_id) FROM metadata m JOIN extended_trace_spans e ON m.run_id = e.run_id"),
 	)
 }
+
+// DuckDB projects a USING/NATURAL join's merged columns once, at the left
+// copy's position (checked against a real duckdb's DESCRIBE), so the
+// right side's hints must shift left accordingly.
+func TestBuildColumnHintsStarOverUsingAndNaturalJoins(t *testing.T) {
+	n := HintNone
+	// metadata (9 columns) + extended_trace_spans minus run_id/span_id.
+	using := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n, n, HintAppID, HintFunctionID, n, n, n, n, n, n, n, n}
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata JOIN extended_trace_spans USING (run_id, span_id)"))
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata LEFT JOIN extended_trace_spans USING (span_id, run_id)"))
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata FULL OUTER JOIN extended_trace_spans USING (run_id, span_id)"))
+
+	// NATURAL merges every shared column: run_id, run_queued_at, span_id,
+	// inngest, metadata.
+	natural := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n, HintAppID, HintFunctionID, n, n, n, n, n, n}
+	require.Equal(t, natural, hintsFor(t, "SELECT * FROM metadata NATURAL JOIN extended_trace_spans"))
+	require.Equal(t, natural, hintsFor(t, "SELECT * FROM metadata m NATURAL FULL JOIN extended_trace_spans e"))
+
+	// Excluding the left copy moves the merged column to the right copy's
+	// position instead of dropping it.
+	require.Equal(t,
+		[]ColumnHint{n, n, n, n, n, n, n, n, HintRunID, n, HintAppID, HintFunctionID, n, n, n, n, n, n, n, n, n},
+		hintsFor(t, "SELECT * EXCLUDE (m.run_id) FROM metadata m JOIN extended_trace_spans e USING (run_id)"))
+
+	// "t.*" is never merged.
+	require.Len(t, hintsFor(t, "SELECT e.* FROM metadata m JOIN extended_trace_spans e USING (run_id)"), 13)
+}
+
+func TestBuildColumnHintsStarOverSemiAntiJoin(t *testing.T) {
+	n := HintNone
+	metadata := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n}
+	require.Equal(t, metadata, hintsFor(t, "SELECT * FROM metadata m SEMI JOIN extended_trace_spans e ON m.run_id = e.run_id"))
+	require.Equal(t, metadata, hintsFor(t, "SELECT * FROM metadata m ANTI JOIN extended_trace_spans e USING (run_id)"))
+	// POSITIONAL/CROSS/ON joins project both sides in full.
+	require.Len(t, hintsFor(t, "SELECT * FROM metadata POSITIONAL JOIN extended_trace_spans"), 22)
+}

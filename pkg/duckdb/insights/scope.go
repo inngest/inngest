@@ -29,6 +29,17 @@ func (e *ValidationError) Error() string {
 type scopeEntry struct {
 	alias string
 	table logicalTable
+	// starHidden marks the right side of a SEMI/ANTI join, whose columns
+	// a bare "*" doesn't project (DuckDB only returns the left side's).
+	starHidden bool
+}
+
+// usingColumn is one table's copy of a column a JOIN ... USING (or a
+// NATURAL join) merged: entry indexes tableScope.entries, column is
+// lowercased.
+type usingColumn struct {
+	entry  int
+	column string
 }
 
 // tableScope is the set of logical tables a single SELECT's FROM clause
@@ -36,6 +47,13 @@ type scopeEntry struct {
 // (an explicit alias, or the logical table's own name).
 type tableScope struct {
 	entries []scopeEntry
+	// using maps every column copy a USING/NATURAL join merged to its
+	// merged set's id: DuckDB projects each set once from a bare "*" (at
+	// the first copy's position) and resolves a bare reference to it
+	// unambiguously. A multi-way "a JOIN b USING (k) JOIN c USING (k)"
+	// merges all three copies into one set.
+	using     map[usingColumn]int
+	nextUsing int
 	// outer is the scope this one may correlate into when a name isn't
 	// found locally — non-nil only for an expression-position subquery
 	// (validateWithCTEs threads its own scope down whenever it recurses
@@ -78,16 +96,124 @@ func (s *tableScope) addRef(ref parser.TableRef, ctes map[string]logicalTable, d
 	case *parser.BaseTableRef:
 		return s.addBaseTable(r, ctes)
 	case *parser.JoinRef:
+		lo := len(s.entries)
 		if err := s.addRef(r.Left, ctes, diags); err != nil {
 			return err
 		}
-		return s.addRef(r.Right, ctes, diags)
+		mid := len(s.entries)
+		if err := s.addRef(r.Right, ctes, diags); err != nil {
+			return err
+		}
+		return s.addJoinColumns(r, lo, mid, len(s.entries))
 	case *parser.TableSubqueryRef:
 		return s.addSubquery(r, ctes, diags)
 	case *parser.TableFunctionRef:
 		return s.addTableFunction(r)
 	default:
 		return &ValidationError{Pos: ref.Pos(), End: ref.End(), Message: "unsupported FROM clause shape"}
+	}
+}
+
+// addJoinColumns applies r's own column semantics once both its sides'
+// entries are in scope (left is entries[lo:mid], right entries[mid:hi]):
+// each USING (or NATURAL join's shared) column must exist, unambiguously,
+// on both sides -- the same binder errors DuckDB reports -- and is merged
+// into one using set; a SEMI/ANTI join's right side is hidden from "*".
+func (s *tableScope) addJoinColumns(r *parser.JoinRef, lo, mid, hi int) error {
+	typ := strings.ToUpper(r.Type)
+	if strings.Contains(typ, "SEMI") || strings.Contains(typ, "ANTI") {
+		for i := mid; i < hi; i++ {
+			s.entries[i].starHidden = true
+		}
+	}
+
+	names := r.Using
+	if strings.HasPrefix(typ, "NATURAL") {
+		names = nil
+		seen := map[string]bool{}
+		for _, e := range s.entries[lo:mid] {
+			for _, name := range e.table.columnOrder {
+				key := strings.ToLower(name)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				if len(s.sideColumns(mid, hi, name)) > 0 {
+					names = append(names, name)
+				}
+			}
+		}
+	}
+
+	for _, name := range names {
+		left, err := s.joinSideColumn(r, lo, mid, name, "left")
+		if err != nil {
+			return err
+		}
+		right, err := s.joinSideColumn(r, mid, hi, name, "right")
+		if err != nil {
+			return err
+		}
+		s.mergeUsing(left, right)
+	}
+	return nil
+}
+
+// sideColumns returns every copy of column name among entries[lo:hi],
+// collapsing copies an earlier USING/NATURAL join already merged into
+// one (the first).
+func (s *tableScope) sideColumns(lo, hi int, name string) []usingColumn {
+	var out []usingColumn
+	sets := map[int]bool{}
+	for i := lo; i < hi; i++ {
+		if _, ok := s.entries[i].table.column(name); !ok {
+			continue
+		}
+		uc := usingColumn{entry: i, column: strings.ToLower(name)}
+		if id, ok := s.using[uc]; ok {
+			if sets[id] {
+				continue
+			}
+			sets[id] = true
+		}
+		out = append(out, uc)
+	}
+	return out
+}
+
+func (s *tableScope) joinSideColumn(r *parser.JoinRef, lo, hi int, name, side string) (usingColumn, error) {
+	switch cols := s.sideColumns(lo, hi, name); len(cols) {
+	case 0:
+		return usingColumn{}, &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("column %q does not exist on %s side of join", name, side)}
+	case 1:
+		return cols[0], nil
+	default:
+		return usingColumn{}, &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("ambiguous column %q on %s side of join", name, side)}
+	}
+}
+
+// mergeUsing puts a and b (and whatever sets either already belongs to)
+// into one using set.
+func (s *tableScope) mergeUsing(a, b usingColumn) {
+	if s.using == nil {
+		s.using = map[usingColumn]int{}
+	}
+	aID, aOK := s.using[a]
+	bID, bOK := s.using[b]
+	switch {
+	case aOK && bOK:
+		for uc, id := range s.using {
+			if id == bID {
+				s.using[uc] = aID
+			}
+		}
+	case aOK:
+		s.using[b] = aID
+	case bOK:
+		s.using[a] = bID
+	default:
+		s.nextUsing++
+		s.using[a], s.using[b] = s.nextUsing, s.nextUsing
 	}
 }
 
@@ -263,15 +389,11 @@ func (s *tableScope) uniqueColumn(name string) (knownColumn, bool) {
 
 // localColumnCount is columnCount without the correlation fallback —
 // columnCount and uniqueColumn both need to know "does *this* scope have
-// any match at all" before deciding whether to check s.outer.
+// any match at all" before deciding whether to check s.outer. Copies a
+// USING/NATURAL join merged count once, matching DuckDB ("SELECT k FROM a
+// JOIN b USING (k)" isn't ambiguous).
 func (s *tableScope) localColumnCount(name string) int {
-	count := 0
-	for _, e := range s.entries {
-		if _, ok := e.table.column(name); ok {
-			count++
-		}
-	}
-	return count
+	return len(s.sideColumns(0, len(s.entries), name))
 }
 
 // columnCount reports how many tables have a column by this name — 0
