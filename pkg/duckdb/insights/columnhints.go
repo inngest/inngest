@@ -169,7 +169,7 @@ func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
 		return col.pathHints
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
-			col, ok := tbl.columns[id.Parts[1]]
+			col, ok := tbl.column(id.Parts[1])
 			if !ok {
 				return nil
 			}
@@ -274,7 +274,7 @@ type starColumn struct {
 func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 	excluded := map[string]bool{}
 	for _, c := range star.Exclude {
-		excluded[c] = true
+		excluded[strings.ToLower(c)] = true
 	}
 
 	var tables []logicalTable
@@ -292,10 +292,11 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 	var out []starColumn
 	for _, tbl := range tables {
 		for _, name := range tbl.columnOrder {
-			if excluded[name] {
+			if excluded[strings.ToLower(name)] {
 				continue
 			}
-			out = append(out, starColumn{name: name, col: tbl.columns[name]})
+			col, _ := tbl.column(name)
+			out = append(out, starColumn{name: name, col: col})
 		}
 	}
 	return out
@@ -355,7 +356,7 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		return col.hint()
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
-			col, ok := tbl.columns[id.Parts[1]]
+			col, ok := tbl.column(id.Parts[1])
 			if !ok {
 				return HintNone
 			}
@@ -379,7 +380,7 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		if !ok {
 			return HintNone
 		}
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok || !col.arrayOfStructs {
 			return HintNone
 		}

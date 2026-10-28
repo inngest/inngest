@@ -97,7 +97,7 @@ func identType(id *parser.Ident, scope *tableScope) ColumnType {
 		if !ok {
 			return ColumnTypeUnknown
 		}
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok {
 			return ColumnTypeUnknown
 		}

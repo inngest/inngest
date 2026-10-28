@@ -1,6 +1,10 @@
 package insights
 
-import "github.com/inngest/inngest/pkg/duckdb/parser"
+import (
+	"strings"
+
+	"github.com/inngest/inngest/pkg/duckdb/parser"
+)
 
 // QueryInfo captures the *physical* logical tables stmt references, for the
 // response envelope's diagnostics. A CTE or FROM-clause subquery's own
@@ -31,7 +35,7 @@ func collectQueryInfo(stmt *parser.SelectStatement, info *QueryInfo, seen, cteNa
 	}
 	if stmt.With != nil {
 		for _, cte := range stmt.With.CTEs {
-			cteNames[cte.Name] = true
+			cteNames[strings.ToLower(cte.Name)] = true
 			collectQueryInfo(cte.Select, info, seen, cteNames)
 		}
 	}
@@ -77,7 +81,7 @@ func collectFromRef(ref parser.TableRef, info *QueryInfo, seen, cteNames map[str
 		if len(r.Name) == 0 {
 			return
 		}
-		name := r.Name[len(r.Name)-1]
+		name := strings.ToLower(r.Name[len(r.Name)-1])
 		if cteNames[name] || seen[name] {
 			return
 		}

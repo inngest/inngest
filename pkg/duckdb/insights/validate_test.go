@@ -513,3 +513,28 @@ func TestValidateRejectsParameters(t *testing.T) {
 		})
 	}
 }
+
+// DuckDB identifiers are case-insensitive (quoted ones too), so table,
+// column, alias, CTE, EXCLUDE and comprehension-variable names all resolve
+// regardless of case.
+func TestValidateIdentifiersCaseInsensitive(t *testing.T) {
+	queries := []string{
+		"SELECT Run_ID FROM RUNS",
+		`SELECT "RUN_ID" FROM "Runs"`,
+		"SELECT R.Run_Id FROM runs r",
+		"SELECT RUNS.run_id FROM runs",
+		"WITH X AS (SELECT run_id AS Foo FROM runs) SELECT x.FOO, foo FROM x",
+		"SELECT * EXCLUDE (RUN_ID) FROM runs",
+		"SELECT r.* FROM runs R",
+		"SELECT run_id AS Foo FROM runs ORDER BY foo",
+		"SELECT [S FOR s IN event_ids] AS x FROM runs",
+		"SELECT Inngest.score FROM runs",
+		"SELECT t.FOO FROM (SELECT run_id AS foo FROM runs) T",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.NoError(t, err)
+		})
+	}
+}

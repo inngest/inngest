@@ -136,9 +136,9 @@ func (s *tableScope) addBaseTable(r *parser.BaseTableRef, ctes map[string]logica
 	if len(r.Name) != 1 {
 		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", strings.Join(r.Name, "."))}
 	}
-	tbl, ok := ctes[r.Name[0]]
+	tbl, ok := ctes[strings.ToLower(r.Name[0])]
 	if !ok {
-		tbl, ok = logicalTables[r.Name[0]]
+		tbl, ok = lookupLogicalTable(r.Name[0])
 	}
 	if !ok {
 		return &ValidationError{Pos: r.Pos(), End: r.End(), Message: fmt.Sprintf("unknown table %q", r.Name[0])}
@@ -173,7 +173,7 @@ func (s *tableScope) addSubquery(r *parser.TableSubqueryRef, ctes map[string]log
 
 func (s *tableScope) lookup(alias string) (logicalTable, bool) {
 	for _, e := range s.entries {
-		if e.alias == alias {
+		if strings.EqualFold(e.alias, alias) {
 			return e.table, true
 		}
 	}
@@ -200,7 +200,7 @@ func (s *tableScope) names() []string {
 func (s *tableScope) uniqueColumn(name string) (knownColumn, bool) {
 	var found knownColumn
 	for _, e := range s.entries {
-		if col, ok := e.table.columns[name]; ok {
+		if col, ok := e.table.column(name); ok {
 			found = col
 		}
 	}
@@ -223,7 +223,7 @@ func (s *tableScope) uniqueColumn(name string) (knownColumn, bool) {
 func (s *tableScope) localColumnCount(name string) int {
 	count := 0
 	for _, e := range s.entries {
-		if _, ok := e.table.columns[name]; ok {
+		if _, ok := e.table.column(name); ok {
 			count++
 		}
 	}
