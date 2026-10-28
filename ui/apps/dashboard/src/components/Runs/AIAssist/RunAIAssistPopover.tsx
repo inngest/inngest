@@ -87,8 +87,8 @@ export function RunAIAssistPopover({
   const message = metadataLoading
     ? 'Preparing prompt…'
     : metadataError
-    ? 'Unable to load page context. Retry to prepare a prompt.'
-    : result.error;
+      ? 'Unable to load page context. Retry to prepare a prompt.'
+      : result.error;
 
   async function copyPrompt() {
     if (blocked || copyState === 'copying') return;
@@ -153,8 +153,8 @@ export function RunAIAssistPopover({
                 productionCloud && client.id === 'codex'
                   ? 'chatgpt_codex'
                   : productionCloud && client.id === 'claude'
-                  ? 'claude'
-                  : client.tracking,
+                    ? 'claude'
+                    : client.tracking,
             });
           }}
         >
@@ -167,13 +167,11 @@ export function RunAIAssistPopover({
                   !productionCloud && id === 'codex'
                     ? 'Codex'
                     : !productionCloud && id === 'claude'
-                    ? 'Claude Code'
-                    : label
+                      ? 'Claude Code'
+                      : label
                 }
                 iconBefore={<Icon className="h-4 w-4" />}
-                className={`min-w-0 gap-1 border-r-0 px-2 text-xs ${
-                  productionCloud && id === 'codex' ? 'flex-[1.4]' : ''
-                }`}
+                className={`min-w-0 gap-1 border-r-0 px-2 text-xs ${productionCloud && id === 'codex' ? 'flex-[1.4]' : ''}`}
               />
             ))}
           </Tabs.List>

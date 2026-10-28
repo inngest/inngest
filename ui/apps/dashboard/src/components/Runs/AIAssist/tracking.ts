@@ -26,8 +26,8 @@ export function useRunAITracking(
               scope === 'debug'
                 ? 'run_details'
                 : scope === 'fn'
-                ? 'function_runs'
-                : 'environment_runs',
+                  ? 'function_runs'
+                  : 'environment_runs',
             templateVersion: scope === 'debug' ? 'run_debug_v1' : 'basic_v1',
             ...(scope === 'debug' ? { detailView } : {}),
           }),
