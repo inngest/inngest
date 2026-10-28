@@ -109,3 +109,26 @@ func TestExecuteCapsConcurrency(t *testing.T) {
 	require.ErrorAs(t, err, &eerr)
 	require.ErrorContains(t, err, "too many Insights queries")
 }
+
+// TestExecuteSlotWaitHonorsCallerCancellation: a caller that gives up (or
+// whose own deadline passes) while waiting for a slot gets its own ctx error
+// back, not the "too many queries" message reserved for Execute's deadline.
+func TestExecuteSlotWaitHonorsCallerCancellation(t *testing.T) {
+	db := newTestQuackDuckDB(t)
+	insights.OccupyExecuteSlots(t)
+
+	tr, err := insights.Transpile("SELECT 1 AS one", uuid.New(), uuid.New())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = insights.Execute(ctx, db, tr)
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotContains(t, err.Error(), "too many Insights queries")
+
+	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err = insights.Execute(ctx, db, tr)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NotContains(t, err.Error(), "too many Insights queries")
+}

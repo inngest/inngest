@@ -24,13 +24,24 @@ var (
 	executeSlots         = make(chan struct{}, maxConcurrentExecutes)
 )
 
+// errExecuteTimeout is the cause Execute's own executeTimeout deadline
+// cancels its ctx with, so a caller's own cancellation or (shorter)
+// deadline isn't reported as one of Execute's limits.
+var errExecuteTimeout = errors.New("insights: execute timeout")
+
+// hitExecuteTimeout reports whether ctx ended because of Execute's own
+// executeTimeout rather than its caller.
+func hitExecuteTimeout(ctx context.Context) bool {
+	return errors.Is(context.Cause(ctx), errExecuteTimeout)
+}
+
 // limitError rewrites err into a user-facing message when it was caused by
 // one of Execute's own limits rather than by the query itself.
 func limitError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, driver.ErrResultTooLarge):
 		return fmt.Errorf("query result exceeds the %d MiB limit; select fewer columns or rows: %w", maxResultBytes>>20, err)
-	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+	case hitExecuteTimeout(ctx):
 		return fmt.Errorf("query exceeded the %s time limit: %w", executeTimeout, err)
 	}
 	return err
@@ -119,13 +130,17 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 	// queued queries can't grow without bound either. The driver turns the
 	// deadline into a real DuckDB interrupt (quack sends a CancelRequest),
 	// not just an abandoned wait.
-	ctx, cancel := context.WithTimeout(ctx, executeTimeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, executeTimeout, errExecuteTimeout)
 	defer cancel()
 
 	select {
 	case executeSlots <- struct{}{}:
 		defer func() { <-executeSlots }()
 	case <-ctx.Done():
+		if !hitExecuteTimeout(ctx) {
+			// The caller gave up (or its own deadline passed) first.
+			return nil, ctx.Err()
+		}
 		return nil, &ExecutionError{Err: fmt.Errorf("too many Insights queries are already running; try again shortly"), Start: tr.Start, End: tr.End}
 	}
 
