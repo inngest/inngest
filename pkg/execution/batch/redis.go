@@ -228,7 +228,10 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 
 	nowUnixSeconds := time.Now().Unix()
 	// script args
-	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
+	newULID, _ := appendIDsFromContext(ctx)
+	if newULID.Compare(ulid.ULID{}) == 0 {
+		newULID = ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
+	}
 	args, err := redis_state.StrSlice([]any{
 		config.MaxSize,
 		bi.EventID.String(),
@@ -501,6 +504,8 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 		ScheduleBatchPayload: ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    batchPointerKey,
+			BatchCluster:    opts.BatchCluster,
+			BatchGeneration: opts.BatchGeneration,
 			AccountID:       opts.AccountID,
 			WorkspaceID:     opts.WorkspaceID,
 			AppID:           opts.AppID,
@@ -560,8 +565,13 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 	}
 
 	nowUnixSeconds := time.Now().Unix()
-	newULID := ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
-	overflowULID := ulid.MustNew(uint64(time.Now().UnixMilli())+1, rand.Reader)
+	newULID, overflowULID := appendIDsFromContext(ctx)
+	if newULID.Compare(ulid.ULID{}) == 0 {
+		newULID = ulid.MustNew(uint64(time.Now().UnixMilli()), rand.Reader)
+	}
+	if overflowULID.Compare(ulid.ULID{}) == 0 {
+		overflowULID = ulid.MustNew(uint64(time.Now().UnixMilli())+1, rand.Reader)
+	}
 
 	// Build args: batchLimit, batchSizeLimit, prefix, statuses, timestamps, ULIDs, eventCount, then event pairs
 	baseArgs := []any{
