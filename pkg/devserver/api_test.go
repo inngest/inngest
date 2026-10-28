@@ -709,6 +709,28 @@ func TestDevEndpoint_DuckdbInsightsFlagReflectsDuckDBConnection(t *testing.T) {
 		var info InfoResponse
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &info))
 		require.True(t, info.Features["duckdb-insights"])
+		require.False(t, info.Features["duckdb-reads"])
+	})
+
+	t.Run("duckdb-reads needs DuckDB and --duckdb-reads", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		ds.Opts = StartOpts{Config: config.Config{ServerKind: headers.ServerKindDev}, EnableDuckDBReads: true}
+		db, err := sql.Open("sqlite", ":memory:")
+		require.NoError(t, err)
+		defer db.Close()
+		ds.DuckDB = db
+
+		noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+		api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+		req := httptest.NewRequest("GET", "/dev", nil)
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, req)
+
+		var info InfoResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &info))
+		require.True(t, info.Features["duckdb-insights"])
+		require.True(t, info.Features["duckdb-reads"])
 	})
 }
 
