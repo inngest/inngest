@@ -10281,11 +10281,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\acolumns\x18\x01 \x03(\v2\x1c.api.v2.InsightsOutputColumnB2\x92A/2-Column metadata for the insights query resultR\acolumns\x12\x96\x01\n" +
 	"\x04rows\x18\x02 \x03(\v2\x13.api.v2.InsightsRowBm\x92Aj2hRows of the insights query result, where each row contains a list of values corresponding to the columnsR\x04rows\x12\x84\x01\n" +
 	"\vdiagnostics\x18\x03 \x03(\v2\x1a.api.v2.InsightsDiagnosticBF\x92AC2AAny non-fatal diagnostics related to the insights query executionR\vdiagnostics\x12\x8a\x01\n" +
-	"\x04info\x18\x04 \x01(\v2\x19.api.v2.InsightsQueryInfoB[\x92AX2VWhich tables the query read and whether its result was capped by the default row limitR\x04info\"\xb2\x02\n" +
+	"\x04info\x18\x04 \x01(\v2\x19.api.v2.InsightsQueryInfoB[\x92AX2VWhich tables the query read and whether its result was capped by the default row limitR\x04info\"\xd0\x02\n" +
 	"\x11InsightsQueryInfo\x12r\n" +
 	"\rprimary_table\x18\x01 \x01(\tBH\x92AE2CThe table the query's outermost FROM reads, if there is exactly oneH\x00R\fprimaryTable\x88\x01\x01\x128\n" +
-	"\x06tables\x18\x02 \x03(\tB \x92A\x1d2\x1bEvery table the query readsR\x06tables\x12]\n" +
-	"\alimited\x18\x03 \x01(\bBC\x92A@2>Whether a default LIMIT was applied because the query had noneR\alimitedB\x10\n" +
+	"\x06tables\x18\x02 \x03(\tB \x92A\x1d2\x1bEvery table the query readsR\x06tables\x12{\n" +
+	"\alimited\x18\x03 \x01(\bBa\x92A^2\\Whether the server applied the default row limit or reduced an explicit LIMIT to the maximumR\alimitedB\x10\n" +
 	"\x0e_primary_table\"\xf5\x03\n" +
 	"\x14InsightsOutputColumn\x12H\n" +
 	"\x04name\x18\x01 \x01(\tB4\x92A12/Name of the column in the insights query resultR\x04name\x12x\n" +
@@ -10298,9 +10298,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x13InsightsPathSegment\x12C\n" +
 	"\x03key\x18\x01 \x01(\tB,\x92A)2'Object key, unset when wildcard is trueH\x00R\x03key\x88\x01\x01\x12:\n" +
 	"\bwildcard\x18\x02 \x01(\bB\x1e\x92A\x1b2\x19Every element of an arrayR\bwildcardB\x06\n" +
-	"\x04_key\"\x8a\x03\n" +
-	"\vInsightsRow\x12\xfa\x02\n" +
-	"\x06values\x18\x01 \x03(\v2\x16.google.protobuf.ValueB\xc9\x02\x92A\xc5\x022\xc2\x02Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.). Values that JSON numbers can't carry exactly are strings: NaN/Infinity/-Infinity, and integers outside +-(2^53 - 1).R\x06values\"\xa7\x04\n" +
+	"\x04_key\"\x95\x02\n" +
+	"\vInsightsRow\x12\x85\x02\n" +
+	"\x06values\x18\x01 \x03(\v2\x16.google.protobuf.ValueB\xd4\x01\x92A\xd0\x012\xcd\x01Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.).R\x06values\"\xa7\x04\n" +
 	"\x12InsightsDiagnostic\x12\x88\x01\n" +
 	"\bseverity\x18\x01 \x01(\x0e2\".api.v2.InsightsDiagnosticSeverityBH\x92AE2CSeverity level of the diagnostic (e.g., 'error', 'warning', 'info')R\bseverity\x12R\n" +
 	"\x04code\x18\x02 \x01(\tB>\x92A;29Machine-readable code representing the type of diagnosticR\x04code\x12O\n" +

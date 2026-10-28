@@ -3716,7 +3716,7 @@ message InsightsQueryInfo {
   ];
   bool limited = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Whether a default LIMIT was applied because the query had none"
+      description: "Whether the server applied the default row limit or reduced an explicit LIMIT to the maximum"
     }
   ];
 }
@@ -3787,7 +3787,7 @@ enum InsightsOutputColumnType {
 message InsightsRow {
   repeated google.protobuf.Value values = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.). Values that JSON numbers can't carry exactly are strings: NaN/Infinity/-Infinity, and integers outside +-(2^53 - 1)."
+      description: "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)."
     }
   ];
 }

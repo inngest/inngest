@@ -77,8 +77,13 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 			}
 			return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, err.Error())
 		}
+		resp, err = toQueryInsightsResponse(nil, sc.Result, &apiv2.InsightsQueryInfo{Tables: sc.Tables})
+		if err != nil {
+			insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusInternalError, "", 0)
+			return nil, err
+		}
 		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusMeta, "", len(sc.Result.Rows))
-		return toQueryInsightsResponse(nil, sc.Result, &apiv2.InsightsQueryInfo{Tables: sc.Tables})
+		return resp, nil
 	}
 
 	// consts.DevServerAccountID/EnvID, matching every other apiv2 endpoint
@@ -103,12 +108,19 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, err.Error())
 	}
 
-	insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusOK, tr.PrimaryTable, len(result.Rows))
 	info := &apiv2.InsightsQueryInfo{Tables: tr.Tables, Limited: tr.Limited}
 	if tr.PrimaryTable != "" {
 		info.PrimaryTable = &tr.PrimaryTable
 	}
-	return toQueryInsightsResponse(tr.Diagnostics, result, info)
+	// Built before recording metrics: converting a row can still fail (e.g.
+	// a NaN json.Marshal can't encode), which isn't a successful query.
+	resp, err = toQueryInsightsResponse(tr.Diagnostics, result, info)
+	if err != nil {
+		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusInternalError, tr.PrimaryTable, 0)
+		return nil, err
+	}
+	insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusOK, tr.PrimaryTable, len(result.Rows))
+	return resp, nil
 }
 
 // ListInsightsTables backs GET /v2/insights/tables, describing the same six
