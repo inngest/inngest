@@ -2037,16 +2037,23 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
+	skip := execution.SkipState{
+		Reason: reason,
+		Events: evts,
+	}
+	if len(req.Events) > 0 {
+		skip.CronSchedule = req.Events[0].GetEvent().CronSchedule()
+	}
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
-				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-					CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-					Reason:       reason,
-					Events:       evts,
-				})
+				e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, skip)
 			})
 	}
+	syncNow := e.now()
+	execution.SafelyInvokeSyncListeners(ctx, e.log, e.syncLifecycles, "OnFunctionSkipped", func(sl execution.SyncLifecycleListener) {
+		sl.OnFunctionSkipped(ctx, metadata, skip, syncNow)
+	})
 	return nil, nil, SkippedError{Reason: reason}
 }
 
@@ -6037,7 +6044,7 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
 	if enableInstrumentation {

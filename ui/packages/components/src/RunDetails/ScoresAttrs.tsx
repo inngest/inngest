@@ -1,8 +1,10 @@
 import { TimeElement } from '../DetailsCard/Element';
+import { canonicalMetadataKind } from '../RunDetailsShared/metadataKind';
 import { KindInngestScore, KindPrefixInngestScore } from '../generated';
 
 type ScoreMetadata = {
   kind: string;
+  isUser?: boolean | null;
   updatedAt: string;
   // Loose structural supertype of every SpanMetadata arm so both the V3 and V4
   // Trace types can be passed in. `object` (not Record<string, unknown>) is
@@ -37,18 +39,19 @@ export function isScoreKind(kind: string): boolean {
 // Normalizes either score kind shape to (name, raw value) pairs so readers
 // don't care which one was written.
 function scoreEntries(md: ScoreMetadata): [string, unknown][] {
-  if (md.kind === KindInngestScore) {
+  const kind = canonicalMetadataKind(md);
+  if (kind === KindInngestScore) {
     return Object.entries(md.values);
   }
-  if (isScoreKind(md.kind)) {
-    return [[md.kind.slice(KindPrefixInngestScore.length), md.values]];
+  if (isScoreKind(kind)) {
+    return [[kind.slice(KindPrefixInngestScore.length), md.values]];
   }
   return [];
 }
 
 export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   // Run views need child spans because scores attach where they are emitted.
-  const metadata = trace?.metadata?.filter((md) => isScoreKind(md.kind)) ?? [];
+  const metadata = trace?.metadata?.filter((md) => isScoreKind(canonicalMetadataKind(md))) ?? [];
   const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
 
   return [...metadata, ...childMetadata];

@@ -1,0 +1,1 @@
+SELECT * FROM read_csv('/etc/passwd')

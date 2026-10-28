@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
@@ -194,6 +195,25 @@ type attr[T any] struct {
 
 func (a attr[T]) Key() string {
 	return a.key
+}
+
+// isJSONEncoded reports whether the attribute's string value is itself a
+// JSON document: the attrs with a wrap func (JsonAttr), which wraps that
+// string as a json.RawMessage.
+func (a attr[T]) isJSONEncoded() bool { return a.wrap != nil }
+
+// JSONAttrKeys returns the keys of every JsonAttr in AttrsByKey: attributes
+// whose string value is itself a JSON document. A writer that stores
+// attributes as structured JSON (rather than OTel strings) can unwrap these.
+func JSONAttrKeys() []string {
+	var keys []string
+	for k, s := range AttrsByKey {
+		if j, ok := s.(interface{ isJSONEncoded() bool }); ok && j.isJSONEncoded() {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (a attr[T]) WrapValue(Value attribute.Value) any {

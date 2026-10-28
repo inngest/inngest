@@ -58,6 +58,7 @@ export type AnalyticsFeature =
   | 'account-concurrency'
   | 'ai-overview'
   | 'experiments'
+  | 'runs-ai-assist'
   | 'sandboxes'
   | 'scores'
   | 'sessions';
@@ -65,6 +66,7 @@ export type AnalyticsFeature =
 // Alphabetical — this list is the only place a valid event name is defined.
 // Feature names never appear here; `feature` carries that instead.
 type AnalyticsEventName =
+  | 'Assistant Action Performed'
   | 'Banner CTA Clicked'
   | 'Banner Dismissed'
   | 'Banner Viewed'
@@ -94,7 +96,58 @@ function track(
       ([, value]) => value !== undefined,
     ),
   );
-  analytics.track(event, compactProperties);
+  return analytics.track(event, compactProperties);
+}
+
+export type AssistantAction =
+  | { action: 'viewed' | 'opened' | 'prompt_copy_clicked' | 'prompt_copied' }
+  | {
+      action:
+        | 'setup_clicked'
+        | 'setup_opened'
+        | 'setup_copied'
+        | 'setup_copy_failed';
+      client:
+        | 'chatgpt'
+        | 'chatgpt_codex'
+        | 'claude'
+        | 'claude_code'
+        | 'codex_cli'
+        | 'other';
+    }
+  | {
+      action: 'prompt_copy_failed';
+      failure_category: 'permission_denied' | 'unavailable' | 'other';
+    }
+  | {
+      action: 'guide_clicked';
+      guide: 'connection' | 'troubleshooting' | 'more_ai_resources';
+    };
+
+type AssistantActionPerformedArgs = {
+  feature: AnalyticsFeature;
+  accountId?: string;
+  surface: 'environment_runs' | 'function_runs' | 'run_details';
+  templateVersion: 'basic_v1' | 'run_debug_v1';
+  detailView?: 'inline' | 'standalone';
+  event: AssistantAction;
+};
+
+export function trackAssistantActionPerformed({
+  feature,
+  accountId,
+  surface,
+  templateVersion,
+  detailView,
+  event,
+}: AssistantActionPerformedArgs) {
+  return track('Assistant Action Performed', feature, {
+    ...event,
+    account_id: accountId,
+    surface,
+    template_version: templateVersion,
+    detail_view: detailView,
+  });
 }
 
 // Banner events are intentionally generic so any warning/info banner can reuse

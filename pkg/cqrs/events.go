@@ -104,6 +104,11 @@ type WorkspaceEventsOpts struct {
 	Oldest                time.Time
 	IncludeInternalEvents bool
 	OmitEventData         bool // skips loading event payloads when not needed
+	// CEL is an optional CEL expression to filter events by. Only the
+	// duckdb-backed EventReader (pkg/cqrs/duckdbquery) implements this;
+	// the SQLite/Postgres wrapper (pkg/cqrs/manager) rejects a non-empty
+	// value rather than silently ignoring it.
+	CEL string
 }
 
 func (o *WorkspaceEventsOpts) Validate() error {

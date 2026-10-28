@@ -36,6 +36,13 @@ end
 
 local existingTime = existing.last -- store a ref to the last time we successfully checked this partition
 
+-- Consume any capacity release recorded since the last lease.
+local capacityReleased = 0
+if existing.capacityReleased == true then
+	capacityReleased = 1
+end
+existing.capacityReleased = nil
+
 existing.leaseID = leaseID
 existing.at = leaseTime
 existing.last = currentTime -- in ms.
@@ -45,4 +52,4 @@ redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, leaseTime)
 update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, leaseTime)
 
-return { existingTime }
+return { existingTime, capacityReleased }

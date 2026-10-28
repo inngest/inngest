@@ -1,0 +1,14 @@
+INPUT
+event.data.foo == "bar"
+
+EVENT SQL
+((x::JSON->>?) = ?)
+
+EVENT ARGS
+[$.data.foo bar]
+
+OUTPUT SQL
+
+
+OUTPUT ARGS
+[]

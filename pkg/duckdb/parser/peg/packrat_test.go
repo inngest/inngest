@@ -1,0 +1,204 @@
+package peg
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+const testGrammar = `
+Greeting <- Hello / Goodbye
+Hello <- 'hello' Name
+Goodbye <- 'bye'? Name
+Name <- Word
+List(D) <- D (',' D)* ','?
+Parens(D) <- '(' D ')'
+Sum <- Parens(List(Name))
+`
+
+func wordPrimitive(newNode func(Node) *Node, input string, pos int) (*Node, int, bool) {
+	start := pos
+	for pos < len(input) && ((input[pos] >= 'a' && input[pos] <= 'z') || (input[pos] >= 'A' && input[pos] <= 'Z')) {
+		pos++
+	}
+	if pos == start {
+		return nil, 0, false
+	}
+	return newNode(Node{Kind: KindPrimitive, Text: input[start:pos], Start: start, End: pos}), pos, true
+}
+
+func skipASCIIWhitespace(input string, pos int) int {
+	for pos < len(input) && (input[pos] == ' ' || input[pos] == '\t' || input[pos] == '\n' || input[pos] == '\r') {
+		pos++
+	}
+	return pos
+}
+
+func newTestParser(t *testing.T) *Parser {
+	g, err := ParseGrammar(testGrammar)
+	require.NoError(t, err)
+	return &Parser{Grammar: g, Primitives: map[string]Primitive{"Word": wordPrimitive}, SkipTrivia: skipASCIIWhitespace}
+}
+
+func TestParseChoiceAndLiteral(t *testing.T) {
+	p := newTestParser(t)
+	n, err := p.Parse("hello world", "Greeting")
+	require.NoError(t, err)
+	require.Equal(t, KindRule, n.Kind)
+	require.Equal(t, "Greeting", n.Name)
+	choice := n.Children[0]
+	require.Equal(t, KindChoice, choice.Kind)
+	require.Equal(t, 0, choice.Alt) // matched Hello, not Goodbye
+}
+
+func TestParseOptional(t *testing.T) {
+	p := newTestParser(t)
+	n, err := p.Parse("world", "Goodbye")
+	require.NoError(t, err) // 'bye'? absent, just Name
+	seq := n.Children[0]
+	require.Equal(t, KindSeq, seq.Kind)
+	opt := seq.Children[0]
+	require.Equal(t, KindOptional, opt.Kind)
+	require.Empty(t, opt.Children)
+}
+
+func TestParseParameterizedRules(t *testing.T) {
+	p := newTestParser(t)
+	n, err := p.Parse("(alice, bob, carol)", "Sum")
+	require.NoError(t, err)
+	require.Equal(t, "Sum", n.Name)
+	// Sum's body is the ExprCall Parens(List(Name)) directly (a single-
+	// element rule body isn't Seq-wrapped — Task 2's dsl_parser.go
+	// collapses a length-1 sequence to its sole element), so n.Children[0]
+	// is the "Parens" KindRule wrapper node itself; unwrap once more to
+	// reach its actual '(' List(Name) ')' Seq.
+	parensNode := n.Children[0]
+	require.Equal(t, KindRule, parensNode.Kind)
+	require.Equal(t, "Parens", parensNode.Name)
+	parensSeq := parensNode.Children[0]
+	require.Equal(t, KindSeq, parensSeq.Kind)
+	require.Len(t, parensSeq.Children, 3)
+	require.Equal(t, KindLiteral, parensSeq.Children[0].Kind)
+	listNode := parensSeq.Children[1]
+	require.Equal(t, "List", listNode.Name)
+}
+
+func TestParseRejectsTrailingGarbage(t *testing.T) {
+	p := newTestParser(t)
+	_, err := p.Parse("hello world!!!", "Greeting")
+	require.Error(t, err)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+}
+
+// TestParseCallMemoDistinguishesArguments checks that a parameterized rule
+// invoked at the same position with different argument expressions never
+// shares a memo entry — neither for composite arguments (`X?` vs `Y?`) nor
+// for a bare parameter forwarded from an enclosing call (`D` bound to X vs
+// to Y), either of which would hand the second alternative the first's
+// cached failure.
+func TestParseCallMemoDistinguishesArguments(t *testing.T) {
+	g, err := ParseGrammar(`
+Composite <- Parens(X?) 'a' / Parens(Y?) 'b'
+Forwarded <- Wrap(X) 'a' / Wrap(Y) 'b'
+Wrap(D) <- Parens(D)
+Parens(D) <- '(' D ')'
+X <- 'x'
+Y <- 'y'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, SkipTrivia: skipASCIIWhitespace}
+
+	_, err = p.Parse("(y) b", "Composite")
+	require.NoError(t, err)
+	_, err = p.Parse("(y) b", "Forwarded")
+	require.NoError(t, err)
+}
+
+func TestParseMaxDepth(t *testing.T) {
+	g, err := ParseGrammar(`
+Nested <- Parens(Nested) / 'x'
+Parens(D) <- '(' D ')'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, MaxDepth: 20}
+	nested := func(depth int) string {
+		return strings.Repeat("(", depth) + "x" + strings.Repeat(")", depth)
+	}
+
+	// Each level is one Nested + one Parens invocation.
+	_, err = p.Parse(nested(9), "Nested")
+	require.NoError(t, err)
+
+	_, err = p.Parse(nested(10), "Nested")
+	require.ErrorIs(t, err, ErrTooDeep)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Equal(t, 10, perr.Pos)
+
+	// A pooled session that hit the limit starts the next parse clean.
+	s := p.AcquireSession()
+	defer s.Release()
+	_, err = s.Parse(nested(10), "Nested")
+	require.ErrorIs(t, err, ErrTooDeep)
+	_, err = s.Parse(nested(9), "Nested")
+	require.NoError(t, err)
+
+	// Malformed input under the limit is still an ordinary parse error.
+	_, err = p.Parse("((x)", "Nested")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrTooDeep)
+}
+
+func TestParseMemoizesRepeatedRuleAtSamePosition(t *testing.T) {
+	// Several alternatives all try Shared at the same starting position
+	// before falling through to Word — not exponential (this engine
+	// doesn't support true left recursion; neither does DuckDB's own
+	// grammar need it, see Task 3's evaluator doc comment), but it does
+	// exercise the same (rule, pos) memo key being looked up repeatedly
+	// and confirms the cached result is reused consistently rather than
+	// corrupting state across repeated evaluations.
+	g, err := ParseGrammar(`
+A <- (Shared 'x') / (Shared 'y') / (Shared 'z') / (Shared 'q') / Word
+Shared <- Word
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, Primitives: map[string]Primitive{"Word": wordPrimitive}, SkipTrivia: skipASCIIWhitespace}
+	n, err := p.Parse("hello", "A")
+	require.NoError(t, err)
+	require.NotNil(t, n)
+}
+
+func TestSymbolTokensMaximalMunch(t *testing.T) {
+	// Op lists the short spelling first, like DuckDB's ComparisonOperator:
+	// without SymbolTokens '<' commits and leaves "= b" unparseable.
+	g, err := ParseGrammar(`
+Cmp <- Word Op Word
+Op <- '<' / '<=' / '!'
+`)
+	require.NoError(t, err)
+	prims := map[string]Primitive{"Word": wordPrimitive}
+
+	plain := &Parser{Grammar: g, Primitives: prims, SkipTrivia: skipASCIIWhitespace}
+	_, err = plain.Parse("a <= b", "Cmp")
+	require.Error(t, err)
+
+	p := &Parser{Grammar: g, Primitives: prims, SkipTrivia: skipASCIIWhitespace, SymbolTokens: []string{"<=", "!="}}
+	n, err := p.Parse("a <= b", "Cmp")
+	require.NoError(t, err)
+	op := n.Children[0].Children[1]
+	require.Equal(t, "Op", op.Name)
+	require.Equal(t, 1, op.Children[0].Alt)
+
+	// A shorter literal still matches when the longer token isn't there.
+	_, err = p.Parse("a < b", "Cmp")
+	require.NoError(t, err)
+	_, err = p.Parse("a <b", "Cmp")
+	require.NoError(t, err)
+	_, err = p.Parse("a ! b", "Cmp")
+	require.NoError(t, err)
+	// ...but never splits one that is: "!=" isn't '!' followed by "=b".
+	_, err = p.Parse("a !=b", "Cmp")
+	require.Error(t, err)
+}

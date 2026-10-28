@@ -92,9 +92,7 @@ describe('Cloud run debugging', () => {
       expect(preview.value).toContain('"env": "default-canonical"');
       expect(preview.value).toContain('"runId": "run-1"');
       expect(
-        screen.getByText(
-          'Example / production · Create chat completion',
-        ),
+        screen.getByText('Example / production · Create chat completion'),
       ).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
       await waitFor(() =>
@@ -123,7 +121,13 @@ describe('Cloud run debugging', () => {
       screen.getByRole<HTMLButtonElement>('button', { name: 'Copy prompt' })
         .disabled,
     ).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Claude Code' }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Claude' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Set up with Claude Code' }),
+    );
     const guide = screen.getByRole<HTMLAnchorElement>('link', {
       name: 'Full setup guide',
     });

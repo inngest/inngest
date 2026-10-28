@@ -26,7 +26,7 @@ export function HelperPanelFrame({
 }: HelperPanelFrameProps) {
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center justify-between border-b px-3">
+      <div className="border-subtle flex h-[41px] shrink-0 flex-row items-center justify-between border-b px-3">
         <div className="flex flex-row items-center gap-2">
           {icon}
           <div className="text-sm font-normal">{title}</div>
