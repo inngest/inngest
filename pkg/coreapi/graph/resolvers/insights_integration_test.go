@@ -292,19 +292,52 @@ func TestInsightsExecutionErrorNamesLogicalTables(t *testing.T) {
 
 // TestInsightsRunsLatestRowTiebreak covers the insights_runs macro's
 // latest-row collapse when lifecycle rows tie on their ms timestamp: the
-// furthest-along row wins regardless of insert order.
+// furthest-along row (finished, then terminal > in-progress > queued) wins
+// regardless of insert order.
 func TestInsightsRunsLatestRowTiebreak(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
 	now := time.Now().UTC().Truncate(time.Millisecond)
+	acct, env := consts.DevServerAccountID, consts.DevServerEnvID
 
-	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r1", "Running", now)
-	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r1", "Queued", now)
-	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r2", "Queued", now)
-	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r2", "Running", now)
+	// Each pair is inserted in both orders, under run IDs <name>-a/<name>-b.
+	// A finished row's ended_at ties the other row's queued_at.
+	pairs := []struct {
+		name          string
+		first, second string
+		endSecond     bool
+		want          string
+	}{
+		{name: "queued-running", first: "Queued", second: "Running", want: "Running"},
+		{name: "running-completed", first: "Running", second: "Completed", endSecond: true, want: "Completed"},
+		{name: "running-failed", first: "Running", second: "Failed", endSecond: true, want: "Failed"},
+	}
+	var want [][]any
+	for _, p := range pairs {
+		var ended *time.Time
+		if p.endSecond {
+			ended = &now
+		}
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-a", p.first, now, nil)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-a", p.second, now, ended)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-b", p.second, now, ended)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-b", p.first, now, nil)
+		want = append(want, []any{p.name + "-a", p.want}, []any{p.name + "-b", p.want})
+	}
 
 	result, err := qr.Insights(context.Background(), "SELECT run_id, status FROM runs ORDER BY run_id")
 	require.NoError(t, err)
-	require.Equal(t, [][]any{{"r1", "Running"}, {"r2", "Running"}}, result.Rows)
+	require.ElementsMatch(t, want, result.Rows)
+}
+
+// insertRunRowEndedAt is insertRunRow w/ an optional ended_at.
+func insertRunRowEndedAt(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, status string, queuedAt time.Time, endedAt *time.Time) {
+	t.Helper()
+	_, err := db.ExecContext(t.Context(),
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, queuedAt, queuedAt, endedAt, uuid.New().String(), "test-app", uuid.New().String(), "test-fn", status, "{}", "{}",
+	)
+	require.NoError(t, err)
 }
