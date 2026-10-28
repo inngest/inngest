@@ -305,15 +305,16 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 			if isExcluded(e.alias, name) {
 				continue
 			}
+			col, _ := e.table.column(name)
 			if bare {
 				if id, ok := scope.using[usingColumn{entry: i, column: strings.ToLower(name)}]; ok {
 					if emitted[id] {
 						continue
 					}
 					emitted[id] = true
+					col = scope.usingCols[id]
 				}
 			}
-			col, _ := e.table.column(name)
 			out = append(out, starColumn{name: name, col: col})
 		}
 	}

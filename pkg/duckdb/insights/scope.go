@@ -2,6 +2,7 @@ package insights
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -59,6 +60,11 @@ type tableScope struct {
 	// merges all three copies into one set.
 	using     map[usingColumn]int
 	nextUsing int
+	// usingCols is each using set's merged output column, by set id: the
+	// left copy for an INNER/LEFT/SEMI/ANTI join, the right copy for a
+	// RIGHT join, and COALESCE(left, right) for a FULL join (see
+	// mergeJoinColumn).
+	usingCols map[int]knownColumn
 	// outer is the scope this one may correlate into when a name isn't
 	// found locally — non-nil only for an expression-position subquery
 	// (validateWithCTEs threads its own scope down whenever it recurses
@@ -157,7 +163,7 @@ func (s *tableScope) addJoinColumns(r *parser.JoinRef, lo, mid, hi int) error {
 		if err != nil {
 			return err
 		}
-		s.mergeUsing(left, right)
+		s.mergeUsing(left, right, typ)
 	}
 
 	if strings.Contains(typ, "SEMI") || strings.Contains(typ, "ANTI") {
@@ -230,28 +236,75 @@ func (s *tableScope) joinSideColumn(r *parser.JoinRef, lo, hi int, name, side st
 	}
 }
 
-// mergeUsing puts a and b (and whatever sets either already belongs to)
-// into one using set.
-func (s *tableScope) mergeUsing(a, b usingColumn) {
+// mergeUsing puts a (the join's left copy) and b (its right copy), and
+// whatever sets either already belongs to, into one using set whose merged
+// column is mergeJoinColumn of the two for a join of type typ.
+func (s *tableScope) mergeUsing(a, b usingColumn, typ string) {
 	if s.using == nil {
 		s.using = map[usingColumn]int{}
+		s.usingCols = map[int]knownColumn{}
 	}
+	merged := mergeJoinColumn(s.columnOf(a), s.columnOf(b), typ)
 	aID, aOK := s.using[a]
 	bID, bOK := s.using[b]
+	id := aID
 	switch {
 	case aOK && bOK:
-		for uc, id := range s.using {
-			if id == bID {
+		for uc, ucID := range s.using {
+			if ucID == bID {
 				s.using[uc] = aID
 			}
 		}
+		delete(s.usingCols, bID)
 	case aOK:
 		s.using[b] = aID
 	case bOK:
+		id = bID
 		s.using[a] = bID
 	default:
 		s.nextUsing++
-		s.using[a], s.using[b] = s.nextUsing, s.nextUsing
+		id = s.nextUsing
+		s.using[a], s.using[b] = id, id
+	}
+	s.usingCols[id] = merged
+}
+
+// columnOf returns uc's column as a reference to it resolves: its using
+// set's merged column if it's in one, or just its own table's column.
+func (s *tableScope) columnOf(uc usingColumn) knownColumn {
+	if id, ok := s.using[uc]; ok {
+		return s.usingCols[id]
+	}
+	col, _ := s.entries[uc.entry].table.column(uc.column)
+	return col
+}
+
+// mergeJoinColumn is the column DuckDB projects for a USING/NATURAL join's
+// merged column (checked against a real duckdb): the left copy for every
+// join type but RIGHT (the right copy) and FULL (COALESCE(left, right),
+// so it only keeps whatever type/hints both sides agree on).
+func mergeJoinColumn(left, right knownColumn, typ string) knownColumn {
+	switch {
+	case strings.Contains(typ, "RIGHT"):
+		return right
+	case strings.Contains(typ, "FULL"):
+		if reflect.DeepEqual(left, right) {
+			return left
+		}
+		out := knownColumn{colType: ColumnTypeUnknown}
+		if left.colType == right.colType {
+			out.colType = left.colType
+		}
+		if reflect.DeepEqual(left.pathHints, right.pathHints) {
+			out.pathHints = left.pathHints
+		}
+		if left.description == right.description {
+			out.description = left.description
+		}
+		out.arrayOfStructs = left.arrayOfStructs && right.arrayOfStructs
+		return out
+	default:
+		return left
 	}
 }
 
@@ -413,21 +466,18 @@ func (x excludeName) matches(alias, name string) bool {
 // to the outer scope only when this scope has no local match at all —
 // mirrors columnCount's own precedence exactly, so the two never disagree
 // about which scope "owns" a name.
+//
+// A USING/NATURAL-merged column resolves to its merged column (columnOf),
+// the same one a bare "*" projects.
 func (s *tableScope) uniqueColumn(name string) (knownColumn, bool) {
-	var found knownColumn
-	for _, e := range s.entries {
-		if col, ok := e.table.column(name); ok && !e.hidden() {
-			found = col
-		}
-	}
-	switch s.localColumnCount(name) {
+	switch cols := s.sideColumns(0, len(s.entries), name); len(cols) {
 	case 0:
 		if s.outer != nil {
 			return s.outer.uniqueColumn(name)
 		}
 		return knownColumn{}, false
 	case 1:
-		return found, true
+		return s.columnOf(cols[0]), true
 	default:
 		return knownColumn{}, false
 	}
