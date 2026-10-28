@@ -145,7 +145,6 @@ describe('useExecutionLimit', () => {
     expect(useExecutionLimit()).toMatchObject({
       band: 'grace',
       isCapHit: false,
-      overageLimit: 10_000,
       remaining: 8_000,
     });
   });

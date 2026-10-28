@@ -56,7 +56,6 @@ type ExecutionLimitData = {
   isCapHit: boolean;
   usage: number;
   limit: number;
-  overageLimit: number;
   remaining: number;
   isVercel: boolean;
   marketplaceBillingURL: string | null;
@@ -108,7 +107,6 @@ export function useExecutionLimit(): ExecutionLimitData | null {
     isCapHit: capHit,
     usage: cap.usage,
     limit: cap.limit,
-    overageLimit: cap.overageLimit,
     remaining: Math.max(cap.limit + cap.overageLimit - cap.usage, 0),
     isVercel:
       'marketplace' in account && account.marketplace === Marketplace.Vercel,

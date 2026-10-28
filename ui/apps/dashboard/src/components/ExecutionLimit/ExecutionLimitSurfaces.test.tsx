@@ -14,6 +14,7 @@ import {
 import { ExecutionLimitBanner } from './ExecutionLimitBanner';
 import { ExecutionLimitCard } from './ExecutionLimitCard';
 import { ExecutionLimitPill } from './ExecutionLimitPill';
+import { type ExecutionCap } from './executionLimit';
 
 const mocks = vi.hoisted(() => ({
   useSkippableGraphQLQuery: vi.fn(),
@@ -58,13 +59,7 @@ class ResizeObserverMock {
 beforeAll(() => vi.stubGlobal('ResizeObserver', ResizeObserverMock));
 afterAll(() => vi.unstubAllGlobals());
 
-function mockCap(cap: {
-  usage: number;
-  limit: number;
-  overageLimit: number;
-  enforced: boolean;
-  exceeded: boolean;
-}) {
+function mockCap(cap: ExecutionCap) {
   mocks.useSkippableGraphQLQuery.mockImplementation(
     ({ skip }: { skip: boolean }) => ({
       data: skip
@@ -101,21 +96,21 @@ afterEach(() => {
 describe('grace period', () => {
   beforeEach(() => mockCap(grace));
 
-  it('shows the grace period in the pill', () => {
+  it('shows the extended limit in the pill', () => {
     render(<ExecutionLimitPill />);
 
-    expect(screen.getByText(/grace period/)).toBeTruthy();
-    expect(screen.getByText(/8,000 executions left/)).toBeTruthy();
+    expect(screen.getByText(/Hobby limit extended/)).toBeTruthy();
+    expect(screen.getByText(/8,000 executions until runs pause/)).toBeTruthy();
     expect(
       screen.getByRole('link', { name: 'Upgrade' }).getAttribute('href'),
     ).toBe('/billing?ref=app-hobby-execution-grace-pill');
   });
 
-  it('shows the grace period in the card without a dismiss button', () => {
+  it('shows the extended limit in the card without a dismiss button', () => {
     render(<ExecutionLimitCard collapsed={false} />);
 
-    expect(screen.getByText('Temporary grace period')).toBeTruthy();
-    expect(screen.getByText(/52,000 executions this month/)).toBeTruthy();
+    expect(screen.getByText('Hobby limit extended')).toBeTruthy();
+    expect(screen.getByText(/keep your runs going/)).toBeTruthy();
     expect(screen.getByText(/8,000 executions remaining/)).toBeTruthy();
     expect(screen.queryByText(/paused/)).toBeNull();
     expect(screen.queryByLabelText('Dismiss for 24 hours')).toBeNull();
@@ -132,10 +127,10 @@ describe('grace period', () => {
     ).toBe('/billing?ref=app-hobby-execution-grace-card-collapsed');
   });
 
-  it('shows the grace period in the runs banner', () => {
+  it('shows the extended limit in the runs banner', () => {
     render(<ExecutionLimitBanner />);
 
-    expect(screen.getByText(/grace period/)).toBeTruthy();
+    expect(screen.getByText(/Hobby limit extended/)).toBeTruthy();
     expect(screen.getByText(/8,000 executions left/)).toBeTruthy();
     expect(
       screen.getByRole('link', { name: 'Upgrade' }).getAttribute('href'),
@@ -170,11 +165,9 @@ describe('limit exceeded without enforcement', () => {
 });
 
 describe('limit exceeded and enforced', () => {
-  beforeEach(() =>
-    mockCap({ ...grace, usage: 60_000, enforced: true, exceeded: true }),
-  );
+  beforeEach(() => mockCap({ ...grace, usage: 60_000, exceeded: true }));
 
-  it('says new runs are paused on the card and banner', () => {
+  it('says new runs are paused instead of mentioning the extended limit', () => {
     render(
       <>
         <ExecutionLimitPill />
@@ -188,6 +181,6 @@ describe('limit exceeded and enforced', () => {
     expect(
       screen.getByText(/Hobby account executions limit reached/),
     ).toBeTruthy();
-    expect(screen.queryByText(/grace period/)).toBeNull();
+    expect(screen.queryByText(/extended/)).toBeNull();
   });
 });

@@ -26,8 +26,8 @@ export function ExecutionLimitBanner() {
           </Banner.Link>
         }
       >
-        Temporary grace period: {numberFormatter.format(data.remaining)}{' '}
-        executions left this month before new runs pause.
+        Hobby limit extended: {numberFormatter.format(data.remaining)}{' '}
+        executions left this month until runs pause.
       </Banner>
     );
   }

@@ -9,7 +9,10 @@ import {
   RiErrorWarningFill,
 } from '@remixicon/react';
 
-import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
+import {
+  boostedStyles,
+  SidebarAlertCard,
+} from '../NavigationV2/SidebarAlertCard';
 import { usageKind, type UsageBand } from './executionLimit';
 import { useDismissal } from './useDismissal';
 import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
@@ -31,6 +34,11 @@ const kindStyles = {
     collapsed: 'border-accent-xSubtle bg-accent-3xSubtle',
     icon: 'text-accent-subtle',
     link: 'text-accent-intense decoration-accent-intense hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+  },
+  boost: {
+    collapsed: boostedStyles.card,
+    icon: boostedStyles.icon,
+    link: boostedStyles.link,
   },
 } as const;
 
@@ -64,16 +72,16 @@ const limitReachedContent = {
 };
 
 const graceContent = {
-  title: 'Temporary grace period',
-  body: (usage: string) =>
-    `You've used ${usage} executions this month and passed the Hobby limit. We've temporarily extended it, so new runs will pause once the extra executions are used. Upgrade to Pro to avoid disruption.`,
+  title: 'Hobby limit extended',
+  body: () =>
+    'Extra executions were added to keep your runs going. New runs pause once those are used up.',
   dismissable: false,
 };
 
 function enhancedContent(band: UsageBand): CardContent | undefined {
   const kind = usageKind(band);
   if (kind === 'default') return undefined;
-  if (band === 'grace') return { kind, ...graceContent };
+  if (kind === 'boost') return { kind, ...graceContent };
   if (band === 'limitReached') return { kind, ...limitReachedContent };
   return { kind, ...pausedContent, dismissable: band !== '90' };
 }
@@ -97,8 +105,8 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   if (content.dismissable && (!isReady || isDismissed)) return null;
 
   const styles = kindStyles[content.kind];
-  const inGrace = data.band === 'grace';
-  const upgradeRef = inGrace
+  const boosted = content.kind === 'boost';
+  const upgradeRef = boosted
     ? 'app-hobby-execution-grace-card'
     : 'app-hobby-execution-limit-card';
 
@@ -121,6 +129,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
     );
   }
 
+  const extendedLimit = data.usage + data.remaining;
   const formattedLimit = numberFormatter.format(data.limit);
   const formattedUsage = numberFormatter.format(data.usage);
 
@@ -161,12 +170,12 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       <div className="mt-2 pt-1">
         <ProgressBar
           kind={content.kind}
-          limit={inGrace ? data.limit + data.overageLimit : data.limit}
+          limit={boosted ? extendedLimit : data.limit}
           size="small"
           value={data.usage}
         />
         <p className="mt-[3px] text-xs font-bold leading-4">
-          {inGrace
+          {boosted
             ? `${numberFormatter.format(
                 data.remaining,
               )} executions remaining this month`

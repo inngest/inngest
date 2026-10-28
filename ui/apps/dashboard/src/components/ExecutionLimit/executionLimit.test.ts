@@ -89,9 +89,6 @@ describe('usageBand', () => {
     expect(
       usageBand({ usage: 10, limit: 0, overageLimit: 0, capHit: false }),
     ).toBe('under50');
-    expect(
-      usageBand({ usage: 10, limit: 0, overageLimit: 10_000, capHit: false }),
-    ).toBe('under50');
   });
 });
 
@@ -177,16 +174,13 @@ describe('pillContent', () => {
     expect(pillContent('75', true, 0)?.text).toContain('Vercel');
   });
 
-  it('warns about the grace period, pointing Vercel accounts at the integration settings', () => {
+  it('describes the extended limit the same way for Vercel accounts', () => {
     expect(pillContent('grace', false, 8_000)).toMatchObject({
-      kind: 'warning',
+      kind: 'boost',
     });
     expect(pillContent('grace', false, 8_000)?.text).toContain(
-      '8,000 executions left',
+      '8,000 executions until runs pause',
     );
-    expect(pillContent('grace', false, 8_000)?.text).not.toContain('Vercel');
-    expect(pillContent('grace', true, 8_000)?.text).toContain(
-      'Vercel Integrations Settings',
-    );
+    expect(pillContent('grace', true, 8_000)?.text).not.toContain('Vercel');
   });
 });

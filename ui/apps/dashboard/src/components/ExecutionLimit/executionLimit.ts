@@ -66,13 +66,14 @@ export function usageBand({
   return 'under50';
 }
 
-export type UsageKind = 'default' | 'caution' | 'warning' | 'error';
+export type UsageKind = 'default' | 'caution' | 'warning' | 'error' | 'boost';
 
 export function usageKind(band: UsageBand): UsageKind {
   if (band === 'limitReached') return 'error';
   if (band === 'under50') return 'default';
   if (band === '50') return 'caution';
-  if (band === '75' || band === 'grace') return 'warning';
+  if (band === '75') return 'warning';
+  if (band === 'grace') return 'boost';
   return 'error';
 }
 
@@ -80,19 +81,16 @@ export function pillContent(
   band: UsageBand,
   isVercel: boolean,
   remaining: number,
-): { kind: 'caution' | 'warning' | 'error'; text: string } | null {
+): { kind: Exclude<UsageKind, 'default'>; text: string } | null {
   const kind = usageKind(band);
   if (kind === 'default') return null;
 
-  if (band === 'grace') {
-    const text = `Hobby limit reached. You're in a temporary grace period with ${numberFormatter.format(
-      remaining,
-    )} executions left this month.`;
+  if (kind === 'boost') {
     return {
       kind,
-      text: isVercel
-        ? `${text} Change configurations on the Vercel Integrations Settings page to upgrade and avoid disruption.`
-        : text,
+      text: `Hobby limit extended. ${numberFormatter.format(
+        remaining,
+      )} executions until runs pause.`,
     };
   }
 
