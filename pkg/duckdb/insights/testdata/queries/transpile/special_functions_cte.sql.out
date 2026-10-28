@@ -1,0 +1,29 @@
+{
+  "sql": "WITH c AS (SELECT COALESCE(ended_at, started_at) AS t, \"nullif\"(status, 'Queued') AS s, date_part('YEAR', queued_at) AS y, \"trim\"(app_id) AS a, \"substring\"(run_id, 1, 8) AS r, \"position\"(function_id, 'a') AS p FROM inngest.insights_runs(?, ?) AS runs) SELECT t, s, y, a, r, p FROM c WHERE y \u003e 2020 AND p \u003e 0 LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "diagnostics": [
+    {
+      "start": "1:216",
+      "end": "1:271",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

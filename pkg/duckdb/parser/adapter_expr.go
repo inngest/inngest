@@ -549,24 +549,137 @@ func (a *adapter) adaptSingleExpression(n *peg.Node) Expr {
 // specialFunctionSpellings names each SpecialFunctionExpression alternative
 // for its "not supported" error.
 var specialFunctionSpellings = map[string]string{
-	"CoalesceExpression":  "COALESCE(...)",
-	"UnpackExpression":    "UNPACK(...)",
-	"TryExpression":       "TRY(...)",
-	"ColumnsExpression":   "COLUMNS(...)",
-	"ExtractExpression":   "EXTRACT(...)",
-	"LambdaExpression":    "The LAMBDA keyword",
-	"NullIfExpression":    "NULLIF(...)",
-	"PositionExpression":  "POSITION(...)",
-	"RowExpression":       "ROW(...)",
-	"SubstringExpression": "SUBSTRING(...)",
-	"TrimExpression":      "TRIM(...)",
-	"OverlayExpression":   "OVERLAY(...)",
+	"UnpackExpression":  "UNPACK(...)",
+	"TryExpression":     "TRY(...)",
+	"ColumnsExpression": "COLUMNS(...)",
+	"LambdaExpression":  "The LAMBDA keyword",
+	"RowExpression":     "ROW(...)",
 }
 
+// adaptSpecialFunctionExpression desugars the keyword-argument call forms
+// into the plain FunctionExpr DuckDB's own transformer produces for them
+// (json_serialize_sql shows the same function name and argument order), so
+// every consumer sees one shape no matter how the call was spelled:
+//
+//	COALESCE(a, b)                -> coalesce(a, b)
+//	NULLIF(a, b)                  -> nullif(a, b)
+//	EXTRACT(year FROM x)          -> date_part('YEAR', x)
+//	TRIM([BOTH] [c] FROM x)       -> trim(x[, c])
+//	TRIM(LEADING/TRAILING ...)    -> ltrim/rtrim(x[, c])
+//	SUBSTRING(x FROM a [FOR b])   -> substring(x, a[, b])
+//	SUBSTRING(x FOR b)            -> substring(x, 1, b)
+//	POSITION(a IN b)              -> position(b, a)
+//	OVERLAY(x PLACING y FROM a [FOR b]) -> overlay(x, y, a[, b])
+//
+// coalesce is the one DuckDB keeps as an operator rather than a function
+// (there's no function named coalesce), so Write prints it back as
+// COALESCE(...) instead of a quoted call; see functionName.
 func (a *adapter) adaptSpecialFunctionExpression(n *peg.Node) Expr {
 	alt := choice(body(n))
+	fn := func(name string, args ...Expr) Expr {
+		return &FunctionExpr{baseExpr: a.at(alt), Name: []string{name}, Args: args}
+	}
+	seq := body(alt)
+	switch alt.Name {
+	case "CoalesceExpression":
+		// 'COALESCE' Parens(List(Expression))
+		return fn("coalesce", a.adaptExprList(seq.Children[1])...)
+	case "NullIfExpression":
+		// 'NULLIF' Parens(NullIfArguments) ; NullIfArguments <- Expression ',' Expression
+		args := body(body(seq.Children[1]).Children[1])
+		return fn("nullif", a.adaptExpression(args.Children[0]), a.adaptExpression(args.Children[2]))
+	case "ExtractExpression":
+		// 'EXTRACT' Parens(ExtractArguments) ; ExtractArguments <- ExtractArgument 'FROM' Expression
+		args := body(body(seq.Children[1]).Children[1])
+		return fn("date_part", a.adaptExtractArgument(args.Children[0]), a.adaptExpression(args.Children[2]))
+	case "TrimExpression":
+		// 'TRIM' Parens(TrimArguments) ; TrimArguments <- TrimDirection? TrimSource? List(Expression)
+		args := body(body(seq.Children[1]).Children[1])
+		name := "trim"
+		if d, ok := present(args.Children[0]); ok {
+			switch choice(body(d)).Name {
+			case "TrimLeading":
+				name = "ltrim"
+			case "TrimTrailing":
+				name = "rtrim"
+			}
+		}
+		exprs := a.adaptExprList2(args.Children[2])
+		if src, ok := present(args.Children[1]); ok {
+			// TrimSource <- Expression? 'FROM'
+			if chars, ok := present(body(src).Children[0]); ok {
+				exprs = append(exprs, a.adaptExpression(chars))
+			}
+		}
+		return fn(name, exprs...)
+	case "SubstringExpression":
+		// 'SUBSTRING' Parens(SubstringArguments) ; SubstringArguments <- SubstringParameters / SubstringExpressionList
+		argsAlt := choice(body(body(body(seq.Children[1])).Children[1]))
+		if argsAlt.Name == "SubstringExpressionList" {
+			return fn("substring", a.adaptExprList2(body(argsAlt))...)
+		}
+		// SubstringParameters <- Expression SubstringFromFor ;
+		// SubstringFromFor <- SubstringFromOptionalFor / SubstringFor
+		pseq := body(argsAlt)
+		x := a.adaptExpression(pseq.Children[0])
+		ff := choice(body(pseq.Children[1]))
+		if ff.Name == "SubstringFor" {
+			// SubstringFor <- ForExpression ; DuckDB starts at 1.
+			one := &Literal{baseExpr: a.at(ff), Kind: LitNumber, Text: "1"}
+			return fn("substring", x, one, a.adaptForOrFromExpression(body(ff)))
+		}
+		// SubstringFromOptionalFor <- FromExpression ForExpression?
+		fseq := body(ff)
+		args := []Expr{x, a.adaptForOrFromExpression(fseq.Children[0])}
+		if f, ok := present(fseq.Children[1]); ok {
+			args = append(args, a.adaptForOrFromExpression(f))
+		}
+		return fn("substring", args...)
+	case "PositionExpression":
+		// 'POSITION' Parens(PositionArguments) ; PositionArguments <- OtherOperatorExpression 'IN' Expression
+		args := body(body(seq.Children[1]).Children[1])
+		return fn("position", a.adaptExpression(args.Children[2]), a.adaptOtherOperatorExpression(args.Children[0]))
+	case "OverlayExpression":
+		// 'OVERLAY' Parens(OverlayArguments) ; OverlayArguments <- OverlayParameters / OverlayExpressionList
+		argsAlt := choice(body(body(body(seq.Children[1])).Children[1]))
+		if argsAlt.Name == "OverlayExpressionList" {
+			return fn("overlay", a.adaptExprList2(body(argsAlt))...)
+		}
+		// OverlayParameters <- Expression 'PLACING' Expression FromExpression ForExpression?
+		oseq := body(argsAlt)
+		args := []Expr{a.adaptExpression(oseq.Children[0]), a.adaptExpression(oseq.Children[2]), a.adaptForOrFromExpression(oseq.Children[3])}
+		if f, ok := present(oseq.Children[4]); ok {
+			args = append(args, a.adaptForOrFromExpression(f))
+		}
+		return fn("overlay", args...)
+	}
 	a.unsupported(alt, specialFunctionSpellings[alt.Name])
 	return nil
+}
+
+// adaptForOrFromExpression reads a FromExpression <- 'FROM' Expression or
+// ForExpression <- 'FOR' Expression node.
+func (a *adapter) adaptForOrFromExpression(n *peg.Node) Expr {
+	return a.adaptExpression(body(n).Children[1])
+}
+
+// adaptExtractArgument reads EXTRACT's date part as the string date_part
+// takes, matching DuckDB: a date-part keyword becomes its canonical
+// singular uppercase name (`years` -> 'YEAR'), and any other identifier or
+// string is kept as spelled.
+func (a *adapter) adaptExtractArgument(n *peg.Node) Expr {
+	// ExtractArgument <- ExtractDatePartArgument / ExtractIdentifierArgument / ExtractStringArgument
+	alt := choice(body(n))
+	var part string
+	switch alt.Name {
+	case "ExtractDatePartArgument":
+		// ExtractDatePartArgument <- ExtractDatePart ; ExtractDatePart <- YearKeyword / MonthKeyword / ...
+		kw := choice(body(body(alt)))
+		part = strings.ToUpper(strings.TrimSuffix(kw.Name, "Keyword"))
+	default: // ExtractIdentifierArgument <- Identifier, ExtractStringArgument <- StringLiteral
+		part = literalText(alt)
+	}
+	return &Literal{baseExpr: a.at(alt), Kind: LitString, Text: part}
 }
 
 func (a *adapter) adaptLiteralExpression(n *peg.Node) Expr {
