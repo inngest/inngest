@@ -15,6 +15,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	grpcLib "google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 )
 
@@ -31,6 +32,14 @@ const (
 	// gives up (~15m).
 	ForwardTimeout = consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod + 30*time.Second
 )
+
+// ServerKeepaliveEnforcement lets peers ping every few seconds, even with no
+// active calls, so clients can detect dead connections quickly. The gRPC default
+// rejects pings more often than every 5 minutes with a GOAWAY.
+var ServerKeepaliveEnforcement = keepalive.EnforcementPolicy{
+	MinTime:             5 * time.Second,
+	PermitWithoutStream: true,
+}
 
 type GatewayGRPCForwarder interface {
 	ConnectToGateways(ctx context.Context) error
@@ -107,7 +116,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 	mgr := &gatewayGRPCManager{
 		gatewayManager:   stateManager,
 		dialer:           grpcLib.NewClient,
-		grpcServer:       grpcLib.NewServer(grpcLib.MaxRecvMsgSize(MaxMessageSize)),
+		grpcServer:       grpcLib.NewServer(grpcLib.MaxRecvMsgSize(MaxMessageSize), grpcLib.KeepaliveEnforcementPolicy(ServerKeepaliveEnforcement)),
 		logger:           logger.StdlibLogger(ctx),
 		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
 		executorGRPCPort: DefaultConnectExecutorGRPCPort,
