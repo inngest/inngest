@@ -31,8 +31,9 @@ type migratingTestEnv struct {
 	bmCurrent BatchManager
 	bmNext    BatchManager
 
-	mode    MigrationMode
-	migBM   BatchManager
+	writeToNext        bool
+	accountWriteToNext map[uuid.UUID]bool
+	migBM              BatchManager
 }
 
 func newMigratingTestEnv(t *testing.T) *migratingTestEnv {
@@ -62,21 +63,25 @@ func newMigratingTestEnv(t *testing.T) *migratingTestEnv {
 	bmNext := NewRedisBatchManager(bcNext, nil, WithoutBuffer())
 
 	env := &migratingTestEnv{
-		t:         t,
-		rCurrent:  rCurrent,
-		rNext:     rNext,
-		rcCurrent: rcCurrent,
-		rcNext:    rcNext,
-		bcCurrent: bcCurrent,
-		bcNext:    bcNext,
-		bmCurrent: bmCurrent,
-		bmNext:    bmNext,
-		mode:      MigrationModeCurrentOnly,
+		t:                  t,
+		rCurrent:           rCurrent,
+		rNext:              rNext,
+		rcCurrent:          rcCurrent,
+		rcNext:             rcNext,
+		bcCurrent:          bcCurrent,
+		bcNext:             bcNext,
+		bmCurrent:          bmCurrent,
+		bmNext:             bmNext,
+		accountWriteToNext: map[uuid.UUID]bool{},
 	}
 
-	env.migBM = NewMigratingBatchManager(bmCurrent, bmNext, func(_ context.Context) MigrationMode {
-		return env.mode
+	env.migBM, err = NewMigratingBatchManager(bmCurrent, bmNext, func(_ context.Context, accountID uuid.UUID) bool {
+		if writeToNext, ok := env.accountWriteToNext[accountID]; ok {
+			return writeToNext
+		}
+		return env.writeToNext
 	})
+	require.NoError(t, err)
 
 	return env
 }
@@ -119,13 +124,30 @@ func TestMigratingIntegration_NilNextReturnsCurrent(t *testing.T) {
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
 	current := NewRedisBatchManager(bc, nil, WithoutBuffer())
 
-	result := NewMigratingBatchManager(current, nil, func(_ context.Context) MigrationMode {
-		return MigrationModeCurrentOnly
+	result, err := NewMigratingBatchManager(current, nil, func(_ context.Context, _ uuid.UUID) bool {
+		return false
 	})
+	require.NoError(t, err)
 	require.Equal(t, current, result)
 }
 
-func TestMigratingIntegration_NilModeReturnsCurrent(t *testing.T) {
+func TestMigratingIntegration_NilCurrentErrors(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	next := NewRedisBatchManager(redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey), nil, WithoutBuffer())
+
+	result, err := NewMigratingBatchManager(nil, next, nil)
+	require.Error(t, err)
+	require.Nil(t, result)
+}
+
+func TestMigratingIntegration_NilWriteToNextWritesToCurrent(t *testing.T) {
 	r1 := miniredis.RunT(t)
 	r2 := miniredis.RunT(t)
 
@@ -149,14 +171,29 @@ func TestMigratingIntegration_NilModeReturnsCurrent(t *testing.T) {
 	current := NewRedisBatchManager(bc1, nil, WithoutBuffer())
 	next := NewRedisBatchManager(bc2, nil, WithoutBuffer())
 
-	result := NewMigratingBatchManager(current, next, nil)
-	require.Equal(t, current, result)
+	ctx := context.Background()
+	migBM, err := NewMigratingBatchManager(current, next, nil)
+	require.NoError(t, err)
+	require.NotEqual(t, current, migBM)
+
+	fnID := uuid.New()
+	fn := newFunction(fnID)
+
+	res, _ := appendItem(ctx, t, migBM, fnID, fn)
+	require.True(t, r1.Exists(bc1.KeyGenerator().Batch(ctx, fnID, ulid.MustParse(res.BatchID))))
+	require.Equal(t, 0, len(r2.Keys()))
+
+	// Reads still fall back to next.
+	nextRes, nextBI := appendItem(ctx, t, next, fnID, fn)
+	items, err := migBM.RetrieveItems(ctx, uuid.Nil, fnID, ulid.MustParse(nextRes.BatchID))
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, nextBI.EventID, items[0].EventID)
 }
 
-func TestMigratingIntegration_CurrentOnly(t *testing.T) {
+func TestMigratingIntegration_WriteToCurrent(t *testing.T) {
 	ctx := context.Background()
 	env := newMigratingTestEnv(t)
-	env.mode = MigrationModeCurrentOnly
 
 	fnID := uuid.New()
 	fn := newFunction(fnID)
@@ -174,7 +211,7 @@ func TestMigratingIntegration_CurrentOnly(t *testing.T) {
 	require.Equal(t, 0, len(env.rNext.Keys()))
 
 	t.Run("RetrieveItems", func(t *testing.T) {
-		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+		items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, bi.EventID, items[0].EventID)
@@ -188,7 +225,7 @@ func TestMigratingIntegration_CurrentOnly(t *testing.T) {
 	})
 
 	t.Run("StartExecution", func(t *testing.T) {
-		status, err := env.migBM.StartExecution(ctx, fnID, batchID, res.BatchPointerKey)
+		status, err := env.migBM.StartExecution(ctx, uuid.Nil, fnID, batchID, res.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 	})
@@ -274,7 +311,6 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 
 	t.Run("writes go to current", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -290,7 +326,6 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 
 	t.Run("reads find data on current via fallback", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -300,15 +335,14 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		batchID := ulid.MustParse(res.BatchID)
 
 		// Read through migrating manager — should find via fallback to current.
-		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+		items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, bi.EventID, items[0].EventID)
 	})
 
-	t.Run("reads prefer next", func(t *testing.T) {
+	t.Run("reads fall back to next", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -317,16 +351,15 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		resNext, biNext := appendItem(ctx, t, env.bmNext, fnID, fn)
 		batchID := ulid.MustParse(resNext.BatchID)
 
-		// Read through migrating manager — should return next's data.
-		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+		// Read through migrating manager — current has nothing, falls back to next.
+		items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, biNext.EventID, items[0].EventID)
 	})
 
-	t.Run("reads fall back when next is empty", func(t *testing.T) {
+	t.Run("reads check current first", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -335,8 +368,8 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		resCur, biCur := appendItem(ctx, t, env.bmCurrent, fnID, fn)
 		batchID := ulid.MustParse(resCur.BatchID)
 
-		// RetrieveItems through migrating — next has nothing, falls back to current.
-		items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+		// RetrieveItems through migrating — found on current, the primary.
+		items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, biCur.EventID, items[0].EventID)
@@ -349,7 +382,6 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 
 	t.Run("BulkAppend writes to current", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -372,16 +404,14 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 
 	t.Run("ScheduleExecution writes to current", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		err := env.migBM.ScheduleExecution(ctx, ScheduleBatchOpts{})
 		require.NoError(t, err)
 	})
 
-	t.Run("StartExecution prefers next then falls back", func(t *testing.T) {
-		// Data on next — returns from next.
+	t.Run("StartExecution finds batch in either cluster", func(t *testing.T) {
+		// Data on next — current reports absent, falls back to next.
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -389,13 +419,12 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
 		batchID := ulid.MustParse(resNext.BatchID)
 
-		status, err := env.migBM.StartExecution(ctx, fnID, batchID, resNext.BatchPointerKey)
+		status, err := env.migBM.StartExecution(ctx, uuid.Nil, fnID, batchID, resNext.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 
-		// Data only on current — falls back.
+		// Data only on current — found on the primary.
 		env2 := newMigratingTestEnv(t)
-		env2.mode = MigrationModeDualRead
 
 		fnID2 := uuid.New()
 		fn2 := newFunction(fnID2)
@@ -406,18 +435,17 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		// next has no keys before the call.
 		require.Equal(t, 0, len(env2.rNext.Keys()))
 
-		status2, err := env2.migBM.StartExecution(ctx, fnID2, batchID2, resCur.BatchPointerKey)
+		status2, err := env2.migBM.StartExecution(ctx, uuid.Nil, fnID2, batchID2, resCur.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status2)
 
-		// next must still have no keys — the absent-batch path must not write a garbage pointer.
+		// next must still have no keys — it is never consulted when current has the batch.
 		require.Equal(t, 0, len(env2.rNext.Keys()))
 	})
 
-	t.Run("DeleteBatch prefers next then falls back", func(t *testing.T) {
-		// Data on next — deletes from next.
+	t.Run("DeleteBatch finds batch in either cluster", func(t *testing.T) {
+		// Data only on next.
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -428,9 +456,8 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.True(t, result.Deleted)
 		require.Equal(t, 1, result.ItemCount)
 
-		// Data only on current — falls back.
+		// Data only on current.
 		env2 := newMigratingTestEnv(t)
-		env2.mode = MigrationModeDualRead
 
 		fnID2 := uuid.New()
 		fn2 := newFunction(fnID2)
@@ -442,10 +469,9 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.Equal(t, 1, result2.ItemCount)
 	})
 
-	t.Run("RunBatch prefers next then falls back", func(t *testing.T) {
-		// Data on next — runs from next.
+	t.Run("RunBatch finds batch in either cluster", func(t *testing.T) {
+		// Data only on next.
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -455,9 +481,8 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, result.Scheduled)
 
-		// Data only on current — falls back.
+		// Data only on current.
 		env2 := newMigratingTestEnv(t)
-		env2.mode = MigrationModeDualRead
 
 		fnID2 := uuid.New()
 		fn2 := newFunction(fnID2)
@@ -470,7 +495,6 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 
 	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
-		env.mode = MigrationModeDualRead
 
 		fnID := uuid.New()
 		fn := newFunction(fnID)
@@ -503,7 +527,7 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 func TestMigratingIntegration_WriteToNext(t *testing.T) {
 	ctx := context.Background()
 	env := newMigratingTestEnv(t)
-	env.mode = MigrationModeWriteToNext
+	env.writeToNext = true
 
 	fnID := uuid.New()
 	fn := newFunction(fnID)
@@ -519,7 +543,7 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 	require.Equal(t, 0, len(env.rCurrent.Keys()))
 
 	// Reads still find data from next.
-	items, err := env.migBM.RetrieveItems(ctx, fnID, batchID)
+	items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	require.Equal(t, bi.EventID, items[0].EventID)
@@ -559,7 +583,7 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 		seRes, _ := appendItem(ctx, t, env.bmNext, seFnID, seFn)
 		seBatchID := ulid.MustParse(seRes.BatchID)
 
-		status, err := env.migBM.StartExecution(ctx, seFnID, seBatchID, seRes.BatchPointerKey)
+		status, err := env.migBM.StartExecution(ctx, uuid.Nil, seFnID, seBatchID, seRes.BatchPointerKey)
 		require.NoError(t, err)
 		require.Equal(t, enums.BatchStatusReady.String(), status)
 	})
@@ -606,19 +630,18 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 		curBatchID := ulid.MustParse(curRes.BatchID)
 
 		// RetrieveItems through migrating — next has nothing for this fn, falls back to current.
-		items, err := env.migBM.RetrieveItems(ctx, curFnID, curBatchID)
+		items, err := env.migBM.RetrieveItems(ctx, uuid.Nil, curFnID, curBatchID)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, curBI.EventID, items[0].EventID)
 	})
 }
 
-func TestMigratingIntegration_DynamicModeSwitch(t *testing.T) {
+func TestMigratingIntegration_FlagFlip(t *testing.T) {
 	ctx := context.Background()
 	env := newMigratingTestEnv(t)
 
-	// Start in CurrentOnly mode.
-	env.mode = MigrationModeCurrentOnly
+	// Start writing to current.
 	fnID1 := uuid.New()
 	fn1 := newFunction(fnID1)
 
@@ -629,8 +652,8 @@ func TestMigratingIntegration_DynamicModeSwitch(t *testing.T) {
 	require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID1, batchID1)))
 	require.Equal(t, 0, len(env.rNext.Keys()))
 
-	// Switch to WriteToNext.
-	env.mode = MigrationModeWriteToNext
+	// Flip the account to write to next.
+	env.writeToNext = true
 	fnID2 := uuid.New()
 	fn2 := newFunction(fnID2)
 
@@ -641,15 +664,114 @@ func TestMigratingIntegration_DynamicModeSwitch(t *testing.T) {
 	require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID2, batchID2)))
 
 	// Reads find data from both clusters.
-	items1, err := env.migBM.RetrieveItems(ctx, fnID1, batchID1)
+	items1, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID1, batchID1)
 	require.NoError(t, err)
 	require.Len(t, items1, 1)
 	require.Equal(t, bi1.EventID, items1[0].EventID)
 
-	items2, err := env.migBM.RetrieveItems(ctx, fnID2, batchID2)
+	items2, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID2, batchID2)
 	require.NoError(t, err)
 	require.Len(t, items2, 1)
 	require.Equal(t, bi2.EventID, items2[0].EventID)
+}
+
+func TestMigratingIntegration_PerAccountWriteToNext(t *testing.T) {
+	ctx := context.Background()
+	env := newMigratingTestEnv(t)
+
+	currentAccountID := uuid.New()
+	nextAccountID := uuid.New()
+	env.accountWriteToNext[currentAccountID] = false
+	env.accountWriteToNext[nextAccountID] = true
+
+	currentFnID := uuid.New()
+	currentFn := newFunction(currentFnID)
+	currentItem := BatchItem{
+		AccountID:  currentAccountID,
+		FunctionID: currentFnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{Name: "test/current"},
+	}
+	currentResult, err := env.migBM.Append(ctx, currentItem, currentFn)
+	require.NoError(t, err)
+	currentBatchID := ulid.MustParse(currentResult.BatchID)
+
+	nextFnID := uuid.New()
+	nextFn := newFunction(nextFnID)
+	nextItem := BatchItem{
+		AccountID:  nextAccountID,
+		FunctionID: nextFnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{Name: "test/next"},
+	}
+	nextResult, err := env.migBM.Append(ctx, nextItem, nextFn)
+	require.NoError(t, err)
+	nextBatchID := ulid.MustParse(nextResult.BatchID)
+
+	require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, currentFnID, currentBatchID)))
+	require.False(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, currentFnID, currentBatchID)))
+	require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, nextFnID, nextBatchID)))
+	require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, nextFnID, nextBatchID)))
+
+	currentItems, err := env.migBM.RetrieveItems(ctx, currentAccountID, currentFnID, currentBatchID)
+	require.NoError(t, err)
+	require.Len(t, currentItems, 1)
+
+	nextItems, err := env.migBM.RetrieveItems(ctx, nextAccountID, nextFnID, nextBatchID)
+	require.NoError(t, err)
+	require.Len(t, nextItems, 1)
+}
+
+func TestMigratingIntegration_PrimaryErrorsDoNotFallBack(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("primary cluster error", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// The batch lives in next, but current is the primary and is down.
+		res, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+		batchID := ulid.MustParse(res.BatchID)
+		env.rCurrent.SetError("current unavailable")
+
+		_, err := env.migBM.RetrieveItems(ctx, uuid.Nil, fnID, batchID)
+		require.Error(t, err)
+
+		_, err = env.migBM.StartExecution(ctx, uuid.Nil, fnID, batchID, res.BatchPointerKey)
+		require.Error(t, err)
+
+		// next was never consulted, so the batch was not started.
+		env.rCurrent.SetError("")
+		status, err := env.migBM.StartExecution(ctx, uuid.Nil, fnID, batchID, res.BatchPointerKey)
+		require.NoError(t, err)
+		require.Equal(t, enums.BatchStatusReady.String(), status)
+	})
+}
+
+func TestMigratingIntegration_DeleteBatchClearsBothClusters(t *testing.T) {
+	ctx := context.Background()
+	env := newMigratingTestEnv(t)
+	fnID := uuid.New()
+	fn := newFunction(fnID)
+
+	// Right after a flag flip both clusters can hold an open batch for the same pointer.
+	appendItem(ctx, t, env.bmCurrent, fnID, fn)
+	appendItem(ctx, t, env.bmCurrent, fnID, fn)
+	resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+
+	result, err := env.migBM.DeleteBatch(ctx, fnID, "")
+	require.NoError(t, err)
+	require.True(t, result.Deleted)
+	require.Equal(t, resNext.BatchID, result.BatchID)
+	require.Equal(t, 3, result.ItemCount)
+
+	infoCur, err := env.bmCurrent.GetBatchInfo(ctx, fnID, "")
+	require.NoError(t, err)
+	require.Empty(t, infoCur.BatchID)
+	infoNext, err := env.bmNext.GetBatchInfo(ctx, fnID, "")
+	require.NoError(t, err)
+	require.Empty(t, infoNext.BatchID)
 }
 
 func TestMigratingIntegration_Close(t *testing.T) {

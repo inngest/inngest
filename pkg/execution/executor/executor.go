@@ -6044,7 +6044,7 @@ func parseBatchID(raw string) (ulid.ULID, error) {
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
 func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *execution.BatchExecOpts) error {
 	enableInstrumentation := e.enableBatchingInstrumentation != nil && e.enableBatchingInstrumentation(ctx, payload.AccountID, payload.WorkspaceID)
-	evtList, err := e.batcher.RetrieveItems(ctx, payload.FunctionID, payload.BatchID)
+	evtList, err := e.batcher.RetrieveItems(ctx, payload.AccountID, payload.FunctionID, payload.BatchID)
 
 	l := logger.StdlibLogger(ctx).With("accountID", payload.AccountID, "workspace_id", payload.WorkspaceID, "batchID", payload.BatchID)
 	if enableInstrumentation {
