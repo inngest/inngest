@@ -669,8 +669,7 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 		for i, e := range s.Exclude {
 			sw.sep(i, ", ")
 			if s.ExcludeParts == nil {
-				
-			writeDottedName(sw, SplitExcludeName(e))
+				writeIdentPart(sw, e)
 				continue
 			}
 			p := s.ExcludeParts[i]
