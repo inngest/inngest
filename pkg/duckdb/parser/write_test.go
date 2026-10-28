@@ -643,3 +643,25 @@ func TestWriteQuotesRecursiveCTEName(t *testing.T) {
 	requireWriteRoundTrip(t, `WITH "recursive" AS (SELECT 1) SELECT * FROM "recursive"`, `WITH "recursive" AS (SELECT 1) SELECT * FROM recursive`)
 	requireWriteRoundTrip(t, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`)
 }
+
+// TestWriteQuantifiedSubqueryOperand checks which subquery shapes under
+// ANY/ALL print bare and which get wrapped, and that each reparses to the
+// same AST (DuckDB parses both spellings of each the same way).
+func TestWriteQuantifiedSubqueryOperand(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"plain", "SELECT x = ANY (SELECT 1)", "SELECT x = ANY (SELECT 1)"},
+		{"array", "SELECT x = ANY (ARRAY(SELECT 1))", "SELECT x = ANY (ARRAY(SELECT 1))"},
+		{"bare array", "SELECT x = ANY ARRAY(SELECT 1)", "SELECT x = ANY (ARRAY(SELECT 1))"},
+		{"array subscript", "SELECT x = ANY (ARRAY(SELECT 1)[1:2])", "SELECT x = ANY (ARRAY(SELECT 1)[1:2])"},
+		{"exists", "SELECT x = ANY (EXISTS (SELECT 1))", "SELECT x = ANY (EXISTS (SELECT 1))"},
+		{"not", "SELECT x = ANY NOT (SELECT TRUE)", "SELECT x = ANY NOT (SELECT TRUE)"},
+		{"not exists", "SELECT x = ANY NOT EXISTS (SELECT 1)", "SELECT x = ANY NOT EXISTS (SELECT 1)"},
+		{"parenthesized not", "SELECT x = ANY (NOT (SELECT TRUE))", "SELECT x = ANY (NOT (SELECT TRUE))"},
+		{"parenthesized not exists", "SELECT x = ANY (NOT EXISTS (SELECT 1))", "SELECT x = ANY (NOT EXISTS (SELECT 1))"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}

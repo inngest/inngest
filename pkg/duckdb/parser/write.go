@@ -347,9 +347,14 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(" ")
 		sw.str(v.Quantifier)
 		sw.str(" ")
-		// The grammar accepts any BitwiseExpression here, but DuckDB's
-		// executing parser requires `ANY (...)`, so always parenthesize.
-		if sub, ok := v.Right.(*SubqueryExpr); ok && !sub.Exists {
+		// The grammar accepts any BitwiseExpression here, so parenthesize
+		// the operand to keep its extent unambiguous (`ANY (...)`). A plain
+		// or NOT subquery already brings its own parens and is kept bare,
+		// since `ANY (NOT EXISTS (...))` would reparse as a NOT over the
+		// EXISTS rather than one SubqueryExpr. An ARRAY(...) or EXISTS
+		// subquery doesn't start with a paren, so it's wrapped like any
+		// other operand.
+		if sub, ok := v.Right.(*SubqueryExpr); ok && !sub.Array && (!sub.Exists || sub.Not) {
 			sw.exprTop(sub)
 		} else {
 			sw.str("(")
