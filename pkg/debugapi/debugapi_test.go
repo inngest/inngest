@@ -1161,3 +1161,76 @@ func TestRunDebounceInvalidFunctionID(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid function_id")
 }
+
+func TestBatchResponsesPerStore(t *testing.T) {
+	item := batch.BatchItem{EventID: ulid.Make()}
+
+	t.Run("info summary is the store with items", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			infos       []batch.BatchInfo
+			wantBatchID string
+			wantItems   int32
+		}{
+			{
+				name: "items in next",
+				infos: []batch.BatchInfo{
+					{Store: "store-a", BatchID: "empty-current", Status: "pending"},
+					{Store: "store-b", BatchID: "next", Items: []batch.BatchItem{item}, Status: "pending"},
+				},
+				wantBatchID: "next",
+				wantItems:   1,
+			},
+			{
+				name: "no items anywhere",
+				infos: []batch.BatchInfo{
+					{Store: "store-a", BatchID: "empty-current", Status: "pending"},
+					{Store: "store-b", BatchID: "", Status: "none"},
+				},
+				wantBatchID: "empty-current",
+			},
+			{
+				name:  "no batch anywhere",
+				infos: []batch.BatchInfo{{Store: "store-a", Status: "none"}},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				resp := BatchInfoResponse(tt.infos)
+				require.Len(t, resp.Stores, len(tt.infos))
+				for i, info := range tt.infos {
+					require.Equal(t, info.Store, resp.Stores[i].Store)
+					require.Equal(t, info.BatchID, resp.Stores[i].BatchId)
+					require.Equal(t, int32(len(info.Items)), resp.Stores[i].ItemCount)
+				}
+				require.Equal(t, tt.wantBatchID, resp.BatchId)
+				require.Equal(t, tt.wantItems, resp.ItemCount)
+			})
+		}
+	})
+
+	t.Run("delete summarizes every store", func(t *testing.T) {
+		resp := DeleteBatchResponse([]batch.DeleteBatchResult{
+			{Store: "store-a", Deleted: true, BatchID: "current", ItemCount: 2},
+			{Store: "store-b", Deleted: true, BatchID: "next", ItemCount: 1},
+		})
+		require.True(t, resp.Deleted)
+		require.Equal(t, "current", resp.BatchId)
+		require.Equal(t, int32(3), resp.ItemCount)
+		require.Len(t, resp.Stores, 2)
+		require.Equal(t, "store-b", resp.Stores[1].Store)
+		require.Equal(t, "next", resp.Stores[1].BatchId)
+	})
+
+	t.Run("run summarizes scheduled stores", func(t *testing.T) {
+		resp := RunBatchResponse([]batch.RunBatchResult{
+			{Store: "store-a"},
+			{Store: "store-b", Scheduled: true, BatchID: "next", ItemCount: 4},
+		})
+		require.True(t, resp.Scheduled)
+		require.Equal(t, "next", resp.BatchId)
+		require.Equal(t, int32(4), resp.ItemCount)
+		require.Len(t, resp.Stores, 2)
+		require.False(t, resp.Stores[0].Scheduled)
+	})
+}

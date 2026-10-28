@@ -22,10 +22,12 @@ type WriteToNextFunc func(ctx context.Context, accountID uuid.UUID) bool
 // from current to next.
 // - Each append goes to exactly one cluster, the account's
 // primary, chosen by writeToNext.
-// - Reads (RetrieveItems, StartExecution, GetBatchInfo) check
-// the primary first and fall back to the other cluster only when the batch is
-// not there, so batches drain from whichever cluster created them.
-// - Deletes always run on both clusters: DeleteKeys and DeleteBatch.
+// - Reads (RetrieveItems, StartExecution) check the primary first and fall
+// back to the other cluster only when the batch is not there, so batches drain
+// from whichever cluster created them.
+// - DeleteKeys always runs on both clusters.
+// - The debug APIs (GetBatchInfo, DeleteBatch, RunBatch) act on both clusters
+// and return one result per cluster, current first.
 //
 // current is required. If next is nil, current is returned directly with zero
 // overhead. If writeToNext is nil, every append goes to current.
@@ -127,59 +129,29 @@ func (m *migratingBatchManager) DeleteKeys(ctx context.Context, functionID uuid.
 	return errors.Join(errNext, errCurrent)
 }
 
-// GetBatchInfo returns the open batch behind next's pointer, falling back to
-// current's when next has none.
-func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
-	info, err := m.next.GetBatchInfo(ctx, functionID, batchKey)
-	if err != nil || (info != nil && info.BatchID != "") {
-		return info, err
-	}
-	// GetBatchInfo has no account to pick a primary, so it always probes next
-	// first. Falling back to current is the expected path for accounts still
-	// writing there, so it is not worth a warning.
-	logger.StdlibLogger(ctx).Debug("no batch in next cluster, falling back to current for GetBatchInfo",
-		"function_id", functionID,
-		"batch_key", batchKey,
-	)
-	return m.current.GetBatchInfo(ctx, functionID, batchKey)
+// GetBatchInfo returns the current batch in each cluster, current first. Both
+// clusters can hold an open batch for the same function during a migration,
+// so the debug APIs report and act on every cluster instead of picking one.
+func (m *migratingBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error) {
+	infoCurrent, errCurrent := m.current.GetBatchInfo(ctx, functionID, batchKey)
+	infoNext, errNext := m.next.GetBatchInfo(ctx, functionID, batchKey)
+	return append(infoCurrent, infoNext...), errors.Join(errCurrent, errNext)
 }
 
-// DeleteBatch deletes the open batch behind each cluster's pointer. Right after
-// a flag flip both clusters can hold one for the same pointer, so it never stops
-// at the first. ItemCount is summed across clusters, and BatchID is next's when
-// next deleted a batch, otherwise current's.
-func (m *migratingBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error) {
-	resNext, errNext := m.next.DeleteBatch(ctx, functionID, batchKey)
+// DeleteBatch deletes the current batch in each cluster and returns one result
+// per cluster, current first.
+func (m *migratingBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) ([]DeleteBatchResult, error) {
 	resCurrent, errCurrent := m.current.DeleteBatch(ctx, functionID, batchKey)
-
-	result := &DeleteBatchResult{}
-	for _, res := range []*DeleteBatchResult{resNext, resCurrent} {
-		if res == nil || !res.Deleted {
-			continue
-		}
-		if !result.Deleted {
-			result.BatchID = res.BatchID
-		}
-		result.Deleted = true
-		result.ItemCount += res.ItemCount
-	}
-	return result, errors.Join(errNext, errCurrent)
+	resNext, errNext := m.next.DeleteBatch(ctx, functionID, batchKey)
+	return append(resCurrent, resNext...), errors.Join(errCurrent, errNext)
 }
 
-// RunBatch runs the open batch behind the primary cluster's pointer, falling
-// back to the fallback cluster's when the primary has none.
-func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error) {
-	primary, fallback := m.writeManager(ctx, opts.AccountID)
-	result, err := primary.RunBatch(ctx, opts)
-	if err != nil || (result != nil && result.Scheduled) {
-		return result, err
-	}
-	logger.StdlibLogger(ctx).Debug("no batch scheduled from primary cluster, falling back for RunBatch",
-		"account_id", opts.AccountID,
-		"function_id", opts.FunctionID,
-		"batch_key", opts.BatchKey,
-	)
-	return fallback.RunBatch(ctx, opts)
+// RunBatch schedules the current batch in each cluster and returns one result
+// per cluster, current first.
+func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]RunBatchResult, error) {
+	resCurrent, errCurrent := m.current.RunBatch(ctx, opts)
+	resNext, errNext := m.next.RunBatch(ctx, opts)
+	return append(resCurrent, resNext...), errors.Join(errCurrent, errNext)
 }
 
 func (m *migratingBatchManager) Close() error {

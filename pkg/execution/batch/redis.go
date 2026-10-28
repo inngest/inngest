@@ -26,6 +26,8 @@ import (
 const (
 	defaultBatchSizeLimit         = 10 * 1024 * 1024 // 10MiB
 	defaultEventIdempotenceSetTTL = 1800             // 30 minutes
+	// defaultStoreName names the batch store in debug results when no name is set.
+	defaultStoreName = "default"
 )
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
@@ -45,6 +47,13 @@ func WithRedisBatchIdempotenceSetTTL(ttl int64) RedisBatchManagerOpt {
 func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.log = l
+	}
+}
+
+// WithStoreName names the batch store in per-store debug results.
+func WithStoreName(name string) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.storeName = name
 	}
 }
 
@@ -109,6 +118,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer, opts ...
 		sizeLimit:         defaultBatchSizeLimit,
 		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
 		log:               logger.StdlibLogger(context.Background()),
+		storeName:         defaultStoreName,
 	}
 
 	// add default buffer
@@ -137,6 +147,9 @@ type redisBatchManager struct {
 	buffer *appendBuffer
 
 	metricRecorder BatchMetricRecorder
+
+	// storeName names this batch store in per-store debug results.
+	storeName string
 
 	// splitBatchPartitionByFunction, when non-nil and returning true for a
 	// given accountID, causes ScheduleExecution to enqueue the batch-scheduling
@@ -411,20 +424,21 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 }
 
 // DeleteBatch deletes the current batch for a function and batch key.
-func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error) {
+func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) ([]DeleteBatchResult, error) {
 	// First get the batch info to know what we're deleting
-	info, err := b.GetBatchInfo(ctx, functionID, batchKey)
+	info, err := b.getBatchInfo(ctx, functionID, batchKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get batch info: %w", err)
 	}
 
 	if info.BatchID == "" {
 		// No active batch to delete
-		return &DeleteBatchResult{
+		return []DeleteBatchResult{{
+			Store:     b.storeName,
 			Deleted:   false,
 			BatchID:   "",
 			ItemCount: 0,
-		}, nil
+		}}, nil
 	}
 
 	batchID, err := ulid.Parse(info.BatchID)
@@ -452,28 +466,34 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 		return nil, fmt.Errorf("failed to delete batch pointer: %w", err)
 	}
 
-	return &DeleteBatchResult{
+	return []DeleteBatchResult{{
+		Store:     b.storeName,
 		Deleted:   true,
 		BatchID:   info.BatchID,
 		ItemCount: len(info.Items),
-	}, nil
+	}}, nil
 }
 
 // RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
-func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error) {
+func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]RunBatchResult, error) {
 	// Get the batch info first
-	info, err := b.GetBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
+	info, err := b.getBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get batch info: %w", err)
 	}
 
-	if info.BatchID == "" {
+	// A pointer batch without items has no metadata, so its schedule job would
+	// find it absent and complete without moving the pointer. That job ID would
+	// then block the batch's own timeout job once events arrive, so only
+	// schedule batches that hold items.
+	if info.BatchID == "" || len(info.Items) == 0 {
 		// No active batch to run
-		return &RunBatchResult{
+		return []RunBatchResult{{
+			Store:     b.storeName,
 			Scheduled: false,
 			BatchID:   "",
 			ItemCount: 0,
-		}, nil
+		}}, nil
 	}
 
 	batchID, err := ulid.Parse(info.BatchID)
@@ -514,11 +534,12 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 		return nil, fmt.Errorf("failed to schedule batch execution: %w", err)
 	}
 
-	return &RunBatchResult{
+	return []RunBatchResult{{
+		Store:     b.storeName,
 		Scheduled: true,
 		BatchID:   info.BatchID,
 		ItemCount: len(info.Items),
-	}, nil
+	}}, nil
 }
 
 // BulkAppendResult represents the result of a bulk append operation.
@@ -616,7 +637,16 @@ func (b *redisBatchManager) Close() error {
 }
 
 // GetBatchInfo retrieves information about the current batch for a function and batch key.
-func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
+func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error) {
+	info, err := b.getBatchInfo(ctx, functionID, batchKey)
+	if err != nil {
+		return nil, err
+	}
+	info.Store = b.storeName
+	return []BatchInfo{*info}, nil
+}
+
+func (b *redisBatchManager) getBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error) {
 	// Determine the batch pointer key based on the batch key
 	// When batchKey is "default" or empty, use BatchPointer (no key suffix)
 	// This matches the behavior of Append when fn.EventBatch.Key is nil

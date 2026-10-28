@@ -426,8 +426,10 @@ func TestGetBatchInfo(t *testing.T) {
 	fnId := uuid.New()
 
 	t.Run("no batch exists returns empty info", func(t *testing.T) {
-		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := bm.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Equal(t, "", info.BatchID)
 		require.Empty(t, info.Items)
 		require.Equal(t, "none", info.Status)
@@ -461,15 +463,19 @@ func TestGetBatchInfo(t *testing.T) {
 		require.NotEmpty(t, res.BatchID)
 
 		// Query with empty batch key (should use default)
-		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := bm.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Equal(t, res.BatchID, info.BatchID)
 		require.Len(t, info.Items, 1)
 		require.Equal(t, eventID, info.Items[0].EventID)
 
 		// Query with explicit "default" key should return same result
-		info2, err := bm.GetBatchInfo(context.Background(), fnId, "default")
+		infos2, err := bm.GetBatchInfo(context.Background(), fnId, "default")
 		require.NoError(t, err)
+		require.Len(t, infos2, 1)
+		info2 := infos2[0]
 		require.Equal(t, res.BatchID, info2.BatchID)
 		require.Len(t, info2.Items, 1)
 	})
@@ -506,15 +512,19 @@ func TestGetBatchInfo(t *testing.T) {
 		require.NotEmpty(t, res.BatchID)
 
 		// Query with the custom batch key
-		info, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		infos, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Equal(t, res.BatchID, info.BatchID)
 		require.Len(t, info.Items, 1)
 		require.Equal(t, eventID, info.Items[0].EventID)
 
 		// Query with default key should NOT find this batch
-		info2, err := bm.GetBatchInfo(context.Background(), customFnId, "default")
+		infos2, err := bm.GetBatchInfo(context.Background(), customFnId, "default")
 		require.NoError(t, err)
+		require.Len(t, infos2, 1)
+		info2 := infos2[0]
 		require.Equal(t, "", info2.BatchID)
 		require.Empty(t, info2.Items)
 	})
@@ -549,8 +559,10 @@ func TestGetBatchInfo(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		info, err := bm.GetBatchInfo(context.Background(), multiFnId, "")
+		infos, err := bm.GetBatchInfo(context.Background(), multiFnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.NotEmpty(t, info.BatchID)
 		require.Len(t, info.Items, 3)
 
@@ -566,8 +578,10 @@ func TestGetBatchInfo(t *testing.T) {
 
 	t.Run("non-existent function returns empty", func(t *testing.T) {
 		nonExistentFnId := uuid.New()
-		info, err := bm.GetBatchInfo(context.Background(), nonExistentFnId, "")
+		infos, err := bm.GetBatchInfo(context.Background(), nonExistentFnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Equal(t, "", info.BatchID)
 		require.Empty(t, info.Items)
 		require.Equal(t, "none", info.Status)
@@ -851,8 +865,10 @@ func TestDeleteBatch(t *testing.T) {
 
 	t.Run("delete non-existent batch returns deleted=false", func(t *testing.T) {
 		nonExistentFnId := uuid.New()
-		result, err := bm.DeleteBatch(context.Background(), nonExistentFnId, "")
+		results, err := bm.DeleteBatch(context.Background(), nonExistentFnId, "")
 		require.NoError(t, err)
+		require.Len(t, results, 1)
+		result := results[0]
 		require.False(t, result.Deleted)
 		require.Equal(t, "", result.BatchID)
 		require.Equal(t, 0, result.ItemCount)
@@ -887,22 +903,28 @@ func TestDeleteBatch(t *testing.T) {
 		}
 
 		// Verify batch exists
-		info, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := bm.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.NotEmpty(t, info.BatchID)
 		require.Len(t, info.Items, 2)
 		batchID := info.BatchID
 
 		// Delete the batch
-		result, err := bm.DeleteBatch(context.Background(), fnId, "")
+		results, err := bm.DeleteBatch(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, results, 1)
+		result := results[0]
 		require.True(t, result.Deleted)
 		require.Equal(t, batchID, result.BatchID)
 		require.Equal(t, 2, result.ItemCount)
 
 		// Verify batch no longer exists
-		infoAfter, err := bm.GetBatchInfo(context.Background(), fnId, "")
+		infosAfter, err := bm.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infosAfter, 1)
+		infoAfter := infosAfter[0]
 		require.Equal(t, "", infoAfter.BatchID)
 		require.Empty(t, infoAfter.Items)
 	})
@@ -938,21 +960,27 @@ func TestDeleteBatch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify batch exists
-		info, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		infos, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.NotEmpty(t, info.BatchID)
 		batchID := info.BatchID
 
 		// Delete using the custom key
-		result, err := bm.DeleteBatch(context.Background(), customFnId, customBatchKey)
+		results, err := bm.DeleteBatch(context.Background(), customFnId, customBatchKey)
 		require.NoError(t, err)
+		require.Len(t, results, 1)
+		result := results[0]
 		require.True(t, result.Deleted)
 		require.Equal(t, batchID, result.BatchID)
 		require.Equal(t, 1, result.ItemCount)
 
 		// Verify batch no longer exists
-		infoAfter, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
+		infosAfter, err := bm.GetBatchInfo(context.Background(), customFnId, customBatchKey)
 		require.NoError(t, err)
+		require.Len(t, infosAfter, 1)
+		infoAfter := infosAfter[0]
 		require.Equal(t, "", infoAfter.BatchID)
 	})
 }
@@ -977,7 +1005,7 @@ func TestRunBatch(t *testing.T) {
 		bm := NewRedisBatchManager(bc, nil)
 		nonExistentFnId := uuid.New()
 
-		result, err := bm.RunBatch(context.Background(), RunBatchOpts{
+		results, err := bm.RunBatch(context.Background(), RunBatchOpts{
 			FunctionID:  nonExistentFnId,
 			BatchKey:    "",
 			AccountID:   accountId,
@@ -985,6 +1013,8 @@ func TestRunBatch(t *testing.T) {
 			AppID:       appId,
 		})
 		require.NoError(t, err)
+		require.Len(t, results, 1)
+		result := results[0]
 		require.False(t, result.Scheduled)
 		require.Equal(t, "", result.BatchID)
 		require.Equal(t, 0, result.ItemCount)
@@ -1128,4 +1158,54 @@ func TestStartExecution(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, overflowID, pointer)
 	})
+}
+
+func TestRunBatchSkipsEmptyBatch(t *testing.T) {
+	tests := []struct {
+		name          string
+		items         int
+		wantScheduled bool
+	}{
+		{name: "pointer batch without items is not scheduled", items: 0},
+		{name: "batch with items is scheduled", items: 2, wantScheduled: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+
+			bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+			q := &fakeProducer{}
+			bm := NewRedisBatchManager(bc, q, WithoutBuffer(), WithStoreName("store-a"))
+			fnID := uuid.New()
+			fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+
+			// A started batch leaves the pointer on a fresh batch ID without items.
+			batchID := ulid.Make()
+			require.NoError(t, r.Set(bc.KeyGenerator().BatchPointer(ctx, fnID), batchID.String()))
+			for i := 0; i < tt.items; i++ {
+				_, err := bm.Append(ctx, BatchItem{FunctionID: fnID, EventID: ulid.Make()}, fn)
+				require.NoError(t, err)
+			}
+			enqueuedBefore := len(q.items)
+
+			results, err := bm.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			require.Equal(t, "store-a", results[0].Store)
+			require.Equal(t, tt.wantScheduled, results[0].Scheduled)
+			require.Equal(t, tt.items, results[0].ItemCount)
+			if tt.wantScheduled {
+				require.Equal(t, batchID.String(), results[0].BatchID)
+				require.Len(t, q.items, enqueuedBefore+1)
+			} else {
+				require.Empty(t, results[0].BatchID)
+				require.Len(t, q.items, enqueuedBefore)
+			}
+		})
+	}
 }

@@ -46,13 +46,30 @@ func DeleteCommand() *cli.Command {
 				return fmt.Errorf("failed to delete batch: %w", err)
 			}
 
-			if !resp.Deleted {
-				fmt.Println("No batch found to delete")
-				return nil
+			// Older servers only fill the top-level fields.
+			stores := resp.Stores
+			if len(stores) == 0 {
+				stores = []*dbgpb.DeleteBatchStoreResult{{
+					Deleted:   resp.Deleted,
+					BatchId:   resp.BatchId,
+					ItemCount: resp.ItemCount,
+				}}
 			}
 
-			fmt.Printf("Deleted batch: %s\n", resp.BatchId)
-			fmt.Printf("Items removed: %d\n", resp.ItemCount)
+			for i, store := range stores {
+				if i > 0 {
+					fmt.Println()
+				}
+				if store.Store != "" {
+					fmt.Printf("Store:         %s\n", store.Store)
+				}
+				if !store.Deleted {
+					fmt.Println("No batch found to delete")
+					continue
+				}
+				fmt.Printf("Deleted batch: %s\n", store.BatchId)
+				fmt.Printf("Items removed: %d\n", store.ItemCount)
+			}
 
 			return nil
 		},

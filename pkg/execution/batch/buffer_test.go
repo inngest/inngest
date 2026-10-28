@@ -176,8 +176,10 @@ func TestBulkAppend(t *testing.T) {
 		require.Equal(t, 0, result.Duplicates)
 
 		// Verify items are in Redis
-		info, err := rbm.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := rbm.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 3)
 	})
 
@@ -226,8 +228,10 @@ func TestBulkAppend(t *testing.T) {
 		require.Equal(t, 1, result.Duplicates)
 
 		// Verify only 2 items in Redis
-		info, err := rbm.GetBatchInfo(context.Background(), newFnId, "")
+		infos, err := rbm.GetBatchInfo(context.Background(), newFnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 2)
 	})
 
@@ -341,8 +345,10 @@ func TestBufferedBatchManager(t *testing.T) {
 		require.GreaterOrEqual(t, elapsed, 90*time.Millisecond)
 
 		// Verify item is in Redis
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 1)
 	})
 
@@ -392,8 +398,10 @@ func TestBufferedBatchManager(t *testing.T) {
 		}
 
 		// Verify all items are in Redis
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 3)
 	})
 
@@ -530,8 +538,10 @@ func TestBufferedBatchManager(t *testing.T) {
 		// Verify item is in Redis - use a fresh manager without buffering for verification
 		verifier := NewRedisBatchManager(bc, nil)
 		defer verifier.Close()
-		info, err := verifier.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := verifier.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 1)
 	})
 
@@ -569,8 +579,10 @@ func TestBufferedBatchManager(t *testing.T) {
 		require.Less(t, elapsed, 50*time.Millisecond)
 
 		// Verify item is in Redis
-		info, err := direct.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := direct.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 1)
 	})
 }
@@ -634,8 +646,10 @@ func TestBufferedBatchManagerConcurrency(t *testing.T) {
 	require.Equal(t, int32(numGoroutines), successCount.Load(), "all appends should succeed")
 
 	// Verify all items are in Redis
-	info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+	infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 	require.NoError(t, err)
+	require.Len(t, infos, 1)
+	info := infos[0]
 	require.Len(t, info.Items, numGoroutines)
 }
 
@@ -785,8 +799,10 @@ func TestBufferedIdempotence(t *testing.T) {
 		require.Equal(t, enums.BatchItemExists, result2.Status)
 
 		// Verify only 1 item in Redis
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 1)
 	})
 
@@ -874,8 +890,10 @@ func TestBufferedIdempotence(t *testing.T) {
 		require.Equal(t, enums.BatchItemExists, results[2].Status)
 
 		// Verify only 2 items in Redis
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 2)
 	})
 }
@@ -1005,8 +1023,10 @@ func TestBufferedBatchFull(t *testing.T) {
 
 		// All 5 events should be committed (3 in first batch, 2 in overflow)
 		// The batch pointer now points to the overflow batch with 2 items
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, "")
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, "")
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 2, "overflow batch should have 2 items")
 	})
 }
@@ -1065,8 +1085,10 @@ func TestBufferedBatchManagerMultipleBufferKeys(t *testing.T) {
 
 	// Each tenant should have their own batch
 	for _, tenant := range tenants {
-		info, err := buffered.GetBatchInfo(context.Background(), fnId, tenant)
+		infos, err := buffered.GetBatchInfo(context.Background(), fnId, tenant)
 		require.NoError(t, err)
+		require.Len(t, infos, 1)
+		info := infos[0]
 		require.Len(t, info.Items, 1, "tenant %s should have 1 item", tenant)
 	}
 }
