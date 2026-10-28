@@ -293,3 +293,22 @@ func TestInsightsEncodesUnrepresentableNumbers(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `[["Infinity","-Infinity","NaN","9007199254740993",42]]`, string(raw))
 }
+
+// TestInsightsRunsLatestRowTiebreak covers the insights_runs macro's
+// latest-row collapse when lifecycle rows tie on their ms timestamp: the
+// furthest-along row wins regardless of insert order.
+func TestInsightsRunsLatestRowTiebreak(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r1", "Running", now)
+	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r1", "Queued", now)
+	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r2", "Queued", now)
+	insertRunRow(t, db, consts.DevServerAccountID, consts.DevServerEnvID, "r2", "Running", now)
+
+	result, err := qr.Insights(context.Background(), "SELECT run_id, status FROM runs ORDER BY run_id")
+	require.NoError(t, err)
+	require.Equal(t, [][]any{{"r1", "Running"}, {"r2", "Running"}}, result.Rows)
+}

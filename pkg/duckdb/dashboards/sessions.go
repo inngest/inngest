@@ -47,6 +47,21 @@ const (
 // this default rather than each hardcoding their own.
 const defaultSessionWindow = 7 * 24 * time.Hour
 
+// latestRunOrder picks each run's latest lifecycle row, matching the
+// inngest.insights_runs macro's own QUALIFY (pkg/db/duckdb/migrations/
+// 000002_insights_views.sql): timestamps are ms precision so rows can tie
+// (a Queued and a Running row in the same ms), and the tiebreaks prefer the
+// furthest-along row (ended, then terminal > in-progress > queued status)
+// instead of whichever row happened to be inserted first.
+const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
+    ended_at IS NOT NULL DESC,
+    CASE
+      WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2
+      WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1
+      ELSE 0
+    END DESC,
+    status DESC`
+
 // latestRunsCTE returns the `WITH latest AS (...)` prefix every session
 // query builds on, appending (accountID, envID) to args in the order
 // they're bound. inngest.runs is append-only (one row per lifecycle
@@ -65,8 +80,8 @@ func latestRunsCTE(scope Scope, args *[]any) string {
   SELECT run_id, app_id, app_name, function_slug, status, queued_at, started_at, ended_at, sessions, inputs
   FROM %s.runs
   WHERE account_id = ? AND env_id = ?
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC) = 1
-)`, driver.DuckLakeAlias)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY %s) = 1
+)`, driver.DuckLakeAlias, latestRunOrder)
 }
 
 // escapeLikeSearch escapes a caller-supplied search string for embedding

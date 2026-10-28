@@ -49,6 +49,13 @@ GROUP BY account_id, env_id, run_id, span_id
 -- pkg/cqrs/duckdbquery's latestRunsCTE uses (pkg/cqrs/duckdbquery/runs.go),
 -- exposed as a macro instead of reimplemented ad hoc. QUALIFY filters on
 -- the window function directly, no subquery wrapper needed.
+--
+-- Timestamps are ms precision, so a run's lifecycle rows can tie on
+-- COALESCE(ended_at, started_at, queued_at) (e.g. a Queued and a Running row
+-- both at the same ms). The tiebreaks pick the furthest-along row: an ended
+-- row first, then terminal > in-progress > queued status, then status
+-- itself so the pick never depends on insert order. inngest.runs has no
+-- insert sequence column to break ties on instead.
 CREATE MACRO inngest.insights_runs(p_account_id, p_env_id) AS TABLE
 SELECT
   r.run_id,
@@ -73,7 +80,15 @@ FROM inngest.runs r
 LEFT JOIN inngest.run_metadata_rollup rmp ON r.account_id = rmp.account_id AND r.env_id = rmp.env_id AND r.run_id = rmp.run_id AND rmp.scope = 'run'
 WHERE r.account_id = p_account_id AND r.env_id = p_env_id
 QUALIFY ROW_NUMBER() OVER (
-  PARTITION BY r.run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC
+  PARTITION BY r.run_id ORDER BY
+    COALESCE(r.ended_at, r.started_at, r.queued_at) DESC,
+    r.ended_at IS NOT NULL DESC,
+    CASE
+      WHEN r.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2
+      WHEN r.status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1
+      ELSE 0
+    END DESC,
+    r.status DESC
 ) = 1;
 
 -- Direct passthrough macros -- see docs/plans/010-duckdb-insights-query-layer.md's
