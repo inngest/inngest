@@ -136,7 +136,8 @@ func (a *adapter) adaptPivotColumnEntry(n *peg.Node) *PivotColumn {
 	case "PivotColumnExpression":
 		return &PivotColumn{baseExpr: a.at(alt), Header: a.adaptExpression(body(alt))}
 	default:
-		panic("duckdb/parser: a PIVOT column subquery entry is not yet supported")
+		a.unsupported(alt, "A PIVOT column subquery entry")
+		return nil
 	}
 }
 
@@ -144,8 +145,8 @@ func (a *adapter) adaptUnpivotStatement(n *peg.Node) *SelectStatement {
 	// UnpivotStatement <- UnpivotKeyword TableRef 'ON' TargetList IntoNameValues?
 	seq := body(n)
 	ref := &UnpivotRef{baseTableRefNode: baseTableRefNode{a.at(n)}, Source: a.adaptTableRef(seq.Children[1]), Columns: a.adaptTargetList(seq.Children[3])}
-	if _, ok := present(seq.Children[4]); ok {
-		panic("duckdb/parser: UNPIVOT ... INTO NAME ... VALUE ... is not yet supported")
+	if into, ok := present(seq.Children[4]); ok {
+		a.unsupported(into, "UNPIVOT ... INTO NAME ... VALUE ...")
 	}
 	return &SelectStatement{baseExpr: a.at(n), From: &FromClause{baseExpr: a.at(n), Refs: []TableRef{ref}}}
 }

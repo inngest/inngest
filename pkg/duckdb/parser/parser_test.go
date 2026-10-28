@@ -60,19 +60,26 @@ func TestParseStringRecoversPanicAsError(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseStringPrefixesRecoveredPanicsOnce(t *testing.T) {
-	// Adapter panics already carry the package prefix; the recover in
-	// ParseString must not add a second one.
-	for _, sql := range []string{
-		"DESCRIBE t",
-		"SELECT * REPLACE (a + 1 AS a) FROM t",
-		"SELECT * RENAME (a AS b) FROM t",
-		"SELECT * FROM t TABLESAMPLE 10%",
+func TestParseStringReportsUnsupportedConstructsAsParseErrors(t *testing.T) {
+	// An unsupported construct comes back as a positioned *ParseError, not
+	// a recovered panic message.
+	for _, c := range []struct {
+		sql, msg string
+		col  int
+	}{
+		{"DESCRIBE t", "DESCRIBE/TABLE as a standalone statement is not supported", 1},
+		{"SELECT * REPLACE (a + 1 AS a) FROM t", "* REPLACE (...) is not supported", 10},
+		{"SELECT * RENAME (a AS b) FROM t", "* RENAME (...) is not supported", 10},
+		{"SELECT * FROM t TABLESAMPLE 10%", "TABLESAMPLE is not supported", 17},
+		{"SELECT a OPERATOR(+) b FROM t", "OPERATOR(...) is not supported", 10},
+		{"SELECT TRY(a) FROM t", "TRY(...) is not supported", 8},
 	} {
-		_, err := ParseString(sql)
-		require.Error(t, err, sql)
-		require.True(t, strings.HasPrefix(err.Error(), "duckdb/parser: "), err.Error())
-		require.Equal(t, 1, strings.Count(err.Error(), "duckdb/parser:"), err.Error())
+		_, err := ParseString(c.sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr, c.sql)
+		require.Equal(t, c.msg, perr.Message, c.sql)
+		require.Equal(t, 1, perr.Pos.Line, c.sql)
+		require.Equal(t, c.col, perr.Pos.Column, c.sql)
 	}
 }
 
