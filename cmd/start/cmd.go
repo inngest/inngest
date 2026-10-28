@@ -107,6 +107,12 @@ func Command() *cli.Command {
 			},
 			&cli.IntFlag{
 				Category: "Advanced",
+				Name:     "queue-claim-concurrency",
+				Value:    devserver.DefaultQueueClaimConcurrency,
+				Usage:    "Maximum concurrent claims per function partition (experimental; 1 preserves best-effort FIFO; must not exceed queue-workers)",
+			},
+			&cli.IntFlag{
+				Category: "Advanced",
 				Name:     "tick",
 				Value:    devserver.DefaultTick,
 				Usage:    "The interval (in milliseconds) at which the executor polls the queue",

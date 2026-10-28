@@ -31,6 +31,12 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
+	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
+	queueClaimConcurrency := localconfig.GetIntValue(cmd, "queue-claim-concurrency", devserver.DefaultQueueClaimConcurrency)
+	if err := localconfig.ValidateQueueClaimConcurrency(queueClaimConcurrency, queueWorkers); err != nil {
+		return err
+	}
+
 	port := localconfig.GetIntValue(cmd, "port", api.DefaultAPIPort)
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
@@ -138,7 +144,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,
 		PostgresURI:             postgresURI,
-		QueueWorkers:            localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
+		QueueWorkers:            queueWorkers,
+		QueueClaimConcurrency:   queueClaimConcurrency,
 		RedisURI:                redisURI,
 		RequireKeys:             true,
 		RetryInterval:           localconfig.GetIntValue(cmd, "retry-interval", 0),
