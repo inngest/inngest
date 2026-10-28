@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
-	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/dashboards"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
