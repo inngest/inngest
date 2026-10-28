@@ -3,6 +3,7 @@ package executor
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"slices"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -63,4 +64,32 @@ func TestSubscriptionWaitPause(t *testing.T) {
 
 	other := "agent/message"
 	require.False(t, isSubscriptionWaitPause(&state.Pause{Event: &other}))
+}
+
+// The park races a delivery: the stack the park read before it wrote the marker
+// can lack a message that the delivery saved just after, and that delivery
+// found no marker. The read after the write must see it. A copy of the park
+// that was woken in between is answered and must not wake the run again.
+func TestParkStateOf(t *testing.T) {
+	step := "park-step"
+	first := subscriptionMessageID("inbox", "evt-1")
+	second := subscriptionMessageID("inbox", "evt-2")
+	other := subscriptionMessageID("other", "evt-3")
+
+	// Before the marker: message 1 is saved, the park awaits message 2.
+	before := []string{"a", first}
+	require.Equal(t, parkWaiting, parkStateOf(before, "inbox", step, 2))
+
+	// The delivery of message 2 saves it and finds no marker. After the marker
+	// is written the park reads the stack again and wakes at once.
+	after := append(slices.Clone(before), second)
+	require.Equal(t, parkReady, parkStateOf(after, "inbox", step, 2))
+
+	// Another subscription's messages do not count.
+	require.Equal(t, parkWaiting, parkStateOf(append(slices.Clone(before), other), "inbox", step, 2))
+
+	// A copy that was woken and answered in the meantime stops, even though the
+	// message exists: waking again would queue a second discovery.
+	answered := append(slices.Clone(after), step)
+	require.Equal(t, parkAnswered, parkStateOf(answered, "inbox", step, 2))
 }

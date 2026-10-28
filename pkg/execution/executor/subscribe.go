@@ -87,6 +87,33 @@ func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
 	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
 }
 
+// parkState is what a park op finds in the run's stack.
+type parkState int
+
+const (
+	// parkWaiting: the awaited message is not saved yet.
+	parkWaiting parkState = iota
+	// parkReady: the awaited message is saved, so the run can wake now.
+	parkReady
+	// parkAnswered: the park step itself is saved, so an earlier copy of this
+	// park was woken.
+	parkAnswered
+)
+
+// parkStateOf reads a park op's situation from the stack. The executor asks it
+// twice: before writing the marker (a copy that was already answered stops
+// there) and after (a message saved while the marker was being written wakes
+// the run now; one saved later finds the marker through its own delivery).
+func parkStateOf(stack []string, key string, stepID string, seq int) parkState {
+	if slices.Contains(stack, stepID) {
+		return parkAnswered
+	}
+	if len(subscriptionMessageIDs(stack, key)) >= seq {
+		return parkReady
+	}
+	return parkWaiting
+}
+
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
 // subscription: open, next, poll and close.
 func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
@@ -182,7 +209,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return err
 		}
 		// A park that was already woken and answered is sent again: nothing to do.
-		if slices.Contains(stack, gen.ID) {
+		if parkStateOf(stack, sub.Key, gen.ID, sub.Seq) == parkAnswered {
 			return nil
 		}
 
@@ -219,11 +246,9 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if err != nil {
 			return err
 		}
-		// A copy of this park was woken in the meantime: its answer is saved.
-		if slices.Contains(stack, gen.ID) {
-			return nil
-		}
-		if len(subscriptionMessageIDs(stack, sub.Key)) < sub.Seq {
+		// Still waiting: the marker is written, and a delivery wakes it. A copy of
+		// this park woken in the meantime has its answer saved: nothing to do.
+		if parkStateOf(stack, sub.Key, gen.ID, sub.Seq) != parkReady {
 			return nil
 		}
 		return e.consumeWait(ctx, &park)
