@@ -237,12 +237,26 @@ func (c *CaseExpr) String() string { return "CaseExpr" }
 type StarExpr struct {
 	baseExpr
 	Qualifier []string
-	Exclude   []string
+	// Exclude is each EXCLUDE entry's column name, decoded (the last part
+	// of a qualified `t.a` entry).
+	Exclude []string
+	// ExcludeParts is each EXCLUDE entry's full dotted name, parallel to
+	// Exclude: `EXCLUDE (t.a, b)` is [[t a] [b]]. Write prints these, so a
+	// qualified entry only excludes that table's column. It may be left
+	// nil on a hand-built StarExpr, which then prints Exclude as-is.
+	ExcludeParts [][]string
 }
 
 func (s *StarExpr) Children() []Node { return nil }
 func (s *StarExpr) String() string {
-	return fmt.Sprintf("StarExpr(%s,exclude=%v)", strings.Join(s.Qualifier, "."), s.Exclude)
+	names := make([]string, len(s.ExcludeParts))
+	for i, p := range s.ExcludeParts {
+		names[i] = strings.Join(p, ".")
+	}
+	if len(names) == 0 {
+		names = s.Exclude
+	}
+	return fmt.Sprintf("StarExpr(%s,exclude=%v)", strings.Join(s.Qualifier, "."), names)
 }
 
 type SubqueryExpr struct {
