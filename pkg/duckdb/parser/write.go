@@ -490,7 +490,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *WindowSpec:
 		sw.windowSpec(v)
 	case *DotExpr:
-		sw.exprAtLeast(v.X, precAtom)
+		sw.indirectionBase(v.X)
 		sw.str(".")
 		writeIdentPart(sw, v.Field)
 	case *SliceExpr:
@@ -511,6 +511,21 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	default:
 		panic(fmt.Sprintf("duckdb/parser: Write: unhandled Expr %T", e))
 	}
+}
+
+// indirectionBase prints the operand of a field access or method call. A
+// bare Ident there only comes from parenthesized source (`(t).x`, since an
+// unparenthesized `t.x` is a single two-part Ident), and printed flat it
+// would merge into the dotted name: `(t).x`, a struct field, would reparse
+// as column x of table t, and `(x).f(1)` as a schema-qualified function.
+func (sw *sqlWriter) indirectionBase(x Expr) {
+	if _, ok := x.(*Ident); ok {
+		sw.str("(")
+		sw.exprTop(x)
+		sw.str(")")
+		return
+	}
+	sw.exprAtLeast(x, precAtom)
 }
 
 func (sw *sqlWriter) literal(l *Literal) {
@@ -696,7 +711,7 @@ func (sw *sqlWriter) listComprehensionExpr(l *ListComprehensionExpr) {
 
 func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 	if f.Receiver != nil {
-		sw.exprAtLeast(f.Receiver, precAtom)
+		sw.indirectionBase(f.Receiver)
 		sw.str(".")
 	}
 	// Function names skip writeIdentPart's keyword check: keyword-named
