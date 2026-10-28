@@ -278,6 +278,10 @@ func TestWriteBetweenInLikeOperandParens(t *testing.T) {
 		{"other operator needs no parens", "SELECT a || b LIKE 'x'", "SELECT a || b LIKE 'x'"},
 		{"escape binds a comparison", "SELECT a LIKE 'x' ESCAPE b = c", "SELECT a LIKE 'x' ESCAPE b = c"},
 		{"escape keeps parens around or", "SELECT a LIKE 'x' ESCAPE (b OR c)", "SELECT a LIKE 'x' ESCAPE (b OR c)"},
+		{"escape like under comparison", "SELECT (a LIKE b ESCAPE c) = d", "SELECT (a LIKE b ESCAPE c) = d"},
+		{"escape like ending a comparison under comparison", "SELECT (x = a LIKE b ESCAPE c) = d", "SELECT (x = a LIKE b ESCAPE c) = d"},
+		{"escape like right of comparison stays flat", "SELECT d = (a LIKE b ESCAPE c)", "SELECT d = a LIKE b ESCAPE c"},
+		{"escape like under and stays flat", "SELECT (a LIKE b ESCAPE c) AND d", "SELECT a LIKE b ESCAPE c AND d"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
