@@ -181,10 +181,12 @@ func queryPath(path string) []PathSegment {
 // (a named field, possibly the first token with no leading ".") and
 // "[*]" (a wildcard, which DuckDB allows glued directly onto the
 // preceding token with no "." — e.g. "$.x[*]" — or right after "$" — e.g.
-// "$[*].a.b", both confirmed empirically). A general numeric index
-// ("[3]") never appears in a pathHints key (single-index access is
-// resolved via resolveArrayElementHint's own "[*]" convention instead,
-// regardless of the actual index), so it isn't handled here.
+// "$[*].a.b", both confirmed empirically). A numeric index ("[3]",
+// "[#-1]") never appears in a pathHints key, so it's read as "[*]", the
+// same convention resolveArrayElementHint uses for a single-index access:
+// any one element has its array's element hints. A quoted key ('["a.b"]')
+// is a named field. Any other bracket form is taken whole as one segment,
+// which no pathHints key matches, so it just gets no hint.
 func parseJSONPath(p string) []PathSegment {
 	var segs []PathSegment
 	for len(p) > 0 {
@@ -192,6 +194,13 @@ func parseJSONPath(p string) []PathSegment {
 		case strings.HasPrefix(p, "[*]"):
 			segs = append(segs, wc)
 			p = p[len("[*]"):]
+		case strings.HasPrefix(p, "["):
+			end := strings.IndexByte(p, ']')
+			if end < 0 {
+				return append(segs, seg(p))
+			}
+			segs = append(segs, bracketSegment(p[1:end]))
+			p = p[end+1:]
 		case strings.HasPrefix(p, "."):
 			p = p[1:]
 		default:
@@ -204,4 +213,18 @@ func parseJSONPath(p string) []PathSegment {
 		}
 	}
 	return segs
+}
+
+// bracketSegment is the segment for a "[...]" JSONPath token's contents
+// (other than "*").
+func bracketSegment(inner string) PathSegment {
+	if len(inner) >= 2 && inner[0] == '"' && inner[len(inner)-1] == '"' {
+		return seg(inner[1 : len(inner)-1])
+	}
+	// "3" or "#-1" (from the end)
+	index := strings.TrimPrefix(strings.TrimPrefix(inner, "#"), "-")
+	if index != "" && strings.Trim(index, "0123456789") == "" {
+		return wc
+	}
+	return seg("[" + inner + "]")
 }
