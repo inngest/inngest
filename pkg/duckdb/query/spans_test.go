@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -81,12 +83,68 @@ func TestGetSpansByRunIDAttachesMetadataViaJoin(t *testing.T) {
 	require.JSONEq(t, `2`, string(byKind["stale.kind"].Values["v"]))
 	require.Contains(t, byKind, "other.kind")
 	require.JSONEq(t, `3`, string(byKind["other.kind"].Values["v"]))
+	require.False(t, byKind["stale.kind"].IsUser)
+	require.True(t, byKind["other.kind"].IsUser)
 
 	require.Len(t, root.Children, 1)
 	child := root.Children[0]
 	require.Len(t, child.Metadata, 1)
 	require.Equal(t, "step.kind", string(child.Metadata[0].Kind))
 	require.JSONEq(t, `4`, string(child.Metadata[0].Values["v"]))
+}
+
+// TestGetSpansByRunIDAgreesWithMetadataRollup seeds one fixture and checks
+// GetSpansByRunID and inngest.run_metadata_rollup pick the same row per
+// kind: a later emission that drops a key, a null value, a created_at tie,
+// and user/internal kinds w/ the same prefix-stripped name.
+func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
+
+	seed := func(kind string, isUser bool, values string, createdAt time.Time) {
+		seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "run", kind, isUser, values, createdAt)
+	}
+	seed("dropped", true, `{"x": 1, "y": 2}`, now)
+	seed("dropped", true, `{"x": null}`, now.Add(time.Second))
+	seed("tied", true, `{"v": 2}`, now)
+	seed("tied", true, `{"v": 1}`, now)
+	seed("shared", true, `{"user": true}`, now)
+	seed("shared", false, `{"internal": true}`, now)
+
+	root, err := m.GetSpansByRunID(ctx, runID)
+	require.NoError(t, err)
+
+	spans := map[bool]map[string]any{true: {}, false: {}}
+	for _, md := range root.Metadata {
+		byt, err := json.Marshal(md.Values)
+		require.NoError(t, err)
+		var values map[string]any
+		require.NoError(t, json.Unmarshal(byt, &values))
+		spans[md.IsUser][string(md.Kind)] = values
+	}
+
+	var user, internal any
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT user_metadata, internal_metadata FROM inngest.run_metadata_rollup WHERE run_id = ? AND span_id = ?;`,
+		runID.String(), "root-span",
+	).Scan(&user, &internal))
+
+	require.Equal(t, map[string]any{
+		"dropped": map[string]any{"x": nil},
+		"tied":    map[string]any{"v": float64(2)},
+		"shared":  map[string]any{"user": true},
+	}, user)
+	require.Equal(t, map[string]any{"shared": map[string]any{"internal": true}}, internal)
+	require.Equal(t, user, spans[true])
+	require.Equal(t, internal, spans[false])
 }
 
 func TestGetSpansByRunIDBuildsTreeFromFlatRows(t *testing.T) {
@@ -294,4 +352,58 @@ func TestGetSpanOutputRequiresRunIDAndSpanID(t *testing.T) {
 	m := Wrap(nil, db).(*Manager)
 	_, err := m.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{})
 	require.Error(t, err)
+}
+
+// TestRunTraceGroupsStepsBySpanPath loads a run whose steps carry span paths
+// (one on the step, one on its execution, as the executor writes them) from
+// DuckDB and converts it as the API does: the steps come back grouped.
+func TestRunTraceGroupsStepsBySpanPath(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	path, err := json.Marshal([]meta.SpanPathElement{{ID: "agent", Name: "Research agent", Kind: "agent"}})
+	require.NoError(t, err)
+	attrs := func(stepID string, queued time.Time, withPath bool) string {
+		a := map[string]any{
+			meta.Attrs.StepID.Key():   stepID,
+			meta.Attrs.StepName.Key(): stepID,
+			meta.Attrs.QueuedAt.Key(): queued.UnixMilli(),
+		}
+		if withPath {
+			a[meta.Attrs.StepSpanPath.Key()] = string(path)
+			a[meta.Attrs.StepOrigin.Key()] = "inngest@3.44.0"
+		}
+		out, err := json.Marshal(a)
+		require.NoError(t, err)
+		return string(out)
+	}
+
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "run", "", meta.SpanNameRun, now, now.Add(time.Second), "{}")
+	// A step whose path is on the step span.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "plan", "run", meta.SpanNameStep, now, now.Add(10*time.Millisecond), attrs("plan", now, true))
+	// A step whose path is only on its execution.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "search", "run", meta.SpanNameStep, now.Add(20*time.Millisecond), now.Add(30*time.Millisecond), attrs("search", now.Add(20*time.Millisecond), false))
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "search-exec", "search", meta.SpanNameExecution, now.Add(20*time.Millisecond), now.Add(30*time.Millisecond), attrs("search", now.Add(20*time.Millisecond), true))
+	// A step outside any group.
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "after", "run", meta.SpanNameStep, now.Add(40*time.Millisecond), now.Add(50*time.Millisecond), attrs("after", now.Add(40*time.Millisecond), false))
+
+	root, err := m.GetSpansByRunID(ctx, runID)
+	require.NoError(t, err)
+	trace, err := loader.ConvertRunSpanFor(ctx, m, root)
+	require.NoError(t, err)
+
+	require.Len(t, trace.ChildrenSpans, 2)
+	group := trace.ChildrenSpans[0]
+	require.Equal(t, "Research agent", group.Name)
+	require.Equal(t, loader.SpanGroupStepType, group.StepType)
+	require.Len(t, group.ChildrenSpans, 2)
+	require.Equal(t, "plan", group.ChildrenSpans[0].Name)
+	require.Equal(t, "search", group.ChildrenSpans[1].Name)
+	require.Equal(t, "inngest@3.44.0", *group.ChildrenSpans[1].Origin)
+	require.Equal(t, "after", trace.ChildrenSpans[1].Name)
 }

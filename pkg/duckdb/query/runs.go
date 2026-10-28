@@ -304,10 +304,10 @@ func eventCELArrayMatchClause(fragment string) string {
 // fetching a candidate set and post-filtering in Go: event.* predicates
 // become an inputs-array match in the pre-collapse WHERE (see
 // eventCELArrayMatchClause); output.*/error.* predicates are appended to
-// the QUALIFY clause. A CEL string mixing both kinds via || has each side
-// evaluated independently and ANDed back together here, which can accept a
-// run neither side alone would — a pre-existing limitation shared with
-// pkg/cqrs/manager's own CEL pushdown.
+// the QUALIFY clause. A CEL string mixing both kinds is only divided along
+// its top-level && conjuncts; a conjunct mixing both (e.g. an || across
+// them) lands whole in the QUALIFY half, which matches its event.* parts
+// against inputs itself — see pkg/duckdb/insights' celExprsToSQL.
 func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	resolvedFilter, noMatch, err := m.resolveAppAndFunctionFilters(ctx, opt.Filter)
 	if err != nil {
