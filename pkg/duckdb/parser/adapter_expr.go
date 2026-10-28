@@ -412,7 +412,7 @@ func (a *adapter) adaptPrefixExpression(n *peg.Node) Expr {
 		if choice(body(prefixes[i])).Name == "QualifiedOperator" {
 			rejectQualifiedOperator()
 		}
-		result =&UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
+		result = &UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
 	}
 	return result
 }
