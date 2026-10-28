@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
@@ -16,6 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// insightsMetricsPkgName tags QueryInsights' metrics (the GQL resolver's
+// are tagged "coreapi.graph.resolvers").
+const insightsMetricsPkgName = "api.v2"
 
 // transpileInsights and executeInsights are seams for tests to inject a
 // panic; production always uses the insights package's own functions.
@@ -35,6 +40,10 @@ var (
 // precedent that this is a query problem a client can point back at, not
 // an API failure.
 func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (resp *apiv2.QueryInsightsResponse, err error) {
+	// Zero until the query actually starts running, so a rate limited or
+	// dual-write-off request records no query metrics (same as GQL).
+	var start time.Time
+
 	// The insights pipeline walks arbitrary user-shaped ASTs; a bug there
 	// must fail this one request with a 500, not crash the gRPC server. The
 	// query text isn't logged: it's user data.
@@ -42,6 +51,9 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 		if r := recover(); r != nil {
 			logger.StdlibLogger(ctx).Error("insights: recovered panic running query",
 				"panic", r, "stack", string(debug.Stack()))
+			if !start.IsZero() {
+				insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusInternalError, "", 0)
+			}
 			resp, err = nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError,
 				"Internal error running the Insights query.")
 		}
@@ -55,14 +67,18 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights requires dual-write (--duckdb) to be enabled")
 	}
 
+	start = time.Now()
+
 	if sc, ok, err := insights.TryShortCircuit(req.Query); ok {
 		if err != nil {
+			insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusMetaError, "", 0)
 			if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
 				return queryInsightsDiagnosticResponse(verr.Diagnostic(), req.Query), nil
 			}
 			return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, err.Error())
 		}
-		return toQueryInsightsResponse(nil, sc.Result)
+		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusMeta, "", len(sc.Result.Rows))
+		return toQueryInsightsResponse(nil, sc.Result, &apiv2.InsightsQueryInfo{Tables: sc.Tables})
 	}
 
 	// consts.DevServerAccountID/EnvID, matching every other apiv2 endpoint
@@ -71,20 +87,28 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 	tr, err := transpileInsights(req.Query, consts.DevServerAccountID, consts.DevServerEnvID)
 	if err != nil {
 		if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
+			insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusValidationError, "", 0)
 			return queryInsightsDiagnosticResponse(verr.Diagnostic(), req.Query), nil
 		}
+		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusParseError, "", 0)
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorValidationError, err.Error())
 	}
 
 	result, err := executeInsights(ctx, s.duckDB, tr)
 	if err != nil {
+		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusExecutionError, tr.PrimaryTable, 0)
 		if eerr, ok := errors.AsType[*insights.ExecutionError](err); ok {
-			return queryInsightsDiagnosticResponse(eerr.Diagnostic(), req.Query), nil
+			return queryInsightsDiagnosticResponse(insights.ExecutionDiagnostic(eerr), req.Query), nil
 		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, err.Error())
 	}
 
-	return toQueryInsightsResponse(tr.Diagnostics, result)
+	insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusOK, tr.PrimaryTable, len(result.Rows))
+	info := &apiv2.InsightsQueryInfo{Tables: tr.Tables, Limited: tr.Limited}
+	if tr.PrimaryTable != "" {
+		info.PrimaryTable = &tr.PrimaryTable
+	}
+	return toQueryInsightsResponse(tr.Diagnostics, result, info)
 }
 
 // ListInsightsTables backs GET /v2/insights/tables, describing the same six
@@ -127,10 +151,17 @@ func (s *Service) ListInsightsEventSchemas(ctx context.Context, req *apiv2.ListI
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }
 
-func toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights.Result) (*apiv2.QueryInsightsResponse, error) {
+func toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights.Result, info *apiv2.InsightsQueryInfo) (*apiv2.QueryInsightsResponse, error) {
 	columns := make([]*apiv2.InsightsOutputColumn, len(result.Columns))
 	for i, c := range result.Columns {
-		columns[i] = &apiv2.InsightsOutputColumn{Name: c.Name, Type: toInsightsOutputColumnType(c.Type)}
+		columns[i] = &apiv2.InsightsOutputColumn{
+			Name:      c.Name,
+			Type:      toInsightsOutputColumnType(c.Type),
+			PathHints: toInsightsPathHints(c.PathHints),
+		}
+	}
+	if info.Tables == nil {
+		info.Tables = []string{}
 	}
 
 	rows := make([]*apiv2.InsightsRow, len(result.Rows))
@@ -152,6 +183,7 @@ func toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights
 			Columns:     columns,
 			Rows:        rows,
 			Diagnostics: diags,
+			Info:        info,
 		},
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
@@ -168,6 +200,7 @@ func queryInsightsDiagnosticResponse(d insights.Diagnostic, query string) *apiv2
 			Columns:     []*apiv2.InsightsOutputColumn{},
 			Rows:        []*apiv2.InsightsRow{},
 			Diagnostics: []*apiv2.InsightsDiagnostic{toInsightsDiagnostic(d, query)},
+			Info:        &apiv2.InsightsQueryInfo{Tables: []string{}},
 		},
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}
@@ -204,6 +237,45 @@ func driverValueToProtoValue(v any) (*structpb.Value, error) {
 		return nil, fmt.Errorf("unmarshaling value: %w", err)
 	}
 	return structpb.NewValue(decoded)
+}
+
+// toInsightsPathHints mirrors the GQL resolver's toGQLPathHints: every
+// hint found at any JSON sub-path of a column (an empty path is the
+// column's own whole-value hint), skipping HintNone defensively.
+func toInsightsPathHints(hints []insights.PathHint) []*apiv2.InsightsPathHint {
+	out := make([]*apiv2.InsightsPathHint, 0, len(hints))
+	for _, ph := range hints {
+		hint := toInsightsColumnHint(ph.Hint)
+		if hint == apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_UNSPECIFIED {
+			continue
+		}
+		path := make([]*apiv2.InsightsPathSegment, len(ph.Path))
+		for i, seg := range ph.Path {
+			path[i] = &apiv2.InsightsPathSegment{Wildcard: seg.Wildcard}
+			if !seg.Wildcard {
+				path[i].Key = new(seg.Key)
+			}
+		}
+		out = append(out, &apiv2.InsightsPathHint{Path: path, Hint: hint})
+	}
+	return out
+}
+
+func toInsightsColumnHint(h insights.ColumnHint) apiv2.InsightsColumnHint {
+	switch h {
+	case insights.HintAppID:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_APP_ID
+	case insights.HintFunctionID:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_FUNCTION_ID
+	case insights.HintRunID:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_RUN_ID
+	case insights.HintEventID:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_EVENT_ID
+	case insights.HintSession:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_SESSION
+	default:
+		return apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_UNSPECIFIED
+	}
 }
 
 func toInsightsOutputColumnType(t insights.ColumnType) apiv2.InsightsOutputColumnType {

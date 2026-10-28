@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
 
 // errInsightsInternal is what Insights returns in place of a recovered panic.
@@ -45,7 +44,7 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (res *models.
 		if r := recover(); r != nil {
 			logger.StdlibLogger(ctx).Error("insights: recovered panic running query",
 				"panic", r, "stack", string(debug.Stack()))
-			recordInsightsQueryMetrics(ctx, start, "internal_error", "", 0)
+			recordInsightsQueryMetrics(ctx, start, insights.QueryStatusInternalError, "", 0)
 			res, err = nil, errInsightsInternal
 		}
 	}()
@@ -57,13 +56,13 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (res *models.
 	if sc, ok, err := insights.TryShortCircuit(sql); ok {
 		if err != nil {
 			if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
-				recordInsightsQueryMetrics(ctx, start, "meta_error", "", 0)
+				recordInsightsQueryMetrics(ctx, start, insights.QueryStatusMetaError, "", 0)
 				return emptyInsightsResultWithDiagnostic(verr.Diagnostic()), nil
 			}
-			recordInsightsQueryMetrics(ctx, start, "meta_error", "", 0)
+			recordInsightsQueryMetrics(ctx, start, insights.QueryStatusMetaError, "", 0)
 			return nil, err
 		}
-		recordInsightsQueryMetrics(ctx, start, "meta", "", len(sc.Result.Rows))
+		recordInsightsQueryMetrics(ctx, start, insights.QueryStatusMeta, "", len(sc.Result.Rows))
 		return toShortCircuitResult(sc), nil
 	}
 
@@ -82,10 +81,10 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (res *models.
 		// generic error banner. Transpile's own contract is unchanged: it
 		// still rejects the query outright, same as ever.
 		if verr, ok := errors.AsType[*insights.ValidationError](err); ok {
-			recordInsightsQueryMetrics(ctx, start, "validation_error", "", 0)
+			recordInsightsQueryMetrics(ctx, start, insights.QueryStatusValidationError, "", 0)
 			return emptyInsightsResultWithDiagnostic(verr.Diagnostic()), nil
 		}
-		recordInsightsQueryMetrics(ctx, start, "parse_error", "", 0)
+		recordInsightsQueryMetrics(ctx, start, insights.QueryStatusParseError, "", 0)
 		return nil, err
 	}
 
@@ -99,34 +98,21 @@ func (qr *queryResolver) Insights(ctx context.Context, sql string) (res *models.
 		// error, for the same reason: the UI can render it as a query
 		// problem instead of a generic error banner.
 		if eerr, ok := errors.AsType[*insights.ExecutionError](err); ok {
-			recordInsightsQueryMetrics(ctx, start, "execution_error", tr.PrimaryTable, 0)
-			return emptyInsightsResultWithDiagnostic(eerr.Diagnostic()), nil
+			recordInsightsQueryMetrics(ctx, start, insights.QueryStatusExecutionError, tr.PrimaryTable, 0)
+			return emptyInsightsResultWithDiagnostic(insights.ExecutionDiagnostic(eerr)), nil
 		}
-		recordInsightsQueryMetrics(ctx, start, "execution_error", tr.PrimaryTable, 0)
+		recordInsightsQueryMetrics(ctx, start, insights.QueryStatusExecutionError, tr.PrimaryTable, 0)
 		return nil, err
 	}
 
-	recordInsightsQueryMetrics(ctx, start, "ok", tr.PrimaryTable, len(result.Rows))
+	recordInsightsQueryMetrics(ctx, start, insights.QueryStatusOK, tr.PrimaryTable, len(result.Rows))
 	return toInsightsQueryResult(tr, result), nil
 }
 
-// recordInsightsQueryMetrics is this resolver's only per-query
-// observability today: a status-tagged count, an end-to-end duration (from
-// just before Transpile to the final outcome), and -- for a successful
-// query -- how many rows it returned. primaryTable is tagged rather than
-// the full table list to keep cardinality bounded to the six logical
-// tables, not their combinations; it's "" for a query that never reached
-// stageExtractQueryInfo (a parse/early-validation failure).
+// recordInsightsQueryMetrics records this resolver's per-query metrics
+// via insights.RecordQueryMetrics, shared w/ the REST endpoint.
 func recordInsightsQueryMetrics(ctx context.Context, start time.Time, status, primaryTable string, rowCount int) {
-	tags := map[string]any{}
-	if primaryTable != "" {
-		tags["primary_table"] = primaryTable
-	}
-	metrics.IncrInsightsQueryCounter(ctx, status, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
-	metrics.HistogramInsightsQueryDuration(ctx, time.Since(start), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
-	if status == "ok" {
-		metrics.HistogramInsightsQueryRowCount(ctx, int64(rowCount), metrics.HistogramOpt{PkgName: pkgName, Tags: tags})
-	}
+	insights.RecordQueryMetrics(ctx, pkgName, start, status, primaryTable, rowCount)
 }
 
 func emptyInsightsResultWithDiagnostic(d insights.Diagnostic) *models.InsightsQueryResult {
