@@ -105,7 +105,7 @@ func choice(n *peg.Node) *peg.Node {
 // AST) instead of a loud, findable failure.
 func present(n *peg.Node) (*peg.Node, bool) {
 	if n.Kind != peg.KindOptional {
-		panic(fmt.Sprintf("duckdb/parser: present() called on a %v node, not KindOptional — the vendored grammar's cardinality at this position likely changed; see Task 15's plan entry", n.Kind))
+		panic(fmt.Sprintf("duckdb/parser: internal error: present() called on a %v node, not KindOptional (the vendored grammar's cardinality at this position likely changed)", n.Kind))
 	}
 	if len(n.Children) == 0 {
 		return nil, false
@@ -119,9 +119,17 @@ func present(n *peg.Node) (*peg.Node, bool) {
 // mismatch for the same reason present() does.
 func repeatChildren(n *peg.Node) []*peg.Node {
 	if n.Kind != peg.KindRepeat {
-		panic(fmt.Sprintf("duckdb/parser: repeatChildren() called on a %v node, not KindRepeat — the vendored grammar's cardinality at this position likely changed; see Task 15's plan entry", n.Kind))
+		panic(fmt.Sprintf("duckdb/parser: internal error: repeatChildren() called on a %v node, not KindRepeat (the vendored grammar's cardinality at this position likely changed)", n.Kind))
 	}
 	return n.Children
+}
+
+// unsupported aborts adapting a construct the grammar accepts but this
+// package doesn't model, with a ParseError at n's position. ParseString
+// recovers it and returns it as-is, so callers see an ordinary positioned
+// ParseError rather than a panic message.
+func (a *adapter) unsupported(n *peg.Node, what string) {
+	panic(&ParseError{Pos: a.pos(n.Start), Message: what + " is not supported"})
 }
 
 // literalText descends through KindRule/KindOptional/KindChoice wrapper
@@ -343,8 +351,8 @@ func (a *adapter) adaptLikeVariations(n *peg.Node) string {
 // yield an empty operator: infix that renders its operands adjacent
 // (`f  (x)`, which DuckDB reparses as a function call), prefix it silently
 // drops the operator.
-func rejectQualifiedOperator() {
-	panic("duckdb/parser: OPERATOR(...) is not supported")
+func (a *adapter) rejectQualifiedOperator(n *peg.Node) {
+	a.unsupported(n, "OPERATOR(...)")
 }
 
 func (a *adapter) adaptOtherOperatorExpression(n *peg.Node) Expr {
@@ -368,7 +376,7 @@ func (a *adapter) adaptOtherOperatorExpression(n *peg.Node) Expr {
 				Right:      right,
 			}
 		} else if choice(body(alt)).Name == "QualifiedOperator" {
-			rejectQualifiedOperator()
+			a.rejectQualifiedOperator(tseq.Children[0])
 		}
 		return &BinaryExpr{baseExpr: a.at(tail), Op: literalText(tseq.Children[0]), Left: left, Right: right}
 	})
@@ -410,9 +418,9 @@ func (a *adapter) adaptPrefixExpression(n *peg.Node) Expr {
 	result := a.adaptBaseExpression(seq.Children[1])
 	for i := len(prefixes) - 1; i >= 0; i-- {
 		if choice(body(prefixes[i])).Name == "QualifiedOperator" {
-			rejectQualifiedOperator()
+			a.rejectQualifiedOperator(prefixes[i])
 		}
-		result =&UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
+		result = &UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
 	}
 	return result
 }
@@ -503,7 +511,7 @@ func (a *adapter) adaptSingleExpression(n *peg.Node) Expr {
 	case "SubqueryExpression":
 		return a.adaptSubqueryExpression(alt)
 	case "SpecialFunctionExpression":
-		panic("duckdb/parser: COALESCE/EXTRACT/POSITION/SUBSTRING/TRIM/OVERLAY/NULLIF/ROW/UNPACK/TRY/COLUMNS/the LAMBDA keyword form are out of scope for now — see this task's scope note")
+		return a.adaptSpecialFunctionExpression(alt)
 	case "ParenthesisExpression":
 		return a.adaptParenthesisExpression(alt)
 	case "IntervalLiteral":
@@ -536,6 +544,29 @@ func (a *adapter) adaptSingleExpression(n *peg.Node) Expr {
 	default: // DefaultExpression <- 'DEFAULT'
 		return &DefaultExpr{baseExpr: a.at(alt)}
 	}
+}
+
+// specialFunctionSpellings names each SpecialFunctionExpression alternative
+// for its "not supported" error.
+var specialFunctionSpellings = map[string]string{
+	"CoalesceExpression":  "COALESCE(...)",
+	"UnpackExpression":    "UNPACK(...)",
+	"TryExpression":       "TRY(...)",
+	"ColumnsExpression":   "COLUMNS(...)",
+	"ExtractExpression":   "EXTRACT(...)",
+	"LambdaExpression":    "The LAMBDA keyword",
+	"NullIfExpression":    "NULLIF(...)",
+	"PositionExpression":  "POSITION(...)",
+	"RowExpression":       "ROW(...)",
+	"SubstringExpression": "SUBSTRING(...)",
+	"TrimExpression":      "TRIM(...)",
+	"OverlayExpression":   "OVERLAY(...)",
+}
+
+func (a *adapter) adaptSpecialFunctionExpression(n *peg.Node) Expr {
+	alt := choice(body(n))
+	a.unsupported(alt, specialFunctionSpellings[alt.Name])
+	return nil
 }
 
 func (a *adapter) adaptLiteralExpression(n *peg.Node) Expr {
@@ -651,11 +682,11 @@ func (a *adapter) adaptStarExpression(n *peg.Node) Expr {
 	}
 	// Not modeled on StarExpr; silently dropping them would change which
 	// columns (or column names) the query returns.
-	if _, ok := present(seq.Children[3]); ok {
-		panic("duckdb/parser: * REPLACE (...) is not yet supported")
+	if r, ok := present(seq.Children[3]); ok {
+		a.unsupported(r, "* REPLACE (...)")
 	}
-	if _, ok := present(seq.Children[4]); ok {
-		panic("duckdb/parser: * RENAME (...) is not yet supported")
+	if r, ok := present(seq.Children[4]); ok {
+		a.unsupported(r, "* RENAME (...)")
 	}
 	return s
 }
