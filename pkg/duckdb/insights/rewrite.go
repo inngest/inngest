@@ -191,7 +191,12 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 
 	switch e := expr.(type) {
 	case *parser.BinaryExpr:
-		e.Left, e.Right = r.rewrite(e.Left), r.rewrite(e.Right)
+		e.Left = r.rewrite(e.Left)
+		// A COLLATE's right operand is a collation name (validate only
+		// admits an Ident there), never a column reference to rewrite.
+		if !strings.EqualFold(e.Op, "COLLATE") {
+			e.Right = r.rewrite(e.Right)
+		}
 	case *parser.QuantifiedExpr:
 		// A *SubqueryExpr Right recurses via the SubqueryExpr case.
 		e.Left, e.Right = r.rewrite(e.Left), r.rewrite(e.Right)

@@ -555,6 +555,28 @@ func TestValidateAcceptsCollate(t *testing.T) {
 	require.ErrorContains(t, err, `unknown column "nope"`)
 }
 
+// Only a (possibly dotted) collation name may follow COLLATE -- anything
+// else would otherwise skip validation entirely.
+func TestValidateRejectsNonNameCollate(t *testing.T) {
+	for _, q := range []string{
+		"SELECT status COLLATE (SELECT name FROM events) FROM runs",
+		"SELECT status COLLATE lower(status) FROM runs",
+		"SELECT status COLLATE read_csv('/etc/passwd') FROM runs",
+		"SELECT run_id FROM runs ORDER BY status COLLATE 'nocase'",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, "unsupported COLLATE expression", q)
+	}
+}
+
+// sessions.key on a COLLATE's right is a collation name, not an
+// array-of-struct access to rewrite.
+func TestRewriteArrayOfStructAccessSkipsCollation(t *testing.T) {
+	tr, err := Transpile("SELECT status COLLATE sessions.key AS s FROM runs", testAccountID, testEnvID)
+	require.NoError(t, err)
+	require.Contains(t, tr.SQL, "status COLLATE sessions.key AS s")
+}
+
 func TestValidateStarExcludeQualified(t *testing.T) {
 	for _, q := range []string{
 		"SELECT * EXCLUDE (runs.run_id) FROM runs",
