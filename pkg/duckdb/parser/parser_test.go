@@ -65,7 +65,7 @@ func TestParseStringReportsUnsupportedConstructsAsParseErrors(t *testing.T) {
 	// a recovered panic message.
 	for _, c := range []struct {
 		sql, msg string
-		col  int
+		col      int
 	}{
 		{"DESCRIBE t", "DESCRIBE/TABLE as a standalone statement is not supported", 1},
 		{"SELECT * REPLACE (a + 1 AS a) FROM t", "* REPLACE (...) is not supported", 10},
