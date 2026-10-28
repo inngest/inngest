@@ -921,6 +921,7 @@ export function buildTopFunctionRows({
           id: summary?.id ?? fn.id,
           isArchived: summary?.isArchived,
           isPaused: summary?.isPaused,
+          isDraining: 'isDraining' in summary ? summary.isDraining : undefined,
           name: summary?.name ?? fn.slug,
           slug: fn.slug,
           triggers:

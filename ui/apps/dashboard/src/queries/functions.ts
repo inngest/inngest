@@ -87,6 +87,7 @@ const GetFunctionsDocument = graphql(`
           name
           isPaused
           isArchived
+          isDraining
           triggers {
             type
             value

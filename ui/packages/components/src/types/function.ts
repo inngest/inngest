@@ -21,6 +21,7 @@ export type Function = {
   };
   isArchived?: boolean;
   isPaused?: boolean;
+  isDraining?: boolean;
   failureRate?: number;
 };
 
