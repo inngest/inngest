@@ -924,11 +924,23 @@ func (w *WindowDef) String() string   { return "WindowDef(" + w.Name + ")" }
 type PivotColumn struct {
 	baseExpr
 	Header Expr
-	In     []string
+	// In is the IN list's entries as source text. The adapter only accepts
+	// literals and bare names there (see adaptPivotValueList), since Walk
+	// can't see into raw text.
+	In []string
+	// Enum is the unparenthesized `IN enum_type` form: In holds that one
+	// type name, and DuckDB pivots on the enum's values rather than a
+	// value list.
+	Enum bool
 }
 
 func (p *PivotColumn) Children() []Node { return []Node{p.Header} }
-func (p *PivotColumn) String() string   { return fmt.Sprintf("PivotColumn(in=%v)", p.In) }
+func (p *PivotColumn) String() string {
+	if p.Enum {
+		return fmt.Sprintf("PivotColumn(enum=%v)", p.In[0])
+	}
+	return fmt.Sprintf("PivotColumn(in=%v)", p.In)
+}
 
 type PivotRef struct {
 	baseTableRefNode

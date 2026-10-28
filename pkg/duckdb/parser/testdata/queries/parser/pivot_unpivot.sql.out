@@ -75,6 +75,6 @@ SelectStatement
       SelectItem()
         FunctionExpr(sum,distinct=false)
           Ident(x)
-      PivotColumn(in=["a b"])
+      PivotColumn(enum="a b")
         Ident(y)
 

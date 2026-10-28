@@ -377,7 +377,42 @@ func TestWriteQuotesBoundNames(t *testing.T) {
 func TestWritePivotEnumTargetKeepsQuoting(t *testing.T) {
 	stmt, err := ParseString(`SELECT * FROM t PIVOT (sum(x) FOR y IN "a b")`)
 	require.NoError(t, err)
-	require.Contains(t, String(stmt), `IN ("a b")`)
+	require.Contains(t, String(stmt), `IN "a b"`)
+}
+
+// TestWritePivotEnumAndValueList checks the unparenthesized `IN enum_type`
+// form stays unparenthesized (`IN (a)` is a one-value list instead).
+func TestWritePivotEnumAndValueList(t *testing.T) {
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN a)", "SELECT * FROM t PIVOT (sum(x) FOR y IN a)")
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN (a))", "SELECT * FROM t PIVOT (sum(x) FOR y IN (a))")
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))", "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))")
+}
+
+// TestRejectsExpressionsInRawTextFields checks the fields kept as source
+// text (PivotColumn.In, CastExpr.Type, TypeLiteral.Type) only ever hold
+// literals and names: Walk can't see into them, so an expression there
+// would reach DuckDB unvalidated.
+func TestRejectsExpressionsInRawTextFields(t *testing.T) {
+	for _, c := range []struct{ sql, msg string }{
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ((SELECT 1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN (f(1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT x::VARCHAR((SELECT 1)) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT x::INT[(SELECT 1)] FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT CAST(x AS VARCHAR(f(1))) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT x::STRUCT(a VARCHAR((SELECT 1))) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT VARCHAR(1 + 1) 'x'", "A type modifier other than a number or string literal is not supported"},
+	} {
+		_, err := ParseString(c.sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr, c.sql)
+		require.Equal(t, c.msg, perr.Message, c.sql)
+	}
+	for _, sql := range []string{
+		"SELECT x::DECIMAL(10, 2), x::INT[3], x::STRUCT(a VARCHAR(10), b INT[2]), x::TIMESTAMP(3), x::MAP(VARCHAR, INT) FROM t",
+	} {
+		_, err := ParseString(sql)
+		require.NoError(t, err, sql)
+	}
 }
 
 // TestWriteOffsetOnly checks an OFFSET with no LIMIT (a LimitClause with a

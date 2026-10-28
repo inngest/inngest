@@ -1189,6 +1189,14 @@ func (sw *sqlWriter) pivotColumn(p *PivotColumn) {
 	if len(p.In) == 0 {
 		return
 	}
+	if p.Enum {
+		if len(p.In) != 1 {
+			panic("duckdb/parser: Write: an enum PivotColumn needs exactly one In entry")
+		}
+		sw.str(" IN ")
+		sw.str(p.In[0]) // the source's own spelling of a single identifier
+		return
+	}
 	sw.str(" IN (")
 	for i, v := range p.In {
 		sw.sep(i, ", ")

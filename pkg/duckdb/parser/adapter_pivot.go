@@ -48,6 +48,7 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 		// form below, since Write emits In verbatim: a decoded quoted
 		// identifier would lose its quotes.
 		pc.In = []string{a.rawText(body(target))}
+		pc.Enum = true
 		return pc
 	}
 	// PivotListTarget <- PivotTargetList ; PivotTargetList <- Parens(TargetList)
@@ -55,9 +56,27 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 	parensSeq := body(body(body(target)))
 	items := a.adaptTargetList(parensSeq.Children[1])
 	for _, item := range items {
+		if !isPivotValue(item.Expr) {
+			panic(&ParseError{Pos: item.Pos(), Message: "A PIVOT IN entry other than a literal or a name is not supported"})
+		}
 		pc.In = append(pc.In, a.src[item.Pos().Offset:item.End().Offset])
 	}
 	return pc
+}
+
+// isPivotValue reports whether a PIVOT IN entry is a literal, a signed
+// number or a bare name. In keeps entries as source text, which Walk can't
+// see into, so anything that could hide a subquery or function call is
+// rejected rather than passed through unchecked.
+func isPivotValue(e Expr) bool {
+	switch v := e.(type) {
+	case *Literal, *Ident:
+		return true
+	case *UnaryExpr:
+		lit, ok := v.X.(*Literal)
+		return (v.Op == "-" || v.Op == "+") && !v.Postfix && ok && lit.Kind == LitNumber
+	}
+	return false
 }
 
 func (a *adapter) adaptTableUnpivotClause(source TableRef, n *peg.Node) TableRef {
