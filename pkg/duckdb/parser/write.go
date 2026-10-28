@@ -1061,7 +1061,15 @@ func (sw *sqlWriter) withClause(w *WithClause) {
 }
 
 func (sw *sqlWriter) cte(c *CTE) {
-	writeIdentPart(sw, c.Name)
+	// RECURSIVE is unreserved, so writeIdentPart leaves it bare, but as a
+	// CTE name it would read as WITH's own RECURSIVE keyword.
+	if strings.EqualFold(c.Name, "recursive") {
+		sw.str(`"`)
+		sw.str(c.Name)
+		sw.str(`"`)
+	} else {
+		writeIdentPart(sw, c.Name)
+	}
 	if len(c.ColumnNames) > 0 {
 		sw.str(" (")
 		for i, n := range c.ColumnNames {

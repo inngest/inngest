@@ -583,3 +583,8 @@ func TestWriteKeepsArraySubqueryFrameExcludeAndTuples(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteQuotesRecursiveCTEName(t *testing.T) {
+	requireWriteRoundTrip(t, `WITH "recursive" AS (SELECT 1) SELECT * FROM "recursive"`, `WITH "recursive" AS (SELECT 1) SELECT * FROM recursive`)
+	requireWriteRoundTrip(t, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`)
+}
