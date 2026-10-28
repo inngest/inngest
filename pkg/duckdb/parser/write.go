@@ -839,7 +839,9 @@ var syntaxFunctionNames = map[string]bool{
 // DuckDB has no function by that name (COALESCE is an operator), so the
 // adapter desugars COALESCE(...) into this FunctionExpr and this is its
 // inverse. A source `"coalesce"(x)`, which DuckDB itself would reject as an
-// unknown function, adapts to the same node and so prints as COALESCE too.
+// unknown function, adapts to the same node and so prints as COALESCE too,
+// unless it has something COALESCE(...) can't spell (no arguments, DISTINCT,
+// OVER, ...; see isCoalesceSyntax), which stays a quoted call.
 func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	if f.Receiver != nil || len(f.Name) > 1 {
 		for i, p := range f.Name {
@@ -858,7 +860,7 @@ func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	p := f.Name[0]
 	up := strings.ToUpper(p)
 	switch {
-	case up == "COALESCE":
+	case up == "COALESCE" && isCoalesceSyntax(f):
 		sw.str("COALESCE")
 	case isSimpleIdent(p) && !syntaxFunctionNames[up] && isFuncNameIdent(p):
 		sw.str(p)
@@ -867,6 +869,22 @@ func (sw *sqlWriter) functionName(f *FunctionExpr) {
 		sw.str(strings.ReplaceAll(p, `"`, `""`))
 		sw.str(`"`)
 	}
+}
+
+// isCoalesceSyntax reports whether f is something the COALESCE(...) syntax
+// (`'COALESCE' Parens(List(Expression))`) can spell: one or more plain
+// arguments and none of a call's other clauses.
+func isCoalesceSyntax(f *FunctionExpr) bool {
+	if len(f.Args) == 0 || f.Distinct || f.All || f.OrderBy != nil || f.IgnoreNulls || f.RespectNulls ||
+		f.Within != nil || f.Filter != nil || f.Export || f.Over != nil {
+		return false
+	}
+	for _, a := range f.Args {
+		if _, ok := a.(*NamedArg); ok {
+			return false
+		}
+	}
+	return true
 }
 
 // windowSpec prints a FunctionExpr's OVER clause. A spec that's just a bare
