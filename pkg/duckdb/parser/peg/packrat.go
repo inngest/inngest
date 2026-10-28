@@ -78,6 +78,14 @@ type Parser struct {
 	// (ErrTooDeep) instead of crashing the process. Like Grammar and
 	// Primitives, it must not change once the Parser has been used.
 	MaxDepth int
+	// MaxEntries, if positive, caps how many memo entries plus CST nodes a
+	// single parse may create. Both grow linearly with input length, but
+	// at tens per input byte (a few KB of memory per byte for a dense
+	// input), so a parser exposed to untrusted input needs this to fail an
+	// oversized one cleanly (ErrTooLarge) instead of allocating without
+	// bound. Like MaxDepth, it must not change once the Parser has been
+	// used.
+	MaxEntries int
 
 	dispatchOnce sync.Once
 	dispatch     map[string]dispatchEntry
@@ -211,7 +219,9 @@ type ParseError struct {
 	Pos     int
 	Message string
 
-	tooDeep bool
+	// cause is ErrTooDeep or ErrTooLarge when the parse was aborted, nil
+	// for an ordinary syntax error.
+	cause error
 }
 
 func (e *ParseError) Error() string { return fmt.Sprintf("offset %d: %s", e.Pos, e.Message) }
@@ -220,12 +230,11 @@ func (e *ParseError) Error() string { return fmt.Sprintf("offset %d: %s", e.Pos,
 // Parser.MaxDepth.
 var ErrTooDeep = errors.New("input is nested too deeply")
 
-func (e *ParseError) Unwrap() error {
-	if e.tooDeep {
-		return ErrTooDeep
-	}
-	return nil
-}
+// ErrTooLarge is wrapped by the *ParseError a parse returns when it exceeds
+// Parser.MaxEntries.
+var ErrTooLarge = errors.New("input is too large to parse")
+
+func (e *ParseError) Unwrap() error { return e.cause }
 
 // Parse builds a fresh evaluator for this one call, so the returned *Node
 // is valid indefinitely. A caller that parses many inputs back-to-back and
@@ -237,9 +246,18 @@ func (p *Parser) Parse(input string, root string) (*Node, error) {
 	return e.run(root)
 }
 
-// newEvaluator allocates a fresh evaluator sized for input. The capacity
-// guesses below are all proportional to input size and calibrated against
-// measured usage on representative queries — refMemo entries and
+// preallocInputBytes caps the input length newEvaluator sizes its buffers
+// for up front. Past it they grow on demand instead: preallocating for a
+// large input costs that memory even when the parse then fails on its
+// first token (a failing 64KiB input used to allocate ~120MB before
+// matching anything), and MaxEntries, not the preallocation, is what
+// bounds a large parse.
+const preallocInputBytes = 2 << 10
+
+// newEvaluator allocates a fresh evaluator sized for input (up to
+// preallocInputBytes). The capacity guesses below are all proportional to
+// input size and calibrated against measured usage on representative
+// queries — refMemo entries and
 // nodeSlab/childSlab elements run 7-20x the input length (more for small
 // inputs, where fixed grammar overhead isn't yet amortized; the multipliers
 // undershoot small inputs a bit and target the large end, since that's
@@ -261,14 +279,15 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 	// getDispatch also builds p.munch and p.callSigs, so it must run before
 	// either is read.
 	dispatch := p.getDispatch()
+	n := min(len(input), preallocInputBytes)
 	e := &evaluator{
-		dispatch: dispatch, munch: p.munch, callSigs: p.callSigs, skip: skip, input: input, maxDepth: p.MaxDepth,
-		refMemo:   make(map[refMemoKey]memoEntry, len(input)*12),
-		callMemo:  make(map[callMemoKey]memoEntry, len(input)/2+1),
+		dispatch: dispatch, munch: p.munch, callSigs: p.callSigs, skip: skip, input: input, maxDepth: p.MaxDepth, maxEntries: p.MaxEntries,
+		refMemo:   make(map[refMemoKey]memoEntry, n*12),
+		callMemo:  make(map[callMemoKey]memoEntry, n/2+1),
 		skipCache: skipCache,
-		nodeSlab:  make([]Node, 0, len(input)*8),
-		childSlab: make([]*Node, 0, len(input)*8),
-		envSlab:   make([]env, 0, len(input)/2+1),
+		nodeSlab:  make([]Node, 0, n*8),
+		childSlab: make([]*Node, 0, n*8),
+		envSlab:   make([]env, 0, n/2+1),
 	}
 	e.newNodeFn = e.newNode
 	return e
@@ -283,7 +302,7 @@ func (p *Parser) newEvaluator(input string) *evaluator {
 func (e *evaluator) reset(input string) {
 	e.input = input
 	e.furthestFail = 0
-	e.depth, e.tooDeep, e.tooDeepPos = 0, false, 0
+	e.depth, e.abort, e.abortPos = 0, nil, 0
 	if cap(e.skipCache) >= len(input)+1 {
 		e.skipCache = e.skipCache[:len(input)+1]
 	} else {
@@ -303,8 +322,8 @@ func (e *evaluator) reset(input string) {
 func (e *evaluator) run(root string) (*Node, error) {
 	start := e.skipPos(0)
 	node, next, ok := e.evalRef(root, nil, false, start)
-	if e.tooDeep {
-		return nil, &ParseError{Pos: e.tooDeepPos, Message: ErrTooDeep.Error(), tooDeep: true}
+	if e.abort != nil {
+		return nil, &ParseError{Pos: e.abortPos, Message: e.abort.Error(), cause: e.abort}
 	}
 	if !ok {
 		return nil, &ParseError{Pos: e.furthestFail, Message: fmt.Sprintf("failed to parse %s", root)}
@@ -342,10 +361,23 @@ func (p *Parser) AcquireSession() *Session {
 	return &Session{parser: p}
 }
 
+// maxRetainedEntries caps the buffers a pooled Session keeps: a session
+// whose last parse grew its memo maps or slabs past this (a large input)
+// drops its evaluator on Release rather than pin that memory in the pool
+// indefinitely. Maps never shrink once grown, so they'd otherwise hold
+// the largest input's footprint for the life of the process. This is
+// roughly what a 4KiB query needs, well above typical.
+const maxRetainedEntries = 64 << 10
+
 // Release returns the session's buffers to the pool for a future
 // AcquireSession call to reuse. The caller must be done reading any *Node
 // this session returned before calling this — see the Session doc comment.
 func (s *Session) Release() {
+	if e := s.e; e != nil && (len(e.refMemo)+len(e.callMemo) > maxRetainedEntries ||
+		cap(e.nodeSlab) > maxRetainedEntries || cap(e.childSlab) > maxRetainedEntries ||
+		cap(e.skipCache) > maxRetainedEntries) {
+		s.e = nil
+	}
 	s.parser.sessionPool.Put(s)
 }
 
@@ -417,12 +449,15 @@ type evaluator struct {
 	callMemo     map[callMemoKey]memoEntry
 	furthestFail int
 
-	// depth counts the rule invocations currently being evaluated; once it
-	// would exceed maxDepth, tooDeep is set and every further invocation
-	// fails immediately so the parse unwinds without more work.
+	// depth counts the rule invocations currently being evaluated. Once it
+	// would exceed maxDepth, or the memo entries plus CST nodes would
+	// exceed maxEntries, abort is set (ErrTooDeep/ErrTooLarge) and every
+	// further invocation fails immediately so the parse unwinds without
+	// more work.
 	depth, maxDepth int
-	tooDeep         bool
-	tooDeepPos      int
+	maxEntries      int
+	abort           error
+	abortPos        int
 
 	// skipCache memoizes skipPos by input offset (-1 = uncomputed). Every
 	// layer of a pure rule-reference chain re-skips trivia at the same
@@ -458,11 +493,15 @@ type evaluator struct {
 // (without recording it) once that would exceed maxDepth. Every true
 // return must be paired with a depth-- once the invocation's body returns.
 func (e *evaluator) enter(pos int) bool {
-	if e.tooDeep {
+	if e.abort != nil {
 		return false
 	}
 	if e.maxDepth > 0 && e.depth >= e.maxDepth {
-		e.tooDeep, e.tooDeepPos = true, pos
+		e.abort, e.abortPos = ErrTooDeep, pos
+		return false
+	}
+	if e.maxEntries > 0 && len(e.nodeSlab)+len(e.refMemo)+len(e.callMemo) >= e.maxEntries {
+		e.abort, e.abortPos = ErrTooLarge, pos
 		return false
 	}
 	e.depth++

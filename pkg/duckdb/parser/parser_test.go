@@ -95,6 +95,25 @@ func TestParseStringRejectsOversizedInput(t *testing.T) {
 	require.Contains(t, perr.Message, "exceeding the 65536-byte limit")
 }
 
+func TestParseStringRejectsOversizedParse(t *testing.T) {
+	// A dense input well under MaxSQLBytes still exceeds the memo/node
+	// budget, and fails cleanly instead of allocating without bound.
+	sql := "SELECT a" + strings.Repeat(", a", 20<<10)
+	require.Less(t, len(sql), MaxSQLBytes)
+	_, err := ParseString(sql)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Equal(t, "query is too large or complex to parse", perr.Message)
+
+	// A realistic large query is well within it.
+	_, err = ParseString("SELECT a" + strings.Repeat(", coalesce(t.b, 'x') + 1 AS c", 200) + " FROM t")
+	require.NoError(t, err)
+
+	// The pooled session that hit the limit is reusable afterwards.
+	_, err = ParseString("SELECT a FROM t")
+	require.NoError(t, err)
+}
+
 func TestParseStringRejectsDeepNesting(t *testing.T) {
 	nestedParens := func(depth int) string {
 		return "SELECT " + strings.Repeat("(", depth) + "1" + strings.Repeat(")", depth)

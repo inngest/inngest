@@ -151,6 +151,55 @@ Parens(D) <- '(' D ')'
 	require.NotErrorIs(t, err, ErrTooDeep)
 }
 
+func TestParseEnforcesMaxEntries(t *testing.T) {
+	g, err := ParseGrammar(`
+Items <- Item (',' Item)*
+Item <- 'x'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, MaxEntries: 50}
+	items := func(n int) string {
+		return "x" + strings.Repeat(",x", n-1)
+	}
+
+	_, err = p.Parse(items(5), "Items")
+	require.NoError(t, err)
+
+	_, err = p.Parse(items(500), "Items")
+	require.ErrorIs(t, err, ErrTooLarge)
+	require.NotErrorIs(t, err, ErrTooDeep)
+
+	// A pooled session that hit the limit starts the next parse clean.
+	s := p.AcquireSession()
+	defer s.Release()
+	_, err = s.Parse(items(500), "Items")
+	require.ErrorIs(t, err, ErrTooLarge)
+	_, err = s.Parse(items(5), "Items")
+	require.NoError(t, err)
+}
+
+func TestSessionReleaseDropsOversizedBuffers(t *testing.T) {
+	g, err := ParseGrammar(`
+Items <- Item (',' Item)*
+Item <- 'x'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g}
+
+	s := p.AcquireSession()
+	_, err = s.Parse("x"+strings.Repeat(",x", maxRetainedEntries), "Items")
+	require.NoError(t, err)
+	require.NotNil(t, s.e)
+	s.Release()
+	require.Nil(t, s.e, "a session that grew past maxRetainedEntries keeps its buffers")
+
+	s = &Session{parser: p}
+	_, err = s.Parse("x,x", "Items")
+	require.NoError(t, err)
+	s.Release()
+	require.NotNil(t, s.e, "a small session drops its buffers")
+}
+
 func TestParseMemoizesRepeatedRuleAtSamePosition(t *testing.T) {
 	// Several alternatives all try Shared at the same starting position
 	// before falling through to Word — not exponential (this engine

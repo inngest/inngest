@@ -41,7 +41,7 @@ func newPegParser() (*peg.Parser, *KeywordSets, error) {
 		return nil, nil, fmt.Errorf("duckdb/parser: %w", err)
 	}
 	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens, MaxDepth: maxRuleDepth}, ks, nil
+	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens, MaxDepth: maxRuleDepth, MaxEntries: maxParseEntries}, ks, nil
 }
 
 // isNonIdentKeyword reports whether s, spelled bare, would lex as a keyword
@@ -76,10 +76,10 @@ func isEmptyQuotedIdent(src string, pos int) bool {
 	return pos >= 0 && strings.HasPrefix(src[min(pos, len(src)):], `""`) && !strings.HasPrefix(src[min(pos, len(src)):], `"""`)
 }
 
-// MaxSQLBytes is the longest input ParseString accepts. Parse cost (time,
-// and memo/slab memory preallocated in proportion to input length) grows
-// with input size — a 64KiB query already takes a few hundred MB of
-// allocations — so larger input is rejected up front rather than parsed.
+// MaxSQLBytes is the longest input ParseString accepts, rejected up front
+// rather than parsed. Memory is bounded separately by maxParseEntries,
+// which a dense input reaches well before this; this mainly bounds the
+// work of scanning trivia (whitespace, comments) that creates no entries.
 const MaxSQLBytes = 64 << 10
 
 // maxRuleDepth caps nested grammar-rule invocations (peg.Parser.MaxDepth).
@@ -88,6 +88,14 @@ const MaxSQLBytes = 64 << 10
 // far beyond any realistic query — while keeping the stack in the low tens
 // of MB instead of overflowing it, which Go can't recover from.
 const maxRuleDepth = 4096
+
+// maxParseEntries caps the packrat memo entries plus CST nodes one parse
+// may create (peg.Parser.MaxEntries). Realistic queries use 10-30 per
+// input byte, so this admits typical queries of tens of KB, while a dense
+// worst case (`SELECT a, a, ...`, ~100 per byte) is cut off around 10KB
+// instead of allocating ~10KB of memo/slab memory per input byte up to
+// MaxSQLBytes (~2GB).
+const maxParseEntries = 512 << 10
 
 // errPrefix starts every non-ParseError error ParseString returns.
 const errPrefix = "duckdb/parser: "
@@ -147,6 +155,8 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 		}
 		if errors.Is(parseErr, peg.ErrTooDeep) {
 			msg = "query is nested too deeply"
+		} else if errors.Is(parseErr, peg.ErrTooLarge) {
+			msg = "query is too large or complex to parse"
 		} else if perr != nil && isEmptyQuotedIdent(trimmed, perr.Pos) {
 			msg = "zero-length delimited identifier"
 		}
