@@ -403,3 +403,24 @@ func TestWriteReturnsErrorForUnwritableAST(t *testing.T) {
 	err := Write(&sb, stmt)
 	require.ErrorContains(t, err, "duckdb/parser: Write: unhandled Expr <nil>")
 }
+
+// TestWriteParenthesizesIdentUnderFieldAccess checks a parenthesized Ident
+// under a field access or method call keeps its parens: printed flat, it
+// merges into the dotted name (`(t).x`, a struct field, becomes column x
+// of table t, and `(x).f(1)` a schema-qualified function).
+func TestWriteParenthesizesIdentUnderFieldAccess(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"field of ident", "SELECT (t).x FROM t", "SELECT (t).x FROM t"},
+		{"field of qualified ident", "SELECT (t.a).x FROM t", "SELECT (t.a).x FROM t"},
+		{"nested field", "SELECT ((t).a).x FROM t", "SELECT (t).a.x FROM t"},
+		{"method on ident", "SELECT (x).f(1) FROM t", "SELECT (x).f(1) FROM t"},
+		{"method on qualified ident", "SELECT (t.a).f(1) FROM t", "SELECT (t.a).f(1) FROM t"},
+		{"plain dotted name stays flat", "SELECT t.a.b FROM t", "SELECT t.a.b FROM t"},
+		{"field of call stays flat", "SELECT f(x).a FROM t", "SELECT f(x).a FROM t"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
