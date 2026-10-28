@@ -212,8 +212,17 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 
 		// A message may have been saved after the SDK read its state and before
-		// the marker existed: its delivery found no marker, so wake now. Messages
-		// saved after the marker wake it through their own delivery.
+		// the marker existed: its delivery found no marker, so wake now. The
+		// stack is read again after the marker is written: a message saved
+		// before this read is seen here, and one saved after it finds the marker.
+		stack, err = e.smv2.LoadStack(ctx, md.ID)
+		if err != nil {
+			return err
+		}
+		// A copy of this park was woken in the meantime: its answer is saved.
+		if slices.Contains(stack, gen.ID) {
+			return nil
+		}
 		if len(subscriptionMessageIDs(stack, sub.Key)) < sub.Seq {
 			return nil
 		}
