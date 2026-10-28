@@ -2,6 +2,7 @@ package insights
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -72,8 +73,8 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 	scope.outer = outerScope
 
 	if stmt.From != nil {
-		for _, ref := range stmt.From.Refs {
-			diags, err := rewriteArrayOfStructAccessInRef(ref, mergedCTEs)
+		for i, ref := range stmt.From.Refs {
+			diags, err := rewriteArrayOfStructAccessInRef(ref, mergedCTEs, stmt.From.Refs[:i], outerScope)
 			diagnostics = append(diagnostics, diags...)
 			if err != nil {
 				return diagnostics, err
@@ -82,6 +83,14 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 	}
 
 	r := &arrayOfStructRewriter{scope: scope, ctes: mergedCTEs}
+	if stmt.From != nil {
+		// A FROM-clause UNNEST's argument is validated against the whole
+		// FROM scope (collectRefExprs, validate.go), so it's rewritten
+		// against it too.
+		for _, ref := range stmt.From.Refs {
+			r.rewriteTableFunctionArgs(ref)
+		}
+	}
 	for _, item := range stmt.Columns {
 		orig := item.Expr
 		item.Expr = r.rewrite(item.Expr)
@@ -125,17 +134,22 @@ func rewriteArrayOfStructAccess(stmt *parser.SelectStatement, ctes map[string]lo
 
 // rewriteArrayOfStructAccessInRef mirrors remapRef's FROM-tree recursion
 // shape, rewriting each nested SelectStatement it finds (a FROM-clause
-// subquery or either side of a JOIN) with its own scope.
-func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logicalTable) ([]Diagnostic, error) {
+// subquery or either side of a JOIN) with its own scope. earlier is every
+// FROM item strictly before ref (a JOIN's left side included, for its
+// right side), which a LATERAL subquery correlates into, matching
+// addSubquery (scope.go); outer is the enclosing statement's own outer
+// scope.
+func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logicalTable, earlier []parser.TableRef, outer *tableScope) ([]Diagnostic, error) {
 	switch r := ref.(type) {
 	case *parser.JoinRef:
 		var diagnostics []Diagnostic
-		diags, err := rewriteArrayOfStructAccessInRef(r.Left, ctes)
+		diags, err := rewriteArrayOfStructAccessInRef(r.Left, ctes, earlier, outer)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
 		}
-		diags, err = rewriteArrayOfStructAccessInRef(r.Right, ctes)
+		withLeft := append(append([]parser.TableRef(nil), earlier...), r.Left)
+		diags, err = rewriteArrayOfStructAccessInRef(r.Right, ctes, withLeft, outer)
 		diagnostics = append(diagnostics, diags...)
 		if err != nil {
 			return diagnostics, err
@@ -147,6 +161,7 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 			if err != nil {
 				return diagnostics, err
 			}
+			scope.outer = outer
 			rw := &arrayOfStructRewriter{scope: scope, ctes: ctes}
 			r.On = rw.rewrite(r.On)
 			diagnostics = append(diagnostics, rw.diagnostics...)
@@ -156,9 +171,29 @@ func rewriteArrayOfStructAccessInRef(ref parser.TableRef, ctes map[string]logica
 		}
 		return diagnostics, nil
 	case *parser.TableSubqueryRef:
-		return rewriteArrayOfStructAccess(r.Select, ctes, nil)
+		if !r.Lateral {
+			return rewriteArrayOfStructAccess(r.Select, ctes, nil)
+		}
+		scope, err := resolveScope(&parser.FromClause{Refs: earlier}, ctes, nil)
+		if err != nil {
+			return nil, err
+		}
+		scope.outer = outer
+		return rewriteArrayOfStructAccess(r.Select, ctes, scope)
 	default:
 		return nil, nil
+	}
+}
+
+func (r *arrayOfStructRewriter) rewriteTableFunctionArgs(ref parser.TableRef) {
+	switch t := ref.(type) {
+	case *parser.JoinRef:
+		r.rewriteTableFunctionArgs(t.Left)
+		r.rewriteTableFunctionArgs(t.Right)
+	case *parser.TableFunctionRef:
+		for i, a := range t.Args {
+			t.Args[i] = r.rewrite(a)
+		}
 	}
 }
 
@@ -175,6 +210,15 @@ type arrayOfStructRewriter struct {
 	ctes        map[string]logicalTable
 	diagnostics []Diagnostic
 	err         error
+	// boundVars is the stack of list-comprehension variables in scope,
+	// innermost last -- each shadows a same-named column, exactly like
+	// exprValidator.boundVars, so "s.key" off a bound s is never
+	// rewritten.
+	boundVars []string
+}
+
+func (r *arrayOfStructRewriter) isBound(name string) bool {
+	return slices.ContainsFunc(r.boundVars, func(b string) bool { return strings.EqualFold(b, name) })
 }
 
 func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
@@ -257,10 +301,25 @@ func (r *arrayOfStructRewriter) rewrite(expr parser.Expr) parser.Expr {
 		for i, a := range e.Args {
 			e.Args[i] = r.rewrite(a)
 		}
+		r.rewriteOrderBy(e.OrderBy)
+		r.rewriteOrderBy(e.Within)
 		e.Filter = r.rewrite(e.Filter)
 		if e.Over != nil {
 			r.rewriteWindowSpec(e.Over)
 		}
+	case *parser.NamedArg:
+		e.Value = r.rewrite(e.Value)
+	case *parser.GroupingExpr:
+		for i, a := range e.Args {
+			e.Args[i] = r.rewrite(a)
+		}
+	case *parser.ListComprehensionExpr:
+		// Source is outside the comprehension's own bindings; Expr/Filter
+		// see its variables (see exprValidator.checkListComprehension).
+		e.Source = r.rewrite(e.Source)
+		r.boundVars = append(r.boundVars, e.Vars...)
+		e.Expr, e.Filter = r.rewrite(e.Expr), r.rewrite(e.Filter)
+		r.boundVars = r.boundVars[:len(r.boundVars)-len(e.Vars)]
 	case *parser.DotExpr:
 		e.X = r.rewrite(e.X)
 	case *parser.SliceExpr:
@@ -292,10 +351,22 @@ func (r *arrayOfStructRewriter) rewriteWindowSpec(spec *parser.WindowSpec) {
 	for i, p := range spec.PartitionBy {
 		spec.PartitionBy[i] = r.rewrite(p)
 	}
-	if spec.OrderBy != nil {
-		for _, item := range spec.OrderBy.Items {
-			item.X = r.rewrite(item.X)
+	r.rewriteOrderBy(spec.OrderBy)
+	if f := spec.Frame; f != nil {
+		for _, b := range []*parser.FrameBound{f.Start, f.EndBound} {
+			if b != nil {
+				b.Expr = r.rewrite(b.Expr)
+			}
 		}
+	}
+}
+
+func (r *arrayOfStructRewriter) rewriteOrderBy(o *parser.OrderByClause) {
+	if o == nil {
+		return
+	}
+	for _, item := range o.Items {
+		item.X = r.rewrite(item.X)
 	}
 }
 
@@ -323,6 +394,9 @@ func (r *arrayOfStructRewriter) rewriteGroupByItem(item parser.GroupByItem) {
 // col ->> '$[*].field' replacement when so — see this file's top doc
 // comment.
 func (r *arrayOfStructRewriter) rewriteIdent(id *parser.Ident) (parser.Expr, bool) {
+	if r.isBound(id.Parts[0]) {
+		return nil, false
+	}
 	switch len(id.Parts) {
 	case 2:
 		// Only a bare column (not table.column) can be arrayOfStructs
