@@ -339,16 +339,23 @@ type excludeName struct {
 	qualifier, column string
 }
 
-// parseExcludeName parses one raw EXCLUDE entry (parser.SplitExcludeName).
-// ok is false for anything past "t.col".
-func parseExcludeName(raw string) (excludeName, bool) {
-	switch parts := parser.SplitExcludeName(raw); len(parts) {
+// parseExcludeName parses star's i'th EXCLUDE entry from its decoded
+// dotted parts (parser.StarExpr.ExcludeParts, or just Exclude[i] on a
+// hand-built StarExpr without them), also returning the entry as written
+// for error messages. ok is false for anything past "t.col".
+func parseExcludeName(star *parser.StarExpr, i int) (x excludeName, display string, ok bool) {
+	parts := []string{star.Exclude[i]}
+	if star.ExcludeParts != nil {
+		parts = star.ExcludeParts[i]
+	}
+	display = strings.Join(parts, ".")
+	switch len(parts) {
 	case 1:
-		return excludeName{column: parts[0]}, true
+		return excludeName{column: parts[0]}, display, true
 	case 2:
-		return excludeName{qualifier: parts[0], column: parts[1]}, true
+		return excludeName{qualifier: parts[0], column: parts[1]}, display, true
 	default:
-		return excludeName{}, false
+		return excludeName{}, display, false
 	}
 }
 
