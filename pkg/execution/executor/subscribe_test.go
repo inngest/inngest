@@ -35,35 +35,51 @@ func TestSubscriptionMessages(t *testing.T) {
 	require.Empty(t, subscriptionMessageIDs(stack, "missing"))
 }
 
-func TestWaitSeq(t *testing.T) {
-	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": 3}}))
-	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": int64(3)}}))
-	require.Equal(t, 3, waitSeq(&state.Pause{Metadata: map[string]any{"seq": float64(3)}}))
-	require.Equal(t, 0, waitSeq(&state.Pause{}))
-	require.Equal(t, 0, waitSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
+func TestParkSeq(t *testing.T) {
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": 3}}))
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": int64(3)}}))
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": float64(3)}}))
+	require.Equal(t, 0, parkSeq(&state.Pause{}))
+	require.Equal(t, 0, parkSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
 }
 
-// The parked marker alternates between two IDs by the awaited message, so the
-// next park never shares an ID with the marker being cleaned up.
+// A marker is keyed by the park step, which is unique to the park. The run is
+// woken for message 1 and its next park awaits message 3 (two more messages were
+// saved meanwhile): the two markers must not share an ID, or the late cleanup of
+// the first would delete the second and leave the run parked.
 func TestSubscriptionParkIDs(t *testing.T) {
-	first := subscriptionParkID("run", "inbox", 1)
+	one := subscriptionStepID("inbox", 1)
+	three := subscriptionStepID("inbox", 3)
+	first := subscriptionParkID("run", "inbox", one)
 
-	require.Equal(t, first, subscriptionParkID("run", "inbox", 1))
-	require.Equal(t, first, subscriptionParkID("run", "inbox", 3))
-	require.NotEqual(t, first, subscriptionParkID("run", "inbox", 2))
-	require.NotEqual(t, first, subscriptionParkID("run", "other", 1))
-	require.NotEqual(t, first, subscriptionParkID("run2", "inbox", 1))
+	require.Equal(t, first, subscriptionParkID("run", "inbox", one))
+	require.NotEqual(t, first, subscriptionParkID("run", "inbox", three))
+	require.NotEqual(t, first, subscriptionParkID("run", "inbox", subscriptionStepID("inbox", 2)))
+	require.NotEqual(t, first, subscriptionParkID("run", "other", one))
+	require.NotEqual(t, first, subscriptionParkID("run2", "inbox", one))
 	require.NotEqual(t, first, subscriptionPauseID("run", "inbox", 0))
 }
 
-func TestSubscriptionWaitPause(t *testing.T) {
-	event := consts.SubscriptionWaitName
+// The markers of one run and subscription share a small index, which a delivery
+// reads to find the current park. It is a separate index per run and
+// subscription, still recognised as a park index.
+func TestSubscriptionParkIndexName(t *testing.T) {
+	name := subscriptionParkIndexName("run", "inbox")
 
-	require.True(t, isSubscriptionWaitPause(&state.Pause{Event: &event}))
-	require.False(t, isSubscriptionWaitPause(&state.Pause{}))
+	require.Equal(t, name, subscriptionParkIndexName("run", "inbox"))
+	require.NotEqual(t, name, subscriptionParkIndexName("run", "other"))
+	require.NotEqual(t, name, subscriptionParkIndexName("run2", "inbox"))
+	require.True(t, isSubscriptionParkPause(&state.Pause{Event: &name}))
+}
+
+func TestSubscriptionParkPause(t *testing.T) {
+	event := consts.SubscriptionParkName
+
+	require.True(t, isSubscriptionParkPause(&state.Pause{Event: &event}))
+	require.False(t, isSubscriptionParkPause(&state.Pause{}))
 
 	other := "agent/message"
-	require.False(t, isSubscriptionWaitPause(&state.Pause{Event: &other}))
+	require.False(t, isSubscriptionParkPause(&state.Pause{Event: &other}))
 }
 
 // The park races a delivery: the stack the park read before it wrote the marker

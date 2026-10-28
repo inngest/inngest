@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -66,14 +67,18 @@ func subscriptionStepID(key string, seq int) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionParkID is the ID of the parked marker of a run and subscription.
-// The SDK reads one message at a time, so a run has at most one park per
-// subscription and a delivery can find it without reading the stack. Consuming
-// a marker deletes it by ID after queuing discovery, and the run may park again
-// straight away, so two slots alternate by the parity of the awaited message:
-// the next park never shares an ID with the one being cleaned up.
-func subscriptionParkID(runID string, key string, slot int) uuid.UUID {
-	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-park:%s:%d", runID, key, slot%2))
+// subscriptionParkIndexName names the index of the parked markers of one run
+// and subscription. It starts with consts.SubscriptionParkName. A delivery reads
+// this one small index to find the marker without reading the run's stack.
+func subscriptionParkIndexName(runID string, key string) string {
+	return consts.SubscriptionParkName + ":" + runID + ":" + subscriptionKeyHash(key)
+}
+
+// subscriptionParkID is the ID of the marker of one park. It is made of the park
+// step's ID, which is unique to the park, so the cleanup of an earlier marker can
+// never delete a later one, however many messages were saved in between.
+func subscriptionParkID(runID string, key string, stepID string) uuid.UUID {
+	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-park:%s:%s", runID, key, stepID))
 }
 
 // subscriptionExpiryJobID is the queue job that expires a subscription pause.
@@ -215,10 +220,11 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		// The marker says "this run is waiting for message Seq". It is a pause
 		// only so that a delivery can find and consume it atomically.
-		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
+		parkEvent := subscriptionParkIndexName(runID, sub.Key)
+		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: parkEvent}
 		opcode := gen.Op.String()
 		park := state.Pause{
-			ID:           subscriptionParkID(runID, sub.Key, sub.Seq),
+			ID:           subscriptionParkID(runID, sub.Key, gen.ID),
 			WorkspaceID:  md.ID.Tenant.EnvID,
 			Identifier:   sv2.NewPauseIdentifier(md.ID),
 			GroupID:      runCtx.GroupID(),
@@ -227,7 +233,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			StepName:     gen.UserDefinedName(),
 			Opcode:       &opcode,
 			Expires:      state.Time(e.now().Add(consts.MaxWaitForEventTimeout)),
-			Event:        new(consts.SubscriptionWaitName),
+			Event:        &parkEvent,
 			DataKey:      gen.ID,
 			MaxAttempts:  runCtx.MaxAttempts(),
 			ParallelMode: gen.ParallelMode(),
@@ -260,7 +266,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			}
 			return nil
 		case parkReady:
-			return e.consumeWait(ctx, &park)
+			return e.consumePark(ctx, &park)
 		}
 		return nil
 
@@ -310,9 +316,9 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
-// waitSeq is the message a wait pause waits for, or 0 when the pause does not say.
+// parkSeq is the message a wait pause waits for, or 0 when the pause does not say.
 // The metadata is a JSON number once it has been stored.
-func waitSeq(pause *state.Pause) int {
+func parkSeq(pause *state.Pause) int {
 	switch seq := pause.Metadata["seq"].(type) {
 	case int:
 		return seq
@@ -325,10 +331,10 @@ func waitSeq(pause *state.Pause) int {
 	return 0
 }
 
-// isSubscriptionWaitPause reports whether a pause is the one a run blocks on while it
+// isSubscriptionParkPause reports whether a pause is the one a run blocks on while it
 // waits for a subscription message. It has no timeout job.
-func isSubscriptionWaitPause(pause *state.Pause) bool {
-	return pause.Event != nil && *pause.Event == consts.SubscriptionWaitName
+func isSubscriptionParkPause(pause *state.Pause) bool {
+	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
 }
 
 // dequeueSubscriptionExpiry removes the queue job that would expire a subscription
@@ -366,15 +372,26 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 // message that is already saved, so it only wakes a run whose awaited message
 // exists.
 func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, redelivered bool) error {
-	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: consts.SubscriptionWaitName}
+	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionParkIndexName(id.RunID.String(), key)}
 
-	for slot := 0; slot < 2; slot++ {
-		pause, err := e.pm.PauseByID(ctx, parkIdx, subscriptionParkID(id.RunID.String(), key, slot))
-		if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
+	iter, err := e.pm.PausesSince(ctx, parkIdx, time.Time{})
+	if err != nil {
+		return err
+	}
+
+	// Normally one marker: the run's current park. A marker already consumed and
+	// not yet deleted may show too; consuming it again is idempotent.
+	var parked []*state.Pause
+	for iter.Next(ctx) {
+		parked = append(parked, iter.Val(ctx))
+	}
+	if err := iter.Error(); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	for _, pause := range parked {
+		if pause == nil {
 			continue
-		}
-		if err != nil {
-			return err
 		}
 
 		if redelivered {
@@ -382,13 +399,12 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, re
 			if err != nil {
 				return err
 			}
-			if len(subscriptionMessageIDs(stack, key)) < waitSeq(pause) {
+			if len(subscriptionMessageIDs(stack, key)) < parkSeq(pause) {
 				continue
 			}
 		}
 
-		// A marker that was just consumed and not yet deleted is leased: ignored.
-		if err := e.consumeWait(ctx, pause); err != nil {
+		if err := e.consumePark(ctx, pause); err != nil {
 			return err
 		}
 	}
@@ -396,10 +412,12 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string, re
 	return nil
 }
 
-// consumeWait consumes a wait pause so the run sees the message it waits for.
-// Its output names that message's position.
-func (e *executor) consumeWait(ctx context.Context, pause *state.Pause) error {
-	awaited := waitSeq(pause)
+// consumePark consumes a marker so the run sees the message it waits for. Its
+// output names that message's position. Another handler may have consumed the
+// marker first: the store then answers that it did not consume (DidConsume
+// false, or an idempotent success) and nothing more is queued.
+func (e *executor) consumePark(ctx context.Context, pause *state.Pause) error {
+	awaited := parkSeq(pause)
 
 	err := e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:     map[string]any{"data": map[string]any{"seq": awaited}},

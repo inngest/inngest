@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,9 +32,9 @@ func SkipFlushing(index Index, pauses []*state.Pause) bool {
 		// flush this block for fast O(1) lookups.
 		return true
 	}
-	if index.EventName == consts.SubscriptionWaitName {
-		// A run blocked on a subscription is woken through an O(1) lookup by ID
-		// and its pause is short-lived: never flush this index.
+	if strings.HasPrefix(index.EventName, consts.SubscriptionParkName) {
+		// The markers of a parked subscription are read through a tiny per-run
+		// index and are short-lived: never flush these indexes.
 		return true
 	}
 

@@ -46,7 +46,7 @@ func TestFinalizingARunRemovesItsSubscriptionPauses(t *testing.T) {
 			identifier := state.PauseIdentifier{RunID: run, FunctionID: uuid.New(), AccountID: uuid.New()}
 
 			messageEvent := "agent/message"
-			waitEvent := consts.SubscriptionWaitName
+			waitEvent := consts.SubscriptionParkName
 			subscription := state.Pause{
 				ID:          uuid.New(),
 				WorkspaceID: ws,

@@ -13,6 +13,7 @@ import (
 func TestSkipFlushingSubscriptionWait(t *testing.T) {
 	ws := uuid.New()
 
-	require.True(t, SkipFlushing(Index{WorkspaceID: ws, EventName: consts.SubscriptionWaitName}, nil))
+	require.True(t, SkipFlushing(Index{WorkspaceID: ws, EventName: consts.SubscriptionParkName}, nil))
+	require.True(t, SkipFlushing(Index{WorkspaceID: ws, EventName: consts.SubscriptionParkName + ":run:hash"}, nil))
 	require.False(t, SkipFlushing(Index{WorkspaceID: ws, EventName: "app/some.event"}, nil))
 }
