@@ -408,7 +408,7 @@ func TestScheduleAccountExecutionCapBatches(t *testing.T) {
 					require.NoError(t, err)
 					var payload batch.ScheduleBatchPayload
 					require.NoError(t, json.Unmarshal(job.Data.Payload.(json.RawMessage), &payload))
-					_, err = e.batcher.StartExecution(t.Context(), req.Function.ID, payload.BatchID, payload.BatchPointer)
+					_, err = e.batcher.StartExecution(t.Context(), req.AccountID, req.Function.ID, payload.BatchID, payload.BatchPointer)
 					require.NoError(t, err)
 					require.NoError(t, e.RetrieveAndScheduleBatch(t.Context(), req.Function, payload, nil))
 				}
@@ -429,7 +429,7 @@ func TestScheduleAccountExecutionCapBatches(t *testing.T) {
 					require.NoError(t, err)
 					require.Len(t, jobs, 1)
 				}
-				remaining, err := e.batcher.RetrieveItems(t.Context(), req.Function.ID, batchID)
+				remaining, err := e.batcher.RetrieveItems(t.Context(), req.AccountID, req.Function.ID, batchID)
 				require.NoError(t, err)
 				require.Empty(t, remaining)
 			})

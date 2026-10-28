@@ -70,8 +70,8 @@ type BatchManager interface {
 	//     an error.
 	BulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function) (*BulkAppendResult, error)
 
-	RetrieveItems(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
-	StartExecution(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
+	RetrieveItems(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) ([]BatchItem, error)
+	StartExecution(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 
 	DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error

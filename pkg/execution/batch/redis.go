@@ -272,7 +272,7 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 }
 
 // RetrieveItems retrieve the data associated with the specified batch.
-func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
+func (b *redisBatchManager) RetrieveItems(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		b.b.Client(),
@@ -303,7 +303,7 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 
 // StartExecution sets the status to `started`
 // If it has already started, don't do anything
-func (b *redisBatchManager) StartExecution(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
+func (b *redisBatchManager) StartExecution(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error) {
 	keys := []string{
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 		batchPointer,
@@ -651,7 +651,7 @@ func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UU
 	}
 
 	// Retrieve the batch items
-	items, err := b.RetrieveItems(ctx, functionID, batchID)
+	items, err := b.RetrieveItems(ctx, consts.DevServerAccountID, functionID, batchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve batch items: %w", err)
 	}

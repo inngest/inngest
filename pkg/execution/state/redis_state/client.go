@@ -71,6 +71,7 @@ func NewBatchClient(r rueidis.Client, queueDefaultKey string) *BatchClient {
 type ShardedClient struct {
 	fnRunState *FunctionRunStateClient
 	batch      *BatchClient
+	batchNext  *BatchClient
 }
 
 type IsShardedWithRunIdFn func(ctx context.Context, accountId uuid.UUID, runId ulid.ULID) bool
@@ -88,6 +89,9 @@ type ShardedClientOpts struct {
 
 	FunctionRunStateClient rueidis.Client
 	BatchClient            rueidis.Client
+	// BatchNextClient is optional. It is the next batch store during a
+	// batching migration, and nil when no migration is in progress.
+	BatchNextClient rueidis.Client
 
 	StateDefaultKey string
 	QueueDefaultKey string
@@ -96,10 +100,14 @@ type ShardedClientOpts struct {
 }
 
 func NewShardedClient(opts ShardedClientOpts) *ShardedClient {
-	return &ShardedClient{
+	sc := &ShardedClient{
 		fnRunState: NewFunctionRunStateClient(opts.FunctionRunStateClient, opts.UnshardedClient, opts.StateDefaultKey, opts.FnRunIsSharded),
 		batch:      NewBatchClient(opts.BatchClient, opts.QueueDefaultKey),
 	}
+	if opts.BatchNextClient != nil {
+		sc.batchNext = NewBatchClient(opts.BatchNextClient, opts.QueueDefaultKey)
+	}
+	return sc
 }
 
 func (s *ShardedClient) FunctionRunState() *FunctionRunStateClient {
@@ -108,6 +116,12 @@ func (s *ShardedClient) FunctionRunState() *FunctionRunStateClient {
 
 func (s *ShardedClient) Batch() *BatchClient {
 	return s.batch
+}
+
+// BatchNext returns the next batch store during a batching migration, or nil
+// when no migration is in progress.
+func (s *ShardedClient) BatchNext() *BatchClient {
+	return s.batchNext
 }
 
 type PauseClient struct {
