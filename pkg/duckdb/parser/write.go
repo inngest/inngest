@@ -429,10 +429,14 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *StarExpr:
 		sw.starExpr(v)
 	case *SubqueryExpr:
+		// Not is set without Exists too: SubqueryNot is its own optional
+		// prefix in SubqueryExpression, reachable wherever a NOT keyword
+		// can't parse as LogicalNotExpression (`x IS DISTINCT FROM NOT
+		// (SELECT ...)`).
+		if v.Not {
+			sw.str("NOT ")
+		}
 		if v.Exists {
-			if v.Not {
-				sw.str("NOT ")
-			}
 			sw.str("EXISTS ")
 		}
 		sw.str("(")
