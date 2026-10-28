@@ -11,9 +11,8 @@ import (
 // RenderWhereSQL are plugin points, not direct calls into
 // pkg/duckdb/insights: this package (the general duckdb-backed CQRS read
 // path) must build and function without the insights SQL execution feature
-// present. A build that also includes pkg/duckdb/insights overrides all
-// four vars (via an init() in that package) with the real CEL-to-SQL
-// implementation.
+// present. pkg/devserver overrides all four vars (in an init() in
+// duckdb.go) with pkg/duckdb/insights' real CEL-to-SQL implementation.
 //
 // Every caller here invokes these unconditionally, whether or not the
 // caller's own CEL expression list is empty -- the common case for a plain
