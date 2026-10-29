@@ -152,7 +152,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 				return subscriptionLimitError("A subscription open lists a stream twice or without an event.")
 			}
 			seen[extra.Stream] = true
-			if err := validateSubscribe(&state.SubscribeOpts{Key: sub.Key, Mode: sub.Mode, Stream: extra.Stream}, extra.Event); err != nil {
+			if err := validateSubscribe(&state.SubscribeOpts{Key: sub.Key, Mode: sub.Mode, Stream: extra.Stream}); err != nil {
 				return err
 			}
 			if err := validateWaitExpression(ctx, extra.If); err != nil {
@@ -646,7 +646,7 @@ func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.
 			return fmt.Errorf("error counting the run's pauses: %w", err)
 		}
 		if len(ids) > consts.MaxSubscriptionPausesPerRun {
-			return subscriptionLimitError("A run can hold at most %d pauses (subscriptions, parked reads and waitForEvents) when it opens a subscription.", consts.MaxSubscriptionPausesPerRun)
+			return subscriptionLimitError("A run can hold at most %d pauses (subscriptions and waitForEvents) when it opens a subscription.", consts.MaxSubscriptionPausesPerRun)
 		}
 	}
 
