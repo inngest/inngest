@@ -71,6 +71,7 @@ type gatewayGRPCManager struct {
 
 	gatewayGRPCPort  int
 	executorGRPCPort int
+	forwardTimeout   time.Duration
 }
 
 type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.ClientConn, error)
@@ -107,6 +108,14 @@ func WithExecutorGRPCPort(p int) GatewayGRPCManagerOption {
 	}
 }
 
+func WithGatewayForwardTimeout(d time.Duration) GatewayGRPCManagerOption {
+	return func(m *gatewayGRPCManager) {
+		if d > 0 {
+			m.forwardTimeout = d
+		}
+	}
+}
+
 // gatewayURL creates a URL for connecting to a gateway's gRPC port
 func (i *gatewayGRPCManager) gatewayURL(ctx context.Context, gateway *state.Gateway) string {
 	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", i.gatewayGRPCPort))
@@ -120,6 +129,7 @@ func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 		logger:           logger.StdlibLogger(ctx),
 		gatewayGRPCPort:  DefaultConnectGatewayGRPCPort,
 		executorGRPCPort: DefaultConnectExecutorGRPCPort,
+		forwardTimeout:   ForwardTimeout,
 	}
 
 	for _, opt := range opts {
@@ -228,6 +238,11 @@ func (i *gatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 }
 
 func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+	// Bound the whole call, including dialing and pinging a new client, which
+	// can hang just like Forward on a connection that blackholes.
+	forwardCtx, cancel := context.WithTimeout(ctx, i.forwardTimeout)
+	defer cancel()
+
 	grpcClient, err := i.grpcClientManager.GetClient(ctx, gatewayID.String())
 	if err != nil && err != ErrGatewayNotFound {
 		logger.StdlibLogger(ctx).Error("could not get grpc client", "gatewayID", gatewayID.String(), "err", err)
@@ -241,7 +256,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 
 		url := i.gatewayURL(ctx, gateway)
 
-		grpcClient, err = i.grpcClientManager.GetOrCreateClient(ctx, gatewayID.String(), url)
+		grpcClient, err = i.grpcClientManager.GetOrCreateClient(forwardCtx, gatewayID.String(), url)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", "gatewayID", gatewayID.String(), "err", err)
 
@@ -249,9 +264,6 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 			return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
 		}
 	}
-
-	forwardCtx, cancel := context.WithTimeout(ctx, ForwardTimeout)
-	defer cancel()
 
 	reply, err := grpcClient.Forward(forwardCtx, &connectpb.ForwardRequest{
 		ConnectionID: connectionID.String(),
