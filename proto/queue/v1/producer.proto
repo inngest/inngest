@@ -9,6 +9,8 @@ option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
 
 service ProducerService {
   rpc Enqueue(EnqueueRequest) returns (EnqueueResponse) {}
+  // Older proxies fail closed rather than silently ignoring migration ownership.
+  rpc EnqueueSingletonMigration(EnqueueRequest) returns (EnqueueResponse) {}
   rpc Requeue(RequeueRequest) returns (RequeueResponse) {}
   rpc RequeueByJobID(RequeueByJobIDRequest) returns (RequeueByJobIDResponse) {}
 }
@@ -49,4 +51,5 @@ message EnqueueOptions {
   string force_queue_shard_name = 2;
   string normalize_from_backlog_id = 3;
   optional google.protobuf.Duration idempotency_period = 4;
+  string singleton_migration_key = 5;
 }

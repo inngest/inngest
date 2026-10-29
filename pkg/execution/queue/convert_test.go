@@ -583,6 +583,7 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 		PassthroughJobId:       true,
 		ForceQueueShardName:    "queue-a",
 		NormalizeFromBacklogID: "backlog-a",
+		SingletonMigrationKey:  "singleton-a",
 		IdempotencyPeriod:      &idempotencyPeriod,
 	}
 

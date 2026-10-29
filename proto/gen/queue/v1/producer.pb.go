@@ -358,6 +358,7 @@ type EnqueueOptions struct {
 	ForceQueueShardName    string                 `protobuf:"bytes,2,opt,name=force_queue_shard_name,json=forceQueueShardName,proto3" json:"force_queue_shard_name,omitempty"`
 	NormalizeFromBacklogId string                 `protobuf:"bytes,3,opt,name=normalize_from_backlog_id,json=normalizeFromBacklogId,proto3" json:"normalize_from_backlog_id,omitempty"`
 	IdempotencyPeriod      *durationpb.Duration   `protobuf:"bytes,4,opt,name=idempotency_period,json=idempotencyPeriod,proto3,oneof" json:"idempotency_period,omitempty"`
+	SingletonMigrationKey  string                 `protobuf:"bytes,5,opt,name=singleton_migration_key,json=singletonMigrationKey,proto3" json:"singleton_migration_key,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -420,6 +421,13 @@ func (x *EnqueueOptions) GetIdempotencyPeriod() *durationpb.Duration {
 	return nil
 }
 
+func (x *EnqueueOptions) GetSingletonMigrationKey() string {
+	if x != nil {
+		return x.SingletonMigrationKey
+	}
+	return ""
+}
+
 var File_queue_v1_producer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_producer_proto_rawDesc = "" +
@@ -448,15 +456,17 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
 	"\x05scope\x18\x04 \x01(\v2\x0f.queue.v1.ScopeR\x05scope\"\x18\n" +
-	"\x16RequeueByJobIDResponse\"\x94\x02\n" +
+	"\x16RequeueByJobIDResponse\"\xcc\x02\n" +
 	"\x0eEnqueueOptions\x12,\n" +
 	"\x12passthrough_job_id\x18\x01 \x01(\bR\x10passthroughJobId\x123\n" +
 	"\x16force_queue_shard_name\x18\x02 \x01(\tR\x13forceQueueShardName\x129\n" +
 	"\x19normalize_from_backlog_id\x18\x03 \x01(\tR\x16normalizeFromBacklogId\x12M\n" +
-	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01B\x15\n" +
-	"\x13_idempotency_period2\xec\x01\n" +
+	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01\x126\n" +
+	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKeyB\x15\n" +
+	"\x13_idempotency_period2\xc0\x02\n" +
 	"\x0fProducerService\x12@\n" +
-	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +
+	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12R\n" +
+	"\x19EnqueueSingletonMigration\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +
 	"\aRequeue\x12\x18.queue.v1.RequeueRequest\x1a\x19.queue.v1.RequeueResponse\"\x00\x12U\n" +
 	"\x0eRequeueByJobID\x12\x1f.queue.v1.RequeueByJobIDRequest\x1a .queue.v1.RequeueByJobIDResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
 
@@ -498,13 +508,15 @@ var file_queue_v1_producer_proto_depIdxs = []int32{
 	10, // 7: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
 	11, // 8: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
 	0,  // 9: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
-	2,  // 10: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
-	4,  // 11: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
-	1,  // 12: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
-	3,  // 13: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
-	5,  // 14: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
+	0,  // 10: queue.v1.ProducerService.EnqueueSingletonMigration:input_type -> queue.v1.EnqueueRequest
+	2,  // 11: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
+	4,  // 12: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
+	1,  // 13: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
+	1,  // 14: queue.v1.ProducerService.EnqueueSingletonMigration:output_type -> queue.v1.EnqueueResponse
+	3,  // 15: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
+	5,  // 16: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
+	13, // [13:17] is the sub-list for method output_type
+	9,  // [9:13] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
