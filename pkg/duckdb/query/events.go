@@ -50,19 +50,17 @@ func (m *Manager) GetEventsByExpressions(ctx context.Context, cel []string) ([]*
 	}
 	query += " ORDER BY received_at DESC;"
 
-	candidates, err := m.queryEvents(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
+	// Streamed, so only matches are retained, not every candidate.
 	out := []*cqrs.Event{}
-	for _, evt := range candidates {
+	err = m.eachEvent(ctx, query, args, func(evt *cqrs.Event) (bool, error) {
 		ok, err := expHandler.MatchEventExpressions(ctx, evt.GetEvent())
-		if err != nil {
-			return nil, err
-		}
 		if ok {
 			out = append(out, evt)
 		}
+		return true, err
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -128,6 +126,8 @@ func (m *Manager) GetEvents(ctx context.Context, accountID, workspaceID uuid.UUI
 	// The CEL SQL is only a prefilter, so page through candidates in
 	// internal_id order (the same keyset the request cursor uses) until
 	// opts.Limit of them pass the Go matcher or they run out.
+	// Each batch is streamed, so only matches (at most opts.Limit) are
+	// retained.
 	batch := int(celCandidateBatch(uint(opts.Limit)))
 	out := []*cqrs.Event{}
 	var after *ulid.ULID
@@ -137,27 +137,24 @@ func (m *Manager) GetEvents(ctx context.Context, accountID, workspaceID uuid.UUI
 			batchQuery += " AND internal_id < ?"
 			batchArgs = append(batchArgs, after.String())
 		}
-		candidates, err := m.queryEvents(ctx, batchQuery+" ORDER BY internal_id DESC LIMIT ?;", append(batchArgs, batch)...)
+		scanned := 0
+		err := m.eachEvent(ctx, batchQuery+" ORDER BY internal_id DESC LIMIT ?;", append(batchArgs, batch), func(evt *cqrs.Event) (bool, error) {
+			scanned++
+			id := evt.ID
+			after = &id
+			ok, err := cel.matcher.MatchEventExpressions(ctx, evt.GetEvent())
+			if err != nil || !ok {
+				return true, err
+			}
+			out = append(out, evt)
+			return len(out) < opts.Limit, nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		for _, evt := range candidates {
-			ok, err := cel.matcher.MatchEventExpressions(ctx, evt.GetEvent())
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				continue
-			}
-			out = append(out, evt)
-			if len(out) >= opts.Limit {
-				return out, nil
-			}
-		}
-		if len(candidates) < batch {
+		if len(out) >= opts.Limit || scanned < batch {
 			return out, nil
 		}
-		after = &candidates[len(candidates)-1].ID
 	}
 }
 
@@ -198,20 +195,18 @@ func (m *Manager) GetEventsCount(ctx context.Context, accountID, workspaceID uui
 	}
 
 	// The CEL SQL is only a prefilter, so every candidate has to be
-	// re-checked in Go rather than counted in SQL.
-	candidates, err := m.queryEvents(ctx, "SELECT "+eventColumns+" "+query+";", args...)
-	if err != nil {
-		return 0, err
-	}
+	// re-checked in Go rather than counted in SQL. Candidates are streamed
+	// so none of them (or their payloads) are retained.
 	var n int64
-	for _, evt := range candidates {
+	err = m.eachEvent(ctx, "SELECT "+eventColumns+" "+query+";", args, func(evt *cqrs.Event) (bool, error) {
 		ok, err := cel.matcher.MatchEventExpressions(ctx, evt.GetEvent())
-		if err != nil {
-			return 0, err
-		}
 		if ok {
 			n++
 		}
+		return true, err
+	})
+	if err != nil {
+		return 0, err
 	}
 	return n, nil
 }
@@ -254,21 +249,37 @@ func eventsCELWhere(ctx context.Context, cel string) (eventsCEL, error) {
 }
 
 func (m *Manager) queryEvents(ctx context.Context, query string, args ...any) ([]*cqrs.Event, error) {
+	var out []*cqrs.Event
+	err := m.eachEvent(ctx, query, args, func(evt *cqrs.Event) (bool, error) {
+		out = append(out, evt)
+		return true, nil
+	})
+	return out, err
+}
+
+// eachEvent streams an eventColumns-shaped query's rows through fn, one at
+// a time, until fn returns false or an error.
+func (m *Manager) eachEvent(ctx context.Context, query string, args []any, fn func(*cqrs.Event) (bool, error)) error {
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: querying events: %w", err)
+		return fmt.Errorf("duckdbquery: querying events: %w", err)
 	}
 	defer rows.Close()
 
-	var out []*cqrs.Event
 	for rows.Next() {
 		evt, err := scanEvent(rows)
 		if err != nil {
-			return nil, fmt.Errorf("duckdbquery: scanning event row: %w", err)
+			return fmt.Errorf("duckdbquery: scanning event row: %w", err)
 		}
-		out = append(out, evt)
+		more, err := fn(evt)
+		if err != nil {
+			return err
+		}
+		if !more {
+			return nil
+		}
 	}
-	return out, rows.Err()
+	return rows.Err()
 }
 
 // scanEvent scans one row of an eventColumns-shaped SELECT into a

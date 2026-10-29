@@ -128,3 +128,76 @@ func TestGetEventsCELMatchesExpressionSemantics(t *testing.T) {
 		})
 	}
 }
+
+// TestGetEventsCELStreamsPastNonMatchingCandidates covers a CEL filter the
+// SQL can't narrow at all (every event is a candidate) over more events
+// than one candidate batch holds: GetEvents has to page past whole batches
+// of non-matches and stop mid-batch once a page fills, and GetEventsCount
+// and GetEventsByExpressions have to see every candidate.
+func TestGetEventsCELStreamsPastNonMatchingCandidates(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	useInsightsCEL(t)
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	const total = 3 * celMinCandidateBatch
+	ids := make([]ulid.ULID, total)
+	for i := range ids {
+		ids[i] = ulid.MustNew(ulid.Timestamp(now.Add(time.Duration(i)*time.Millisecond)), nil)
+	}
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
+		 SELECT ?, ?, (?::VARCHAR[])[i + 1], ?, 'test', printf('evt-%d', i), 'x', json_object('a', i % 100), '', ?
+		 FROM range(?) t(i);`,
+		accountID.String(), envID.String(), ulidStrings(ids), now, now, total,
+	)
+	require.NoError(t, err)
+
+	cel := `event.data.a != 1 && event.data.a != 2 && !(event.data.a != 0 || event.name != "x")`
+	want := []string{}
+	for i := total - 1; i >= 0; i-- {
+		if i%100 == 0 {
+			want = append(want, ids[i].String())
+		}
+	}
+
+	opts := &cqrs.WorkspaceEventsOpts{
+		Limit: 2, Newest: now.Add(time.Minute), Oldest: now.Add(-time.Minute),
+		IncludeInternalEvents: true, CEL: cel,
+	}
+	got := []string{}
+	for range total {
+		res, err := m.GetEvents(ctx, accountID, envID, opts)
+		require.NoError(t, err)
+		for _, e := range res {
+			got = append(got, e.ID.String())
+		}
+		if len(res) < opts.Limit {
+			break
+		}
+		opts.Cursor = &res[len(res)-1].ID
+	}
+	require.Equal(t, want, got)
+
+	count, err := m.GetEventsCount(ctx, accountID, envID, cqrs.WorkspaceEventsOpts{
+		Limit: 2, Newest: now.Add(time.Minute), Oldest: now.Add(-time.Minute),
+		IncludeInternalEvents: true, CEL: cel,
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, len(want), count)
+
+	byExpr, err := m.GetEventsByExpressions(ctx, []string{cel})
+	require.NoError(t, err)
+	require.Len(t, byExpr, len(want))
+}
+
+func ulidStrings(ids []ulid.ULID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
+	}
+	return out
+}
