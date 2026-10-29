@@ -595,10 +595,10 @@ var specialFunctionSpellings = map[string]string{
 //	POSITION(a IN b)              -> position(b, a)
 //	OVERLAY(x PLACING y FROM a [FOR b]) -> overlay(x, y, a[, b])
 //
-// coalesce is the one DuckDB keeps as an operator rather than a function
-// (there's no function named coalesce), so it's marked Syntax and Write
-// prints it back as COALESCE(...) instead of a quoted call; see
-// functionName.
+// coalesce is the odd one out: DuckDB documents it as a function, but it's
+// parser syntax for its COALESCE operator, not a catalog function, so it's
+// marked Syntax and Write prints it back as COALESCE(...) instead of a
+// quoted call; see functionName.
 func (a *adapter) adaptSpecialFunctionExpression(n *peg.Node) Expr {
 	alt := choice(body(n))
 	fn := func(name string, args ...Expr) Expr {

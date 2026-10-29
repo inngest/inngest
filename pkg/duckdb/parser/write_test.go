@@ -589,8 +589,9 @@ func TestWriteQuotesKeywordFunctionNames(t *testing.T) {
 func TestWriteSpecialFunctions(t *testing.T) {
 	cases := []struct{ name, sql, want string }{
 		{"coalesce", "SELECT coalesce(a, b) FROM t", "SELECT COALESCE(a, b) FROM t"},
-		// DuckDB has no coalesce function, so a quoted call stays one and
-		// fails there as an unknown function instead of becoming COALESCE.
+		// COALESCE is parser syntax, not a catalog function, so a quoted
+		// call stays one and fails DuckDB's function lookup instead of
+		// becoming COALESCE.
 		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, `SELECT "coalesce"(a) FROM t`},
 		{"quoted coalesce w/o args", `SELECT "coalesce"() FROM t`, `SELECT "coalesce"() FROM t`},
 		{"quoted coalesce window", `SELECT "coalesce"(a) OVER () FROM t`, `SELECT "coalesce"(a) OVER () FROM t`},
