@@ -18,6 +18,11 @@ func TestBuildColumnHintsBareColumn(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT run_id FROM runs"))
 }
 
+func TestBuildColumnHintsCollate(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID, HintRunID, HintAppID, HintRunID},
+		hintsFor(t, `SELECT run_id COLLATE nocase, run_id COLLATE nocase COLLATE "nocase.noaccent" AS r, runs.app_id COLLATE nocase, defer_parent_run_ids[1] COLLATE nocase FROM runs`))
+}
+
 func TestBuildColumnHintsQualifiedColumn(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintAppID}, hintsFor(t, "SELECT runs.app_id FROM runs"))
 }

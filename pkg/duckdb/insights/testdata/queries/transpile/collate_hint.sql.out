@@ -1,0 +1,26 @@
+{
+  "sql": "SELECT run_id COLLATE nocase AS r, runs.app_id COLLATE nocase, defer_parent_run_ids[1] COLLATE nocase AS p FROM inngest.insights_runs(?, ?) AS runs WHERE run_id COLLATE nocase IS NOT NULL LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    3,
+    1,
+    3
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:157",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}
