@@ -60,6 +60,13 @@ func subscriptionMessageIDs(stack []string, key string) []string {
 	return ids
 }
 
+// subscriptionClosedID is the step that marks a subscription as closed. It
+// starts with the message prefix, so the SDK does not wait for it, and its hash
+// part is not a message of any subscription.
+func subscriptionClosedID(key string) string {
+	return subscriptionMessagePrefix + "closed:" + subscriptionKeyHash(key)
+}
+
 // subscriptionStepID is the step ID of the wait for message seq. The SDK gives
 // its blocking next() the same ID.
 func subscriptionStepID(key string, seq int, attempt int) string {
@@ -330,13 +337,9 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 
 		// Still waiting. A subscription closed in the same batch may have run its
-		// close before this marker existed, and then nobody would end this park. A
-		// closed subscription has no pause: end the park now.
-		open, err := e.pm.PauseByID(ctx, idx, pauseID)
-		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
-			return err
-		}
-		if open == nil {
+		// close before this marker existed, and then nobody would end this park.
+		// A closed subscription has its closed step: end the park now.
+		if slices.Contains(stack, subscriptionClosedID(sub.Key)) {
 			return e.consumePark(ctx, &park, true)
 		}
 
@@ -372,6 +375,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 	case state.SubscribeClose:
 		if err := deleteStream(); err != nil {
+			return err
+		}
+
+		// Mark the subscription closed, so a park written after this still ends.
+		if _, err := e.smv2.SaveStep(ctx, md.ID, subscriptionClosedID(sub.Key), []byte("true")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 			return err
 		}
 

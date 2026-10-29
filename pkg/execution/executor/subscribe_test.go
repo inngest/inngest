@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -132,4 +133,14 @@ func TestMarkersToWake(t *testing.T) {
 
 	answered := marker("park-1", 1)
 	require.Empty(t, markersToWake([]*state.Pause{answered}, []string{one, "park-1"}, "inbox"))
+}
+
+// The closed step starts with the message prefix, so the SDK does not wait for
+// it, and is never one of the subscription's messages.
+func TestSubscriptionClosedID(t *testing.T) {
+	closed := subscriptionClosedID("inbox")
+
+	require.True(t, strings.HasPrefix(closed, subscriptionMessagePrefix))
+	require.NotEqual(t, closed, subscriptionClosedID("other"))
+	require.Empty(t, subscriptionMessageIDs([]string{closed}, "inbox"))
 }
