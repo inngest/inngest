@@ -47,30 +47,53 @@ func InfoCommand() *cli.Command {
 				return fmt.Errorf("failed to get batch info: %w", err)
 			}
 
-			if resp.BatchId == "" {
-				fmt.Println("No active batch found")
-				return nil
+			// Older servers only fill the top-level fields.
+			stores := resp.Stores
+			if len(stores) == 0 {
+				stores = []*dbgpb.BatchInfo{{
+					BatchId:   resp.BatchId,
+					ItemCount: resp.ItemCount,
+					Items:     resp.Items,
+					Status:    resp.Status,
+				}}
 			}
 
-			fmt.Printf("Batch ID:    %s\n", resp.BatchId)
-			fmt.Printf("Status:      %s\n", resp.Status)
-			fmt.Printf("Item Count:  %d\n", resp.ItemCount)
-
-			if len(resp.Items) > 0 {
-				fmt.Println("\nBatch Items:")
-				for i, item := range resp.Items {
-					fmt.Printf("  [%d] Event ID: %s\n", i+1, item.EventId)
-					if len(item.EventData) > 0 {
-						var eventData map[string]any
-						if err := json.Unmarshal(item.EventData, &eventData); err == nil {
-							prettyJSON, _ := json.MarshalIndent(eventData, "      ", "  ")
-							fmt.Printf("      Data: %s\n", string(prettyJSON))
-						}
-					}
+			for i, store := range stores {
+				if i > 0 {
+					fmt.Println()
 				}
+				if store.Store != "" {
+					fmt.Printf("Store:       %s\n", store.Store)
+				}
+				printBatchInfo(store)
 			}
 
 			return nil
 		},
+	}
+}
+
+func printBatchInfo(store *dbgpb.BatchInfo) {
+	if store.BatchId == "" {
+		fmt.Println("No active batch found")
+		return
+	}
+
+	fmt.Printf("Batch ID:    %s\n", store.BatchId)
+	fmt.Printf("Status:      %s\n", store.Status)
+	fmt.Printf("Item Count:  %d\n", store.ItemCount)
+
+	if len(store.Items) > 0 {
+		fmt.Println("\nBatch Items:")
+		for i, item := range store.Items {
+			fmt.Printf("  [%d] Event ID: %s\n", i+1, item.EventId)
+			if len(item.EventData) > 0 {
+				var eventData map[string]any
+				if err := json.Unmarshal(item.EventData, &eventData); err == nil {
+					prettyJSON, _ := json.MarshalIndent(eventData, "      ", "  ")
+					fmt.Printf("      Data: %s\n", string(prettyJSON))
+				}
+			}
+		}
 	}
 }

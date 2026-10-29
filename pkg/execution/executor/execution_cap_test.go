@@ -397,8 +397,10 @@ func TestScheduleAccountExecutionCapBatches(t *testing.T) {
 						FunctionID: req.Function.ID, FunctionVersion: 1, EventID: ulid.Make(), Event: input,
 					}, nil))
 					if i == 0 {
-						info, err := e.batcher.GetBatchInfo(t.Context(), req.Function.ID, "")
+						infos, err := e.batcher.GetBatchInfo(t.Context(), req.Function.ID, "")
 						require.NoError(t, err)
+						require.Len(t, infos, 1)
+						info := infos[0]
 						batchID = ulid.MustParse(info.BatchID)
 					}
 				}
