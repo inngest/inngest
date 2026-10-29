@@ -223,3 +223,55 @@ func TestQueryInsights_RecoversPanics(t *testing.T) {
 		require.Equal(t, codes.Internal, status.Code(err))
 	})
 }
+
+func TestQueryInsights_InfoAndPathHints(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SELECT run_id, status FROM runs"})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Data.Info)
+	require.Equal(t, "runs", resp.Data.Info.GetPrimaryTable())
+	require.Equal(t, []string{"runs"}, resp.Data.Info.Tables)
+	require.True(t, resp.Data.Info.Limited)
+
+	require.Len(t, resp.Data.Columns, 2)
+	require.Len(t, resp.Data.Columns[0].PathHints, 1)
+	require.Empty(t, resp.Data.Columns[0].PathHints[0].Path)
+	require.Equal(t, apiv2.InsightsColumnHint_INSIGHTS_COLUMN_HINT_RUN_ID, resp.Data.Columns[0].PathHints[0].Hint)
+	require.Empty(t, resp.Data.Columns[1].PathHints)
+
+	resp, err = service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SHOW TABLES"})
+	require.NoError(t, err)
+	require.Len(t, resp.Data.Info.Tables, 6)
+	require.False(t, resp.Data.Info.Limited)
+}
+
+// TestQueryInsights_ExecutionErrorNamesLogicalTables covers DuckDB error
+// text about the rewritten SQL: its macro references must read as the
+// logical table names. Quack transport, since jsonlines only surfaces an
+// error's first line (which here doesn't quote the SQL at all).
+func TestQueryInsights_ExecutionErrorNamesLogicalTables(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SELECT length(queued_at) FROM runs"})
+	require.NoError(t, err)
+	require.Len(t, resp.Data.Diagnostics, 1)
+	msg := resp.Data.Diagnostics[0].Message
+	require.Equal(t, "execution-error", resp.Data.Diagnostics[0].Code)
+	require.Contains(t, msg, "length(TIMESTAMP WITH TIME ZONE)")
+	require.NotContains(t, msg, "insights_runs")
+	require.NotContains(t, msg, "LINE 1")
+}
