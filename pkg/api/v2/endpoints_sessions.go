@@ -2,8 +2,10 @@ package apiv2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
@@ -46,7 +48,7 @@ func (s *Service) ListSessionKeys(ctx context.Context, req *apiv2.ListSessionKey
 		Limit:  limit,
 	})
 	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch session keys")
+		return nil, s.sessionsError(err, "Unable to fetch session keys")
 	}
 
 	data := make([]*apiv2.SessionKey, len(result.Keys))
@@ -110,7 +112,7 @@ func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsReque
 
 	result, err := dashboards.ListSessions(ctx, s.duckDB, consts.DevServerAccountID, consts.DevServerEnvID, opts)
 	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch sessions")
+		return nil, s.sessionsError(err, "Unable to fetch sessions")
 	}
 
 	data := make([]*apiv2.SessionGroup, len(result.Sessions))
@@ -171,7 +173,7 @@ func (s *Service) ListSessionRuns(ctx context.Context, req *apiv2.ListSessionRun
 
 	result, err := dashboards.ListSessionRuns(ctx, s.duckDB, consts.DevServerAccountID, consts.DevServerEnvID, opts)
 	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch session runs")
+		return nil, s.sessionsError(err, "Unable to fetch session runs")
 	}
 
 	data := make([]*apiv2.SessionRun, len(result.Runs))
@@ -189,6 +191,21 @@ func (s *Service) ListSessionRuns(ctx context.Context, req *apiv2.ListSessionRun
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 		Page:     sessionsPage(limit, result.HasMore, nextCursor),
 	}, nil
+}
+
+// sessionsError maps a pkg/duckdb/dashboards error to its API error: a
+// caller error (*dashboards.InvalidArgumentError -- bad cursor, inverted
+// time range, ...) is a 400 w/ its own message, anything else a 500 w/
+// internalMsg.
+func (s *Service) sessionsError(err error, internalMsg string) error {
+	if iae, ok := errors.AsType[*dashboards.InvalidArgumentError](err); ok {
+		msg := iae.Message
+		if msg != "" {
+			msg = strings.ToUpper(msg[:1]) + msg[1:]
+		}
+		return s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, msg)
+	}
+	return s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, internalMsg)
 }
 
 // boundedLimit mirrors parseRunsPageOpts' limit handling (endpoints_runs.go):

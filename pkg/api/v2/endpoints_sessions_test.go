@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // insertSessionRun inserts one inngest.runs row scoped to
@@ -135,4 +136,86 @@ func TestListSessionRuns_ReturnsMatchingRuns(t *testing.T) {
 	require.Equal(t, "app-fn", resp.Data[0].Function.GetSlug())
 	require.Equal(t, "app", resp.Data[0].Function.App.Id)
 	require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+}
+
+// TestSessions_CallerErrorsAre400s covers caller mistakes that used to
+// surface as 500s, and from w/o until, which now defaults until to now
+// (like GQL) rather than erroring.
+func TestSessions_CallerErrorsAre400s(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	insertSessionRun(t, db, appID, functionID, "r1", "user", "u1", "Completed", now.Add(-time.Minute))
+
+	t.Run("from w/o until defaults until to now", func(t *testing.T) {
+		resp, err := service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{
+			SessionKey: "user", From: timestamppb.New(now.Add(-time.Hour)),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+
+		runs, err := service.ListSessionRuns(context.Background(), &apiv2.ListSessionRunsRequest{
+			SessionKey: "user", SessionId: "u1", From: timestamppb.New(now.Add(-time.Hour)),
+		})
+		require.NoError(t, err)
+		require.Len(t, runs.Data, 1)
+	})
+
+	t.Run("from after until", func(t *testing.T) {
+		_, err := service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{
+			SessionKey: "user", From: timestamppb.New(now), Until: timestamppb.New(now.Add(-time.Hour)),
+		})
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.ErrorContains(t, err, "Invalid time range")
+
+		_, err = service.ListSessionRuns(context.Background(), &apiv2.ListSessionRunsRequest{
+			SessionKey: "user", SessionId: "u1", From: timestamppb.New(now), Until: timestamppb.New(now),
+		})
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("malformed cursor", func(t *testing.T) {
+		bad := "not-a-cursor!"
+		_, err := service.ListSessionKeys(context.Background(), &apiv2.ListSessionKeysRequest{Cursor: &bad})
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+		require.ErrorContains(t, err, "Invalid cursor")
+
+		_, err = service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{SessionKey: "user", Cursor: &bad})
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+
+		_, err = service.ListSessionRuns(context.Background(), &apiv2.ListSessionRunsRequest{SessionKey: "user", SessionId: "u1", Cursor: &bad})
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+}
+
+// TestSessions_CursorFromAnotherListingIs400 covers a cursor that decodes
+// fine but belongs to a different listing (here a sessions cursor sent to
+// session runs), which used to silently restart at page 1.
+func TestSessions_CursorFromAnotherListingIs400(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	service := NewService(ServiceOptions{DuckDB: db})
+
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	insertSessionRun(t, db, appID, functionID, "r1", "user", "u1", "Completed", now.Add(-2*time.Minute))
+	insertSessionRun(t, db, appID, functionID, "r2", "user", "u2", "Completed", now.Add(-time.Minute))
+
+	limit := int32(1)
+	sessions, err := service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{SessionKey: "user", Limit: &limit})
+	require.NoError(t, err)
+	require.True(t, sessions.Page.HasMore)
+	require.NotNil(t, sessions.Page.Cursor)
+
+	_, err = service.ListSessionRuns(context.Background(), &apiv2.ListSessionRunsRequest{
+		SessionKey: "user", SessionId: "u1", Cursor: sessions.Page.Cursor,
+	})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+	require.ErrorContains(t, err, "Invalid cursor")
+
+	_, err = service.ListSessionKeys(context.Background(), &apiv2.ListSessionKeysRequest{Cursor: sessions.Page.Cursor})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
