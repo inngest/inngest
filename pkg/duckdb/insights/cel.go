@@ -400,9 +400,27 @@ func handleJSONFilter(expr, fieldPath string, literal any, op string) ([]sq.Expr
 		return handleStringOp(sq.L(textExpr, jsonPath), v, op)
 	case int64, float64:
 		// TRY_CAST: a non-numeric value (a string, object, or array) becomes
-		// NULL and matches nothing, like a missing key, instead of a
-		// conversion error failing the whole query.
-		return handleNumericOp(sq.L(fmt.Sprintf("TRY_CAST(%s AS DOUBLE)", textExpr), jsonPath), v, op)
+		// NULL and matches nothing instead of a conversion error failing the
+		// whole query (CEL errors on those too, which is a non-match).
+		filters, err := handleNumericOp(sq.L(fmt.Sprintf("TRY_CAST(%s AS DOUBLE)", textExpr), jsonPath), v, op)
+		if err != nil || len(filters) == 0 {
+			return filters, err
+		}
+		// pkg/expressions orders a missing key below every number (a < 5
+		// holds, a > -1 doesn't) and compares a JSON null as 0 (null > -1
+		// holds), but both extract as SQL NULL here, which no comparison
+		// passes. So </<= also let a missing or null value through, and
+		// >/>= let a JSON null through when 0 itself would pass.
+		switch op {
+		case operators.Less, operators.LessEquals:
+			return []sq.Expression{sq.Or(append(filters, sq.L(fmt.Sprintf("%s IS NULL", textExpr), jsonPath))...)}, nil
+		case operators.Greater, operators.GreaterEquals:
+			f := toFloat(v)
+			if f < 0 || op == operators.GreaterEquals && f == 0 {
+				return []sq.Expression{sq.Or(append(filters, sq.L(fmt.Sprintf("json_type(%s, ?) = 'NULL'", expr), jsonPath))...)}, nil
+			}
+		}
+		return filters, nil
 	case bool:
 		// DuckDB's ->> extracts a JSON boolean as the text "true"/"false".
 		boolStr := "false"
@@ -497,6 +515,15 @@ func handleStringOp(expr exp.LiteralExpression, value string, op string) ([]sq.E
 	}
 	// e.g. a string <, or in
 	return []sq.Expression{}, nil
+}
+
+// toFloat widens a CEL numeric literal (int64 or float64) for comparing
+// against 0.
+func toFloat(v any) float64 {
+	if i, ok := v.(int64); ok {
+		return float64(i)
+	}
+	return v.(float64)
 }
 
 func handleNumericOp(expr exp.LiteralExpression, value any, op string) ([]sq.Expression, error) {
