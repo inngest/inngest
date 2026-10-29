@@ -274,6 +274,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 				CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
 				Payload:               queue.PayloadPauseTimeout{PauseID: park.ID, Pause: park},
 				Metadata:              make(map[string]any),
+				MaxAttempts:           runCtx.MaxAttempts(),
 				ParallelMode:          gen.ParallelMode(),
 			}
 			if err := e.queue.Enqueue(ctx, timeout, parkExpires, queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
