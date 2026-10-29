@@ -3410,6 +3410,9 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	// find the pause with correlationID
 	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
+	if errors.Is(err, state.ErrInvokePauseNotFound) {
+		pause, err = e.invokePauseByID(ctx, evt, correlationID)
+	}
 	if err != nil {
 		return err
 	}
