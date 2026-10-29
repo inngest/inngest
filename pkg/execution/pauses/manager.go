@@ -232,6 +232,9 @@ func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) 
 	// lookup of [pause ID] -> "created at".
 
 	pause, err := m.buf.PauseByID(ctx, index, pauseID)
+	if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+		return nil, err
+	}
 	if pause != nil && err == nil {
 		return pause, err
 	}
