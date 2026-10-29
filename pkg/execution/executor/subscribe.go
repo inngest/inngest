@@ -522,6 +522,19 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 	err = e.queue.Enqueue(ctx, item, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
+
+		// EXPERIMENT: the wake in the way may be past its last check. A second
+		// wake, later than any removal, looks again.
+		recheck := item
+		recheckID := jobID + "-recheck"
+		recheck.JobID = &recheckID
+		recheck.GroupID = uuid.New().String()
+		recheck.Metadata = map[string]any{subscriptionWakeMetadataKey: subscriptionKeyHash(key)}
+		rerr := e.queue.Enqueue(ctx, recheck, e.now().Add(750*time.Millisecond), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
+		if rerr != nil && !errors.Is(rerr, queue.ErrQueueItemExists) {
+			return retryableEnqueueError(rerr)
+		}
+
 		return nil
 	}
 	if err != nil {
