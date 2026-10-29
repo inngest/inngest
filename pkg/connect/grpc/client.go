@@ -16,12 +16,14 @@ import (
 var ErrGatewayNotFound = fmt.Errorf("gateway not found")
 
 // ClientKeepalive pings idle and busy connections so a peer that disappears
-// without closing the TCP connection is detected in seconds, failing in-flight
-// calls with Unavailable instead of hanging until the kernel gives up.
-// Peers must accept this rate; see ServerKeepaliveEnforcement.
+// without closing the TCP connection is detected within about 30s, failing
+// in-flight calls with Unavailable instead of hanging until the kernel gives up.
+// Timeout also sets TCP_USER_TIMEOUT, so it stays at the gRPC default of 20s to
+// ride out short network blips. Peers must accept this ping rate; see
+// ServerKeepaliveEnforcement.
 var ClientKeepalive = keepalive.ClientParameters{
 	Time:                10 * time.Second,
-	Timeout:             5 * time.Second,
+	Timeout:             20 * time.Second,
 	PermitWithoutStream: true,
 }
 
