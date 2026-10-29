@@ -3949,7 +3949,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if e.shards != nil && !isSubscriptionParkPause(&pause) {
+		if e.shards != nil && !(isSubscriptionParkPause(&pause) && !parkHasTimeout(&pause)) {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shards.Resolve(ctx, queue.Scope{

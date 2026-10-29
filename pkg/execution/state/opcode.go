@@ -632,6 +632,13 @@ type SubscribeOpts struct {
 	Mode string `json:"mode"`
 	// Seq is the message a next or poll op asks for, starting at 1.
 	Seq int `json:"seq,omitempty"`
+	// Timeout, for a park, is how long the run waits for the message before the
+	// park ends unanswered, as a waitForEvent timeout string. Empty waits for
+	// ever.
+	Timeout string `json:"timeout,omitempty"`
+	// Attempt, for a park, counts the parks for this Seq that timed out before.
+	// Each park is its own step, so a timed-out one is not answered again.
+	Attempt int `json:"attempt,omitempty"`
 	// Stream is which of the subscription's events this op is for. Each event is
 	// its own pause; all of them save messages under the same Key.
 	Stream int `json:"stream,omitempty"`

@@ -62,8 +62,12 @@ func subscriptionMessageIDs(stack []string, key string) []string {
 
 // subscriptionStepID is the step ID of the wait for message seq. The SDK gives
 // its blocking next() the same ID.
-func subscriptionStepID(key string, seq int) string {
-	sum := sha1.Sum([]byte(fmt.Sprintf("%s:%d", key, seq)))
+func subscriptionStepID(key string, seq int, attempt int) string {
+	id := fmt.Sprintf("%s:%d", key, seq)
+	if attempt > 0 {
+		id = fmt.Sprintf("%s:%d", id, attempt)
+	}
+	sum := sha1.Sum([]byte(id))
 	return hex.EncodeToString(sum[:])
 }
 
@@ -205,7 +209,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"opened": true})
 
 	case state.SubscribePark:
-		if gen.ID != subscriptionStepID(sub.Key, sub.Seq) {
+		if gen.ID != subscriptionStepID(sub.Key, sub.Seq, sub.Attempt) {
 			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
 		}
 
@@ -220,6 +224,15 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		// The marker says "this run is waiting for message Seq". It is a pause
 		// only so that a delivery can find and consume it atomically.
+		parkExpires := e.now().Add(consts.MaxWaitForEventTimeout)
+		if sub.Timeout != "" {
+			expires, err := (&state.WaitForEventOpts{Timeout: sub.Timeout}).Expires()
+			if err != nil {
+				return fmt.Errorf("unable to parse the park timeout: %w", err)
+			}
+			parkExpires = expires
+		}
+
 		parkEvent := subscriptionParkIndexName(runID, sub.Key)
 		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: parkEvent}
 		opcode := gen.Op.String()
@@ -232,7 +245,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			Incoming:     edge.Edge.Incoming,
 			StepName:     gen.UserDefinedName(),
 			Opcode:       &opcode,
-			Expires:      state.Time(e.now().Add(consts.MaxWaitForEventTimeout)),
+			Expires:      state.Time(parkExpires),
 			Event:        &parkEvent,
 			DataKey:      gen.ID,
 			MaxAttempts:  runCtx.MaxAttempts(),
@@ -240,10 +253,32 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// Like waitForEvent: the wake joins the batch's shared discovery.
 			ParallelCoalesceKey: group.ParallelCoalesceKey,
 			CreatedAt:           e.now(),
-			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq},
+			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq, "timeout": sub.Timeout != ""},
 		}
 		if _, err := e.pm.Write(ctx, parkIdx, &park); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription park: %w", err)
+		}
+
+		// A park with a timeout ends unanswered when it expires, like a
+		// waitForEvent: a queue item consumes the marker then. Consuming the marker
+		// first (a message, or close) removes the item.
+		if sub.Timeout != "" {
+			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID)
+			timeout := queue.Item{
+				JobID:                 &jobID,
+				WorkspaceID:           md.ID.Tenant.EnvID,
+				GroupID:               runCtx.GroupID(),
+				Kind:                  queue.KindPause,
+				Identifier:            sv2.V1FromMetadata(*md),
+				PriorityFactor:        runCtx.PriorityFactor(),
+				CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+				Payload:               queue.PayloadPauseTimeout{PauseID: park.ID, Pause: park},
+				Metadata:              make(map[string]any),
+				ParallelMode:          gen.ParallelMode(),
+			}
+			if err := e.queue.Enqueue(ctx, timeout, parkExpires, queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+				return fmt.Errorf("error enqueueing the park timeout: %w", err)
+			}
 		}
 
 		// A message may have been saved after the SDK read its state and before
@@ -519,4 +554,10 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
 	return e.wakeSubscriber(ctx, id, key)
+}
+
+// parkHasTimeout reports whether a park marker has a timeout job in the queue.
+func parkHasTimeout(pause *state.Pause) bool {
+	timeout, _ := pause.Metadata["timeout"].(bool)
+	return timeout
 }
