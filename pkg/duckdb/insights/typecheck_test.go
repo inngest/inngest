@@ -177,6 +177,16 @@ func TestInferTypeMatchesDuckDB(t *testing.T) {
 		"SELECT CAST(run_id AS CHAR VARYING (10)) FROM runs":           ColumnTypeString,
 		"SELECT run_id::GUID FROM runs":                                ColumnTypeString,
 		"SELECT CAST(1 AS INT64) FROM runs":                            ColumnTypeNumber,
+		"SELECT CAST(NULL AS INT ARRAY) FROM runs":                     ColumnTypeJSON,
+		"SELECT CAST(NULL AS SETOF INT) FROM runs":                     ColumnTypeNumber,
+		"SELECT CAST(NULL AS main.int8) FROM runs":                     ColumnTypeNumber,
+		"SELECT CAST(NULL AS ROW (a INT)) FROM runs":                   ColumnTypeJSON,
+		"SELECT CAST(NULL AS \"varchar\") FROM runs":                   ColumnTypeString,
+		"SELECT CAST(NULL AS double  precision) FROM runs":             ColumnTypeNumber,
+		"SELECT CAST(NULL AS timestamp (3) with time zone) FROM runs":  ColumnTypeDatetime,
+		"SELECT CAST(NULL AS interval day to second) FROM runs":        ColumnTypeDatetime,
+		"SELECT date '2024-01-01' - DATE '2024-01-01' FROM runs":       ColumnTypeNumber,
+		"SELECT [queued_at::date] FROM runs":                           ColumnTypeJSON,
 	}
 	for q, want := range cases {
 		t.Run(q, func(t *testing.T) {
