@@ -1209,3 +1209,47 @@ func TestRunBatchSkipsEmptyBatch(t *testing.T) {
 		})
 	}
 }
+
+func TestDebugAPIsReportStoreName(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      []RedisBatchManagerOpt
+		wantStore string
+	}{
+		{name: "named store", opts: []RedisBatchManagerOpt{WithStoreName("store-a")}, wantStore: "store-a"},
+		{name: "default store name", wantStore: "default"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+
+			bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+			opts := append([]RedisBatchManagerOpt{WithoutBuffer()}, tt.opts...)
+			bm := NewRedisBatchManager(bc, &fakeProducer{}, opts...)
+			fnID := uuid.New()
+			fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 10, Timeout: "60s"}}
+			_, err = bm.Append(ctx, BatchItem{FunctionID: fnID, EventID: ulid.Make()}, fn)
+			require.NoError(t, err)
+
+			infos, err := bm.GetBatchInfo(ctx, fnID, "")
+			require.NoError(t, err)
+			require.Len(t, infos, 1)
+			require.Equal(t, tt.wantStore, infos[0].Store)
+
+			runs, err := bm.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+			require.NoError(t, err)
+			require.Len(t, runs, 1)
+			require.Equal(t, tt.wantStore, runs[0].Store)
+
+			deletes, err := bm.DeleteBatch(ctx, fnID, "")
+			require.NoError(t, err)
+			require.Len(t, deletes, 1)
+			require.Equal(t, tt.wantStore, deletes[0].Store)
+		})
+	}
+}

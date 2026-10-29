@@ -428,7 +428,7 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 	// First get the batch info to know what we're deleting
 	info, err := b.getBatchInfo(ctx, functionID, batchKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch info: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to get batch info: %w", b.storeName, err)
 	}
 
 	if info.BatchID == "" {
@@ -443,12 +443,12 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 
 	batchID, err := ulid.Parse(info.BatchID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid batch ID: %w", err)
+		return nil, fmt.Errorf("batch store %s: invalid batch ID: %w", b.storeName, err)
 	}
 
 	// Delete the batch keys
 	if err := b.DeleteKeys(ctx, functionID, batchID); err != nil {
-		return nil, fmt.Errorf("failed to delete batch keys: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to delete batch keys: %w", b.storeName, err)
 	}
 
 	// Delete the batch pointer
@@ -463,7 +463,7 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 	if err := b.b.Client().Do(ctx, func(c rueidis.Client) rueidis.Completed {
 		return c.B().Del().Key(batchPointerKey).Build()
 	}).Error(); err != nil {
-		return nil, fmt.Errorf("failed to delete batch pointer: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to delete batch pointer: %w", b.storeName, err)
 	}
 
 	return []DeleteBatchResult{{
@@ -479,7 +479,7 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]
 	// Get the batch info first
 	info, err := b.getBatchInfo(ctx, opts.FunctionID, opts.BatchKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch info: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to get batch info: %w", b.storeName, err)
 	}
 
 	// A pointer batch without items has no metadata, so its schedule job would
@@ -498,7 +498,7 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]
 
 	batchID, err := ulid.Parse(info.BatchID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid batch ID: %w", err)
+		return nil, fmt.Errorf("batch store %s: invalid batch ID: %w", b.storeName, err)
 	}
 
 	// Determine the batch pointer key
@@ -531,7 +531,7 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) ([]
 	}
 
 	if err := b.ScheduleExecution(ctx, scheduleOpts); err != nil {
-		return nil, fmt.Errorf("failed to schedule batch execution: %w", err)
+		return nil, fmt.Errorf("batch store %s: failed to schedule batch execution: %w", b.storeName, err)
 	}
 
 	return []RunBatchResult{{
@@ -640,7 +640,7 @@ func (b *redisBatchManager) Close() error {
 func (b *redisBatchManager) GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error) {
 	info, err := b.getBatchInfo(ctx, functionID, batchKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("batch store %s: %w", b.storeName, err)
 	}
 	info.Store = b.storeName
 	return []BatchInfo{*info}, nil

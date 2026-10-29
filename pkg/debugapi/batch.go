@@ -31,33 +31,18 @@ func (d *debugAPI) GetBatchInfo(ctx context.Context, req *pb.BatchInfoRequest) (
 	return BatchInfoResponse(infos), nil
 }
 
-// BatchInfoResponse converts per-store batch info into a response. The
-// top-level fields describe the first store that holds items, or else the
-// first store with a batch, for clients that read a single batch.
+// BatchInfoResponse converts per-store batch info into a response with one
+// entry per store.
 func BatchInfoResponse(infos []batch.BatchInfo) *pb.BatchInfoResponse {
 	resp := &pb.BatchInfoResponse{}
-	var summary *pb.BatchStoreInfo
 	for _, info := range infos {
-		store := &pb.BatchStoreInfo{
+		resp.Stores = append(resp.Stores, &pb.BatchInfo{
 			Store:     info.Store,
 			BatchId:   info.BatchID,
 			ItemCount: int32(len(info.Items)),
 			Items:     batchEventItems(info.Items),
 			Status:    info.Status,
-		}
-		resp.Stores = append(resp.Stores, store)
-		if store.BatchId == "" {
-			continue
-		}
-		if summary == nil || (summary.ItemCount == 0 && store.ItemCount > 0) {
-			summary = store
-		}
-	}
-	if summary != nil {
-		resp.BatchId = summary.BatchId
-		resp.ItemCount = summary.ItemCount
-		resp.Items = summary.Items
-		resp.Status = summary.Status
+		})
 	}
 	return resp
 }
@@ -102,26 +87,17 @@ func (d *debugAPI) DeleteBatch(ctx context.Context, req *pb.DeleteBatchRequest) 
 	return DeleteBatchResponse(results), nil
 }
 
-// DeleteBatchResponse converts per-store delete results into a response. The
-// top-level fields summarize every store: deleted is true if any store deleted
-// a batch, batch_id is the first deleted batch, and item_count is the total.
+// DeleteBatchResponse converts per-store delete results into a response with
+// one entry per store.
 func DeleteBatchResponse(results []batch.DeleteBatchResult) *pb.DeleteBatchResponse {
 	resp := &pb.DeleteBatchResponse{}
 	for _, result := range results {
-		resp.Stores = append(resp.Stores, &pb.DeleteBatchStoreResult{
+		resp.Stores = append(resp.Stores, &pb.DeleteBatchResult{
 			Store:     result.Store,
 			Deleted:   result.Deleted,
 			BatchId:   result.BatchID,
 			ItemCount: int32(result.ItemCount),
 		})
-		if !result.Deleted {
-			continue
-		}
-		if !resp.Deleted {
-			resp.BatchId = result.BatchID
-		}
-		resp.Deleted = true
-		resp.ItemCount += int32(result.ItemCount)
 	}
 	return resp
 }
@@ -157,27 +133,17 @@ func (d *debugAPI) RunBatch(ctx context.Context, req *pb.RunBatchRequest) (*pb.R
 	return RunBatchResponse(results), nil
 }
 
-// RunBatchResponse converts per-store run results into a response. The
-// top-level fields summarize every store: scheduled is true if any store
-// scheduled a batch, batch_id is the first scheduled batch, and item_count is
-// the total.
+// RunBatchResponse converts per-store run results into a response with one
+// entry per store.
 func RunBatchResponse(results []batch.RunBatchResult) *pb.RunBatchResponse {
 	resp := &pb.RunBatchResponse{}
 	for _, result := range results {
-		resp.Stores = append(resp.Stores, &pb.RunBatchStoreResult{
+		resp.Stores = append(resp.Stores, &pb.RunBatchResult{
 			Store:     result.Store,
 			Scheduled: result.Scheduled,
 			BatchId:   result.BatchID,
 			ItemCount: int32(result.ItemCount),
 		})
-		if !result.Scheduled {
-			continue
-		}
-		if !resp.Scheduled {
-			resp.BatchId = result.BatchID
-		}
-		resp.Scheduled = true
-		resp.ItemCount += int32(result.ItemCount)
 	}
 	return resp
 }

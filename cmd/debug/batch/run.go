@@ -49,7 +49,7 @@ func RunCommand() *cli.Command {
 			// Older servers only fill the top-level fields.
 			stores := resp.Stores
 			if len(stores) == 0 {
-				stores = []*dbgpb.RunBatchStoreResult{{
+				stores = []*dbgpb.RunBatchResult{{
 					Scheduled: resp.Scheduled,
 					BatchId:   resp.BatchId,
 					ItemCount: resp.ItemCount,

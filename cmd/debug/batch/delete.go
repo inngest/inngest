@@ -49,7 +49,7 @@ func DeleteCommand() *cli.Command {
 			// Older servers only fill the top-level fields.
 			stores := resp.Stores
 			if len(stores) == 0 {
-				stores = []*dbgpb.DeleteBatchStoreResult{{
+				stores = []*dbgpb.DeleteBatchResult{{
 					Deleted:   resp.Deleted,
 					BatchId:   resp.BatchId,
 					ItemCount: resp.ItemCount,

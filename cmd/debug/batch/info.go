@@ -50,7 +50,7 @@ func InfoCommand() *cli.Command {
 			// Older servers only fill the top-level fields.
 			stores := resp.Stores
 			if len(stores) == 0 {
-				stores = []*dbgpb.BatchStoreInfo{{
+				stores = []*dbgpb.BatchInfo{{
 					BatchId:   resp.BatchId,
 					ItemCount: resp.ItemCount,
 					Items:     resp.Items,
@@ -73,7 +73,7 @@ func InfoCommand() *cli.Command {
 	}
 }
 
-func printBatchInfo(store *dbgpb.BatchStoreInfo) {
+func printBatchInfo(store *dbgpb.BatchInfo) {
 	if store.BatchId == "" {
 		fmt.Println("No active batch found")
 		return

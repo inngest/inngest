@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"crypto/rand"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -838,4 +839,45 @@ func TestMigratingIntegration_DebugAPIsReportBothClusters(t *testing.T) {
 		{Store: "current", Scheduled: true, BatchID: resCur.BatchID, ItemCount: 2},
 		{Store: "next", Scheduled: true, BatchID: resNext.BatchID, ItemCount: 1},
 	}, results)
+}
+
+func TestMigratingIntegration_DebugAPIErrorsNameFailingCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		failCurrent bool
+		failNext    bool
+	}{
+		{name: "next fails", failNext: true},
+		{name: "current fails", failCurrent: true},
+		{name: "both fail", failCurrent: true, failNext: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			env := newMigratingTestEnv(t)
+			fnID := uuid.New()
+			if tt.failCurrent {
+				env.rCurrent.SetError("unavailable")
+			}
+			if tt.failNext {
+				env.rNext.SetError("unavailable")
+			}
+
+			// A failing cluster fails the debug call, and the error names each
+			// failing cluster so an operator knows which store to check.
+			checkErr := func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Equal(t, tt.failCurrent, strings.Contains(err.Error(), "batch store current:"))
+				require.Equal(t, tt.failNext, strings.Contains(err.Error(), "batch store next:"))
+			}
+
+			_, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+			checkErr(t, err)
+			_, err = env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+			checkErr(t, err)
+			_, err = env.migBM.DeleteBatch(ctx, fnID, "")
+			checkErr(t, err)
+		})
+	}
 }

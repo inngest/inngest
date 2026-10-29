@@ -81,29 +81,27 @@ func (x *BatchInfoRequest) GetBatchKey() string {
 type BatchInfoResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// batch_id is the current batch ULID if one exists.
-	// Deprecated: use stores, which has the batch in each batch store.
+	// Deprecated: no longer populated; use stores, which has the batch in each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	BatchId string `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	// item_count is the number of events currently in the batch.
-	// Deprecated: use stores, which has the batch in each batch store.
+	// Deprecated: no longer populated; use stores, which has the batch in each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	ItemCount int32 `protobuf:"varint,2,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
 	// items contains the batch items with event data.
-	// Deprecated: use stores, which has the batch in each batch store.
+	// Deprecated: no longer populated; use stores, which has the batch in each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	Items []*BatchEventItem `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
 	// status is the current batch status (pending, started, etc.).
-	// Deprecated: use stores, which has the batch in each batch store.
+	// Deprecated: no longer populated; use stores, which has the batch in each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	Status string `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	// stores has the current batch in each batch store. During a batch store
-	// migration there is one entry per store; the fields above describe the
-	// first store that holds items.
-	Stores        []*BatchStoreInfo `protobuf:"bytes,5,rep,name=stores,proto3" json:"stores,omitempty"`
+	// stores has the current batch in each batch store.
+	Stores        []*BatchInfo `protobuf:"bytes,5,rep,name=stores,proto3" json:"stores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -170,15 +168,15 @@ func (x *BatchInfoResponse) GetStatus() string {
 	return ""
 }
 
-func (x *BatchInfoResponse) GetStores() []*BatchStoreInfo {
+func (x *BatchInfoResponse) GetStores() []*BatchInfo {
 	if x != nil {
 		return x.Stores
 	}
 	return nil
 }
 
-// BatchStoreInfo describes the current batch in one batch store.
-type BatchStoreInfo struct {
+// BatchInfo describes the current batch in one batch store.
+type BatchInfo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// store is the name of the batch store.
 	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
@@ -194,20 +192,20 @@ type BatchStoreInfo struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BatchStoreInfo) Reset() {
-	*x = BatchStoreInfo{}
+func (x *BatchInfo) Reset() {
+	*x = BatchInfo{}
 	mi := &file_debug_v1_batch_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BatchStoreInfo) String() string {
+func (x *BatchInfo) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BatchStoreInfo) ProtoMessage() {}
+func (*BatchInfo) ProtoMessage() {}
 
-func (x *BatchStoreInfo) ProtoReflect() protoreflect.Message {
+func (x *BatchInfo) ProtoReflect() protoreflect.Message {
 	mi := &file_debug_v1_batch_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -219,40 +217,40 @@ func (x *BatchStoreInfo) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BatchStoreInfo.ProtoReflect.Descriptor instead.
-func (*BatchStoreInfo) Descriptor() ([]byte, []int) {
+// Deprecated: Use BatchInfo.ProtoReflect.Descriptor instead.
+func (*BatchInfo) Descriptor() ([]byte, []int) {
 	return file_debug_v1_batch_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BatchStoreInfo) GetStore() string {
+func (x *BatchInfo) GetStore() string {
 	if x != nil {
 		return x.Store
 	}
 	return ""
 }
 
-func (x *BatchStoreInfo) GetBatchId() string {
+func (x *BatchInfo) GetBatchId() string {
 	if x != nil {
 		return x.BatchId
 	}
 	return ""
 }
 
-func (x *BatchStoreInfo) GetItemCount() int32 {
+func (x *BatchInfo) GetItemCount() int32 {
 	if x != nil {
 		return x.ItemCount
 	}
 	return 0
 }
 
-func (x *BatchStoreInfo) GetItems() []*BatchEventItem {
+func (x *BatchInfo) GetItems() []*BatchEventItem {
 	if x != nil {
 		return x.Items
 	}
 	return nil
 }
 
-func (x *BatchStoreInfo) GetStatus() string {
+func (x *BatchInfo) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
@@ -412,24 +410,22 @@ func (x *DeleteBatchRequest) GetBatchKey() string {
 type DeleteBatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// deleted indicates whether a batch was found and deleted.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	Deleted bool `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	// batch_id is the ULID of the deleted batch, if one was deleted.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	BatchId string `protobuf:"bytes,2,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	// item_count is the number of events that were in the deleted batch.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	ItemCount int32 `protobuf:"varint,3,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
-	// stores has the result for each batch store. The fields above summarize
-	// them: deleted is true if any store deleted a batch, batch_id is the first
-	// deleted batch, and item_count is the total.
-	Stores        []*DeleteBatchStoreResult `protobuf:"bytes,4,rep,name=stores,proto3" json:"stores,omitempty"`
+	// stores has the result for each batch store.
+	Stores        []*DeleteBatchResult `protobuf:"bytes,4,rep,name=stores,proto3" json:"stores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -488,15 +484,15 @@ func (x *DeleteBatchResponse) GetItemCount() int32 {
 	return 0
 }
 
-func (x *DeleteBatchResponse) GetStores() []*DeleteBatchStoreResult {
+func (x *DeleteBatchResponse) GetStores() []*DeleteBatchResult {
 	if x != nil {
 		return x.Stores
 	}
 	return nil
 }
 
-// DeleteBatchStoreResult describes the batch deleted from one batch store.
-type DeleteBatchStoreResult struct {
+// DeleteBatchResult describes the batch deleted from one batch store.
+type DeleteBatchResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// store is the name of the batch store.
 	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
@@ -510,20 +506,20 @@ type DeleteBatchStoreResult struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DeleteBatchStoreResult) Reset() {
-	*x = DeleteBatchStoreResult{}
+func (x *DeleteBatchResult) Reset() {
+	*x = DeleteBatchResult{}
 	mi := &file_debug_v1_batch_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DeleteBatchStoreResult) String() string {
+func (x *DeleteBatchResult) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteBatchStoreResult) ProtoMessage() {}
+func (*DeleteBatchResult) ProtoMessage() {}
 
-func (x *DeleteBatchStoreResult) ProtoReflect() protoreflect.Message {
+func (x *DeleteBatchResult) ProtoReflect() protoreflect.Message {
 	mi := &file_debug_v1_batch_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -535,33 +531,33 @@ func (x *DeleteBatchStoreResult) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteBatchStoreResult.ProtoReflect.Descriptor instead.
-func (*DeleteBatchStoreResult) Descriptor() ([]byte, []int) {
+// Deprecated: Use DeleteBatchResult.ProtoReflect.Descriptor instead.
+func (*DeleteBatchResult) Descriptor() ([]byte, []int) {
 	return file_debug_v1_batch_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *DeleteBatchStoreResult) GetStore() string {
+func (x *DeleteBatchResult) GetStore() string {
 	if x != nil {
 		return x.Store
 	}
 	return ""
 }
 
-func (x *DeleteBatchStoreResult) GetDeleted() bool {
+func (x *DeleteBatchResult) GetDeleted() bool {
 	if x != nil {
 		return x.Deleted
 	}
 	return false
 }
 
-func (x *DeleteBatchStoreResult) GetBatchId() string {
+func (x *DeleteBatchResult) GetBatchId() string {
 	if x != nil {
 		return x.BatchId
 	}
 	return ""
 }
 
-func (x *DeleteBatchStoreResult) GetItemCount() int32 {
+func (x *DeleteBatchResult) GetItemCount() int32 {
 	if x != nil {
 		return x.ItemCount
 	}
@@ -627,24 +623,22 @@ func (x *RunBatchRequest) GetBatchKey() string {
 type RunBatchResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// scheduled indicates whether a batch was found and scheduled.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	Scheduled bool `protobuf:"varint,1,opt,name=scheduled,proto3" json:"scheduled,omitempty"`
 	// batch_id is the ULID of the batch that was scheduled.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	BatchId string `protobuf:"bytes,2,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	// item_count is the number of events in the batch.
-	// Deprecated: use stores, which has the result for each batch store.
+	// Deprecated: no longer populated; use stores, which has the result for each batch store.
 	//
 	// Deprecated: Marked as deprecated in debug/v1/batch.proto.
 	ItemCount int32 `protobuf:"varint,3,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
-	// stores has the result for each batch store. The fields above summarize
-	// them: scheduled is true if any store scheduled a batch, batch_id is the
-	// first scheduled batch, and item_count is the total.
-	Stores        []*RunBatchStoreResult `protobuf:"bytes,4,rep,name=stores,proto3" json:"stores,omitempty"`
+	// stores has the result for each batch store.
+	Stores        []*RunBatchResult `protobuf:"bytes,4,rep,name=stores,proto3" json:"stores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -703,15 +697,15 @@ func (x *RunBatchResponse) GetItemCount() int32 {
 	return 0
 }
 
-func (x *RunBatchResponse) GetStores() []*RunBatchStoreResult {
+func (x *RunBatchResponse) GetStores() []*RunBatchResult {
 	if x != nil {
 		return x.Stores
 	}
 	return nil
 }
 
-// RunBatchStoreResult describes the batch scheduled in one batch store.
-type RunBatchStoreResult struct {
+// RunBatchResult describes the batch scheduled in one batch store.
+type RunBatchResult struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// store is the name of the batch store.
 	Store string `protobuf:"bytes,1,opt,name=store,proto3" json:"store,omitempty"`
@@ -725,20 +719,20 @@ type RunBatchStoreResult struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RunBatchStoreResult) Reset() {
-	*x = RunBatchStoreResult{}
+func (x *RunBatchResult) Reset() {
+	*x = RunBatchResult{}
 	mi := &file_debug_v1_batch_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RunBatchStoreResult) String() string {
+func (x *RunBatchResult) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RunBatchStoreResult) ProtoMessage() {}
+func (*RunBatchResult) ProtoMessage() {}
 
-func (x *RunBatchStoreResult) ProtoReflect() protoreflect.Message {
+func (x *RunBatchResult) ProtoReflect() protoreflect.Message {
 	mi := &file_debug_v1_batch_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -750,33 +744,33 @@ func (x *RunBatchStoreResult) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunBatchStoreResult.ProtoReflect.Descriptor instead.
-func (*RunBatchStoreResult) Descriptor() ([]byte, []int) {
+// Deprecated: Use RunBatchResult.ProtoReflect.Descriptor instead.
+func (*RunBatchResult) Descriptor() ([]byte, []int) {
 	return file_debug_v1_batch_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *RunBatchStoreResult) GetStore() string {
+func (x *RunBatchResult) GetStore() string {
 	if x != nil {
 		return x.Store
 	}
 	return ""
 }
 
-func (x *RunBatchStoreResult) GetScheduled() bool {
+func (x *RunBatchResult) GetScheduled() bool {
 	if x != nil {
 		return x.Scheduled
 	}
 	return false
 }
 
-func (x *RunBatchStoreResult) GetBatchId() string {
+func (x *RunBatchResult) GetBatchId() string {
 	if x != nil {
 		return x.BatchId
 	}
 	return ""
 }
 
-func (x *RunBatchStoreResult) GetItemCount() int32 {
+func (x *RunBatchResult) GetItemCount() int32 {
 	if x != nil {
 		return x.ItemCount
 	}
@@ -791,15 +785,15 @@ const file_debug_v1_batch_proto_rawDesc = "" +
 	"\x10BatchInfoRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xd7\x01\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xd2\x01\n" +
 	"\x11BatchInfoResponse\x12\x1d\n" +
 	"\bbatch_id\x18\x01 \x01(\tB\x02\x18\x01R\abatchId\x12!\n" +
 	"\n" +
 	"item_count\x18\x02 \x01(\x05B\x02\x18\x01R\titemCount\x122\n" +
 	"\x05items\x18\x03 \x03(\v2\x18.debug.v1.BatchEventItemB\x02\x18\x01R\x05items\x12\x1a\n" +
-	"\x06status\x18\x04 \x01(\tB\x02\x18\x01R\x06status\x120\n" +
-	"\x06stores\x18\x05 \x03(\v2\x18.debug.v1.BatchStoreInfoR\x06stores\"\xa8\x01\n" +
-	"\x0eBatchStoreInfo\x12\x14\n" +
+	"\x06status\x18\x04 \x01(\tB\x02\x18\x01R\x06status\x12+\n" +
+	"\x06stores\x18\x05 \x03(\v2\x13.debug.v1.BatchInfoR\x06stores\"\xa3\x01\n" +
+	"\tBatchInfo\x12\x14\n" +
 	"\x05store\x18\x01 \x01(\tR\x05store\x12\x19\n" +
 	"\bbatch_id\x18\x02 \x01(\tR\abatchId\x12\x1d\n" +
 	"\n" +
@@ -820,14 +814,14 @@ const file_debug_v1_batch_proto_rawDesc = "" +
 	"\x12DeleteBatchRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xaf\x01\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xaa\x01\n" +
 	"\x13DeleteBatchResponse\x12\x1c\n" +
 	"\adeleted\x18\x01 \x01(\bB\x02\x18\x01R\adeleted\x12\x1d\n" +
 	"\bbatch_id\x18\x02 \x01(\tB\x02\x18\x01R\abatchId\x12!\n" +
 	"\n" +
-	"item_count\x18\x03 \x01(\x05B\x02\x18\x01R\titemCount\x128\n" +
-	"\x06stores\x18\x04 \x03(\v2 .debug.v1.DeleteBatchStoreResultR\x06stores\"\x82\x01\n" +
-	"\x16DeleteBatchStoreResult\x12\x14\n" +
+	"item_count\x18\x03 \x01(\x05B\x02\x18\x01R\titemCount\x123\n" +
+	"\x06stores\x18\x04 \x03(\v2\x1b.debug.v1.DeleteBatchResultR\x06stores\"}\n" +
+	"\x11DeleteBatchResult\x12\x14\n" +
 	"\x05store\x18\x01 \x01(\tR\x05store\x12\x18\n" +
 	"\adeleted\x18\x02 \x01(\bR\adeleted\x12\x19\n" +
 	"\bbatch_id\x18\x03 \x01(\tR\abatchId\x12\x1d\n" +
@@ -836,14 +830,14 @@ const file_debug_v1_batch_proto_rawDesc = "" +
 	"\x0fRunBatchRequest\x12\x1f\n" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12\x1b\n" +
-	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xad\x01\n" +
+	"\tbatch_key\x18\x02 \x01(\tR\bbatchKey\"\xa8\x01\n" +
 	"\x10RunBatchResponse\x12 \n" +
 	"\tscheduled\x18\x01 \x01(\bB\x02\x18\x01R\tscheduled\x12\x1d\n" +
 	"\bbatch_id\x18\x02 \x01(\tB\x02\x18\x01R\abatchId\x12!\n" +
 	"\n" +
-	"item_count\x18\x03 \x01(\x05B\x02\x18\x01R\titemCount\x125\n" +
-	"\x06stores\x18\x04 \x03(\v2\x1d.debug.v1.RunBatchStoreResultR\x06stores\"\x83\x01\n" +
-	"\x13RunBatchStoreResult\x12\x14\n" +
+	"item_count\x18\x03 \x01(\x05B\x02\x18\x01R\titemCount\x120\n" +
+	"\x06stores\x18\x04 \x03(\v2\x18.debug.v1.RunBatchResultR\x06stores\"~\n" +
+	"\x0eRunBatchResult\x12\x14\n" +
 	"\x05store\x18\x01 \x01(\tR\x05store\x12\x1c\n" +
 	"\tscheduled\x18\x02 \x01(\bR\tscheduled\x12\x19\n" +
 	"\bbatch_id\x18\x03 \x01(\tR\abatchId\x12\x1d\n" +
@@ -864,23 +858,23 @@ func file_debug_v1_batch_proto_rawDescGZIP() []byte {
 
 var file_debug_v1_batch_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_debug_v1_batch_proto_goTypes = []any{
-	(*BatchInfoRequest)(nil),       // 0: debug.v1.BatchInfoRequest
-	(*BatchInfoResponse)(nil),      // 1: debug.v1.BatchInfoResponse
-	(*BatchStoreInfo)(nil),         // 2: debug.v1.BatchStoreInfo
-	(*BatchEventItem)(nil),         // 3: debug.v1.BatchEventItem
-	(*DeleteBatchRequest)(nil),     // 4: debug.v1.DeleteBatchRequest
-	(*DeleteBatchResponse)(nil),    // 5: debug.v1.DeleteBatchResponse
-	(*DeleteBatchStoreResult)(nil), // 6: debug.v1.DeleteBatchStoreResult
-	(*RunBatchRequest)(nil),        // 7: debug.v1.RunBatchRequest
-	(*RunBatchResponse)(nil),       // 8: debug.v1.RunBatchResponse
-	(*RunBatchStoreResult)(nil),    // 9: debug.v1.RunBatchStoreResult
+	(*BatchInfoRequest)(nil),    // 0: debug.v1.BatchInfoRequest
+	(*BatchInfoResponse)(nil),   // 1: debug.v1.BatchInfoResponse
+	(*BatchInfo)(nil),           // 2: debug.v1.BatchInfo
+	(*BatchEventItem)(nil),      // 3: debug.v1.BatchEventItem
+	(*DeleteBatchRequest)(nil),  // 4: debug.v1.DeleteBatchRequest
+	(*DeleteBatchResponse)(nil), // 5: debug.v1.DeleteBatchResponse
+	(*DeleteBatchResult)(nil),   // 6: debug.v1.DeleteBatchResult
+	(*RunBatchRequest)(nil),     // 7: debug.v1.RunBatchRequest
+	(*RunBatchResponse)(nil),    // 8: debug.v1.RunBatchResponse
+	(*RunBatchResult)(nil),      // 9: debug.v1.RunBatchResult
 }
 var file_debug_v1_batch_proto_depIdxs = []int32{
 	3, // 0: debug.v1.BatchInfoResponse.items:type_name -> debug.v1.BatchEventItem
-	2, // 1: debug.v1.BatchInfoResponse.stores:type_name -> debug.v1.BatchStoreInfo
-	3, // 2: debug.v1.BatchStoreInfo.items:type_name -> debug.v1.BatchEventItem
-	6, // 3: debug.v1.DeleteBatchResponse.stores:type_name -> debug.v1.DeleteBatchStoreResult
-	9, // 4: debug.v1.RunBatchResponse.stores:type_name -> debug.v1.RunBatchStoreResult
+	2, // 1: debug.v1.BatchInfoResponse.stores:type_name -> debug.v1.BatchInfo
+	3, // 2: debug.v1.BatchInfo.items:type_name -> debug.v1.BatchEventItem
+	6, // 3: debug.v1.DeleteBatchResponse.stores:type_name -> debug.v1.DeleteBatchResult
+	9, // 4: debug.v1.RunBatchResponse.stores:type_name -> debug.v1.RunBatchResult
 	5, // [5:5] is the sub-list for method output_type
 	5, // [5:5] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
