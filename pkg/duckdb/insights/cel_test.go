@@ -228,6 +228,18 @@ func TestCELOutputFilters(t *testing.T) {
 			},
 		},
 		{
+			// A JSON null compares as 0 in pkg/expressions, so >= 0 lets it
+			// through.
+			name: "output numeric comparison including zero",
+			cel:  []string{`output.count >= 0`},
+			expected: []sq.Expression{
+				sq.Or(
+					sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(0)),
+					sq.L("json_type(output::JSON, ?) = 'NULL'", "$.data.count"),
+				),
+			},
+		},
+		{
 			name: "output nested path",
 			cel:  []string{`output.nested.value == "x"`},
 			expected: []sq.Expression{
@@ -426,8 +438,13 @@ func TestCELFiltersNeverNarrow(t *testing.T) {
 	t.Run("negated leaf is still converted", func(t *testing.T) {
 		ev, err := CELEventFilters(ctx, []string{`!(event.data.a > 1)`})
 		require.NoError(t, err)
+		// <= also keeps a missing or null a, which pkg/expressions treats as
+		// below 1.
 		assert.Equal(t, []sq.Expression{
-			sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.data.a").Lte(int64(1)),
+			sq.Or(
+				sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.data.a").Lte(int64(1)),
+				sq.L("(x::JSON->>?) IS NULL", "$.data.a"),
+			),
 		}, ev)
 	})
 
