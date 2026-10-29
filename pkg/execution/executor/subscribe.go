@@ -22,6 +22,8 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
 // A step.subscribe subscription keeps its pause when an event matches and saves
@@ -39,6 +41,10 @@ func subscriptionKeyHash(key string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// subscriptionWakeMetadataKey marks a queue item as the wake of a subscription;
+// its value is the hash of the subscription ID.
+const subscriptionWakeMetadataKey = "subscription_wake"
+
 // subscriptionMessageID is the step ID of the message an event is in a
 // subscription.
 func subscriptionMessageID(key string, eventID string) string {
@@ -48,7 +54,11 @@ func subscriptionMessageID(key string, eventID string) string {
 // subscriptionMessageIDs returns the message step IDs of a subscription in
 // stack order.
 func subscriptionMessageIDs(stack []string, key string) []string {
-	prefix := subscriptionMessagePrefix + subscriptionKeyHash(key) + ":"
+	return subscriptionMessageIDsOfHash(stack, subscriptionKeyHash(key))
+}
+
+func subscriptionMessageIDsOfHash(stack []string, hash string) []string {
+	prefix := subscriptionMessagePrefix + hash + ":"
 
 	var ids []string
 	for _, id := range stack {
@@ -67,36 +77,6 @@ func subscriptionClosedID(key string) string {
 	return subscriptionMessagePrefix + "closed:" + subscriptionKeyHash(key)
 }
 
-// subscriptionStepID is the step ID of the wait for message seq. The SDK gives
-// its blocking next() the same ID.
-func subscriptionStepID(key string, reader string, seq int, attempt int) string {
-	id := key
-	if reader != "" {
-		id = fmt.Sprintf("%s:%s", key, reader)
-	}
-	id = fmt.Sprintf("%s:%d", id, seq)
-	if attempt > 0 {
-		id = fmt.Sprintf("%s:%d", id, attempt)
-	}
-	sum := sha1.Sum([]byte(id))
-	return hex.EncodeToString(sum[:])
-}
-
-// subscriptionParkIndexName names the index of the parked markers of one run
-// and subscription. It starts with pauses.SubscriptionParkIndexPrefix; it is a
-// key, not an event name. A delivery reads
-// this one small index to find the marker without reading the run's stack.
-func subscriptionParkIndexName(runID string, key string) string {
-	return pauses.SubscriptionParkIndexPrefix + ":" + runID + ":" + subscriptionKeyHash(key)
-}
-
-// subscriptionParkID is the ID of the marker of one park. It is made of the park
-// step's ID, which is unique to the park, so the cleanup of an earlier marker can
-// never delete a later one, however many messages were saved in between.
-func subscriptionParkID(runID string, key string, stepID string) uuid.UUID {
-	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription-park:%s:%s", runID, key, stepID))
-}
-
 // subscriptionExpiryJobID is the queue job that expires a subscription pause.
 func subscriptionExpiryJobID(md *sv2.Metadata, pauseID uuid.UUID) string {
 	return fmt.Sprintf("%s-subscription-expiry-%s", md.IdempotencyKey(), pauseID)
@@ -108,38 +88,11 @@ func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
 	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
 }
 
-// parkState is what a park op finds in the run's stack.
-type parkState int
-
-const (
-	// parkWaiting: the awaited message is not saved yet.
-	parkWaiting parkState = iota
-	// parkReady: the awaited message is saved, so the run can wake now.
-	parkReady
-	// parkAnswered: the park step itself is saved, so an earlier copy of this
-	// park was woken.
-	parkAnswered
-)
-
-// parkStateOf reads a park op's situation from the stack. The executor asks it
-// twice: before writing the marker (a copy that was already answered stops
-// there) and after (a message saved while the marker was being written wakes
-// the run now; one saved later finds the marker through its own delivery).
-func parkStateOf(stack []string, key string, stepID string, seq int) parkState {
-	if slices.Contains(stack, stepID) {
-		return parkAnswered
-	}
-	if len(subscriptionMessageIDs(stack, key)) >= seq {
-		return parkReady
-	}
-	return parkWaiting
-}
-
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
 // subscription: open, next, poll and close.
 func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
 	sub := opts.Subscribe
-	if err := validateSubscribe(sub, opts.Event); err != nil {
+	if err := validateSubscribe(sub); err != nil {
 		return err
 	}
 
@@ -251,138 +204,6 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		return answer(map[string]any{"opened": true})
 
-	case state.SubscribePark:
-		if gen.ID != subscriptionStepID(sub.Key, sub.Reader, sub.Seq, sub.Attempt) {
-			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
-		}
-
-		stack, err := e.smv2.LoadStack(ctx, md.ID)
-		if err != nil {
-			return err
-		}
-		// A park that was already woken and answered is sent again: nothing to do.
-		if parkStateOf(stack, sub.Key, gen.ID, sub.Seq) == parkAnswered {
-			return nil
-		}
-
-		// The marker says "this run is waiting for message Seq". It is a pause
-		// only so that a delivery can find and consume it atomically.
-		parkExpires := e.now().Add(consts.MaxWaitForEventTimeout)
-		if sub.Timeout != "" {
-			expires, err := (&state.WaitForEventOpts{Timeout: sub.Timeout}).Expires()
-			if err != nil {
-				return fmt.Errorf("unable to parse the park timeout: %w", err)
-			}
-			parkExpires = expires
-		}
-
-		parkEvent := subscriptionParkIndexName(runID, sub.Key)
-		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: parkEvent}
-		opcode := gen.Op.String()
-		park := state.Pause{
-			ID:           subscriptionParkID(runID, sub.Key, gen.ID),
-			WorkspaceID:  md.ID.Tenant.EnvID,
-			Identifier:   sv2.NewPauseIdentifier(md.ID),
-			GroupID:      runCtx.GroupID(),
-			Outgoing:     gen.ID,
-			Incoming:     edge.Edge.Incoming,
-			StepName:     gen.UserDefinedName(),
-			Opcode:       &opcode,
-			Expires:      state.Time(parkExpires),
-			Event:        &parkEvent,
-			DataKey:      gen.ID,
-			MaxAttempts:  runCtx.MaxAttempts(),
-			ParallelMode: gen.ParallelMode(),
-			// Like waitForEvent: the wake joins the batch's shared discovery.
-			ParallelCoalesceKey: group.ParallelCoalesceKey,
-			CreatedAt:           e.now(),
-			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq, "timeout": sub.Timeout != ""},
-		}
-		if _, err := e.pm.Write(ctx, parkIdx, &park); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-			return fmt.Errorf("error saving subscription park: %w", err)
-		}
-
-		// A park with a timeout ends unanswered when it expires, like a
-		// waitForEvent: a queue item consumes the marker then. Consuming the marker
-		// first (a message, or close) removes the item.
-		if sub.Timeout != "" {
-			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID)
-			timeout := queue.Item{
-				JobID:                 &jobID,
-				WorkspaceID:           md.ID.Tenant.EnvID,
-				GroupID:               runCtx.GroupID(),
-				Kind:                  queue.KindPause,
-				Identifier:            sv2.V1FromMetadata(*md),
-				PriorityFactor:        runCtx.PriorityFactor(),
-				CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
-				Payload:               queue.PayloadPauseTimeout{PauseID: park.ID, Pause: park},
-				Metadata:              make(map[string]any),
-				MaxAttempts:           runCtx.MaxAttempts(),
-				ParallelMode:          gen.ParallelMode(),
-			}
-			if err := e.queue.Enqueue(ctx, timeout, parkExpires, queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-				return fmt.Errorf("error enqueueing the park timeout: %w", err)
-			}
-		}
-
-		// A message may have been saved after the SDK read its state and before
-		// the marker existed: its delivery found no marker, so wake now. The
-		// stack is read again after the marker is written: a message saved
-		// before this read is seen here, and one saved after it finds the marker.
-		stack, err = e.smv2.LoadStack(ctx, md.ID)
-		if err != nil {
-			return err
-		}
-		// Still waiting: the marker is written, and a delivery wakes it. A copy of
-		// this park woken in the meantime has its answer saved: nothing to do.
-		switch parkStateOf(stack, sub.Key, gen.ID, sub.Seq) {
-		case parkAnswered:
-			// An earlier copy was answered between the first read and the write,
-			// so the marker just written belongs to a park that is over. Remove it:
-			// a later message would consume it and queue a stale discovery.
-			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
-				return fmt.Errorf("error deleting stale subscription park: %w", err)
-			}
-			// And the timeout item enqueued for it above.
-			if sub.Timeout != "" {
-				e.dequeuePauseJob(ctx, md, fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID))
-			}
-			return nil
-		case parkReady:
-			return e.consumePark(ctx, &park, false)
-		}
-
-		// Still waiting. A subscription closed in the same batch may have run its
-		// close before this marker existed, and then nobody would end this park.
-		// A closed subscription has its closed step: end the park now.
-		if slices.Contains(stack, subscriptionClosedID(sub.Key)) {
-			return e.consumePark(ctx, &park, true)
-		}
-
-		// Reads parked at once are bounded: a delivery reads every marker. The
-		// count includes this one, written above.
-		markers, err := e.parkedMarkers(ctx, md.ID, sub.Key)
-		if err != nil {
-			return err
-		}
-		waiting := 0
-		for _, marker := range markers {
-			if marker.Outgoing == "" || !slices.Contains(stack, marker.Outgoing) {
-				waiting++
-			}
-		}
-		if waiting > consts.MaxSubscriptionParks {
-			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
-				return fmt.Errorf("error deleting over-limit subscription park: %w", err)
-			}
-			if sub.Timeout != "" {
-				e.dequeuePauseJob(ctx, md, fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID))
-			}
-			return subscriptionLimitError("A subscription can have at most %d reads waiting at once.", consts.MaxSubscriptionParks)
-		}
-
-		return nil
-
 	case state.SubscribePoll:
 		ids, err := messages()
 		if err != nil {
@@ -438,27 +259,6 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
-// parkSeq is the message a wait pause waits for, or 0 when the pause does not say.
-// The metadata is a JSON number once it has been stored.
-func parkSeq(pause *state.Pause) int {
-	switch seq := pause.Metadata["seq"].(type) {
-	case int:
-		return seq
-	case int64:
-		return int(seq)
-	case float64:
-		return int(seq)
-	}
-
-	return 0
-}
-
-// isSubscriptionParkPause reports whether a pause is the one a run blocks on while it
-// waits for a subscription message. It has no timeout job.
-func isSubscriptionParkPause(pause *state.Pause) bool {
-	return pause.Event != nil && strings.HasPrefix(*pause.Event, pauses.SubscriptionParkIndexPrefix)
-}
-
 // dequeueSubscriptionExpiry removes the queue job that would expire a subscription
 // pause, once the pause is closed.
 func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metadata, pauseID uuid.UUID) {
@@ -492,100 +292,6 @@ func (e *executor) dequeuePauseJob(ctx context.Context, md *sv2.Metadata, jobID 
 	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 		logger.StdlibLogger(ctx).Error("error dequeueing a subscription job", "error", err)
 	}
-}
-
-// wakeSubscriber wakes the run if it is parked on this subscription. A delivery
-// to a busy run finds no marker and costs nothing more. When there is a marker it
-// reads the stack once: a marker whose park is already answered is skipped, and
-// so is one that awaits a message that is not saved yet (another delivery of the
-// same burst saved its message first and the run has since parked for the
-// next).
-func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) error {
-	parked, err := e.parkedMarkers(ctx, id, key)
-	if err != nil {
-		return err
-	}
-	if len(parked) == 0 {
-		return nil
-	}
-
-	stack, err := e.smv2.LoadStack(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	for _, pause := range markersToWake(parked, stack, key) {
-		if err := e.consumePark(ctx, pause, false); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// markersToWake picks the markers a delivery may consume: those whose awaited
-// message is saved and whose park is not answered yet.
-func markersToWake(parked []*state.Pause, stack []string, key string) []*state.Pause {
-	saved := len(subscriptionMessageIDs(stack, key))
-
-	var ready []*state.Pause
-	for _, pause := range parked {
-		if pause.Outgoing != "" && slices.Contains(stack, pause.Outgoing) {
-			continue
-		}
-		if saved < parkSeq(pause) {
-			continue
-		}
-		ready = append(ready, pause)
-	}
-
-	return ready
-}
-
-// parkedMarkers returns the markers of the run's parks on a subscription.
-// Normally one: the current park. A marker already consumed and not yet deleted
-// may show too; consuming it again is idempotent.
-func (e *executor) parkedMarkers(ctx context.Context, id sv2.ID, key string) ([]*state.Pause, error) {
-	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionParkIndexName(id.RunID.String(), key)}
-
-	iter, err := e.pm.PausesSince(ctx, parkIdx, time.Time{})
-	if err != nil {
-		return nil, err
-	}
-
-	var parked []*state.Pause
-	for iter.Next(ctx) {
-		if pause := iter.Val(ctx); pause != nil {
-			parked = append(parked, pause)
-		}
-	}
-	if err := iter.Error(); err != nil && !errors.Is(err, context.Canceled) {
-		return nil, err
-	}
-
-	return parked, nil
-}
-
-// consumePark consumes a marker so the run sees the message it waits for. Its
-// output names that message's position, or says the subscription was closed
-// (closed), so the reader can tell the end of a subscription from a message
-// that is missing. Another handler may have consumed the
-// marker first: the store then answers that it did not consume (DidConsume
-// false, or an idempotent success) and nothing more is queued.
-func (e *executor) consumePark(ctx context.Context, pause *state.Pause, closed bool) error {
-	answer := map[string]any{"seq": parkSeq(pause)}
-	if closed {
-		answer = map[string]any{"closed": true}
-	}
-
-	err := e.Resume(ctx, *pause, execution.ResumeRequest{
-		With:     map[string]any{"data": answer},
-		StepName: pause.StepName,
-	})
-	if errors.Is(err, state.ErrPauseLeased) || errors.Is(err, state.ErrPauseNotFound) {
-		return nil
-	}
-	return err
 }
 
 // deliverSubscription saves an event that matched a subscription pause as a
@@ -645,7 +351,12 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 				return err
 			}
 			idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
-			return e.removeSubscriptionPause(ctx, &md, idx, pause)
+			if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
+				return err
+			}
+
+			// A read waiting for a message that will not come sees the close.
+			return e.enqueueSubscriptionWake(ctx, &md, pause, key, subscriptionClosedID(key))
 		}
 	}
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
@@ -656,13 +367,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return e.wakeSubscriber(ctx, id, key)
-}
-
-// parkHasTimeout reports whether a park marker has a timeout job in the queue.
-func parkHasTimeout(pause *state.Pause) bool {
-	timeout, _ := pause.Metadata["timeout"].(bool)
-	return timeout
+	return e.enqueueSubscriptionWake(ctx, &md, pause, key, messageID)
 }
 
 // subscriptionTriggerExclusion returns the event ID a subscription pause must
@@ -696,27 +401,18 @@ func subscriptionLimitError(format string, args ...any) error {
 
 // validateSubscribe checks the bounds of a subscription op before it touches any
 // state: the sizes and numbers an SDK (or a caller of the API) could set freely.
-func validateSubscribe(sub *state.SubscribeOpts, event string) error {
+func validateSubscribe(sub *state.SubscribeOpts) error {
 	if sub.Key == "" {
 		return subscriptionLimitError("The subscription ID is empty.")
 	}
 	if len(sub.Key) > consts.MaxSubscriptionKeyLength {
 		return subscriptionLimitError("The subscription ID is longer than %d characters.", consts.MaxSubscriptionKeyLength)
 	}
-	if len(sub.Reader) > consts.MaxSubscriptionKeyLength {
-		return subscriptionLimitError("The subscription reader name is longer than %d characters.", consts.MaxSubscriptionKeyLength)
-	}
 	if sub.Stream < 0 || sub.Stream >= consts.MaxSubscriptionPausesPerRun {
 		return subscriptionLimitError("A subscription can listen to at most %d events.", consts.MaxSubscriptionPausesPerRun)
 	}
-	if sub.Attempt < 0 {
-		return subscriptionLimitError("The subscription attempt is negative.")
-	}
-	if (sub.Mode == state.SubscribePark || sub.Mode == state.SubscribePoll) && sub.Seq < 1 {
+	if sub.Mode == state.SubscribePoll && sub.Seq < 1 {
 		return subscriptionLimitError("The message number of a subscription read starts at 1.")
-	}
-	if sub.Mode == state.SubscribeOpen && strings.HasPrefix(event, pauses.SubscriptionParkIndexPrefix) {
-		return subscriptionLimitError("A subscription cannot listen to the event %q: the name is reserved.", event)
 	}
 
 	return nil
@@ -780,29 +476,128 @@ func (e *executor) subscriptionLimits(id sv2.ID) (stepLimit int, stateLimit int)
 	return stepLimit, stateLimit
 }
 
-// endSubscription marks a subscription closed and ends every read parked on it.
-// The data of the closed step is "true", or says which limit closed it.
+// endSubscription marks a subscription closed. The data of the closed step is
+// "true", or says which limit closed it. A read waiting on the subscription sees
+// the step on its next discovery.
 func (e *executor) endSubscription(ctx context.Context, id sv2.ID, key string, data []byte) error {
-	// Mark the subscription closed, so a park written after this still ends.
 	if _, err := e.smv2.SaveStep(ctx, id, subscriptionClosedID(key), data); err != nil &&
 		!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 		return err
 	}
 
-	// A read that is still parked (one the function stopped waiting for, such as
-	// a lost race) must not keep the run waiting: end every park now, so the
-	// steps they stand for are answered and discovery can follow the close.
-	parked, err := e.parkedMarkers(ctx, id, key)
+	return nil
+}
+
+// enqueueSubscriptionWake gives the run the chance to see what a subscription
+// saved. It is the discovery edge the executor enqueues after any step, so it
+// runs under the run's current mode, which lives in its metadata (ForceStepPlan),
+// not on the item: a sequential run may execute a lone step inline, a run that
+// is already parallel plans every step first. The SDK keeps plan-first mode on
+// while a subscription is open, so a wake that overlaps a running step plans it
+// (a deduped step item) instead of running it twice. The executor neither knows
+// nor cares whether the function is blocked on a read; a function with nothing
+// to do with the message runs to the same wait again.
+//
+// The job ID is the run and the subscription, so deliveries while a wake is
+// queued or running join it; the wake runs again by itself if messages arrived
+// while it ran (see subscriptionWakeAgain). Its idempotency period is zero, so no
+// key outlives the item.
+func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata, pause *state.Pause, key string, outgoing string) error {
+	jobID := fmt.Sprintf("%s-subscription-wake-%s", md.ID.RunID, subscriptionKeyHash(key))
+	item := queue.Item{
+		JobID:                 &jobID,
+		GroupID:               uuid.New().String(),
+		WorkspaceID:           md.ID.Tenant.EnvID,
+		Kind:                  queue.KindEdge,
+		Identifier:            sv2.V1FromMetadata(*md),
+		PriorityFactor:        md.Config.PriorityFactor,
+		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+		Semaphores:            stepSemaphores(*md),
+		MaxAttempts:           pause.MaxAttempts,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{Outgoing: outgoing, Incoming: pause.Incoming},
+		},
+		Metadata: map[string]any{subscriptionWakeMetadataKey: subscriptionKeyHash(key)},
+	}
+
+	span, err := e.tracerProvider.CreateDroppableSpan(
+		ctx,
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{item.Metadata},
+			FollowsFrom: tracing.SpanRefFromPause(pause),
+			Debug:       &tracing.SpanDebugData{Location: "executor.enqueueSubscriptionWake"},
+			Metadata:    md,
+			Parent:      tracing.RunSpanRefFromMetadata(md),
+			QueueItem:   &item,
+		},
+	)
+	if err != nil {
+		e.log.Debug("error creating span for a subscription wake", "error", err)
+	}
+
+	noKey := time.Duration(0)
+	err = e.queue.Enqueue(ctx, item, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
+	if errors.Is(err, queue.ErrQueueItemExists) {
+		span.Drop()
+		return nil
+	}
+	if err != nil {
+		span.Drop()
+		return retryableEnqueueError(err)
+	}
+	_ = span.Send()
+
+	return nil
+}
+
+// subscriptionWake is a wake discovery in flight: the subscription it is for
+// and how many of its messages were saved when the wake started, before its
+// request read the run's state.
+type subscriptionWake struct {
+	hash string
+	seen int
+}
+
+// newSubscriptionWake returns the wake an item is, or the zero value for any
+// other item.
+func newSubscriptionWake(item queue.Item, stack []string) subscriptionWake {
+	hash, _ := item.Metadata[subscriptionWakeMetadataKey].(string)
+	if hash == "" {
+		return subscriptionWake{}
+	}
+
+	return subscriptionWake{hash: hash, seen: len(subscriptionMessageIDsOfHash(stack, hash))}
+}
+
+// errSubscriptionWakeAgain ends a wake that finished with messages it did not
+// see. The queue runs the same item again at once, so the wake keeps its job ID
+// throughout and there is never a second one to collide with.
+var errSubscriptionWakeAgain = errors.New("subscription messages arrived while the wake ran")
+
+// subscriptionWakeFollowUp runs when a wake discovery has been handled. If the
+// subscription now holds more messages than the wake saw at its start, it
+// returns the error that runs the same item again. Only the final completion of
+// a wake checks: a request that failed is retried by the queue and checks on
+// its own completion, and a run that ended or failed has nothing to see.
+func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w subscriptionWake, resp *state.DriverResponse, err error) error {
+	if w.hash == "" || err != nil || resp == nil || resp.Err != nil {
+		return nil
+	}
+
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if errors.Is(err, state.ErrRunNotFound) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	for _, marker := range parked {
-		if err := e.consumePark(ctx, marker, true); err != nil {
-			return err
-		}
+	if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) <= w.seen {
+		return nil
 	}
 
-	return nil
+	now := e.now()
+	return queue.RetryAtError(queue.AlwaysRetryError(errSubscriptionWakeAgain), &now)
 }
 
 // removeSubscriptionPause deletes the pause of a subscription stream so its

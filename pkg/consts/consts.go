@@ -98,14 +98,10 @@ const (
 	MaxSubscriptionKeyLength = 256
 
 	// MaxSubscriptionPausesPerRun is the most pauses of any kind (subscription
-	// streams, parked reads, waitForEvents) a run may hold when it opens a
+	// streams, waitForEvents) a run may hold when it opens a
 	// subscription stream. A subscription pause outlives the event that matches
 	// it, so this keeps its matching cost near that of waitForEvent.
 	MaxSubscriptionPausesPerRun = 50
-
-	// MaxSubscriptionParks is the most reads of one subscription that can be
-	// parked at once. A delivery reads every parked marker of the subscription.
-	MaxSubscriptionParks = 20
 
 	// MaxSubscriptionMessages is the most messages one subscription saves. At
 	// this count the subscription is closed.

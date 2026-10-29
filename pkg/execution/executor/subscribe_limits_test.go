@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -28,29 +27,23 @@ func TestValidateSubscribe(t *testing.T) {
 	}
 	for name, tc := range map[string]struct {
 		change func(*state.SubscribeOpts)
-		event  string
 		bad    bool
 	}{
-		"valid":                 {change: func(*state.SubscribeOpts) {}},
-		"empty key":             {change: func(s *state.SubscribeOpts) { s.Key = "" }, bad: true},
-		"long key":              {change: func(s *state.SubscribeOpts) { s.Key = strings.Repeat("k", consts.MaxSubscriptionKeyLength+1) }, bad: true},
-		"key at the limit":      {change: func(s *state.SubscribeOpts) { s.Key = strings.Repeat("k", consts.MaxSubscriptionKeyLength) }},
-		"long reader":           {change: func(s *state.SubscribeOpts) { s.Reader = strings.Repeat("r", consts.MaxSubscriptionKeyLength+1) }, bad: true},
-		"negative stream":       {change: func(s *state.SubscribeOpts) { s.Stream = -1 }, bad: true},
-		"too many streams":      {change: func(s *state.SubscribeOpts) { s.Stream = consts.MaxSubscriptionPausesPerRun }, bad: true},
-		"last stream":           {change: func(s *state.SubscribeOpts) { s.Stream = consts.MaxSubscriptionPausesPerRun - 1 }},
-		"negative attempt":      {change: func(s *state.SubscribeOpts) { s.Attempt = -1 }, bad: true},
-		"park seq zero":         {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePark }, bad: true},
-		"poll seq negative":     {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePoll; s.Seq = -3 }, bad: true},
-		"park seq one":          {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePark; s.Seq = 1 }},
-		"reserved event":        {change: func(*state.SubscribeOpts) {}, event: pauses.SubscriptionParkIndexPrefix + ":run:hash", bad: true},
-		"ordinary event":        {change: func(*state.SubscribeOpts) {}, event: "agent/message"},
-		"reserved name on park": {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePark; s.Seq = 1 }, event: pauses.SubscriptionParkIndexPrefix},
+		"valid":             {change: func(*state.SubscribeOpts) {}},
+		"empty key":         {change: func(s *state.SubscribeOpts) { s.Key = "" }, bad: true},
+		"long key":          {change: func(s *state.SubscribeOpts) { s.Key = strings.Repeat("k", consts.MaxSubscriptionKeyLength+1) }, bad: true},
+		"key at the limit":  {change: func(s *state.SubscribeOpts) { s.Key = strings.Repeat("k", consts.MaxSubscriptionKeyLength) }},
+		"negative stream":   {change: func(s *state.SubscribeOpts) { s.Stream = -1 }, bad: true},
+		"too many streams":  {change: func(s *state.SubscribeOpts) { s.Stream = consts.MaxSubscriptionPausesPerRun }, bad: true},
+		"last stream":       {change: func(s *state.SubscribeOpts) { s.Stream = consts.MaxSubscriptionPausesPerRun - 1 }},
+		"poll seq negative": {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePoll; s.Seq = -3 }, bad: true},
+		"poll seq zero":     {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePoll }, bad: true},
+		"poll seq one":      {change: func(s *state.SubscribeOpts) { s.Mode = state.SubscribePoll; s.Seq = 1 }},
 	} {
 		t.Run(name, func(t *testing.T) {
 			sub := ok()
 			tc.change(sub)
-			err := validateSubscribe(sub, tc.event)
+			err := validateSubscribe(sub)
 			if !tc.bad {
 				require.NoError(t, err)
 				return
@@ -133,7 +126,6 @@ type limitPauseManager struct {
 	runPauses int
 	wrote     []*state.Pause
 	deleted   []uuid.UUID
-	markers   []*state.Pause
 }
 
 func (m *limitPauseManager) Write(_ context.Context, _ pauses.Index, p ...*state.Pause) (int, error) {
@@ -147,23 +139,6 @@ func (m *limitPauseManager) Delete(_ context.Context, _ pauses.Index, p state.Pa
 	m.deleted = append(m.deleted, p.ID)
 	return nil
 }
-func (m *limitPauseManager) PausesSince(context.Context, pauses.Index, time.Time) (state.PauseIterator, error) {
-	return &markerIter{markers: m.markers}, nil
-}
-
-type markerIter struct {
-	markers []*state.Pause
-	i       int
-}
-
-func (m *markerIter) Count() int                { return len(m.markers) }
-func (m *markerIter) Index() int64              { return int64(m.i) }
-func (m *markerIter) Error() error              { return nil }
-func (m *markerIter) Next(context.Context) bool { m.i++; return m.i <= len(m.markers) }
-func (m *markerIter) Val(context.Context) *state.Pause {
-	return m.markers[m.i-1]
-}
-
 func limitMetadata() sv2.Metadata {
 	return sv2.Metadata{
 		ID:     sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New(), Tenant: sv2.Tenant{EnvID: uuid.New(), AccountID: uuid.New()}},
@@ -178,7 +153,7 @@ func TestDeliverSubscriptionLimitClosesTheSubscription(t *testing.T) {
 	md.Stack = messageStack("inbox", consts.MaxSubscriptionMessages)
 	rs := &limitRunService{md: md, stack: md.Stack}
 	pm := &limitPauseManager{}
-	e := &executor{log: logger.VoidLogger(), smv2: rs, pm: pm}
+	e := newLimitExecutor(rs, pm)
 
 	name := "agent/message"
 	pause := &state.Pause{
@@ -194,10 +169,15 @@ func TestDeliverSubscriptionLimitClosesTheSubscription(t *testing.T) {
 	require.NotContains(t, rs.saved, subscriptionMessageID("inbox", evt.GetInternalID().String()))
 	require.Contains(t, string(rs.saved[subscriptionClosedID("inbox")]), "limit")
 
+	// A read waiting for a message that will not come is given the chance to see the close.
+	wakes := e.queue.(*stubQueue).enqueued
+	require.Len(t, wakes, 1)
+	require.Equal(t, subscriptionClosedID("inbox"), wakes[0].Payload.(queue.PayloadEdge).Edge.Outgoing)
+
 	// A redelivery of a message that was saved before the limit is not new.
 	rs2 := &limitRunService{md: md, stack: md.Stack}
 	pm2 := &limitPauseManager{}
-	e2 := &executor{log: logger.VoidLogger(), smv2: rs2, pm: pm2}
+	e2 := newLimitExecutor(rs2, pm2)
 	md2 := md
 	md2.Stack = append(append([]string{}, md.Stack...), subscriptionMessageID("inbox", evt.GetInternalID().String()))
 	rs2.md = md2
@@ -244,41 +224,6 @@ func TestOpenSubscriptionPauseLimit(t *testing.T) {
 	require.Equal(t, []uuid.UUID{pm.wrote[0].ID}, pm.deleted)
 }
 
-// A subscription with too many reads waiting at once fails the run on the park
-// that is over, and removes that marker.
-func TestParkLimit(t *testing.T) {
-	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
-	md := limitMetadata()
-	rs := &limitRunService{md: md}
-
-	var markers []*state.Pause
-	for i := 0; i < consts.MaxSubscriptionParks; i++ {
-		markers = append(markers, &state.Pause{ID: uuid.New(), Outgoing: fmt.Sprintf("park-%d", i)})
-	}
-	pm := &limitPauseManager{markers: markers}
-	e := newLimitExecutor(rs, pm)
-	stepID := subscriptionStepID("inbox", "", 1, 0)
-	gen, opts := subscribeGen(state.SubscribeOpts{Key: "inbox", Mode: state.SubscribePark, Seq: 1}, stepID)
-
-	// At the limit: allowed.
-	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil))
-
-	// One more: refused.
-	pm = &limitPauseManager{markers: append(markers, &state.Pause{ID: uuid.New(), Outgoing: "park-extra"})}
-	e = newLimitExecutor(rs, pm)
-	err := e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil)
-	require.ErrorIs(t, err, state.ErrSubscriptionLimit)
-	require.Len(t, pm.deleted, 1)
-
-	// Markers whose park is answered are not waiting.
-	answered := append([]*state.Pause{}, markers...)
-	answered = append(answered, &state.Pause{ID: uuid.New(), Outgoing: "done"})
-	rs.stack = []string{"done"}
-	pm = &limitPauseManager{markers: answered}
-	e = newLimitExecutor(rs, pm)
-	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil))
-}
-
 // A run at its step limit takes no message, whatever messages it holds.
 func TestSubscriptionMessageLimitStepCount(t *testing.T) {
 	md := &sv2.Metadata{Metrics: sv2.RunMetrics{StepCount: 10}}
@@ -293,7 +238,7 @@ func TestDeliverToClosedSubscriptionRemovesThePause(t *testing.T) {
 	md.Stack = []string{subscriptionClosedID("inbox")}
 	rs := &limitRunService{md: md, stack: md.Stack}
 	pm := &limitPauseManager{}
-	e := &executor{log: logger.VoidLogger(), smv2: rs, pm: pm}
+	e := newLimitExecutor(rs, pm)
 
 	name := "agent/message"
 	pause := &state.Pause{

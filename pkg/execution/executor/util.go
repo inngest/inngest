@@ -74,6 +74,18 @@ type OpcodeGroups struct {
 	OtherGroup OpcodeGroup
 }
 
+// countsAsStep reports whether an opcode is a step the run waits for. Lazy ops
+// piggyback on a host op. An OpcodeNone with an ID is a function thread that is
+// waiting on something outside the run (a step.subscribe read with nothing to
+// read): it is never answered, so it must not be counted or held as pending.
+func countsAsStep(op *state.GeneratorOpcode) bool {
+	if enums.OpcodeIsLazy(op.Op) {
+		return false
+	}
+
+	return op.Op != enums.OpcodeNone || op.ID == ""
+}
+
 // nonLazyOpCount returns the count used to gate parallel-step behavior — see
 // enums.OpcodeIsLazy. Nil entries are skipped to mirror handleGeneratorGroup.
 func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
@@ -82,7 +94,7 @@ func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
 		if op == nil {
 			continue
 		}
-		if !enums.OpcodeIsLazy(op.Op) {
+		if countsAsStep(op) {
 			n++
 		}
 	}
@@ -131,7 +143,7 @@ func (g OpcodeGroups) NonLazyIDs() []string {
 	ids := []string{}
 	for _, group := range g.All() {
 		for _, op := range group.Opcodes {
-			if enums.OpcodeIsLazy(op.Op) {
+			if !countsAsStep(op) {
 				continue
 			}
 			ids = append(ids, op.ID)

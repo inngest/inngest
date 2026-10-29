@@ -15,9 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A run that ends or is cancelled while it is blocked waiting for a
-// step.subscribe message leaves nothing behind: finalizing the run deletes
-// every pause it has, the pause of its subscription and the pause it blocked on.
+// A run that ends or is cancelled with an open step.subscribe subscription
+// leaves nothing behind: finalizing the run deletes the pause of its subscription.
 func TestFinalizingARunRemovesItsSubscriptionPauses(t *testing.T) {
 	for name, remove := range map[string]func(context.Context, Manager, *redis_state.PauseStore, ulid.ULID, uuid.UUID) error{
 		"through the pause manager": func(ctx context.Context, m Manager, _ *redis_state.PauseStore, run ulid.ULID, ws uuid.UUID) error {
@@ -45,7 +44,6 @@ func TestFinalizingARunRemovesItsSubscriptionPauses(t *testing.T) {
 			identifier := state.PauseIdentifier{RunID: run, FunctionID: uuid.New(), AccountID: uuid.New()}
 
 			messageEvent := "agent/message"
-			waitEvent := SubscriptionParkIndexPrefix
 			subscription := state.Pause{
 				ID:          uuid.New(),
 				WorkspaceID: ws,
@@ -55,49 +53,24 @@ func TestFinalizingARunRemovesItsSubscriptionPauses(t *testing.T) {
 				Event:       &messageEvent,
 				Subscribe:   &state.PauseSubscribe{Key: "inbox"},
 			}
-			wait := state.Pause{
-				ID:          uuid.New(),
-				WorkspaceID: ws,
-				Expires:     state.Time(time.Now().Add(time.Hour)),
-				CreatedAt:   time.Now(),
-				Identifier:  identifier,
-				Event:       &waitEvent,
-				DataKey:     "wait-step",
-				Metadata:    map[string]any{"key": "inbox", "seq": 2},
-			}
 			subscriptionIndex := Index{WorkspaceID: ws, EventName: messageEvent}
-			waitIndex := Index{WorkspaceID: ws, EventName: waitEvent}
 
 			_, err = m.Write(ctx, subscriptionIndex, &subscription)
-			require.NoError(t, err)
-			_, err = m.Write(ctx, waitIndex, &wait)
 			require.NoError(t, err)
 
 			ids, err := m.PauseIDsForRun(ctx, run)
 			require.NoError(t, err)
-			require.ElementsMatch(t, []uuid.UUID{subscription.ID, wait.ID}, ids)
-
-			// Both are found while the run lives.
-			found, err := m.PauseByID(ctx, waitIndex, wait.ID)
-			require.NoError(t, err)
-			require.Equal(t, "wait-step", found.DataKey)
+			require.ElementsMatch(t, []uuid.UUID{subscription.ID}, ids)
 
 			require.NoError(t, remove(ctx, m, store, run, ws))
 
-			for _, gone := range []struct {
-				index Index
-				id    uuid.UUID
-			}{
-				{subscriptionIndex, subscription.ID},
-				{waitIndex, wait.ID},
-			} {
-				_, err := m.PauseByID(ctx, gone.index, gone.id)
-				require.ErrorIs(t, err, state.ErrPauseNotFound)
-			}
+			_, err = m.PauseByID(ctx, subscriptionIndex, subscription.ID)
+			require.ErrorIs(t, err, state.ErrPauseNotFound)
 
 			ids, err = m.PauseIDsForRun(ctx, run)
 			require.NoError(t, err)
 			require.Empty(t, ids)
+
 		})
 	}
 }
