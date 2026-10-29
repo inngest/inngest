@@ -169,6 +169,10 @@ func TestInferTypeMatchesDuckDB(t *testing.T) {
 		"SELECT ended_at - queued_at FROM runs":                        ColumnTypeDatetime,
 		"SELECT status COLLATE nocase FROM runs":                       ColumnTypeString,
 		"SELECT run_id::INT8 FROM runs":                                ColumnTypeNumber,
+		"SELECT CAST(NULL AS STRUCT (a INT)) FROM runs":                ColumnTypeJSON,
+		"SELECT CAST(NULL AS MAP (VARCHAR, INT)) FROM runs":            ColumnTypeJSON,
+		"SELECT CAST(1 AS DECIMAL (10, 2)) FROM runs":                  ColumnTypeNumber,
+		"SELECT CAST(NULL AS INTEGER []) FROM runs":                    ColumnTypeJSON,
 	}
 	for q, want := range cases {
 		t.Run(q, func(t *testing.T) {
