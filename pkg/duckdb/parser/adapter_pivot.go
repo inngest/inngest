@@ -70,7 +70,7 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 // keeps entries as source text, which Walk can't see into, so anything that
 // could hide a subquery or function call is rejected rather than passed
 // through unchecked. Type names are already checked for hidden expressions
-// when they're adapted (typeText), so a cast or typed literal only
+// when they're adapted (adaptType), so a cast or typed literal only
 // needs its operand checked.
 func isPivotValue(e Expr) bool {
 	switch v := e.(type) {
