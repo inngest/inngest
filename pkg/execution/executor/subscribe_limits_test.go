@@ -278,3 +278,32 @@ func TestParkLimit(t *testing.T) {
 	e = newLimitExecutor(rs, pm)
 	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil))
 }
+
+// A run at its step limit takes no message, whatever messages it holds.
+func TestSubscriptionMessageLimitStepCount(t *testing.T) {
+	md := &sv2.Metadata{Metrics: sv2.RunMetrics{StepCount: 10}}
+	require.NotEmpty(t, subscriptionMessageLimit(md, "inbox", 1, 10, consts.DefaultMaxStateSizeLimit))
+	md.Metrics.StepCount = 9
+	require.Empty(t, subscriptionMessageLimit(md, "inbox", 1, 10, consts.DefaultMaxStateSizeLimit))
+}
+
+// Another stream of a closed subscription saves nothing and removes its pause.
+func TestDeliverToClosedSubscriptionRemovesThePause(t *testing.T) {
+	md := limitMetadata()
+	md.Stack = []string{subscriptionClosedID("inbox")}
+	rs := &limitRunService{md: md, stack: md.Stack}
+	pm := &limitPauseManager{}
+	e := &executor{log: logger.VoidLogger(), smv2: rs, pm: pm}
+
+	name := "agent/message"
+	pause := &state.Pause{
+		ID: uuid.New(), WorkspaceID: md.ID.Tenant.EnvID, Event: &name,
+		Identifier: sv2.NewPauseIdentifier(md.ID),
+		Subscribe:  &state.PauseSubscribe{Key: "inbox", Stream: 1},
+	}
+	evt := event.InternalEvent{ID: ulid.MustNew(ulid.Now(), nil), Event: event.Event{Name: name}}
+
+	require.NoError(t, e.deliverSubscription(context.Background(), evt, pause, logger.VoidLogger()))
+	require.Equal(t, []uuid.UUID{pause.ID}, pm.deleted)
+	require.Empty(t, rs.saved)
+}

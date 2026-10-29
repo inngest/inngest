@@ -623,6 +623,13 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	// the message it already is.
 	messageID := subscriptionMessageID(key, eventID)
 
+	// A closed subscription saves nothing more: another stream of it may still
+	// have its pause, so remove that one now.
+	if slices.Contains(md.Stack, subscriptionClosedID(key)) {
+		idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
+		return e.removeSubscriptionPause(ctx, &md, idx, pause)
+	}
+
 	// A message that would break a limit is dropped and the subscription is
 	// closed: its pause stops matching, and the reader sees the end after the
 	// messages already saved. A redelivery of a saved message is not new.
@@ -631,12 +638,14 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		if limit := subscriptionMessageLimit(&md, key, len(data), stepLimit, stateLimit); limit != "" {
 			l.Warn("subscription limit reached, closing the subscription", "limit", limit, "key", key)
 
-			idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
-			if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
+			// Close first: it is idempotent, so a failure here is retried with the
+			// pause still there to find it.
+			reason, _ := json.Marshal(map[string]any{"limit": limit})
+			if err := e.endSubscription(ctx, id, key, reason); err != nil {
 				return err
 			}
-			reason, _ := json.Marshal(map[string]any{"limit": limit})
-			return e.endSubscription(ctx, id, key, reason)
+			idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
+			return e.removeSubscriptionPause(ctx, &md, idx, pause)
 		}
 	}
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
@@ -743,6 +752,8 @@ func subscriptionMessageLimit(md *sv2.Metadata, key string, size int, stepLimit 
 		return fmt.Sprintf("the run's subscriptions saved %d messages", consts.MaxSubscriptionMessagesPerRun)
 	case inRun >= stepLimit/2:
 		return fmt.Sprintf("messages took half of the run's step limit of %d", stepLimit)
+	case md.Metrics.StepCount >= stepLimit:
+		return fmt.Sprintf("the run reached its step limit of %d", stepLimit)
 	case md.Metrics.StateSize+size > stateLimit/4*3:
 		return fmt.Sprintf("the run's state reached three quarters of its limit of %d bytes", stateLimit)
 	}
