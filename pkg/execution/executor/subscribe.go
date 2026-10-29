@@ -301,7 +301,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			}
 			return nil
 		case parkReady:
-			return e.consumePark(ctx, &park)
+			return e.consumePark(ctx, &park, false)
 		}
 
 		// Still waiting. A subscription closed in the same batch may have run its
@@ -312,7 +312,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return err
 		}
 		if open == nil {
-			return e.consumePark(ctx, &park)
+			return e.consumePark(ctx, &park, true)
 		}
 
 		return nil
@@ -361,7 +361,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return err
 		}
 		for _, marker := range parked {
-			if err := e.consumePark(ctx, marker); err != nil {
+			if err := e.consumePark(ctx, marker, true); err != nil {
 				return err
 			}
 		}
@@ -448,7 +448,7 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) er
 	}
 
 	for _, pause := range markersToWake(parked, stack, key) {
-		if err := e.consumePark(ctx, pause); err != nil {
+		if err := e.consumePark(ctx, pause, false); err != nil {
 			return err
 		}
 	}
@@ -500,14 +500,19 @@ func (e *executor) parkedMarkers(ctx context.Context, id sv2.ID, key string) ([]
 }
 
 // consumePark consumes a marker so the run sees the message it waits for. Its
-// output names that message's position. Another handler may have consumed the
+// output names that message's position, or says the subscription was closed
+// (closed), so the reader can tell the end of a subscription from a message
+// that is missing. Another handler may have consumed the
 // marker first: the store then answers that it did not consume (DidConsume
 // false, or an idempotent success) and nothing more is queued.
-func (e *executor) consumePark(ctx context.Context, pause *state.Pause) error {
-	awaited := parkSeq(pause)
+func (e *executor) consumePark(ctx context.Context, pause *state.Pause, closed bool) error {
+	answer := map[string]any{"seq": parkSeq(pause)}
+	if closed {
+		answer = map[string]any{"closed": true}
+	}
 
 	err := e.Resume(ctx, *pause, execution.ResumeRequest{
-		With:     map[string]any{"data": map[string]any{"seq": awaited}},
+		With:     map[string]any{"data": answer},
 		StepName: pause.StepName,
 	})
 	if errors.Is(err, state.ErrPauseLeased) || errors.Is(err, state.ErrPauseNotFound) {
