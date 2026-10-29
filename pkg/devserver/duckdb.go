@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
@@ -16,22 +17,49 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 )
 
-// dualWriteQuackConns is the *sql.DB connection cap setupDualWrite opens
-// with (driver.Options.QuackConns), shared by dual-write's own writes and
-// every caller reading through the same handle (Insights, and
-// query.Wrap when --duckdb-reads is on). Above 1, database/sql can
-// run that many statements genuinely concurrently instead of serializing
-// every one of them (write or read) behind a single mutex — see
-// driver.Options.QuackConns. Sized for "a handful of simultaneously open
-// Insights tabs plus dual-write's own batch flushes," not production load.
+// dualWriteQuackConns is the default *sql.DB connection cap setupDualWrite
+// opens dual-write's own handle with (driver.Options.QuackConns),
+// overridable w/ INNGEST_DUCKDB_WRITE_CONNS. Above 1, database/sql can run
+// that many statements genuinely concurrently instead of serializing every
+// one of them behind a single mutex -- see driver.Options.QuackConns.
 const dualWriteQuackConns = 16
+
+// duckDBReadConns is the default cap on the separate read handle
+// setupDualWrite returns for Insights, Sessions and query.Wrap
+// (--duckdb-reads), overridable w/ INNGEST_DUCKDB_READ_CONNS. It's its own
+// pool so slow user queries can wait on each other but never take a
+// connection dual-write's batch flushes need. Sized for "a handful of
+// simultaneously open Insights tabs," not production load.
+const duckDBReadConns = 8
+
+const (
+	duckDBWriteConnsEnv = "INNGEST_DUCKDB_WRITE_CONNS"
+	duckDBReadConnsEnv  = "INNGEST_DUCKDB_READ_CONNS"
+)
+
+// duckDBConnLimit reads a positive connection cap from env, falling back to
+// def (w/ a warning) when it's unset, not an integer, or below 1.
+func duckDBConnLimit(ctx context.Context, env string, def int) int {
+	raw := os.Getenv(env)
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		logger.StdlibLogger(ctx).Warn("ignoring invalid duckdb connection limit", "env", env, "value", raw, "default", def)
+		return def
+	}
+	return n
+}
 
 // setupDualWrite starts the duckdb subprocess, runs migrations, and returns
 // the dual-write listener devserver.go registers with the executor/runner,
-// along with the same *sql.DB handle dual-write writes through — needed so
-// devserver.go can also wrap it as the GQL resolver's DuckDB-backed data
-// source (query.Wrap). Both return values are set together or not at
-// all — on any failure both are nil, in which case the caller must proceed
+// along with the *sql.DB handle dual-write writes through and a separate,
+// smaller read handle on the same subprocess (duckDBReadConns, or
+// INNGEST_DUCKDB_READ_CONNS) for
+// Insights, Sessions and query.Wrap. Closing readDB leaves the subprocess
+// up; closing db (via the listener) tears it down. All three return values
+// are set together or not at all -- on any failure all are nil, in which case the caller must proceed
 // without dual-write. This is additive, best-effort wiring for the POC: a
 // missing binary, failed spawn, or failed migration is logged once and must
 // never block or crash devserver startup. binaryPath is an explicit path to
@@ -72,11 +100,11 @@ const dualWriteQuackConns = 16
 // to that Postgres database instead of a local catalog file — see
 // duckLakeOptionsFor. It is ignored when persist is false, matching
 // devserver.go's own gating (opts.Persist && enableDuckDBPersistence).
-func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stateDir, postgresURI string) (execution.SyncLifecycleListener, *sql.DB) {
+func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stateDir, postgresURI string) (listener execution.SyncLifecycleListener, db, readDB *sql.DB) {
 	l := logger.StdlibLogger(ctx)
 
 	if !enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// An empty binaryPath means "resolve the pinned/downloaded binary" (see
@@ -87,7 +115,7 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	if binaryPath != "" {
 		if _, err := exec.LookPath(binaryPath); err != nil {
 			l.Warn("duckdb binary not found; dual-write disabled", "path", binaryPath, "error", err)
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 
@@ -98,13 +126,13 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	resolvedStateDir, err := util.ResolveStateDir(stateDir)
 	if err != nil {
 		l.Warn("failed to resolve state directory; dual-write disabled", "dir", stateDir, "error", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	duckdbDir := filepath.Join(resolvedStateDir, "duckdb")
 	if err := os.MkdirAll(duckdbDir, 0o755); err != nil {
 		l.Warn("failed to create duckdb state directory; dual-write disabled", "path", duckdbDir, "error", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// A kernel-assigned port rather than quack's default (9494) or a
@@ -123,13 +151,13 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 		duckLake = duckLakeOptionsFor(duckdbDir, postgresURI)
 	}
 
-	db, err := driver.Open(ctx, driver.Options{
+	connector, db, err := driver.OpenConnector(ctx, driver.Options{
 		BinaryPath: binaryPath,
 		StateDir:   resolvedStateDir,
 		DBFile:     dbFile,
 		DuckLake:   duckLake,
 		QuackAddr:  &quackAddr,
-		QuackConns: dualWriteQuackConns,
+		QuackConns: duckDBConnLimit(ctx, duckDBWriteConnsEnv, dualWriteQuackConns),
 		// Insights runs user-written SQL on this same handle, so sandbox the
 		// subprocess (no file/env access beyond the lake's own data) as
 		// defense in depth behind insights' validator. Left off for a
@@ -142,16 +170,16 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if err := duckdb.Migrate(ctx, db, persist); err != nil {
 		l.Warn("failed to migrate duckdb staging schema; dual-write disabled", "error", err)
 		_ = db.Close()
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return tracing.NewListener(db), db
+	return tracing.NewListener(db), db, connector.OpenShared(duckDBConnLimit(ctx, duckDBReadConnsEnv, duckDBReadConns))
 }
 
 // duckLakeOptionsFor builds the DuckLakeOptions for a persisted (--persist)
