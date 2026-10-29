@@ -193,7 +193,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		// The op's own source is the first stream; a many-source open carries
 		// the rest, so an inbox opens in one step.
 		sources := []state.SubscribeStream{{Stream: sub.Stream, Event: opts.Event, If: expr}}
+		seen := map[int]bool{sub.Stream: true}
 		for _, extra := range sub.Streams {
+			if extra.Event == "" || seen[extra.Stream] {
+				return subscriptionLimitError("A subscription open lists a stream twice or without an event.")
+			}
+			seen[extra.Stream] = true
 			if err := validateSubscribe(&state.SubscribeOpts{Key: sub.Key, Mode: sub.Mode, Stream: extra.Stream}, extra.Event); err != nil {
 				return err
 			}
