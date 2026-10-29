@@ -2,9 +2,9 @@ package event
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
@@ -91,17 +91,11 @@ func TestDeferredScheduleMetadataParentOutcome(t *testing.T) {
 		ParentDeferSpan: &meta.SpanReference{},
 	}
 
-	for _, status := range []string{"", "Completed", "Failed", "Cancelled"} {
+	for _, status := range []string{"", "Completed", "Failed", "Cancelled", "SomethingNew"} {
 		m := valid
 		m.ParentStatus = status
 		require.NoError(t, m.Validate(), status)
 	}
-
-	m := valid
-	m.ParentStatus = "Running"
-	err := m.Validate()
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "parent_status")
 
 	t.Run("round trips through event data", func(t *testing.T) {
 		m := valid

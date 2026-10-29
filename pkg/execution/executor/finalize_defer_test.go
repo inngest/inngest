@@ -132,3 +132,12 @@ func TestCapDeferParentError(t *testing.T) {
 	require.LessOrEqual(t, len(got), consts.MaxDeferParentErrorSize)
 	require.True(t, json.Valid(got))
 }
+
+func TestCapDeferParentErrorEscapeExpansion(t *testing.T) {
+	got := capDeferParentError(map[string]string{
+		"name":    "n",
+		"message": strings.Repeat("\x01", consts.MaxDeferParentErrorSize),
+	})
+	require.LessOrEqual(t, len(got), consts.MaxDeferParentErrorSize)
+	require.True(t, json.Valid(got))
+}

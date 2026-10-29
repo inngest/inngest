@@ -52,7 +52,7 @@ Each `inngest/deferred.schedule` event tells the deferred run how its parent end
 - `parent_error`: only present when the parent failed with an error. Same shape as the `error` field of `inngest/function.finished` (`name`, `message`, `stack`, ...). Errors over `consts.MaxDeferParentErrorSize` (16 KB) are reduced to `{name, message, truncated: true}`.
 - `parent_ended_at`: when the parent ended, in Unix milliseconds.
 
-Finalize derives these from `FinalizeOpts.Status()` and the same error selection `function.finished` uses (`finalizeResponseError`). Cancelled runs and runs that complete have no `parent_error`. `Validate` rejects an unknown non-empty `parent_status` but accepts an empty one, so events built before this field existed still validate.
+Finalize derives these from `FinalizeOpts.Status()` and the same error selection `function.finished` uses (`finalizeResponseError`). Cancelled runs and runs that complete have no `parent_error`. `Validate` does not check `parent_status`, so events built before this field existed, or with statuses added later, still validate.
 
 ## Abort path
 

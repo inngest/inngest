@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -39,7 +38,8 @@ type DeferredScheduleMetadata struct {
 	ParentRunID  ulid.ULID `json:"parent_run_id"`
 
 	// ParentStatus is how the parent run ended: the string form of
-	// enums.StepStatus, one of Completed, Failed or Cancelled.
+	// enums.StepStatus, one of Completed, Failed or Cancelled. It is not
+	// validated, so consumers must tolerate values added later.
 	ParentStatus string `json:"parent_status,omitempty"`
 
 	// ParentError is the parent run's error, in the same shape as the `error`
@@ -50,13 +50,6 @@ type DeferredScheduleMetadata struct {
 
 	// ParentEndedAt is when the parent run ended, in Unix milliseconds.
 	ParentEndedAt int64 `json:"parent_ended_at,omitempty"`
-}
-
-// validParentStatuses are the run outcomes a parent can report.
-var validParentStatuses = map[string]struct{}{
-	enums.StepStatusCompleted.String(): {},
-	enums.StepStatusFailed.String():    {},
-	enums.StepStatusCancelled.String(): {},
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {
@@ -78,13 +71,6 @@ func (m *DeferredScheduleMetadata) Validate() error {
 	}
 	if m.ParentDeferSpan == nil {
 		errs = append(errs, errors.New("parent_defer_span is required"))
-	}
-	// Empty is allowed so events published before parent outcomes existed still
-	// validate.
-	if m.ParentStatus != "" {
-		if _, ok := validParentStatuses[m.ParentStatus]; !ok {
-			errs = append(errs, fmt.Errorf("parent_status %q is not Completed, Failed or Cancelled", m.ParentStatus))
-		}
 	}
 	return errors.Join(errs...)
 }

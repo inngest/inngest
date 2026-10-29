@@ -412,15 +412,24 @@ func capDeferParentError(runErr any) json.RawMessage {
 		Message string `json:"message"`
 	}
 	_ = json.Unmarshal(byt, &full)
-	reduced, err := json.Marshal(map[string]any{
-		"name":      truncateUTF8(full.Name, 256),
-		"message":   truncateUTF8(full.Message, consts.MaxDeferParentErrorSize/2),
-		"truncated": true,
-	})
-	if err != nil {
-		return nil
+	// Truncating by raw bytes isn't enough: JSON escaping can expand the text,
+	// so shrink the message until the encoded form fits.
+	name := truncateUTF8(full.Name, 256)
+	msgLen := consts.MaxDeferParentErrorSize / 2
+	for {
+		reduced, err := json.Marshal(map[string]any{
+			"name":      name,
+			"message":   truncateUTF8(full.Message, msgLen),
+			"truncated": true,
+		})
+		if err != nil {
+			return nil
+		}
+		if len(reduced) <= consts.MaxDeferParentErrorSize || msgLen == 0 {
+			return reduced
+		}
+		msgLen /= 2
 	}
-	return reduced
 }
 
 // truncateUTF8 cuts s to at most n bytes without splitting a rune.
