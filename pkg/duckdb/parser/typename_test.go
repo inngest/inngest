@@ -381,3 +381,38 @@ func TestTypeAliasesMatchDuckDB(t *testing.T) {
 	}
 	require.Greater(t, checked, 60)
 }
+
+// TestParseTypeResultsSurviveSessionReuse checks a TypeName from ParseType
+// doesn't share anything with the pooled Session that parsed it: parsing
+// more types afterwards (also concurrently) must leave it unchanged.
+func TestParseTypeResultsSurviveSessionReuse(t *testing.T) {
+	first, err := ParseType("STRUCT(a INTEGER, b VARCHAR[])[]")
+	require.NoError(t, err)
+	want := Dump(first)
+
+	others := []string{"MAP(VARCHAR, DOUBLE)", "DECIMAL(18,3)", "UNION(x INTEGER, y TIMESTAMP WITH TIME ZONE)", "INTEGER[3]"}
+	done := make(chan struct{})
+	for i := range 8 {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			for range 50 {
+				if _, err := ParseType(others[i%len(others)]); err != nil {
+					t.Error(err)
+				}
+			}
+		}()
+	}
+	for range 8 {
+		<-done
+	}
+	require.Equal(t, want, Dump(first))
+}
+
+func BenchmarkParseType(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := ParseType("STRUCT(a INTEGER, b VARCHAR[])[]"); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

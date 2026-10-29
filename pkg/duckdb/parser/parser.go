@@ -164,8 +164,13 @@ func ParseType(s string) (t *TypeName, err error) {
 		return nil, loadErr
 	}
 	trimmed := strings.TrimSpace(s)
+	// insights calls this once per result column, so reuse a Session's
+	// buffers like ParseString does. Safe for the same reason: cst is fully
+	// adapted (no *peg.Node references kept) before Release runs.
+	sess := p.AcquireSession()
+	defer sess.Release()
 	defer recoverParse(&err)
-	cst, parseErr := p.Parse(trimmed, "Type")
+	cst, parseErr := sess.Parse(trimmed, "Type")
 	if parseErr != nil {
 		return nil, convertParseError(trimmed, parseErr)
 	}
