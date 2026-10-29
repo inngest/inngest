@@ -1,0 +1,18 @@
+{
+  "description": "Event data is immutable, so any key filter is pushed.",
+  "mode": "product",
+  "tables": {
+    "events": [
+      {
+        "logical": "data-\u003e\u003e'userId' = 'u_123'",
+        "physical": "events.event_data-\u003e\u003e'userId' = 'u_123'",
+        "pushed": true
+      },
+      {
+        "logical": "meta-\u003e\u003e'source' != 'api'",
+        "physical": "events.event_meta-\u003e\u003e'source' != 'api'",
+        "pushed": true
+      }
+    ]
+  }
+}

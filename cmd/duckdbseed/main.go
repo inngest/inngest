@@ -270,7 +270,7 @@ func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Conne
 		return nil, nil, err
 	}
 
-	if err := duckdb.Migrate(ctx, db, true); err != nil {
+	if err := duckdb.Migrate(ctx, db, duckdb.ModeRawLake); err != nil {
 		_ = db.Close()
 		_ = connector.Close()
 		return nil, nil, err
