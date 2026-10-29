@@ -44,6 +44,16 @@ Three Redis hashes per run, all under a shared `{...:runID}` hash tag so multi-k
 3. Future SDK requests carry the entry in `SDKRequest.Defers` (built from `LoadDefersMeta`, so multi-MB inputs aren't re-sent every step).
 4. Parent run finalizes: `LoadDefers` returns all defers; `finalize.go` emits one `inngest/deferred.schedule` event per `AfterRun` defer. Other statuses are skipped.
 
+## Parent outcome
+
+Each `inngest/deferred.schedule` event tells the deferred run how its parent ended. The `_inngest` metadata (`event.DeferredScheduleMetadata`) carries:
+
+- `parent_status`: `Completed`, `Failed` or `Cancelled`. This is the string form of `enums.StepStatus`, the same value as `_inngest.status` on `inngest/function.finished`.
+- `parent_error`: only present when the parent failed with an error. Same shape as the `error` field of `inngest/function.finished` (`name`, `message`, `stack`, ...). Errors over `consts.MaxDeferParentErrorSize` (16 KB) are reduced to `{name, message, truncated: true}`.
+- `parent_ended_at`: when the parent ended, in Unix milliseconds.
+
+Finalize derives these from `FinalizeOpts.Status()` and the same error selection `function.finished` uses (`finalizeResponseError`). Cancelled runs and runs that complete have no `parent_error`. `Validate` rejects an unknown non-empty `parent_status` but accepts an empty one, so events built before this field existed still validate.
+
 ## Abort path
 
 1. SDK emits `OpcodeDeferAbort`.

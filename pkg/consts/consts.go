@@ -108,6 +108,11 @@ const (
 	// the parent run.
 	MaxDeferInputAggregateSize = 1024 * 1024 * 4 // 4MB
 
+	// MaxDeferParentErrorSize is the maximum size, in bytes, of the parent
+	// run's error embedded in an inngest/deferred.schedule event. Larger errors
+	// are reduced to a truncated name and message.
+	MaxDeferParentErrorSize = 1024 * 16 // 16KB
+
 	// MaxEventMetaSize is the maximum size, in bytes, of a raw event-meta blob
 	// carried opaquely on an op that persists it before validation.
 	//

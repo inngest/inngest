@@ -1,6 +1,8 @@
 package event
 
 import (
+	"encoding/json"
+	"github.com/google/uuid"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -76,5 +78,45 @@ func TestEventDeferredScheduleMetadata(t *testing.T) {
 		got, err := e.DeferredScheduleMetadata()
 		r.Error(err)
 		r.Nil(got)
+	})
+}
+
+func TestDeferredScheduleMetadataParentOutcome(t *testing.T) {
+	valid := DeferredScheduleMetadata{
+		FnSlug:          "child",
+		ParentAppID:     uuid.New(),
+		ParentFnID:      uuid.New(),
+		ParentFnSlug:    "parent",
+		ParentRunID:     ulid.MustParse("01HKQJZ5R7XR4MNTQGZ8Z3KPAB"),
+		ParentDeferSpan: &meta.SpanReference{},
+	}
+
+	for _, status := range []string{"", "Completed", "Failed", "Cancelled"} {
+		m := valid
+		m.ParentStatus = status
+		require.NoError(t, m.Validate(), status)
+	}
+
+	m := valid
+	m.ParentStatus = "Running"
+	err := m.Validate()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parent_status")
+
+	t.Run("round trips through event data", func(t *testing.T) {
+		m := valid
+		m.ParentStatus = "Failed"
+		m.ParentError = json.RawMessage(`{"name":"E","message":"m"}`)
+		m.ParentEndedAt = 1700000000000
+		byt, err := json.Marshal(m)
+		require.NoError(t, err)
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(byt, &raw))
+
+		got, err := Event{Data: map[string]any{consts.InngestEventDataPrefix: raw}}.DeferredScheduleMetadata()
+		require.NoError(t, err)
+		require.Equal(t, "Failed", got.ParentStatus)
+		require.JSONEq(t, `{"name":"E","message":"m"}`, string(got.ParentError))
+		require.Equal(t, int64(1700000000000), got.ParentEndedAt)
 	})
 }

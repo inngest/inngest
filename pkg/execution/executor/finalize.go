@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
@@ -390,6 +391,49 @@ func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) sv2.F
 	return claim
 }
 
+// capDeferParentError marshals the parent run's error for a deferred schedule
+// event. Errors over consts.MaxDeferParentErrorSize are reduced to a truncated
+// name and message so a huge stack or cause can't bloat every deferred event.
+// It returns nil when there is no error.
+func capDeferParentError(runErr any) json.RawMessage {
+	if runErr == nil {
+		return nil
+	}
+	byt, err := json.Marshal(runErr)
+	if err != nil {
+		return nil
+	}
+	if len(byt) <= consts.MaxDeferParentErrorSize {
+		return byt
+	}
+
+	var full struct {
+		Name    string `json:"name"`
+		Message string `json:"message"`
+	}
+	_ = json.Unmarshal(byt, &full)
+	reduced, err := json.Marshal(map[string]any{
+		"name":      truncateUTF8(full.Name, 256),
+		"message":   truncateUTF8(full.Message, consts.MaxDeferParentErrorSize/2),
+		"truncated": true,
+	})
+	if err != nil {
+		return nil
+	}
+	return reduced
+}
+
+// truncateUTF8 cuts s to at most n bytes without splitting a rune.
+func truncateUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
 // buildDeferEvents constructs the inngest/deferred.schedule events for every
 // AfterRun defer in `defers`. It does no publishing — the events are returned
 // for the caller (Finalize) to fold into the single finishHandler call inside
@@ -420,6 +464,11 @@ func (e *executor) buildDeferEvents(
 	l := logger.StdlibLogger(ctx).With(
 		"run_id", util.SanitizeLogField(opts.Metadata.ID.RunID.String()),
 	)
+
+	// Every deferred run is told how its parent ended.
+	parentStatus := opts.Status().String()
+	parentError := capDeferParentError(finalizeResponseError(opts.Response))
+	parentEndedAt := now.UnixMilli()
 
 	for _, d := range defers {
 		l := l.With(
@@ -476,6 +525,9 @@ func (e *executor) buildDeferEvents(
 			ParentFnID:      opts.Metadata.ID.FunctionID,
 			ParentFnSlug:    fnSlug,
 			ParentRunID:     opts.Metadata.ID.RunID,
+			ParentStatus:    parentStatus,
+			ParentError:     parentError,
+			ParentEndedAt:   parentEndedAt,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			l.Error(

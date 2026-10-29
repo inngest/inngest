@@ -2731,16 +2731,28 @@ func (f *functionFinishedData) setResponse(resp execution.FinalizeResponse) {
 
 	case execution.FinalizeResponseDriver:
 		r := resp.DriverResponse
-		if r.Err != nil {
-			f.Error = r.StandardError()
-		}
-		if r.UserError != nil {
-			f.Error = r.UserError
-		}
+		f.Error = finalizeResponseError(resp)
 		if r.Output != nil {
 			f.Result = r.Output
 		}
 	}
+}
+
+// finalizeResponseError returns the run's error as reported in the `error`
+// field of inngest/function.finished, or nil if the run has none.
+func finalizeResponseError(resp execution.FinalizeResponse) any {
+	if resp.Type != execution.FinalizeResponseDriver {
+		return nil
+	}
+	r := resp.DriverResponse
+	var err any
+	if r.Err != nil {
+		err = r.StandardError()
+	}
+	if r.UserError != nil {
+		err = r.UserError
+	}
+	return err
 }
 
 func (f functionFinishedData) Map() map[string]any {
