@@ -39,7 +39,25 @@ func groupedStep(id string, at, secs int, status enums.StepStatus, path ...meta.
 	}
 }
 
-func convertGroupedRun(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTraceSpan {
+// runConverters are both RunTrace converters, which must group spans alike:
+// the tree conversion, and the flat one DuckDB-backed traces use.
+var runConverters = map[string]func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error){
+	"tree": convertDynamicRunSpanToGQL,
+	"flat": convertFlatRunSpanToGQL,
+}
+
+// forEachConverter runs test once per converter, with its convertGroupedRun.
+func forEachConverter(t *testing.T, test func(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan)) {
+	for name, convert := range runConverters {
+		t.Run(name, func(t *testing.T) {
+			test(t, func(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTraceSpan {
+				return groupedRun(t, convert, children...)
+			})
+		})
+	}
+}
+
+func groupedRun(t *testing.T, convert func(context.Context, *cqrs.OtelSpan) (*models.RunTraceSpan, error), children ...*cqrs.OtelSpan) *models.RunTraceSpan {
 	t.Helper()
 
 	run := &cqrs.OtelSpan{
@@ -48,7 +66,7 @@ func convertGroupedRun(t *testing.T, children ...*cqrs.OtelSpan) *models.RunTrac
 		Children:    children,
 	}
 
-	result, err := ConvertRunSpan(context.Background(), run)
+	result, err := convert(context.Background(), run)
 	require.NoError(t, err)
 	return result
 }
@@ -62,6 +80,10 @@ func childNames(span *models.RunTraceSpan) []string {
 }
 
 func TestGroupBySpanPath(t *testing.T) {
+	forEachConverter(t, testGroupBySpanPath)
+}
+
+func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan) {
 	completed := enums.StepStatusCompleted
 	failed := enums.StepStatusFailed
 	running := enums.StepStatusRunning
@@ -224,6 +246,10 @@ func TestGroupBySpanPath(t *testing.T) {
 }
 
 func TestSpanGroupStartsAtEarliestChildStart(t *testing.T) {
+	forEachConverter(t, testSpanGroupStartsAtEarliestChildStart)
+}
+
+func testSpanGroupStartsAtEarliestChildStart(t *testing.T, convertGroupedRun func(*testing.T, ...*cqrs.OtelSpan) *models.RunTraceSpan) {
 	completed := enums.StepStatusCompleted
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 

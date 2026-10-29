@@ -104,7 +104,7 @@ export function PauseFunctionModal({
       onClose={onCloseWrapper}
       onSubmit={isPaused ? handleResume : handlePause}
       title={`${isPaused ? 'Resume' : 'Pause'} function “${functionName}”`}
-      className="w-1/3"
+      className="w-full max-w-lg break-words"
       confirmButtonLabel={confirmButtonLabel}
       confirmButtonKind={isPaused ? 'primary' : 'danger'}
       cancelButtonLabel="Close"
@@ -153,13 +153,16 @@ export function PauseFunctionModal({
               multiple={false}
               value={currentRunHandlingStrategy}
             >
-              <Select.Button isLabelVisible={false}>
+              <Select.Button
+                isLabelVisible={false}
+                className="h-auto min-h-8 text-left"
+              >
                 <div className="">
                   {currentRunHandlingStrategy.name ||
                     'How should currently-running runs be handled?'}
                 </div>
               </Select.Button>
-              <Select.Options>
+              <Select.Options className="bottom-full mb-2 mt-0 w-full min-w-0">
                 {currentRunHandlingOptions.map((option) => {
                   return (
                     <Select.Option key={option.id} option={option}>

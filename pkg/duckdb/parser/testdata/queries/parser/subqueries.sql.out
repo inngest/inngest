@@ -1,0 +1,115 @@
+-- SELECT a FROM t WHERE EXISTS (SELECT 1 FROM other WHERE other.id = t.id)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  SubqueryExpr(exists=true,not=false)
+    SelectStatement
+      SelectItem()
+        Literal(1,1)
+      FromClause
+        BaseTableRef(other,alias=)
+      BinaryExpr(=)
+        Ident(other.id)
+        Ident(t.id)
+
+-- SELECT (SELECT max(a) FROM t) AS m FROM other
+SelectStatement
+  SelectItem(m)
+    SubqueryExpr(exists=false,not=false)
+      SelectStatement
+        SelectItem()
+          FunctionExpr(max,distinct=false)
+            Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+  FromClause
+    BaseTableRef(other,alias=)
+
+-- SELECT a FROM t WHERE a = ANY (SELECT id FROM other) AND b >= ALL ([1, 2]) AND c <> ANY (tags)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  BinaryExpr(AND)
+    BinaryExpr(AND)
+      QuantifiedExpr(= ANY)
+        Ident(a)
+        SubqueryExpr(exists=false,not=false)
+          SelectStatement
+            SelectItem()
+              Ident(id)
+            FromClause
+              BaseTableRef(other,alias=)
+      QuantifiedExpr(>= ALL)
+        Ident(b)
+        ListExpr(paren=false)
+          Literal(1,1)
+          Literal(1,2)
+    QuantifiedExpr(<> ANY)
+      Ident(c)
+      Ident(tags)
+
+-- SELECT * FROM (SELECT a FROM t OFFSET 5) AS s
+SelectStatement
+  SelectItem()
+    StarExpr(,exclude=[])
+  FromClause
+    TableSubqueryRef(alias=s)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        LimitClause(all=false,percent=false)
+          Literal(1,5)
+
+-- SELECT a FROM t WHERE a IN (SELECT b FROM u OFFSET 1)
+SelectStatement
+  SelectItem()
+    Ident(a)
+  FromClause
+    BaseTableRef(t,alias=)
+  InExpr(not=false)
+    Ident(a)
+    SelectStatement
+      SelectItem()
+        Ident(b)
+      FromClause
+        BaseTableRef(u,alias=)
+      LimitClause(all=false,percent=false)
+        Literal(1,1)
+
+-- WITH c AS (SELECT a FROM t OFFSET 2) SELECT a FROM c
+SelectStatement
+  SelectItem()
+    Ident(a)
+  WithClause(recursive=false)
+    CTE(c)
+      SelectStatement
+        SelectItem()
+          Ident(a)
+        FromClause
+          BaseTableRef(t,alias=)
+        LimitClause(all=false,percent=false)
+          Literal(1,2)
+  FromClause
+    BaseTableRef(c,alias=)
+
+-- (SELECT a FROM t OFFSET 1) UNION ALL SELECT a FROM u;
+SelectStatement(UNION,all=true,byName=false)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(t,alias=)
+    LimitClause(all=false,percent=false)
+      Literal(1,1)
+  SelectStatement
+    SelectItem()
+      Ident(a)
+    FromClause
+      BaseTableRef(u,alias=)
+

@@ -54,6 +54,12 @@ function RunsComponent() {
     'polling-disabled',
     false,
   );
+  // duckdb-backed runs queries support CEL search at any result size, so the
+  // 1000-row search cap below only applies to the (slower) non-duckdb path.
+  const { value: duckdbInsightsEnabled } = booleanFlag(
+    'duckdb-insights',
+    false,
+  );
 
   const [autoRefresh, setAutoRefresh] = useState(true);
 
@@ -250,7 +256,7 @@ function RunsComponent() {
         scope="env"
         totalCount={totalCount}
         searchError={searchError}
-        searchLimit={1000}
+        searchLimit={duckdbInsightsEnabled ? undefined : 1000}
         infiniteScrollTrigger={(containerRef) => (
           <InfiniteScrollTrigger
             onIntersect={fetchNextPage}

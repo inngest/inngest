@@ -5,6 +5,7 @@ import { Button } from '../Button/Button';
 import { InlineCode } from '../Code';
 import { ElementWrapper, TimeElement } from '../DetailsCard/Element';
 import { Pill } from '../Pill/Pill';
+import { hasMetadataKind } from '../RunDetailsShared/metadataKind';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { KindInngestAI } from '../generated';
@@ -29,7 +30,7 @@ export const traceHasAIMetadata = (trace: Trace | undefined): boolean => {
 
   let found = false;
   traceWalk(trace, (span) => {
-    if (span.metadata?.some((md) => md.kind === KindInngestAI)) {
+    if (span.metadata?.some((md) => hasMetadataKind(md, KindInngestAI))) {
       found = true;
     }
   });
