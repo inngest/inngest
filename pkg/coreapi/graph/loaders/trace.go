@@ -92,7 +92,7 @@ func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	}
 
 	switch *op {
-	case enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepPlanned:
+	case enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepFailed, enums.OpcodeStepPlanned:
 		op := models.StepOpRun
 		return &op
 	case enums.OpcodeAIGateway, enums.OpcodeGateway: // TODO gateway separate
