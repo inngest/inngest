@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -105,6 +107,33 @@ func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
 	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
 }
 
+// parkState is what a park op finds in the run's stack.
+type parkState int
+
+const (
+	// parkWaiting: the awaited message is not saved yet.
+	parkWaiting parkState = iota
+	// parkReady: the awaited message is saved, so the run can wake now.
+	parkReady
+	// parkAnswered: the park step itself is saved, so an earlier copy of this
+	// park was woken.
+	parkAnswered
+)
+
+// parkStateOf reads a park op's situation from the stack. The executor asks it
+// twice: before writing the marker (a copy that was already answered stops
+// there) and after (a message saved while the marker was being written wakes
+// the run now; one saved later finds the marker through its own delivery).
+func parkStateOf(stack []string, key string, stepID string, seq int) parkState {
+	if slices.Contains(stack, stepID) {
+		return parkAnswered
+	}
+	if len(subscriptionMessageIDs(stack, key)) >= seq {
+		return parkReady
+	}
+	return parkWaiting
+}
+
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
 // subscription: open, next, poll and close.
 func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
@@ -190,6 +219,75 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		return answer(map[string]any{"opened": true})
 
+	case state.SubscribePark:
+		if gen.ID != subscriptionStepID(sub.Key, sub.Reader, sub.Seq, sub.Attempt) {
+			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
+		}
+
+		stack, err := e.smv2.LoadStack(ctx, md.ID)
+		if err != nil {
+			return err
+		}
+		// A park that was already woken and answered is sent again: nothing to do.
+		if parkStateOf(stack, sub.Key, gen.ID, sub.Seq) == parkAnswered {
+			return nil
+		}
+
+		// The marker says "this run is waiting for message Seq". It is a pause
+		// only so that a delivery can find and consume it atomically.
+		parkExpires := e.now().Add(consts.MaxWaitForEventTimeout)
+
+		parkEvent := subscriptionParkIndexName(runID, sub.Key)
+		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: parkEvent}
+		opcode := gen.Op.String()
+		park := state.Pause{
+			ID:           subscriptionParkID(runID, sub.Key, gen.ID),
+			WorkspaceID:  md.ID.Tenant.EnvID,
+			Identifier:   sv2.NewPauseIdentifier(md.ID),
+			GroupID:      runCtx.GroupID(),
+			Outgoing:     gen.ID,
+			Incoming:     edge.Edge.Incoming,
+			StepName:     gen.UserDefinedName(),
+			Opcode:       &opcode,
+			Expires:      state.Time(parkExpires),
+			Event:        &parkEvent,
+			DataKey:      gen.ID,
+			MaxAttempts:  runCtx.MaxAttempts(),
+			ParallelMode: gen.ParallelMode(),
+			// Like waitForEvent: the wake joins the batch's shared discovery.
+			ParallelCoalesceKey: group.ParallelCoalesceKey,
+			CreatedAt:           e.now(),
+			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq},
+		}
+		if _, err := e.pm.Write(ctx, parkIdx, &park); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+			return fmt.Errorf("error saving subscription park: %w", err)
+		}
+
+		// A message may have been saved after the SDK read its state and before
+		// the marker existed: its delivery found no marker, so wake now. The
+		// stack is read again after the marker is written: a message saved
+		// before this read is seen here, and one saved after it finds the marker.
+		stack, err = e.smv2.LoadStack(ctx, md.ID)
+		if err != nil {
+			return err
+		}
+		// Still waiting: the marker is written, and a delivery wakes it. A copy of
+		// this park woken in the meantime has its answer saved: nothing to do.
+		switch parkStateOf(stack, sub.Key, gen.ID, sub.Seq) {
+		case parkAnswered:
+			// An earlier copy was answered between the first read and the write,
+			// so the marker just written belongs to a park that is over. Remove it:
+			// a later message would consume it and queue a stale discovery.
+			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+				return fmt.Errorf("error deleting stale subscription park: %w", err)
+			}
+			return nil
+		case parkReady:
+			return e.consumePark(ctx, &park)
+		}
+
+		return nil
+
 	case state.SubscribePoll:
 		ids, err := messages()
 		if err != nil {
@@ -216,10 +314,114 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
+// parkSeq is the message a wait pause waits for, or 0 when the pause does not say.
+// The metadata is a JSON number once it has been stored.
+func parkSeq(pause *state.Pause) int {
+	switch seq := pause.Metadata["seq"].(type) {
+	case int:
+		return seq
+	case int64:
+		return int(seq)
+	case float64:
+		return int(seq)
+	}
+
+	return 0
+}
+
 // isSubscriptionParkPause reports whether a pause is the one a run blocks on while it
 // waits for a subscription message. It has no timeout job.
 func isSubscriptionParkPause(pause *state.Pause) bool {
 	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
+}
+
+// wakeSubscriber wakes the run if it is parked on this subscription. A delivery
+// to a busy run finds no marker and costs nothing more. When there is a marker it
+// reads the stack once: a marker whose park is already answered is skipped, and
+// so is one that awaits a message that is not saved yet (another delivery of the
+// same burst saved its message first and the run has since parked for the
+// next).
+func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) error {
+	parked, err := e.parkedMarkers(ctx, id, key)
+	if err != nil {
+		return err
+	}
+	if len(parked) == 0 {
+		return nil
+	}
+
+	stack, err := e.smv2.LoadStack(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	for _, pause := range markersToWake(parked, stack, key) {
+		if err := e.consumePark(ctx, pause); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// markersToWake picks the markers a delivery may consume: those whose awaited
+// message is saved and whose park is not answered yet.
+func markersToWake(parked []*state.Pause, stack []string, key string) []*state.Pause {
+	saved := len(subscriptionMessageIDs(stack, key))
+
+	var ready []*state.Pause
+	for _, pause := range parked {
+		if pause.Outgoing != "" && slices.Contains(stack, pause.Outgoing) {
+			continue
+		}
+		if saved < parkSeq(pause) {
+			continue
+		}
+		ready = append(ready, pause)
+	}
+
+	return ready
+}
+
+// parkedMarkers returns the markers of the run's parks on a subscription.
+// Normally one: the current park. A marker already consumed and not yet deleted
+// may show too; consuming it again is idempotent.
+func (e *executor) parkedMarkers(ctx context.Context, id sv2.ID, key string) ([]*state.Pause, error) {
+	parkIdx := pauses.Index{WorkspaceID: id.Tenant.EnvID, EventName: subscriptionParkIndexName(id.RunID.String(), key)}
+
+	iter, err := e.pm.PausesSince(ctx, parkIdx, time.Time{})
+	if err != nil {
+		return nil, err
+	}
+
+	var parked []*state.Pause
+	for iter.Next(ctx) {
+		if pause := iter.Val(ctx); pause != nil {
+			parked = append(parked, pause)
+		}
+	}
+	if err := iter.Error(); err != nil && !errors.Is(err, context.Canceled) {
+		return nil, err
+	}
+
+	return parked, nil
+}
+
+// consumePark consumes a marker so the run sees the message it waits for. Its
+// output names that message's position. Another handler may have consumed the
+// marker first: the store then answers that it did not consume (DidConsume
+// false, or an idempotent success) and nothing more is queued.
+func (e *executor) consumePark(ctx context.Context, pause *state.Pause) error {
+	answer := map[string]any{"seq": parkSeq(pause)}
+
+	err := e.Resume(ctx, *pause, execution.ResumeRequest{
+		With:     map[string]any{"data": answer},
+		StepName: pause.StepName,
+	})
+	if errors.Is(err, state.ErrPauseLeased) || errors.Is(err, state.ErrPauseNotFound) {
+		return nil
+	}
+	return err
 }
 
 // deliverSubscription saves an event that matched a subscription pause as a
@@ -261,5 +463,5 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return nil
+	return e.wakeSubscriber(ctx, id, key)
 }

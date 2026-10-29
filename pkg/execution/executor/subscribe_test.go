@@ -3,6 +3,7 @@ package executor
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,6 +40,14 @@ func TestSubscriptionMessages(t *testing.T) {
 	require.Equal(t, []string{second, first}, subscriptionMessageIDs(stack, "inbox"))
 	require.Equal(t, []string{subscriptionMessageID("other", "evt-9")}, subscriptionMessageIDs(stack, "other"))
 	require.Empty(t, subscriptionMessageIDs(stack, "missing"))
+}
+
+func TestParkSeq(t *testing.T) {
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": 3}}))
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": int64(3)}}))
+	require.Equal(t, 3, parkSeq(&state.Pause{Metadata: map[string]any{"seq": float64(3)}}))
+	require.Equal(t, 0, parkSeq(&state.Pause{}))
+	require.Equal(t, 0, parkSeq(&state.Pause{Metadata: map[string]any{"seq": "3"}}))
 }
 
 // A marker is keyed by the park step, which is unique to the park. The run is
@@ -78,6 +87,55 @@ func TestSubscriptionParkPause(t *testing.T) {
 
 	other := "agent/message"
 	require.False(t, isSubscriptionParkPause(&state.Pause{Event: &other}))
+}
+
+// The park races a delivery: the stack the park read before it wrote the marker
+// can lack a message that the delivery saved just after, and that delivery
+// found no marker. The read after the write must see it. A copy of the park
+// that was woken in between is answered and must not wake the run again.
+func TestParkStateOf(t *testing.T) {
+	step := "park-step"
+	first := subscriptionMessageID("inbox", "evt-1")
+	second := subscriptionMessageID("inbox", "evt-2")
+	other := subscriptionMessageID("other", "evt-3")
+
+	// Before the marker: message 1 is saved, the park awaits message 2.
+	before := []string{"a", first}
+	require.Equal(t, parkWaiting, parkStateOf(before, "inbox", step, 2))
+
+	// The delivery of message 2 saves it and finds no marker. After the marker
+	// is written the park reads the stack again and wakes at once.
+	after := append(slices.Clone(before), second)
+	require.Equal(t, parkReady, parkStateOf(after, "inbox", step, 2))
+
+	// Another subscription's messages do not count.
+	require.Equal(t, parkWaiting, parkStateOf(append(slices.Clone(before), other), "inbox", step, 2))
+
+	// A copy that was woken and answered in the meantime stops, even though the
+	// message exists: waking again would queue a second discovery.
+	answered := append(slices.Clone(after), step)
+	require.Equal(t, parkAnswered, parkStateOf(answered, "inbox", step, 2))
+}
+
+// Two deliveries of one burst: the first wakes the run, which reads both messages
+// and parks for the third; the second delivery then finds that new marker and
+// must leave it, because its message is not saved yet. A marker whose park is
+// already answered is left too.
+func TestMarkersToWake(t *testing.T) {
+	one := subscriptionMessageID("inbox", "evt-1")
+	two := subscriptionMessageID("inbox", "evt-2")
+	three := subscriptionMessageID("inbox", "evt-3")
+	marker := func(step string, seq int) *state.Pause {
+		return &state.Pause{Outgoing: step, Metadata: map[string]any{"seq": seq}}
+	}
+
+	parkedForThree := marker("park-3", 3)
+
+	require.Empty(t, markersToWake([]*state.Pause{parkedForThree}, []string{one, two}, "inbox"))
+	require.Equal(t, []*state.Pause{parkedForThree}, markersToWake([]*state.Pause{parkedForThree}, []string{one, two, three}, "inbox"))
+
+	answered := marker("park-1", 1)
+	require.Empty(t, markersToWake([]*state.Pause{answered}, []string{one, "park-1"}, "inbox"))
 }
 
 // The closed step starts with the message prefix, so the SDK does not wait for
