@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	sq "github.com/doug-martin/goqu/v9"
+	"github.com/google/cel-go/common/operators"
 	"github.com/inngest/inngest/pkg/duckdb/insights/trie"
 )
 
@@ -40,11 +41,11 @@ type celFieldScope = trie.Trie[[]string, string, celFieldHandler]
 // {"data":T}/{"error":T} envelope DriverResponse.GetTraceFunctionOutput
 // always produces.
 var runsInputsCELScope = trie.New[[]string, string, celFieldHandler]().
-	Add([]string{"event", "id"}, celJSONFieldHandler("x", "id")).
-	Add([]string{"event", "name"}, celJSONFieldHandler("x", "name")).
-	Add([]string{"event", "v"}, celJSONFieldHandler("x", "v")).
-	Add([]string{"event", "ts"}, celJSONFieldHandler("x", "ts")).
-	AddWild([]string{"event", "data"}, celWildJSONFieldHandler("x", "event.data", "data")).
+	Add([]string{"event", "id"}, celEventStringFieldHandler(celNullableSQL("(x::JSON->>?)", "$.id"))).
+	Add([]string{"event", "name"}, celEventStringFieldHandler(celNullableSQL("(x::JSON->>?)", "$.name"))).
+	Add([]string{"event", "v"}, celEventVersionHandler(celNullableSQL("(x::JSON->>?)", "$.v"))).
+	Add([]string{"event", "ts"}, celEventTimestampHandler(celNullableSQL("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.ts"))).
+	AddWild([]string{"event", "data"}, celEventDataHandler(celWildJSONFieldHandler("x", "event.data", "data"))).
 	AddWild([]string{"output"}, celWildJSONFieldHandler("output", "output", "data")).
 	AddWild([]string{"error"}, celWildJSONFieldHandler("output", "error", "error"))
 
@@ -63,20 +64,11 @@ const runsInputsMatchSQL = `len(list_filter(json_transform(inputs::JSON, '["JSON
 // columns directly rather than a JSON path into a lambda parameter — only
 // event.data.* needs JSON extraction, from event_data.
 var eventsTableCELScope = trie.New[[]string, string, celFieldHandler]().
-	Add([]string{"event", "id"}, celColumnEqHandler("event_id")).
-	Add([]string{"event", "name"}, celColumnEqHandler("event_name")).
-	Add([]string{"event", "v"}, celColumnEqHandler("event_v")).
-	Add([]string{"event", "ts"}, celColumnTimestampHandler("event_ts")).
-	AddWild([]string{"event", "data"}, celWildJSONFieldHandler("event_data", "event.data", ""))
-
-// celJSONFieldHandler builds a handler for a field registered via Add — it
-// always targets the same fixed JSON path off base, ignoring ident (which
-// can only ever be the one path it was registered under).
-func celJSONFieldHandler(base, fixedPath string) celFieldHandler {
-	return func(_ string, literal any, op string) ([]sq.Expression, error) {
-		return handleJSONFilter(base, fixedPath, literal, op)
-	}
-}
+	Add([]string{"event", "id"}, celEventStringFieldHandler(celColumnSQL("event_id"))).
+	Add([]string{"event", "name"}, celEventStringFieldHandler(celColumnSQL("event_name"))).
+	Add([]string{"event", "v"}, celEventVersionHandler(celColumnSQL("event_v"))).
+	Add([]string{"event", "ts"}, celEventTimestampHandler(celColumnSQL("epoch_ms(event_ts)"))).
+	AddWild([]string{"event", "data"}, celEventDataHandler(celWildJSONFieldHandler("event_data", "event.data", "")))
 
 // celWildJSONFieldHandler builds a handler for a field registered via
 // AddWild: it strips celPrefix (the CEL field path it was registered under,
@@ -101,34 +93,106 @@ func celWildJSONFieldHandler(base, celPrefix, fixedJSONPrefix string) celFieldHa
 	}
 }
 
-// celColumnEqHandler builds a handler for a field registered via Add that
-// targets a plain typed column directly (no JSON extraction) — only ==/!=
-// are supported, matching pkg/run.EventFieldConverter's own event.id/name/v
-// contract for the equivalent SQLite/Postgres column search. A non-string
-// literal (which CEL would never match against a string field anyways) is
-// left unconstrained rather than failing the whole query, since the result
-// is only a prefilter (see celFieldConverter).
-func celColumnEqHandler(column string) celFieldHandler {
-	return func(ident string, literal any, op string) ([]sq.Expression, error) {
+// The handlers below cover event.id/name/v/ts/data, which (unlike any
+// other JSON path) pkg/event.Event.Map() never exposes as "missing": the Go
+// re-check (see celFieldConverter) sees "" for a missing/null id or name, 0
+// for a missing/null ts, and an empty map for missing data, while a v that's
+// missing, null, or "" is left out of the map (so it compares like null).
+// Each handler's SQL has to account for that or it'd drop rows the Go side
+// matches, e.g. event_v != 'x' for an unversioned event (stored as '') that
+// event.v != "x" matches.
+
+// celEventFieldSQL is the SQL for one of those fields' raw values.
+type celEventFieldSQL struct {
+	expr string
+	args []any
+	// nullable is set when expr is SQL NULL for a missing/null value (a
+	// JSON path), rather than a NOT NULL column already holding the zero
+	// value.
+	nullable bool
+}
+
+func celNullableSQL(expr string, args ...any) celEventFieldSQL {
+	return celEventFieldSQL{expr: expr, args: args, nullable: true}
+}
+
+func celColumnSQL(column string) celEventFieldSQL {
+	return celEventFieldSQL{expr: column}
+}
+
+// orZero returns f's value with a missing/null value replaced by zero (a
+// SQL literal), plus its args.
+func (f celEventFieldSQL) orZero(zero string) (string, []any) {
+	if !f.nullable {
+		return f.expr, f.args
+	}
+	return fmt.Sprintf("COALESCE(%s, %s)", f.expr, zero), f.args
+}
+
+// celEventStringFieldHandler handles event.id/event.name. Only a string
+// literal is constrained: Go compares any other literal against a string
+// field as a type mismatch, which is a non-match, so leaving it
+// unconstrained is still a superset.
+func celEventStringFieldHandler(f celEventFieldSQL) celFieldHandler {
+	return func(_ string, literal any, op string) ([]sq.Expression, error) {
 		v, ok := literal.(string)
 		if !ok {
 			return []sq.Expression{}, nil
 		}
-		return handleStringOp(sq.L(column), v, op)
+		expr, args := f.orZero("''")
+		return handleStringOp(sq.L(expr, args...), v, op)
 	}
 }
 
-// celColumnTimestampHandler builds a handler for a field registered via Add
-// that targets a TIMESTAMPTZ column directly. The column (not the
-// int64-milliseconds CEL literal) is converted, via epoch_ms, rather than the
-// other way around. Any other literal type is left unconstrained, same as
-// celColumnEqHandler.
-func celColumnTimestampHandler(column string) celFieldHandler {
+// celEventVersionHandler handles event.v, whose Go value is missing (null)
+// rather than "" for an unversioned event.
+func celEventVersionHandler(f celEventFieldSQL) celFieldHandler {
+	v, args := f.orZero("''")
+	return func(_ string, literal any, op string) ([]sq.Expression, error) {
+		switch lit := literal.(type) {
+		case nil:
+			switch op {
+			case operators.Equals:
+				return []sq.Expression{sq.L(v+" = ''", args...)}, nil
+			case operators.NotEquals:
+				return []sq.Expression{sq.L(v+" != ''", args...)}, nil
+			}
+		case string:
+			switch op {
+			case operators.Equals:
+				// == "" never matches in Go, so this is just a superset then.
+				return []sq.Expression{sq.L(v, args...).Eq(lit)}, nil
+			case operators.NotEquals:
+				// A missing v != "x" holds too.
+				both := append(append(append([]any{}, args...), args...), lit)
+				return []sq.Expression{sq.L(fmt.Sprintf("(%s = '' OR %s != ?)", v, v), both...)}, nil
+			}
+		}
+		return []sq.Expression{}, nil
+	}
+}
+
+// celEventTimestampHandler handles event.ts (epoch milliseconds). f must
+// already be numeric.
+func celEventTimestampHandler(f celEventFieldSQL) celFieldHandler {
+	return func(_ string, literal any, op string) ([]sq.Expression, error) {
+		switch literal.(type) {
+		case int64, float64:
+			expr, args := f.orZero("0")
+			return handleNumericOp(sq.L(expr, args...), literal, op)
+		}
+		return []sq.Expression{}, nil
+	}
+}
+
+// celEventDataHandler wraps event.data's JSON handler: a bare event.data
+// is always a map in Go, so event.data == null never holds and
+// event.data != null always does, whatever the stored JSON says.
+func celEventDataHandler(h celFieldHandler) celFieldHandler {
 	return func(ident string, literal any, op string) ([]sq.Expression, error) {
-		ts, ok := literal.(int64)
-		if !ok {
+		if ident == "event.data" && literal == nil {
 			return []sq.Expression{}, nil
 		}
-		return handleNumericOp(sq.L(fmt.Sprintf("epoch_ms(%s)", column)), ts, op)
+		return h(ident, literal, op)
 	}
 }

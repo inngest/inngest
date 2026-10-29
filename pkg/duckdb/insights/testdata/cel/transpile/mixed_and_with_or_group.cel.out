@@ -2,7 +2,7 @@ INPUT
 event.name == "y" && (event.data.a == 1 || output.ok == true)
 
 EVENT SQL
-((x::JSON->>?) = ?)
+(COALESCE((x::JSON->>?), '') = ?)
 
 EVENT ARGS
 [$.name y]
