@@ -79,7 +79,8 @@ func TestManualSemaphoreStartRetry(t *testing.T) {
 			usage("2")
 			owned, getErr := redis.Get(sem.UsageKey(account) + ":owner:" + run.String())
 			require.NoError(t, getErr)
-			require.Equal(t, "2", owned, "retry must not double-charge the run")
+			require.Equal(t, "2:"+retry.RequestID.String(), owned, "retry must not double-charge the run")
+			require.False(t, redis.Exists(sem.UsageKey(account)+":owner:"+run.String()+":claim"), "no separate attempt key")
 			require.Empty(t, acquire("another-live-retry", run).Leases)
 			require.Empty(t, acquire("still-competing", ulid.Make()).Leases)
 
@@ -88,8 +89,8 @@ func TestManualSemaphoreStartRetry(t *testing.T) {
 				LeaseID: *extended.LeaseID, LeaseIssuedAt: clock.Now(), Source: LeaseSource{Location: CallerLocationLeaseScavenge}})
 			require.NoError(t, err)
 			usage("2")
-			sm := NewRedisSemaphoreManager(cm.client).(OwnedSemaphoreManager)
-			require.NoError(t, sm.ReleaseOwnedSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, run.String()))
+			sm := NewRedisSemaphoreManager(cm.client)
+			require.NoError(t, sm.ReleaseSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, run.String(), 2))
 			usage("0")
 			require.Empty(t, acquire("finalized-retry", run).Leases, "a tombstoned run must not revive")
 			other := acquire("next-run", ulid.Make())
@@ -171,14 +172,14 @@ func TestManualSemaphoreStartRetryConcurrent(t *testing.T) {
 		LeaseIssuedAt: clock.Now(), Source: LeaseSource{Location: CallerLocationLeaseScavenge},
 	})
 	require.NoError(t, internalErr)
-	require.NoError(t, sm.(OwnedSemaphoreManager).ReleaseOwnedSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, run.String()))
+	require.NoError(t, sm.ReleaseSemaphore(ctx, account, sem.ID, sem.EvaluatedKeyHash, run.String(), 1))
 	_, usage, err = sm.GetCapacity(ctx, account, sem.ID, sem.EvaluatedKeyHash)
 	require.NoError(t, err)
 	require.Zero(t, usage)
 }
 
 func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
-	for _, kind := range []string{"legacy", "tracked-without-claim", "active-claim", "changed-weight", "invalid-owner", "wrong-type-owner", "wrong-type-claim", "finalized"} {
+	for _, kind := range []string{"legacy", "old-record", "active-claim", "changed-weight", "invalid-owner", "wrong-type-owner", "invalid-attempt", "finalized"} {
 		t.Run(kind, func(t *testing.T) {
 			cm, redis, _, clock := newSemaphoreTestEnv(t)
 			cm.manualSemaphoreOwnership = true
@@ -188,13 +189,15 @@ func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 			require.NoError(t, redis.Set(sem.CapacityKey(account), "1"))
 			require.NoError(t, redis.Set(sem.UsageKey(account), "1"))
 			if kind != "legacy" {
+				require.NoError(t, redis.Set(ownerKey, "1:"))
+			}
+			if kind == "old-record" {
 				require.NoError(t, redis.Set(ownerKey, "1"))
 			}
 			if kind == "active-claim" {
-				require.NoError(t, redis.Set(ownerKey+":claim", ulid.Make().String()))
+				require.NoError(t, redis.Set(ownerKey, "1:"+ulid.Make().String()))
 			}
 			if kind == "changed-weight" {
-				require.NoError(t, redis.Set(ownerKey+":claim", "released"))
 				sem.Weight = 2
 			}
 			if kind == "invalid-owner" {
@@ -204,12 +207,11 @@ func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 				redis.Del(ownerKey)
 				redis.HSet(ownerKey, "invalid", "1")
 			}
-			if kind == "wrong-type-claim" {
-				redis.HSet(ownerKey+":claim", "invalid", "1")
+			if kind == "invalid-attempt" {
+				require.NoError(t, redis.Set(ownerKey, "1:bad:attempt"))
 			}
 			if kind == "finalized" {
-				require.NoError(t, redis.Set(ownerKey, "0"))
-				require.NoError(t, redis.Set(ownerKey+":claim", "released"))
+				require.NoError(t, redis.Set(ownerKey, "0:"))
 			}
 			res, err := cm.Acquire(t.Context(), &CapacityAcquireRequest{
 				AccountID: account, EnvID: env, FunctionID: fn, IdempotencyKey: "retry", Amount: 1,
@@ -218,7 +220,7 @@ func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 				CurrentTime: clock.Now(), Duration: time.Minute, MaximumLifetime: time.Hour,
 				Source: LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
 			})
-			if kind == "invalid-owner" || kind == "wrong-type-owner" || kind == "wrong-type-claim" {
+			if kind == "invalid-owner" || kind == "wrong-type-owner" || kind == "invalid-attempt" || kind == "old-record" {
 				require.ErrorContains(t, err, "manual semaphore ownership is invalid")
 			} else {
 				require.NoError(t, err)
@@ -240,8 +242,7 @@ func TestManualSemaphoreStartRetryHonorsOtherConstraints(t *testing.T) {
 	require.NoError(t, redis.Set(manual.CapacityKey(account), "1"))
 	require.NoError(t, redis.Set(manual.UsageKey(account), "1"))
 	ownerKey := manual.UsageKey(account) + ":owner:" + run.String()
-	require.NoError(t, redis.Set(ownerKey, "1"))
-	require.NoError(t, redis.Set(ownerKey+":claim", "released"))
+	require.NoError(t, redis.Set(ownerKey, "1:"))
 	res, err := cm.Acquire(t.Context(), &CapacityAcquireRequest{
 		AccountID: account, EnvID: env, FunctionID: fn, IdempotencyKey: "retry", Amount: 1,
 		LeaseIdempotencyKeys: []string{"retry"}, LeaseRunIDs: map[string]ulid.ULID{"retry": run},
@@ -251,9 +252,9 @@ func TestManualSemaphoreStartRetryHonorsOtherConstraints(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Empty(t, res.Leases, "owning a manual permit cannot bypass unavailable worker capacity")
-	claim, getErr := redis.Get(ownerKey + ":claim")
+	claim, getErr := redis.Get(ownerKey)
 	require.NoError(t, getErr)
-	require.Equal(t, "released", claim, "a rejected request must not claim the run")
+	require.Equal(t, "1:", claim, "a rejected request must not claim the run")
 }
 
 func TestManualSemaphoreStartRetryBatchPrefix(t *testing.T) {
@@ -267,8 +268,7 @@ func TestManualSemaphoreStartRetryBatchPrefix(t *testing.T) {
 				require.NoError(t, redis.Set(sem.CapacityKey(account), fmt.Sprint(capacity)))
 				require.NoError(t, redis.Set(sem.UsageKey(account), "1"))
 				ownerKey := sem.UsageKey(account) + ":owner:" + owner.String()
-				require.NoError(t, redis.Set(ownerKey, "1"))
-				require.NoError(t, redis.Set(ownerKey+":claim", "released"))
+				require.NoError(t, redis.Set(ownerKey, "1:"))
 				runs := []ulid.ULID{newcomer, owner}
 				if reuseFirst {
 					runs[0], runs[1] = runs[1], runs[0]
@@ -310,4 +310,42 @@ func TestManualSemaphoreStartRetryRejectsDuplicateOwners(t *testing.T) {
 		Constraints: []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: sem}, {Kind: ConstraintKindSemaphore, Semaphore: sem}},
 	}, true)
 	require.ErrorContains(t, err, "duplicate manual semaphore")
+}
+
+func TestManualSemaphoreRetryAfterPartialBatchRelease(t *testing.T) {
+	cm, redis, _, clock := newSemaphoreTestEnv(t)
+	cm.manualSemaphoreOwnership = true
+	account, env, fn, firstRun, secondRun := uuid.New(), uuid.New(), uuid.New(), ulid.Make(), ulid.Make()
+	sem := SemaphoreConstraint{ID: "fnkey:partial", Weight: 1, Release: SemaphoreReleaseManual}
+	require.NoError(t, redis.Set(sem.CapacityKey(account), "2"))
+	req := &CapacityAcquireRequest{
+		AccountID: account, EnvID: env, FunctionID: fn, IdempotencyKey: "batch", Amount: 2,
+		LeaseIdempotencyKeys: []string{"first", "second"}, LeaseRunIDs: map[string]ulid.ULID{"first": firstRun, "second": secondRun},
+		Configuration: ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{{ID: sem.ID, Weight: 1, Release: sem.Release}}},
+		Constraints:   []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}},
+		CurrentTime:   clock.Now(), Duration: time.Minute, MaximumLifetime: time.Hour,
+		Source: LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
+	}
+	batch, err := cm.Acquire(t.Context(), req)
+	require.NoError(t, err)
+	require.Len(t, batch.Leases, 2)
+	_, err = cm.Release(t.Context(), &CapacityReleaseRequest{AccountID: account, LeaseID: batch.Leases[0].LeaseID,
+		IdempotencyKey: "release-first", LeaseIssuedAt: clock.Now(), Source: req.Source})
+	require.NoError(t, err)
+	require.True(t, redis.Exists(cm.keyRequestState(account, batch.RequestID)), "second lease still needs the batch request")
+	for _, attempt := range []struct {
+		run  ulid.ULID
+		want int
+	}{{secondRun, 0}, {firstRun, 1}, {firstRun, 0}} {
+		req.IdempotencyKey = uuid.NewString()
+		req.Amount = 1
+		req.LeaseIdempotencyKeys = []string{req.IdempotencyKey}
+		req.LeaseRunIDs = map[string]ulid.ULID{req.IdempotencyKey: attempt.run}
+		res, err := cm.Acquire(t.Context(), req)
+		require.NoError(t, err)
+		require.Len(t, res.Leases, attempt.want, "only the released run's first retry may enter")
+	}
+	usage, getErr := redis.Get(sem.UsageKey(account))
+	require.NoError(t, getErr)
+	require.Equal(t, "2", usage)
 }

@@ -10,26 +10,26 @@ local keyOwner = KEYS[3]
 
 local weight = tonumber(ARGV[1])
 local idempotencyTTL = tonumber(ARGV[2])
-local strictOwnership = ARGV[3] == "true"
-local retention = tonumber(ARGV[4])
+local retention = tonumber(ARGV[3])
+
+-- $include(helper/manual_owner.lua)
 
 -- Check durable, run-specific ownership before the short legacy dedupe key.
 -- A zero tombstone is a completed release, not permission to decrement again.
 local owned = redis.call("GET", keyOwner)
 if owned ~= false and owned ~= nil then
-	local held = tonumber(owned)
-	if held == nil or held < 0 then return -1 end
+	local held = decodeManualOwner(owned)
+	if held == nil then return -1 end
 	if held == 0 then return 0 end
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0
 	if usage < held then return -1 end
 	local remaining = redis.call("DECRBY", keyUsage, held)
-	redis.call("SET", keyOwner, "0", "EX", retention)
-	redis.call("SET", keyOwner .. ":claim", "released", "EX", retention)
+	redis.call("SET", keyOwner, "0:", "EX", retention)
 	return remaining
 end
 
 local tracked = redis.call("EXISTS", keyUsage .. ":ownership") == 1
-if strictOwnership or tracked then
+if tracked then
 	-- A legacy zero does not prove that no old lease can be scavenged later.
 	-- Only an already-migrated key can safely treat an absent owner as a no-op.
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0

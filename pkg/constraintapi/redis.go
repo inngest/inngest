@@ -70,9 +70,9 @@ type RedisCapacityManagerOption func(m *redisCapacityManager)
 
 // WithManualSemaphoreOwnership records manual permits by run, atomically with
 // acquisition. It also allows a start retry to reuse the same run's permit after
-// ordinary release relinquishes its active claim. Deploy retry-aware releasers
-// (including scavengers) before enabling any writer. Legacy permits and older
-// owner records without claims cannot be adopted retroactively.
+// ordinary release relinquishes its active attempt. Deploy compatible releasers
+// (including scavengers) before enabling any writer. Legacy permits cannot be
+// adopted retroactively.
 func WithManualSemaphoreOwnership() RedisCapacityManagerOption {
 	return func(m *redisCapacityManager) { m.manualSemaphoreOwnership = true }
 }

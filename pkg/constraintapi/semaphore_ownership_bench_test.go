@@ -61,7 +61,7 @@ func BenchmarkManualSemaphoreOwnership(b *testing.B) {
 					fixedKeys = append(fixedKeys, sem.UsageKey(account), sem.UsageKey(account)+":ownership")
 					for _, run := range req.LeaseRunIDs {
 						owner := sem.UsageKey(account) + ":owner:" + run.String()
-						fixedKeys = append(fixedKeys, owner, owner+":claim")
+						fixedKeys = append(fixedKeys, owner)
 					}
 				}
 				_, _, _, fingerprint, err := buildRequestStateWithOwnership(req, tracked)

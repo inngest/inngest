@@ -44,7 +44,7 @@ func TestManualSemaphoreRunRefusalDoesNotPoisonCache(t *testing.T) {
 			}
 			require.Len(t, acquire(cache, run).Leases, 1)
 			if state == "finalized" {
-				require.NoError(t, NewRedisSemaphoreManager(client).(OwnedSemaphoreManager).ReleaseOwnedSemaphore(t.Context(), account, sem.ID, "", run.String()))
+				require.NoError(t, NewRedisSemaphoreManager(client).ReleaseSemaphore(t.Context(), account, sem.ID, "", run.String(), 1))
 			}
 			rejectedRun := run
 			if state == "shared limit full" {

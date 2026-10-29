@@ -112,28 +112,26 @@ end
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
 
+-- $include(helper/manual_owner.lua)
+
 -- Validate all tracked manual holds before mutating any constraint. Redis
 -- scripts do not roll back earlier writes when a later command fails.
 local manualHolds = {}
-local manualClaims = {}
-if requestDetails.msr then
-	local runID = call("HGET", keyLeaseDetails, "rid")
+local runID
+if requestDetails.mso then
+	runID = call("HGET", keyLeaseDetails, "rid")
 	for index, c in ipairs(constraints) do
 		if c.k == 4 and c.sem.rel == 1 then
-			manualClaims[index] = call("GET", c.sem.k .. ":owner:" .. runID .. ":claim") == requestID
-		end
-	end
-end
-if requestDetails.mso and forceReleaseSemaphores then
-	local runID = call("HGET", keyLeaseDetails, "rid")
-	for index, c in ipairs(constraints) do
-		if c.k == 4 and c.sem.rel == 1 then
-			local held = tonumber(call("GET", c.sem.k .. ":owner:" .. runID))
-			local usage = tonumber(call("GET", c.sem.k)) or 0
-			if held == nil or held < 0 or usage < held then
+			local owned = call("GET", c.sem.k .. ":owner:" .. runID)
+			if owned == false then return redis.error_reply("ERR manual semaphore ownership is unknown") end
+			local held, claim = decodeManualOwner(owned)
+			if held == nil then
 				return redis.error_reply("ERR manual semaphore ownership is unknown")
 			end
-			if requestDetails.msr and held > 0 and not manualClaims[index] then
+			if forceReleaseSemaphores and (tonumber(call("GET", c.sem.k)) or 0) < held then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if held > 0 and claim ~= requestID then
 				return redis.error_reply("ERR manual semaphore claim belongs to another request")
 			end
 			manualHolds[index] = held
@@ -156,32 +154,20 @@ for index, c in ipairs(constraints) do
 			end
 			local releaseWeight = toInteger(weight)
 			if c.sem.rel == 1 and requestDetails.mso then
-				local runID = call("HGET", keyLeaseDetails, "rid")
 				local ownerKey = c.sem.k .. ":owner:" .. runID
 				local held = manualHolds[index]
-				releaseWeight = math.min(releaseWeight, held)
+				releaseWeight = held
 				if held > 0 then
-					local remaining = held - releaseWeight
-					if remaining == 0 then
-						call("SET", ownerKey, "0", "EX", 604800)
-						if requestDetails.msr then call("SET", ownerKey .. ":claim", "released", "EX", 604800) end
-					else
-						call("SET", ownerKey, tostring(remaining))
-					end
+					call("SET", ownerKey, "0:", "EX", 604800)
 				end
 			end
 			local newVal = call("DECRBY", c.sem.k, releaseWeight)
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
 			end
-		elseif requestDetails.msr then
-			local runID = call("HGET", keyLeaseDetails, "rid")
-			local claimKey = c.sem.k .. ":owner:" .. runID .. ":claim"
-			if manualClaims[index] then
-				-- Keep the run's permit, but allow its next start attempt to
-				-- claim it after this lease is removed in the same transaction.
-				call("SET", claimKey, "released")
-			end
+		elseif requestDetails.mso and manualHolds[index] > 0 then
+			-- Release the attempt, not the whole-run admission.
+			call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
 		end
 	end
 end

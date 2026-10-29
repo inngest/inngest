@@ -65,9 +65,6 @@ type redisRequestState struct {
 	// Persist the protocol version so release/scavenge honors how this request
 	// acquired permits, even if the writer's rollout setting changes later.
 	ManualSemaphoreOwnership bool `json:"mso,omitempty"`
-	// Only requests written by retry-aware writers may hand their run's hold
-	// back to a later start attempt. Older tracked holds are not adopted.
-	ManualSemaphoreStartRetry bool `json:"msr,omitempty"`
 
 	// Annotate metadata
 	Metadata stateMetadata `json:"m,omitzero"`
@@ -129,7 +126,6 @@ func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool)
 
 	state.LeaseRunIDs = leaseRunIDs
 	state.ManualSemaphoreOwnership = ownership
-	state.ManualSemaphoreStartRetry = ownership
 	if ownership {
 		seenSemaphores := map[string]bool{}
 		for _, c := range req.Constraints {

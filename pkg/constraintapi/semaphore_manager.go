@@ -20,12 +20,6 @@ const (
 
 var ErrSemaphoreOwnershipUnknown = errors.New("manual semaphore ownership is unknown")
 
-// OwnedSemaphoreManager is required by strict recovery callers. It deliberately
-// has no fallback to the legacy, ownership-blind decrement.
-type OwnedSemaphoreManager interface {
-	ReleaseOwnedSemaphore(context.Context, uuid.UUID, string, string, string) error
-}
-
 // SetResult describes the outcome of SetCapacity. Applied is false when the
 // call was an idempotent replay of a previously-seen idempotency key; callers
 // emitting side effects (audit events) should gate on Applied. Capacity is the
@@ -180,15 +174,6 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 }
 
 func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error {
-	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, idempotencyKey, weight, false)
-}
-
-func (m *redisSemaphoreManager) ReleaseOwnedSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, runID string) error {
-	// Strict release uses the recorded weight and never the legacy decrement.
-	return m.releaseSemaphore(ctx, accountID, name, evaluatedKeyHash, runID, 0, true)
-}
-
-func (m *redisSemaphoreManager) releaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64, strict bool) error {
 	start := time.Now()
 
 	keys := []string{
@@ -199,7 +184,6 @@ func (m *redisSemaphoreManager) releaseSemaphore(ctx context.Context, accountID 
 	args := []string{
 		fmt.Sprintf("%d", weight),
 		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
-		fmt.Sprintf("%t", strict),
 		fmt.Sprintf("%d", int(semaphoreOwnershipRetention.Seconds())),
 	}
 

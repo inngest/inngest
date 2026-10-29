@@ -93,6 +93,7 @@ local function addConstraintUsage(target, index, limit, used)
 end
 
 -- $include(helper/gcra.lua)
+-- $include(helper/manual_owner.lua)
 
 ---@type integer
 local requested = requestDetails.r
@@ -264,14 +265,13 @@ for index, value in ipairs(constraints) do
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if requestDetails.msr and value.sem.rel == 1 then
+		if requestDetails.mso and value.sem.rel == 1 then
 			manualReuse[index] = {}
 			constraintCapacity = 0
 			local ownerKeys = {}
 			for j = 1, requested do
 				local ownerKey = value.sem.k .. ":owner:" .. requestDetails.lri[requestDetails.lik[j]]
 				table.insert(ownerKeys, ownerKey)
-				table.insert(ownerKeys, ownerKey .. ":claim")
 			end
 			local owners = call("MGET", unpack(ownerKeys))
 			-- MGET returns false for both absent and non-string keys. Preserve
@@ -284,43 +284,24 @@ for index, value in ipairs(constraints) do
 				return redis.error_reply("ERR manual semaphore ownership is invalid")
 			end
 			for j = 1, requested do
-				local owned = owners[j * 2 - 1]
-				local claim = owners[j * 2]
-				local held = tonumber(owned)
-				if owned ~= false and owned ~= nil and (held == nil or held < 0 or held % 1 ~= 0 or usage < held) then
-					return redis.error_reply("ERR manual semaphore ownership is invalid")
-				end
-				if held == nil then
-					if claim ~= false and claim ~= nil then
-						return redis.error_reply("ERR manual semaphore claim has no owner")
-					end
+				local owned = owners[j]
+				if owned == false then
 					if remaining < weight then break end
 					remaining = remaining - weight
-				elseif held == weight and claim == "released" then
-					-- The previous lease released this tracked run hold normally.
-					-- Reuse it without increasing either usage or owned weight.
-					manualReuse[index][j] = true
 				else
-					-- Active claims, tombstones, changed weights and pre-protocol
-					-- owners are not evidence that another attempt may enter.
-					runLimited = true
-					break
+					local held, claim = decodeManualOwner(owned)
+					if held == nil or usage < held then
+						return redis.error_reply("ERR manual semaphore ownership is invalid")
+					end
+					if held ~= weight or claim ~= "" then
+						runLimited = true
+						break
+					end
+					manualReuse[index][j] = true
 				end
 				constraintCapacity = constraintCapacity + 1
 			end
 		else
-			if requestDetails.mso and value.sem.rel == 1 then
-				for _, lik in ipairs(requestDetails.lik) do
-					local owned = call("GET", value.sem.k .. ":owner:" .. requestDetails.lri[lik])
-					if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
-						return redis.error_reply("ERR manual semaphore ownership is invalid")
-					end
-					if owned == "0" then
-						remaining = 0
-						runLimited = true
-					end
-				end
-			end
 			constraintCapacity = math.max(math.floor(remaining / weight), 0)
 		end
 		addConstraintUsage(constraintUsage, index, capacity, usage)
@@ -462,18 +443,9 @@ for i, value in ipairs(constraints) do
 			for j = 1, granted do
 				local runID = requestDetails.lri[requestDetails.lik[j]]
 				local ownerKey = value.sem.k .. ":owner:" .. runID
-				if requestDetails.msr then
-					if not manualReuse[i][j] then
-						-- Preflight proved this owner absent; Lua executes atomically.
-						table.insert(ownerUpdates, ownerKey)
-						table.insert(ownerUpdates, tostring(toInteger(weight)))
-					end
-					-- Request ID is stable across lease renewal, unlike lease ID.
-					table.insert(ownerUpdates, ownerKey .. ":claim")
-					table.insert(ownerUpdates, requestID)
-				else
-					call("INCRBY", ownerKey, toInteger(weight))
-				end
+				-- The existing request ID remains stable across lease renewal.
+				table.insert(ownerUpdates, ownerKey)
+				table.insert(ownerUpdates, tostring(toInteger(weight)) .. ":" .. requestID)
 			end
 			call("MSET", unpack(ownerUpdates))
 		end
