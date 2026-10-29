@@ -213,6 +213,7 @@ func TestProxyGRPCForwardFailsAfterDelivery(t *testing.T) {
 				IPAddress:         net.ParseIP("127.0.0.1"),
 			}))
 
+			afterResponse := counterTotal(t, "inngest_connect_proxy.forward_failed_after_response_total")
 			resp, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 				AccountID: accID,
 				EnvID:     envID,
@@ -238,6 +239,7 @@ func TestProxyGRPCForwardFailsAfterDelivery(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 				require.Equal(t, "reqid-test", resp.RequestId)
+				require.Equal(t, afterResponse+1, counterTotal(t, "inngest_connect_proxy.forward_failed_after_response_total"))
 				return
 			}
 

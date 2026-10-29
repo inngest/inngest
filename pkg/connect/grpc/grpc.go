@@ -281,12 +281,15 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 		case grpcCodes.Unavailable, grpcCodes.DeadlineExceeded:
 			logger.StdlibLogger(ctx).Warn("removing grpc client after transport failure", "gatewayID", gatewayID.String(), "err", err)
 			i.grpcClientManager.RemoveClientIfCurrent(gatewayID.String(), grpcClient)
+			metrics.IncrConnectGatewayGRPCClientEvictedCounter(ctx, 1, metrics.CounterOpt{
+				Tags: map[string]any{"code": status.Code(err).String()},
+			})
 		}
 	}
 
 	success := err == nil && reply != nil && reply.Success
 	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{
-		Tags: map[string]any{"success": success},
+		Tags: map[string]any{"success": success, "code": status.Code(err).String()},
 	})
 
 	if err == nil && reply != nil && !reply.Success {

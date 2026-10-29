@@ -472,6 +472,9 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			// use the response that arrived instead.
 			if ctx.Err() == nil && waitForResponseCtx.Err() != nil {
 				l.Warn("forward to gateway failed after the response arrived, not re-routing", "err", err)
+				metrics.IncrConnectProxyForwardFailedAfterResponseCount(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+				})
 				err = nil
 				break
 			}

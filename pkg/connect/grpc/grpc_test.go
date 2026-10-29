@@ -274,6 +274,7 @@ func TestForwardRemovesClientOnTransportFailure(t *testing.T) {
 				defer cancel()
 			}
 
+			evicted := counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total")
 			err := mgr.Forward(callCtx, gatewayID, ulid.MustNew(ulid.Now(), nil), &connectpb.GatewayExecutorRequestData{
 				RequestId: uuid.New().String(),
 			})
@@ -282,8 +283,10 @@ func TestForwardRemovesClientOnTransportFailure(t *testing.T) {
 			_, err = mgr.grpcClientManager.GetClient(ctx, gatewayID.String())
 			if tt.expectRemoved {
 				require.ErrorIs(t, err, ErrGatewayNotFound)
+				require.Equal(t, evicted+1, counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total"))
 			} else {
 				require.NoError(t, err)
+				require.Equal(t, evicted, counterTotal(t, "inngest_connect_gateway.grpc.client_evicted_total"))
 			}
 		})
 	}
