@@ -92,6 +92,12 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		}
 	}
 
+	// Remove the item only while its lease is the one the caller holds.
+	leaseCheck := ""
+	if o.LeaseHeld && i.LeaseID != nil {
+		leaseCheck = i.LeaseID.String()
+	}
+
 	idempotency := q.IdempotencyTTL
 	if q.IdempotencyTTLFunc != nil {
 		idempotency = q.IdempotencyTTLFunc(ctx, i)
@@ -109,6 +115,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
+		leaseCheck,
 	})
 	if err != nil {
 		return err
@@ -130,7 +137,8 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		}
 
 		return nil
-	case 1:
+	case 1, 2:
+		// 2: the stored lease is not the caller's, so the item is not theirs to remove.
 		return osqueue.ErrQueueItemNotFound
 	default:
 		return fmt.Errorf("unknown response dequeueing item: %d", status)
@@ -351,7 +359,8 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		}
 
 		return nil
-	case 1:
+	case 1, 2:
+		// 2: the stored lease is not the caller's, so the item is not theirs to remove.
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
 		return osqueue.ErrQueueItemNotFound

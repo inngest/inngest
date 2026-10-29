@@ -69,6 +69,10 @@ func (q *queueProcessor) ProcessItem(
 		requeueOpts = append(requeueOpts, RequeueCapacityLeased())
 	}
 
+	if held, _ := qi.Data.Metadata[MetadataLeaseHeldDequeue].(bool); held {
+		dequeueOpts = append(dequeueOpts, DequeueLeaseHeld())
+	}
+
 	leaseID := qi.LeaseID
 	leaseMu := sync.RWMutex{}
 	processResult := ProcessItemResult{}

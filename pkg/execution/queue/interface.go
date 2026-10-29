@@ -20,6 +20,12 @@ type DequeueOptions struct {
 	// that wake parked partitions on capacity release should wait for
 	// CapacityReleaseNotifier.CapacityReleased instead of waking at dequeue.
 	CapacityLeased bool
+
+	// LeaseHeld removes the item only while the lease on the dequeued item is
+	// still the one stored. When the item was removed and queued again under the
+	// same ID, or leased by someone else, the dequeue finds nothing to remove and
+	// returns ErrQueueItemNotFound.
+	LeaseHeld bool
 }
 
 // DequeueCapacityLeased marks the dequeued item as holding a capacity lease
@@ -379,3 +385,15 @@ func WithBacklogRefillItemCapacityLeases(itemCapacityLeases []CapacityLease) Bac
 		o.CapacityLeases = itemCapacityLeases
 	}
 }
+
+// DequeueLeaseHeld removes the item only while its stored lease is the lease of
+// the item passed to Dequeue; see DequeueOptions.LeaseHeld.
+func DequeueLeaseHeld() DequeueOptionFn {
+	return func(o *DequeueOptions) { o.LeaseHeld = true }
+}
+
+// MetadataLeaseHeldDequeue marks an item whose processor removal is lease
+// checked: Item.Metadata[MetadataLeaseHeldDequeue] = true. An item that frees
+// its own ID before the processor removes it (see the subscription wake) needs
+// it, so the removal cannot delete a newer item queued under the same ID.
+const MetadataLeaseHeldDequeue = "lease_held_dequeue"

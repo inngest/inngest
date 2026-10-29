@@ -451,3 +451,63 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 	require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
 }
+
+func TestQueueDequeueLeaseHeld(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+	_, shard := newQueue(t, rc, osqueue.WithClock(clock))
+	ctx := context.Background()
+
+	fnID, acctID := uuid.New(), uuid.New()
+	noKey := time.Duration(0)
+	enqueue := func() osqueue.QueueItem {
+		item, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+			ID:                "wake",
+			IdempotencyPeriod: &noKey,
+			FunctionID:        fnID,
+			Data:              osqueue.Item{Identifier: state.Identifier{AccountID: acctID}},
+		}, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		return item
+	}
+
+	t.Run("it removes an item whose lease is held", func(t *testing.T) {
+		r.FlushAll()
+		item := enqueue()
+		lease, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		require.NoError(t, err)
+		item.LeaseID = lease
+
+		require.NoError(t, shard.Dequeue(ctx, item, osqueue.DequeueLeaseHeld()))
+		_, err = shard.LoadQueueItem(ctx, item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+	})
+
+	t.Run("it leaves a newer item queued under the same ID", func(t *testing.T) {
+		r.FlushAll()
+		old := enqueue()
+		lease, err := shard.Lease(ctx, old, 5*time.Second, clock.Now())
+		require.NoError(t, err)
+		old.LeaseID = lease
+
+		// The old item is removed and the ID is queued again.
+		require.NoError(t, shard.Dequeue(ctx, old))
+		enqueue()
+
+		require.ErrorIs(t, shard.Dequeue(ctx, old, osqueue.DequeueLeaseHeld()), osqueue.ErrQueueItemNotFound)
+		_, err = shard.LoadQueueItem(ctx, old.ID)
+		require.NoError(t, err, "the newer item is still queued")
+
+		// Without the option the old removal deletes it, as before.
+		require.NoError(t, shard.Dequeue(ctx, old))
+	})
+}

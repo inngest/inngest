@@ -222,7 +222,7 @@ func (r *wakeRun) end(resp *state.DriverResponse, driverErr error) (again bool) 
 		return false
 	}
 
-	require.NoError(r.f.t, r.f.rq.Dequeue(r.f.ctx, r.f.shard.Name(), r.qi))
+	r.f.queueRemoves(r.qi)
 	return false
 }
 
@@ -577,4 +577,38 @@ func TestWaitingThreadIsNotAStep(t *testing.T) {
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{step, wait}))
 	require.Equal(t, []string{"bg"}, opGroups([]*state.GeneratorOpcode{step, wait}).NonLazyIDs())
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{empty}))
+}
+
+// A message saved after the wake's final check and before the queue removes the
+// item is refused a wake of its own (the ID is held until the removal) and is
+// not seen by this one. The wake must not be lost: the message gets a wake.
+func TestWakeMessageBetweenFinalCheckAndRemoval(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.deliver("inbox")
+
+	r := f.start("inbox")
+	r.read()
+
+	// The final check finds nothing new.
+	require.NoError(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
+
+	// A message lands before the queue's own removal of the item.
+	f.deliver("inbox")
+
+	// The queue removes the item it leased, as process.go does: with the lease it holds.
+	f.queueRemoves(r.qi)
+
+	f.drain("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// queueRemoves is the processor's removal of a finished item: it carries the
+// lease the processor holds, and finding the item gone or queued again by a
+// newer wake is safe.
+func (f *wakeFixture) queueRemoves(qi queue.QueueItem) {
+	f.t.Helper()
+	err := f.rq.Dequeue(f.ctx, f.shard.Name(), qi, queue.DequeueLeaseHeld())
+	if !errors.Is(err, queue.ErrQueueItemNotFound) {
+		require.NoError(f.t, err)
+	}
 }

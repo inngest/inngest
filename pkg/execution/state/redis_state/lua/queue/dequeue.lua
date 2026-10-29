@@ -3,6 +3,7 @@
 Output:
   0: Successfully dequeued item
   1: Queue item not found
+  2: The stored lease is not leaseCheck
 
 ]]
 
@@ -42,12 +43,25 @@ local backlogID      = ARGV[3]
 local accountID      = ARGV[4]
 local runID          = ARGV[5]
 local idempotencyTTL = tonumber(ARGV[6])
+local leaseCheck     = ARGV[7] -- empty: remove whatever lease the item holds
 
 -- $include(get_partition_item.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
+
+if leaseCheck ~= "" then
+	local raw = redis.call("HGET", keyQueueMap, queueID)
+	if raw == false or raw == nil then
+		return 1
+	end
+
+	local stored = cjson.decode(raw)
+	if stored.leaseID ~= leaseCheck then
+		return 2
+	end
+end
 
 if redis.call("HDEL", keyQueueMap, queueID) == 0 then
 	return 1

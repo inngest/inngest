@@ -499,7 +499,10 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 		Payload: queue.PayloadEdge{
 			Edge: inngest.Edge{Outgoing: outgoing, Incoming: pause.Incoming},
 		},
-		Metadata: map[string]any{subscriptionWakeMetadataKey: subscriptionKeyHash(key)},
+		Metadata: map[string]any{
+			subscriptionWakeMetadataKey:    subscriptionKeyHash(key),
+			queue.MetadataLeaseHeldDequeue: true,
+		},
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -539,6 +542,7 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 type subscriptionWake struct {
 	hash string
 	seen int
+	item queue.Item
 }
 
 // newSubscriptionWake returns the wake an item is, or the zero value for any
@@ -549,7 +553,7 @@ func newSubscriptionWake(item queue.Item, stack []string) subscriptionWake {
 		return subscriptionWake{}
 	}
 
-	return subscriptionWake{hash: hash, seen: len(subscriptionMessageIDsOfHash(stack, hash))}
+	return subscriptionWake{hash: hash, seen: len(subscriptionMessageIDsOfHash(stack, hash)), item: item}
 }
 
 // errSubscriptionWakeAgain ends a wake that finished with messages it did not
@@ -563,12 +567,12 @@ var errSubscriptionWakeAgain = errors.New("subscription messages arrived while t
 // a wake checks: a request that failed is retried by the queue and checks on
 // its own completion, and a run that ended or failed has nothing to see.
 //
-// A message saved after this check and before the queue removes the item is
-// refused a wake of its own (the job ID is held until the removal) and is not
-// seen by this one. That window is the time the queue takes to remove the item;
-// the next message heals it. Closing it needs the queue to remove an item only
-// while its lease is still held, so that the wake could release its ID and look
-// again without the queue's own removal deleting a newer wake.
+// When nothing new arrived, the wake frees its job ID and looks once more. A
+// message saved before the release was refused a wake of its own (the ID was
+// held) and is found by the second look, which queues a new wake; a message
+// saved after it queues one itself. The queue's own removal of the old item
+// then runs with the lease it held (queue.MetadataLeaseHeldDequeue), so it
+// cannot delete the newer wake that took the ID.
 func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w subscriptionWake, resp *state.DriverResponse, err error) error {
 	if w.hash == "" || err != nil || resp == nil || resp.Err != nil {
 		return nil
@@ -581,12 +585,66 @@ func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w su
 	if err != nil {
 		return err
 	}
+	if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) > w.seen {
+		now := e.now()
+		return queue.RetryAtError(queue.AlwaysRetryError(errSubscriptionWakeAgain), &now)
+	}
+
+	if !e.releaseSubscriptionWake(ctx, id, w) {
+		return nil
+	}
+
+	md, err = e.smv2.LoadMetadata(ctx, id)
+	if errors.Is(err, state.ErrRunNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) <= w.seen {
 		return nil
 	}
 
-	now := e.now()
-	return queue.RetryAtError(queue.AlwaysRetryError(errSubscriptionWakeAgain), &now)
+	// The ID is free, so this wakes the run for the messages the old wake missed.
+	next := w.item
+	next.GroupID = uuid.New().String()
+	next.Attempt = 0
+	noKey := time.Duration(0)
+	err = e.queue.Enqueue(ctx, next, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+		return retryableEnqueueError(err)
+	}
+
+	return nil
+}
+
+// releaseSubscriptionWake removes the wake's own item, which frees its job ID.
+// It reports whether the ID was freed; without a shard to remove from, the
+// removal is left to the queue.
+func (e *executor) releaseSubscriptionWake(ctx context.Context, id sv2.ID, w subscriptionWake) bool {
+	if e.shards == nil {
+		return false
+	}
+
+	shard, err := e.shards.Resolve(ctx, queue.Scope{
+		AccountID:  id.Tenant.AccountID,
+		EnvID:      id.Tenant.EnvID,
+		FunctionID: id.FunctionID,
+	}, nil)
+	if err != nil {
+		return false
+	}
+
+	// The wake holds no idempotency key, so removing it must not leave one.
+	noKey := time.Duration(0)
+	err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
+		ID:                queue.HashID(ctx, subscriptionWakeJobID(id.RunID.String(), w.hash)),
+		FunctionID:        id.FunctionID,
+		IdempotencyPeriod: &noKey,
+		Data:              w.item,
+	})
+
+	return err == nil
 }
 
 // removeSubscriptionPause deletes the pause of a subscription stream so its
