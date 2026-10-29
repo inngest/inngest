@@ -173,6 +173,10 @@ func TestInferTypeMatchesDuckDB(t *testing.T) {
 		"SELECT CAST(NULL AS MAP (VARCHAR, INT)) FROM runs":            ColumnTypeJSON,
 		"SELECT CAST(1 AS DECIMAL (10, 2)) FROM runs":                  ColumnTypeNumber,
 		"SELECT CAST(NULL AS INTEGER []) FROM runs":                    ColumnTypeJSON,
+		"SELECT CAST(run_id AS CHARACTER VARYING) FROM runs":           ColumnTypeString,
+		"SELECT CAST(run_id AS CHAR VARYING (10)) FROM runs":           ColumnTypeString,
+		"SELECT run_id::GUID FROM runs":                                ColumnTypeString,
+		"SELECT CAST(1 AS INT64) FROM runs":                            ColumnTypeNumber,
 	}
 	for q, want := range cases {
 		t.Run(q, func(t *testing.T) {

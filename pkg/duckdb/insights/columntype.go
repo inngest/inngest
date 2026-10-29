@@ -38,7 +38,8 @@ func DuckDBToColumnType(duckdbType string) ColumnType {
 	switch {
 	// T[] lists and T[n] fixed-size arrays.
 	case strings.HasSuffix(t, "]"),
-		strings.HasPrefix(t, "STRUCT("), strings.HasPrefix(t, "MAP("), strings.HasPrefix(t, "UNION("):
+		strings.HasPrefix(t, "STRUCT("), strings.HasPrefix(t, "ROW("),
+		strings.HasPrefix(t, "MAP("), strings.HasPrefix(t, "UNION("):
 		return ColumnTypeJSON
 	case strings.HasPrefix(t, "ENUM("):
 		return ColumnTypeString
@@ -55,7 +56,8 @@ func DuckDBToColumnType(duckdbType string) ColumnType {
 		return ColumnTypeString
 	case t == "BOOLEAN":
 		return ColumnTypeBoolean
-	case t == "DATE", strings.HasPrefix(t, "TIME"), t == "INTERVAL":
+	// INTERVAL can carry a qualifier (INTERVAL YEAR, INTERVAL DAY TO SECOND).
+	case t == "DATE", strings.HasPrefix(t, "TIME"), t == "INTERVAL", strings.HasPrefix(t, "INTERVAL "):
 		return ColumnTypeDatetime
 	case t == "JSON", t == "VARIANT":
 		return ColumnTypeJSON
@@ -94,20 +96,27 @@ func isTypePunct(c byte) bool {
 }
 
 // duckDBTypeAliases maps every DuckDB type alias to the canonical name
-// DuckDB reports for it (typeof(NULL::<alias>) against a real duckdb).
-// TIMESTAMP*/TIME* variants (TIMESTAMPTZ, TIMETZ, TIME WITH TIME ZONE,
-// TIMESTAMP_NS, ...) need no entry: they're all DATETIME by prefix.
+// DuckDB reports for it (typeof(NULL::<alias>) against a real duckdb):
+// every duckdb_types() alias (TestDuckDBTypeAliasesMatchDuckDB) plus the
+// SQL-standard multi-word spellings its parser also accepts (CHARACTER
+// VARYING, NATIONAL CHAR, ...). TIMESTAMP*/TIME* variants (TIMESTAMPTZ,
+// TIMETZ, TIME WITH TIME ZONE, TIMESTAMP_NS, ...) need no entry: they're
+// all DATETIME by prefix.
 var duckDBTypeAliases = map[string]string{
 	"CHAR": "VARCHAR", "BPCHAR": "VARCHAR", "TEXT": "VARCHAR", "STRING": "VARCHAR",
-	"NVARCHAR": "VARCHAR",
-	"BYTEA":    "BLOB", "BINARY": "BLOB", "VARBINARY": "BLOB",
+	"NVARCHAR": "VARCHAR", "NCHAR": "VARCHAR",
+	"CHARACTER": "VARCHAR", "CHARACTER VARYING": "VARCHAR", "CHAR VARYING": "VARCHAR",
+	"NCHAR VARYING": "VARCHAR", "NATIONAL CHARACTER": "VARCHAR", "NATIONAL CHAR": "VARCHAR",
+	"NATIONAL CHARACTER VARYING": "VARCHAR", "NATIONAL CHAR VARYING": "VARCHAR",
+	"BYTEA": "BLOB", "BINARY": "BLOB", "VARBINARY": "BLOB",
+	"GUID": "UUID",
 	"BOOL": "BOOLEAN", "LOGICAL": "BOOLEAN",
-	"INT1": "TINYINT", "INT2": "SMALLINT", "SHORT": "SMALLINT",
-	"INT": "INTEGER", "INT4": "INTEGER", "SIGNED": "INTEGER",
-	"INT8": "BIGINT", "LONG": "BIGINT", "INT128": "HUGEINT",
+	"INT1": "TINYINT", "INT2": "SMALLINT", "INT16": "SMALLINT", "SHORT": "SMALLINT",
+	"INT": "INTEGER", "INT4": "INTEGER", "INT32": "INTEGER", "SIGNED": "INTEGER", "INTEGRAL": "INTEGER",
+	"INT8": "BIGINT", "INT64": "BIGINT", "LONG": "BIGINT", "OID": "BIGINT", "INT128": "HUGEINT",
 	"UINT8": "UTINYINT", "UINT16": "USMALLINT", "UINT32": "UINTEGER", "UINT64": "UBIGINT", "UINT128": "UHUGEINT",
 	"REAL": "FLOAT", "FLOAT4": "FLOAT", "FLOAT8": "DOUBLE", "DOUBLE PRECISION": "DOUBLE",
-	"NUMERIC": "DECIMAL", "VARINT": "BIGNUM",
+	"NUMERIC": "DECIMAL", "DEC": "DECIMAL", "VARINT": "BIGNUM",
 	"DATETIME": "TIMESTAMP",
 }
 
