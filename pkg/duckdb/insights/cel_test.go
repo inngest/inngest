@@ -104,28 +104,30 @@ func TestCELEventFilters(t *testing.T) {
 			name: "event.id equals",
 			cel:  []string{`event.id == "abc"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>?)", "$.id").Eq("abc"),
+				sq.L("COALESCE((x::JSON->>?), '')", "$.id").Eq("abc"),
 			},
 		},
 		{
-			// A JSON != can't be checked by text without dropping a
-			// missing or differently-typed value CEL's != still matches.
-			name:     "event.name not equals is unconstrained",
-			cel:      []string{`event.name != "test/hello"`},
-			expected: []sq.Expression{},
+			// event.Event.Map() always has a string name ("" when
+			// missing), so unlike other JSON paths != is still sound.
+			name: "event.name not equals",
+			cel:  []string{`event.name != "test/hello"`},
+			expected: []sq.Expression{
+				sq.L("COALESCE((x::JSON->>?), '')", "$.name").Neq("test/hello"),
+			},
 		},
 		{
 			name: "event.v equals",
 			cel:  []string{`event.v == "2024-01-01"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>?)", "$.v").Eq("2024-01-01"),
+				sq.L("COALESCE((x::JSON->>?), '')", "$.v").Eq("2024-01-01"),
 			},
 		},
 		{
 			name: "event.ts greater than",
 			cel:  []string{`event.ts > 1727291508963`},
 			expected: []sq.Expression{
-				sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.ts").Gt(int64(1727291508963)),
+				sq.L("COALESCE(TRY_CAST((x::JSON->>?) AS DOUBLE), 0)", "$.ts").Gt(int64(1727291508963)),
 			},
 		},
 		{
@@ -168,7 +170,7 @@ func TestCELEventFilters(t *testing.T) {
 			cel:  []string{`event.name == "x" && event.data.foo == "bar"`},
 			expected: []sq.Expression{
 				sq.And(
-					sq.L("(x::JSON->>?)", "$.name").Eq("x"),
+					sq.L("COALESCE((x::JSON->>?), '')", "$.name").Eq("x"),
 					sq.L("(x::JSON->>?)", "$.data.foo").Eq("bar"),
 				),
 			},
@@ -261,7 +263,7 @@ func TestCELEventAndOutputFiltersSplitAMixedExpression(t *testing.T) {
 
 	eventFilters, err := CELEventFilters(ctx, cel)
 	require.NoError(t, err)
-	assert.Equal(t, []sq.Expression{sq.L("(x::JSON->>?)", "$.name").Eq("x")}, eventFilters)
+	assert.Equal(t, []sq.Expression{sq.L("COALESCE((x::JSON->>?), '')", "$.name").Eq("x")}, eventFilters)
 
 	outputFilters, err := CELOutputFilters(ctx, cel)
 	require.NoError(t, err)
@@ -283,7 +285,7 @@ func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
 	require.NoError(t, err)
 	sqlText, args, err := RenderWhereSQL(outputFilters)
 	require.NoError(t, err)
-	assert.Equal(t, `(len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
+	assert.Equal(t, `(len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: (COALESCE((x::JSON->>?), '') = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
 	assert.Equal(t, []any{"$.name", "x", "$.data.ok", "true"}, args)
 }
 
@@ -404,6 +406,11 @@ func TestCELFiltersNeverNarrow(t *testing.T) {
 		`"x" in event.data.list`,
 		`event.data.a < "x"`,
 		`event.data.a == 1u`,
+		// event.Event.Map() always has these, whatever's stored.
+		`event.data == null`,
+		`event.data != null`,
+		`event.name != null`,
+		`event.ts == null`,
 	}
 	for _, cel := range unconstrained {
 		t.Run(cel, func(t *testing.T) {

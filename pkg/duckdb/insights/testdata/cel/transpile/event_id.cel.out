@@ -2,7 +2,7 @@ INPUT
 event.id == "abc"
 
 EVENT SQL
-((x::JSON->>?) = ?)
+(COALESCE((x::JSON->>?), '') = ?)
 
 EVENT ARGS
 [$.id abc]
