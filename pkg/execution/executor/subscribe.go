@@ -190,66 +190,38 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 	switch sub.Mode {
 	case state.SubscribeOpen:
-		now := e.now()
-		pause := state.Pause{
-			ID:          pauseID,
-			WorkspaceID: md.ID.Tenant.EnvID,
-			Identifier:  sv2.NewPauseIdentifier(md.ID),
-			GroupID:     runCtx.GroupID(),
-			Outgoing:    gen.ID,
-			Incoming:    edge.Edge.Incoming,
-			StepName:    gen.UserDefinedName(),
-			Opcode:      new(gen.Op.String()),
-			// A subscription lives as long as the run.
-			Expires:     state.Time(now.Add(consts.MaxWaitForEventTimeout)),
-			Event:       &opts.Event,
-			Expression:  expr,
-			MaxAttempts: runCtx.MaxAttempts(),
-			Subscribe:   &state.PauseSubscribe{Key: sub.Key, Stream: sub.Stream},
-			CreatedAt:   now,
-
-			TriggeringEventID: subscriptionTriggerExclusion(sub, md),
-		}
-
-		_, err := e.pm.Write(ctx, idx, &pause)
-		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
-			return fmt.Errorf("error saving subscription pause: %w", err)
-		}
-		if err == nil {
-			// Count after writing, so opens in the same response each see the
-			// ones before them and at most the limit are kept. An open that was
-			// already written passed this check before.
-			ids, err := e.pm.PauseIDsForRun(ctx, md.ID.RunID)
+		// The op's own source is the first stream; a many-source open carries
+		// the rest, so an inbox opens in one step.
+		sources := []state.SubscribeStream{{Stream: sub.Stream, Event: opts.Event, If: expr}}
+		for _, extra := range sub.Streams {
+			if err := validateSubscribe(&state.SubscribeOpts{Key: sub.Key, Mode: sub.Mode, Stream: extra.Stream}, extra.Event); err != nil {
+				return err
+			}
+			if err := validateWaitExpression(ctx, extra.If); err != nil {
+				return err
+			}
+			interpolated, _, err := interpolateWaitExpression(ctx, runCtx, extra.If)
 			if err != nil {
-				return fmt.Errorf("error counting the run's pauses: %w", err)
+				return err
 			}
-			if len(ids) > consts.MaxSubscriptionPausesPerRun {
-				if err := e.removeSubscriptionPause(ctx, md, idx, &pause); err != nil {
-					return err
-				}
-				return subscriptionLimitError("A run can hold at most %d pauses (subscriptions, parked reads and waitForEvents) when it opens a subscription.", consts.MaxSubscriptionPausesPerRun)
-			}
+			sources = append(sources, state.SubscribeStream{Stream: extra.Stream, Event: extra.Event, If: interpolated})
 		}
-		// A queued item that fires when the subscription expires. It keeps the
-		// run holding its function singleton while it waits: the singleton lock
-		// is released once the run has no queued items.
-		jobID := subscriptionExpiryJobID(md, pauseID)
-		expiry := queue.Item{
-			JobID:                 &jobID,
-			WorkspaceID:           md.ID.Tenant.EnvID,
-			GroupID:               runCtx.GroupID(),
-			Kind:                  queue.KindPause,
-			Identifier:            sv2.V1FromMetadata(*md),
-			PriorityFactor:        runCtx.PriorityFactor(),
-			CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
-			Payload:               queue.PayloadPauseTimeout{PauseID: pauseID, Pause: pause},
-			Metadata:              make(map[string]any),
-		}
-		if err := e.queue.Enqueue(ctx, expiry, pause.Expires.Time(), queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-			return fmt.Errorf("error enqueueing subscription expiry: %w", err)
+		if len(sources) > consts.MaxSubscriptionPausesPerRun {
+			return subscriptionLimitError("A subscription can listen to at most %d events.", consts.MaxSubscriptionPausesPerRun)
 		}
 
-		return answer(map[string]any{"opened": true})
+		var written []*state.Pause
+		for _, source := range sources {
+			if err := e.openSubscriptionStream(ctx, runCtx, edge, gen, sub, source, &written); err != nil {
+				// The run fails, so the pauses this op wrote go with it.
+				for _, pause := range written {
+					_ = e.removeSubscriptionPause(ctx, md, pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: *pause.Event}, pause)
+				}
+				return err
+			}
+		}
+
+		return answer(map[string]any{"opened": true, "streams": len(sources)})
 
 	case state.SubscribePark:
 		if gen.ID != subscriptionStepID(sub.Key, sub.Reader, sub.Seq, sub.Attempt) {
@@ -815,6 +787,75 @@ func (e *executor) removeSubscriptionPause(ctx context.Context, md *sv2.Metadata
 		_ = e.exprAggregator.RemovePause(ctx, pause)
 	}
 	e.dequeueSubscriptionExpiry(ctx, md, pause.ID)
+
+	return nil
+}
+
+// openSubscriptionStream saves the pause of one stream and queues its expiry.
+// A pause this call wrote is appended to written.
+func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.RunContext, edge queue.PayloadEdge, gen state.GeneratorOpcode, sub *state.SubscribeOpts, source state.SubscribeStream, written *[]*state.Pause) error {
+	md := runCtx.Metadata()
+	pauseID := subscriptionPauseID(md.ID.RunID.String(), sub.Key, source.Stream)
+	idx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: source.Event}
+	now := e.now()
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: md.ID.Tenant.EnvID,
+		Identifier:  sv2.NewPauseIdentifier(md.ID),
+		GroupID:     runCtx.GroupID(),
+		Outgoing:    gen.ID,
+		Incoming:    edge.Edge.Incoming,
+		StepName:    gen.UserDefinedName(),
+		Opcode:      new(gen.Op.String()),
+		// A subscription lives as long as the run.
+		Expires:     state.Time(now.Add(consts.MaxWaitForEventTimeout)),
+		Event:       &source.Event,
+		Expression:  source.If,
+		MaxAttempts: runCtx.MaxAttempts(),
+		Subscribe:   &state.PauseSubscribe{Key: sub.Key, Stream: source.Stream},
+		CreatedAt:   now,
+
+		TriggeringEventID: subscriptionTriggerExclusion(sub, md),
+	}
+
+	_, err := e.pm.Write(ctx, idx, &pause)
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+		return fmt.Errorf("error saving subscription pause: %w", err)
+	}
+	if err == nil {
+		*written = append(*written, &pause)
+
+		// Count after writing, so opens in the same response each see the
+		// ones before them and at most the limit are kept. An open that was
+		// already written passed this check before.
+		ids, err := e.pm.PauseIDsForRun(ctx, md.ID.RunID)
+		if err != nil {
+			return fmt.Errorf("error counting the run's pauses: %w", err)
+		}
+		if len(ids) > consts.MaxSubscriptionPausesPerRun {
+			return subscriptionLimitError("A run can hold at most %d pauses (subscriptions, parked reads and waitForEvents) when it opens a subscription.", consts.MaxSubscriptionPausesPerRun)
+		}
+	}
+
+	// A queued item that fires when the subscription expires. It keeps the
+	// run holding its function singleton while it waits: the singleton lock
+	// is released once the run has no queued items.
+	jobID := subscriptionExpiryJobID(md, pauseID)
+	expiry := queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           md.ID.Tenant.EnvID,
+		GroupID:               runCtx.GroupID(),
+		Kind:                  queue.KindPause,
+		Identifier:            sv2.V1FromMetadata(*md),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Payload:               queue.PayloadPauseTimeout{PauseID: pauseID, Pause: pause},
+		Metadata:              make(map[string]any),
+	}
+	if err := e.queue.Enqueue(ctx, expiry, pause.Expires.Time(), queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+		return fmt.Errorf("error enqueueing subscription expiry: %w", err)
+	}
 
 	return nil
 }

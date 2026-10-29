@@ -655,6 +655,11 @@ type SubscribeOpts struct {
 	// as the first message itself, so the executor must not save it again if it
 	// matches. Without it the trigger is an ordinary event to the subscription.
 	TriggerIsFirst bool `json:"triggerIsFirst,omitempty"`
+	// Streams, on open, are further sources to open in the same op, after the
+	// one the op itself carries (Stream, with the op's event and `if`). An SDK
+	// that sends it must check the answer's `streams` count, since an executor
+	// that does not know the field opens only the first.
+	Streams []SubscribeStream `json:"streams,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {
@@ -801,4 +806,11 @@ func (l *lenient[T]) UnmarshalJSON(byt []byte) error {
 		l.Value = zero
 	}
 	return nil
+}
+
+// SubscribeStream is one more event source of an open op.
+type SubscribeStream struct {
+	Stream int     `json:"stream"`
+	Event  string  `json:"event"`
+	If     *string `json:"if,omitempty"`
 }
