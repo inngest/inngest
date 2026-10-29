@@ -74,12 +74,19 @@ const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
 // already, and adding the reverse edge (insights-adjacent packages
 // depending back on duckdbquery) for a two-line window function isn't
 // worth the coupling.
+//
+// scope.From/To bound queued_at *inside* the CTE, below the window:
+// queued_at is the run ID's own ULID timestamp on every lifecycle row
+// (pkg/duckdb/tracing's materializeRuns writes run_queued_at), so filtering
+// first never splits a run's rows or changes which one wins, and DuckDB only
+// window-sorts the runs in range instead of every run in the env (it can't
+// push a queued_at filter through a window partitioned by run_id itself).
 func latestRunsCTE(scope Scope, args *[]any) string {
-	*args = append(*args, scope.AccountID.String(), scope.EnvID.String())
+	*args = append(*args, scope.AccountID.String(), scope.EnvID.String(), scope.From, scope.To)
 	return fmt.Sprintf(`WITH latest AS (
   SELECT run_id, app_id, app_name, function_slug, status, queued_at, started_at, ended_at, sessions, inputs
   FROM %s.runs
-  WHERE account_id = ? AND env_id = ?
+  WHERE account_id = ? AND env_id = ? AND queued_at BETWEEN ? AND ?
   QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY %s) = 1
 )`, driver.DuckLakeAlias, latestRunOrder)
 }
@@ -97,13 +104,22 @@ func escapeLikeSearch(search string) string {
 // sessions/keys.go's session_keys table + upserter), this queries
 // inngest.runs directly -- a dev server's data volume doesn't warrant a
 // second write path just to keep key listing cheap.
+//
+// Unlike the other builders this skips latestRunsCTE's latest-row collapse:
+// sessions comes from the triggering events, which every run lifecycle row
+// carries (pkg/duckdb/tracing's addRunEventAttrs), and queued_at is constant
+// per run, so DISTINCT keys and MIN(queued_at) are the same over every row
+// as over the latest ones, w/o window-sorting the env's runs (~650ms ->
+// ~12ms on 3M rows / 1M runs). It's deliberately not time bounded by
+// default: created_at is "first seen", which a window would silently
+// redefine, and a key w/ no recent runs would vanish from the listing
+// that's the entry point to everything else.
 func buildSessionKeysSQL(scope Scope) (string, []any, error) {
-	var args []any
-	query := latestRunsCTE(scope, &args)
+	args := []any{scope.AccountID.String(), scope.EnvID.String()}
 
-	where := ""
+	where := "\nWHERE account_id = ? AND env_id = ?"
 	if search := escapeLikeSearch(strings.TrimSpace(scope.Search)); search != "" {
-		where = "\nWHERE session.key ILIKE ? ESCAPE '\\'"
+		where += " AND session.key ILIKE ? ESCAPE '\\'"
 		args = append(args, "%"+search+"%")
 	}
 
@@ -119,12 +135,12 @@ func buildSessionKeysSQL(scope Scope) (string, []any, error) {
 		}
 	}
 
-	query += fmt.Sprintf(`
+	query := fmt.Sprintf(`
 SELECT session.key AS key, MIN(queued_at) AS created_at
-FROM latest, UNNEST(sessions) AS s(session)%s
+FROM %s.runs, UNNEST(sessions) AS s(session)%s
 GROUP BY session.key%s
 ORDER BY created_at DESC, key DESC
-LIMIT ?;`, where, having)
+LIMIT ?;`, driver.DuckLakeAlias, where, having)
 	args = append(args, resolveLimit(scope.Limit)+1)
 
 	return query, args, nil
@@ -147,8 +163,6 @@ func buildSessionsSQL(scope Scope) (string, []any, error) {
 		where += " AND session.id ILIKE ? ESCAPE '\\'"
 		args = append(args, "%"+search+"%")
 	}
-	where += " AND queued_at BETWEEN ? AND ?"
-	args = append(args, scope.From, scope.To)
 
 	having := ""
 	if scope.Cursor != "" {
@@ -192,8 +206,8 @@ func buildSessionRunsSQL(scope Scope) (string, []any, error) {
 	var args []any
 	query := latestRunsCTE(scope, &args)
 
-	where := "\nWHERE session.key = ? AND session.id = ? AND queued_at BETWEEN ? AND ?"
-	args = append(args, scope.SessionKey, scope.SessionID, scope.From, scope.To)
+	where := "\nWHERE session.key = ? AND session.id = ?"
+	args = append(args, scope.SessionKey, scope.SessionID)
 
 	if scope.Cursor != "" {
 		cur, err := decodeSessionCursor(scope.Cursor, "queued_at")
