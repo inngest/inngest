@@ -145,6 +145,7 @@ func unionColumnPathHints(stmt *parser.SelectStatement, ctes map[string]logicalT
 // recurses through the FunctionExpr case (listReturnType) and then this
 // same jsonPathAccess case again for its own base.
 func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
+	expr = unwrapCollate(expr)
 	if base, path, ok := jsonPathAccess(expr); ok {
 		segs, collects := queryPath(path)
 		return projectJSONSubPathHints(resolveColumnPathHints(base, scope), segs, collects)
@@ -339,10 +340,24 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 // projection (only a path that explicitly declares a leading wc
 // contributes anything), not a fallback.
 func resolveItemHint(expr parser.Expr, scope *tableScope) ColumnHint {
+	expr = unwrapCollate(expr)
 	if id, ok := expr.(*parser.Ident); ok {
 		return resolveIdentHint(id, scope)
 	}
 	return rootHintOf(resolveColumnPathHints(expr, scope))
+}
+
+// unwrapCollate strips any "x COLLATE <name>" down to x: a collation only
+// changes how x compares, not its value or type (inferType's COLLATE
+// case), so run_id COLLATE nocase is still a run ID.
+func unwrapCollate(expr parser.Expr) parser.Expr {
+	for {
+		b, ok := expr.(*parser.BinaryExpr)
+		if !ok || !strings.EqualFold(b.Op, "COLLATE") {
+			return expr
+		}
+		expr = b.Left
+	}
 }
 
 // resolveArrayElementHint resolves the hint for one element of the array x
