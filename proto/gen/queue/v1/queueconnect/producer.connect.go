@@ -35,9 +35,6 @@ const (
 const (
 	// ProducerServiceEnqueueProcedure is the fully-qualified name of the ProducerService's Enqueue RPC.
 	ProducerServiceEnqueueProcedure = "/queue.v1.ProducerService/Enqueue"
-	// ProducerServiceEnqueueSingletonMigrationProcedure is the fully-qualified name of the
-	// ProducerService's EnqueueSingletonMigration RPC.
-	ProducerServiceEnqueueSingletonMigrationProcedure = "/queue.v1.ProducerService/EnqueueSingletonMigration"
 	// ProducerServiceRequeueProcedure is the fully-qualified name of the ProducerService's Requeue RPC.
 	ProducerServiceRequeueProcedure = "/queue.v1.ProducerService/Requeue"
 	// ProducerServiceRequeueByJobIDProcedure is the fully-qualified name of the ProducerService's
@@ -48,8 +45,6 @@ const (
 // ProducerServiceClient is a client for the queue.v1.ProducerService service.
 type ProducerServiceClient interface {
 	Enqueue(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
-	// Older proxies fail closed rather than silently ignoring migration ownership.
-	EnqueueSingletonMigration(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
 	Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error)
 	RequeueByJobID(context.Context, *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error)
 }
@@ -71,12 +66,6 @@ func NewProducerServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(producerServiceMethods.ByName("Enqueue")),
 			connect.WithClientOptions(opts...),
 		),
-		enqueueSingletonMigration: connect.NewClient[v1.EnqueueRequest, v1.EnqueueResponse](
-			httpClient,
-			baseURL+ProducerServiceEnqueueSingletonMigrationProcedure,
-			connect.WithSchema(producerServiceMethods.ByName("EnqueueSingletonMigration")),
-			connect.WithClientOptions(opts...),
-		),
 		requeue: connect.NewClient[v1.RequeueRequest, v1.RequeueResponse](
 			httpClient,
 			baseURL+ProducerServiceRequeueProcedure,
@@ -94,20 +83,14 @@ func NewProducerServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // producerServiceClient implements ProducerServiceClient.
 type producerServiceClient struct {
-	enqueue                   *connect.Client[v1.EnqueueRequest, v1.EnqueueResponse]
-	enqueueSingletonMigration *connect.Client[v1.EnqueueRequest, v1.EnqueueResponse]
-	requeue                   *connect.Client[v1.RequeueRequest, v1.RequeueResponse]
-	requeueByJobID            *connect.Client[v1.RequeueByJobIDRequest, v1.RequeueByJobIDResponse]
+	enqueue        *connect.Client[v1.EnqueueRequest, v1.EnqueueResponse]
+	requeue        *connect.Client[v1.RequeueRequest, v1.RequeueResponse]
+	requeueByJobID *connect.Client[v1.RequeueByJobIDRequest, v1.RequeueByJobIDResponse]
 }
 
 // Enqueue calls queue.v1.ProducerService.Enqueue.
 func (c *producerServiceClient) Enqueue(ctx context.Context, req *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error) {
 	return c.enqueue.CallUnary(ctx, req)
-}
-
-// EnqueueSingletonMigration calls queue.v1.ProducerService.EnqueueSingletonMigration.
-func (c *producerServiceClient) EnqueueSingletonMigration(ctx context.Context, req *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error) {
-	return c.enqueueSingletonMigration.CallUnary(ctx, req)
 }
 
 // Requeue calls queue.v1.ProducerService.Requeue.
@@ -123,8 +106,6 @@ func (c *producerServiceClient) RequeueByJobID(ctx context.Context, req *connect
 // ProducerServiceHandler is an implementation of the queue.v1.ProducerService service.
 type ProducerServiceHandler interface {
 	Enqueue(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
-	// Older proxies fail closed rather than silently ignoring migration ownership.
-	EnqueueSingletonMigration(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error)
 	Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error)
 	RequeueByJobID(context.Context, *connect.Request[v1.RequeueByJobIDRequest]) (*connect.Response[v1.RequeueByJobIDResponse], error)
 }
@@ -140,12 +121,6 @@ func NewProducerServiceHandler(svc ProducerServiceHandler, opts ...connect.Handl
 		ProducerServiceEnqueueProcedure,
 		svc.Enqueue,
 		connect.WithSchema(producerServiceMethods.ByName("Enqueue")),
-		connect.WithHandlerOptions(opts...),
-	)
-	producerServiceEnqueueSingletonMigrationHandler := connect.NewUnaryHandler(
-		ProducerServiceEnqueueSingletonMigrationProcedure,
-		svc.EnqueueSingletonMigration,
-		connect.WithSchema(producerServiceMethods.ByName("EnqueueSingletonMigration")),
 		connect.WithHandlerOptions(opts...),
 	)
 	producerServiceRequeueHandler := connect.NewUnaryHandler(
@@ -164,8 +139,6 @@ func NewProducerServiceHandler(svc ProducerServiceHandler, opts ...connect.Handl
 		switch r.URL.Path {
 		case ProducerServiceEnqueueProcedure:
 			producerServiceEnqueueHandler.ServeHTTP(w, r)
-		case ProducerServiceEnqueueSingletonMigrationProcedure:
-			producerServiceEnqueueSingletonMigrationHandler.ServeHTTP(w, r)
 		case ProducerServiceRequeueProcedure:
 			producerServiceRequeueHandler.ServeHTTP(w, r)
 		case ProducerServiceRequeueByJobIDProcedure:
@@ -181,10 +154,6 @@ type UnimplementedProducerServiceHandler struct{}
 
 func (UnimplementedProducerServiceHandler) Enqueue(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ProducerService.Enqueue is not implemented"))
-}
-
-func (UnimplementedProducerServiceHandler) EnqueueSingletonMigration(context.Context, *connect.Request[v1.EnqueueRequest]) (*connect.Response[v1.EnqueueResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("queue.v1.ProducerService.EnqueueSingletonMigration is not implemented"))
 }
 
 func (UnimplementedProducerServiceHandler) Requeue(context.Context, *connect.Request[v1.RequeueRequest]) (*connect.Response[v1.RequeueResponse], error) {

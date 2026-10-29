@@ -19,10 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProducerService_Enqueue_FullMethodName                   = "/queue.v1.ProducerService/Enqueue"
-	ProducerService_EnqueueSingletonMigration_FullMethodName = "/queue.v1.ProducerService/EnqueueSingletonMigration"
-	ProducerService_Requeue_FullMethodName                   = "/queue.v1.ProducerService/Requeue"
-	ProducerService_RequeueByJobID_FullMethodName            = "/queue.v1.ProducerService/RequeueByJobID"
+	ProducerService_Enqueue_FullMethodName        = "/queue.v1.ProducerService/Enqueue"
+	ProducerService_Requeue_FullMethodName        = "/queue.v1.ProducerService/Requeue"
+	ProducerService_RequeueByJobID_FullMethodName = "/queue.v1.ProducerService/RequeueByJobID"
 )
 
 // ProducerServiceClient is the client API for ProducerService service.
@@ -30,8 +29,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProducerServiceClient interface {
 	Enqueue(ctx context.Context, in *EnqueueRequest, opts ...grpc.CallOption) (*EnqueueResponse, error)
-	// Older proxies fail closed rather than silently ignoring migration ownership.
-	EnqueueSingletonMigration(ctx context.Context, in *EnqueueRequest, opts ...grpc.CallOption) (*EnqueueResponse, error)
 	Requeue(ctx context.Context, in *RequeueRequest, opts ...grpc.CallOption) (*RequeueResponse, error)
 	RequeueByJobID(ctx context.Context, in *RequeueByJobIDRequest, opts ...grpc.CallOption) (*RequeueByJobIDResponse, error)
 }
@@ -48,16 +45,6 @@ func (c *producerServiceClient) Enqueue(ctx context.Context, in *EnqueueRequest,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EnqueueResponse)
 	err := c.cc.Invoke(ctx, ProducerService_Enqueue_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *producerServiceClient) EnqueueSingletonMigration(ctx context.Context, in *EnqueueRequest, opts ...grpc.CallOption) (*EnqueueResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EnqueueResponse)
-	err := c.cc.Invoke(ctx, ProducerService_EnqueueSingletonMigration_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +76,6 @@ func (c *producerServiceClient) RequeueByJobID(ctx context.Context, in *RequeueB
 // for forward compatibility.
 type ProducerServiceServer interface {
 	Enqueue(context.Context, *EnqueueRequest) (*EnqueueResponse, error)
-	// Older proxies fail closed rather than silently ignoring migration ownership.
-	EnqueueSingletonMigration(context.Context, *EnqueueRequest) (*EnqueueResponse, error)
 	Requeue(context.Context, *RequeueRequest) (*RequeueResponse, error)
 	RequeueByJobID(context.Context, *RequeueByJobIDRequest) (*RequeueByJobIDResponse, error)
 	mustEmbedUnimplementedProducerServiceServer()
@@ -105,9 +90,6 @@ type UnimplementedProducerServiceServer struct{}
 
 func (UnimplementedProducerServiceServer) Enqueue(context.Context, *EnqueueRequest) (*EnqueueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Enqueue not implemented")
-}
-func (UnimplementedProducerServiceServer) EnqueueSingletonMigration(context.Context, *EnqueueRequest) (*EnqueueResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method EnqueueSingletonMigration not implemented")
 }
 func (UnimplementedProducerServiceServer) Requeue(context.Context, *RequeueRequest) (*RequeueResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Requeue not implemented")
@@ -150,24 +132,6 @@ func _ProducerService_Enqueue_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProducerServiceServer).Enqueue(ctx, req.(*EnqueueRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ProducerService_EnqueueSingletonMigration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EnqueueRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProducerServiceServer).EnqueueSingletonMigration(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProducerService_EnqueueSingletonMigration_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProducerServiceServer).EnqueueSingletonMigration(ctx, req.(*EnqueueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -218,10 +182,6 @@ var ProducerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Enqueue",
 			Handler:    _ProducerService_Enqueue_Handler,
-		},
-		{
-			MethodName: "EnqueueSingletonMigration",
-			Handler:    _ProducerService_EnqueueSingletonMigration_Handler,
 		},
 		{
 			MethodName: "Requeue",

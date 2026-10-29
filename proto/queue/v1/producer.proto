@@ -9,8 +9,6 @@ option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
 
 service ProducerService {
   rpc Enqueue(EnqueueRequest) returns (EnqueueResponse) {}
-  // Older proxies fail closed rather than silently ignoring migration ownership.
-  rpc EnqueueSingletonMigration(EnqueueRequest) returns (EnqueueResponse) {}
   rpc Requeue(RequeueRequest) returns (RequeueResponse) {}
   rpc RequeueByJobID(RequeueByJobIDRequest) returns (RequeueByJobIDResponse) {}
 }
