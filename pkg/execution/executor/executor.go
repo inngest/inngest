@@ -3631,13 +3631,19 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 
 	now := e.now()
 	pauseSpan := tracing.SpanRefFromPause(&pause)
-	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    now,
-		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
-		Status:     enums.StepStatusTimedOut,
-		TargetSpan: pauseSpan,
-		Attributes: tracing.ResumeAttrs(&pause, &r),
-	})
+
+	// A step.subscribe park marker is not a step the user sees: it has no span to
+	// end and no waitForEvent to report as timed out.
+	marker := isSubscriptionParkPause(&pause)
+	if !marker {
+		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			EndTime:    now,
+			Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+			Status:     enums.StepStatusTimedOut,
+			TargetSpan: pauseSpan,
+			Attributes: tracing.ResumeAttrs(&pause, &r),
+		})
+	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
@@ -3711,6 +3717,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	code := pause.GetOpcode()
+	if marker {
+		code = enums.OpcodeNone
+	}
 	// Only run lifecycles if we consumed the pause and enqueued next step.
 	switch code {
 	case enums.OpcodeInvokeFunction:
@@ -3735,9 +3744,11 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 		})
 	}
-	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnRunResumed(ctx, id, r, code)
-	})
+	if !marker {
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRunResumed(ctx, id, r, code)
+		})
+	}
 
 	// And delete the OG pause.
 	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
@@ -3956,7 +3967,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if e.shards != nil {
+		if e.shards != nil && !(isSubscriptionParkPause(&pause) && !parkHasTimeout(&pause)) {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shards.Resolve(ctx, queue.Scope{

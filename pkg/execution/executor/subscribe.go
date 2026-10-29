@@ -236,6 +236,13 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		// The marker says "this run is waiting for message Seq". It is a pause
 		// only so that a delivery can find and consume it atomically.
 		parkExpires := e.now().Add(consts.MaxWaitForEventTimeout)
+		if sub.Timeout != "" {
+			expires, err := (&state.WaitForEventOpts{Timeout: sub.Timeout}).Expires()
+			if err != nil {
+				return fmt.Errorf("unable to parse the park timeout: %w", err)
+			}
+			parkExpires = expires
+		}
 
 		parkEvent := subscriptionParkIndexName(runID, sub.Key)
 		parkIdx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: parkEvent}
@@ -257,10 +264,33 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// Like waitForEvent: the wake joins the batch's shared discovery.
 			ParallelCoalesceKey: group.ParallelCoalesceKey,
 			CreatedAt:           e.now(),
-			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq},
+			Metadata:            map[string]any{"key": sub.Key, "seq": sub.Seq, "timeout": sub.Timeout != ""},
 		}
 		if _, err := e.pm.Write(ctx, parkIdx, &park); err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription park: %w", err)
+		}
+
+		// A park with a timeout ends unanswered when it expires, like a
+		// waitForEvent: a queue item consumes the marker then. Consuming the marker
+		// first (a message, or close) removes the item.
+		if sub.Timeout != "" {
+			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID)
+			timeout := queue.Item{
+				JobID:                 &jobID,
+				WorkspaceID:           md.ID.Tenant.EnvID,
+				GroupID:               runCtx.GroupID(),
+				Kind:                  queue.KindPause,
+				Identifier:            sv2.V1FromMetadata(*md),
+				PriorityFactor:        runCtx.PriorityFactor(),
+				CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+				Payload:               queue.PayloadPauseTimeout{PauseID: park.ID, Pause: park},
+				Metadata:              make(map[string]any),
+				MaxAttempts:           runCtx.MaxAttempts(),
+				ParallelMode:          gen.ParallelMode(),
+			}
+			if err := e.queue.Enqueue(ctx, timeout, parkExpires, queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+				return fmt.Errorf("error enqueueing the park timeout: %w", err)
+			}
 		}
 
 		// A message may have been saved after the SDK read its state and before
@@ -280,6 +310,10 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// a later message would consume it and queue a stale discovery.
 			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
 				return fmt.Errorf("error deleting stale subscription park: %w", err)
+			}
+			// And the timeout item enqueued for it above.
+			if sub.Timeout != "" {
+				e.dequeuePauseJob(ctx, md, fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID))
 			}
 			return nil
 		case parkReady:
@@ -333,6 +367,35 @@ func parkSeq(pause *state.Pause) int {
 // waits for a subscription message. It has no timeout job.
 func isSubscriptionParkPause(pause *state.Pause) bool {
 	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
+}
+
+// dequeuePauseJob removes a pause job from the run's queue partition.
+func (e *executor) dequeuePauseJob(ctx context.Context, md *sv2.Metadata, jobID string) {
+	if e.shards == nil {
+		return
+	}
+
+	shard, err := e.shards.Resolve(ctx, queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, nil)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("could not find shard to dequeue a subscription job", "error", err)
+		return
+	}
+
+	err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
+		ID:         queue.HashID(ctx, jobID),
+		FunctionID: md.ID.FunctionID,
+		Data: queue.Item{
+			Kind:       queue.KindPause,
+			Identifier: sv2.V1FromMetadata(*md),
+		},
+	})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
+		logger.StdlibLogger(ctx).Error("error dequeueing a subscription job", "error", err)
+	}
 }
 
 // wakeSubscriber wakes the run if it is parked on this subscription. A delivery
@@ -464,4 +527,10 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
 	return e.wakeSubscriber(ctx, id, key)
+}
+
+// parkHasTimeout reports whether a park marker has a timeout job in the queue.
+func parkHasTimeout(pause *state.Pause) bool {
+	timeout, _ := pause.Metadata["timeout"].(bool)
+	return timeout
 }
