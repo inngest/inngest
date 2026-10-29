@@ -83,10 +83,11 @@ func subscriptionStepID(key string, reader string, seq int, attempt int) string 
 }
 
 // subscriptionParkIndexName names the index of the parked markers of one run
-// and subscription. It starts with consts.SubscriptionParkName. A delivery reads
+// and subscription. It starts with pauses.SubscriptionParkIndexPrefix; it is a
+// key, not an event name. A delivery reads
 // this one small index to find the marker without reading the run's stack.
 func subscriptionParkIndexName(runID string, key string) string {
-	return consts.SubscriptionParkName + ":" + runID + ":" + subscriptionKeyHash(key)
+	return pauses.SubscriptionParkIndexPrefix + ":" + runID + ":" + subscriptionKeyHash(key)
 }
 
 // subscriptionParkID is the ID of the marker of one park. It is made of the park
@@ -206,12 +207,8 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			MaxAttempts: runCtx.MaxAttempts(),
 			Subscribe:   &state.PauseSubscribe{Key: sub.Key, Stream: sub.Stream},
 			CreatedAt:   now,
-		}
-		if len(md.Config.EventIDs) > 0 {
-			// The event that started the run is its first message, not a
-			// subscription match.
-			trigger := md.Config.EventIDs[0].String()
-			pause.TriggeringEventID = &trigger
+
+			TriggeringEventID: subscriptionTriggerExclusion(sub, md),
 		}
 
 		_, err := e.pm.Write(ctx, idx, &pause)
@@ -437,7 +434,7 @@ func parkSeq(pause *state.Pause) int {
 // isSubscriptionParkPause reports whether a pause is the one a run blocks on while it
 // waits for a subscription message. It has no timeout job.
 func isSubscriptionParkPause(pause *state.Pause) bool {
-	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
+	return pause.Event != nil && strings.HasPrefix(*pause.Event, pauses.SubscriptionParkIndexPrefix)
 }
 
 // dequeueSubscriptionExpiry removes the queue job that would expire a subscription
@@ -618,4 +615,17 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 func parkHasTimeout(pause *state.Pause) bool {
 	timeout, _ := pause.Metadata["timeout"].(bool)
 	return timeout
+}
+
+// subscriptionTriggerExclusion returns the event ID a subscription pause must
+// not save as a message: the event that started the run, when the SDK asked
+// for it to be the first message itself (an agent inbox puts it back). Without
+// the ask the trigger is an ordinary event to the subscription.
+func subscriptionTriggerExclusion(sub *state.SubscribeOpts, md *sv2.Metadata) *string {
+	if !sub.TriggerIsFirst || len(md.Config.EventIDs) == 0 {
+		return nil
+	}
+
+	trigger := md.Config.EventIDs[0].String()
+	return &trigger
 }

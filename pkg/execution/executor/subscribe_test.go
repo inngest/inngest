@@ -1,14 +1,17 @@
 package executor
 
 import (
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,7 +83,7 @@ func TestSubscriptionParkIndexName(t *testing.T) {
 }
 
 func TestSubscriptionParkPause(t *testing.T) {
-	event := consts.SubscriptionParkName
+	event := pauses.SubscriptionParkIndexPrefix
 
 	require.True(t, isSubscriptionParkPause(&state.Pause{Event: &event}))
 	require.False(t, isSubscriptionParkPause(&state.Pause{}))
@@ -146,4 +149,16 @@ func TestSubscriptionClosedID(t *testing.T) {
 	require.True(t, strings.HasPrefix(closed, subscriptionMessagePrefix))
 	require.NotEqual(t, closed, subscriptionClosedID("other"))
 	require.Empty(t, subscriptionMessageIDs([]string{closed}, "inbox"))
+}
+
+func TestSubscriptionTriggerExclusion(t *testing.T) {
+	trigger := ulid.MustNew(ulid.Now(), rand.Reader)
+	md := &sv2.Metadata{Config: sv2.Config{EventIDs: []ulid.ULID{trigger}}}
+
+	require.Nil(t, subscriptionTriggerExclusion(&state.SubscribeOpts{Key: "plain"}, md))
+	require.Nil(t, subscriptionTriggerExclusion(&state.SubscribeOpts{Key: "inbox", TriggerIsFirst: true}, &sv2.Metadata{}))
+
+	got := subscriptionTriggerExclusion(&state.SubscribeOpts{Key: "inbox", TriggerIsFirst: true}, md)
+	require.NotNil(t, got)
+	require.Equal(t, trigger.String(), *got)
 }

@@ -17,6 +17,15 @@ import (
 
 var ErrNotInBuffer = fmt.Errorf("pause not in buffer")
 
+// SubscriptionParkIndexPrefix starts the name of the pause index of the park
+// markers of a run that waits on a step.subscribe subscription: the prefix, then
+// the run and a hash of the subscription. It is only a key. No event of this
+// name is ever sent, stored or matched: the pause store is indexed by a string
+// that is an event name for waitForEvent pauses, and a marker reuses that slot.
+// The "inngest/" prefix keeps the key out of reach of user events, which cannot
+// start with it.
+const SubscriptionParkIndexPrefix = consts.InternalNamePrefix + "subscription-park"
+
 // SkipFlushing returns whether we should skip flushing for any of the pauses
 // defined in the slice, or for given indexes.
 //
@@ -32,7 +41,7 @@ func SkipFlushing(index Index, pauses []*state.Pause) bool {
 		// flush this block for fast O(1) lookups.
 		return true
 	}
-	if strings.HasPrefix(index.EventName, consts.SubscriptionParkName) {
+	if strings.HasPrefix(index.EventName, SubscriptionParkIndexPrefix) {
 		// The markers of a parked subscription are read through a tiny per-run
 		// index and are short-lived: never flush these indexes.
 		return true

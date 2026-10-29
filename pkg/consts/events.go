@@ -12,8 +12,3 @@ const (
 	FnDeferScheduleName = InternalNamePrefix + "deferred.schedule"
 	HttpRequestName     = InternalNamePrefix + "http.request"
 )
-
-// SubscriptionParkName starts the name of the index of the markers of a run that
-// is parked on a step.subscribe subscription: the name, then the run and a hash of
-// the subscription. The string is the one the earlier wait pauses used.
-const SubscriptionParkName = InternalNamePrefix + "subscription.wait"

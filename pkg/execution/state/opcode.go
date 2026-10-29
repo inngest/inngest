@@ -651,6 +651,10 @@ type SubscribeOpts struct {
 	// Stream is which of the subscription's events this op is for. Each event is
 	// its own pause; all of them save messages under the same Key.
 	Stream int `json:"stream,omitempty"`
+	// TriggerIsFirst, on open, says the SDK treats the event that started the run
+	// as the first message itself, so the executor must not save it again if it
+	// matches. Without it the trigger is an ordinary event to the subscription.
+	TriggerIsFirst bool `json:"triggerIsFirst,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
@@ -46,7 +45,7 @@ func TestFinalizingARunRemovesItsSubscriptionPauses(t *testing.T) {
 			identifier := state.PauseIdentifier{RunID: run, FunctionID: uuid.New(), AccountID: uuid.New()}
 
 			messageEvent := "agent/message"
-			waitEvent := consts.SubscriptionParkName
+			waitEvent := SubscriptionParkIndexPrefix
 			subscription := state.Pause{
 				ID:          uuid.New(),
 				WorkspaceID: ws,
