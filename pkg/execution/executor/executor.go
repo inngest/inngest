@@ -3366,6 +3366,23 @@ func (e *executor) handlePause(
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
 		}
 
+		if pause.Subscribe != nil {
+			// step.subscribe: save the event as a message and keep the pause.
+			err := e.deliverSubscription(ctx, evt, pause, l)
+			if errors.Is(err, state.ErrRunNotFound) {
+				// The run is gone, so the message cannot be saved to it. It is dropped:
+				// nothing is re-sent for a run that has finished.
+				cleanup(ctx)
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("error delivering subscription message: %w", err)
+			}
+
+			atomic.AddInt32(&res[1], 1)
+			return nil
+		}
+
 		resumeData := pause.GetResumeData(evt.GetEvent())
 
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
@@ -3569,6 +3586,12 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// A subscription pause lives as long as the run: its expiry is not a timeout
+	// the run waits on, and a closed subscription has nothing to resume.
+	if pause.Subscribe != nil {
+		return nil
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -3608,13 +3631,19 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 
 	now := e.now()
 	pauseSpan := tracing.SpanRefFromPause(&pause)
-	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    now,
-		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
-		Status:     enums.StepStatusTimedOut,
-		TargetSpan: pauseSpan,
-		Attributes: tracing.ResumeAttrs(&pause, &r),
-	})
+
+	// A step.subscribe park marker is not a step the user sees: it has no span to
+	// end and no waitForEvent to report as timed out.
+	marker := isSubscriptionParkPause(&pause)
+	if !marker {
+		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			EndTime:    now,
+			Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
+			Status:     enums.StepStatusTimedOut,
+			TargetSpan: pauseSpan,
+			Attributes: tracing.ResumeAttrs(&pause, &r),
+		})
+	}
 
 	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
@@ -3688,6 +3717,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	code := pause.GetOpcode()
+	if marker {
+		code = enums.OpcodeNone
+	}
 	// Only run lifecycles if we consumed the pause and enqueued next step.
 	switch code {
 	case enums.OpcodeInvokeFunction:
@@ -3712,9 +3744,11 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 		})
 	}
-	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnRunResumed(ctx, id, r, code)
-	})
+	if !marker {
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRunResumed(ctx, id, r, code)
+		})
+	}
 
 	// And delete the OG pause.
 	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
@@ -3796,13 +3830,19 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 		now := e.now()
 		pauseSpan := tracing.SpanRefFromPause(&pause)
-		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			EndTime:    now,
-			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
-			Status:     status,
-			TargetSpan: pauseSpan,
-			Attributes: tracing.ResumeAttrs(&pause, &r),
-		})
+
+		// A step.subscribe marker is not a step the user sees: it has no span to
+		// end and no waitForEvent to report as resumed.
+		marker := isSubscriptionParkPause(&pause)
+		if !marker {
+			_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+				EndTime:    now,
+				Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
+				Status:     status,
+				TargetSpan: pauseSpan,
+				Attributes: tracing.ResumeAttrs(&pause, &r),
+			})
+		}
 
 		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
 			if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
@@ -3888,6 +3928,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		code := pause.GetOpcode()
+		if marker {
+			code = enums.OpcodeNone
+		}
 		// Only run lifecycles if we consumed the pause and enqueued next step.
 		switch code {
 		case enums.OpcodeInvokeFunction:
@@ -3912,9 +3955,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 			})
 		}
-		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnRunResumed(ctx, sv2id, r, code)
-		})
+		if !marker {
+			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+				l.OnRunResumed(ctx, sv2id, r, code)
+			})
+		}
 
 		// The timeout job is running on the queue and will Dequeue() itself. No need to continue.
 		if r.IsTimeout {
@@ -3922,7 +3967,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if e.shards != nil {
+		if e.shards != nil && !(isSubscriptionParkPause(&pause) && !parkHasTimeout(&pause)) {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shards.Resolve(ctx, queue.Scope{
@@ -5803,6 +5848,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		if err := gen.SetOpt("if", interpolated); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
+	}
+
+	if opts.Subscribe != nil {
+		// step.subscribe shares the expression handling above.
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts, expr)
 	}
 
 	opcode := gen.Op.String()

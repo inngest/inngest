@@ -605,6 +605,52 @@ type WaitForEventOpts struct {
 	If      *string `json:"if"`
 	// Event is taken from GeneratorOpcode.Name if this is empty.
 	Event string `json:"event"`
+	// Subscribe marks this op as part of a step.subscribe subscription: a
+	// persistent pause that is not consumed when an event matches.
+	Subscribe *SubscribeOpts `json:"subscribe,omitempty"`
+}
+
+// Modes of a subscription op.
+const (
+	// SubscribeOpen creates the subscription pause.
+	SubscribeOpen = "open"
+	// SubscribePark parks the run until message Seq exists: the number of messages the SDK has read, plus one.
+	SubscribePark = "park"
+	// SubscribePoll answers message Seq now, or null when it has not arrived.
+	SubscribePoll = "poll"
+	// SubscribeClose deletes the subscription pause and reports how many
+	// messages were saved.
+	SubscribeClose = "close"
+	// SubscribeStop deletes the pause of one stream, so its events are no longer
+	// saved, and leaves the rest of the subscription and its parks alone.
+	SubscribeStop = "stop"
+	// SubscribeCurrent answers how many messages the subscription has saved so
+	// far, without moving anything.
+	SubscribeCurrent = "current"
+)
+
+// SubscribeOpts are the step.subscribe options carried on a WaitForEvent op.
+type SubscribeOpts struct {
+	// Key is the unhashed subscription ID. Messages are saved as steps whose ID
+	// is made of it and the event ID.
+	Key string `json:"key"`
+	// Mode is one of the Subscribe* constants.
+	Mode string `json:"mode"`
+	// Seq is the message a next or poll op asks for, starting at 1.
+	Seq int `json:"seq,omitempty"`
+	// Timeout, for a park, is how long the run waits for the message before the
+	// park ends unanswered, as a waitForEvent timeout string. Empty waits for
+	// ever.
+	Timeout string `json:"timeout,omitempty"`
+	// Attempt, for a park, counts the parks for this Seq that timed out before.
+	// Each park is its own step, so a timed-out one is not answered again.
+	Attempt int `json:"attempt,omitempty"`
+	// Reader, for a park, names the reader that waits (a view of the inbox has
+	// its own cursor and its own parks). Empty for the inbox's own reader.
+	Reader string `json:"reader,omitempty"`
+	// Stream is which of the subscription's events this op is for. Each event is
+	// its own pause; all of them save messages under the same Key.
+	Stream int `json:"stream,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {
