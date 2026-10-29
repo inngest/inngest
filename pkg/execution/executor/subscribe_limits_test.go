@@ -252,3 +252,34 @@ func TestDeliverToClosedSubscriptionRemovesThePause(t *testing.T) {
 	require.Equal(t, []uuid.UUID{pause.ID}, pm.deleted)
 	require.Empty(t, rs.saved)
 }
+
+// An open that carries more streams saves one pause per stream and says how
+// many it opened; one over the limit fails the run and leaves none behind.
+func TestOpenSubscriptionManyStreams(t *testing.T) {
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+	md := limitMetadata()
+	rs := &limitRunService{md: md}
+
+	pm := &limitPauseManager{}
+	e := newLimitExecutor(rs, pm)
+	gen, opts := subscribeGen(state.SubscribeOpts{
+		Key:  "inbox",
+		Mode: state.SubscribeOpen,
+		Streams: []state.SubscribeStream{
+			{Stream: 1, Event: "agent/b"},
+			{Stream: 2, Event: "agent/c"},
+		},
+	}, "inbox:open")
+	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil))
+	require.Len(t, pm.wrote, 3)
+	require.Equal(t, "agent/message", *pm.wrote[0].Event)
+	require.Equal(t, "agent/c", *pm.wrote[2].Event)
+	require.Equal(t, 2, pm.wrote[2].Subscribe.Stream)
+
+	pm = &limitPauseManager{runPauses: consts.MaxSubscriptionPausesPerRun + 1}
+	e = newLimitExecutor(rs, pm)
+	err := e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil)
+	require.ErrorIs(t, err, state.ErrSubscriptionLimit)
+	require.Len(t, pm.deleted, len(pm.wrote))
+	require.NotEmpty(t, pm.wrote)
+}
