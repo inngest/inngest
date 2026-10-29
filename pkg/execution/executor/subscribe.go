@@ -12,12 +12,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 // A step.subscribe subscription keeps its pause when an event matches and saves
@@ -127,6 +129,15 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
 	}
 
+	// messages are the subscription's message step IDs in stack order.
+	messages := func() ([]string, error) {
+		stack, err := e.smv2.LoadStack(ctx, md.ID)
+		if err != nil {
+			return nil, err
+		}
+		return subscriptionMessageIDs(stack, sub.Key), nil
+	}
+
 	switch sub.Mode {
 	case state.SubscribeOpen:
 		now := e.now()
@@ -179,6 +190,27 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		return answer(map[string]any{"opened": true})
 
+	case state.SubscribePoll:
+		ids, err := messages()
+		if err != nil {
+			return err
+		}
+		if len(ids) < sub.Seq {
+			return answer(nil)
+		}
+
+		saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{ids[sub.Seq-1]})
+		if err != nil {
+			return err
+		}
+		var stored struct {
+			Data any `json:"data"`
+		}
+		if err := json.Unmarshal(saved[ids[sub.Seq-1]], &stored); err != nil {
+			return err
+		}
+		return answer(stored.Data)
+
 	}
 
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
@@ -188,4 +220,46 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 // waits for a subscription message. It has no timeout job.
 func isSubscriptionParkPause(pause *state.Pause) bool {
 	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
+}
+
+// deliverSubscription saves an event that matched a subscription pause as a
+// message of the run and wakes the run if it is blocked on that message. The
+// pause stays.
+func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEvent, pause *state.Pause, l logger.Logger) error {
+	id := sv2.IDFromPause(*pause)
+	key := pause.Subscribe.Key
+	eventID := evt.GetInternalID().String()
+
+	// The event that started the run is its first message, not a match.
+	if pause.TriggeringEventID != nil && *pause.TriggeringEventID == eventID {
+		return nil
+	}
+
+	// SaveStep writes to the run's hashes whether or not the run still
+	// exists, so check first: a finished run cannot take the message.
+	if exists, err := e.smv2.Exists(ctx, id); err != nil {
+		return err
+	} else if !exists {
+		return state.ErrRunNotFound
+	}
+
+	saved := evt.GetEvent().Map()
+
+	data, err := json.Marshal(map[string]any{"data": saved})
+	if err != nil {
+		return err
+	}
+
+	// The same event saves the same bytes under the same ID: a redelivery is
+	// the message it already is.
+	messageID := subscriptionMessageID(key, eventID)
+	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
+	redelivered := err != nil
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
+	}
+
+	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
+
+	return nil
 }

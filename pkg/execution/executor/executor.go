@@ -3366,6 +3366,23 @@ func (e *executor) handlePause(
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
 		}
 
+		if pause.Subscribe != nil {
+			// step.subscribe: save the event as a message and keep the pause.
+			err := e.deliverSubscription(ctx, evt, pause, l)
+			if errors.Is(err, state.ErrRunNotFound) {
+				// The run is gone, so the message cannot be saved to it. It is dropped:
+				// nothing is re-sent for a run that has finished.
+				cleanup(ctx)
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("error delivering subscription message: %w", err)
+			}
+
+			atomic.AddInt32(&res[1], 1)
+			return nil
+		}
+
 		resumeData := pause.GetResumeData(evt.GetEvent())
 
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
