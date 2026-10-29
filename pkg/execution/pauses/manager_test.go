@@ -3,6 +3,8 @@ package pauses
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -427,4 +429,61 @@ func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[str
 }
 func (m *mockRunService) LoadDefersMeta(ctx context.Context, id statev2.ID) (map[string]statev2.DeferMeta, error) {
 	return nil, nil
+}
+
+type pauseLookupBuffer struct {
+	Bufferer
+	pause *state.Pause
+	err   error
+}
+
+func (b *pauseLookupBuffer) PauseByID(context.Context, Index, uuid.UUID) (*state.Pause, error) {
+	return b.pause, b.err
+}
+
+type pauseLookupBlockStore struct {
+	BlockStore
+	pause *state.Pause
+	calls int
+}
+
+func (b *pauseLookupBlockStore) PauseByID(context.Context, Index, uuid.UUID) (*state.Pause, error) {
+	b.calls++
+	return b.pause, nil
+}
+
+func TestPauseByIDBufferErrors(t *testing.T) {
+	ctx := context.Background()
+	p := &state.Pause{ID: uuid.New(), WorkspaceID: uuid.New()}
+	storeErr := errors.New("buffer unavailable")
+	for _, tt := range []struct {
+		name       string
+		pause      *state.Pause
+		err        error
+		wantErr    error
+		wantBlocks bool
+	}{
+		{name: "buffer hit", pause: p},
+		{name: "buffer miss", err: state.ErrPauseNotFound, wantBlocks: true},
+		{name: "wrapped buffer miss", err: fmt.Errorf("lookup: %w", state.ErrPauseNotFound), wantBlocks: true},
+		{name: "nil buffer result", wantBlocks: true},
+		{name: "buffer failure", err: storeErr, wantErr: storeErr},
+		{name: "partial buffer result with failure", pause: p, err: storeErr, wantErr: storeErr},
+		{name: "cancellation", err: context.Canceled, wantErr: context.Canceled},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			buffer := &pauseLookupBuffer{pause: tt.pause, err: tt.err}
+			blocks := &pauseLookupBlockStore{pause: p}
+			mgr := NewManager(buffer, blocks, WithBlockStoreEnabled(alwaysEnabled))
+			got, err := mgr.PauseByID(ctx, Index{WorkspaceID: p.WorkspaceID}, p.ID)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				require.Same(t, p, got)
+			}
+			require.Equal(t, tt.wantBlocks, blocks.calls == 1)
+		})
+	}
 }

@@ -231,3 +231,44 @@ func TestHandleInvokeFinishMissingIndexResumes(t *testing.T) {
 		})
 	}
 }
+
+type missingInvokeBlockStore struct {
+	pauses.BlockStore
+	lookups int
+}
+
+func (b *missingInvokeBlockStore) PauseByID(context.Context, pauses.Index, uuid.UUID) (*state.Pause, error) {
+	b.lookups++
+	return nil, state.ErrPauseNotFound
+}
+
+func TestHandleInvokeFinishBlockStorageReadError(t *testing.T) {
+	storeErr := errors.New("buffer unavailable")
+	for _, tt := range []struct {
+		name             string
+		readErr          error
+		wantErr          error
+		wantBlockLookups int
+	}{
+		{name: "read error stays retryable", readErr: storeErr, wantErr: storeErr},
+		{name: "missing pause stays missing", readErr: state.ErrPauseNotFound, wantErr: state.ErrInvokePauseNotFound, wantBlockLookups: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p, evt := invokePauseFixture()
+			buffer := &invokeLookupManager{
+				lookup: func() (*state.Pause, error) { return nil, state.ErrInvokePauseNotFound },
+				byID: func(index pauses.Index, id uuid.UUID) (*state.Pause, error) {
+					require.Equal(t, pauses.Index{WorkspaceID: p.WorkspaceID, EventName: event.FnFinishedName}, index)
+					require.Equal(t, p.ID, id)
+					return nil, tt.readErr
+				},
+			}
+			blocks := &missingInvokeBlockStore{}
+			pm := pauses.NewManager(buffer, blocks, pauses.WithBlockStoreEnabled(func(context.Context, uuid.UUID) bool { return true }))
+			e := &executor{pm: pm, log: logger.From(context.Background())}
+			err := e.HandleInvokeFinish(context.Background(), evt)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.wantBlockLookups, blocks.lookups)
+		})
+	}
+}
