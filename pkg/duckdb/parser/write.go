@@ -836,9 +836,10 @@ var syntaxFunctionNames = map[string]bool{
 // Reserved* names that take any keyword.
 //
 // A Syntax call (the adapter's desugared COALESCE(...)) is printed back as
-// that syntax: DuckDB has no function named coalesce (COALESCE is an
-// operator). A source `"coalesce"(x)` call isn't Syntax, so it stays a
-// quoted call and fails as an unknown function, same as in DuckDB itself.
+// that syntax: COALESCE is parser syntax for an operator, not a catalog
+// function, even though DuckDB documents it as one. A source
+// `"coalesce"(x)` call isn't Syntax, so it stays a quoted call and fails
+// the catalog lookup, same as in DuckDB itself.
 func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	if f.Receiver != nil || len(f.Name) > 1 {
 		for i, p := range f.Name {

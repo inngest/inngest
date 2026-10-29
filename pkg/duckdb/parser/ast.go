@@ -371,8 +371,9 @@ type FunctionExpr struct {
 	Export       bool
 	Over         *WindowSpec
 	// Syntax marks a call desugared from a keyword syntax form that has no
-	// plain function behind it (only COALESCE(...) today, an operator in
-	// DuckDB), so Write prints it back in that form rather than as a call.
+	// catalog function behind it (only COALESCE(...) today, which DuckDB
+	// parses straight into an operator), so Write prints it back in that
+	// form rather than as a call.
 	Syntax bool
 }
 
