@@ -1196,6 +1196,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionWaiting(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
@@ -1817,4 +1818,61 @@ func StrSlice(args []any) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+// SetSubscriptionWaiting marks a subscription of a run as waiting. It reports
+// whether the run exists.
+func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string, token string) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	set, err := retriableScripts["setSubscriptionWaiting"].Exec(
+		redis_telemetry.WithScriptName(ctx, "setSubscriptionWaiting"),
+		r,
+		[]string{
+			fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID),
+			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
+		},
+		[]string{hash, token},
+	).AsInt64()
+	if err != nil {
+		return false, fmt.Errorf("error marking a subscription as waiting: %w", err)
+	}
+
+	return set == 1, nil
+}
+
+// TakeSubscriptionWaiting clears the waiting flag of a subscription and returns
+// the token it held. The flag was not set when ok is false.
+func (m shardedMgr) TakeSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) (token string, ok bool, err error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "TakeSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	token, err = retriableScripts["takeSubscriptionWaiting"].Exec(
+		redis_telemetry.WithScriptName(ctx, "takeSubscriptionWaiting"),
+		r,
+		[]string{fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)},
+		[]string{hash},
+	).ToString()
+	if rueidis.IsRedisNil(err) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("error clearing a subscription's waiting flag: %w", err)
+	}
+
+	return token, true, nil
+}
+
+// ClearSubscriptionWaiting clears the waiting flags of every subscription of a run.
+func (m shardedMgr) ClearSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClearSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Del().Key(fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)).Build()
+	}).Error()
 }

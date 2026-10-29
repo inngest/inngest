@@ -6,19 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
 	mrand "math/rand"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/oklog/ulid/v2"
@@ -28,10 +31,10 @@ import (
 
 // These tests drive step.subscribe wakes through the real queue and run state
 // (miniredis, the real Lua), one step at a time, so every interleaving is a
-// sequence the test writes down. A wake is processed the way the queue and
-// Execute process it: lease the item, record the message count (start), let the
-// SDK read the run's state (read), then handle the response (end): a follow-up
-// error requeues the same item, anything else dequeues it.
+// sequence the test writes down. A request is the function's request: it reads
+// the run's state (read) and ends with a waiting read (end), which is when the
+// executor sets the waiting flag. A wake is the discovery item a delivery or
+// that end queues; the queue removes it (dequeue) after its request was handled.
 
 type recordingQueue struct {
 	queue.Queue
@@ -50,23 +53,57 @@ func (q *recordingQueue) Enqueue(ctx context.Context, item queue.Item, at time.T
 	return err
 }
 
+// hookedRunService runs a function after the waiting flag is set and after the
+// recheck loads the stack, to land a delivery exactly there.
+type hookedRunService struct {
+	sv2.RunService
+	afterSet   func()
+	afterStack func()
+}
+
+func (h *hookedRunService) SetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string, token string) error {
+	err := h.RunService.(sv2.SubscriptionWaiter).SetSubscriptionWaiting(ctx, id, hash, token)
+	if h.afterSet != nil {
+		h.afterSet()
+	}
+	return err
+}
+
+func (h *hookedRunService) TakeSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string) (string, bool, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).TakeSubscriptionWaiting(ctx, id, hash)
+}
+
+func (h *hookedRunService) ClearSubscriptionWaiting(ctx context.Context, id sv2.ID) error {
+	return h.RunService.(sv2.SubscriptionWaiter).ClearSubscriptionWaiting(ctx, id)
+}
+
+func (h *hookedRunService) LoadStack(ctx context.Context, id sv2.ID) ([]string, error) {
+	stack, err := h.RunService.LoadStack(ctx, id)
+	if h.afterStack != nil {
+		h.afterStack()
+	}
+	return stack, err
+}
+
 type wakeFixture struct {
 	t      *testing.T
 	ctx    context.Context
+	mr     *miniredis.Miniredis
 	e      *executor
 	rq     *recordingQueue
 	shard  queue.QueueShard
 	rs     sv2.RunService
+	hooks  *hookedRunService
 	md     sv2.Metadata
 	events int
 
 	// delivered counts the messages saved per subscription.
 	delivered map[string]int
 	// saw is how many messages the function's last request read, per
-	// subscription: what the SDK saw when it last blocked.
+	// subscription.
 	saw map[string]int
-	// starts counts the wake discoveries that ran, per subscription.
-	starts map[string]int
+	// requests counts the requests the function made, per subscription.
+	requests map[string]int
 }
 
 func newWakeFixture(t *testing.T, forceStepPlan bool) *wakeFixture {
@@ -87,6 +124,7 @@ func newWakeFixture(t *testing.T, forceStepPlan bool) *wakeFixture {
 	mgr, err := redis_state.New(ctx, redis_state.WithShardedClient(sc), redis_state.WithPauseDeleter(redis_state.NewPauseStore(uc)))
 	require.NoError(t, err)
 	rs := redis_state.MustRunServiceV2(mgr)
+	hooks := &hookedRunService{RunService: rs}
 
 	shard := redis_state.NewQueueShard("local", redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey))
 	registry, err := queue.NewSingleShardRegistry(shard)
@@ -110,12 +148,12 @@ func newWakeFixture(t *testing.T, forceStepPlan bool) *wakeFixture {
 
 	rq := &recordingQueue{Queue: q}
 	return &wakeFixture{
-		t: t, ctx: ctx, rq: rq, shard: shard, rs: rs, md: md,
+		t: t, ctx: ctx, mr: mr, rq: rq, shard: shard, rs: rs, hooks: hooks, md: md,
 		e: &executor{
-			log: logger.VoidLogger(), smv2: rs, queue: rq, shards: registry,
+			log: logger.VoidLogger(), smv2: hooks, queue: rq, shards: registry,
 			pm: &limitPauseManager{}, tracerProvider: tracing.NewNoopTracerProvider(),
 		},
-		delivered: map[string]int{}, saw: map[string]int{}, starts: map[string]int{},
+		delivered: map[string]int{}, saw: map[string]int{}, requests: map[string]int{},
 	}
 }
 
@@ -143,108 +181,136 @@ func (f *wakeFixture) burst(key string, n int) {
 	}
 }
 
-func wakeJobID(f *wakeFixture, key string) string {
-	return subscriptionWakeJobID(f.md.ID.RunID.String(), subscriptionKeyHash(key))
+func (f *wakeFixture) wakePrefix(key string) string {
+	return fmt.Sprintf("%s-subscription-wake-%s-", f.md.ID.RunID, subscriptionKeyHash(key))
 }
 
-// queued reports whether the subscription's wake is in the queue, queued or leased.
+// wakes are the wake items of the subscription in the queue, queued or leased.
+func (f *wakeFixture) wakes(key string) []queue.QueueItem {
+	var items []queue.QueueItem
+	for _, id := range f.rq.accepted {
+		if !strings.HasPrefix(id, f.wakePrefix(key)) {
+			continue
+		}
+		qi, err := f.shard.LoadQueueItem(f.ctx, queue.HashID(f.ctx, id))
+		if errors.Is(err, queue.ErrQueueItemNotFound) {
+			continue
+		}
+		require.NoError(f.t, err)
+		items = append(items, *qi)
+	}
+	return items
+}
+
 func (f *wakeFixture) queued(key string) bool {
-	_, err := f.shard.LoadQueueItem(f.ctx, queue.HashID(f.ctx, wakeJobID(f, key)))
-	if errors.Is(err, queue.ErrQueueItemNotFound) {
-		return false
+	return len(f.wakes(key)) > 0
+}
+
+// accepts is how many wake items were ever queued for the subscription.
+func (f *wakeFixture) accepts(key string) int {
+	n := 0
+	for _, id := range f.rq.accepted {
+		if strings.HasPrefix(id, f.wakePrefix(key)) {
+			n++
+		}
 	}
-	require.NoError(f.t, err)
-	return true
+	return n
 }
 
-type wakeRun struct {
-	f    *wakeFixture
-	key  string
-	qi   queue.QueueItem
-	wake subscriptionWake
-	// done is set once the request has read the run's state.
-	done bool
+// request is one request of the function for a subscription.
+type request struct {
+	f   *wakeFixture
+	key string
+	// qi is the wake item the request runs for, nil for any other request.
+	qi     *queue.QueueItem
+	read   bool
+	closed bool
+	ended  bool
 }
 
-// start leases the wake of the subscription and records its message count, as
-// Execute does before it calls the SDK. It returns nil when nothing is queued.
-func (f *wakeFixture) start(key string) *wakeRun {
+// begin starts a request that is not a wake: the first one, or the one a timer
+// runs.
+func (f *wakeFixture) begin(key string) *request {
+	f.requests[key]++
+	return &request{f: f, key: key}
+}
+
+// start leases a queued wake and starts its request.
+func (f *wakeFixture) start(key string) *request {
 	f.t.Helper()
-	qi, err := f.shard.LoadQueueItem(f.ctx, queue.HashID(f.ctx, wakeJobID(f, key)))
-	if errors.Is(err, queue.ErrQueueItemNotFound) {
-		return nil
+	for _, qi := range f.wakes(key) {
+		if qi.LeaseID != nil {
+			continue
+		}
+		lease, err := f.shard.Lease(f.ctx, qi, 30*time.Second, time.Now())
+		require.NoError(f.t, err)
+		qi.LeaseID = lease
+		r := f.begin(key)
+		r.qi = &qi
+		return r
 	}
-	require.NoError(f.t, err)
-	require.Nil(f.t, qi.LeaseID, "a second wake started while one runs")
-
-	lease, err := f.shard.Lease(f.ctx, *qi, 30*time.Second, time.Now())
-	require.NoError(f.t, err)
-	qi.LeaseID = lease
-
-	md, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
-	require.NoError(f.t, err)
-	f.starts[key]++
-
-	return &wakeRun{f: f, key: key, qi: *qi, wake: newSubscriptionWake(qi.Data, md.Stack)}
+	return nil
 }
 
-// read is the SDK's request reading the run's state: what it holds now is what
-// the function sees when it blocks again.
-func (r *wakeRun) read() {
+// readState is the request reading the run's state: what it holds now is what
+// the function sees when it blocks.
+func (r *request) readState() {
 	r.f.t.Helper()
+	if r.read {
+		return
+	}
 	stack, err := r.f.rs.LoadStack(r.f.ctx, r.f.md.ID)
 	require.NoError(r.f.t, err)
 	r.f.saw[r.key] = len(subscriptionMessageIDs(stack, r.key))
-	r.done = true
+	r.closed = slices.Contains(stack, subscriptionClosedID(r.key))
+	r.read = true
 }
 
-// end handles the response: a follow-up error requeues the same item, as the
-// queue does for an always-retry error; any other outcome dequeues it.
-func (r *wakeRun) end(resp *state.DriverResponse, driverErr error) (again bool) {
+// waitOp is the waiting op the SDK returns for a read that found nothing.
+func (r *request) waitOp() state.GeneratorOpcode {
+	return state.GeneratorOpcode{
+		Op: enums.OpcodeNone, ID: fmt.Sprintf("%s:%d", r.key, r.f.saw[r.key]+1),
+		Opts: map[string]any{"subscribe": map[string]any{"key": r.key, "seq": r.f.saw[r.key] + 1}},
+	}
+}
+
+// handle is the executor handling the response of the request: the waiting op.
+func (r *request) handle() {
 	r.f.t.Helper()
-	// A request always reads the state it runs on.
-	if !r.done {
-		r.read()
+	r.readState()
+	// A subscription closed when the request read ends the read instead of waiting.
+	if r.closed {
+		r.ended = true
+		return
 	}
-	err := r.f.e.subscriptionWakeFollowUp(r.f.ctx, r.f.md.ID, r.wake, resp, driverErr)
-
-	if queue.IsAlwaysRetryable(err) {
-		require.ErrorContains(r.f.t, err, errSubscriptionWakeAgain.Error())
-		require.NoError(r.f.t, r.f.rq.Requeue(r.f.ctx, r.f.shard.Name(), r.qi, time.Now()))
-		return true
-	}
+	rc := &mockRunContext{md: r.f.md}
+	err := r.f.e.handleGeneratorSubscribeWait(r.f.ctx, rc, r.waitOp(), queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}})
 	require.NoError(r.f.t, err)
+	r.ended = true
+}
 
-	if driverErr != nil || (resp != nil && resp.Err != nil) {
-		// A failed request is retried as the same item, one attempt later.
-		r.qi.Data.Attempt++
-		require.NoError(r.f.t, r.f.rq.Requeue(r.f.ctx, r.f.shard.Name(), r.qi, time.Now()))
-		return false
+// finish is the queue removing the wake item once its request is handled.
+func (r *request) finish() {
+	r.f.t.Helper()
+	if r.qi != nil {
+		require.NoError(r.f.t, r.f.rq.Dequeue(r.f.ctx, r.f.shard.Name(), *r.qi))
 	}
-
-	require.NoError(r.f.t, r.f.rq.Dequeue(r.f.ctx, r.f.shard.Name(), r.qi))
-	return false
 }
 
-func okResp() *state.DriverResponse { return &state.DriverResponse{} }
-
-// run is one whole wake with nothing in between.
-func (f *wakeFixture) run(key string) {
-	f.t.Helper()
-	r := f.start(key)
-	require.NotNil(f.t, r)
-	r.read()
-	r.end(okResp(), nil)
+// end handles the response and removes the item.
+func (r *request) end() {
+	r.handle()
+	r.finish()
 }
 
-// drain runs wakes until none is queued. The bound catches a wake that never settles.
-func (f *wakeFixture) drain(keys ...string) {
+// settle runs wakes until none is queued. The bound catches a wake that never settles.
+func (f *wakeFixture) settle(keys ...string) {
 	f.t.Helper()
 	for i := 0; i < 1000; i++ {
 		ran := false
 		for _, key := range keys {
-			if f.queued(key) {
-				f.run(key)
+			if r := f.start(key); r != nil {
+				r.end()
 				ran = true
 			}
 		}
@@ -255,247 +321,385 @@ func (f *wakeFixture) drain(keys ...string) {
 	f.t.Fatal("wakes did not settle")
 }
 
-// requireNothingLost is the end state of every cell: no wake is queued (no
-// hang), and the function's last request saw every message that was saved (no
-// lost wake).
+// requireNothingLost is the end state of every cell: no wake is queued, the
+// function's last request saw every message that was saved, and the run is
+// waiting (the flag is set, so the next message wakes it).
 func (f *wakeFixture) requireNothingLost(keys ...string) {
 	f.t.Helper()
+	waiter := f.rs.(sv2.SubscriptionWaiter)
 	for _, key := range keys {
 		require.False(f.t, f.queued(key), "wake of %q left queued", key)
 		require.Equal(f.t, f.delivered[key], f.saw[key], "messages of %q the function never saw", key)
+		_, waiting, err := waiter.TakeSubscriptionWaiting(f.ctx, f.md.ID, subscriptionKeyHash(key))
+		require.NoError(f.t, err)
+		require.True(f.t, waiting, "the run is not waiting on %q, so the next message would not wake it", key)
+		require.NoError(f.t, waiter.SetSubscriptionWaiting(f.ctx, f.md.ID, subscriptionKeyHash(key), uuid.NewString()))
 	}
 }
 
-// Twenty messages while the wake cannot run (flow control, concurrency): one
-// wake in the queue, which sees all twenty.
-func TestWakeBurstWhileBlocked(t *testing.T) {
+// A run that is busy has no flag: messages saved while a request runs, or a
+// lone step runs inline in it, queue nothing, so no discovery overlaps the
+// step. The request that ends waiting finds them with one wake.
+func TestWakeBusyRunGetsNoDiscoveries(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-	f.burst("inbox", 19)
+	r := f.begin("inbox")
+	r.readState()
 
-	require.Len(t, f.rq.accepted, 1)
-	require.Equal(t, 19, f.rq.rejected)
-	require.Equal(t, []string{wakeJobID(f, "inbox")}, f.rq.accepted)
+	// The request runs a step inline while messages arrive.
+	f.burst("inbox", 20)
+	require.Zero(t, f.accepts("inbox"))
+	require.Zero(t, f.rq.rejected)
 
-	f.run("inbox")
-	f.requireNothingLost("inbox")
-	require.Equal(t, 1, f.starts["inbox"])
-	require.Equal(t, 20, f.saw["inbox"])
-}
+	r.end()
+	require.Equal(t, 1, f.accepts("inbox"), "the end of the request wakes the run once")
 
-// The wake is an ordinary edge item with no idempotency period: the ID is free
-// once it is done, and held for as long as it queues or runs.
-func TestWakeJobIDHeldWhileQueuedAndFreedWhenDone(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	qi, err := f.shard.LoadQueueItem(f.ctx, queue.HashID(f.ctx, wakeJobID(f, "inbox")))
-	require.NoError(t, err)
-	require.Equal(t, queue.KindEdge, qi.Data.Kind)
-	require.NotNil(t, qi.IdempotencyPeriod)
-	require.Zero(t, *qi.IdempotencyPeriod)
-	require.Equal(t, "step", qi.Data.Payload.(queue.PayloadEdge).Edge.Incoming)
-
-	// Held while leased, too.
-	r := f.start("inbox")
-	f.deliver("inbox")
-	require.Equal(t, 1, f.rq.rejected)
-	r.read()
-	require.True(t, r.end(okResp(), nil))
-	f.run("inbox")
-
-	// Free once done: the next message makes a new item at once, with no key left.
-	require.False(t, f.queued("inbox"))
-	before := len(f.rq.accepted)
-	f.deliver("inbox")
-	require.Len(t, f.rq.accepted, before+1)
-	f.run("inbox")
+	f.settle("inbox")
 	f.requireNothingLost("inbox")
 }
 
-// A message that lands while a wake runs, after its request read the state, is
-// the lost wake this design exists to prevent: the same item runs again.
-func TestWakeMessageAfterStateRead(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.burst("inbox", 3)
-
-	r := f.start("inbox")
-	r.read()
-	f.deliver("inbox")
-	require.True(t, r.end(okResp(), nil), "the wake must run again")
-	require.True(t, f.queued("inbox"))
-
-	f.run("inbox")
-	f.requireNothingLost("inbox")
-	require.Equal(t, 2, f.starts["inbox"])
-	require.Len(t, f.rq.accepted, 1, "the second run is the same item, never a second one")
-}
-
-// A message between the start and the read is seen by the read; the wake may
-// still run once more, harmlessly.
-func TestWakeMessageBeforeStateRead(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	r := f.start("inbox")
-	f.deliver("inbox")
-	r.read()
-	r.end(okResp(), nil)
-
-	f.drain("inbox")
-	f.requireNothingLost("inbox")
-	require.LessOrEqual(t, f.starts["inbox"], 2)
-}
-
-// A long step: messages keep arriving while a wake runs. They all join the one
-// item, and the wake runs once more for all of them.
-func TestWakeMessagesDuringALongDiscovery(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	r := f.start("inbox")
-	r.read()
-	f.burst("inbox", 30)
-	require.Equal(t, 30, f.rq.rejected)
-	require.True(t, r.end(okResp(), nil))
-
-	f.drain("inbox")
-	f.requireNothingLost("inbox")
-	require.Equal(t, 2, f.starts["inbox"])
-	require.Len(t, f.rq.accepted, 1)
-}
-
-// Messages arrive in a stream while the function runs wake after wake: the
-// number of wakes follows the number of bursts, never the number of messages.
-func TestWakeCountFollowsBurstsNotMessages(t *testing.T) {
-	for name, forceStepPlan := range map[string]bool{"sequential": false, "already parallel": true} {
+// A delivery during every moment of an inline step queues nothing, in both of
+// the run's modes, however many requests the function makes.
+func TestWakeDeliveryDuringInlineStepNeverQueues(t *testing.T) {
+	for name, forceStepPlan := range map[string]bool{"sequential": false, "parallel": true} {
 		t.Run(name, func(t *testing.T) {
 			f := newWakeFixture(t, forceStepPlan)
-			mode, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
-			require.NoError(t, err)
 
-			// Parallel steps are pending the whole time.
-			require.NoError(t, f.rs.SavePending(f.ctx, f.md.ID, []string{"bg-1", "bg-2"}))
-
-			const bursts, size = 8, 20
-			for b := 0; b < bursts; b++ {
-				f.burst("inbox", size)
-				r := f.start("inbox")
-				r.read()
-				// One message lands while the wake runs.
+			// Wait, wake, run a step inline, wait again: three times.
+			f.begin("inbox").end()
+			for i := 0; i < 3; i++ {
 				f.deliver("inbox")
-				require.True(t, r.end(okResp(), nil))
-				f.run("inbox")
+				w := f.start("inbox")
+				require.NotNil(t, w)
+				before := f.accepts("inbox")
+				w.readState()
+				// The step runs inline in this request.
+				f.burst("inbox", 5)
+				require.Equal(t, before, f.accepts("inbox"), "a delivery queued a wake while a step ran inline")
+				w.end()
+				f.settle("inbox")
 			}
-
 			f.requireNothingLost("inbox")
-			require.Equal(t, bursts*(size+1), f.delivered["inbox"])
-			require.Equal(t, 2*bursts, f.starts["inbox"], "two wakes per burst, not one per message")
-			require.Len(t, f.rq.accepted, bursts, "one item per burst")
-			for _, id := range f.rq.accepted {
-				require.Equal(t, wakeJobID(f, "inbox"), id)
-			}
-
-			// A wake leaves the run's mode alone.
-			md, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
-			require.NoError(t, err)
-			require.Equal(t, mode.Config.ForceStepPlan, md.Config.ForceStepPlan)
 		})
 	}
 }
 
-// The wake carries no parallel mode of its own: it is the run's metadata that
-// says whether the SDK plans before it runs.
-func TestWakeItemHasNoParallelMode(t *testing.T) {
+// Set the flag, then the message: the delivery takes the flag and queues one wake.
+func TestWakeFlagThenMessage(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+	require.Zero(t, f.accepts("inbox"))
+
+	f.deliver("inbox")
+	require.Equal(t, 1, f.accepts("inbox"))
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// The message, then the flag: the request read its state before the message
+// landed, so the executor's recheck finds it and wakes the run itself.
+func TestWakeMessageThenFlag(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+	f.deliver("inbox")
+	require.Zero(t, f.accepts("inbox"))
+
+	r.end()
+	require.Equal(t, 1, f.accepts("inbox"))
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// The message lands between setting the flag and the recheck: the delivery
+// takes the flag, the recheck finds it gone, and exactly one wake is queued.
+func TestWakeMessageBetweenFlagAndRecheck(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+
+	f.hooks.afterSet = func() {
+		f.hooks.afterSet = nil
+		f.deliver("inbox")
+	}
+	r.end()
+	require.Equal(t, 1, f.accepts("inbox"))
+	require.Zero(t, f.rq.rejected)
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// The message lands right after the recheck counted: the flag is set, so the
+// delivery takes it.
+func TestWakeMessageAfterRecheck(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+
+	f.hooks.afterStack = func() {
+		f.hooks.afterStack = nil
+		f.deliver("inbox")
+	}
+	r.end()
+	require.Equal(t, 1, f.accepts("inbox"))
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// A message that lands while the wake's own request is handled, after the item
+// would be removed last: the wake's end sets the flag and the delivery that
+// follows queues a wake while the earlier item is still there. Each wait has
+// its own job ID, so the two never collide.
+func TestWakeDeliveryWhileThePreviousItemIsStillQueued(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+
+	f.deliver("inbox")
+	w := f.start("inbox")
+	w.readState()
+	w.handle()
+
+	// The queue has not removed the item yet.
+	require.Len(t, f.wakes("inbox"), 1)
+	f.deliver("inbox")
+	require.Equal(t, 2, f.accepts("inbox"))
+	require.Zero(t, f.rq.rejected)
+	w.finish()
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// Twenty messages while the run waits: one wake, however many arrive before it runs.
+func TestWakeBurstWhileBlocked(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+	f.burst("inbox", 20)
+
+	require.Equal(t, 1, f.accepts("inbox"))
+	require.Zero(t, f.rq.rejected, "later messages find no flag, they do not even try")
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+	require.Equal(t, 2, f.requests["inbox"])
+	require.Equal(t, 20, f.saw["inbox"])
+}
+
+// The wake is an ordinary edge item with no idempotency period.
+func TestWakeItemShape(t *testing.T) {
 	for _, forceStepPlan := range []bool{false, true} {
 		f := newWakeFixture(t, forceStepPlan)
-		f.deliver("inbox")
-		qi, err := f.shard.LoadQueueItem(f.ctx, queue.HashID(f.ctx, wakeJobID(f, "inbox")))
+		before, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
 		require.NoError(t, err)
+		f.begin("inbox").end()
+		f.deliver("inbox")
+
+		items := f.wakes("inbox")
+		require.Len(t, items, 1)
+		qi := items[0]
+		require.Equal(t, queue.KindEdge, qi.Data.Kind)
+		require.NotNil(t, qi.IdempotencyPeriod)
+		require.Zero(t, *qi.IdempotencyPeriod)
+		require.Equal(t, "step", qi.Data.Payload.(queue.PayloadEdge).Edge.Incoming)
+		// The run's metadata says whether the SDK plans before it runs, not the item.
 		require.Zero(t, qi.Data.ParallelMode)
 		require.Empty(t, qi.Data.GetConcurrencyKeys())
+
+		md, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
+		require.NoError(t, err)
+		require.Equal(t, before.Config.ForceStepPlan, md.Config.ForceStepPlan)
 	}
 }
 
-// Two subscriptions in one run are counted apart: messages of one never make
-// the other's wake run again, and each has its own item.
+// Messages arrive in bursts while the function waits between them: one wake per
+// wait, never one per message.
+func TestWakeCountFollowsWaitsNotMessages(t *testing.T) {
+	for name, forceStepPlan := range map[string]bool{"sequential": false, "already parallel": true} {
+		t.Run(name, func(t *testing.T) {
+			f := newWakeFixture(t, forceStepPlan)
+			require.NoError(t, f.rs.SavePending(f.ctx, f.md.ID, []string{"bg-1", "bg-2"}))
+			f.begin("inbox").end()
+
+			const bursts, size = 8, 20
+			for b := 0; b < bursts; b++ {
+				f.burst("inbox", size)
+				f.settle("inbox")
+			}
+
+			f.requireNothingLost("inbox")
+			require.Equal(t, bursts*size, f.delivered["inbox"])
+			require.Equal(t, bursts, f.accepts("inbox"))
+		})
+	}
+}
+
+// Two subscriptions in one run have a flag each: a message of one never wakes
+// the other.
 func TestWakeSubscriptionsAreSeparate(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.deliver("a")
-	f.deliver("b")
-	require.Len(t, f.rq.accepted, 2)
-	require.NotEqual(t, f.rq.accepted[0], f.rq.accepted[1])
+	f.begin("a").end()
+	f.begin("b").end()
 
-	ra := f.start("a")
-	ra.read()
 	f.burst("b", 5)
-	require.False(t, ra.end(okResp(), nil), "messages of b are not news to the wake of a")
+	require.Zero(t, f.accepts("a"))
+	require.Equal(t, 1, f.accepts("b"))
 
-	f.drain("a", "b")
+	f.deliver("a")
+	require.Equal(t, 1, f.accepts("a"))
+
+	f.settle("a", "b")
 	f.requireNothingLost("a", "b")
-	require.Equal(t, 1, f.starts["a"])
-	require.Equal(t, 1, f.starts["b"])
 }
 
-// A request that failed is retried by the queue as the same item, and only the
-// final completion looks for more messages.
-func TestWakeRetriedRequestChecksOnItsFinalCompletion(t *testing.T) {
+// A request waiting on one subscription sets only that subscription's flag, and
+// a recheck counts only that subscription's messages.
+func TestWakeRecheckCountsOnlyItsSubscription(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	r := f.start("inbox")
-	f.burst("inbox", 4)
-	// The SDK request failed (a response error, then a transport error).
-	require.False(t, r.end(&state.DriverResponse{Err: new("boom")}, nil))
-	r = f.start("inbox")
-	require.Equal(t, 5, r.wake.seen, "the retry records the count at its own start")
-	require.False(t, r.end(okResp(), errors.New("connection reset")))
-
-	r = f.start("inbox")
-	r.read()
-	require.False(t, r.end(okResp(), nil), "the final completion saw every message")
-	f.requireNothingLost("inbox")
-	require.Len(t, f.rq.accepted, 1)
+	r := f.begin("a")
+	r.readState()
+	f.burst("b", 3)
+	r.end()
+	require.Zero(t, f.accepts("a"))
+	require.Zero(t, f.accepts("b"))
 }
 
-// A run that ended or failed has nothing to see: no follow-up is enqueued, and
-// the item is done.
+// A timed read ends with a sleep as well as the waiting op. If the message wins,
+// the wake runs; the timer firing later changes nothing that matters.
+func TestWakeTimedReadMessageWins(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+	f.deliver("inbox")
+	f.settle("inbox")
+
+	// The timer of the read that got its message fires: its request waits again.
+	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	f.begin("inbox").end()
+
+	f.deliver("inbox")
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// A timed read whose timer wins leaves no flag behind: the function moved on and
+// is busy, so the next message queues nothing. A flag left from before would
+// wake it while a step ran inline.
+func TestWakeTimedReadTimerWins(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+
+	// The timer fires, and the request it runs is busy.
+	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	r := f.begin("inbox")
+	r.readState()
+	f.deliver("inbox")
+	require.Zero(t, f.accepts("inbox"))
+
+	// It ends waiting and sees the message that arrived.
+	r.end()
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// The timer firing clears a flag that a newer wait set; the request the timer
+// runs reports the wait again, so nothing is lost.
+func TestWakeTimerClearsANewerWait(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
+
+	// A message lands as the timer fires, before the timer's request reads.
+	f.deliver("inbox")
+	f.settle("inbox")
+	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	r := f.begin("inbox")
+	f.deliver("inbox")
+	r.end()
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+// A run that ended has nothing to wake: its flags go with its state, setting one
+// does nothing, and a message for it is dropped.
 func TestWakeOfARunThatEnded(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.deliver("inbox")
+	f.begin("inbox").end()
+	key := redis_state.StateDefaultKey
+	_ = key
+	require.NotEmpty(t, f.mr.Keys())
+	flagKeys := func() (n int) {
+		for _, k := range f.mr.Keys() {
+			if strings.Contains(k, "sub-waiting") {
+				n++
+			}
+		}
+		return n
+	}
+	require.Equal(t, 1, flagKeys())
 
-	r := f.start("inbox")
-	r.read()
-	f.deliver("inbox")
 	require.NoError(t, f.rs.Delete(f.ctx, f.md.ID))
+	require.Zero(t, flagKeys())
 
-	require.False(t, r.end(okResp(), nil))
-	require.False(t, f.queued("inbox"))
+	// A request that ends after the run is gone sets nothing.
+	r := f.begin("inbox")
+	r.readState()
+	rc := &mockRunContext{md: f.md}
+	require.NoError(t, f.e.handleGeneratorSubscribeWait(f.ctx, rc, r.waitOp(), queue.PayloadEdge{}))
+	require.Zero(t, flagKeys())
 
-	// And a message for a run that is gone is dropped, not queued.
 	err := f.e.deliverSubscription(f.ctx, event.InternalEvent{ID: ulid.Make(), Event: event.Event{Name: "agent/message"}}, f.pause("inbox"), logger.VoidLogger())
 	require.ErrorIs(t, err, state.ErrRunNotFound)
-	require.False(t, f.queued("inbox"))
+	require.Zero(t, f.accepts("inbox"))
 }
 
-// An item that is not a wake never looks for messages.
-func TestWakeFollowUpIgnoresOtherItems(t *testing.T) {
+// A wake that cannot be queued puts the flag back, so the delivery, retried,
+// wakes the run.
+func TestWakeEnqueueFailureKeepsTheFlag(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-	other := newSubscriptionWake(queue.Item{Metadata: map[string]any{}}, nil)
-	require.NoError(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, other, okResp(), nil))
-	require.Zero(t, newSubscriptionWake(queue.Item{}, []string{subscriptionMessageID("inbox", "x")}).seen)
+	f.begin("inbox").end()
+
+	f.e.queue = failingQueue{Queue: f.rq}
+	f.events++
+	evt := event.InternalEvent{ID: ulid.MustNew(uint64(f.events), rand.Reader), Event: event.Event{Name: "agent/message"}}
+	require.Error(t, f.e.deliverSubscription(f.ctx, evt, f.pause("inbox"), logger.VoidLogger()))
+	require.Zero(t, f.accepts("inbox"))
+
+	f.e.queue = f.rq
+	require.NoError(t, f.e.deliverSubscription(f.ctx, evt, f.pause("inbox"), logger.VoidLogger()))
+	f.delivered["inbox"]++
+	require.Equal(t, 1, f.accepts("inbox"))
+
+	f.settle("inbox")
+	f.requireNothingLost("inbox")
+}
+
+type failingQueue struct{ queue.Queue }
+
+func (failingQueue) Enqueue(context.Context, queue.Item, time.Time, queue.EnqueueOpts) error {
+	return errors.New("queue down")
+}
+
+// A waiting op without a subscription key is not a subscription read.
+func TestWaitingOpWithoutASubscriptionDoesNothing(t *testing.T) {
+	f := newWakeFixture(t, false)
+	rc := &mockRunContext{md: f.md, lifecycleItem: queue.Item{Payload: queue.PayloadEdge{}}}
+	op := state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "x"}
+	require.NoError(t, f.e.handleGeneratorSubscribeWait(f.ctx, rc, op, queue.PayloadEdge{}))
+	require.NoError(t, f.e.handleGeneratorOp(f.ctx, rc, op, OpcodeGroup{}))
 }
 
 // Closing at a limit gives a waiting read the chance to see the close.
 func TestWakeAfterALimitClose(t *testing.T) {
 	f := newWakeFixture(t, false)
+	f.begin("inbox").end()
 	f.burst("inbox", consts.MaxSubscriptionMessages)
-	f.run("inbox")
+	f.settle("inbox")
 	f.requireNothingLost("inbox")
 
 	// The next message breaks the limit: it is dropped, the subscription is
-	// closed, and the run is woken to see the close.
+	// closed, and the waiting run is woken to see the close.
 	f.events++
 	evt := event.InternalEvent{ID: ulid.MustNew(uint64(f.events), rand.Reader), Event: event.Event{Name: "agent/message"}}
 	require.NoError(t, f.e.deliverSubscription(f.ctx, evt, f.pause("inbox"), logger.VoidLogger()))
@@ -503,72 +707,24 @@ func TestWakeAfterALimitClose(t *testing.T) {
 	stack, err := f.rs.LoadStack(f.ctx, f.md.ID)
 	require.NoError(t, err)
 	require.Contains(t, stack, subscriptionClosedID("inbox"))
-	f.run("inbox")
+	f.settle("inbox")
 	require.False(t, f.queued("inbox"))
-	f.requireNothingLost("inbox")
 }
 
-// Every interleaving of deliveries and wake steps ends with the function having
-// seen every message and nothing queued, and no more than one item per
-// subscription is ever created at a time.
-func TestWakeRandomInterleavings(t *testing.T) {
-	keys := []string{"a", "b"}
-	for seed := int64(0); seed < 24; seed++ {
-		t.Run(fmt.Sprintf("seed %d", seed), func(t *testing.T) {
-			rng := mrand.New(mrand.NewSource(seed))
-			f := newWakeFixture(t, seed%2 == 0)
-
-			running := map[string]*wakeRun{}
-			readDone := map[string]bool{}
-			for step := 0; step < 120; step++ {
-				key := keys[rng.Intn(len(keys))]
-				switch rng.Intn(4) {
-				case 0, 1:
-					f.deliver(key)
-				case 2:
-					if running[key] == nil {
-						if r := f.start(key); r != nil {
-							running[key] = r
-							readDone[key] = false
-						}
-					} else if !readDone[key] {
-						running[key].read()
-						readDone[key] = true
-					}
-				case 3:
-					if r := running[key]; r != nil {
-						if !readDone[key] && rng.Intn(2) == 0 {
-							r.read()
-						}
-						r.end(okResp(), nil)
-						running[key] = nil
-					}
-				}
-			}
-			for key, r := range running {
-				if r != nil {
-					r.read()
-					r.end(okResp(), nil)
-				}
-				_ = key
-			}
-			f.drain(keys...)
-			f.requireNothingLost(keys...)
-
-			for _, id := range f.rq.accepted {
-				require.Contains(t, []string{wakeJobID(f, "a"), wakeJobID(f, "b")}, id)
-			}
-			for _, key := range keys {
-				require.LessOrEqual(t, f.starts[key], f.delivered[key]+1)
-			}
-		})
-	}
+// A request that waits when the subscription closed since it read finds the close
+// in the recheck.
+func TestWakeRecheckSeesAClose(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+	require.NoError(t, f.e.endSubscription(f.ctx, f.md.ID, "inbox", []byte("true")))
+	r.end()
+	require.Equal(t, 1, f.accepts("inbox"))
 }
 
-// A read that has nothing to read reports a waiting thread (OpcodeNone with an
-// ID). It is not a step: counting it would make a lone background step look
-// parallel, and holding it as pending would stop that step's completion from
-// ever running a discovery.
+// A waiting thread is not a step: counting it would make a lone background step
+// look parallel, and holding it as pending would stop that step's completion
+// from ever running a discovery.
 func TestWaitingThreadIsNotAStep(t *testing.T) {
 	wait := &state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "inbox:1"}
 	step := &state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: "bg"}
@@ -577,4 +733,74 @@ func TestWaitingThreadIsNotAStep(t *testing.T) {
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{step, wait}))
 	require.Equal(t, []string{"bg"}, opGroups([]*state.GeneratorOpcode{step, wait}).NonLazyIDs())
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{empty}))
+}
+
+// Every interleaving of deliveries, requests (the first, a wake's, a timer's),
+// their reads and ends, and the queue's removal ends with the function having
+// seen every message, nothing queued, and the run waiting.
+func TestWakeRandomInterleavings(t *testing.T) {
+	keys := []string{"a", "b"}
+	for seed := int64(0); seed < 24; seed++ {
+		t.Run(fmt.Sprintf("seed %d", seed), func(t *testing.T) {
+			rng := mrand.New(mrand.NewSource(seed))
+			f := newWakeFixture(t, seed%2 == 0)
+
+			running := map[string]*request{}
+			handled := map[string]bool{}
+			for _, key := range keys {
+				running[key] = f.begin(key)
+			}
+			finish := func(key string) {
+				r := running[key]
+				if !handled[key] {
+					r.handle()
+				}
+				r.finish()
+				running[key], handled[key] = nil, false
+			}
+
+			for step := 0; step < 150; step++ {
+				key := keys[rng.Intn(len(keys))]
+				r := running[key]
+				switch rng.Intn(6) {
+				case 0, 1:
+					f.deliver(key)
+				case 2:
+					// A wake item is leased, or a timer fires and runs a request.
+					if r == nil {
+						if rng.Intn(4) == 0 {
+							require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+							running[key] = f.begin(key)
+						} else {
+							running[key] = f.start(key)
+						}
+					}
+				case 3:
+					if r != nil {
+						r.readState()
+					}
+				case 4:
+					if r != nil && !handled[key] {
+						r.handle()
+						handled[key] = true
+					}
+				case 5:
+					if r != nil && handled[key] {
+						finish(key)
+					}
+				}
+			}
+			for _, key := range keys {
+				if running[key] != nil {
+					finish(key)
+				}
+			}
+			f.settle(keys...)
+			f.requireNothingLost(keys...)
+
+			for _, key := range keys {
+				require.LessOrEqual(t, f.accepts(key), f.delivered[key]+1)
+			}
+		})
+	}
 }

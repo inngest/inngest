@@ -2180,6 +2180,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	if isSleepResume {
+		// A timed step.subscribe read ends with its timer. The request that
+		// follows reports any read that still waits, so a flag from before the
+		// timer is not left behind to wake a run that moved on.
+		if err := e.clearSubscriptionWaiting(ctx, md.ID); err != nil {
+			return nil, err
+		}
+	}
+
+	if isSleepResume {
 		if err := e.maybeResetForceStepPlan(ctx, &md); err != nil {
 			return nil, fmt.Errorf("error resetting force step plan: %w", err)
 		}
@@ -2358,8 +2367,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		start:      start,
 	}
 
-	wake := newSubscriptionWake(item, md.Stack)
-
 	// This span will be updated with output as soon as execution finishes.
 	execAttrs := tracing.FunctionAttrs(&instance.f)
 	meta.AddAttr(execAttrs, meta.Attrs.StartedAt, &start)
@@ -2513,10 +2520,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		if handleErr != nil {
 			return resp, handleErr
-		}
-
-		if werr := e.subscriptionWakeFollowUp(ctx, md.ID, wake, resp, err); werr != nil {
-			return resp, werr
 		}
 
 		return resp, err
@@ -4179,6 +4182,11 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		// This is necessary for parallelization:  we may fan out from 1 step -> 10 parallel steps,
 		// then need to coalesce back to a single thread after all 10 have finished.  We expect
 		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
+		//
+		// With an ID it is a step.subscribe read that has nothing to read.
+		if gen.ID != "" {
+			return e.handleGeneratorSubscribeWait(ctx, runCtx, gen, edge)
+		}
 		return nil
 	case enums.OpcodeStep, enums.OpcodeStepRun:
 		return e.handleGeneratorStep(ctx, runCtx, gen, edge)

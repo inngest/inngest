@@ -835,3 +835,25 @@ func (v v2) retryableError(err error) bool {
 
 	return true
 }
+
+// SetSubscriptionWaiting marks a subscription of a run as waiting.
+func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string, token string) error {
+	set, err := v.mgr.SetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash, token)
+	if err != nil {
+		return err
+	}
+	if !set {
+		return state.ErrRunNotFound
+	}
+	return nil
+}
+
+// TakeSubscriptionWaiting clears the waiting flag of a subscription and returns its token.
+func (v v2) TakeSubscriptionWaiting(ctx context.Context, id state.ID, hash string) (string, bool, error) {
+	return v.mgr.TakeSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash)
+}
+
+// ClearSubscriptionWaiting clears the waiting flags of every subscription of a run.
+func (v v2) ClearSubscriptionWaiting(ctx context.Context, id state.ID) error {
+	return v.mgr.ClearSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID)
+}

@@ -30,6 +30,10 @@ type RunStateKeyGenerator interface {
 	// Stack returns the key used to store the stack for a given run
 	Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string
 
+	// SubscriptionWaiting returns the key of the hash that holds, for each
+	// step.subscribe subscription of a run, the token of its waiting flag.
+	SubscriptionWaiting(ctx context.Context, isSharded bool, runID ulid.ULID) string
+
 	// ActionInputs returns the key used to store the action inputs for a given
 	// run.
 	ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string
@@ -102,6 +106,10 @@ func (s runStateKeyGenerator) DefersControlMeta(ctx context.Context, isSharded b
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:stack:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
+}
+
+func (s runStateKeyGenerator) SubscriptionWaiting(ctx context.Context, isSharded bool, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:sub-waiting:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
 }
 
 func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string {

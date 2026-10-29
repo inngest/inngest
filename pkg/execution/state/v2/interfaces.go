@@ -244,3 +244,19 @@ var (
 	// without importing v1.
 	ErrDeferMetaInvalid = state.ErrDeferMetaInvalid
 )
+
+// SubscriptionWaiter is the run-state primitive behind a step.subscribe wake: a
+// flag per run and subscription that says a function thread is waiting for a
+// message and nothing is running for it. A store that holds a run's state
+// implements it as three atomic operations on that run.
+type SubscriptionWaiter interface {
+	// SetSubscriptionWaiting sets the flag of the subscription (identified by a
+	// hash of its key) to a token that is unique to this wait, replacing any
+	// token already there. It returns ErrRunNotFound when the run is gone.
+	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
+	// TakeSubscriptionWaiting tests and clears the flag in one atomic step. Of
+	// any number of concurrent callers, at most one gets ok and the token.
+	TakeSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
+	// ClearSubscriptionWaiting clears the flags of every subscription of the run.
+	ClearSubscriptionWaiting(ctx context.Context, id ID) error
+}

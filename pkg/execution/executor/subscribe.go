@@ -41,10 +41,6 @@ func subscriptionKeyHash(key string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// subscriptionWakeMetadataKey marks a queue item as the wake of a subscription;
-// its value is the hash of the subscription ID.
-const subscriptionWakeMetadataKey = "subscription_wake"
-
 // subscriptionMessageID is the step ID of the message an event is in a
 // subscription.
 func subscriptionMessageID(key string, eventID string) string {
@@ -333,7 +329,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 			}
 
 			// A read waiting for a message that will not come sees the close.
-			return e.enqueueSubscriptionWake(ctx, &md, pause, key, subscriptionClosedID(key))
+			return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, subscriptionClosedID(key))
 		}
 	}
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
@@ -344,7 +340,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	l.Debug("subscription message saved", "message_id", messageID, "redelivered", redelivered)
 
-	return e.enqueueSubscriptionWake(ctx, &md, pause, key, messageID)
+	return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, messageID)
 }
 
 // subscriptionTriggerExclusion returns the event ID a subscription pause must
@@ -465,27 +461,117 @@ func (e *executor) endSubscription(ctx context.Context, id sv2.ID, key string, d
 	return nil
 }
 
-// subscriptionWakeJobID is the job ID of a subscription's wake in a run.
-func subscriptionWakeJobID(runID string, hash string) string {
-	return fmt.Sprintf("%s-subscription-wake-%s", runID, hash)
+// A step.subscribe read with nothing to read ends its request with a waiting
+// thread (see handleGeneratorSubscribeWait), and the run is then idle. That is
+// the only time a delivery wakes it: the executor keeps one flag per run and
+// subscription, set when the run goes idle waiting and cleared by whoever wakes
+// it. A run that is busy has no flag, so its messages cost nothing and no
+// discovery overlaps the function's own requests.
+
+// subscriptionWakeJobID is the job ID of one wake of a subscription in a run.
+// The token belongs to one wait, so a wake never meets the item of the wake
+// before it, which the queue keeps until that wake's request has been handled.
+func subscriptionWakeJobID(runID string, hash string, token string) string {
+	return fmt.Sprintf("%s-subscription-wake-%s-%s", runID, hash, token)
 }
 
-// enqueueSubscriptionWake gives the run the chance to see what a subscription
-// saved. It is the discovery edge the executor enqueues after any step, so it
-// runs under the run's current mode, which lives in its metadata (ForceStepPlan),
-// not on the item: a sequential run may execute a lone step inline, a run that
-// is already parallel plans every step first. The SDK keeps plan-first mode on
-// while a subscription is open, so a wake that overlaps a running step plans it
-// (a deduped step item) instead of running it twice. The executor neither knows
-// nor cares whether the function is blocked on a read; a function with nothing
-// to do with the message runs to the same wait again.
-//
-// The job ID is the run and the subscription, so deliveries while a wake is
-// queued or running join it; the wake runs again by itself if messages arrived
-// while it ran (see subscriptionWakeAgain). Its idempotency period is zero, so no
-// key outlives the item.
-func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata, pause *state.Pause, key string, outgoing string) error {
-	jobID := subscriptionWakeJobID(md.ID.RunID.String(), subscriptionKeyHash(key))
+// subscriptionWaiter is the run state's waiting flag.
+func (e *executor) subscriptionWaiter() (sv2.SubscriptionWaiter, error) {
+	waiter, ok := e.smv2.(sv2.SubscriptionWaiter)
+	if !ok {
+		return nil, errors.New("the run state does not support step.subscribe")
+	}
+
+	return waiter, nil
+}
+
+// clearSubscriptionWaiting drops the waiting flags of a run.
+func (e *executor) clearSubscriptionWaiting(ctx context.Context, id sv2.ID) error {
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return err
+	}
+
+	return waiter.ClearSubscriptionWaiting(ctx, id)
+}
+
+// handleGeneratorSubscribeWait runs when the function's request ended with a
+// read that has nothing to read. Nothing is in flight now, so the run is marked
+// as waiting, and then the messages are counted once more: one saved since the
+// request read its state found no flag to take, so this is what wakes the run.
+func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	byt, err := json.Marshal(gen.Opts)
+	if err != nil {
+		return err
+	}
+	var opts struct {
+		Subscribe struct {
+			Key string `json:"key"`
+			// Seq is the number of messages the request saw, plus one.
+			Seq int `json:"seq"`
+		} `json:"subscribe"`
+	}
+	if err := json.Unmarshal(byt, &opts); err != nil || opts.Subscribe.Key == "" {
+		return nil
+	}
+
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return err
+	}
+
+	md := runCtx.Metadata()
+	key := opts.Subscribe.Key
+	hash := subscriptionKeyHash(key)
+	token := uuid.NewString()
+	if err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token); err != nil {
+		if errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	stack, err := e.smv2.LoadStack(ctx, md.ID)
+	if err != nil {
+		return err
+	}
+	if len(subscriptionMessageIDsOfHash(stack, hash)) < opts.Subscribe.Seq && !slices.Contains(stack, subscriptionClosedID(key)) {
+		return nil
+	}
+
+	return e.wakeSubscription(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, key, gen.ID)
+}
+
+// wakeSubscription wakes the run if it is waiting on the subscription: it takes
+// the flag and, only if it was set, queues a discovery that lets the function
+// see what the subscription saved.
+func (e *executor) wakeSubscription(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, key string, outgoing string) error {
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return err
+	}
+
+	hash := subscriptionKeyHash(key)
+	token, waiting, err := waiter.TakeSubscriptionWaiting(ctx, md.ID, hash)
+	if err != nil || !waiting {
+		return err
+	}
+
+	if err := e.enqueueSubscriptionWake(ctx, md, incoming, maxAttempts, follows, hash, token, outgoing); err != nil {
+		// The flag goes back so that the delivery, retried, wakes the run.
+		_ = waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token)
+		return err
+	}
+
+	return nil
+}
+
+// enqueueSubscriptionWake queues the discovery that gives a waiting run the
+// chance to see what its subscription saved. It runs under the run's own mode
+// like any discovery after a step. The idempotency period is zero, so no key
+// outlives the item.
+func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, hash string, token string, outgoing string) error {
+	jobID := subscriptionWakeJobID(md.ID.RunID.String(), hash, token)
 	item := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               uuid.New().String(),
@@ -495,11 +581,11 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 		PriorityFactor:        md.Config.PriorityFactor,
 		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
 		Semaphores:            stepSemaphores(*md),
-		MaxAttempts:           pause.MaxAttempts,
+		MaxAttempts:           maxAttempts,
 		Payload: queue.PayloadEdge{
-			Edge: inngest.Edge{Outgoing: outgoing, Incoming: pause.Incoming},
+			Edge: inngest.Edge{Outgoing: outgoing, Incoming: incoming},
 		},
-		Metadata: map[string]any{subscriptionWakeMetadataKey: subscriptionKeyHash(key)},
+		Metadata: map[string]any{},
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -507,7 +593,7 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 		meta.SpanNameStepDiscovery,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{item.Metadata},
-			FollowsFrom: tracing.SpanRefFromPause(pause),
+			FollowsFrom: follows,
 			Debug:       &tracing.SpanDebugData{Location: "executor.enqueueSubscriptionWake"},
 			Metadata:    md,
 			Parent:      tracing.RunSpanRefFromMetadata(md),
@@ -531,62 +617,6 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 	_ = span.Send()
 
 	return nil
-}
-
-// subscriptionWake is a wake discovery in flight: the subscription it is for
-// and how many of its messages were saved when the wake started, before its
-// request read the run's state.
-type subscriptionWake struct {
-	hash string
-	seen int
-}
-
-// newSubscriptionWake returns the wake an item is, or the zero value for any
-// other item.
-func newSubscriptionWake(item queue.Item, stack []string) subscriptionWake {
-	hash, _ := item.Metadata[subscriptionWakeMetadataKey].(string)
-	if hash == "" {
-		return subscriptionWake{}
-	}
-
-	return subscriptionWake{hash: hash, seen: len(subscriptionMessageIDsOfHash(stack, hash))}
-}
-
-// errSubscriptionWakeAgain ends a wake that finished with messages it did not
-// see. The queue runs the same item again at once, so the wake keeps its job ID
-// throughout and there is never a second one to collide with.
-var errSubscriptionWakeAgain = errors.New("subscription messages arrived while the wake ran")
-
-// subscriptionWakeFollowUp runs when a wake discovery has been handled. If the
-// subscription now holds more messages than the wake saw at its start, it
-// returns the error that runs the same item again. Only the final completion of
-// a wake checks: a request that failed is retried by the queue and checks on
-// its own completion, and a run that ended or failed has nothing to see.
-//
-// A message saved after this check and before the queue removes the item is
-// refused a wake of its own (the job ID is held until the removal) and is not
-// seen by this one. That window is the time the queue takes to remove the item;
-// the next message heals it. Closing it needs the queue to remove an item only
-// while its lease is still held, so that the wake could release its ID and look
-// again without the queue's own removal deleting a newer wake.
-func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w subscriptionWake, resp *state.DriverResponse, err error) error {
-	if w.hash == "" || err != nil || resp == nil || resp.Err != nil {
-		return nil
-	}
-
-	md, err := e.smv2.LoadMetadata(ctx, id)
-	if errors.Is(err, state.ErrRunNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) <= w.seen {
-		return nil
-	}
-
-	now := e.now()
-	return queue.RetryAtError(queue.AlwaysRetryError(errSubscriptionWakeAgain), &now)
 }
 
 // removeSubscriptionPause deletes the pause of a subscription stream so its
