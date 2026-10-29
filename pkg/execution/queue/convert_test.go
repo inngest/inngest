@@ -1156,6 +1156,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"PassthroughJobId",
 			"ForceQueueShardName",
 			"NormalizeFromBacklogID",
+			"SingletonMigrationKey",
 			"IdempotencyPeriod",
 		},
 	})
