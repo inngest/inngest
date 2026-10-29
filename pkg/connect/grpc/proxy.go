@@ -467,6 +467,15 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				break
 			}
 
+			// A Forward stuck on a dead connection can fail after the worker already
+			// received the request and replied. Re-routing would run it twice, so
+			// use the response that arrived instead.
+			if ctx.Err() == nil && waitForResponseCtx.Err() != nil {
+				l.Warn("forward to gateway failed after the response arrived, not re-routing", "err", err)
+				err = nil
+				break
+			}
+
 			// Clean up the old worker lease before re-routing.
 			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 				l, "could not clean up worker lease after forward failure")
@@ -513,6 +522,19 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
+
+			// Report a Forward that outlived the request lease the same way as a
+			// lease that expires while waiting for the response.
+			if ctx.Err() == nil && leaseCtx.Err() != nil {
+				metrics.IncrConnectProxyLeaseExpiredCount(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+				})
+
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectWorkerStoppedResponding,
+					Message: "The worker stopped responding to the request.",
+				}
+			}
 
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
