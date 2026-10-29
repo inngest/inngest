@@ -87,7 +87,7 @@ import (
 )
 
 const (
-	DefaultTick         = 150
+	DefaultTick         = 10
 	DefaultTickDuration = time.Millisecond * DefaultTick
 	DefaultPollInterval = 5
 	DefaultQueueWorkers = 100
