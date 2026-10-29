@@ -60,3 +60,30 @@ records without a claim are not adopted, and existing legacy SYSOP jobs are
 not repaired or replayed by deployment. Do not downgrade these participants
 while retry-aware holds remain active. Releasing a large old backlog still
 requires separate authorization and bounded pressure-monitored recovery.
+
+## Performance before enabling
+
+Tracking has a real Redis CPU and memory cost. Owner/claim reads and writes are
+batched per manual constraint; tracking-off acquisitions do not perform those
+operations or an extra usage read before INCRBY. Batching does not make the
+additional records or their seven-day retention free.
+
+Use a dedicated disposable localhost Redis/Valkey, with no other Lua callers:
+
+```sh
+SEMAPHORE_TEST_REDIS_ADDR=127.0.0.1:<test-port> ENV=test \
+  go test -run '^$' -bench '^BenchmarkManualSemaphoreOwnership$' \
+  -benchtime=1000x -count=3 ./pkg/constraintapi
+```
+
+The benchmark covers one job/one manual constraint and twenty jobs/three manual
+constraints with tracking off/on. `redis-us/op` is server EVALSHA CPU from command
+statistics; `ns/op` includes the Go caller and round trip. Cleanup of only the
+benchmark's random account is outside the timer. Never use production or a
+production port-forward. Compare revisions on the same quiet engine.
+
+Before enabling an account, estimate active and retained ownership records using
+its actual permit volume and key lengths, and check the shard's Redis CPU and
+memory headroom. The benchmark is not a production tail-latency guarantee. Keep
+the rollout small until real pressure and memory growth are understood; do not
+shorten retention or remove correctness checks to meet a performance target.

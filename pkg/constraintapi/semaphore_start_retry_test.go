@@ -178,7 +178,7 @@ func TestManualSemaphoreStartRetryConcurrent(t *testing.T) {
 }
 
 func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
-	for _, kind := range []string{"legacy", "tracked-without-claim", "active-claim", "changed-weight", "invalid-owner", "finalized"} {
+	for _, kind := range []string{"legacy", "tracked-without-claim", "active-claim", "changed-weight", "invalid-owner", "wrong-type-owner", "wrong-type-claim", "finalized"} {
 		t.Run(kind, func(t *testing.T) {
 			cm, redis, _, clock := newSemaphoreTestEnv(t)
 			cm.manualSemaphoreOwnership = true
@@ -200,6 +200,13 @@ func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 			if kind == "invalid-owner" {
 				require.NoError(t, redis.Set(ownerKey, "invalid"))
 			}
+			if kind == "wrong-type-owner" {
+				redis.Del(ownerKey)
+				redis.HSet(ownerKey, "invalid", "1")
+			}
+			if kind == "wrong-type-claim" {
+				redis.HSet(ownerKey+":claim", "invalid", "1")
+			}
 			if kind == "finalized" {
 				require.NoError(t, redis.Set(ownerKey, "0"))
 				require.NoError(t, redis.Set(ownerKey+":claim", "released"))
@@ -211,7 +218,7 @@ func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 				CurrentTime: clock.Now(), Duration: time.Minute, MaximumLifetime: time.Hour,
 				Source: LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
 			})
-			if kind == "invalid-owner" {
+			if kind == "invalid-owner" || kind == "wrong-type-owner" || kind == "wrong-type-claim" {
 				require.ErrorContains(t, err, "manual semaphore ownership is invalid")
 			} else {
 				require.NoError(t, err)
@@ -250,39 +257,43 @@ func TestManualSemaphoreStartRetryHonorsOtherConstraints(t *testing.T) {
 }
 
 func TestManualSemaphoreStartRetryBatchPrefix(t *testing.T) {
-	for _, reuseFirst := range []bool{false, true} {
-		t.Run(fmt.Sprintf("reuse-first=%t", reuseFirst), func(t *testing.T) {
-			cm, redis, _, clock := newSemaphoreTestEnv(t)
-			cm.manualSemaphoreOwnership = true
-			account, env, fn, owner, newcomer := uuid.New(), uuid.New(), uuid.New(), ulid.Make(), ulid.Make()
-			sem := SemaphoreConstraint{ID: "fnkey:batch", Weight: 1, Release: SemaphoreReleaseManual}
-			require.NoError(t, redis.Set(sem.CapacityKey(account), "1"))
-			require.NoError(t, redis.Set(sem.UsageKey(account), "1"))
-			ownerKey := sem.UsageKey(account) + ":owner:" + owner.String()
-			require.NoError(t, redis.Set(ownerKey, "1"))
-			require.NoError(t, redis.Set(ownerKey+":claim", "released"))
-			runs := []ulid.ULID{newcomer, owner}
-			if reuseFirst {
-				runs[0], runs[1] = runs[1], runs[0]
-			}
-			res, err := cm.Acquire(t.Context(), &CapacityAcquireRequest{
-				AccountID: account, EnvID: env, FunctionID: fn, IdempotencyKey: "batch", Amount: 2,
-				LeaseIdempotencyKeys: []string{"first", "second"}, LeaseRunIDs: map[string]ulid.ULID{"first": runs[0], "second": runs[1]},
-				Configuration: ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{{ID: sem.ID, Weight: sem.Weight, Release: sem.Release}}}, Constraints: []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}},
-				CurrentTime: clock.Now(), Duration: time.Minute, MaximumLifetime: time.Hour,
-				Source: LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
+	for _, capacity := range []int{1, 2} {
+		for _, reuseFirst := range []bool{false, true} {
+			t.Run(fmt.Sprintf("capacity=%d/reuse-first=%t", capacity, reuseFirst), func(t *testing.T) {
+				cm, redis, _, clock := newSemaphoreTestEnv(t)
+				cm.manualSemaphoreOwnership = true
+				account, env, fn, owner, newcomer := uuid.New(), uuid.New(), uuid.New(), ulid.Make(), ulid.Make()
+				sem := SemaphoreConstraint{ID: "fnkey:batch", Weight: 1, Release: SemaphoreReleaseManual}
+				require.NoError(t, redis.Set(sem.CapacityKey(account), fmt.Sprint(capacity)))
+				require.NoError(t, redis.Set(sem.UsageKey(account), "1"))
+				ownerKey := sem.UsageKey(account) + ":owner:" + owner.String()
+				require.NoError(t, redis.Set(ownerKey, "1"))
+				require.NoError(t, redis.Set(ownerKey+":claim", "released"))
+				runs := []ulid.ULID{newcomer, owner}
+				if reuseFirst {
+					runs[0], runs[1] = runs[1], runs[0]
+				}
+				res, err := cm.Acquire(t.Context(), &CapacityAcquireRequest{
+					AccountID: account, EnvID: env, FunctionID: fn, IdempotencyKey: "batch", Amount: 2,
+					LeaseIdempotencyKeys: []string{"first", "second"}, LeaseRunIDs: map[string]ulid.ULID{"first": runs[0], "second": runs[1]},
+					Configuration: ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{{ID: sem.ID, Weight: sem.Weight, Release: sem.Release}}}, Constraints: []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}},
+					CurrentTime: clock.Now(), Duration: time.Minute, MaximumLifetime: time.Hour,
+					Source: LeaseSource{Service: ServiceExecutor, Location: CallerLocationItemLease},
+				})
+				require.NoError(t, err)
+				if capacity == 2 {
+					require.Len(t, res.Leases, 2, "a mixed batch reuses one hold and acquires only one new hold")
+				} else if reuseFirst {
+					require.Len(t, res.Leases, 1)
+				} else {
+					require.Empty(t, res.Leases)
+				}
+				require.Equal(t, capacity == 2, redis.Exists(sem.UsageKey(account)+":owner:"+newcomer.String()))
+				usage, getErr := redis.Get(sem.UsageKey(account))
+				require.NoError(t, getErr)
+				require.Equal(t, fmt.Sprint(capacity), usage)
 			})
-			require.NoError(t, err)
-			if reuseFirst {
-				require.Len(t, res.Leases, 1)
-			} else {
-				require.Empty(t, res.Leases)
-			}
-			require.False(t, redis.Exists(sem.UsageKey(account)+":owner:"+newcomer.String()))
-			usage, getErr := redis.Get(sem.UsageKey(account))
-			require.NoError(t, getErr)
-			require.Equal(t, "1", usage)
-		})
+		}
 	}
 }
 

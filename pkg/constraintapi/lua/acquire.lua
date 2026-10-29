@@ -266,12 +266,25 @@ for index, value in ipairs(constraints) do
 		if requestDetails.msr and value.sem.rel == 1 then
 			manualReuse[index] = {}
 			constraintCapacity = 0
+			local ownerKeys = {}
 			for j = 1, requested do
-				local lik = requestDetails.lik[j]
-				local runID = requestDetails.lri[lik]
-				local ownerKey = value.sem.k .. ":owner:" .. runID
-				local owned = call("GET", ownerKey)
-				local claim = call("GET", ownerKey .. ":claim")
+				local ownerKey = value.sem.k .. ":owner:" .. requestDetails.lri[requestDetails.lik[j]]
+				table.insert(ownerKeys, ownerKey)
+				table.insert(ownerKeys, ownerKey .. ":claim")
+			end
+			local owners = call("MGET", unpack(ownerKeys))
+			-- MGET returns false for both absent and non-string keys. Preserve
+			-- GET's fail-closed behavior without doing one command per owner.
+			local present = 0
+			for _, owned in ipairs(owners) do
+				if owned ~= false then present = present + 1 end
+			end
+			if call("EXISTS", unpack(ownerKeys)) ~= present then
+				return redis.error_reply("ERR manual semaphore ownership is invalid")
+			end
+			for j = 1, requested do
+				local owned = owners[j * 2 - 1]
+				local claim = owners[j * 2]
 				local held = tonumber(owned)
 				if owned ~= false and owned ~= nil and (held == nil or held < 0 or held % 1 ~= 0 or usage < held) then
 					return redis.error_reply("ERR manual semaphore ownership is invalid")
@@ -430,25 +443,33 @@ for i, value in ipairs(constraints) do
 				if manualReuse[i][j] then acquired = acquired - 1 end
 			end
 		end
-		local newUsage = tonumber(call("GET", value.sem.k)) or 0
+		local newUsage
 		if acquired > 0 then
 			newUsage = call("INCRBY", value.sem.k, toInteger(weight * acquired))
+		else
+			newUsage = tonumber(call("GET", value.sem.k)) or 0
 		end
 		if requestDetails.mso and value.sem.rel == 1 then
 			-- Once a key uses ownership, a missing owner must never fall back
 			-- to a legacy decrement, even after released tombstones expire.
-			call("SET", value.sem.k .. ":ownership", "1")
+			local ownerUpdates = { value.sem.k .. ":ownership", "1" }
 			for j = 1, granted do
 				local runID = requestDetails.lri[requestDetails.lik[j]]
 				local ownerKey = value.sem.k .. ":owner:" .. runID
-				if not (manualReuse[i] and manualReuse[i][j]) then
+				if requestDetails.msr then
+					if not manualReuse[i][j] then
+						-- Preflight proved this owner absent; Lua executes atomically.
+						table.insert(ownerUpdates, ownerKey)
+						table.insert(ownerUpdates, tostring(toInteger(weight)))
+					end
+					-- Request ID is stable across lease renewal, unlike lease ID.
+					table.insert(ownerUpdates, ownerKey .. ":claim")
+					table.insert(ownerUpdates, requestID)
+				else
 					call("INCRBY", ownerKey, toInteger(weight))
 				end
-				if requestDetails.msr then
-					-- Request ID is stable across lease renewal, unlike lease ID.
-					call("SET", ownerKey .. ":claim", requestID)
-				end
 			end
+			call("MSET", unpack(ownerUpdates))
 		end
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
 		local remaining = capacity - newUsage
