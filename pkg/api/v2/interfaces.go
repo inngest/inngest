@@ -246,3 +246,12 @@ type ScoreProvider interface {
 	// ErrScoresNotEnabled when the account cannot submit scores.
 	CreateScores(ctx context.Context, params CreateScoresParams) error
 }
+
+type CreateCancellationOpts struct {
+	From, Until time.Time
+	If, Name    *string
+}
+
+type CancellationCreator interface {
+	CreateCancellation(context.Context, inngest.DeployedFunction, CreateCancellationOpts) (*cqrs.Cancellation, error)
+}

@@ -2761,8 +2761,7 @@ func correlationID(event event.Event) *string {
 }
 
 func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
-	// If no cancellation checker was provided, assume run should not be cancelled
-	if e.cancellationChecker == nil {
+	if e.cancellationChecker == nil || len(evts) == 0 {
 		return false, nil
 	}
 

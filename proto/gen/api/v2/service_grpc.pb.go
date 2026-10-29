@@ -71,6 +71,7 @@ const (
 	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
+	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
@@ -145,6 +146,7 @@ type V2Client interface {
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
+	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
@@ -706,6 +708,16 @@ func (c *v2Client) GetFunction(ctx context.Context, in *GetFunctionRequest, opts
 	return out, nil
 }
 
+func (c *v2Client) CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateCancellationResponse)
+	err := c.cc.Invoke(ctx, V2_CreateCancellation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PauseFunctionResponse)
@@ -904,6 +916,7 @@ type V2Server interface {
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
+	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
@@ -1080,6 +1093,9 @@ func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTrace
 }
 func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
+}
+func (UnimplementedV2Server) CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCancellation not implemented")
 }
 func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PauseFunction not implemented")
@@ -2041,6 +2057,24 @@ func _V2_GetFunction_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_CreateCancellation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCancellationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateCancellation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateCancellation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateCancellation(ctx, req.(*CreateCancellationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_PauseFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PauseFunctionRequest)
 	if err := dec(in); err != nil {
@@ -2491,6 +2525,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunction",
 			Handler:    _V2_GetFunction_Handler,
+		},
+		{
+			MethodName: "CreateCancellation",
+			Handler:    _V2_CreateCancellation_Handler,
 		},
 		{
 			MethodName: "PauseFunction",
