@@ -1,13 +1,20 @@
 package executor
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/pauses"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -94,6 +101,87 @@ func subscriptionExpiryJobID(md *sv2.Metadata, pauseID uuid.UUID) string {
 // subscription.
 func subscriptionPauseID(runID string, key string, stream int) uuid.UUID {
 	return inngest.DeterministicSha1UUID(fmt.Sprintf("%s:subscription:%s:%d", runID, key, stream))
+}
+
+// handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe
+// subscription: open, next, poll and close.
+func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
+	sub := opts.Subscribe
+	if sub.Key == "" {
+		return fmt.Errorf("subscription key is empty")
+	}
+
+	md := runCtx.Metadata()
+	runID := md.ID.RunID.String()
+	pauseID := subscriptionPauseID(runID, sub.Key, sub.Stream)
+	idx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: opts.Event}
+
+	// answer completes the op right away with the given output.
+	answer := func(output any) error {
+		byt, err := json.Marshal(output)
+		if err != nil {
+			return err
+		}
+		gen.Op = enums.OpcodeStepRun
+		gen.Data = byt
+		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
+	}
+
+	switch sub.Mode {
+	case state.SubscribeOpen:
+		now := e.now()
+		pause := state.Pause{
+			ID:          pauseID,
+			WorkspaceID: md.ID.Tenant.EnvID,
+			Identifier:  sv2.NewPauseIdentifier(md.ID),
+			GroupID:     runCtx.GroupID(),
+			Outgoing:    gen.ID,
+			Incoming:    edge.Edge.Incoming,
+			StepName:    gen.UserDefinedName(),
+			Opcode:      new(gen.Op.String()),
+			// A subscription lives as long as the run.
+			Expires:     state.Time(now.Add(consts.MaxWaitForEventTimeout)),
+			Event:       &opts.Event,
+			Expression:  expr,
+			MaxAttempts: runCtx.MaxAttempts(),
+			Subscribe:   &state.PauseSubscribe{Key: sub.Key, Stream: sub.Stream},
+			CreatedAt:   now,
+		}
+		if len(md.Config.EventIDs) > 0 {
+			// The event that started the run is its first message, not a
+			// subscription match.
+			trigger := md.Config.EventIDs[0].String()
+			pause.TriggeringEventID = &trigger
+		}
+
+		_, err := e.pm.Write(ctx, idx, &pause)
+		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+			return fmt.Errorf("error saving subscription pause: %w", err)
+		}
+		// A queued item that fires when the subscription expires. It keeps the
+		// run holding its function singleton while it waits: the singleton lock
+		// is released once the run has no queued items.
+		jobID := subscriptionExpiryJobID(md, pauseID)
+		expiry := queue.Item{
+			JobID:                 &jobID,
+			WorkspaceID:           md.ID.Tenant.EnvID,
+			GroupID:               runCtx.GroupID(),
+			Kind:                  queue.KindPause,
+			Identifier:            sv2.V1FromMetadata(*md),
+			PriorityFactor:        runCtx.PriorityFactor(),
+			CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+			Payload:               queue.PayloadPauseTimeout{PauseID: pauseID, Pause: pause},
+			Metadata:              make(map[string]any),
+		}
+		if err := e.queue.Enqueue(ctx, expiry, pause.Expires.Time(), queue.EnqueueOpts{}); err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+			return fmt.Errorf("error enqueueing subscription expiry: %w", err)
+		}
+
+		return answer(map[string]any{"opened": true})
+
+	}
+
+	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
 // isSubscriptionParkPause reports whether a pause is the one a run blocks on while it

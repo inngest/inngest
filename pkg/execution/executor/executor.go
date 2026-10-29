@@ -3569,6 +3569,12 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// A subscription pause lives as long as the run: its expiry is not a timeout
+	// the run waits on, and a closed subscription has nothing to resume.
+	if pause.Subscribe != nil {
+		return nil
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -5803,6 +5809,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		if err := gen.SetOpt("if", interpolated); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
+	}
+
+	if opts.Subscribe != nil {
+		// step.subscribe shares the expression handling above.
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts, expr)
 	}
 
 	opcode := gen.Op.String()
