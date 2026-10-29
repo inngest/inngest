@@ -366,6 +366,14 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		return answer(stored.Data)
 
+	case state.SubscribeCurrent:
+		ids, err := messages()
+		if err != nil {
+			return err
+		}
+
+		return answer(map[string]any{"count": len(ids)})
+
 	case state.SubscribeStop:
 		if err := deleteStream(); err != nil {
 			return err
