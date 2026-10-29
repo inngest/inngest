@@ -36,6 +36,11 @@ func (n *noopTracerProvider) UpdateSpan(ctx context.Context, opts *UpdateSpanOpt
 	return nil
 }
 
+// Shutdown implements TracerProvider. Noop has nothing to flush or release.
+func (n *noopTracerProvider) Shutdown(ctx context.Context) error {
+	return nil
+}
+
 func NewNoopTracerProvider() TracerProvider {
 	return &noopTracerProvider{}
 }
