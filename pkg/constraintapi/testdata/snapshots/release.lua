@@ -70,6 +70,15 @@ if not constraints then
 end
 local constraintUsage = {}
 local manualHolds = {}
+local manualClaims = {}
+if requestDetails.msr then
+	local runID = call("HGET", keyLeaseDetails, "rid")
+	for index, c in ipairs(constraints) do
+		if c.k == 4 and c.sem.rel == 1 then
+			manualClaims[index] = call("GET", c.sem.k .. ":owner:" .. runID .. ":claim") == requestID
+		end
+	end
+end
 if requestDetails.mso and forceReleaseSemaphores then
 	local runID = call("HGET", keyLeaseDetails, "rid")
 	for index, c in ipairs(constraints) do
@@ -78,6 +87,9 @@ if requestDetails.mso and forceReleaseSemaphores then
 			local usage = tonumber(call("GET", c.sem.k)) or 0
 			if held == nil or held < 0 or usage < held then
 				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if requestDetails.msr and held > 0 and not manualClaims[index] then
+				return redis.error_reply("ERR manual semaphore claim belongs to another request")
 			end
 			manualHolds[index] = held
 		end
@@ -104,6 +116,7 @@ for index, c in ipairs(constraints) do
 					local remaining = held - releaseWeight
 					if remaining == 0 then
 						call("SET", ownerKey, "0", "EX", 604800)
+						if requestDetails.msr then call("SET", ownerKey .. ":claim", "released", "EX", 604800) end
 					else
 						call("SET", ownerKey, tostring(remaining))
 					end
@@ -112,6 +125,12 @@ for index, c in ipairs(constraints) do
 			local newVal = call("DECRBY", c.sem.k, releaseWeight)
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
+			end
+		elseif requestDetails.msr then
+			local runID = call("HGET", keyLeaseDetails, "rid")
+			local claimKey = c.sem.k .. ":owner:" .. runID .. ":claim"
+			if manualClaims[index] then
+				call("SET", claimKey, "released")
 			end
 		end
 	end

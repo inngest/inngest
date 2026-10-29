@@ -65,6 +65,9 @@ type redisRequestState struct {
 	// Persist the protocol version so release/scavenge honors how this request
 	// acquired permits, even if the writer's rollout setting changes later.
 	ManualSemaphoreOwnership bool `json:"mso,omitempty"`
+	// Only requests written by retry-aware writers may hand their run's hold
+	// back to a later start attempt. Older tracked holds are not adopted.
+	ManualSemaphoreStartRetry bool `json:"msr,omitempty"`
 
 	// Annotate metadata
 	Metadata stateMetadata `json:"m,omitzero"`
@@ -126,15 +129,28 @@ func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool)
 
 	state.LeaseRunIDs = leaseRunIDs
 	state.ManualSemaphoreOwnership = ownership
+	state.ManualSemaphoreStartRetry = ownership
 	if ownership {
+		seenSemaphores := map[string]bool{}
 		for _, c := range req.Constraints {
 			if c.Kind != ConstraintKindSemaphore || c.Semaphore.Release != SemaphoreReleaseManual {
 				continue
 			}
+			key := c.Semaphore.UsageKey(req.AccountID)
+			if seenSemaphores[key] {
+				return nil, nil, nil, "", fmt.Errorf("duplicate manual semaphore constraint")
+			}
+			seenSemaphores[key] = true
+			seenRuns := map[ulid.ULID]bool{}
 			for _, key := range req.LeaseIdempotencyKeys {
-				if req.LeaseRunIDs[key] == (ulid.ULID{}) {
+				runID := req.LeaseRunIDs[key]
+				if runID == (ulid.ULID{}) {
 					return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires a run ID for each lease")
 				}
+				if seenRuns[runID] {
+					return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires distinct run IDs")
+				}
+				seenRuns[runID] = true
 			}
 		}
 	}

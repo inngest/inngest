@@ -210,6 +210,7 @@ local exhaustedConstraints = {}
 local exhaustedSet = {}
 local retryAt = 0
 local concurrencyUsageCache = {}
+local manualReuse = {}
 local constraintUsage = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 local cacheEnabled = cacheMaxTTL > 0
@@ -287,20 +288,43 @@ for index, value in ipairs(constraints) do
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if requestDetails.mso and value.sem.rel == 1 then
-			for _, lik in ipairs(requestDetails.lik) do
+		if requestDetails.msr and value.sem.rel == 1 then
+			manualReuse[index] = {}
+			constraintCapacity = 0
+			for j = 1, requested do
+				local lik = requestDetails.lik[j]
 				local runID = requestDetails.lri[lik]
-				local owned = call("GET", value.sem.k .. ":owner:" .. runID)
-				if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
+				local ownerKey = value.sem.k .. ":owner:" .. runID
+				local owned = call("GET", ownerKey)
+				local claim = call("GET", ownerKey .. ":claim")
+				local held = tonumber(owned)
+				if owned ~= false and owned ~= nil and (held == nil or held < 0 or held % 1 ~= 0 or usage < held) then
 					return redis.error_reply("ERR manual semaphore ownership is invalid")
 				end
-				if owned == "0" then remaining = 0 end
+				if held == nil then
+					if claim ~= false and claim ~= nil then
+						return redis.error_reply("ERR manual semaphore claim has no owner")
+					end
+					if remaining < weight then break end
+					remaining = remaining - weight
+				elseif held == weight and claim == "released" then
+					manualReuse[index][j] = true
+				else
+					break
+				end
+				constraintCapacity = constraintCapacity + 1
 			end
-		end
-		if remaining < weight then
-			constraintCapacity = 0
 		else
-			constraintCapacity = math.floor(remaining / weight)
+			if requestDetails.mso and value.sem.rel == 1 then
+				for _, lik in ipairs(requestDetails.lik) do
+					local owned = call("GET", value.sem.k .. ":owner:" .. requestDetails.lri[lik])
+					if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
+						return redis.error_reply("ERR manual semaphore ownership is invalid")
+					end
+					if owned == "0" then remaining = 0 end
+				end
+			end
+			constraintCapacity = math.max(math.floor(remaining / weight), 0)
 		end
 		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
@@ -382,12 +406,27 @@ for i, value in ipairs(constraints) do
 		if not weight or weight <= 0 then
 			weight = 1
 		end
-		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
+		local acquired = granted
+		if manualReuse[i] then
+			for j = 1, granted do
+				if manualReuse[i][j] then acquired = acquired - 1 end
+			end
+		end
+		local newUsage = tonumber(call("GET", value.sem.k)) or 0
+		if acquired > 0 then
+			newUsage = call("INCRBY", value.sem.k, toInteger(weight * acquired))
+		end
 		if requestDetails.mso and value.sem.rel == 1 then
 			call("SET", value.sem.k .. ":ownership", "1")
 			for j = 1, granted do
 				local runID = requestDetails.lri[requestDetails.lik[j]]
-				call("INCRBY", value.sem.k .. ":owner:" .. runID, toInteger(weight))
+				local ownerKey = value.sem.k .. ":owner:" .. runID
+				if not (manualReuse[i] and manualReuse[i][j]) then
+					call("INCRBY", ownerKey, toInteger(weight))
+				end
+				if requestDetails.msr then
+					call("SET", ownerKey .. ":claim", requestID)
+				end
 			end
 		end
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0

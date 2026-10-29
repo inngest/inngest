@@ -24,6 +24,7 @@ if owned ~= false and owned ~= nil then
 	if usage < held then return -1 end
 	local remaining = redis.call("DECRBY", keyUsage, held)
 	redis.call("SET", keyOwner, "0", "EX", retention)
+	redis.call("SET", keyOwner .. ":claim", "released", "EX", retention)
 	return remaining
 end
 

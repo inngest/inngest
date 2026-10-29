@@ -161,6 +161,10 @@ local retryAt = 0
 ---@type table<integer, integer>
 local concurrencyUsageCache = {}
 
+-- Per-candidate decisions are computed before any writes. A batch grants a
+-- prefix of its lease keys, not an arbitrary set of owners with capacity.
+local manualReuse = {}
+
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
 
@@ -259,21 +263,47 @@ for index, value in ipairs(constraints) do
 			weight = 1
 		end
 		local remaining = capacity - usage
-		if requestDetails.mso and value.sem.rel == 1 then
-			for _, lik in ipairs(requestDetails.lik) do
+		if requestDetails.msr and value.sem.rel == 1 then
+			manualReuse[index] = {}
+			constraintCapacity = 0
+			for j = 1, requested do
+				local lik = requestDetails.lik[j]
 				local runID = requestDetails.lri[lik]
-				local owned = call("GET", value.sem.k .. ":owner:" .. runID)
-				if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
+				local ownerKey = value.sem.k .. ":owner:" .. runID
+				local owned = call("GET", ownerKey)
+				local claim = call("GET", ownerKey .. ":claim")
+				local held = tonumber(owned)
+				if owned ~= false and owned ~= nil and (held == nil or held < 0 or held % 1 ~= 0 or usage < held) then
 					return redis.error_reply("ERR manual semaphore ownership is invalid")
 				end
-				-- Never revive an already finalized/scavenged run's permit.
-				if owned == "0" then remaining = 0 end
+				if held == nil then
+					if claim ~= false and claim ~= nil then
+						return redis.error_reply("ERR manual semaphore claim has no owner")
+					end
+					if remaining < weight then break end
+					remaining = remaining - weight
+				elseif held == weight and claim == "released" then
+					-- The previous lease released this tracked run hold normally.
+					-- Reuse it without increasing either usage or owned weight.
+					manualReuse[index][j] = true
+				else
+					-- Active claims, tombstones, changed weights and pre-protocol
+					-- owners are not evidence that another attempt may enter.
+					break
+				end
+				constraintCapacity = constraintCapacity + 1
 			end
-		end
-		if remaining < weight then
-			constraintCapacity = 0
 		else
-			constraintCapacity = math.floor(remaining / weight)
+			if requestDetails.mso and value.sem.rel == 1 then
+				for _, lik in ipairs(requestDetails.lik) do
+					local owned = call("GET", value.sem.k .. ":owner:" .. requestDetails.lri[lik])
+					if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
+						return redis.error_reply("ERR manual semaphore ownership is invalid")
+					end
+					if owned == "0" then remaining = 0 end
+				end
+			end
+			constraintCapacity = math.max(math.floor(remaining / weight), 0)
 		end
 		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
@@ -394,14 +424,30 @@ for i, value in ipairs(constraints) do
 		if not weight or weight <= 0 then
 			weight = 1
 		end
-		local newUsage = call("INCRBY", value.sem.k, toInteger(weight * granted))
+		local acquired = granted
+		if manualReuse[i] then
+			for j = 1, granted do
+				if manualReuse[i][j] then acquired = acquired - 1 end
+			end
+		end
+		local newUsage = tonumber(call("GET", value.sem.k)) or 0
+		if acquired > 0 then
+			newUsage = call("INCRBY", value.sem.k, toInteger(weight * acquired))
+		end
 		if requestDetails.mso and value.sem.rel == 1 then
 			-- Once a key uses ownership, a missing owner must never fall back
 			-- to a legacy decrement, even after released tombstones expire.
 			call("SET", value.sem.k .. ":ownership", "1")
 			for j = 1, granted do
 				local runID = requestDetails.lri[requestDetails.lik[j]]
-				call("INCRBY", value.sem.k .. ":owner:" .. runID, toInteger(weight))
+				local ownerKey = value.sem.k .. ":owner:" .. runID
+				if not (manualReuse[i] and manualReuse[i][j]) then
+					call("INCRBY", ownerKey, toInteger(weight))
+				end
+				if requestDetails.msr then
+					-- Request ID is stable across lease renewal, unlike lease ID.
+					call("SET", ownerKey .. ":claim", requestID)
+				end
 			end
 		end
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0

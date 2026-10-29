@@ -34,3 +34,29 @@ Cloud or authorize a migration, counter reset, or cleanup of existing runs.
 
 Old runs are not backfilled automatically. Their safe recovery still requires
 an explicit hold, independently verified holders, and a recovery manifest.
+
+## Start-job retries
+
+With ownership enabled, new acquisitions also record which capacity request
+currently claims each run's manual permit. Ordinary release keeps the permit
+but marks that claim released, atomically with removing the old lease. A retry
+of the same run can then reuse the recorded weight rather than acquiring it
+twice. Renewing a lease does not change its capacity request ID.
+
+This closes a retry deadlock: an unsuccessful start could release its capacity
+lease while leaving its manual permit held. Its retry was blocked by that hold,
+and the scavenger had no lease record left to reclaim.
+
+An active claim cannot be reused. Other runs, changed weights, finalized or
+scavenged runs, and untracked legacy holds remain blocked. Every other constraint
+is still checked; owning a run permit does not supply worker or step capacity.
+Batch acquisition only grants an eligible prefix and rejects duplicate runs or
+duplicate manual semaphore constraints before writing.
+
+Deploy retry-aware acquisition, ordinary release, finalization and scavenging
+everywhere before enabling ownership. The internal request marker `msr` keeps
+older ownership requests from being treated as retry-aware. Existing owner
+records without a claim are not adopted, and existing legacy SYSOP jobs are
+not repaired or replayed by deployment. Do not downgrade these participants
+while retry-aware holds remain active. Releasing a large old backlog still
+requires separate authorization and bounded pressure-monitored recovery.
