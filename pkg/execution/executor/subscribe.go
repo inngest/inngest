@@ -300,6 +300,10 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
 				return fmt.Errorf("error deleting stale subscription park: %w", err)
 			}
+			// And the timeout item enqueued for it above.
+			if sub.Timeout != "" {
+				e.dequeuePauseJob(ctx, md, fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID))
+			}
 			return nil
 		case parkReady:
 			return e.consumePark(ctx, &park, false)
@@ -401,6 +405,11 @@ func isSubscriptionParkPause(pause *state.Pause) bool {
 // dequeueSubscriptionExpiry removes the queue job that would expire a subscription
 // pause, once the pause is closed.
 func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metadata, pauseID uuid.UUID) {
+	e.dequeuePauseJob(ctx, md, subscriptionExpiryJobID(md, pauseID))
+}
+
+// dequeuePauseJob removes a pause job from the run's queue partition.
+func (e *executor) dequeuePauseJob(ctx context.Context, md *sv2.Metadata, jobID string) {
 	if e.shards == nil {
 		return
 	}
@@ -411,12 +420,12 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 		FunctionID: md.ID.FunctionID,
 	}, nil)
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn("could not find shard to dequeue the subscription expiry", "error", err)
+		logger.StdlibLogger(ctx).Warn("could not find shard to dequeue a subscription job", "error", err)
 		return
 	}
 
 	err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
-		ID:         queue.HashID(ctx, subscriptionExpiryJobID(md, pauseID)),
+		ID:         queue.HashID(ctx, jobID),
 		FunctionID: md.ID.FunctionID,
 		Data: queue.Item{
 			Kind:       queue.KindPause,
@@ -424,7 +433,7 @@ func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metada
 		},
 	})
 	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
-		logger.StdlibLogger(ctx).Error("error dequeueing the subscription expiry", "error", err)
+		logger.StdlibLogger(ctx).Error("error dequeueing a subscription job", "error", err)
 	}
 }
 
