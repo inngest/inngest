@@ -835,13 +835,10 @@ var syntaxFunctionNames = map[string]bool{
 // CatalogName/SchemaName, quoted like any identifier; the rest are
 // Reserved* names that take any keyword.
 //
-// coalesce is printed as the COALESCE(...) syntax rather than a call:
-// DuckDB has no function by that name (COALESCE is an operator), so the
-// adapter desugars COALESCE(...) into this FunctionExpr and this is its
-// inverse. A source `"coalesce"(x)`, which DuckDB itself would reject as an
-// unknown function, adapts to the same node and so prints as COALESCE too,
-// unless it has something COALESCE(...) can't spell (no arguments, DISTINCT,
-// OVER, ...; see isCoalesceSyntax), which stays a quoted call.
+// A Syntax call (the adapter's desugared COALESCE(...)) is printed back as
+// that syntax: DuckDB has no function named coalesce (COALESCE is an
+// operator). A source `"coalesce"(x)` call isn't Syntax, so it stays a
+// quoted call and fails as an unknown function, same as in DuckDB itself.
 func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	if f.Receiver != nil || len(f.Name) > 1 {
 		for i, p := range f.Name {
@@ -860,7 +857,10 @@ func (sw *sqlWriter) functionName(f *FunctionExpr) {
 	p := f.Name[0]
 	up := strings.ToUpper(p)
 	switch {
-	case up == "COALESCE" && isCoalesceSyntax(f):
+	case f.Syntax:
+		if up != "COALESCE" || !isCoalesceSyntax(f) {
+			panic(fmt.Sprintf("duckdb/parser: Write: Syntax FunctionExpr %q can't be written as COALESCE(...)", p))
+		}
 		sw.str("COALESCE")
 	case isSimpleIdent(p) && !syntaxFunctionNames[up] && isFuncNameIdent(p):
 		sw.str(p)

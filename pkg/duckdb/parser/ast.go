@@ -370,6 +370,10 @@ type FunctionExpr struct {
 	Within       *OrderByClause
 	Export       bool
 	Over         *WindowSpec
+	// Syntax marks a call desugared from a keyword syntax form that has no
+	// plain function behind it (only COALESCE(...) today, an operator in
+	// DuckDB), so Write prints it back in that form rather than as a call.
+	Syntax bool
 }
 
 func (f *FunctionExpr) Children() []Node {

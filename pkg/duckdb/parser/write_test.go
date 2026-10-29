@@ -589,7 +589,9 @@ func TestWriteQuotesKeywordFunctionNames(t *testing.T) {
 func TestWriteSpecialFunctions(t *testing.T) {
 	cases := []struct{ name, sql, want string }{
 		{"coalesce", "SELECT coalesce(a, b) FROM t", "SELECT COALESCE(a, b) FROM t"},
-		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, "SELECT COALESCE(a) FROM t"},
+		// DuckDB has no coalesce function, so a quoted call stays one and
+		// fails there as an unknown function instead of becoming COALESCE.
+		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, `SELECT "coalesce"(a) FROM t`},
 		{"quoted coalesce w/o args", `SELECT "coalesce"() FROM t`, `SELECT "coalesce"() FROM t`},
 		{"quoted coalesce window", `SELECT "coalesce"(a) OVER () FROM t`, `SELECT "coalesce"(a) OVER () FROM t`},
 		{"quoted coalesce distinct", `SELECT "coalesce"(DISTINCT a) FROM t`, `SELECT "coalesce"(DISTINCT a) FROM t`},
@@ -703,4 +705,15 @@ func TestWriteRoundTripsEveryKeywordAsFunctionName(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestWriteSyntaxCoalesceMustBeSpellable checks a hand-built Syntax call that
+// COALESCE(...) can't spell is a Write error, not a silently different call.
+func TestWriteSyntaxCoalesceMustBeSpellable(t *testing.T) {
+	stmt, err := ParseString("SELECT COALESCE(a, b) FROM t")
+	require.NoError(t, err)
+	f := stmt.Columns[0].Expr.(*FunctionExpr)
+	require.True(t, f.Syntax)
+	f.Distinct = true
+	require.ErrorContains(t, Write(&strings.Builder{}, stmt), "can't be written as COALESCE(...)")
 }

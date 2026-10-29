@@ -596,8 +596,9 @@ var specialFunctionSpellings = map[string]string{
 //	OVERLAY(x PLACING y FROM a [FOR b]) -> overlay(x, y, a[, b])
 //
 // coalesce is the one DuckDB keeps as an operator rather than a function
-// (there's no function named coalesce), so Write prints it back as
-// COALESCE(...) instead of a quoted call; see functionName.
+// (there's no function named coalesce), so it's marked Syntax and Write
+// prints it back as COALESCE(...) instead of a quoted call; see
+// functionName.
 func (a *adapter) adaptSpecialFunctionExpression(n *peg.Node) Expr {
 	alt := choice(body(n))
 	fn := func(name string, args ...Expr) Expr {
@@ -607,7 +608,9 @@ func (a *adapter) adaptSpecialFunctionExpression(n *peg.Node) Expr {
 	switch alt.Name {
 	case "CoalesceExpression":
 		// 'COALESCE' Parens(List(Expression))
-		return fn("coalesce", a.adaptExprList(seq.Children[1])...)
+		f := fn("coalesce", a.adaptExprList(seq.Children[1])...).(*FunctionExpr)
+		f.Syntax = true
+		return f
 	case "NullIfExpression":
 		// 'NULLIF' Parens(NullIfArguments) ; NullIfArguments <- Expression ',' Expression
 		args := body(body(seq.Children[1]).Children[1])
