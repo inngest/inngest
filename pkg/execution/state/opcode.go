@@ -645,6 +645,9 @@ type SubscribeOpts struct {
 	// Attempt, for a park, counts the parks for this Seq that timed out before.
 	// Each park is its own step, so a timed-out one is not answered again.
 	Attempt int `json:"attempt,omitempty"`
+	// Reader, for a park, names the reader that waits (a view of the inbox has
+	// its own cursor and its own parks). Empty for the inbox's own reader.
+	Reader string `json:"reader,omitempty"`
 	// Stream is which of the subscription's events this op is for. Each event is
 	// its own pause; all of them save messages under the same Key.
 	Stream int `json:"stream,omitempty"`

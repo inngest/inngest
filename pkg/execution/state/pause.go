@@ -273,6 +273,8 @@ type Pause struct {
 type PauseSubscribe struct {
 	// Key is the unhashed subscription ID.
 	Key string `json:"key"`
+	// Stream is which of the subscription's events this pause is for.
+	Stream int `json:"stream,omitempty"`
 }
 
 // CreatedAfter reports whether this pause was created after the given

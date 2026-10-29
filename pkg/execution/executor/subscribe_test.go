@@ -14,13 +14,16 @@ import (
 
 func TestSubscriptionStepIDs(t *testing.T) {
 	sum := sha1.Sum([]byte("inbox:3"))
-	require.Equal(t, hex.EncodeToString(sum[:]), subscriptionStepID("inbox", 3, 0))
+	require.Equal(t, hex.EncodeToString(sum[:]), subscriptionStepID("inbox", "", 3, 0))
 
-	require.NotEqual(t, subscriptionStepID("inbox", 1, 0), subscriptionStepID("inbox", 2, 0))
+	require.NotEqual(t, subscriptionStepID("inbox", "", 1, 0), subscriptionStepID("inbox", "", 2, 0))
 	// A park that timed out is followed by a new one for the same message.
-	require.NotEqual(t, subscriptionStepID("inbox", 1, 0), subscriptionStepID("inbox", 1, 1))
-	require.NotEqual(t, subscriptionStepID("inbox", 1, 1), subscriptionStepID("inbox", 1, 2))
-	require.NotEqual(t, subscriptionStepID("a", 1, 0), subscriptionStepID("b", 1, 0))
+	require.NotEqual(t, subscriptionStepID("inbox", "", 1, 0), subscriptionStepID("inbox", "", 1, 1))
+	require.NotEqual(t, subscriptionStepID("inbox", "", 1, 1), subscriptionStepID("inbox", "", 1, 2))
+	require.NotEqual(t, subscriptionStepID("a", "", 1, 0), subscriptionStepID("b", "", 1, 0))
+	// A view has parks of its own, which never share an ID with the inbox's.
+	require.NotEqual(t, subscriptionStepID("inbox", "", 1, 0), subscriptionStepID("inbox", "v1", 1, 0))
+	require.NotEqual(t, subscriptionStepID("inbox", "v1", 1, 0), subscriptionStepID("inbox", "v2", 1, 0))
 }
 
 // A message is the step of its event in a subscription: the same event is the same
@@ -52,13 +55,13 @@ func TestParkSeq(t *testing.T) {
 // saved meanwhile): the two markers must not share an ID, or the late cleanup of
 // the first would delete the second and leave the run parked.
 func TestSubscriptionParkIDs(t *testing.T) {
-	one := subscriptionStepID("inbox", 1, 0)
-	three := subscriptionStepID("inbox", 3, 0)
+	one := subscriptionStepID("inbox", "", 1, 0)
+	three := subscriptionStepID("inbox", "", 3, 0)
 	first := subscriptionParkID("run", "inbox", one)
 
 	require.Equal(t, first, subscriptionParkID("run", "inbox", one))
 	require.NotEqual(t, first, subscriptionParkID("run", "inbox", three))
-	require.NotEqual(t, first, subscriptionParkID("run", "inbox", subscriptionStepID("inbox", 2, 0)))
+	require.NotEqual(t, first, subscriptionParkID("run", "inbox", subscriptionStepID("inbox", "", 2, 0)))
 	require.NotEqual(t, first, subscriptionParkID("run", "other", one))
 	require.NotEqual(t, first, subscriptionParkID("run2", "inbox", one))
 	require.NotEqual(t, first, subscriptionPauseID("run", "inbox", 0))

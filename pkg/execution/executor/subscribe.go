@@ -69,8 +69,12 @@ func subscriptionClosedID(key string) string {
 
 // subscriptionStepID is the step ID of the wait for message seq. The SDK gives
 // its blocking next() the same ID.
-func subscriptionStepID(key string, seq int, attempt int) string {
-	id := fmt.Sprintf("%s:%d", key, seq)
+func subscriptionStepID(key string, reader string, seq int, attempt int) string {
+	id := key
+	if reader != "" {
+		id = fmt.Sprintf("%s:%s", key, reader)
+	}
+	id = fmt.Sprintf("%s:%d", id, seq)
 	if attempt > 0 {
 		id = fmt.Sprintf("%s:%d", id, attempt)
 	}
@@ -200,7 +204,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			Event:       &opts.Event,
 			Expression:  expr,
 			MaxAttempts: runCtx.MaxAttempts(),
-			Subscribe:   &state.PauseSubscribe{Key: sub.Key},
+			Subscribe:   &state.PauseSubscribe{Key: sub.Key, Stream: sub.Stream},
 			CreatedAt:   now,
 		}
 		if len(md.Config.EventIDs) > 0 {
@@ -236,7 +240,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"opened": true})
 
 	case state.SubscribePark:
-		if gen.ID != subscriptionStepID(sub.Key, sub.Seq, sub.Attempt) {
+		if gen.ID != subscriptionStepID(sub.Key, sub.Reader, sub.Seq, sub.Attempt) {
 			return fmt.Errorf("subscription step ID does not match message %d", sub.Seq)
 		}
 
@@ -586,7 +590,12 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		return state.ErrRunNotFound
 	}
 
-	data, err := json.Marshal(map[string]any{"data": evt.GetEvent().Map()})
+	// The message is the event, with the stream that saved it so a reader can
+	// tell which source of the subscription it came from.
+	saved := evt.GetEvent().Map()
+	saved["stream"] = pause.Subscribe.Stream
+
+	data, err := json.Marshal(map[string]any{"data": saved})
 	if err != nil {
 		return err
 	}
