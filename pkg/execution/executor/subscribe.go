@@ -167,6 +167,26 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return subscriptionMessageIDs(stack, sub.Key), nil
 	}
 
+	// deleteStream removes the pause of this op's stream, so its events are no
+	// longer saved. Deleting a pause that is gone is not an error.
+	deleteStream := func() error {
+		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return fmt.Errorf("error loading subscription pause: %w", err)
+		}
+		if pause != nil {
+			if err := e.pm.Delete(ctx, idx, *pause); err != nil {
+				return fmt.Errorf("error deleting subscription pause: %w", err)
+			}
+			if e.exprAggregator != nil {
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+			}
+			e.dequeueSubscriptionExpiry(ctx, md, pauseID)
+		}
+
+		return nil
+	}
+
 	switch sub.Mode {
 	case state.SubscribeOpen:
 		now := e.now()
@@ -317,7 +337,14 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			}
 			return nil
 		case parkReady:
-			return e.consumePark(ctx, &park)
+			return e.consumePark(ctx, &park, false)
+		}
+
+		// Still waiting. A subscription closed in the same batch may have run its
+		// close before this marker existed, and then nobody would end this park.
+		// A closed subscription has its closed step: end the park now.
+		if slices.Contains(stack, subscriptionClosedID(sub.Key)) {
+			return e.consumePark(ctx, &park, true)
 		}
 
 		return nil
@@ -343,6 +370,43 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		return answer(stored.Data)
 
+	case state.SubscribeCurrent:
+		ids, err := messages()
+		if err != nil {
+			return err
+		}
+
+		return answer(map[string]any{"count": len(ids)})
+
+	case state.SubscribeClose:
+		if err := deleteStream(); err != nil {
+			return err
+		}
+
+		// Mark the subscription closed, so a park written after this still ends.
+		if _, err := e.smv2.SaveStep(ctx, md.ID, subscriptionClosedID(sub.Key), []byte("true")); err != nil &&
+			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+			return err
+		}
+
+		// A read that is still parked (one the function stopped waiting for, such as
+		// a lost race) must not keep the run waiting: end every park now, so the
+		// steps they stand for are answered and discovery can follow the close.
+		parked, err := e.parkedMarkers(ctx, md.ID, sub.Key)
+		if err != nil {
+			return err
+		}
+		for _, marker := range parked {
+			if err := e.consumePark(ctx, marker, true); err != nil {
+				return err
+			}
+		}
+
+		ids, err := messages()
+		if err != nil {
+			return err
+		}
+		return answer(map[string]any{"count": len(ids)})
 	}
 
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
@@ -367,6 +431,12 @@ func parkSeq(pause *state.Pause) int {
 // waits for a subscription message. It has no timeout job.
 func isSubscriptionParkPause(pause *state.Pause) bool {
 	return pause.Event != nil && strings.HasPrefix(*pause.Event, consts.SubscriptionParkName)
+}
+
+// dequeueSubscriptionExpiry removes the queue job that would expire a subscription
+// pause, once the pause is closed.
+func (e *executor) dequeueSubscriptionExpiry(ctx context.Context, md *sv2.Metadata, pauseID uuid.UUID) {
+	e.dequeuePauseJob(ctx, md, subscriptionExpiryJobID(md, pauseID))
 }
 
 // dequeuePauseJob removes a pause job from the run's queue partition.
@@ -419,7 +489,7 @@ func (e *executor) wakeSubscriber(ctx context.Context, id sv2.ID, key string) er
 	}
 
 	for _, pause := range markersToWake(parked, stack, key) {
-		if err := e.consumePark(ctx, pause); err != nil {
+		if err := e.consumePark(ctx, pause, false); err != nil {
 			return err
 		}
 	}
@@ -471,11 +541,16 @@ func (e *executor) parkedMarkers(ctx context.Context, id sv2.ID, key string) ([]
 }
 
 // consumePark consumes a marker so the run sees the message it waits for. Its
-// output names that message's position. Another handler may have consumed the
+// output names that message's position, or says the subscription was closed
+// (closed), so the reader can tell the end of a subscription from a message
+// that is missing. Another handler may have consumed the
 // marker first: the store then answers that it did not consume (DidConsume
 // false, or an idempotent success) and nothing more is queued.
-func (e *executor) consumePark(ctx context.Context, pause *state.Pause) error {
+func (e *executor) consumePark(ctx context.Context, pause *state.Pause, closed bool) error {
 	answer := map[string]any{"seq": parkSeq(pause)}
+	if closed {
+		answer = map[string]any{"closed": true}
+	}
 
 	err := e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:     map[string]any{"data": answer},
