@@ -902,6 +902,18 @@ func applyResponse(
 		return nil
 	}
 
+	// Handle function completion opcodes which contain the function's final output.
+	// These are generator responses but represent the function result, not intermediate steps.
+	for _, op := range resp.Generator {
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+			output, _ := op.Output()
+			if output != "" {
+				h.Result.Output = output
+			}
+			return nil
+		}
+	}
+
 	if len(resp.Generator) > 0 {
 		// If we're a generator, exit now to prevent attempting to parse
 		// generator response as an output; the generator response may be in
