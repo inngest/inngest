@@ -378,6 +378,13 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		return answer(map[string]any{"count": len(ids)})
 
+	case state.SubscribeStop:
+		if err := deleteStream(); err != nil {
+			return err
+		}
+
+		return answer(map[string]any{"stopped": true})
+
 	case state.SubscribeClose:
 		if err := deleteStream(); err != nil {
 			return err
@@ -583,7 +590,10 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		return state.ErrRunNotFound
 	}
 
+	// The message is the event, with the stream that saved it so a reader can
+	// tell which source of the subscription it came from.
 	saved := evt.GetEvent().Map()
+	saved["stream"] = pause.Subscribe.Stream
 
 	data, err := json.Marshal(map[string]any{"data": saved})
 	if err != nil {
