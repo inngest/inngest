@@ -3189,8 +3189,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
-	if iter.Error() != context.Canceled {
-		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	if err := iter.Error(); err != nil && err != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
 
 	return res, goerr

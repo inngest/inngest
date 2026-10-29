@@ -124,12 +124,15 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	require.ErrorIs(t, iter.Error(), context.Canceled)
 	assert.Equal(t, 4, pauseCount, "Should retrieve all pauses from buffer and blocks")
 
-	// Test 6: Test deleting a pause
+	// Existing blocks must remain deletable after both feature flags are disabled.
+	manager.blockFlushEnabled = func(context.Context, uuid.UUID) bool { return false }
+	manager.blockStoreEnabled = func(context.Context, uuid.UUID) bool { return false }
 	pauseToDelete := pauses[0]
 	err = manager.Delete(ctx, index, *pauseToDelete)
 	require.NoError(t, err)
 
 	// Verify the pause was deleted by trying to access it
+	manager.blockStoreEnabled = alwaysEnabled
 	mockBufferer.clearPauses() // Clear buffer to force reading from blocks
 	iter, err = manager.PausesSince(ctx, index, time.Time{})
 	require.NoError(t, err)
@@ -222,7 +225,7 @@ func TestDeletePauseByID(t *testing.T) {
 		err := manager.DeletePauseByID(ctx, pauseID, workspaceID)
 		require.NoError(t, err)
 
-		assert.Equal(t, 0, mockBlockStore.deleteByIDCalled, "BlockStore DeleteByID should NOT be called when disabled")
+		assert.Equal(t, 1, mockBlockStore.deleteByIDCalled, "Existing blocks must remain deletable when flags are disabled")
 		assert.Equal(t, 1, mockBufferer.deletePauseByIDCalled, "Buffer DeletePauseByID should be called once")
 	})
 

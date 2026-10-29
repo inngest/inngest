@@ -49,4 +49,5 @@ message EnqueueOptions {
   string force_queue_shard_name = 2;
   string normalize_from_backlog_id = 3;
   optional google.protobuf.Duration idempotency_period = 4;
+  string singleton_migration_key = 5;
 }
