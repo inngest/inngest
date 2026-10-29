@@ -71,9 +71,12 @@ if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
   return 1
 end
 
+-- Migration may join the same run's existing ownership, never another run's.
+local singletonMigration = ARGV[15] == "1"
 -- Check if the item is a singleton and if an existing item already exists
 if exists_without_ending(singletonKey, ":singleton:-") and not is_normalize then
-  if redis.call("EXISTS", singletonKey) ~= 0 then
+  local holder = redis.call("GET", singletonKey)
+  if holder and (not singletonMigration or holder ~= runID) then
     return 2
   end
 
