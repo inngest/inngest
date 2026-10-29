@@ -488,6 +488,11 @@ func (e *executor) endSubscription(ctx context.Context, id sv2.ID, key string, d
 	return nil
 }
 
+// subscriptionWakeJobID is the job ID of a subscription's wake in a run.
+func subscriptionWakeJobID(runID string, hash string) string {
+	return fmt.Sprintf("%s-subscription-wake-%s", runID, hash)
+}
+
 // enqueueSubscriptionWake gives the run the chance to see what a subscription
 // saved. It is the discovery edge the executor enqueues after any step, so it
 // runs under the run's current mode, which lives in its metadata (ForceStepPlan),
@@ -503,7 +508,7 @@ func (e *executor) endSubscription(ctx context.Context, id sv2.ID, key string, d
 // while it ran (see subscriptionWakeAgain). Its idempotency period is zero, so no
 // key outlives the item.
 func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata, pause *state.Pause, key string, outgoing string) error {
-	jobID := fmt.Sprintf("%s-subscription-wake-%s", md.ID.RunID, subscriptionKeyHash(key))
+	jobID := subscriptionWakeJobID(md.ID.RunID.String(), subscriptionKeyHash(key))
 	item := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               uuid.New().String(),
@@ -580,6 +585,13 @@ var errSubscriptionWakeAgain = errors.New("subscription messages arrived while t
 // returns the error that runs the same item again. Only the final completion of
 // a wake checks: a request that failed is retried by the queue and checks on
 // its own completion, and a run that ended or failed has nothing to see.
+//
+// A message saved after this check and before the queue removes the item is
+// refused a wake of its own (the job ID is held until the removal) and is not
+// seen by this one. That window is the time the queue takes to remove the item;
+// the next message heals it. Closing it needs the queue to remove an item only
+// while its lease is still held, so that the wake could release its ID and look
+// again without the queue's own removal deleting a newer wake.
 func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w subscriptionWake, resp *state.DriverResponse, err error) error {
 	if w.hash == "" || err != nil || resp == nil || resp.Err != nil {
 		return nil

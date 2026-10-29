@@ -144,7 +144,7 @@ func (f *wakeFixture) burst(key string, n int) {
 }
 
 func wakeJobID(f *wakeFixture, key string) string {
-	return fmt.Sprintf("%s-subscription-wake-%s", f.md.ID.RunID, subscriptionKeyHash(key))
+	return subscriptionWakeJobID(f.md.ID.RunID.String(), subscriptionKeyHash(key))
 }
 
 // queued reports whether the subscription's wake is in the queue, queued or leased.
