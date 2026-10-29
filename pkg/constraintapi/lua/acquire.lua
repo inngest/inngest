@@ -230,6 +230,7 @@ for index, value in ipairs(constraints) do
 	-- Retrieve constraint capacity
 	local constraintCapacity = 0
 	local constraintRetryAt = 0
+	local runLimited = false
 	if skipGCRA and (value.k == 1 or value.k == 3) then
 		-- skip constraint, don't mark as exhausted
 		constraintCapacity = math.max(availableCapacity, 1)
@@ -302,6 +303,7 @@ for index, value in ipairs(constraints) do
 				else
 					-- Active claims, tombstones, changed weights and pre-protocol
 					-- owners are not evidence that another attempt may enter.
+					runLimited = true
 					break
 				end
 				constraintCapacity = constraintCapacity + 1
@@ -313,7 +315,10 @@ for index, value in ipairs(constraints) do
 					if owned ~= false and owned ~= nil and (tonumber(owned) == nil or tonumber(owned) < 0) then
 						return redis.error_reply("ERR manual semaphore ownership is invalid")
 					end
-					if owned == "0" then remaining = 0 end
+					if owned == "0" then
+						remaining = 0
+						runLimited = true
+					end
 				end
 			end
 			constraintCapacity = math.max(math.floor(remaining / weight), 0)
@@ -321,8 +326,9 @@ for index, value in ipairs(constraints) do
 		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
 
-	-- Track if constraint is exhausted before granting
-	if constraintCapacity <= 0 then
+	-- A run-specific refusal limits this request, but is not shared exhaustion:
+	-- caching it would block unrelated runs that can still acquire this key.
+	if constraintCapacity <= 0 and not runLimited then
 		if not exhaustedSet[index] then
 			table.insert(exhaustedConstraints, index)
 			exhaustedSet[index] = true
