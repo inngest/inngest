@@ -139,8 +139,8 @@ func parkStateOf(stack []string, key string, stepID string, seq int) parkState {
 // subscription: open, next, poll and close.
 func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts, expr *string) error {
 	sub := opts.Subscribe
-	if sub.Key == "" {
-		return fmt.Errorf("subscription key is empty")
+	if err := validateSubscribe(sub, opts.Event); err != nil {
+		return err
 	}
 
 	md := runCtx.Metadata()
@@ -214,6 +214,21 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		_, err := e.pm.Write(ctx, idx, &pause)
 		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return fmt.Errorf("error saving subscription pause: %w", err)
+		}
+		if err == nil {
+			// Count after writing, so opens in the same response each see the
+			// ones before them and at most the limit are kept. An open that was
+			// already written passed this check before.
+			ids, err := e.pm.PauseIDsForRun(ctx, md.ID.RunID)
+			if err != nil {
+				return fmt.Errorf("error counting the run's pauses: %w", err)
+			}
+			if len(ids) > consts.MaxSubscriptionPausesPerRun {
+				if err := e.removeSubscriptionPause(ctx, md, idx, &pause); err != nil {
+					return err
+				}
+				return subscriptionLimitError("A run can hold at most %d pauses (subscriptions, parked reads and waitForEvents) when it opens a subscription.", consts.MaxSubscriptionPausesPerRun)
+			}
 		}
 		// A queued item that fires when the subscription expires. It keeps the
 		// run holding its function singleton while it waits: the singleton lock
@@ -344,6 +359,28 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return e.consumePark(ctx, &park, true)
 		}
 
+		// Reads parked at once are bounded: a delivery reads every marker. The
+		// count includes this one, written above.
+		markers, err := e.parkedMarkers(ctx, md.ID, sub.Key)
+		if err != nil {
+			return err
+		}
+		waiting := 0
+		for _, marker := range markers {
+			if marker.Outgoing == "" || !slices.Contains(stack, marker.Outgoing) {
+				waiting++
+			}
+		}
+		if waiting > consts.MaxSubscriptionParks {
+			if err := e.pm.Delete(ctx, parkIdx, park); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+				return fmt.Errorf("error deleting over-limit subscription park: %w", err)
+			}
+			if sub.Timeout != "" {
+				e.dequeuePauseJob(ctx, md, fmt.Sprintf("%s-%s", md.IdempotencyKey(), gen.ID))
+			}
+			return subscriptionLimitError("A subscription can have at most %d reads waiting at once.", consts.MaxSubscriptionParks)
+		}
+
 		return nil
 
 	case state.SubscribePoll:
@@ -387,23 +424,8 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return err
 		}
 
-		// Mark the subscription closed, so a park written after this still ends.
-		if _, err := e.smv2.SaveStep(ctx, md.ID, subscriptionClosedID(sub.Key), []byte("true")); err != nil &&
-			!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		if err := e.endSubscription(ctx, md.ID, sub.Key, []byte("true")); err != nil {
 			return err
-		}
-
-		// A read that is still parked (one the function stopped waiting for, such as
-		// a lost race) must not keep the run waiting: end every park now, so the
-		// steps they stand for are answered and discovery can follow the close.
-		parked, err := e.parkedMarkers(ctx, md.ID, sub.Key)
-		if err != nil {
-			return err
-		}
-		for _, marker := range parked {
-			if err := e.consumePark(ctx, marker, true); err != nil {
-				return err
-			}
 		}
 
 		ids, err := messages()
@@ -580,11 +602,11 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	}
 
 	// SaveStep writes to the run's hashes whether or not the run still
-	// exists, so check first: a finished run cannot take the message.
-	if exists, err := e.smv2.Exists(ctx, id); err != nil {
+	// exists, so check first: a finished run cannot take the message. The
+	// metadata also tells how much the run holds, for the limits below.
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if err != nil {
 		return err
-	} else if !exists {
-		return state.ErrRunNotFound
 	}
 
 	// The message is the event, with the stream that saved it so a reader can
@@ -600,6 +622,23 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	// The same event saves the same bytes under the same ID: a redelivery is
 	// the message it already is.
 	messageID := subscriptionMessageID(key, eventID)
+
+	// A message that would break a limit is dropped and the subscription is
+	// closed: its pause stops matching, and the reader sees the end after the
+	// messages already saved. A redelivery of a saved message is not new.
+	if !slices.Contains(md.Stack, messageID) {
+		stepLimit, stateLimit := e.subscriptionLimits(id)
+		if limit := subscriptionMessageLimit(&md, key, len(data), stepLimit, stateLimit); limit != "" {
+			l.Warn("subscription limit reached, closing the subscription", "limit", limit, "key", key)
+
+			idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
+			if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
+				return err
+			}
+			reason, _ := json.Marshal(map[string]any{"limit": limit})
+			return e.endSubscription(ctx, id, key, reason)
+		}
+	}
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
 	redelivered := err != nil
 	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
@@ -628,4 +667,143 @@ func subscriptionTriggerExclusion(sub *state.SubscribeOpts, md *sv2.Metadata) *s
 
 	trigger := md.Config.EventIDs[0].String()
 	return &trigger
+}
+
+// subscriptionClosedPrefix starts the ID of every closed marker. Closed markers
+// are not messages, so they never count against a message limit.
+const subscriptionClosedPrefix = subscriptionMessagePrefix + "closed:"
+
+// subscriptionLimitError is the error a run fails with when a step.subscribe op
+// exceeds a limit or is malformed. It fails the run immediately, like a
+// waitForEvent timeout that is too long.
+func subscriptionLimitError(format string, args ...any) error {
+	return state.WrapInStandardError(
+		state.ErrSubscriptionLimit,
+		state.InngestErrSubscriptionLimit,
+		fmt.Sprintf(format, args...),
+		"",
+	)
+}
+
+// validateSubscribe checks the bounds of a subscription op before it touches any
+// state: the sizes and numbers an SDK (or a caller of the API) could set freely.
+func validateSubscribe(sub *state.SubscribeOpts, event string) error {
+	if sub.Key == "" {
+		return subscriptionLimitError("The subscription ID is empty.")
+	}
+	if len(sub.Key) > consts.MaxSubscriptionKeyLength {
+		return subscriptionLimitError("The subscription ID is longer than %d characters.", consts.MaxSubscriptionKeyLength)
+	}
+	if len(sub.Reader) > consts.MaxSubscriptionKeyLength {
+		return subscriptionLimitError("The subscription reader name is longer than %d characters.", consts.MaxSubscriptionKeyLength)
+	}
+	if sub.Stream < 0 || sub.Stream >= consts.MaxSubscriptionPausesPerRun {
+		return subscriptionLimitError("A subscription can listen to at most %d events.", consts.MaxSubscriptionPausesPerRun)
+	}
+	if sub.Attempt < 0 {
+		return subscriptionLimitError("The subscription attempt is negative.")
+	}
+	if (sub.Mode == state.SubscribePark || sub.Mode == state.SubscribePoll) && sub.Seq < 1 {
+		return subscriptionLimitError("The message number of a subscription read starts at 1.")
+	}
+	if sub.Mode == state.SubscribeOpen && strings.HasPrefix(event, pauses.SubscriptionParkIndexPrefix) {
+		return subscriptionLimitError("A subscription cannot listen to the event %q: the name is reserved.", event)
+	}
+
+	return nil
+}
+
+// isSubscriptionMessageID reports whether a step ID in the stack is a message.
+func isSubscriptionMessageID(id string) bool {
+	return strings.HasPrefix(id, subscriptionMessagePrefix) && !strings.HasPrefix(id, subscriptionClosedPrefix)
+}
+
+// subscriptionMessageLimit reports which limit saving one more message of the
+// subscription would break, or "" when it fits. The stack and metrics are the
+// run's. A message is only refused for a limit that cannot lift again: counts
+// and sizes only grow.
+func subscriptionMessageLimit(md *sv2.Metadata, key string, size int, stepLimit int, stateLimit int) string {
+	prefix := subscriptionMessagePrefix + subscriptionKeyHash(key) + ":"
+
+	inRun, inSubscription := 0, 0
+	for _, id := range md.Stack {
+		if !isSubscriptionMessageID(id) {
+			continue
+		}
+		inRun++
+		if strings.HasPrefix(id, prefix) {
+			inSubscription++
+		}
+	}
+
+	switch {
+	case inSubscription >= consts.MaxSubscriptionMessages:
+		return fmt.Sprintf("the subscription saved %d messages", consts.MaxSubscriptionMessages)
+	case inRun >= consts.MaxSubscriptionMessagesPerRun:
+		return fmt.Sprintf("the run's subscriptions saved %d messages", consts.MaxSubscriptionMessagesPerRun)
+	case inRun >= stepLimit/2:
+		return fmt.Sprintf("messages took half of the run's step limit of %d", stepLimit)
+	case md.Metrics.StateSize+size > stateLimit/4*3:
+		return fmt.Sprintf("the run's state reached three quarters of its limit of %d bytes", stateLimit)
+	}
+
+	return ""
+}
+
+// subscriptionLimits are the run's step and state size limits as the executor
+// enforces them for steps.
+func (e *executor) subscriptionLimits(id sv2.ID) (stepLimit int, stateLimit int) {
+	if e.steplimit != nil {
+		stepLimit = e.steplimit(id)
+	}
+	if stepLimit == 0 {
+		stepLimit = consts.DefaultMaxStepLimit
+	}
+	if e.stateSizeLimit != nil {
+		stateLimit = e.stateSizeLimit(id)
+	}
+	if stateLimit == 0 {
+		stateLimit = consts.DefaultMaxStateSizeLimit
+	}
+
+	return stepLimit, stateLimit
+}
+
+// endSubscription marks a subscription closed and ends every read parked on it.
+// The data of the closed step is "true", or says which limit closed it.
+func (e *executor) endSubscription(ctx context.Context, id sv2.ID, key string, data []byte) error {
+	// Mark the subscription closed, so a park written after this still ends.
+	if _, err := e.smv2.SaveStep(ctx, id, subscriptionClosedID(key), data); err != nil &&
+		!errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return err
+	}
+
+	// A read that is still parked (one the function stopped waiting for, such as
+	// a lost race) must not keep the run waiting: end every park now, so the
+	// steps they stand for are answered and discovery can follow the close.
+	parked, err := e.parkedMarkers(ctx, id, key)
+	if err != nil {
+		return err
+	}
+	for _, marker := range parked {
+		if err := e.consumePark(ctx, marker, true); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// removeSubscriptionPause deletes the pause of a subscription stream so its
+// events are no longer matched, with its expiry job.
+func (e *executor) removeSubscriptionPause(ctx context.Context, md *sv2.Metadata, idx pauses.Index, pause *state.Pause) error {
+	if err := e.pm.Delete(ctx, idx, *pause); err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+		return fmt.Errorf("error deleting subscription pause: %w", err)
+	}
+	if e.exprAggregator != nil {
+		_ = e.exprAggregator.RemovePause(ctx, pause)
+	}
+	e.dequeueSubscriptionExpiry(ctx, md, pause.ID)
+
+	return nil
 }
