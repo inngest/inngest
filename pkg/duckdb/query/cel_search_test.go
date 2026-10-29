@@ -109,8 +109,16 @@ func TestGetTraceRunsCELMatchesExpressionSemantics(t *testing.T) {
 		// pkg/expressions fails the whole expression when any part of it
 		// errors (here "x".ok), even under an || that's already true.
 		{`output == "x" || output.ok == false`, []int{2}},
-		{`event.name == "x" && output.ok == true`, []int{1, 6}},
-		{`event.name == "z" || output.ok == true`, []int{1, 5, 6}},
+		// Like pkg/cqrs/manager, a mixed expression is checked once against
+		// the triggering events alone and once against the output alone
+		// (the other namespace reads as null each time), so a mixed ||
+		// needs both halves and a mixed && never matches. A run w/o
+		// output (8) or w/o a triggering event (7) never matches either.
+		{`event.name == "x" && output.ok == true`, []int{}},
+		{`event.name == "x" || output.ok == true`, []int{1, 6}},
+		{`event.name == "xa" || output.ok == true`, []int{}},
+		{`event.name == "z" || output.ok == true`, []int{}},
+		{`event.name == "z" || error.message == "boom"`, []int{5}},
 	}
 
 	for _, test := range tests {
