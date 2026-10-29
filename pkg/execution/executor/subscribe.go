@@ -156,6 +156,26 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return subscriptionMessageIDs(stack, sub.Key), nil
 	}
 
+	// deleteStream removes the pause of this op's stream, so its events are no
+	// longer saved. Deleting a pause that is gone is not an error.
+	deleteStream := func() error {
+		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
+		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+			return fmt.Errorf("error loading subscription pause: %w", err)
+		}
+		if pause != nil {
+			if err := e.pm.Delete(ctx, idx, *pause); err != nil {
+				return fmt.Errorf("error deleting subscription pause: %w", err)
+			}
+			if e.exprAggregator != nil {
+				_ = e.exprAggregator.RemovePause(ctx, pause)
+			}
+			e.dequeueSubscriptionExpiry(ctx, md, pauseID)
+		}
+
+		return nil
+	}
+
 	switch sub.Mode {
 	case state.SubscribeOpen:
 		now := e.now()
@@ -343,19 +363,16 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		return answer(stored.Data)
 
-	case state.SubscribeClose:
-		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
-		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
-			return fmt.Errorf("error loading subscription pause: %w", err)
+	case state.SubscribeStop:
+		if err := deleteStream(); err != nil {
+			return err
 		}
-		if pause != nil {
-			if err := e.pm.Delete(ctx, idx, *pause); err != nil {
-				return fmt.Errorf("error deleting subscription pause: %w", err)
-			}
-			if e.exprAggregator != nil {
-				_ = e.exprAggregator.RemovePause(ctx, pause)
-			}
-			e.dequeueSubscriptionExpiry(ctx, md, pauseID)
+
+		return answer(map[string]any{"stopped": true})
+
+	case state.SubscribeClose:
+		if err := deleteStream(); err != nil {
+			return err
 		}
 
 		// A read that is still parked (one the function stopped waiting for, such as

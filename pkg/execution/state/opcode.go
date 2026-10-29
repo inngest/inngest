@@ -621,6 +621,9 @@ const (
 	// SubscribeClose deletes the subscription pause and reports how many
 	// messages were saved.
 	SubscribeClose = "close"
+	// SubscribeStop deletes the pause of one stream, so its events are no longer
+	// saved, and leaves the rest of the subscription and its parks alone.
+	SubscribeStop = "stop"
 )
 
 // SubscribeOpts are the step.subscribe options carried on a WaitForEvent op.
