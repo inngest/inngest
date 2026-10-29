@@ -56,6 +56,20 @@ func TestDuckDBToColumnType(t *testing.T) {
 		{"TIMESTAMP WITH TIME ZONE", ColumnTypeDatetime},
 		{"INTEGER[3]", ColumnTypeJSON},
 		{"UNION(a INTEGER, b VARCHAR)", ColumnTypeJSON},
+		// Any spacing/casing DuckDB accepts in a CAST (each checked with
+		// typeof(NULL::<type>)).
+		{"STRUCT (a INT)", ColumnTypeJSON},
+		{"struct(a int)", ColumnTypeJSON},
+		{"MAP (VARCHAR, INT)", ColumnTypeJSON},
+		{"UNION (a INT, b VARCHAR)", ColumnTypeJSON},
+		{"ENUM ('a', 'b')", ColumnTypeString},
+		{"DECIMAL (10, 2)", ColumnTypeNumber},
+		{"VARCHAR (10)", ColumnTypeString},
+		{"INTEGER []", ColumnTypeJSON},
+		{"INTEGER [ 3 ]", ColumnTypeJSON},
+		{"STRUCT (a INT) []", ColumnTypeJSON},
+		{"  double\n\tprecision ", ColumnTypeNumber},
+		{"timestamp  with   time zone", ColumnTypeDatetime},
 		{"BIT", ColumnTypeUnknown},
 		{"SOMETHING_UNRECOGNIZED", ColumnTypeUnknown},
 	}

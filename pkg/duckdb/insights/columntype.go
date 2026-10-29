@@ -29,8 +29,11 @@ const (
 // any of DuckDB's aliases (INT, INT8, REAL, STRING, DATETIME, ...) or carry
 // a parameter list (VARCHAR(10), NUMERIC(10,2)), so both are normalized
 // to the canonical name DuckDB itself reports (typeof(NULL::<alias>)).
+// A query's raw type text can also be spaced/cased any way DuckDB accepts
+// (STRUCT (a INT), integer [], DOUBLE\tPRECISION), so it's normalized
+// first (normalizeTypeName).
 func DuckDBToColumnType(duckdbType string) ColumnType {
-	t := strings.ToUpper(strings.TrimSpace(duckdbType))
+	t := normalizeTypeName(duckdbType)
 
 	switch {
 	// T[] lists and T[n] fixed-size arrays.
@@ -60,6 +63,33 @@ func DuckDBToColumnType(duckdbType string) ColumnType {
 		return ColumnTypeNumber
 	default:
 		return ColumnTypeUnknown
+	}
+}
+
+// normalizeTypeName uppercases a type name, collapses every whitespace
+// run to a single space, and drops any space next to a paren, bracket, or
+// comma, so "struct (a  INT) []" -> "STRUCT(A INT)[]" and
+// "DECIMAL (10, 2)" -> "DECIMAL(10,2)" (the same shape typeof() reports).
+func normalizeTypeName(s string) string {
+	s = strings.ToUpper(strings.Join(strings.Fields(s), " "))
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		// Fields already trimmed s, so a space is never first or last.
+		if s[i] == ' ' && (isTypePunct(s[i-1]) || isTypePunct(s[i+1])) {
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func isTypePunct(c byte) bool {
+	switch c {
+	case '(', ')', '[', ']', ',':
+		return true
+	default:
+		return false
 	}
 }
 
