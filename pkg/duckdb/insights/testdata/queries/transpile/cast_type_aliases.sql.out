@@ -1,5 +1,5 @@
 {
-  "sql": "WITH t AS (SELECT run_id::CHARACTER VARYING AS a, run_id::CHAR VARYING (10) AS b, run_id::CHARACTER AS c, run_id::GUID AS d, 1::INT64 AS e, 1::DEC AS f FROM inngest.insights_runs(?, ?) AS runs) SELECT * FROM t LIMIT 1000",
+  "sql": "WITH t AS (SELECT run_id::CHARACTER VARYING AS a, run_id::CHAR VARYING(10) AS b, run_id::CHARACTER AS c, run_id::GUID AS d, 1::INT64 AS e, 1::DEC AS f FROM inngest.insights_runs(?, ?) AS runs) SELECT * FROM t LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

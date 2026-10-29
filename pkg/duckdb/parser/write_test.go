@@ -403,10 +403,10 @@ func TestWritePivotTupleAndTypedValues(t *testing.T) {
 	}
 }
 
-// TestRejectsExpressionsInRawTextFields checks the fields kept as source
-// text (PivotColumn.In, CastExpr.Type, TypeLiteral.Type) only ever hold
-// literals and names: Walk can't see into them, so an expression there
-// would reach DuckDB unvalidated.
+// TestRejectsExpressionsInRawTextFields checks PivotColumn.In, kept as
+// source text, only ever holds literals and names: Walk can't see into it,
+// so an expression there would reach DuckDB unvalidated. Type modifiers
+// are Walk-visible TypeName children but stay literal-only too.
 func TestRejectsExpressionsInRawTextFields(t *testing.T) {
 	for _, c := range []struct{ sql, msg string }{
 		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ((SELECT 1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
@@ -556,7 +556,7 @@ func TestWriteParenthesizesCastUnderIndirection(t *testing.T) {
 	require.NoError(t, err)
 	cast, ok := stmt.Columns[0].Expr.(*CastExpr)
 	require.True(t, ok, "got %T", stmt.Columns[0].Expr)
-	require.Equal(t, "INT[][1]", cast.Type)
+	require.Equal(t, "INT[][1]", String(cast.Type))
 }
 
 // TestWriteQuotesKeywordFunctionNames checks a function whose name is a

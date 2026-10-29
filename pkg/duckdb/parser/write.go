@@ -303,6 +303,10 @@ func (sw *sqlWriter) node(n Node) {
 		sw.frameClause(v)
 	case *FrameBound:
 		sw.frameBound(v)
+	case *TypeName:
+		sw.typeName(v)
+	case *TypeField:
+		sw.typeField(v)
 	case Expr:
 		sw.exprTop(v)
 	case TableRef:
@@ -441,13 +445,13 @@ func (sw *sqlWriter) exprTop(e Expr) {
 			sw.str("TRY_CAST(")
 			sw.exprTop(v.X)
 			sw.str(" AS ")
-			sw.str(v.Type)
+			sw.typeName(v.Type)
 			sw.str(")")
 			return
 		}
 		sw.exprAtLeast(v.X, precAtom)
 		sw.str("::")
-		sw.str(v.Type)
+		sw.typeName(v.Type)
 	case *CaseWhen:
 		sw.str("WHEN ")
 		sw.exprTop(v.Cond)
@@ -513,7 +517,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 			sw.str(v.Unit)
 		}
 	case *TypeLiteral:
-		sw.str(v.Type)
+		sw.typeName(v.Type)
 		sw.str(" '")
 		sw.str(strings.ReplaceAll(v.Value, "'", "''"))
 		sw.str("'")

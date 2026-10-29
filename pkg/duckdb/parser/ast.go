@@ -203,12 +203,12 @@ func (l *LikeExpr) String() string   { return fmt.Sprintf("LikeExpr(%s,not=%v)",
 type CastExpr struct {
 	baseExpr
 	X       Expr
-	Type    string
+	Type    *TypeName
 	TryCast bool
 }
 
-func (c *CastExpr) Children() []Node { return []Node{c.X} }
-func (c *CastExpr) String() string   { return fmt.Sprintf("CastExpr(%s,try=%v)", c.Type, c.TryCast) }
+func (c *CastExpr) Children() []Node { return []Node{c.X, c.Type} }
+func (c *CastExpr) String() string   { return fmt.Sprintf("CastExpr(try=%v)", c.TryCast) }
 
 type CaseWhen struct {
 	baseExpr
@@ -340,12 +340,12 @@ func (i *IntervalExpr) String() string   { return "IntervalExpr(" + i.Unit + ")"
 
 type TypeLiteral struct {
 	baseExpr
-	Type  string
+	Type  *TypeName
 	Value string
 }
 
-func (t *TypeLiteral) Children() []Node { return nil }
-func (t *TypeLiteral) String() string   { return fmt.Sprintf("TypeLiteral(%s,%s)", t.Type, t.Value) }
+func (t *TypeLiteral) Children() []Node { return []Node{t.Type} }
+func (t *TypeLiteral) String() string   { return fmt.Sprintf("TypeLiteral(%s)", t.Value) }
 
 type NamedArg struct {
 	baseExpr

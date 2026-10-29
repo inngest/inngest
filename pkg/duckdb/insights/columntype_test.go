@@ -89,6 +89,15 @@ func TestDuckDBToColumnType(t *testing.T) {
 		{"INTERVAL YEAR", ColumnTypeDatetime},
 		{"INTERVAL DAY TO SECOND", ColumnTypeDatetime},
 		{"BIT", ColumnTypeUnknown},
+		// DuckDB's own quoting (typeof()/DESCRIBE, quack's typeName()).
+		{`STRUCT("key" VARCHAR, "select" INTEGER, "a b" INTEGER)[]`, ColumnTypeJSON},
+		{"ENUM('it''s', 'b')", ColumnTypeString},
+		{"TIMESTAMP_MS", ColumnTypeDatetime},
+		{"TIMESTAMPTZ_NS", ColumnTypeDatetime},
+		{"MAP(VARCHAR, STRUCT(a INTEGER[3]))", ColumnTypeJSON},
+		{`"NULL"`, ColumnTypeUnknown},
+		{"UNKNOWN(42)", ColumnTypeUnknown},
+		{"", ColumnTypeUnknown},
 		{"SOMETHING_UNRECOGNIZED", ColumnTypeUnknown},
 	}
 	for _, c := range cases {
