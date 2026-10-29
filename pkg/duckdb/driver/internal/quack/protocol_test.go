@@ -954,3 +954,23 @@ func TestQuackDecodeChunkListOfStructDecodesRowsOfMaps(t *testing.T) {
 		},
 	}, values)
 }
+
+// TestQuackLogicalTypeNameQuoting checks typeName() quotes STRUCT/UNION
+// field names and ENUM values exactly like DuckDB's own typeof() does, so
+// the name parses back as the same type.
+func TestQuackLogicalTypeNameQuoting(t *testing.T) {
+	integer := logicalType{id: logicalTypeInteger}
+	st := logicalType{id: logicalTypeStruct, structFields: []structField{
+		{name: "key", typ: integer}, {name: "id", typ: integer}, {name: "Key", typ: integer},
+		{name: "a b", typ: integer}, {name: `x"y`, typ: integer}, {name: "select", typ: integer},
+	}}
+	require.Equal(t, `STRUCT("key" INTEGER, id INTEGER, "Key" INTEGER, "a b" INTEGER, "x""y" INTEGER, "select" INTEGER)`, st.typeName())
+
+	un := logicalType{id: logicalTypeUnion, structFields: []structField{
+		{name: "", typ: logicalType{id: logicalTypeUTinyInt}}, {name: "type", typ: integer}, {name: "n", typ: integer},
+	}}
+	require.Equal(t, `UNION("type" INTEGER, n INTEGER)`, un.typeName())
+
+	en := logicalType{id: logicalTypeEnum, enumValues: []string{"it's", "b"}}
+	require.Equal(t, `ENUM('it''s', 'b')`, en.typeName())
+}

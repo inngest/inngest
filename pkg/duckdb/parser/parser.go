@@ -59,6 +59,16 @@ func isNonIdentKeyword(s string) bool {
 	return false
 }
 
+// IsKeyword reports whether s (case-insensitively) is any keyword in the
+// vendored grammar's lists, unreserved ones included. DuckDB quotes every
+// such name when it prints a type (`STRUCT("type" INTEGER)`).
+func IsKeyword(s string) bool {
+	if _, err := loadPegParser(); err != nil {
+		return false
+	}
+	return keywordSets.isAnyKeyword([]byte(strings.ToUpper(s)))
+}
+
 // isFuncNameIdent reports whether s, spelled bare, lexes as a FunctionName
 // (an identifier, or a keyword the function-name category allows).
 func isFuncNameIdent(s string) bool {
