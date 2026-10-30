@@ -1,3 +1,3 @@
 {
-  "error": "insights: parsing query: duckdb/parser: OPERATOR(...) is not supported"
+  "error": "insights: parsing query: 1:61: OPERATOR(...) is not supported"
 }

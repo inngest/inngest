@@ -88,6 +88,54 @@ func TestAddDefaultLimitRejectsNonIntegerLiteral(t *testing.T) {
 	}
 }
 
+// TestAddDefaultLimitDigitSeparators checks a `_`-separated integer
+// (`1_000`, which DuckDB lexes as 1000) is bounded like its plain spelling,
+// and rewritten without separators when capped.
+func TestAddDefaultLimitDigitSeparators(t *testing.T) {
+	for _, c := range []struct {
+		sql, want string
+		outcome   limitOutcome
+	}{
+		{"SELECT run_id FROM runs LIMIT 1_000", "SELECT run_id FROM runs LIMIT 1_000", limitUnchanged},
+		{"SELECT run_id FROM runs LIMIT 1_0", "SELECT run_id FROM runs LIMIT 1_0", limitUnchanged},
+		{"SELECT run_id FROM runs LIMIT 1_001", "SELECT run_id FROM runs LIMIT 1000", limitCapped},
+		{"SELECT run_id FROM runs LIMIT 5_000_000", "SELECT run_id FROM runs LIMIT 1000", limitCapped},
+		{"SELECT run_id FROM runs LIMIT 99_999_999_999_999_999_999", "SELECT run_id FROM runs LIMIT 1000", limitCapped},
+	} {
+		t.Run(c.sql, func(t *testing.T) {
+			stmt := mustParse(t, c.sql)
+			outcome, err := addDefaultLimit(stmt)
+			require.NoError(t, err)
+			require.Equal(t, c.outcome, outcome)
+			require.Equal(t, c.want, parser.String(stmt))
+		})
+	}
+}
+
+func TestLimitDigits(t *testing.T) {
+	for _, c := range []struct {
+		in, want string
+		ok       bool
+	}{
+		{"1000", "1000", true},
+		{"1_000", "1000", true},
+		{"1_0_0", "100", true},
+		{"01_0", "010", true},
+		{"1__0", "", false},
+		{"_1", "", false},
+		{"1_", "", false},
+		{"1_.5", "", false},
+		{"1e1_0", "", false},
+		{"", "", false},
+	} {
+		got, ok := limitDigits(c.in)
+		require.Equal(t, c.ok, ok, c.in)
+		if c.ok {
+			require.Equal(t, c.want, got, c.in)
+		}
+	}
+}
+
 func TestAddDefaultLimitCapsFetch(t *testing.T) {
 	stmt := mustParse(t, "SELECT run_id FROM runs FETCH FIRST 5000000 ROWS ONLY")
 	outcome, err := addDefaultLimit(stmt)

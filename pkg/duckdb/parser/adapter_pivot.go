@@ -48,6 +48,7 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 		// form below, since Write emits In verbatim: a decoded quoted
 		// identifier would lose its quotes.
 		pc.In = []string{a.rawText(body(target))}
+		pc.Enum = true
 		return pc
 	}
 	// PivotListTarget <- PivotTargetList ; PivotTargetList <- Parens(TargetList)
@@ -55,9 +56,43 @@ func (a *adapter) adaptPivotValueList(n *peg.Node) *PivotColumn {
 	parensSeq := body(body(body(target)))
 	items := a.adaptTargetList(parensSeq.Children[1])
 	for _, item := range items {
+		if !isPivotValue(item.Expr) {
+			panic(&ParseError{Pos: item.Pos(), Message: "A PIVOT IN entry other than a literal or a name is not supported"})
+		}
 		pc.In = append(pc.In, a.src[item.Pos().Offset:item.End().Offset])
 	}
 	return pc
+}
+
+// isPivotValue reports whether a PIVOT IN entry is a literal, a signed
+// number, a bare name, a typed literal (`DATE '2024-01-01'`), a cast of one
+// of those, or a tuple of them (multi-column `FOR (a, b) IN ((1, 2))`). In
+// keeps entries as source text, which Walk can't see into, so anything that
+// could hide a subquery or function call is rejected rather than passed
+// through unchecked. Type names are already checked for hidden expressions
+// when they're adapted (adaptType), so a cast or typed literal only
+// needs its operand checked.
+func isPivotValue(e Expr) bool {
+	switch v := e.(type) {
+	case *Literal, *Ident, *TypeLiteral:
+		return true
+	case *UnaryExpr:
+		lit, ok := v.X.(*Literal)
+		return (v.Op == "-" || v.Op == "+") && !v.Postfix && ok && lit.Kind == LitNumber
+	case *CastExpr:
+		return isPivotValue(v.X)
+	case *ListExpr:
+		if !v.Paren {
+			return false
+		}
+		for _, elem := range v.Elems {
+			if !isPivotValue(elem) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (a *adapter) adaptTableUnpivotClause(source TableRef, n *peg.Node) TableRef {
@@ -136,7 +171,8 @@ func (a *adapter) adaptPivotColumnEntry(n *peg.Node) *PivotColumn {
 	case "PivotColumnExpression":
 		return &PivotColumn{baseExpr: a.at(alt), Header: a.adaptExpression(body(alt))}
 	default:
-		panic("duckdb/parser: a PIVOT column subquery entry is not yet supported")
+		a.unsupported(alt, "A PIVOT column subquery entry")
+		return nil
 	}
 }
 
@@ -144,8 +180,8 @@ func (a *adapter) adaptUnpivotStatement(n *peg.Node) *SelectStatement {
 	// UnpivotStatement <- UnpivotKeyword TableRef 'ON' TargetList IntoNameValues?
 	seq := body(n)
 	ref := &UnpivotRef{baseTableRefNode: baseTableRefNode{a.at(n)}, Source: a.adaptTableRef(seq.Children[1]), Columns: a.adaptTargetList(seq.Children[3])}
-	if _, ok := present(seq.Children[4]); ok {
-		panic("duckdb/parser: UNPIVOT ... INTO NAME ... VALUE ... is not yet supported")
+	if into, ok := present(seq.Children[4]); ok {
+		a.unsupported(into, "UNPIVOT ... INTO NAME ... VALUE ...")
 	}
 	return &SelectStatement{baseExpr: a.at(n), From: &FromClause{baseExpr: a.at(n), Refs: []TableRef{ref}}}
 }
