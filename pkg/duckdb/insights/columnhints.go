@@ -146,7 +146,8 @@ func unionColumnPathHints(stmt *parser.SelectStatement, ctes map[string]logicalT
 // same jsonPathAccess case again for its own base.
 func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
 	if base, path, ok := jsonPathAccess(expr); ok {
-		return projectJSONSubPathHints(resolveColumnPathHints(base, scope), queryPath(path))
+		segs, collects := queryPath(path)
+		return projectJSONSubPathHints(resolveColumnPathHints(base, scope), segs, collects)
 	}
 	if f, ok := expr.(*parser.FunctionExpr); ok {
 		_, ph, _ := functionReturnType(strings.ToLower(strings.Join(f.Name, ".")), f.Args, scope)
@@ -205,15 +206,16 @@ func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
 //
 // A literal (non-"$"-prefixed) path -- a plain top-level JSON key, not a
 // JSONPath expression at all (queryPath's own doc comment) -- never
-// triggers this: only a real "[*]" wildcard implies DuckDB collected
-// multiple matches into an array. attributes -> '_inngest.defer.parent_run_ids'
+// triggers this, nor does a numeric index (one element): only a real
+// "[*]" wildcard implies DuckDB collected multiple matches into an array
+// (queryPath's collects). attributes -> '_inngest.defer.parent_run_ids'
 // (TestBuildColumnHintsUnnestOfHintedArray) doesn't need this special
 // case at all -- attributes' own declared entry already carries an
 // explicit trailing wc past that literal key, so projectPathHints alone
 // already leaves a {wc} entry (not a root one) for UNNEST to find.
-func projectJSONSubPathHints(baseHints []PathHint, path []PathSegment) []PathHint {
+func projectJSONSubPathHints(baseHints []PathHint, path []PathSegment, collects bool) []PathHint {
 	projected := projectPathHints(baseHints, path)
-	if !pathHasWildcard(path) {
+	if !collects {
 		return projected
 	}
 	out := make([]PathHint, len(projected), len(projected)+1)
@@ -224,15 +226,6 @@ func projectJSONSubPathHints(baseHints []PathHint, path []PathSegment) []PathHin
 		}
 	}
 	return out
-}
-
-func pathHasWildcard(path []PathSegment) bool {
-	for _, s := range path {
-		if s.Wildcard {
-			return true
-		}
-	}
-	return false
 }
 
 // unionColumnHints reconciles a UNION/INTERSECT/EXCEPT statement's two
@@ -414,5 +407,6 @@ func arrayOfStructsFieldHint(colName, field string, scope *tableScope) ColumnHin
 // result pathHints, functions.go's listReturnType) looked up at path,
 // exactly matching whatever nesting the query itself named (queryPath).
 func resolveSubPathHint(base parser.Expr, path string, scope *tableScope) ColumnHint {
-	return lookupPathIn(resolveColumnPathHints(base, scope), queryPath(path))
+	segs, _ := queryPath(path)
+	return lookupPathIn(resolveColumnPathHints(base, scope), segs)
 }

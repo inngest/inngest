@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
-	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/dashboards"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
@@ -439,4 +439,59 @@ func TestListSessions_EnvIsolation(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Sessions, 1)
 	require.Equal(t, 1, result.Sessions[0].RunCount, "the other env's run must not be counted")
+}
+
+// TestListSessionRuns_LatestRowTiebreak covers lifecycle rows that tie on
+// COALESCE(ended_at, started_at, queued_at) (ms timestamps make a Queued and
+// a Running row in the same ms common): the furthest-along row (finished,
+// then terminal > in-progress > queued) must win regardless of insert order.
+func TestListSessionRuns_LatestRowTiebreak(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	accountID, envID := uuid.New(), uuid.New()
+	appID, functionID := uuid.New(), uuid.New()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+
+	run := func(runID, status string, queuedAt time.Time, endedAt *time.Time) testRun {
+		return testRun{
+			runID: runID, accountID: accountID, envID: envID, appID: appID, appName: "app", functionID: functionID, functionSlug: "fn",
+			status: status, queuedAt: queuedAt, endedAt: endedAt, eventName: "e",
+			sessions: []testSession{{key: "user", id: "u1"}},
+		}
+	}
+	// Each pair is inserted in both orders, under run IDs <name>-a/<name>-b.
+	// A finished row's ended_at ties the other row's queued_at.
+	pairs := []struct {
+		name          string
+		first, second string
+		endSecond     bool
+		want          enums.RunStatus
+	}{
+		{name: "queued-running", first: "Queued", second: "Running", want: enums.RunStatusRunning},
+		{name: "running-completed", first: "Running", second: "Completed", endSecond: true, want: enums.RunStatusCompleted},
+		{name: "running-failed", first: "Running", second: "Failed", endSecond: true, want: enums.RunStatusFailed},
+	}
+	want := map[string]enums.RunStatus{}
+	for i, p := range pairs {
+		at := now.Add(time.Duration(i) * time.Second)
+		var ended *time.Time
+		if p.endSecond {
+			ended = &at
+		}
+		insertRun(t, db, run(p.name+"-a", p.first, at, nil))
+		insertRun(t, db, run(p.name+"-a", p.second, at, ended))
+		insertRun(t, db, run(p.name+"-b", p.second, at, ended))
+		insertRun(t, db, run(p.name+"-b", p.first, at, nil))
+		want[p.name+"-a"], want[p.name+"-b"] = p.want, p.want
+	}
+
+	result, err := dashboards.ListSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "u1", From: now.Add(-time.Hour), Until: now.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	got := map[string]enums.RunStatus{}
+	for _, r := range result.Runs {
+		got[r.RunID] = r.Status
+	}
+	require.Equal(t, want, got)
 }

@@ -19,6 +19,7 @@ import {
   borderColor,
 } from '@/utils/tailwind';
 import type { EntityLookup, EntityType } from './Dashboard';
+import { createTooltipTimestamp } from './tooltipTimestamp';
 
 // Type assertion for extended colors that aren't in DefaultColors
 const extendedColors = colors as typeof colors & {
@@ -67,8 +68,8 @@ export const dateFormat = (dateString: string, diff: number) => {
   return d < 6000 // a minute
     ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-    ? lightFormat(date, 'HH:mm')
-    : lightFormat(date, 'MM/dd:HH');
+      ? lightFormat(date, 'HH:mm')
+      : lightFormat(date, 'MM/dd:HH');
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -102,6 +103,14 @@ export const marker = (color: string) =>
   `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;
       border-width: 1px;border-color:${color};background-color:${color};"></span>`;
 
+const escapeHTML = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
 export const formatDimension = (param: any) => {
   const color =
     typeof param.color === 'object'
@@ -116,26 +125,29 @@ export const formatDimension = (param: any) => {
       <span class="mr">${marker(color)}
       </span>
       <span>
-      ${param.seriesName}
+      ${escapeHTML(param.seriesName ?? '')}
       </span>
     </div> 
     <div class="ml-4 font-bold">${formatNumber(param.value)}</div>
   </div>`;
 };
 
-const tooltipFormatter = (params: any) => {
+export const tooltipFormatter = (params: any) => {
   const observed = Array.isArray(params)
     ? params.filter((param: any) => typeof param.value === 'number')
     : [];
 
-  return observed[0]
-    ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${
-        observed[0].axisValue
-      }</div>${observed
-        .sort((a: any, b: any) => b.value - a.value)
-        .map((p: any) => formatDimension(p))
-        .join('')}</div>`
-    : '';
+  if (!observed[0]) return '';
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'my-1';
+  const dimensions = document.createElement('div');
+  dimensions.innerHTML = observed
+    .sort((a: any, b: any) => b.value - a.value)
+    .map((p: any) => formatDimension(p))
+    .join('');
+  tooltip.append(createTooltipTimestamp(observed[0].axisValue), dimensions);
+  return tooltip;
 };
 
 export const getLineChartOptions = (
@@ -148,7 +160,14 @@ export const getLineChartOptions = (
       trigger: 'axis',
       renderMode: 'html',
       enterable: true,
-      position: 'top',
+      // Keep the copy button reachable while moving across time buckets.
+      position: (
+        _point,
+        _params,
+        _element,
+        _rect,
+        { viewSize, contentSize },
+      ) => [Math.max(0, viewSize[0] - contentSize[0] - 8), 8],
       backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
       borderColor: resolveColor(borderColor.subtle, dark),
       textStyle: { color: resolveColor(textColor.basis, dark) },
@@ -161,7 +180,8 @@ export const getLineChartOptions = (
       // Attach tooltips to a dedicated dom node above interim parents
       // with low z-indexes
       appendTo: () => document.getElementById('chart-tooltip'),
-      transitionDuration: 1.5,
+      hideDelay: 300,
+      transitionDuration: 0,
       formatter: (params) => tooltipFormatter(params),
       padding: 0,
       extraCssText: 'max-height: 300px; overflow-y: scroll;',
@@ -243,9 +263,11 @@ export const mapEntityLines = (
   {
     areaStyle,
     connectNulls = false,
+    nameBy = 'entity',
   }: {
     areaStyle?: { opacity: number };
     connectNulls?: boolean;
+    nameBy?: 'entity' | 'tag';
   } = {},
 ) => {
   const dark = isDark();
@@ -257,9 +279,8 @@ export const mapEntityLines = (
 
   // Create series with names first
   const seriesWithNames = metrics.map((f, index) => {
-    // For worker metrics, use tagValue as the series name if available
-    const seriesName =
-      f.tagValue || entities[f.id]?.name || `Series ${index + 1}`;
+    const entityName = entities[f.id]?.name || f.id || `Series ${index + 1}`;
+    const seriesName = nameBy === 'tag' ? f.tagValue || entityName : entityName;
 
     return {
       metric: f,

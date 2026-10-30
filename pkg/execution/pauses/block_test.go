@@ -1964,9 +1964,10 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 		assert.Equal(t, int64(0), bufLen, "Expected buffer to be empty after flush goroutine completes")
 	}, 5*time.Second, 100*time.Millisecond)
 
-	// First, delete from blocks only
+	// Delete existing blocks through a manager with reading and flushing disabled.
+	mgr := NewManager(redisAdapter{rsm: pauseStore}, store)
 	for _, pause := range pauses {
-		err = store.DeleteByID(ctx, pause.ID, workspaceID)
+		err = mgr.DeletePauseByID(ctx, pause.ID, workspaceID)
 		require.NoError(t, err)
 	}
 

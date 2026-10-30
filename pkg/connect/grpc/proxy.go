@@ -383,6 +383,21 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Forward message to the gateway if the request wasn't already running
 	var routedInstanceID string
 	if leaseID != nil {
+		forwardAttempted := false
+		defer func() {
+			// A routing/assignment rejection must not make the next dispatch
+			// wait for SDK work that was never sent. Preserve the lease once
+			// forwarding starts, since an error may still mean SDK delivery.
+			if forwardAttempted {
+				return
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			if err := i.stateManager.ReleaseRequestLease(cleanupCtx, opts.EnvID, opts.Data.RequestId, *leaseID); err != nil {
+				l.ReportError(err, "could not release unsent request lease")
+			}
+		}()
+
 		// Determine the most suitable connection
 		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
@@ -446,8 +461,21 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			// Forward now awaits the SDK to ack a job, so an error means that it's likely
 			// safe to retry through a different route (in case workers/gateways are unavailable)
+			forwardAttempted = true
 			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 			if err == nil {
+				break
+			}
+
+			// A Forward stuck on a dead connection can fail after the worker already
+			// received the request and replied. Re-routing would run it twice, so
+			// use the response that arrived instead.
+			if ctx.Err() == nil && waitForResponseCtx.Err() != nil {
+				l.Warn("forward to gateway failed after the response arrived, not re-routing", "err", err)
+				metrics.IncrConnectProxyForwardFailedAfterResponseCount(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+				})
+				err = nil
 				break
 			}
 
@@ -463,6 +491,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			}
 
 			if forwardAttempt == maxForwardAttempts-1 {
+				break
+			}
+
+			// A Forward stuck until its timeout outlives the request lease. Re-routing
+			// now would start the work on a new worker while the lease watcher has
+			// already given up on it, so fail and let the step be retried instead.
+			if leaseCtx.Err() != nil {
 				break
 			}
 
@@ -490,6 +525,19 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
+
+			// Report a Forward that outlived the request lease the same way as a
+			// lease that expires while waiting for the response.
+			if ctx.Err() == nil && leaseCtx.Err() != nil {
+				metrics.IncrConnectProxyLeaseExpiredCount(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+				})
+
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectWorkerStoppedResponding,
+					Message: "The worker stopped responding to the request.",
+				}
+			}
 
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}

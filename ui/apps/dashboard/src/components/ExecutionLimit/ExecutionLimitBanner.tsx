@@ -7,7 +7,32 @@ const numberFormatter = new Intl.NumberFormat('en-US');
 export function ExecutionLimitBanner() {
   const data = useExecutionLimit();
 
-  if (!data?.enhanced || data.band !== 'limitReached') return null;
+  if (!data?.enhanced) return null;
+
+  if (data.band === 'grace') {
+    return (
+      <Banner
+        severity="warning"
+        cta={
+          <Banner.Link
+            severity="warning"
+            className="mr-2 shrink-0"
+            {...upgradeLinkProps(
+              data.marketplaceBillingURL,
+              'app-hobby-execution-grace-banner',
+            )}
+          >
+            Upgrade
+          </Banner.Link>
+        }
+      >
+        Hobby limit extended: {numberFormatter.format(data.remaining)}{' '}
+        executions left this month until runs pause.
+      </Banner>
+    );
+  }
+
+  if (data.band !== 'limitReached') return null;
 
   const formattedUsage = numberFormatter.format(data.usage);
 

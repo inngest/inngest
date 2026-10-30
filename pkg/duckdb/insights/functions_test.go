@@ -125,16 +125,17 @@ func TestValidateRejectsWrongArgumentCount(t *testing.T) {
 // mid-range/unbounded call, must all still succeed.
 func TestValidateAcceptsBoundaryArgumentCounts(t *testing.T) {
 	queries := []string{
-		"SELECT abs(step_index) FROM steps",                              // exactly min (1) and max (1)
-		"SELECT concat_ws(',', run_id, app_id) FROM runs",                // exactly min (2)
-		"SELECT concat_ws(',', run_id, app_id, function_id) FROM runs",   // above min, unbounded max
-		"SELECT row_number() OVER (ORDER BY queued_at) FROM runs",        // exactly 0 args
-		"SELECT lag(status) OVER (ORDER BY queued_at) FROM runs",         // exactly min (1)
-		"SELECT lag(status, 1, 'x') OVER (ORDER BY queued_at) FROM runs", // exactly max (3)
-		"SELECT if(status = 'Completed', run_id, app_id) FROM runs",      // exactly 3
-		"SELECT unnest(event_ids) FROM runs",                             // exactly 1
-		"SELECT list_aggregate(event_ids, 'count') FROM runs",            // exactly min (2)
-		"SELECT list_aggregate(event_ids, 'string_agg', ',') FROM runs",  // above min, unbounded max
+		"SELECT abs(step_index) FROM steps",                                // exactly min (1) and max (1)
+		"SELECT concat_ws(',', run_id, app_id) FROM runs",                  // exactly min (2)
+		"SELECT concat_ws(',', run_id, app_id, function_id) FROM runs",     // above min, unbounded max
+		"SELECT row_number() OVER (ORDER BY queued_at) FROM runs",          // exactly 0 args
+		"SELECT lag(status) OVER (ORDER BY queued_at) FROM runs",           // exactly min (1)
+		"SELECT lag(status, 1, 'x') OVER (ORDER BY queued_at) FROM runs",   // exactly max (3)
+		"SELECT if(status = 'Completed', run_id, app_id) FROM runs",        // exactly 3
+		"SELECT unnest(event_ids) FROM runs",                               // exactly 1
+		"SELECT list_aggregate(event_ids, 'count') FROM runs",              // exactly min (2)
+		"SELECT list_aggregate(event_ids, 'string_agg', ',') FROM runs",    // above min, unbounded max
+		"SELECT list_aggregate([1, 2, 3], 'quantile_cont', 0.5) FROM runs", // forwards 0.5 to quantile_cont
 	}
 	for _, sql := range queries {
 		t.Run(sql, func(t *testing.T) {

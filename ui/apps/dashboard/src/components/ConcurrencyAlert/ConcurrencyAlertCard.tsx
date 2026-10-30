@@ -9,7 +9,10 @@ import {
 } from '@remixicon/react';
 
 import { ExecutionLimitCard } from '../ExecutionLimit/ExecutionLimitCard';
-import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
+import {
+  boostedStyles,
+  SidebarAlertCard,
+} from '../NavigationV2/SidebarAlertCard';
 import { BURST_MULTIPLIER, minutesLeftLabel } from './concurrencyAlert';
 import {
   useConcurrencyAlert,
@@ -19,15 +22,6 @@ import {
 const numberFormatter = new Intl.NumberFormat('en-US');
 
 const arrow = <RiArrowRightLine className="h-3.5 w-3.5" />;
-
-const boostedStyles = {
-  card: 'bg-contrast border-contrast text-onContrast',
-  divider: 'border-contrast',
-  icon: 'text-secondary-moderate',
-  link: 'text-secondary-subtle hover:decoration-secondary-subtle',
-  track: 'bg-[rgb(var(--color-foreground-subtle))]',
-  bar: 'bg-gradient-to-r from-secondary-moderate to-secondary-xSubtle',
-};
 
 const limitedStyles = {
   collapsed: 'border-accent-xSubtle bg-warning',
@@ -76,7 +70,6 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
   return (
     <SidebarAlertCard
       className={cn('mb-5', boostedStyles.card)}
-      footerClassName={boostedStyles.divider}
       footer={
         <Link
           {...alert.linkProps}
@@ -97,8 +90,7 @@ function BoostedCard({ alert }: { alert: ConcurrencyAlert }) {
       </p>
       <div className="mt-2 pt-1">
         <ProgressBar
-          className={boostedStyles.track}
-          indicatorClassName={boostedStyles.bar}
+          kind="boost"
           limit={1}
           size="small"
           value={alert.usedRatio}

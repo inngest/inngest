@@ -3189,8 +3189,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
-	if iter.Error() != context.Canceled {
-		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", iter.Error()))
+	if err := iter.Error(); err != nil && err != context.Canceled {
+		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
 
 	return res, goerr
@@ -3410,6 +3410,9 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	// find the pause with correlationID
 	pause, err := e.pm.PauseByInvokeCorrelationID(ctx, wsID, correlationID)
+	if errors.Is(err, state.ErrInvokePauseNotFound) {
+		pause, err = e.invokePauseByID(ctx, evt, correlationID)
+	}
 	if err != nil {
 		return err
 	}
@@ -6533,6 +6536,12 @@ func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext
 	item := runCtx.LifecycleItem()
 	queuedAt = item.EnqueuedAt
 	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
+
+	// A sleep item is enqueued when the sleep begins, but steps run while
+	// resuming it can only be queued once the sleep has ended.
+	if item.Kind == queue.KindSleep {
+		queuedAt = scheduledAt
+	}
 
 	if gen != nil {
 		startedAt = gen.Timing.Start()
