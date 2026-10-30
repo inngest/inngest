@@ -393,7 +393,8 @@ func DequeueLeaseHeld() DequeueOptionFn {
 }
 
 // MetadataLeaseHeldDequeue marks an item whose processor removal is lease
-// checked: Item.Metadata[MetadataLeaseHeldDequeue] = true. An item that frees
-// its own ID before the processor removes it (see the subscription wake) needs
-// it, so the removal cannot delete a newer item queued under the same ID.
+// checked: Item.Metadata[MetadataLeaseHeldDequeue] = true. A duplicate enqueue
+// of such an item marks the held one instead of only being refused, and the
+// lease-checked removal keeps a marked item and requeues it (see the
+// subscription wake). Queue shards that proxy Dequeue must carry LeaseHeld.
 const MetadataLeaseHeldDequeue = "lease_held_dequeue"

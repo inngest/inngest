@@ -4,6 +4,7 @@ Output:
   0: Successfully dequeued item
   1: Queue item not found
   2: The stored lease is not leaseCheck
+  3: The item was marked by a duplicate enqueue since it was leased; it is kept
 
 ]]
 
@@ -60,6 +61,9 @@ if leaseCheck ~= "" then
 	local stored = cjson.decode(raw)
 	if stored.leaseID ~= leaseCheck then
 		return 2
+	end
+	if stored.wakeDirty == true then
+		return 3
 	end
 end
 

@@ -510,4 +510,72 @@ func TestQueueDequeueLeaseHeld(t *testing.T) {
 		// Without the option the old removal deletes it, as before.
 		require.NoError(t, shard.Dequeue(ctx, old))
 	})
+
+	markedInput := func() osqueue.QueueItem {
+		return osqueue.QueueItem{
+			ID:                "wake",
+			IdempotencyPeriod: &noKey,
+			FunctionID:        fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{AccountID: acctID},
+				Metadata:   map[string]any{osqueue.MetadataLeaseHeldDequeue: true},
+			},
+		}
+	}
+	marked := func() osqueue.QueueItem {
+		item, err := shard.EnqueueItem(ctx, markedInput(), clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		return item
+	}
+
+	t.Run("a duplicate of a held item makes its lease-held removal requeue it", func(t *testing.T) {
+		r.FlushAll()
+		item := marked()
+		lease, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		require.NoError(t, err)
+		item.LeaseID = lease
+
+		_, err = shard.EnqueueItem(ctx, markedInput(), clock.Now(), osqueue.EnqueueOpts{})
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+
+		require.NoError(t, shard.Dequeue(ctx, item, osqueue.DequeueLeaseHeld()))
+		stored, err := shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err, "the marked item is kept")
+		require.Nil(t, stored.LeaseID)
+
+		// Retrying after a lost reply finds the requeued item under no lease.
+		require.ErrorIs(t, shard.Dequeue(ctx, item, osqueue.DequeueLeaseHeld()), osqueue.ErrQueueItemNotFound)
+		_, err = shard.LoadQueueItem(ctx, item.ID)
+		require.NoError(t, err)
+	})
+
+	t.Run("a new lease clears the mark, so only later duplicates keep the item", func(t *testing.T) {
+		r.FlushAll()
+		item := marked()
+		_, err := shard.EnqueueItem(ctx, markedInput(), clock.Now(), osqueue.EnqueueOpts{})
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+
+		lease, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		require.NoError(t, err)
+		item.LeaseID = lease
+
+		require.NoError(t, shard.Dequeue(ctx, item, osqueue.DequeueLeaseHeld()))
+		_, err = shard.LoadQueueItem(ctx, item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+	})
+
+	t.Run("a duplicate of an unmarked item changes nothing", func(t *testing.T) {
+		r.FlushAll()
+		item := enqueue()
+		lease, err := shard.Lease(ctx, item, 5*time.Second, clock.Now())
+		require.NoError(t, err)
+		item.LeaseID = lease
+
+		_, err = shard.EnqueueItem(ctx, osqueue.QueueItem{ID: "wake", IdempotencyPeriod: &noKey, FunctionID: fnID, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID}}}, clock.Now(), osqueue.EnqueueOpts{})
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		require.NoError(t, shard.Dequeue(ctx, item, osqueue.DequeueLeaseHeld()))
+		_, err = shard.LoadQueueItem(ctx, item.ID)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+	})
 }

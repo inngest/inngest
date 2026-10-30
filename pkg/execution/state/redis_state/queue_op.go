@@ -137,6 +137,16 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		}
 
 		return nil
+	case 3:
+		// A duplicate enqueue marked the item while it ran, so it must run again.
+		// The script kept it, leased, so nothing is lost if this fails or never
+		// returns: the lease expires and the item runs again. Requeueing is
+		// idempotent, so a retried Dequeue is safe.
+		var requeueOpts []osqueue.RequeueOptionFn
+		if o.CapacityLeased {
+			requeueOpts = append(requeueOpts, osqueue.RequeueCapacityLeased())
+		}
+		return q.Requeue(ctx, i, q.Clock.Now(), requeueOpts...)
 	case 1, 2:
 		// 2: the stored lease is not the caller's, so the item is not theirs to remove.
 		return osqueue.ErrQueueItemNotFound

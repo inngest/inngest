@@ -63,6 +63,9 @@ end
 
 -- Update the item's lease key.
 item.leaseID = newLeaseID
+-- A new lease starts a new run of the item, which reads what a duplicate
+-- enqueue marked before it; the mark only matters between lease and dequeue.
+item.wakeDirty = nil
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress

@@ -68,6 +68,14 @@ end
 
 -- Preserve duplicate precedence without writing an item before singleton checks.
 if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
+  -- A duplicate of a lease-held item (a subscription wake) is refused, but the
+  -- held item must run again for what the duplicate stands for: mark it, in
+  -- this same script, so the dequeue that would remove it sees the mark.
+  if string.find(queueItem, "lease_held_dequeue", 1, true) then
+    local held = cjson.decode(redis.call("HGET", queueKey, queueID))
+    held.wakeDirty = true
+    redis.call("HSET", queueKey, queueID, cjson.encode(held))
+  end
   return 1
 end
 
