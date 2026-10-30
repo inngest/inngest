@@ -254,7 +254,7 @@ func (f *capacityRecoveryFixture) functionUsage() int {
 }
 
 // Requeue eligibility must be checked on current Redis state, after the peek.
-func TestRequeueExpiredCapacityLeaseConditions(t *testing.T) {
+func TestRequeueIfExpiredCapacityLeaseConditions(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		change      func(*capacityRecoveryFixture, *queue.QueueItem, *ulid.ULID)
@@ -336,9 +336,8 @@ func TestRequeueExpiredCapacityLeaseConditions(t *testing.T) {
 			before, err := f.shard.LoadQueueItem(t.Context(), snapshot.ID)
 			require.NoError(t, err)
 			ready, backlog := f.ready(), f.backlogSize()
-			repaired, err := f.shard.(queue.ExpiredCapacityLeaseRequeuer).RequeueExpiredCapacityLease(t.Context(), snapshot, *partitionLease)
+			err = f.shard.Requeue(t.Context(), snapshot, f.clock.Now(), queue.RequeueIfExpiredCapacityLease(*partitionLease))
 			require.ErrorIs(t, err, tc.wantErr)
-			require.Equal(t, tc.wantRequeue, repaired)
 			after, err := f.shard.LoadQueueItem(t.Context(), snapshot.ID)
 			require.NoError(t, err)
 			if !tc.wantRequeue {
@@ -401,9 +400,8 @@ func TestExpiredCapacityRepairDuringItemAdmission(t *testing.T) {
 	var once sync.Once
 	f.processor.Options().CapacityManager = &capacityAcquireHook{CapacityManager: f.cm, afterAcquire: func() {
 		once.Do(func() {
-			repaired, err := f.shard.(queue.ExpiredCapacityLeaseRequeuer).RequeueExpiredCapacityLease(t.Context(), snapshot, *p.LeaseID)
+			err := f.shard.Requeue(t.Context(), snapshot, f.clock.Now(), queue.RequeueIfExpiredCapacityLease(*p.LeaseID))
 			require.NoError(t, err)
-			require.True(t, repaired)
 			f.advance(time.Millisecond)
 			// A refill can reserve the repaired generation before the original
 			// admission resumes. Its stale item lease must still be fenced.
@@ -464,4 +462,70 @@ func TestExpiredCapacityRepairBoundsWorkAndReachesReservations(t *testing.T) {
 	score, err := f.redis.ZScore(key, f.shadow.PartitionID)
 	require.NoError(t, err)
 	require.LessOrEqual(t, int64(score), f.clock.Now().Unix(), "remaining repair must be promptly rescanned")
+}
+
+func TestExpiredCapacityRepairRespectsKeyQueueDisable(t *testing.T) {
+	for _, disableDuringCleanup := range []bool{false, true} {
+		name := "disabled_before_scan"
+		if disableDuringCleanup {
+			name = "disabled_after_processor_check"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := newCapacityRecoveryFixture(t, 25)
+			f.enqueue(50)
+			for range 2 {
+				f.refill()
+				f.advance(time.Millisecond)
+			}
+			require.Equal(t, 25, f.ready())
+			require.EqualValues(t, 25, f.backlogSize())
+			f.advance(31 * time.Second)
+
+			f.keyQueuesEnabled = disableDuringCleanup
+			checks := 0
+			queue.WithAllowKeyQueues(func(_ context.Context, accountID, envID, functionID uuid.UUID) bool {
+				require.Equal(t, *f.shadow.AccountID, accountID)
+				require.Equal(t, *f.shadow.EnvID, envID)
+				require.Equal(t, *f.shadow.FunctionID, functionID)
+				checks++
+				if disableDuringCleanup && checks == 1 {
+					// The processor observed enablement, but the shard observes
+					// the emergency disable before constructing the Redis mutation.
+					f.keyQueuesEnabled = false
+					return true
+				}
+				return f.keyQueuesEnabled
+			})(f.processor.Options())
+
+			f.processPartition()
+			require.Positive(t, checks)
+			require.False(t, f.keyQueuesEnabled)
+			require.EqualValues(t, 25, f.backlogSize(), "expired ready items must not be returned to disabled backlogs")
+			if disableDuringCleanup {
+				require.Equal(t, 24, f.dispatched)
+				require.Equal(t, 1, f.ready(), "a rejected cleanup snapshot is retried on the next scan")
+			} else {
+				require.Equal(t, 25, f.dispatched)
+				require.Zero(t, f.ready())
+			}
+
+			// Emergency refill still dumps the backlog into ready in bounded
+			// batches without capacity reservations, for ordinary admission.
+			for range 2 {
+				f.refill()
+				f.advance(time.Millisecond)
+			}
+			require.Zero(t, f.backlogSize())
+			for i := 25; i < 50; i++ {
+				item, err := f.shard.LoadQueueItem(t.Context(), fmt.Sprintf("job-%04d", i))
+				require.NoError(t, err)
+				require.Nil(t, item.CapacityLease)
+			}
+			f.processPartition()
+			require.Equal(t, 50, f.dispatched)
+			require.Zero(t, f.ready())
+			require.Zero(t, f.backlogSize())
+			require.Zero(t, f.functionUsage())
+		})
+	}
 }

@@ -1,14 +1,16 @@
 package queue
 
-import "context"
+import (
+	"context"
+	"github.com/inngest/inngest/pkg/enums"
+)
 
 // Bound Redis mutations so repairing a large ready queue does not monopolize
 // the partition lease. Subsequent scans continue removing the expired prefix.
 const expiredCapacityLeaseRequeueLimit = 100
 
 func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *QueuePartition, items []*QueueItem) ([]*QueueItem, bool, error) {
-	requeuer, ok := q.Shard().(ExpiredCapacityLeaseRequeuer)
-	if !ok || q.CapacityManager == nil || p.LeaseID == nil {
+	if q.Shard().Kind() != enums.QueueShardKindRedis || q.CapacityManager == nil || p.LeaseID == nil {
 		return items, false, nil
 	}
 	remaining := p.LeaseID.Timestamp().Sub(q.Clock().Now())
@@ -34,7 +36,7 @@ func (q *queueProcessor) requeueExpiredCapacityLeases(ctx context.Context, p *Qu
 			continue
 		}
 		if attempts < expiredCapacityLeaseRequeueLimit {
-			if _, err := requeuer.RequeueExpiredCapacityLease(ctx, *item, *p.LeaseID); err != nil {
+			if err := q.Shard().Requeue(ctx, *item, now, RequeueIfExpiredCapacityLease(*p.LeaseID)); err != nil {
 				return nil, false, err
 			}
 			attempts++

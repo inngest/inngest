@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
-	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -185,30 +184,15 @@ var _ osqueue.CapacityReleaseNotifier = (*queue)(nil)
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, options ...osqueue.RequeueOptionFn) error {
-	return q.requeue(ctx, i, at, nil, options...)
-}
-
-var errExpiredCapacityRequeueSkipped = errors.New("expired capacity requeue precondition failed")
-
-var _ osqueue.ExpiredCapacityLeaseRequeuer = (*queue)(nil)
-
-func (q *queue) RequeueExpiredCapacityLease(ctx context.Context, item osqueue.QueueItem, partitionLeaseID ulid.ULID) (bool, error) {
-	if item.CapacityLease == nil || (item.Data.Throttle != nil && item.Data.Throttle.KeyExpressionHash == "") {
-		return false, nil
-	}
-	err := q.requeue(ctx, item, q.Clock.Now(), &partitionLeaseID)
-	if errors.Is(err, errExpiredCapacityRequeueSkipped) || errors.Is(err, osqueue.ErrQueueItemNotFound) {
-		return false, nil
-	}
-	return err == nil, err
-}
-
-func (q *queue) requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, expiredCapacityPartitionLease *ulid.ULID, options ...osqueue.RequeueOptionFn) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
 	o := &osqueue.RequeueOptions{}
 	for _, opt := range options {
 		opt(o)
+	}
+	if o.ExpiredCapacityLeasePartition != nil &&
+		(i.CapacityLease == nil || (i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "")) {
+		return nil
 	}
 
 	l := logger.StdlibLogger(ctx).With("item", i)
@@ -223,8 +207,8 @@ func (q *queue) requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	expectedCapacityLease := ""
 	expectedRefilledFrom := i.RefilledFrom
 	partitionLease := ""
-	if expiredCapacityPartitionLease != nil {
-		partitionLease = expiredCapacityPartitionLease.String()
+	if o.ExpiredCapacityLeasePartition != nil {
+		partitionLease = o.ExpiredCapacityLeasePartition.String()
 		expectedCapacityLease = i.CapacityLease.LeaseID.String()
 		i.CapacityLease = nil
 	}
@@ -245,7 +229,7 @@ func (q *queue) requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	i.RefilledAt = 0
 
 	// Reset enqueuedAt (used for latency calculation)
-	if expiredCapacityPartitionLease == nil {
+	if o.ExpiredCapacityLeasePartition == nil {
 		i.EnqueuedAt = now.UnixMilli()
 	}
 	i.EarliestPeekTime = 0
@@ -387,11 +371,14 @@ func (q *queue) requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 		return nil
 	case 1:
+		if o.ExpiredCapacityLeasePartition != nil {
+			return nil // The cleanup snapshot was deleted after peek.
+		}
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
 		return osqueue.ErrQueueItemNotFound
 	case 2:
-		return errExpiredCapacityRequeueSkipped
+		return nil // A conditional repair lost eligibility; leave the item untouched.
 	case 3:
 		return osqueue.ErrPartitionLeaseMismatch
 	default:

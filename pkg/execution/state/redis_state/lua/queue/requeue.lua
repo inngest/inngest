@@ -67,17 +67,49 @@ if item == nil then
 end
 
 if expectedPartitionLease ~= nil and expectedPartitionLease ~= "" then
+    -- Go resolves the account/env/function flag again before this call. Once
+    -- disabled, leave ready work for ordinary admission/emergency draining.
+    if requeueToBacklog ~= 1 then
+        return 2
+    end
+
+    -- A stalled scanner may resume after its partition lease was replaced or
+    -- expired. Stop that scanner rather than mutate another owner's items.
     local partition = get_partition_item(keyPartitionMap, partitionID)
-    if partition == nil or partition.leaseID ~= expectedPartitionLease or decode_ulid_time(expectedPartitionLease) <= nowMS then
+    if partition == nil or partition.leaseID ~= expectedPartitionLease then
         return 3
     end
-    -- Inspect current Redis state, not just the snapshot chosen by the scanner.
-    if requeueToBacklog ~= 1 or redis.call("ZSCORE", keyReadyQueue, queueID) == false or
-       (item.genID or 0) ~= expectedGeneration or
-       (item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS) or
-       item.cl == nil or item.cl == cjson.null or item.cl.l ~= expectedCapacityLease or
-       decode_ulid_time(item.cl.l) >= nowMS or item.at > nowMS or
-       item.rf == nil or item.rf == cjson.null or item.rf == "" or item.rf ~= expectedRefilledFrom then
+    if decode_ulid_time(expectedPartitionLease) <= nowMS then
+        return 3
+    end
+
+    -- Requeue/normalization/refill may supersede the peeked snapshot. Check
+    -- generation (including legacy zero) and provenance before using its data
+    -- to route the item back to a backlog.
+    if (item.genID or 0) ~= expectedGeneration then
+        return 2
+    end
+    if item.rf == nil or item.rf == cjson.null or item.rf == "" or item.rf ~= expectedRefilledFrom then
+        return 2
+    end
+
+    -- Only repair due ready work. Leasing normally removes ready membership;
+    -- also check the live item lease so a stale ready pointer cannot let this
+    -- mutation erase another processor's ownership.
+    if redis.call("ZSCORE", keyReadyQueue, queueID) == false or item.at > nowMS then
+        return 2
+    end
+    if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS then
+        return 2
+    end
+
+    -- Capacity may be refreshed without changing generation. Require the exact
+    -- expired reservation observed by the scanner. As in Acquire, an expiry
+    -- equal to nowMS is still counted as active.
+    if item.cl == nil or item.cl == cjson.null then
+        return 2
+    end
+    if item.cl.l ~= expectedCapacityLease or decode_ulid_time(item.cl.l) >= nowMS then
         return 2
     end
 end
