@@ -63,6 +63,7 @@ var (
 	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
 	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
 	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")
+	ErrConditionalRequeueUnsupported = fmt.Errorf("conditional requeue requires a direct Redis shard")
 	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
 	ErrQueueItemSingletonExists      = fmt.Errorf("singleton item already exists")
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
