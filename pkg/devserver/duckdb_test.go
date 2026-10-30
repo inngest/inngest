@@ -486,3 +486,34 @@ func TestSetupDualWriteReadConnsFromEnv(t *testing.T) {
 	require.Equal(t, 3, readDB.Stats().MaxOpenConnections)
 	require.Equal(t, 5, db.Stats().MaxOpenConnections)
 }
+
+// TestSetupDualWriteReadsDontShareASingleWriteConn pins that the read handle
+// gets its own quack sessions even w/ INNGEST_DUCKDB_WRITE_CONNS=1, where
+// every write runs on the primary connection: a read must not wait behind a
+// slow write.
+func TestSetupDualWriteReadsDontShareASingleWriteConn(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	t.Setenv(duckDBWriteConnsEnv, "1")
+	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
+	require.NotNil(t, readDB)
+	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
+
+	// Constant-folded, so it's slow w/o needing any data or much memory.
+	slow := make(chan error, 1)
+	go func() {
+		var n int
+		slow <- db.QueryRowContext(context.Background(), "SELECT levenshtein(repeat('a', 60000), repeat('b', 60000));").Scan(&n)
+	}()
+	time.Sleep(300 * time.Millisecond)
+
+	start := time.Now()
+	var one int
+	require.NoError(t, readDB.QueryRowContext(t.Context(), "SELECT 1;").Scan(&one))
+	readTook := time.Since(start)
+
+	require.NoError(t, <-slow)
+	require.Less(t, readTook, time.Second, "read waited behind the write")
+}

@@ -1435,10 +1435,12 @@ func OpenConnector(ctx context.Context, opts Options) (*Connector, *sql.DB, erro
 // OpenShared returns another *sql.DB over c's subprocess with its own pool,
 // capped at maxConns open connections, for a caller that mustn't be able to
 // take every connection another handle relies on (e.g. user queries next to
-// dual-write's writes). Each connection is its own quack session when
-// Options.QuackConns > 1, like any connection past the first. Closing it
-// only closes its own connections: the subprocess stays up until the
-// *sql.DB OpenConnector returned is closed.
+// dual-write's writes). When Options.QuackAddr is set, each of its
+// connections is its own quack session regardless of Options.QuackConns, so
+// it never shares the primary connection (and its mutex) w/ the other
+// handle; without a quack listener it can only share the primary connection.
+// Closing it only closes its own connections: the subprocess stays up until
+// the *sql.DB OpenConnector returned is closed.
 func (c *Connector) OpenShared(maxConns int) *sql.DB {
 	db := sql.OpenDB(sharedConnector{c})
 	db.SetMaxOpenConns(maxConns)
@@ -1450,7 +1452,14 @@ func (c *Connector) OpenShared(maxConns int) *sql.DB {
 type sharedConnector struct{ c *Connector }
 
 func (s sharedConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	return s.c.Connect(ctx)
+	if s.c.opts.QuackAddr == nil {
+		return s.c.Connect(ctx)
+	}
+	sess, err := s.c.proc.openQuackConn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &conn{sess: sess}, nil
 }
 
 func (s sharedConnector) Driver() driver.Driver { return s.c.Driver() }
