@@ -14,6 +14,10 @@ type queueProducer struct {
 	conditionalTracer  trace.ConditionalTracer
 
 	shards ShardRegistry
+
+	// onEnqueued runs after each durable enqueue. The Dev Server uses it to wake
+	// the scanners instead of waiting for the next poll tick.
+	onEnqueued func()
 }
 
 type producerOpt func(*queueProducer)
@@ -57,6 +61,12 @@ func WithProducerConditionalTracer(tracer trace.ConditionalTracer) ProducerOpt {
 func withProducerConditionalTracer(tracer trace.ConditionalTracer) producerOpt {
 	return func(q *queueProducer) {
 		q.conditionalTracer = tracer
+	}
+}
+
+func WithProducerOnEnqueued(fn func()) ProducerOpt {
+	return func(q *queueProducer) {
+		q.onEnqueued = fn
 	}
 }
 

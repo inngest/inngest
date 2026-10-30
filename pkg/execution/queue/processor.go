@@ -45,6 +45,26 @@ func New(
 		return nil, fmt.Errorf("shard registry must not be nil")
 	}
 
+	// Capacity 1 channels coalesce a burst of enqueues into one extra scan.
+	wakeScan := make(chan struct{}, 1)
+	wakeShadow := make(chan struct{}, 1)
+	producerOpts := []ProducerOpt{
+		WithProducerClock(o.Clock),
+		WithProducerKindToQueueMapping(o.queueKindMapping),
+		WithProducerJobPromotion(o.enableJobPromotion),
+		WithProducerConditionalTracer(o.ConditionalTracer),
+	}
+	if o.wakeOnEnqueue {
+		producerOpts = append(producerOpts, WithProducerOnEnqueued(func() {
+			for _, ch := range []chan struct{}{wakeShadow, wakeScan} {
+				select {
+				case ch <- struct{}{}:
+				default:
+				}
+			}
+		}))
+	}
+
 	reader := newShardBackedReaders(shards, o.AccountShardIterationEnabled)
 	qp := &queueProcessor{
 		name:         name,
@@ -64,14 +84,10 @@ func New(
 		partitionSem: util.NewTrackingSemaphore(int(o.numPartitionWorkers)),
 		quit:         make(chan error, o.numWorkers),
 
-		shards: shards,
-		Producer: NewProducer(
-			shards,
-			WithProducerClock(o.Clock),
-			WithProducerKindToQueueMapping(o.queueKindMapping),
-			WithProducerJobPromotion(o.enableJobPromotion),
-			WithProducerConditionalTracer(o.ConditionalTracer),
-		),
+		shards:               shards,
+		Producer:             NewProducer(shards, producerOpts...),
+		wakeScan:             wakeScan,
+		wakeShadow:           wakeShadow,
 		Consumer:             NewConsumer(shards),
 		RunQueueReader:       reader,
 		QueueStatusReader:    reader,
@@ -142,6 +158,11 @@ type queueProcessor struct {
 	MigrationLocker
 	Unpauser
 	AttemptResetter
+
+	// wakeScan and wakeShadow are signalled by the producer when wakeOnEnqueue is
+	// set. They stay nil-safe: without the option nothing ever sends.
+	wakeScan   chan struct{}
+	wakeShadow chan struct{}
 
 	// name is the identifiable name for this worker, for logging.
 	name string

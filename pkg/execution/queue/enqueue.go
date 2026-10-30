@@ -98,6 +98,9 @@ func (q *queueProducer) Enqueue(ctx context.Context, item Item, at time.Time, op
 	if opts.OnEnqueued != nil {
 		opts.OnEnqueued(enqueued, shard.Name())
 	}
+	if q.onEnqueued != nil {
+		q.onEnqueued()
+	}
 
 	// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,
 	// we want to ensure that we schedule a rebalance job which takes the queue item and places it

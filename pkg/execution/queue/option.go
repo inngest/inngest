@@ -297,6 +297,15 @@ func WithPollTick(t time.Duration) QueueOpt {
 	}
 }
 
+// WithWakeOnEnqueue makes an enqueue wake the scanners right away rather than
+// waiting for the next poll tick. It only helps when the producer and the scanner
+// are the same process, as in the Dev Server.
+func WithWakeOnEnqueue() QueueOpt {
+	return func(q *QueueOptions) {
+		q.wakeOnEnqueue = true
+	}
+}
+
 // WithShadowPollTick specifies the interval at which the queue will poll the backing store
 // for available shadow partitions.
 func WithShadowPollTick(t time.Duration) QueueOpt {
@@ -507,6 +516,10 @@ type QueueOptions struct {
 	pollTick                 time.Duration
 	shadowPollTick           time.Duration
 	backlogNormalizePollTick time.Duration
+	// wakeOnEnqueue makes each enqueue signal the scanners immediately instead of
+	// waiting for the next poll tick. Only useful when producer and scanner share
+	// a process.
+	wakeOnEnqueue bool
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions

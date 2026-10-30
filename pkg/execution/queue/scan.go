@@ -22,6 +22,7 @@ func (q *queueProcessor) executionScan(ctx context.Context, dispatch DispatchFun
 	)
 
 	tick := q.Clock().NewTicker(q.pollTick)
+	trigger := mergeTriggers(ctx, tick.Chan(), q.wakeScan)
 	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
@@ -41,7 +42,7 @@ LOOP:
 			tick.Stop()
 			break LOOP
 
-		case <-tick.Chan():
+		case <-trigger:
 			if q.capacity() < minWorkersFree || q.partitionCapacity() == 0 {
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
@@ -305,6 +306,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.Clock().NewTicker(q.shadowPollTick)
+	trigger := mergeTriggers(ctx, tick.Chan(), q.wakeShadow)
 	l.Debug("starting shadow scanner", "poll", q.shadowPollTick.String())
 
 	backoff := 200 * time.Millisecond
@@ -315,7 +317,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			tick.Stop()
 			return nil
 
-		case <-tick.Chan():
+		case <-trigger:
 			// Scan a little further into the future
 			now := q.Clock().Now()
 			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
@@ -338,4 +340,26 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			backoff = 200 * time.Millisecond
 		}
 	}
+}
+
+// mergeTriggers fires when either the poll tick or an enqueue wake arrives, so a
+// scan loop can handle both with one select case. A nil wake channel never fires.
+func mergeTriggers(ctx context.Context, tick <-chan time.Time, wake <-chan struct{}) <-chan struct{} {
+	out := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick:
+			case <-wake:
+			}
+			select {
+			case out <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
 }

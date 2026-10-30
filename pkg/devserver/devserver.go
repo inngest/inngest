@@ -400,6 +400,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		queue.WithIdempotencyTTL(time.Hour),
 		queue.WithNumWorkers(int32(opts.QueueWorkers)),
 		queue.WithPollTick(opts.Tick),
+		queue.WithWakeOnEnqueue(),
 		queue.WithShadowPollTick(2 * opts.Tick),
 		queue.WithBacklogNormalizePollTick(5 * opts.Tick),
 
