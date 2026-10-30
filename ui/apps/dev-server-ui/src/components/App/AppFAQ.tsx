@@ -2,14 +2,10 @@ import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { InlineCode } from '@inngest/components/Code';
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Link } from '@inngest/components/Link';
-import { RiAddLine, RiFunctionLine, RiPlayFill } from '@remixicon/react';
 
-import { useTracking } from '@/hooks/useTracking';
 import { useInfoQuery } from '@/store/devApi';
-import HelperCard from './HelperCard';
 
 export default function AppFAQ({ openByDefault = false }) {
-  const { trackEvent } = useTracking();
   const { data: info, isLoading, error } = useInfoQuery();
   const isDevServer = error ? false : !info?.isSingleNodeService;
   return (
@@ -20,59 +16,9 @@ export default function AppFAQ({ openByDefault = false }) {
     >
       <AccordionList.Item value="FAQ">
         <AccordionList.Trigger className="text-muted text-sm data-[state=open]:border-0">
-          NEED HELP SETTING UP YOUR APP?
+          About apps and syncing
         </AccordionList.Trigger>
         <AccordionList.Content className="px-0">
-          <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <HelperCard
-              onClick={() =>
-                trackEvent('cli/onboarding.action', {
-                  type: 'btn-click',
-                  label: 'choose-framework',
-                })
-              }
-              to="/apps/choose-framework"
-              icon={
-                <div className="bg-primary-3xSubtle w-fit rounded-sm p-[10px]">
-                  <RiAddLine className="h-5 w-5" />
-                </div>
-              }
-              title="Add Inngest to existing project"
-              description="Choose your preferred framework and build your app using inngest."
-            />
-            <HelperCard
-              onClick={() =>
-                trackEvent('cli/onboarding.action', {
-                  type: 'btn-click',
-                  label: 'choose-template',
-                })
-              }
-              to="/apps/choose-template"
-              icon={
-                <div className="bg-tertiary-3xSubtle w-fit rounded-sm p-[10px]">
-                  <RiFunctionLine className="h-5 w-5" />
-                </div>
-              }
-              title="Grab a starter template"
-              description="Choose from our pre-built templates for a faster start."
-            />
-            <HelperCard
-              onClick={() =>
-                trackEvent('cli/onboarding.action', {
-                  type: 'btn-click',
-                  label: 'run-demo',
-                })
-              }
-              href="https://github.com/inngest/inngest-demo"
-              icon={
-                <div className="bg-quaternary-cool3xSubtle w-fit rounded-sm p-[10px]">
-                  <RiPlayFill className="h-5 w-5" />
-                </div>
-              }
-              title="Run a demo"
-              description="Explore our demo project to see Inngest in action locally."
-            />
-          </div>
           <AccordionList type="multiple" defaultValue={[]}>
             <AccordionList.Item value="app_definition">
               <AccordionList.Trigger>What is an app?</AccordionList.Trigger>

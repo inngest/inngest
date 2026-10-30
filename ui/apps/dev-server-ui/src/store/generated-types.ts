@@ -2794,6 +2794,15 @@ export type GetEventV2RunsQuery = {
   };
 };
 
+export type QuickstartRunsQueryVariables = Exact<{
+  functionIDs: Array<Scalars['UUID']> | Scalars['UUID'];
+  from: Scalars['Time'];
+  status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+}>;
+
+
+export type QuickstartRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', id: any, appID: any, status: FunctionRunStatus, queuedAt: any, endedAt: any | null, function: { __typename?: 'Function', id: string, name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean } } };
+
 export type ExecuteInsightsQueryQueryVariables = Exact<{
   sql: Scalars['String'];
 }>;

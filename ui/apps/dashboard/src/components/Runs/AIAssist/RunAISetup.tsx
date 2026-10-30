@@ -36,8 +36,8 @@ export function RunAISetup({
     client === 'claude'
       ? 'claude_code'
       : client === 'codex'
-        ? 'codex_cli'
-        : 'other';
+      ? 'codex_cli'
+      : 'other';
   const command =
     createMCPClients(endpoint, false).find((item) => item.id === client)
       ?.snippet.content ?? endpoint;

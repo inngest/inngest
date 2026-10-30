@@ -3,6 +3,7 @@ import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { IconPanelLeftClose } from '@inngest/components/icons/PanelLeftClose';
 import { IconPanelLeftOpen } from '@inngest/components/icons/PanelLeftOpen';
 
+import { OnboardingWidget } from '../Quickstart/OnboardingWidget';
 import Navigation from '../NavigationV2/Navigation';
 
 type SideBarProps = {
@@ -80,6 +81,7 @@ export default function SideBarV2({
         <Navigation collapsed={collapsed} />
 
         <div className="pl-3 pr-2">
+          <OnboardingWidget collapsed={collapsed} />
           {/* Discreet, icon-only collapse toggle pinned to the sidebar foot.
               Hover-revealed via opacity so it stays out of the way; focus-within
               keeps it keyboard reachable while it's transparent. */}

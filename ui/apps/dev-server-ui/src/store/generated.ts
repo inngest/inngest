@@ -1369,6 +1369,15 @@ export type GetEventV2RunsQueryVariables = Exact<{
 
 export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string }, trace: { __typename?: 'RunTraceSpan', skipReason: string | null, skipExistingRunID: string | null } | null }> } };
 
+export type QuickstartRunsQueryVariables = Exact<{
+  functionIDs: Array<Scalars['UUID']> | Scalars['UUID'];
+  from: Scalars['Time'];
+  status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
+}>;
+
+
+export type QuickstartRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', id: any, appID: any, status: FunctionRunStatus, queuedAt: any, endedAt: any | null, function: { __typename?: 'Function', id: string, name: string, slug: string } } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean } } };
+
 export type ExecuteInsightsQueryQueryVariables = Exact<{
   sql: Scalars['String'];
 }>;
@@ -1415,6 +1424,7 @@ export const TraceDetailsFragmentDoc = `
   metadata {
     scope
     kind
+    isUser
     values
     updatedAt
   }
@@ -1554,7 +1564,6 @@ export const GetFunctionDocument = `
       throttle {
         burst
         key
-    isUser
         limit
         period
       }
@@ -2002,6 +2011,33 @@ export const GetEventV2RunsDocument = `
   }
 }
     `;
+export const QuickstartRunsDocument = `
+    query QuickstartRuns($functionIDs: [UUID!]!, $from: Time!, $status: [FunctionRunStatus!]) {
+  runs(
+    first: 20
+    filter: {functionIDs: $functionIDs, from: $from, status: $status, timeField: QUEUED_AT}
+    orderBy: [{field: QUEUED_AT, direction: DESC}]
+  ) {
+    edges {
+      node {
+        id
+        appID
+        status
+        queuedAt
+        endedAt
+        function {
+          id
+          name
+          slug
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
+}
+    `;
 export const ExecuteInsightsQueryDocument = `
     query ExecuteInsightsQuery($sql: String!) {
   insights(sql: $sql) {
@@ -2116,6 +2152,9 @@ const injectedRtkApi = api.injectEndpoints({
     GetEventV2Runs: build.query<GetEventV2RunsQuery, GetEventV2RunsQueryVariables>({
       query: (variables) => ({ document: GetEventV2RunsDocument, variables })
     }),
+    QuickstartRuns: build.query<QuickstartRunsQuery, QuickstartRunsQueryVariables>({
+      query: (variables) => ({ document: QuickstartRunsDocument, variables })
+    }),
     ExecuteInsightsQuery: build.query<ExecuteInsightsQueryQuery, ExecuteInsightsQueryQueryVariables>({
       query: (variables) => ({ document: ExecuteInsightsQueryDocument, variables })
     }),
@@ -2123,5 +2162,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetRunLinkageQuery, useLazyGetRunLinkageQuery, useGetRunTraceQuery, useLazyGetRunTraceQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery, useExecuteInsightsQueryQuery, useLazyExecuteInsightsQueryQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetRunLinkageQuery, useLazyGetRunLinkageQuery, useGetRunTraceQuery, useLazyGetRunTraceQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery, useQuickstartRunsQuery, useLazyQuickstartRunsQuery, useExecuteInsightsQueryQuery, useLazyExecuteInsightsQueryQuery } = injectedRtkApi;
 
