@@ -4,10 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -113,41 +111,6 @@ func TestNQTimerAndWakeBothRun(t *testing.T) {
 	f.settle("inbox")
 	f.requireNothingLost("inbox")
 	require.LessOrEqual(t, f.accepts("inbox"), f.delivered["inbox"]+1)
-}
-
-// A response with a planned step beside the waiting op leaves no flag: the run
-// is busy, a delivery queues no discovery, and the step runs once. A timer
-// beside the wait does not make the run busy.
-func TestNQPlannedStepBesideTheWaitSetsNoFlag(t *testing.T) {
-	f := newWakeFixture(t, false)
-	r := f.begin("inbox")
-	r.readState()
-
-	ops := []*state.GeneratorOpcode{
-		{Op: enums.OpcodeStepPlanned, ID: "p"},
-		func() *state.GeneratorOpcode { op := r.waitOp(); return &op }(),
-	}
-	dropSubscriptionWaits(ops)
-	require.Empty(t, ops[1].ID)
-
-	rc := &mockRunContext{md: f.md, lifecycleItem: queue.Item{Payload: queue.PayloadEdge{}}}
-	require.NoError(t, f.e.handleGeneratorOp(f.ctx, rc, *ops[1], OpcodeGroup{}))
-	_, ok := f.flag("inbox")
-	require.False(t, ok)
-
-	f.deliver("inbox")
-	require.Zero(t, f.accepts("inbox"))
-
-	timed := []*state.GeneratorOpcode{
-		{Op: enums.OpcodeSleep, ID: "t"},
-		func() *state.GeneratorOpcode { op := r.waitOp(); return &op }(),
-	}
-	dropSubscriptionWaits(timed)
-	require.NotEmpty(t, timed[1].ID)
-
-	lone := []*state.GeneratorOpcode{func() *state.GeneratorOpcode { op := r.waitOp(); return &op }()}
-	dropSubscriptionWaits(lone)
-	require.NotEmpty(t, lone[0].ID)
 }
 
 // Any execution that is not the wake of the current wait clears the flags, so a

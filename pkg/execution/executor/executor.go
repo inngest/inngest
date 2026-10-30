@@ -4058,11 +4058,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		)
 	}
 
-	// A read that waits marks the run idle only when nothing else came with it
-	// but its own timer. With a planned step or other work in the response the
-	// run is busy, and a flag would let a message queue a discovery under it.
-	dropSubscriptionWaits(resp.Generator)
-
 	groups := opGroups(resp.Generator)
 
 	// One handling timestamp for the whole response: handlers run

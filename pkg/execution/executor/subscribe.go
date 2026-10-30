@@ -739,27 +739,3 @@ func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.
 
 	return nil
 }
-
-// dropSubscriptionWaits turns the waiting reads of a response into plain
-// no-ops when the response holds anything besides waits and sleeps.
-func dropSubscriptionWaits(ops []*state.GeneratorOpcode) {
-	busy := false
-	for _, op := range ops {
-		if op == nil {
-			continue
-		}
-		if op.Op == enums.OpcodeSleep || (op.Op == enums.OpcodeNone && op.ID != "") {
-			continue
-		}
-		busy = true
-	}
-	if !busy {
-		return
-	}
-
-	for _, op := range ops {
-		if op != nil && op.Op == enums.OpcodeNone {
-			op.ID = ""
-		}
-	}
-}
