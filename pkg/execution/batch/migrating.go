@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -94,6 +95,7 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, f
 		"function_id", functionID,
 		"batch_id", batchID,
 	)
+	recordFallback(ctx, "start_execution")
 	return fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
 }
 
@@ -111,7 +113,17 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 		"function_id", functionID,
 		"batch_id", batchID,
 	)
+	recordFallback(ctx, "retrieve_items")
 	return fallback.RetrieveItems(ctx, accountID, functionID, batchID)
+}
+
+// recordFallback counts a read that missed the primary store and is retried
+// on the fallback store.
+func recordFallback(ctx context.Context, op string) {
+	metrics.IncrBatchMigrationFallbackCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"op": op},
+	})
 }
 
 // ScheduleExecution doesn't touch either store; it only enqueues the
