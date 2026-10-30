@@ -63,7 +63,7 @@ func TestCELEventTableFilters(t *testing.T) {
 			name: "event.data null",
 			cel:  []string{`event.data.n == null`},
 			expected: []sq.Expression{
-				sq.L("(event_data::JSON->?) = 'null'::JSON", "$.n"),
+				sq.L("((event_data::JSON->?) IS NULL OR (event_data::JSON->?) = 'null'::JSON)", "$.n", "$.n"),
 			},
 		},
 		{
@@ -77,18 +77,15 @@ func TestCELEventTableFilters(t *testing.T) {
 			},
 		},
 		{
-			name: "event.id rejects a non-string literal",
-			cel:  []string{`event.id == 123`},
+			name:     "event.id with a non-string literal is unconstrained",
+			cel:      []string{`event.id == 123`},
+			expected: []sq.Expression{},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			filters, err := CELEventTableFilters(ctx, test.cel)
-			if test.expected == nil {
-				assert.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
 			assert.ElementsMatch(t, test.expected, filters)
 		})
@@ -107,28 +104,30 @@ func TestCELEventFilters(t *testing.T) {
 			name: "event.id equals",
 			cel:  []string{`event.id == "abc"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>?)", "$.id").Eq("abc"),
+				sq.L("COALESCE((x::JSON->>?), '')", "$.id").Eq("abc"),
 			},
 		},
 		{
+			// event.Event.Map() always has a string name ("" when
+			// missing), so unlike other JSON paths != is still sound.
 			name: "event.name not equals",
 			cel:  []string{`event.name != "test/hello"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>?)", "$.name").Neq("test/hello"),
+				sq.L("COALESCE((x::JSON->>?), '')", "$.name").Neq("test/hello"),
 			},
 		},
 		{
 			name: "event.v equals",
 			cel:  []string{`event.v == "2024-01-01"`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->>?)", "$.v").Eq("2024-01-01"),
+				sq.L("COALESCE((x::JSON->>?), '')", "$.v").Eq("2024-01-01"),
 			},
 		},
 		{
 			name: "event.ts greater than",
 			cel:  []string{`event.ts > 1727291508963`},
 			expected: []sq.Expression{
-				sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.ts").Gt(int64(1727291508963)),
+				sq.L("COALESCE(TRY_CAST((x::JSON->>?) AS DOUBLE), 0)", "$.ts").Gt(int64(1727291508963)),
 			},
 		},
 		{
@@ -149,7 +148,7 @@ func TestCELEventFilters(t *testing.T) {
 			name: "event.data null",
 			cel:  []string{`event.data.n == null`},
 			expected: []sq.Expression{
-				sq.L("(x::JSON->?) = 'null'::JSON", "$.data.n"),
+				sq.L("((x::JSON->?) IS NULL OR (x::JSON->?) = 'null'::JSON)", "$.data.n", "$.data.n"),
 			},
 		},
 		{
@@ -171,7 +170,7 @@ func TestCELEventFilters(t *testing.T) {
 			cel:  []string{`event.name == "x" && event.data.foo == "bar"`},
 			expected: []sq.Expression{
 				sq.And(
-					sq.L("(x::JSON->>?)", "$.name").Eq("x"),
+					sq.L("COALESCE((x::JSON->>?), '')", "$.name").Eq("x"),
 					sq.L("(x::JSON->>?)", "$.data.foo").Eq("bar"),
 				),
 			},
@@ -211,7 +210,14 @@ func TestCELOutputFilters(t *testing.T) {
 			name: "output null",
 			cel:  []string{`output.result == null`},
 			expected: []sq.Expression{
-				sq.L("(output::JSON->?) = 'null'::JSON", "$.data.result"),
+				sq.L("((output::JSON->?) IS NULL OR (output::JSON->?) = 'null'::JSON)", "$.data.result", "$.data.result"),
+			},
+		},
+		{
+			name: "bare output targets the whole data envelope",
+			cel:  []string{`output == "x"`},
+			expected: []sq.Expression{
+				sq.L("(output::JSON->>?)", "$.data").Eq("x"),
 			},
 		},
 		{
@@ -219,6 +225,18 @@ func TestCELOutputFilters(t *testing.T) {
 			cel:  []string{`output.count >= 3`},
 			expected: []sq.Expression{
 				sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(3)),
+			},
+		},
+		{
+			// A JSON null compares as 0 in pkg/expressions, so >= 0 lets it
+			// through.
+			name: "output numeric comparison including zero",
+			cel:  []string{`output.count >= 0`},
+			expected: []sq.Expression{
+				sq.Or(
+					sq.L("TRY_CAST((output::JSON->>?) AS DOUBLE)", "$.data.count").Gte(int64(0)),
+					sq.L("json_type(output::JSON, ?) = 'NULL'", "$.data.count"),
+				),
 			},
 		},
 		{
@@ -257,7 +275,7 @@ func TestCELEventAndOutputFiltersSplitAMixedExpression(t *testing.T) {
 
 	eventFilters, err := CELEventFilters(ctx, cel)
 	require.NoError(t, err)
-	assert.Equal(t, []sq.Expression{sq.L("(x::JSON->>?)", "$.name").Eq("x")}, eventFilters)
+	assert.Equal(t, []sq.Expression{sq.L("COALESCE((x::JSON->>?), '')", "$.name").Eq("x")}, eventFilters)
 
 	outputFilters, err := CELOutputFilters(ctx, cel)
 	require.NoError(t, err)
@@ -279,7 +297,7 @@ func TestCELEventAndOutputFiltersKeepAMixedOrWhole(t *testing.T) {
 	require.NoError(t, err)
 	sqlText, args, err := RenderWhereSQL(outputFilters)
 	require.NoError(t, err)
-	assert.Equal(t, `(len(list_filter(json_transform(inputs, '["JSON"]'), lambda x: ((x::JSON->>?) = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
+	assert.Equal(t, `(len(list_filter(json_transform(inputs::JSON, '["JSON"]'), lambda x: (COALESCE((x::JSON->>?), '') = ?))) > 0 OR ((output::JSON->>?) = ?))`, sqlText)
 	assert.Equal(t, []any{"$.name", "x", "$.data.ok", "true"}, args)
 }
 
@@ -377,4 +395,62 @@ func TestRenderWhereSQL(t *testing.T) {
 			assert.Equal(t, test.wantArgs, args)
 		})
 	}
+}
+
+// TestCELFiltersNeverNarrow covers expression shapes whose SQL used to be
+// narrower than (or unrelated to) what the CEL means. Each one must now be
+// either a sound superset or no filter at all, since pkg/duckdb/query
+// re-checks every candidate in Go.
+func TestCELFiltersNeverNarrow(t *testing.T) {
+	ctx := context.Background()
+
+	unconstrained := []string{
+		// expr turns these into a != 1 && b != 2 (and the || equivalent).
+		`!(event.data.a == 1 && event.data.b == 2)`,
+		`!(event.data.a == "x" || event.data.b == "y")`,
+		`!(event.name == "x" || (event.data.a == 1 && event.data.b == 2))`,
+		// Field-to-field and bytes comparisons used to become == null.
+		`event.data.a == event.data.b`,
+		`event.data.a == b"x"`,
+		`event.data.a != 1`,
+		`event.data.a != "x"`,
+		`event.data.a != true`,
+		`"x" in event.data.list`,
+		`event.data.a < "x"`,
+		`event.data.a == 1u`,
+		// event.Event.Map() always has these, whatever's stored.
+		`event.data == null`,
+		`event.data != null`,
+		`event.name != null`,
+		`event.ts == null`,
+	}
+	for _, cel := range unconstrained {
+		t.Run(cel, func(t *testing.T) {
+			ev, err := CELEventFilters(ctx, []string{cel})
+			require.NoError(t, err)
+			assert.Empty(t, ev)
+			tbl, err := CELEventTableFilters(ctx, []string{cel})
+			require.NoError(t, err)
+			assert.Empty(t, tbl)
+		})
+	}
+
+	t.Run("negated leaf is still converted", func(t *testing.T) {
+		ev, err := CELEventFilters(ctx, []string{`!(event.data.a > 1)`})
+		require.NoError(t, err)
+		// <= also keeps a missing or null a, which pkg/expressions treats as
+		// below 1.
+		assert.Equal(t, []sq.Expression{
+			sq.Or(
+				sq.L("TRY_CAST((x::JSON->>?) AS DOUBLE)", "$.data.a").Lte(int64(1)),
+				sq.L("(x::JSON->>?) IS NULL", "$.data.a"),
+			),
+		}, ev)
+	})
+
+	t.Run("negated logic in an output expression is unconstrained", func(t *testing.T) {
+		out, err := CELOutputFilters(ctx, []string{`!(output.a == 1 && output.b == 2)`})
+		require.NoError(t, err)
+		assert.Empty(t, out)
+	})
 }
