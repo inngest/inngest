@@ -1,7 +1,6 @@
 package redis_state
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -64,9 +63,7 @@ func TestSingletonMigrationSourceDrained(t *testing.T) {
 	t.Cleanup(rc.Close)
 	_, shard := newQueue(t, rc)
 	scope := osqueue.ScopeFromQueueItem(migrationTestItem())
-	checker := shard.(interface {
-		SingletonMigrationSourceDrained(context.Context, osqueue.Scope) (bool, error)
-	})
+	checker := shard.(osqueue.SingletonMigrationOperations)
 	kg := shard.Client().kg
 	for _, key := range []string{
 		kg.PartitionQueueSet(enums.PartitionTypeDefault, scope.FunctionID.String(), ""),
@@ -91,9 +88,7 @@ func TestProtectSingletonMigrationRun(t *testing.T) {
 	t.Cleanup(rc.Close)
 	_, shard := newQueue(t, rc)
 	scope := osqueue.ScopeFromQueueItem(migrationTestItem())
-	protector := shard.(interface {
-		ProtectSingletonMigrationRun(context.Context, osqueue.Scope, string, string, ulid.ULID) error
-	})
+	protector := shard.(osqueue.SingletonMigrationRunProtector)
 	hold := shard.(osqueue.SingletonMigrationOperations)
 	run := ulid.Make()
 	ctx := t.Context()

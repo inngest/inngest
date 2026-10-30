@@ -20,10 +20,7 @@ return owner
 `)
 
 func (q *queue) SingletonAdmission(ctx context.Context, scope osqueue.Scope, key string, mode enums.SingletonMode) (*ulid.ULID, error) {
-	if scope.IsSystem {
-		return nil, fmt.Errorf("singleton migration requires a function scope")
-	}
-	if err := scope.Validate(); err != nil {
+	if err := validateSingletonMigrationScope(scope); err != nil {
 		return nil, err
 	}
 	if mode != enums.SingletonModeSkip && mode != enums.SingletonModeCancel {
@@ -100,10 +97,7 @@ return 1
 // excludes expired leases and therefore cannot prove a migration source empty.
 // This is a source-only check: destination work may still be executing.
 func (q *queue) SingletonMigrationSourceDrained(ctx context.Context, scope osqueue.Scope) (bool, error) {
-	if scope.IsSystem {
-		return false, fmt.Errorf("singleton migration requires a function scope")
-	}
-	if err := scope.Validate(); err != nil {
+	if err := validateSingletonMigrationScope(scope); err != nil {
 		return false, err
 	}
 	kg := q.RedisClient.kg
@@ -140,11 +134,15 @@ redis.call("DEL", KEYS[1], KEYS[2])
 return 1
 `)
 
-func validateSingletonMigration(scope osqueue.Scope, migrationID string) error {
+func validateSingletonMigrationScope(scope osqueue.Scope) error {
 	if scope.IsSystem {
 		return fmt.Errorf("singleton migration requires a function scope")
 	}
-	if err := scope.Validate(); err != nil {
+	return scope.Validate()
+}
+
+func validateSingletonMigration(scope osqueue.Scope, migrationID string) error {
+	if err := validateSingletonMigrationScope(scope); err != nil {
 		return err
 	}
 	if migrationID == "" {
@@ -199,3 +197,4 @@ func (q *queue) FinishSingletonMigration(ctx context.Context, scope osqueue.Scop
 }
 
 var _ osqueue.SingletonMigrationOperations = (*queue)(nil)
+var _ osqueue.SingletonMigrationRunProtector = (*queue)(nil)

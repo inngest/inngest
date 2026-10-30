@@ -178,10 +178,20 @@ type SingletonMigrationOperations interface {
 	// BeginSingletonMigration is idempotent for migrationID. Holds are durable:
 	// a crash or an expired scanner lock must not release singleton ownership.
 	BeginSingletonMigration(ctx context.Context, scope Scope, migrationID string) error
+	// SingletonMigrationSourceDrained proves this shard owns no remaining work,
+	// including backlogs and expired leases awaiting recovery. Destination-owned
+	// work in a shared database must not count as source work.
+	SingletonMigrationSourceDrained(ctx context.Context, scope Scope) (bool, error)
 	// FinishSingletonMigration reconciles a bounded page of deferred releases.
 	// Call only after source jobs and leases have drained; repeat until done.
 	// A different migrationID cannot remove another migration's protection.
 	FinishSingletonMigration(ctx context.Context, scope Scope, migrationID string) (done bool, err error)
+}
+
+// SingletonMigrationRunProtector registers durable ownership and cleanup for
+// Redis runs still executing on the source, even if no job reaches destination.
+type SingletonMigrationRunProtector interface {
+	ProtectSingletonMigrationRun(ctx context.Context, scope Scope, migrationID, key string, runID ulid.ULID) error
 }
 
 // SingletonAdmissionOperations checks migration protection atomically with the
