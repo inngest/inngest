@@ -70,7 +70,7 @@ func TestBreakWaitBesideAnAsyncWaitIsStillWakeable(t *testing.T) {
 			wait := r.waitOp()
 			rc := &mockRunContext{md: f.md, lifecycleItem: queue.Item{Payload: queue.PayloadEdge{}}}
 
-			ops := []*state.GeneratorOpcode{{Op: op, ID: "other"}, &wait}
+			ops := []*state.GeneratorOpcode{{Op: op, ID: "other", Opts: map[string]any{"event": "e"}}, &wait}
 			markBusySubscriptionWaits(ops)
 			require.NoError(t, f.e.handleGeneratorOp(f.ctx, rc, wait, OpcodeGroup{}))
 
@@ -80,25 +80,116 @@ func TestBreakWaitBesideAnAsyncWaitIsStillWakeable(t *testing.T) {
 	}
 }
 
-// S9. A message wins a timed read and its wake starts. The read's timer is not
-// cancelled, so when it fires its request reads the same message while the
-// wake's request is still handling it: both run what follows the read.
-func TestBreakTimerRunsWhileTheWakeHandlesTheMessage(t *testing.T) {
+// S9. A timed read's message and its timer both want to run what follows. Each
+// claims the wait by saving the timer's step; the first one wins and the other
+// sees the duplicate and runs nothing.
+func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
+	wakeItem := func(f *wakeFixture) queue.Item {
+		token := subscriptionWaitToken("timer")
+		return queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), token)}}
+	}
+
+	t.Run("MessageWins", func(t *testing.T) {
+		f := newWakeFixture(t, false)
+		item := wakeItem(f)
+
+		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
+		require.NoError(t, err)
+		require.True(t, ok)
+
+		// A rerun of the same wake still runs.
+		ok, err = f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
+		require.NoError(t, err)
+		require.True(t, ok)
+
+		// The timer saves null, sees the duplicate, and sees the message won.
+		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		require.Error(t, err)
+		won, err := f.e.messageWonTimer(f.ctx, f.md.ID, "timer")
+		require.NoError(t, err)
+		require.True(t, won)
+	})
+
+	t.Run("TimerWins", func(t *testing.T) {
+		f := newWakeFixture(t, false)
+		_, err := f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		require.NoError(t, err)
+
+		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, wakeItem(f))
+		require.NoError(t, err)
+		require.False(t, ok, "the timer's request runs the function")
+
+		// A retry of the timer sees its own null, so it carries on.
+		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		require.Error(t, err)
+		won, err := f.e.messageWonTimer(f.ctx, f.md.ID, "timer")
+		require.NoError(t, err)
+		require.False(t, won)
+	})
+
+	t.Run("UntimedWakeAlwaysRuns", func(t *testing.T) {
+		f := newWakeFixture(t, false)
+		item := queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), subscriptionWaitToken(""))}}
+		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
+		require.NoError(t, err)
+		require.True(t, ok)
+	})
+}
+
+// The executor tells a timed read's waiting op which sleep is its timer.
+func TestBreakWaitingOpLearnsItsTimer(t *testing.T) {
+	wait := &state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "w", Opts: map[string]any{"subscribe": map[string]any{"key": "inbox", "seq": 1}}}
+	wait.Userland = &struct {
+		ID    string `json:"id"`
+		Index int    `json:"index,omitempty"`
+	}{ID: "read:1:waiting"}
+	sleep := &state.GeneratorOpcode{Op: enums.OpcodeSleep, ID: "hashed-timer"}
+	sleep.Userland = &struct {
+		ID    string `json:"id"`
+		Index int    `json:"index,omitempty"`
+	}{ID: "read:1"}
+	other := &state.GeneratorOpcode{Op: enums.OpcodeSleep, ID: "user-sleep"}
+	other.Userland = &struct {
+		ID    string `json:"id"`
+		Index int    `json:"index,omitempty"`
+	}{ID: "nap"}
+
+	markSubscriptionTimers([]*state.GeneratorOpcode{other, sleep, wait})
+	require.Equal(t, "hashed-timer", wait.Opts.(map[string]any)["timer"])
+}
+
+// A rerun of an earlier wake clears only its own subscription's flag, whatever
+// token the flag holds.
+func TestBreakRerunClearsOnlyItsOwnSubscription(t *testing.T) {
 	f := newWakeFixture(t, false)
-	f.begin("inbox").end()
-	f.deliver("inbox")
+	f.begin("a").end()
+	f.begin("b").end()
 
-	wake := f.start("inbox")
-	require.NotNil(t, wake)
-	wake.readState()
-	seenByWake := f.saw["inbox"]
+	stale := queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("a"), "old")}}
+	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, stale))
 
-	// The timer of the same read fires while the wake's request is in flight.
-	timer := f.beginAs("inbox", queue.Item{Kind: queue.KindSleep})
-	timer.readState()
-	seenByTimer := f.saw["inbox"]
+	_, ok := f.flag("a")
+	require.False(t, ok)
+	_, ok = f.flag("b")
+	require.True(t, ok)
+}
 
-	require.False(t, seenByWake >= 1 && seenByTimer >= 1, "two overlapping requests both read message 1, so both run the step after it")
+// The parking ops leave a run idle; a subscription op beside the read does not.
+func TestBreakParkingOps(t *testing.T) {
+	for _, op := range []enums.Opcode{enums.OpcodeSleep, enums.OpcodeWaitForEvent, enums.OpcodeInvokeFunction, enums.OpcodeWaitForSignal} {
+		wait := &state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "w", Opts: map[string]any{}}
+		markBusySubscriptionWaits([]*state.GeneratorOpcode{{Op: op, ID: "x", Opts: map[string]any{"event": "e"}}, wait})
+		require.Nil(t, wait.Opts.(map[string]any)["busy"], op.String())
+	}
+
+	wait := &state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "w", Opts: map[string]any{}}
+	sub := &state.GeneratorOpcode{Op: enums.OpcodeWaitForEvent, ID: "s", Opts: map[string]any{"event": "e", "subscribe": map[string]any{"key": "k"}}}
+	markBusySubscriptionWaits([]*state.GeneratorOpcode{sub, wait})
+	require.Equal(t, true, wait.Opts.(map[string]any)["busy"])
+
+	wait = &state.GeneratorOpcode{Op: enums.OpcodeNone, ID: "w", Opts: map[string]any{}}
+	markBusySubscriptionWaits([]*state.GeneratorOpcode{{Op: enums.OpcodeStepPlanned, ID: "p"}, wait})
+	require.Equal(t, true, wait.Opts.(map[string]any)["busy"])
 }
 
 // A wake item whose metadata is gone (an older item version) clears every flag

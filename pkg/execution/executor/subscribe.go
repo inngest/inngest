@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -511,6 +512,8 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 			Seq int `json:"seq"`
 		} `json:"subscribe"`
 		Busy bool `json:"busy"`
+		// Timer is the step ID of the read's timer, when it has one.
+		Timer string `json:"timer"`
 	}
 	if err := json.Unmarshal(byt, &opts); err != nil || opts.Subscribe.Key == "" || opts.Busy {
 		return nil
@@ -524,7 +527,7 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	md := runCtx.Metadata()
 	key := opts.Subscribe.Key
 	hash := subscriptionKeyHash(key)
-	token := uuid.NewString()
+	token := subscriptionWaitToken(opts.Timer)
 	if err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token); err != nil {
 		if errors.Is(err, state.ErrRunNotFound) {
 			return nil
@@ -584,8 +587,9 @@ func parseSubscriptionWakeMeta(v string) (hash string, token string, ok bool) {
 }
 
 // startSubscriptionWake runs at the start of every execution, before the run's
-// state is read. A wake clears the flag of its own wait, so a message saved
-// after this point finds no flag. Any other execution runs the function while
+// state is read. A wake clears the flag of its own subscription by hash, so a
+// message saved after this point finds no flag, even when the wake is a rerun
+// of an earlier one. Any other execution runs the function while
 // the run is no longer idle, so every flag is stale.
 func (e *executor) startSubscriptionWake(ctx context.Context, id sv2.ID, item queue.Item) error {
 	waiter, ok := e.smv2.(sv2.SubscriptionWaiter)
@@ -594,12 +598,12 @@ func (e *executor) startSubscriptionWake(ctx context.Context, id sv2.ID, item qu
 	}
 
 	if v, _ := item.Metadata[subscriptionWakeMetaKey].(string); v != "" {
-		hash, token, ok := parseSubscriptionWakeMeta(v)
+		hash, _, ok := parseSubscriptionWakeMeta(v)
 		if !ok {
 			return nil
 		}
 
-		return waiter.ClearSubscriptionWaitingIf(ctx, id, hash, token)
+		return waiter.ClearSubscriptionWaitingFor(ctx, id, hash)
 	}
 
 	return waiter.ClearSubscriptionWaiting(ctx, id)
@@ -743,11 +747,13 @@ func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.
 
 // markBusySubscriptionWaits tells the waiting reads of a response that the run
 // is not idle: anything beside waits and their timers (a step the function ran
-// or planned) means a message must not queue a discovery under this wait.
+// or planned) means a message must not queue a discovery under this wait. Ops
+// that only park the run (sleep, a signal, an invoke, an event wait that is not
+// a subscription op) leave it idle, so a read beside them stays wakeable.
 func markBusySubscriptionWaits(ops []*state.GeneratorOpcode) {
 	busy := false
 	for _, op := range ops {
-		if op == nil || op.Op == enums.OpcodeSleep || (op.Op == enums.OpcodeNone && op.ID != "") {
+		if op == nil || isParkingOp(op) || (op.Op == enums.OpcodeNone && op.ID != "") {
 			continue
 		}
 		busy = true
@@ -764,4 +770,110 @@ func markBusySubscriptionWaits(ops []*state.GeneratorOpcode) {
 			opts["busy"] = true
 		}
 	}
+}
+
+// isParkingOp reports whether the op only waits: nothing runs now, and the run
+// resumes when something outside it happens.
+func isParkingOp(op *state.GeneratorOpcode) bool {
+	switch op.Op {
+	case enums.OpcodeSleep, enums.OpcodeInvokeFunction, enums.OpcodeWaitForSignal:
+		return true
+	case enums.OpcodeWaitForEvent:
+		opts, err := op.WaitForEventOpts()
+		return err == nil && opts.Subscribe == nil
+	}
+
+	return false
+}
+
+// subscriptionMessageWon is what a message that wins a timed read saves as the
+// result of the read's timer step. The timer saves null when it wins. Whichever
+// is saved first is the winner, and the other one sees the duplicate and runs
+// nothing, so a message and its timer never both run what follows the read.
+var subscriptionMessageWon = []byte(`"subscription-message"`)
+
+// subscriptionWaitToken is the token of one wait: unique, and ending in the ID of
+// the read's timer step when the read has one.
+func subscriptionWaitToken(timer string) string {
+	token := uuid.NewString()
+	if timer == "" {
+		return token
+	}
+
+	return token + "." + timer
+}
+
+// subscriptionTimerOfToken is the timer step ID a wait token ends in.
+func subscriptionTimerOfToken(token string) string {
+	_, timer, _ := strings.Cut(token, ".")
+	return timer
+}
+
+// markSubscriptionTimers tells each waiting read of a response which sleep is
+// its timer: the SDK gives the waiting op the ID of the timer plus ":waiting".
+func markSubscriptionTimers(ops []*state.GeneratorOpcode) {
+	timers := map[string]string{}
+	for _, op := range ops {
+		if op != nil && op.Op == enums.OpcodeSleep {
+			if id := userStepID(op); id != "" {
+				timers[id+":waiting"] = op.ID
+			}
+		}
+	}
+	if len(timers) == 0 {
+		return
+	}
+
+	for _, op := range ops {
+		if op == nil || op.Op != enums.OpcodeNone || op.ID == "" {
+			continue
+		}
+		timer, ok := timers[userStepID(op)]
+		if !ok {
+			continue
+		}
+		if opts, ok := op.Opts.(map[string]any); ok {
+			opts["timer"] = timer
+		}
+	}
+}
+
+// messageWonTimer reports whether the step holds the mark of a message that won.
+func (e *executor) messageWonTimer(ctx context.Context, id sv2.ID, stepID string) (bool, error) {
+	steps, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{stepID})
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(steps[stepID], subscriptionMessageWon), nil
+}
+
+// claimSubscriptionTimer runs for a wake before it does anything else. For a
+// timed read the wake claims the wait by saving the timer's step as won. It
+// returns false when the timer got there first: the timer's request runs the
+// function, so this one must not. A rerun of the same wake finds its own mark
+// and carries on.
+func (e *executor) claimSubscriptionTimer(ctx context.Context, id sv2.ID, item queue.Item) (bool, error) {
+	v, _ := item.Metadata[subscriptionWakeMetaKey].(string)
+	_, token, ok := parseSubscriptionWakeMeta(v)
+	timer := subscriptionTimerOfToken(token)
+	if !ok || timer == "" {
+		return true, nil
+	}
+
+	_, err := e.smv2.SaveStep(ctx, id, timer, subscriptionMessageWon)
+	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		return e.messageWonTimer(ctx, id, timer)
+	}
+
+	return err == nil, err
+}
+
+// userStepID is the ID the user gave the op, empty when the SDK sent none.
+func userStepID(op *state.GeneratorOpcode) string {
+	if op.Userland == nil {
+		return ""
+	}
+
+	return op.Userland.ID
 }

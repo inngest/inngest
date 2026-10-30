@@ -814,8 +814,8 @@ func TestWakeRandomInterleavings(t *testing.T) {
 	}
 }
 
-func (h *hookedRunService) ClearSubscriptionWaitingIf(ctx context.Context, id sv2.ID, hash string, token string) error {
-	err := h.RunService.(sv2.SubscriptionWaiter).ClearSubscriptionWaitingIf(ctx, id, hash, token)
+func (h *hookedRunService) ClearSubscriptionWaitingFor(ctx context.Context, id sv2.ID, hash string) error {
+	err := h.RunService.(sv2.SubscriptionWaiter).ClearSubscriptionWaitingFor(ctx, id, hash)
 	if err == nil && h.lostClearReply {
 		h.lostClearReply = false
 		return errors.New("reply lost")

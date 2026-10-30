@@ -117,18 +117,18 @@ func TestNQTimerAndWakeBothRun(t *testing.T) {
 
 // Any execution that is not the wake of the current wait clears the flags, so a
 // parallel step finishing or an invoke returning leaves no flag on a busy run.
-// A wake of an older wait leaves a newer wait's flag alone.
+// A wake clears its own subscription by hash, whatever token the flag holds.
 func TestNQFlagClearedOnEveryEntry(t *testing.T) {
 	f := newWakeFixture(t, false)
 	f.begin("inbox").end()
-	token, _ := f.flag("inbox")
 
-	// A wake with another token: no match, the flag stays.
+	// A wake of an older wait clears the flag too: the function runs after it
+	// and sets a new one.
 	old := queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), "old")}}
 	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, old))
-	got, ok := f.flag("inbox")
-	require.True(t, ok)
-	require.Equal(t, token, got)
+	_, ok := f.flag("inbox")
+	require.False(t, ok)
+	f.begin("inbox").end()
 
 	// A step completion (an edge item with no wake metadata) clears it.
 	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, queue.Item{Kind: queue.KindEdge, Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}}))

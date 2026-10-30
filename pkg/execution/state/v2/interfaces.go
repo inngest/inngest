@@ -256,9 +256,9 @@ type SubscriptionWaiter interface {
 	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
 	// GetSubscriptionWaiting reads the flag without changing it.
 	GetSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
-	// ClearSubscriptionWaitingIf clears the flag if it still holds the token,
-	// atomically. A flag with another token, or none, is not an error.
-	ClearSubscriptionWaitingIf(ctx context.Context, id ID, hash string, token string) error
+	// ClearSubscriptionWaitingFor clears the flag of one subscription, whatever
+	// token it holds. A missing flag is not an error.
+	ClearSubscriptionWaitingFor(ctx context.Context, id ID, hash string) error
 	// ClearSubscriptionWaiting clears the flags of every subscription of the run.
 	ClearSubscriptionWaiting(ctx context.Context, id ID) error
 }

@@ -293,6 +293,6 @@ func (s *limitRunService) GetSubscriptionWaiting(context.Context, sv2.ID, string
 }
 func (s *limitRunService) ClearSubscriptionWaiting(context.Context, sv2.ID) error { return nil }
 
-func (s *limitRunService) ClearSubscriptionWaitingIf(context.Context, sv2.ID, string, string) error {
+func (s *limitRunService) ClearSubscriptionWaitingFor(context.Context, sv2.ID, string) error {
 	return nil
 }

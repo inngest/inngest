@@ -1863,19 +1863,16 @@ func (m shardedMgr) GetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 	return token, true, nil
 }
 
-// ClearSubscriptionWaitingIf clears the waiting flag of a subscription if it
-// still holds the token.
-func (m shardedMgr) ClearSubscriptionWaitingIf(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string, token string) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClearSubscriptionWaitingIf"), redis_telemetry.ScopeFnRunState)
+// ClearSubscriptionWaitingFor clears the waiting flag of one subscription,
+// whatever token it holds. Clearing twice is harmless.
+func (m shardedMgr) ClearSubscriptionWaitingFor(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClearSubscriptionWaitingFor"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	err := retriableScripts["compareDeleteSubscriptionWaiting"].Exec(
-		redis_telemetry.WithScriptName(ctx, "compareDeleteSubscriptionWaiting"),
-		r,
-		[]string{fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)},
-		[]string{hash, token},
-	).Error()
+	err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hdel().Key(fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)).Field(hash).Build()
+	}).Error()
 	if err != nil {
 		return fmt.Errorf("error clearing a subscription's waiting flag: %w", err)
 	}

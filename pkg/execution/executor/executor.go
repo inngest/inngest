@@ -2119,6 +2119,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for `tools.sleep` within generator functions.
 	//
 	// This also marks the sleep item as completed.
+	runID := sv2.ID{
+		RunID:      id.RunID,
+		FunctionID: id.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
+	}
+
 	isSleep := item.Kind == queue.KindSleep
 	// New sleep items don't store span refs; reconstruct deterministically and rehydrate
 	// item.Metadata so downstream reads find them. Even on retries.
@@ -2156,6 +2166,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) && err != nil {
 			return nil, err
 		}
+		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+			// A message that won a timed read saved this timer step first.
+			won, err := e.messageWonTimer(ctx, runID, edge.Outgoing)
+			if err != nil {
+				return nil, err
+			}
+			if won {
+				return nil, nil
+			}
+		}
 		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
 			// Other steps are pending before we re-enter the function, so
 			// we're now done with this execution.
@@ -2163,17 +2183,17 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	// A wake of a timed read claims the wait before anything else, so it never
+	// runs beside the read's timer.
+	if ok, err := e.claimSubscriptionTimer(ctx, runID, item); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, nil
+	}
+
 	// Before any state is read, so a message saved after this finds no flag, and
 	// a message saved before it is in the state this execution reads.
-	if err := e.startSubscriptionWake(ctx, sv2.ID{
-		RunID:      id.RunID,
-		FunctionID: id.WorkflowID,
-		Tenant: sv2.Tenant{
-			AppID:     id.AppID,
-			EnvID:     id.WorkspaceID,
-			AccountID: id.AccountID,
-		},
-	}, item); err != nil {
+	if err := e.startSubscriptionWake(ctx, runID, item); err != nil {
 		return nil, err
 	}
 
@@ -4060,6 +4080,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	// A read that waits sets the flag only when nothing else came with it.
 	markBusySubscriptionWaits(resp.Generator)
+	markSubscriptionTimers(resp.Generator)
 
 	groups := opGroups(resp.Generator)
 
