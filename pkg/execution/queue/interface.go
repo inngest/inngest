@@ -171,6 +171,19 @@ type SingletonOperations interface {
 	SingletonReleaseRunID(ctx context.Context, scope Scope, key string) (*ulid.ULID, error)
 }
 
+// SingletonMigrationOperations protects singleton ownership while a function's
+// jobs are split across queue shards. It is optional so an unsupported shard
+// fails migration before any items are copied.
+type SingletonMigrationOperations interface {
+	// BeginSingletonMigration is idempotent for migrationID. Holds are durable:
+	// a crash or an expired scanner lock must not release singleton ownership.
+	BeginSingletonMigration(ctx context.Context, scope Scope, migrationID string) error
+	// FinishSingletonMigration reconciles a bounded page of deferred releases.
+	// Call only after source jobs and leases have drained; repeat until done.
+	// A different migrationID cannot remove another migration's protection.
+	FinishSingletonMigration(ctx context.Context, scope Scope, migrationID string) (done bool, err error)
+}
+
 // DebounceUpdateStatus describes the outcome of DebounceUpdate.
 type DebounceUpdateStatus int
 
