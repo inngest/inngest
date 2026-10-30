@@ -69,13 +69,43 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 local constraintUsage = {}
+local function decodeManualOwner(value)
+	local weight, request = string.match(value, "^(%d+):([^:]*)$")
+	return tonumber(weight), request
+end
+local manualHolds = {}
+local runID
+if requestDetails.mso then
+	runID = call("HGET", keyLeaseDetails, "rid")
+	for index, c in ipairs(constraints) do
+		if c.k == 4 and c.sem.rel == 1 then
+			local owned = call("GET", c.sem.k .. ":owner:" .. runID)
+			if owned == false then return redis.error_reply("ERR manual semaphore ownership is unknown") end
+			local held, claim = decodeManualOwner(owned)
+			if held == nil then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if forceReleaseSemaphores and (tonumber(call("GET", c.sem.k)) or 0) < held then
+				return redis.error_reply("ERR manual semaphore ownership is unknown")
+			end
+			if held > 0 and claim ~= requestID then
+				return redis.error_reply("ERR manual semaphore claim belongs to another request")
+			end
+			manualHolds[index] = held
+		end
+	end
+end
 for index, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
 		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
-		if c.sem.rel == 0 or forceReleaseSemaphores then
+		if c.sem.rel == 1 and requestDetails.mso then
+			if manualHolds[index] > 0 then
+				call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
+			end
+		elseif c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w
 			if not weight or weight <= 0 then
 				weight = 1

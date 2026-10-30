@@ -88,8 +88,8 @@ type LeaseItemResult struct {
 	Status     LeaseItemStatus
 	Err        error
 	RetryAfter time.Time
-	// ExhaustedSemaphores lists the semaphores that had no capacity for this item.
-	// the iterator uses it to skip later items that carry the same semaphore.
+	// ExhaustedSemaphores lists shared exhaustion safe to memoize for later
+	// items. Owned manual permits are omitted because another run may reuse one.
 	ExhaustedSemaphores []constraintapi.SemaphoreConstraint
 }
 
