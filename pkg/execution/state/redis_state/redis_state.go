@@ -1820,9 +1820,10 @@ func StrSlice(args []any) ([]string, error) {
 	return res, nil
 }
 
-// SetSubscriptionWaiting marks a subscription of a run as waiting. It reports
+// SetSubscriptionWaiting marks a subscription of a run as waiting, unless the
+// wait is already over (see the script). It reports
 // whether the run exists.
-func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string, token string) (bool, error) {
+func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, token string) (bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
@@ -1833,6 +1834,7 @@ func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 		[]string{
 			fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID),
 			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
+			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
 		},
 		[]string{hash, token},
 	).AsInt64()
@@ -1840,7 +1842,7 @@ func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 		return false, fmt.Errorf("error marking a subscription as waiting: %w", err)
 	}
 
-	return set == 1, nil
+	return set != 0, nil
 }
 
 // GetSubscriptionWaiting reads the waiting flag of a subscription without

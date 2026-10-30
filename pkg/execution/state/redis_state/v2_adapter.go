@@ -838,7 +838,7 @@ func (v v2) retryableError(err error) bool {
 
 // SetSubscriptionWaiting marks a subscription of a run as waiting.
 func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string, token string) error {
-	set, err := v.mgr.SetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash, token)
+	set, err := v.mgr.SetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, token)
 	if err != nil {
 		return err
 	}

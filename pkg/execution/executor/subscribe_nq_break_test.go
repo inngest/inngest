@@ -313,3 +313,29 @@ func TestBreakBusyThenIdleSetsTheFlag(t *testing.T) {
 
 	f.requireNothingLost("inbox")
 }
+
+// A late write of a finished timed wait's token must not overwrite the flag of a
+// newer wait: the wake it would name would stop at the finished timer's step
+// and the newer wait would not be woken.
+func TestBreakLateFlagOfAFinishedTimedWait(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+
+	// The timer of the old wait fired; a newer wait set its flag.
+	_, err := f.rs.SaveStep(f.ctx, f.md.ID, "timer1", []byte("null"))
+	require.NoError(t, err)
+	f.begin("inbox").end()
+	newer, ok := f.flag("inbox")
+	require.True(t, ok)
+
+	// The old request now reports its wait, with its timer.
+	wait := r.waitOp()
+	wait.Opts.(map[string]any)["timer"] = "timer1"
+	rc := &mockRunContext{md: f.md}
+	require.NoError(t, f.e.handleGeneratorSubscribeWait(f.ctx, rc, wait, queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}))
+
+	got, ok := f.flag("inbox")
+	require.True(t, ok)
+	require.Equal(t, newer, got)
+}
