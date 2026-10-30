@@ -510,8 +510,9 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 			// Seq is the number of messages the request saw, plus one.
 			Seq int `json:"seq"`
 		} `json:"subscribe"`
+		Busy bool `json:"busy"`
 	}
-	if err := json.Unmarshal(byt, &opts); err != nil || opts.Subscribe.Key == "" {
+	if err := json.Unmarshal(byt, &opts); err != nil || opts.Subscribe.Key == "" || opts.Busy {
 		return nil
 	}
 
@@ -738,4 +739,29 @@ func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.
 	}
 
 	return nil
+}
+
+// markBusySubscriptionWaits tells the waiting reads of a response that the run
+// is not idle: anything beside waits and their timers (a step the function ran
+// or planned) means a message must not queue a discovery under this wait.
+func markBusySubscriptionWaits(ops []*state.GeneratorOpcode) {
+	busy := false
+	for _, op := range ops {
+		if op == nil || op.Op == enums.OpcodeSleep || (op.Op == enums.OpcodeNone && op.ID != "") {
+			continue
+		}
+		busy = true
+	}
+	if !busy {
+		return
+	}
+
+	for _, op := range ops {
+		if op == nil || op.Op != enums.OpcodeNone || op.ID == "" {
+			continue
+		}
+		if opts, ok := op.Opts.(map[string]any); ok {
+			opts["busy"] = true
+		}
+	}
 }

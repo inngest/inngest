@@ -2,6 +2,8 @@ package executor
 
 import (
 	"crypto/rand"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/event"
@@ -136,4 +138,32 @@ func TestNQFlagClearedOnEveryEntry(t *testing.T) {
 	// A delivery now finds no flag.
 	f.deliver("inbox")
 	require.Zero(t, f.accepts("inbox"))
+}
+
+// A response with a planned step beside the waiting op leaves no flag: the run
+// is busy, so a delivery queues no discovery under it. A timer beside the wait
+// does not make the run busy.
+func TestNQPlannedStepBesideTheWaitSetsNoFlag(t *testing.T) {
+	f := newWakeFixture(t, false)
+	r := f.begin("inbox")
+	r.readState()
+	wait := func() *state.GeneratorOpcode {
+		op := r.waitOp()
+		return &op
+	}
+	rc := &mockRunContext{md: f.md, lifecycleItem: queue.Item{Payload: queue.PayloadEdge{}}}
+
+	busy := []*state.GeneratorOpcode{{Op: enums.OpcodeStepPlanned, ID: "p"}, wait()}
+	markBusySubscriptionWaits(busy)
+	require.NoError(t, f.e.handleGeneratorOp(f.ctx, rc, *busy[1], OpcodeGroup{}))
+	_, ok := f.flag("inbox")
+	require.False(t, ok)
+	f.deliver("inbox")
+	require.Zero(t, f.accepts("inbox"))
+
+	timed := []*state.GeneratorOpcode{{Op: enums.OpcodeSleep, ID: "t"}, wait()}
+	markBusySubscriptionWaits(timed)
+	require.NoError(t, f.e.handleGeneratorOp(f.ctx, rc, *timed[1], OpcodeGroup{}))
+	_, ok = f.flag("inbox")
+	require.True(t, ok)
 }

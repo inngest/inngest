@@ -4058,6 +4058,9 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		)
 	}
 
+	// A read that waits sets the flag only when nothing else came with it.
+	markBusySubscriptionWaits(resp.Generator)
+
 	groups := opGroups(resp.Generator)
 
 	// One handling timestamp for the whole response: handlers run
