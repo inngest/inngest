@@ -71,9 +71,7 @@ if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
   -- A duplicate of a lease-held item (a subscription wake) is refused, but the
   -- held item must run again for what the duplicate stands for: mark it, in
   -- this same script, so the dequeue that would remove it sees the mark.
-  local incoming = cjson.decode(queueItem)
-  local incomingData = incoming.data
-  if incomingData ~= nil and incomingData.metadata ~= nil and incomingData.metadata.lease_held_dequeue == true then
+  if string.find(queueItem, "lease_held_dequeue", 1, true) then
     local held = cjson.decode(redis.call("HGET", queueKey, queueID))
     held.wakeDirty = true
     redis.call("HSET", queueKey, queueID, cjson.encode(held))
