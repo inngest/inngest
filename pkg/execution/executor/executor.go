@@ -2168,11 +2168,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 			// A message that won a timed read saved this timer step first.
-			won, err := e.messageWonTimer(ctx, runID, edge.Outgoing)
+			winner, err := e.timerWinner(ctx, runID, edge.Outgoing)
 			if err != nil {
 				return nil, err
 			}
-			if won {
+			if winner != "" {
 				return nil, nil
 			}
 		}

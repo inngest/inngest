@@ -103,12 +103,18 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, ok)
 
+		// Another wake of the same read (its own token) stops: the winner runs.
+		other := wakeItem(f)
+		ok, err = f.e.claimSubscriptionTimer(f.ctx, f.md.ID, other)
+		require.NoError(t, err)
+		require.False(t, ok)
+
 		// The timer saves null, sees the duplicate, and sees the message won.
 		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
 		require.Error(t, err)
-		won, err := f.e.messageWonTimer(f.ctx, f.md.ID, "timer")
+		winner, err := f.e.timerWinner(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
-		require.True(t, won)
+		require.NotEmpty(t, winner)
 	})
 
 	t.Run("TimerWins", func(t *testing.T) {
@@ -124,9 +130,9 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		// A retry of the timer sees its own null, so it carries on.
 		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
 		require.Error(t, err)
-		won, err := f.e.messageWonTimer(f.ctx, f.md.ID, "timer")
+		winner, err := f.e.timerWinner(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
-		require.False(t, won)
+		require.Empty(t, winner)
 	})
 
 	t.Run("MissingMessageClaimsNothing", func(t *testing.T) {
