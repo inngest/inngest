@@ -254,6 +254,16 @@ type SubscriptionWaiter interface {
 	// hash of its key) to a token that is unique to this wait, replacing any
 	// token already there. It returns ErrRunNotFound when the run is gone.
 	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
+	// BufferSubscriptionMessage appends a message to the run's buffer, for a
+	// reader that is not waiting. It reports false when the message is already a
+	// step or already buffered, and ErrSubscriptionBufferFull at the limit.
+	BufferSubscriptionMessage(ctx context.Context, id ID, hash string, stepID string, value []byte, limit int) (added bool, err error)
+	// BufferedSubscriptionMessages reads one subscription's buffered messages in
+	// arrival order.
+	BufferedSubscriptionMessages(ctx context.Context, id ID, hash string) ([]state.BufferedMessage, error)
+	// RemoveBufferedSubscriptionMessages drops messages that were flushed into
+	// step state. Dropping one that is gone is harmless.
+	RemoveBufferedSubscriptionMessages(ctx context.Context, id ID, messages []state.BufferedMessage) error
 	// RegisterSubscriptionTimer records the timer step of a timed read, so it
 	// can be claimed. Registering twice is harmless.
 	RegisterSubscriptionTimer(ctx context.Context, id ID, timer string) error

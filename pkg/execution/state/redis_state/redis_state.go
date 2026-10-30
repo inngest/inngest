@@ -1198,6 +1198,8 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 		fnRunState.kg.SubscriptionWaiting(ctx, isSharded, i.RunID),
 		fnRunState.kg.SubscriptionClaims(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionBuffer(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionBufferIndex(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
@@ -1844,6 +1846,94 @@ func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 	}
 
 	return set != 0, nil
+}
+
+// bufferedSubscriptionMessage is one entry of the buffer.
+type bufferedSubscriptionMessage struct {
+	Hash  string          `json:"h"`
+	ID    string          `json:"i"`
+	Value json.RawMessage `json:"v"`
+}
+
+// BufferSubscriptionMessage appends a message to the run's buffer. It reports
+// false when the message is already a step or buffered.
+func (m shardedMgr) BufferSubscriptionMessage(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, stepID string, value []byte, limit int) (bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BufferSubscriptionMessage"), redis_telemetry.ScopeFnRunState)
+
+	entry, err := json.Marshal(bufferedSubscriptionMessage{Hash: hash, ID: stepID, Value: value})
+	if err != nil {
+		return false, err
+	}
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	res, err := retriableScripts["bufferSubscriptionMessage"].Exec(
+		redis_telemetry.WithScriptName(ctx, "bufferSubscriptionMessage"),
+		r,
+		[]string{
+			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
+			fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID),
+			fnRunState.kg.SubscriptionBufferIndex(ctx, isSharded, runID),
+		},
+		[]string{stepID, string(entry), strconv.Itoa(limit)},
+	).AsInt64()
+	if err != nil {
+		return false, fmt.Errorf("error buffering a subscription message: %w", err)
+	}
+	if res < 0 {
+		return false, state.ErrSubscriptionBufferFull
+	}
+
+	return res == 1, nil
+}
+
+// BufferedSubscriptionMessages reads the buffered messages of one subscription
+// in arrival order.
+func (m shardedMgr) BufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) ([]state.BufferedMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BufferedSubscriptionMessages"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	raw, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Lrange().Key(fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
+	}).AsStrSlice()
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error reading buffered subscription messages: %w", err)
+	}
+
+	var out []state.BufferedMessage
+	for _, entry := range raw {
+		var b bufferedSubscriptionMessage
+		if err := json.Unmarshal([]byte(entry), &b); err != nil {
+			return nil, err
+		}
+		if b.Hash == hash {
+			out = append(out, state.BufferedMessage{ID: b.ID, Value: b.Value, Entry: entry})
+		}
+	}
+
+	return out, nil
+}
+
+// RemoveBufferedSubscriptionMessages drops flushed messages from the buffer.
+// Dropping one that is gone is harmless.
+func (m shardedMgr) RemoveBufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, messages []state.BufferedMessage) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RemoveBufferedSubscriptionMessages"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	for _, msg := range messages {
+		if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+			return client.B().Lrem().Key(fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID)).Count(1).Element(msg.Entry).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("error removing a buffered subscription message: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // RegisterSubscriptionTimer records a timed read's timer, so its timer and the

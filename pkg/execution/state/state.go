@@ -499,3 +499,18 @@ type Input struct {
 	// ScheduledAt is the time the run was due to start.
 	ScheduledAt time.Time
 }
+
+// ErrSubscriptionBufferFull is returned when a subscription's buffer of messages
+// nobody has asked for is full.
+var ErrSubscriptionBufferFull = fmt.Errorf("subscription buffer full")
+
+// BufferedMessage is a message of a step.subscribe subscription that arrived while
+// its reader was not waiting. It becomes a step when the reader asks for it.
+type BufferedMessage struct {
+	// ID is the step ID the message is saved under.
+	ID string
+	// Value is the saved step data.
+	Value []byte
+	// Entry is the buffer entry as stored, to remove it once flushed.
+	Entry string
+}

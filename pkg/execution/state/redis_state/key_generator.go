@@ -34,6 +34,12 @@ type RunStateKeyGenerator interface {
 	// step.subscribe subscription of a run, the token of its waiting flag.
 	SubscriptionWaiting(ctx context.Context, isSharded bool, runID ulid.ULID) string
 
+	// SubscriptionBuffer returns the key of the list of messages a run's
+	// subscriptions received while their readers were not waiting, and
+	// SubscriptionBufferIndex the hash that dedupes them by step ID.
+	SubscriptionBuffer(ctx context.Context, isSharded bool, runID ulid.ULID) string
+	SubscriptionBufferIndex(ctx context.Context, isSharded bool, runID ulid.ULID) string
+
 	// SubscriptionClaims returns the key of the hash that holds, for each timed
 	// step.subscribe read of a run, who claimed it: its timer or a message.
 	SubscriptionClaims(ctx context.Context, isSharded bool, runID ulid.ULID) string
@@ -114,6 +120,14 @@ func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID u
 
 func (s runStateKeyGenerator) SubscriptionWaiting(ctx context.Context, isSharded bool, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:sub-waiting:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
+}
+
+func (s runStateKeyGenerator) SubscriptionBuffer(ctx context.Context, isSharded bool, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:sub-buffer:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
+}
+
+func (s runStateKeyGenerator) SubscriptionBufferIndex(ctx context.Context, isSharded bool, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:sub-bufidx:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
 }
 
 func (s runStateKeyGenerator) SubscriptionClaims(ctx context.Context, isSharded bool, runID ulid.ULID) string {

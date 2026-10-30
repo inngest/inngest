@@ -109,8 +109,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
 	}
 
-	// messages are the subscription's message step IDs in stack order.
+	// messages are the subscription's message step IDs in stack order. A read
+	// of them first flushes what was buffered, so it sees every message.
 	messages := func() ([]string, error) {
+		if err := e.flushSubscription(ctx, md.ID, sub.Key); err != nil {
+			return nil, err
+		}
 		stack, err := e.smv2.LoadStack(ctx, md.ID)
 		if err != nil {
 			return nil, err
@@ -338,6 +342,25 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 			return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, subscriptionClosedID(key))
 		}
 	}
+	// A reader that is not waiting gets the message when it asks for it: until
+	// then it waits in the run's buffer and costs no step. A reader that is
+	// waiting (the flag is set) gets it as a step now, and a wake.
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return err
+	}
+	if _, waiting, err := waiter.GetSubscriptionWaiting(ctx, id, subscriptionKeyHash(key)); err != nil {
+		return err
+	} else if !waiting {
+		_, err := waiter.BufferSubscriptionMessage(ctx, id, subscriptionKeyHash(key), messageID, data, consts.MaxSubscriptionMessages)
+		if errors.Is(err, state.ErrSubscriptionBufferFull) {
+			l.Warn("subscription buffer full, dropping a message", "key", key)
+			return nil
+		}
+
+		return err
+	}
+
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
 	redelivered := err != nil
 	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
@@ -546,6 +569,13 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		return err
 	}
 
+	// Messages that arrived while the function ran wait in the buffer: they
+	// become steps now, after the flag, so one that arrives from here on finds
+	// the flag and is saved by its own delivery.
+	if err := e.flushSubscription(ctx, md.ID, key); err != nil {
+		return err
+	}
+
 	stack, err := e.smv2.LoadStack(ctx, md.ID)
 	if err != nil {
 		return err
@@ -555,6 +585,30 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	}
 
 	return e.wakeSubscription(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, key, gen.ID)
+}
+
+// flushSubscription saves the messages a subscription buffered, in arrival
+// order, as steps of the run. Saving is idempotent, so a flush that stopped
+// halfway is finished by the next one.
+func (e *executor) flushSubscription(ctx context.Context, id sv2.ID, key string) error {
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return err
+	}
+
+	buffered, err := waiter.BufferedSubscriptionMessages(ctx, id, subscriptionKeyHash(key))
+	if err != nil || len(buffered) == 0 {
+		return err
+	}
+
+	for _, msg := range buffered {
+		_, err := e.smv2.SaveStep(ctx, id, msg.ID, msg.Value)
+		if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+			return err
+		}
+	}
+
+	return waiter.RemoveBufferedSubscriptionMessages(ctx, id, buffered)
 }
 
 // wakeSubscription wakes the run if it is waiting on the subscription: it reads

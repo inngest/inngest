@@ -100,6 +100,7 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		register(f, "timer")
 		item := wakeItem(f)
 		f.deliver("inbox")
+		f.flush("inbox")
 
 		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
 		require.NoError(t, err)
@@ -126,6 +127,7 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		f := newWakeFixture(t, false)
 		register(f, "timer")
 		f.deliver("inbox")
+		f.flush("inbox")
 		lost, err := f.e.timerClaimLost(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
 		require.False(t, lost)
@@ -332,6 +334,8 @@ func TestBreakBusyThenIdleSetsTheFlag(t *testing.T) {
 	next := f.begin("inbox")
 	next.end()
 
+	// The message waited in the buffer; the wait flushed it and queued a wake.
+	f.settle("inbox")
 	f.requireNothingLost("inbox")
 }
 

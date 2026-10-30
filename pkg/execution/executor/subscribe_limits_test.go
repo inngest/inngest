@@ -304,3 +304,15 @@ func (s *limitRunService) RegisterSubscriptionTimer(context.Context, sv2.ID, str
 func (s *limitRunService) ClaimSubscriptionTimer(context.Context, sv2.ID, string, string) (string, error) {
 	return "", nil
 }
+
+func (s *limitRunService) BufferSubscriptionMessage(context.Context, sv2.ID, string, string, []byte, int) (bool, error) {
+	return true, nil
+}
+
+func (s *limitRunService) BufferedSubscriptionMessages(context.Context, sv2.ID, string) ([]state.BufferedMessage, error) {
+	return nil, nil
+}
+
+func (s *limitRunService) RemoveBufferedSubscriptionMessages(context.Context, sv2.ID, []state.BufferedMessage) error {
+	return nil
+}

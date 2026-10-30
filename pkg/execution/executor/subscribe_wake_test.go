@@ -177,6 +177,13 @@ func (f *wakeFixture) deliver(key string) {
 	f.delivered[key]++
 }
 
+// flush turns what the subscription buffered into steps, as the reader's next
+// op does.
+func (f *wakeFixture) flush(key string) {
+	f.t.Helper()
+	require.NoError(f.t, f.e.flushSubscription(f.ctx, f.md.ID, key))
+}
+
 func (f *wakeFixture) burst(key string, n int) {
 	for i := 0; i < n; i++ {
 		f.deliver(key)
@@ -829,4 +836,16 @@ func (h *hookedRunService) RegisterSubscriptionTimer(ctx context.Context, id sv2
 
 func (h *hookedRunService) ClaimSubscriptionTimer(ctx context.Context, id sv2.ID, timer string, who string) (string, error) {
 	return h.RunService.(sv2.SubscriptionWaiter).ClaimSubscriptionTimer(ctx, id, timer, who)
+}
+
+func (h *hookedRunService) BufferSubscriptionMessage(ctx context.Context, id sv2.ID, hash string, stepID string, value []byte, limit int) (bool, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).BufferSubscriptionMessage(ctx, id, hash, stepID, value, limit)
+}
+
+func (h *hookedRunService) BufferedSubscriptionMessages(ctx context.Context, id sv2.ID, hash string) ([]state.BufferedMessage, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).BufferedSubscriptionMessages(ctx, id, hash)
+}
+
+func (h *hookedRunService) RemoveBufferedSubscriptionMessages(ctx context.Context, id sv2.ID, messages []state.BufferedMessage) error {
+	return h.RunService.(sv2.SubscriptionWaiter).RemoveBufferedSubscriptionMessages(ctx, id, messages)
 }

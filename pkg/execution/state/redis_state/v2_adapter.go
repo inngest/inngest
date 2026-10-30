@@ -848,6 +848,21 @@ func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string
 	return nil
 }
 
+// BufferSubscriptionMessage buffers a message for a reader that is not waiting.
+func (v v2) BufferSubscriptionMessage(ctx context.Context, id state.ID, hash string, stepID string, value []byte, limit int) (bool, error) {
+	return v.mgr.BufferSubscriptionMessage(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, stepID, value, limit)
+}
+
+// BufferedSubscriptionMessages reads a subscription's buffered messages.
+func (v v2) BufferedSubscriptionMessages(ctx context.Context, id state.ID, hash string) ([]statev1.BufferedMessage, error) {
+	return v.mgr.BufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.RunID, hash)
+}
+
+// RemoveBufferedSubscriptionMessages drops flushed messages from the buffer.
+func (v v2) RemoveBufferedSubscriptionMessages(ctx context.Context, id state.ID, messages []statev1.BufferedMessage) error {
+	return v.mgr.RemoveBufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.RunID, messages)
+}
+
 // RegisterSubscriptionTimer registers the timer of a timed read.
 func (v v2) RegisterSubscriptionTimer(ctx context.Context, id state.ID, timer string) error {
 	return v.mgr.RegisterSubscriptionTimer(ctx, id.Tenant.AccountID, id.RunID, timer)
