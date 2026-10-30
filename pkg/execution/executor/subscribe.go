@@ -594,28 +594,54 @@ func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w su
 		return nil
 	}
 
-	md, err = e.smv2.LoadMetadata(ctx, id)
-	if errors.Is(err, state.ErrRunNotFound) {
+	// The wake item is gone, so an error from here on cannot be left to the
+	// queue: its retry finds no item and is dropped, which would leave the
+	// messages without a wake. Retry in place instead.
+	return retryInPlace(ctx, func() error {
+		md, err := e.smv2.LoadMetadata(ctx, id)
+		if errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) <= w.seen {
+			return nil
+		}
+
+		// The ID is free, so this wakes the run for the messages the old wake missed.
+		next := w.item
+		// The item came out of the queue with its job ID already hashed.
+		jobID := subscriptionWakeJobID(id.RunID.String(), w.hash)
+		next.JobID = &jobID
+		next.GroupID = uuid.New().String()
+		next.Attempt = 0
+		noKey := time.Duration(0)
+		err = e.queue.Enqueue(ctx, next, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
+		if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+			return retryableEnqueueError(err)
+		}
+
 		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if len(subscriptionMessageIDsOfHash(md.Stack, w.hash)) <= w.seen {
-		return nil
+	})
+}
+
+// retryInPlace runs fn up to five times with a short growing pause, returning
+// the last error.
+func retryInPlace(ctx context.Context, fn func() error) error {
+	var err error
+	for attempt := 1; attempt <= 5; attempt++ {
+		if err = fn(); err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
+		}
 	}
 
-	// The ID is free, so this wakes the run for the messages the old wake missed.
-	next := w.item
-	next.GroupID = uuid.New().String()
-	next.Attempt = 0
-	noKey := time.Duration(0)
-	err = e.queue.Enqueue(ctx, next, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
-	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-		return retryableEnqueueError(err)
-	}
-
-	return nil
+	return err
 }
 
 // releaseSubscriptionWake removes the wake's own item, which frees its job ID.
