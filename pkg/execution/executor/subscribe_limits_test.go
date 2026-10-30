@@ -285,8 +285,8 @@ func TestOpenSubscriptionManyStreams(t *testing.T) {
 }
 
 // The limit tests have no flag to keep: the run is always waiting.
-func (s *limitRunService) SetSubscriptionWaiting(context.Context, sv2.ID, string, string) error {
-	return nil
+func (s *limitRunService) SetSubscriptionWaiting(context.Context, sv2.ID, string, string) (string, error) {
+	return "set", nil
 }
 func (s *limitRunService) GetSubscriptionWaiting(context.Context, sv2.ID, string) (string, bool, error) {
 	return "token", true, nil
@@ -305,14 +305,22 @@ func (s *limitRunService) ClaimSubscriptionTimer(context.Context, sv2.ID, string
 	return "", nil
 }
 
-func (s *limitRunService) BufferSubscriptionMessage(context.Context, sv2.ID, string, string, []byte, int) (bool, error) {
-	return true, nil
+func (s *limitRunService) DeliverSubscriptionMessage(context.Context, sv2.ID, string, string, []byte, int) (state.SubscriptionDelivery, error) {
+	return state.SubscriptionDelivery{Kind: "waiting", Token: "token"}, nil
 }
 
 func (s *limitRunService) BufferedSubscriptionMessages(context.Context, sv2.ID, string) ([]state.BufferedMessage, error) {
 	return nil, nil
 }
 
-func (s *limitRunService) RemoveBufferedSubscriptionMessages(context.Context, sv2.ID, []state.BufferedMessage) error {
+func (s *limitRunService) RemoveBufferedSubscriptionMessages(context.Context, sv2.ID, string, []state.BufferedMessage) error {
 	return nil
+}
+
+func (s *limitRunService) CloseSubscription(context.Context, sv2.ID, string) error {
+	return nil
+}
+
+func (m *limitPauseManager) PauseByID(_ context.Context, _ pauses.Index, id uuid.UUID) (*state.Pause, error) {
+	return &state.Pause{ID: id}, nil
 }

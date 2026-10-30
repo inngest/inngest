@@ -1,10 +1,15 @@
 package executor
 
 import (
+	"context"
 	"crypto/rand"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -120,4 +125,69 @@ func TestBufferTwoInboxesFlushSeparately(t *testing.T) {
 
 	require.Equal(t, 2, f.messageSteps("two"))
 	require.Equal(t, 0, f.buffered("two"))
+}
+
+// A listener of three sources owns three pauses (one exact event and its own
+// `if` each), opened by one op, and its stop deletes exactly those three.
+func TestListenerOfThreeSourcesStopsItsOwnThreePauses(t *testing.T) {
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+	md := limitMetadata()
+	rs := &limitRunService{md: md}
+	pm := &limitPauseManager{}
+	e := newLimitExecutor(rs, pm)
+
+	gen, opts := subscribeGen(state.SubscribeOpts{
+		Key:  "inbox",
+		Mode: state.SubscribeOpen,
+		Streams: []state.SubscribeStream{
+			{Stream: 4, Event: "github/pr.review"},
+			{Stream: 5, Event: "github/check_run"},
+		},
+		Stream: 3,
+	}, "inbox:3:open")
+	opts.Event = "github/pr.comment"
+	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), gen, edge, OpcodeGroup{}, opts, nil))
+	require.Len(t, pm.wrote, 3)
+	for i, name := range []string{"github/pr.comment", "github/pr.review", "github/check_run"} {
+		require.Equal(t, name, *pm.wrote[i].Event)
+		require.Equal(t, "inbox", pm.wrote[i].Subscribe.Key, "every source feeds the same inbox")
+	}
+
+	stop, stopOpts := subscribeGen(state.SubscribeOpts{
+		Key:  "inbox",
+		Mode: state.SubscribeStop,
+		Streams: []state.SubscribeStream{
+			{Stream: 4, Event: "github/pr.review"},
+			{Stream: 5, Event: "github/check_run"},
+		},
+		Stream: 3,
+	}, "inbox:3:stop")
+	stopOpts.Event = "github/pr.comment"
+	require.NoError(t, e.handleGeneratorSubscribe(context.Background(), openCtx(md), stop, edge, OpcodeGroup{}, stopOpts, nil))
+
+	want := []uuid.UUID{
+		subscriptionPauseID(md.ID.RunID.String(), "inbox", 3),
+		subscriptionPauseID(md.ID.RunID.String(), "inbox", 4),
+		subscriptionPauseID(md.ID.RunID.String(), "inbox", 5),
+	}
+	require.Equal(t, want, pm.deleted, "only the listener's own pauses go, not the inbox's others")
+}
+
+// An event that matches two sources of one inbox is one message: the second
+// delivery of it is a duplicate.
+func TestEventMatchingTwoSourcesIsStoredOnce(t *testing.T) {
+	f := newWakeFixture(t, false)
+	name := "agent/message"
+	evt := event.InternalEvent{ID: ulid.MustNew(7, rand.Reader), Event: event.Event{Name: name}}
+
+	first := f.pause("inbox")
+	first.Subscribe.Stream = 1
+	second := f.pause("inbox")
+	second.Subscribe.Stream = 2
+	require.NoError(t, f.e.deliverSubscription(f.ctx, evt, first, logger.VoidLogger()))
+	require.NoError(t, f.e.deliverSubscription(f.ctx, evt, second, logger.VoidLogger()))
+
+	require.Equal(t, 1, f.buffered("inbox"))
+	f.flush("inbox")
+	require.Equal(t, 1, f.messageSteps("inbox"))
 }

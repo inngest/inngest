@@ -63,12 +63,12 @@ type hookedRunService struct {
 	lostClearReply bool
 }
 
-func (h *hookedRunService) SetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string, token string) error {
-	err := h.RunService.(sv2.SubscriptionWaiter).SetSubscriptionWaiting(ctx, id, hash, token)
+func (h *hookedRunService) SetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string, token string) (string, error) {
+	res, err := h.RunService.(sv2.SubscriptionWaiter).SetSubscriptionWaiting(ctx, id, hash, token)
 	if h.afterSet != nil {
 		h.afterSet()
 	}
-	return err
+	return res, err
 }
 
 func (h *hookedRunService) GetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string) (string, bool, error) {
@@ -647,7 +647,7 @@ func TestWakeOfARunThatEnded(t *testing.T) {
 	require.NotEmpty(t, f.mr.Keys())
 	flagKeys := func() (n int) {
 		for _, k := range f.mr.Keys() {
-			if strings.Contains(k, "sub-waiting") {
+			if strings.Contains(k, ":subs:") {
 				n++
 			}
 		}
@@ -838,14 +838,18 @@ func (h *hookedRunService) ClaimSubscriptionTimer(ctx context.Context, id sv2.ID
 	return h.RunService.(sv2.SubscriptionWaiter).ClaimSubscriptionTimer(ctx, id, timer, who)
 }
 
-func (h *hookedRunService) BufferSubscriptionMessage(ctx context.Context, id sv2.ID, hash string, stepID string, value []byte, limit int) (bool, error) {
-	return h.RunService.(sv2.SubscriptionWaiter).BufferSubscriptionMessage(ctx, id, hash, stepID, value, limit)
+func (h *hookedRunService) DeliverSubscriptionMessage(ctx context.Context, id sv2.ID, hash string, stepID string, value []byte, limit int) (state.SubscriptionDelivery, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).DeliverSubscriptionMessage(ctx, id, hash, stepID, value, limit)
 }
 
 func (h *hookedRunService) BufferedSubscriptionMessages(ctx context.Context, id sv2.ID, hash string) ([]state.BufferedMessage, error) {
 	return h.RunService.(sv2.SubscriptionWaiter).BufferedSubscriptionMessages(ctx, id, hash)
 }
 
-func (h *hookedRunService) RemoveBufferedSubscriptionMessages(ctx context.Context, id sv2.ID, messages []state.BufferedMessage) error {
-	return h.RunService.(sv2.SubscriptionWaiter).RemoveBufferedSubscriptionMessages(ctx, id, messages)
+func (h *hookedRunService) RemoveBufferedSubscriptionMessages(ctx context.Context, id sv2.ID, hash string, messages []state.BufferedMessage) error {
+	return h.RunService.(sv2.SubscriptionWaiter).RemoveBufferedSubscriptionMessages(ctx, id, hash, messages)
+}
+
+func (h *hookedRunService) CloseSubscription(ctx context.Context, id sv2.ID, hash string) error {
+	return h.RunService.(sv2.SubscriptionWaiter).CloseSubscription(ctx, id, hash)
 }

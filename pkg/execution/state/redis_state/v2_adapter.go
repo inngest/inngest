@@ -836,31 +836,29 @@ func (v v2) retryableError(err error) bool {
 	return true
 }
 
-// SetSubscriptionWaiting marks a subscription of a run as waiting.
-func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string, token string) error {
-	set, err := v.mgr.SetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, token)
-	if err != nil {
-		return err
-	}
-	if !set {
-		return state.ErrRunNotFound
-	}
-	return nil
+// SetSubscriptionWaiting marks an inbox as waiting, and reports what it did.
+func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string, token string) (string, error) {
+	return v.mgr.SetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, token)
 }
 
-// BufferSubscriptionMessage buffers a message for a reader that is not waiting.
-func (v v2) BufferSubscriptionMessage(ctx context.Context, id state.ID, hash string, stepID string, value []byte, limit int) (bool, error) {
-	return v.mgr.BufferSubscriptionMessage(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, stepID, value, limit)
+// DeliverSubscriptionMessage decides what a delivered message does.
+func (v v2) DeliverSubscriptionMessage(ctx context.Context, id state.ID, hash string, stepID string, value []byte, limit int) (statev1.SubscriptionDelivery, error) {
+	return v.mgr.DeliverSubscriptionMessage(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, stepID, value, limit)
 }
 
-// BufferedSubscriptionMessages reads a subscription's buffered messages.
+// BufferedSubscriptionMessages reads an inbox's buffered messages.
 func (v v2) BufferedSubscriptionMessages(ctx context.Context, id state.ID, hash string) ([]statev1.BufferedMessage, error) {
-	return v.mgr.BufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.RunID, hash)
+	return v.mgr.BufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash)
 }
 
-// RemoveBufferedSubscriptionMessages drops flushed messages from the buffer.
-func (v v2) RemoveBufferedSubscriptionMessages(ctx context.Context, id state.ID, messages []statev1.BufferedMessage) error {
-	return v.mgr.RemoveBufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.RunID, messages)
+// RemoveBufferedSubscriptionMessages drops flushed messages from an inbox's buffer.
+func (v v2) RemoveBufferedSubscriptionMessages(ctx context.Context, id state.ID, hash string, messages []statev1.BufferedMessage) error {
+	return v.mgr.RemoveBufferedSubscriptionMessages(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash, messages)
+}
+
+// CloseSubscription marks an inbox closed.
+func (v v2) CloseSubscription(ctx context.Context, id state.ID, hash string) error {
+	return v.mgr.CloseSubscription(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash)
 }
 
 // RegisterSubscriptionTimer registers the timer of a timed read.
@@ -875,15 +873,15 @@ func (v v2) ClaimSubscriptionTimer(ctx context.Context, id state.ID, timer strin
 
 // GetSubscriptionWaiting reads the waiting flag of a subscription.
 func (v v2) GetSubscriptionWaiting(ctx context.Context, id state.ID, hash string) (string, bool, error) {
-	return v.mgr.GetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash)
+	return v.mgr.GetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash)
 }
 
 // ClearSubscriptionWaitingFor clears the flag of one subscription.
 func (v v2) ClearSubscriptionWaitingFor(ctx context.Context, id state.ID, hash string) error {
-	return v.mgr.ClearSubscriptionWaitingFor(ctx, id.Tenant.AccountID, id.RunID, hash)
+	return v.mgr.ClearSubscriptionWaitingFor(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, hash)
 }
 
 // ClearSubscriptionWaiting clears the waiting flags of every subscription of a run.
 func (v v2) ClearSubscriptionWaiting(ctx context.Context, id state.ID) error {
-	return v.mgr.ClearSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID)
+	return v.mgr.ClearSubscriptionWaiting(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }

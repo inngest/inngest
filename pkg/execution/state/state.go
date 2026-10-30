@@ -511,6 +511,12 @@ type BufferedMessage struct {
 	ID string
 	// Value is the saved step data.
 	Value []byte
-	// Entry is the buffer entry as stored, to remove it once flushed.
-	Entry string
+}
+
+// SubscriptionDelivery is what delivering a message to an inbox decided.
+type SubscriptionDelivery struct {
+	// Kind is "closed", "waiting", "dup", "full" or "buffered".
+	Kind string
+	// Token is the token of the waiting read, for Kind "waiting".
+	Token string
 }

@@ -220,8 +220,15 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"count": len(ids)})
 
 	case state.SubscribeStop:
+		// A listener of several sources stops them with one op. The inbox's
+		// buffer and its other sources are untouched.
 		if err := deleteStream(); err != nil {
 			return err
+		}
+		for _, extra := range sub.Streams {
+			if err := deleteStreamOf(pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: extra.Event}, subscriptionPauseID(runID, sub.Key, extra.Stream)); err != nil {
+				return err
+			}
 		}
 
 		return answer(map[string]any{"stopped": true})
@@ -241,6 +248,13 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		ids, err := messages()
 		if err != nil {
+			return err
+		}
+		w, err := e.subscriptionWaiter()
+		if err != nil {
+			return err
+		}
+		if err := w.CloseSubscription(ctx, md.ID, subscriptionKeyHash(sub.Key)); err != nil {
 			return err
 		}
 		return answer(map[string]any{"count": len(ids)})
@@ -344,13 +358,30 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		if err := e.endSubscription(ctx, id, key, reason); err != nil {
 			return err
 		}
+		// The close replaces the inbox's waiting flag, so the wake that shows a
+		// waiting read the close is queued under the token read before it.
+		w, err := e.subscriptionWaiter()
+		if err != nil {
+			return err
+		}
+		token, waiting, err := w.GetSubscriptionWaiting(ctx, id, subscriptionKeyHash(key))
+		if err != nil {
+			return err
+		}
+		if err := w.CloseSubscription(ctx, id, subscriptionKeyHash(key)); err != nil {
+			return err
+		}
 		idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
 		if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
 			return err
 		}
 
 		// A read waiting for a message that will not come sees the close.
-		return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, subscriptionClosedID(key))
+		if !waiting {
+			return nil
+		}
+
+		return e.enqueueSubscriptionWake(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), subscriptionKeyHash(key), token, subscriptionClosedID(key))
 	}
 	if !slices.Contains(md.Stack, messageID) {
 		stepLimit, stateLimit := e.subscriptionLimits(id)
@@ -365,16 +396,17 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	if err != nil {
 		return err
 	}
-	if _, waiting, err := waiter.GetSubscriptionWaiting(ctx, id, subscriptionKeyHash(key)); err != nil {
+	// One atomic decision on this inbox's own state: buffer it, or find it waiting.
+	delivery, err := waiter.DeliverSubscriptionMessage(ctx, id, subscriptionKeyHash(key), messageID, data, consts.MaxSubscriptionMessages)
+	if err != nil {
 		return err
-	} else if !waiting {
-		_, err := waiter.BufferSubscriptionMessage(ctx, id, subscriptionKeyHash(key), messageID, data, consts.MaxSubscriptionMessages)
-		if errors.Is(err, state.ErrSubscriptionBufferFull) {
-			// The messages nobody asked for reached the subscription's limit.
-			return closeForLimit(fmt.Sprintf("the subscription saved %d messages", consts.MaxSubscriptionMessages))
-		}
-
-		return err
+	}
+	switch delivery.Kind {
+	case "closed", "dup", "buffered":
+		return nil
+	case "full":
+		// The messages nobody asked for reached the subscription's limit.
+		return closeForLimit(fmt.Sprintf("the subscription saved %d messages", consts.MaxSubscriptionMessages))
 	}
 
 	_, err = e.smv2.SaveStep(ctx, id, messageID, data)
@@ -578,18 +610,29 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 			return err
 		}
 	}
-	if err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token); err != nil {
+
+	// Messages that arrived while the function ran wait in this inbox's buffer:
+	// they become steps first, since an inbox never waits with a buffer. One that
+	// arrives between the flush and the flag makes the flag refuse; flush again.
+	for {
+		if err := e.flushSubscription(ctx, md.ID, key); err != nil {
+			return err
+		}
+		result, err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token)
 		if errors.Is(err, state.ErrRunNotFound) {
 			return nil
 		}
-		return err
-	}
-
-	// Messages that arrived while the function ran wait in the buffer: they
-	// become steps now, after the flag, so one that arrives from here on finds
-	// the flag and is saved by its own delivery.
-	if err := e.flushSubscription(ctx, md.ID, key); err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+		if result == "buffered" {
+			continue
+		}
+		if result != "set" {
+			// The wait is over, or the inbox is closed: nothing waits.
+			return nil
+		}
+		break
 	}
 
 	stack, err := e.smv2.LoadStack(ctx, md.ID)
@@ -624,7 +667,7 @@ func (e *executor) flushSubscription(ctx context.Context, id sv2.ID, key string)
 		}
 	}
 
-	return waiter.RemoveBufferedSubscriptionMessages(ctx, id, buffered)
+	return waiter.RemoveBufferedSubscriptionMessages(ctx, id, subscriptionKeyHash(key), buffered)
 }
 
 // wakeSubscription wakes the run if it is waiting on the subscription: it reads

@@ -250,20 +250,25 @@ var (
 // message and nothing is running for it. A store that holds a run's state
 // implements it as three atomic operations on that run.
 type SubscriptionWaiter interface {
-	// SetSubscriptionWaiting sets the flag of the subscription (identified by a
-	// hash of its key) to a token that is unique to this wait, replacing any
-	// token already there. It returns ErrRunNotFound when the run is gone.
-	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
-	// BufferSubscriptionMessage appends a message to the run's buffer, for a
-	// reader that is not waiting. It reports false when the message is already a
-	// step or already buffered, and ErrSubscriptionBufferFull at the limit.
-	BufferSubscriptionMessage(ctx context.Context, id ID, hash string, stepID string, value []byte, limit int) (added bool, err error)
-	// BufferedSubscriptionMessages reads one subscription's buffered messages in
+	// SetSubscriptionWaiting marks the inbox (identified by a hash of its key) as
+	// waiting for a token that is unique to this wait. It does nothing, and says
+	// so, when the wait is already over ("over"), messages are buffered for the
+	// inbox ("buffered": flush them first) or it is closed ("closed"); otherwise
+	// it returns "set". ErrRunNotFound when the run is gone.
+	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) (result string, err error)
+	// DeliverSubscriptionMessage atomically decides what a delivered message
+	// does. Kind is "closed" (dropped), "waiting" (the inbox is waiting under
+	// Token: save the message as a step and wake the run), "dup" (already a step
+	// or buffered), "full" (the buffer is at the limit) or "buffered".
+	DeliverSubscriptionMessage(ctx context.Context, id ID, hash string, stepID string, value []byte, limit int) (state.SubscriptionDelivery, error)
+	// BufferedSubscriptionMessages reads one inbox's buffered messages in
 	// arrival order.
 	BufferedSubscriptionMessages(ctx context.Context, id ID, hash string) ([]state.BufferedMessage, error)
 	// RemoveBufferedSubscriptionMessages drops messages that were flushed into
-	// step state. Dropping one that is gone is harmless.
-	RemoveBufferedSubscriptionMessages(ctx context.Context, id ID, messages []state.BufferedMessage) error
+	// step state from one inbox's buffer. Dropping one that is gone is harmless.
+	RemoveBufferedSubscriptionMessages(ctx context.Context, id ID, hash string, messages []state.BufferedMessage) error
+	// CloseSubscription marks the inbox closed: later deliveries are dropped.
+	CloseSubscription(ctx context.Context, id ID, hash string) error
 	// RegisterSubscriptionTimer records the timer step of a timed read, so it
 	// can be claimed. Registering twice is harmless.
 	RegisterSubscriptionTimer(ctx context.Context, id ID, timer string) error
@@ -271,11 +276,12 @@ type SubscriptionWaiter interface {
 	// timer itself or a wake) unless it is claimed, and returns the holder. The
 	// holder is empty when the timer is not registered. No step is saved.
 	ClaimSubscriptionTimer(ctx context.Context, id ID, timer string, who string) (holder string, err error)
-	// GetSubscriptionWaiting reads the flag without changing it.
+	// GetSubscriptionWaiting reads the token of the inbox's waiting read.
 	GetSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
-	// ClearSubscriptionWaitingFor clears the flag of one subscription, whatever
-	// token it holds. A missing flag is not an error.
+	// ClearSubscriptionWaitingFor clears the waiting flag of one inbox, whatever
+	// token it holds, and leaves its buffer or close alone. A missing flag is not
+	// an error.
 	ClearSubscriptionWaitingFor(ctx context.Context, id ID, hash string) error
-	// ClearSubscriptionWaiting clears the flags of every subscription of the run.
+	// ClearSubscriptionWaiting clears the waiting flags of every inbox of the run.
 	ClearSubscriptionWaiting(ctx context.Context, id ID) error
 }

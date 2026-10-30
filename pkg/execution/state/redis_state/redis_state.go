@@ -1196,10 +1196,8 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
-		fnRunState.kg.SubscriptionWaiting(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionState(ctx, isSharded, i.RunID),
 		fnRunState.kg.SubscriptionClaims(ctx, isSharded, i.RunID),
-		fnRunState.kg.SubscriptionBuffer(ctx, isSharded, i.RunID),
-		fnRunState.kg.SubscriptionBufferIndex(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
@@ -1823,117 +1821,132 @@ func StrSlice(args []any) ([]string, error) {
 	return res, nil
 }
 
-// SetSubscriptionWaiting marks a subscription of a run as waiting, unless the
-// wait is already over (see the script). It reports
-// whether the run exists.
-func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, token string) (bool, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
+// subscriptionState runs one op of the subscription state script on the field of
+// one inbox. See lua/subscriptionState.lua for the states and ops.
+func (m shardedMgr) subscriptionState(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, args ...string) (rueidis.RedisMessage, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SubscriptionState"), redis_telemetry.ScopeFnRunState)
 
 	fnRunState := m.s.FunctionRunState()
 	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	set, err := retriableScripts["setSubscriptionWaiting"].Exec(
-		redis_telemetry.WithScriptName(ctx, "setSubscriptionWaiting"),
+
+	return retriableScripts["subscriptionState"].Exec(
+		redis_telemetry.WithScriptName(ctx, "subscriptionState"),
 		r,
 		[]string{
-			fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID),
+			fnRunState.kg.SubscriptionState(ctx, isSharded, runID),
+			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
 			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
 			fnRunState.kg.SubscriptionClaims(ctx, isSharded, runID),
 		},
-		[]string{hash, token},
-	).AsInt64()
-	if err != nil {
-		return false, fmt.Errorf("error marking a subscription as waiting: %w", err)
-	}
-
-	return set != 0, nil
+		append([]string{args[0], hash}, args[1:]...),
+	).ToMessage()
 }
 
-// bufferedSubscriptionMessage is one entry of the buffer.
-type bufferedSubscriptionMessage struct {
-	Hash  string          `json:"h"`
-	ID    string          `json:"i"`
-	Value json.RawMessage `json:"v"`
+func (m shardedMgr) subscriptionStrings(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, args ...string) ([]string, error) {
+	msg, err := m.subscriptionState(ctx, accountID, fnID, runID, hash, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error reading a subscription's state: %w", err)
+	}
+
+	switch {
+	case msg.IsArray():
+		return msg.AsStrSlice()
+	case msg.IsInt64():
+		n, err := msg.AsInt64()
+
+		return []string{strconv.FormatInt(n, 10)}, err
+	default:
+		str, err := msg.ToString()
+
+		return []string{str}, err
+	}
 }
 
-// BufferSubscriptionMessage appends a message to the run's buffer. It reports
-// false when the message is already a step or buffered.
-func (m shardedMgr) BufferSubscriptionMessage(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, stepID string, value []byte, limit int) (bool, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BufferSubscriptionMessage"), redis_telemetry.ScopeFnRunState)
+// SubscriptionWaitResult is what reporting a waiting read did.
+const (
+	SubscriptionWaitSet      = "set"
+	SubscriptionWaitOver     = "over"
+	SubscriptionWaitBuffered = "buffered"
+	SubscriptionWaitClosed   = "closed"
+)
 
-	entry, err := json.Marshal(bufferedSubscriptionMessage{Hash: hash, ID: stepID, Value: value})
+// SetSubscriptionWaiting marks the inbox as waiting, unless the wait is already
+// over, messages are buffered for it (they are flushed, not waited for) or it is
+// closed. It returns what it did, and ErrRunNotFound when the run is gone.
+func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, token string) (string, error) {
+	res, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, "wait", token)
 	if err != nil {
-		return false, err
+		return "", err
+	}
+	if len(res) == 0 || res[0] == "norun" {
+		return "", state.ErrRunNotFound
 	}
 
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	res, err := retriableScripts["bufferSubscriptionMessage"].Exec(
-		redis_telemetry.WithScriptName(ctx, "bufferSubscriptionMessage"),
-		r,
-		[]string{
-			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
-			fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID),
-			fnRunState.kg.SubscriptionBufferIndex(ctx, isSharded, runID),
-		},
-		[]string{stepID, string(entry), strconv.Itoa(limit)},
-	).AsInt64()
-	if err != nil {
-		return false, fmt.Errorf("error buffering a subscription message: %w", err)
-	}
-	if res < 0 {
-		return false, state.ErrSubscriptionBufferFull
-	}
-
-	return res == 1, nil
+	return res[0], nil
 }
 
-// BufferedSubscriptionMessages reads the buffered messages of one subscription
-// in arrival order.
-func (m shardedMgr) BufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) ([]state.BufferedMessage, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BufferedSubscriptionMessages"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	raw, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Lrange().Key(fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID)).Start(0).Stop(-1).Build()
-	}).AsStrSlice()
-	if rueidis.IsRedisNil(err) {
-		return nil, nil
-	}
+// DeliverSubscriptionMessage decides what a delivered message does: it is
+// buffered for an inbox that is not waiting, and for a waiting one it reports the
+// token of the wait so the caller saves it as a step and wakes the run.
+func (m shardedMgr) DeliverSubscriptionMessage(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, stepID string, value []byte, limit int) (state.SubscriptionDelivery, error) {
+	res, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, "deliver", stepID, string(value), strconv.Itoa(limit))
 	if err != nil {
-		return nil, fmt.Errorf("error reading buffered subscription messages: %w", err)
+		return state.SubscriptionDelivery{}, err
 	}
-
-	var out []state.BufferedMessage
-	for _, entry := range raw {
-		var b bufferedSubscriptionMessage
-		if err := json.Unmarshal([]byte(entry), &b); err != nil {
-			return nil, err
-		}
-		if b.Hash == hash {
-			out = append(out, state.BufferedMessage{ID: b.ID, Value: b.Value, Entry: entry})
-		}
+	if len(res) == 0 {
+		return state.SubscriptionDelivery{}, errors.New("empty subscription delivery result")
+	}
+	out := state.SubscriptionDelivery{Kind: res[0]}
+	if len(res) > 1 {
+		out.Token = res[1]
 	}
 
 	return out, nil
 }
 
-// RemoveBufferedSubscriptionMessages drops flushed messages from the buffer.
-// Dropping one that is gone is harmless.
-func (m shardedMgr) RemoveBufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, messages []state.BufferedMessage) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RemoveBufferedSubscriptionMessages"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	for _, msg := range messages {
-		if err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Lrem().Key(fnRunState.kg.SubscriptionBuffer(ctx, isSharded, runID)).Count(1).Element(msg.Entry).Build()
-		}).Error(); err != nil {
-			return fmt.Errorf("error removing a buffered subscription message: %w", err)
-		}
+// BufferedSubscriptionMessages reads an inbox's buffered messages in arrival
+// order.
+func (m shardedMgr) BufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string) ([]state.BufferedMessage, error) {
+	res, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, "list")
+	if err != nil {
+		return nil, err
+	}
+	if len(res) == 0 || res[0] == "" {
+		return nil, nil
 	}
 
-	return nil
+	var entries []struct {
+		ID    string `json:"i"`
+		Value string `json:"v"`
+	}
+	if err := json.Unmarshal([]byte(res[0]), &entries); err != nil {
+		return nil, err
+	}
+	out := make([]state.BufferedMessage, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, state.BufferedMessage{ID: e.ID, Value: []byte(e.Value)})
+	}
+
+	return out, nil
+}
+
+// RemoveBufferedSubscriptionMessages drops flushed messages from an inbox's
+// buffer. Dropping one that is gone is harmless.
+func (m shardedMgr) RemoveBufferedSubscriptionMessages(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string, messages []state.BufferedMessage) error {
+	args := []string{"ack"}
+	for _, msg := range messages {
+		args = append(args, msg.ID)
+	}
+	_, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, args...)
+
+	return err
+}
+
+// CloseSubscription marks the inbox closed: later deliveries are dropped.
+func (m shardedMgr) CloseSubscription(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string) error {
+	_, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, "close")
+
+	return err
 }
 
 // RegisterSubscriptionTimer records a timed read's timer, so its timer and the
@@ -1972,50 +1985,33 @@ func (m shardedMgr) claimSubscriptionTimer(ctx context.Context, accountID uuid.U
 	return "", nil
 }
 
-// GetSubscriptionWaiting reads the waiting flag of a subscription without
-// changing it. The flag was not set when ok is false.
-func (m shardedMgr) GetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) (token string, ok bool, err error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "GetSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	token, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hget().Key(fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)).Field(hash).Build()
-	}).ToString()
-	if rueidis.IsRedisNil(err) {
-		return "", false, nil
-	}
+// GetSubscriptionWaiting reads the token of the inbox's waiting read. It is not
+// waiting when ok is false.
+func (m shardedMgr) GetSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string) (token string, ok bool, err error) {
+	msg, err := m.subscriptionState(ctx, accountID, fnID, runID, hash, "get")
 	if err != nil {
 		return "", false, fmt.Errorf("error reading a subscription's waiting flag: %w", err)
 	}
-
-	return token, true, nil
-}
-
-// ClearSubscriptionWaitingFor clears the waiting flag of one subscription,
-// whatever token it holds. Clearing twice is harmless.
-func (m shardedMgr) ClearSubscriptionWaitingFor(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, hash string) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClearSubscriptionWaitingFor"), redis_telemetry.ScopeFnRunState)
-
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hdel().Key(fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)).Field(hash).Build()
-	}).Error()
+	token, err = msg.ToString()
 	if err != nil {
-		return fmt.Errorf("error clearing a subscription's waiting flag: %w", err)
+		return "", false, err
 	}
 
-	return nil
+	return token, token != "", nil
 }
 
-// ClearSubscriptionWaiting clears the waiting flags of every subscription of a run.
-func (m shardedMgr) ClearSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, runID ulid.ULID) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClearSubscriptionWaiting"), redis_telemetry.ScopeFnRunState)
+// ClearSubscriptionWaitingFor clears the waiting flag of one inbox, whatever
+// token it holds, and leaves its buffer or close alone. Clearing twice is
+// harmless.
+func (m shardedMgr) ClearSubscriptionWaitingFor(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, hash string) error {
+	_, err := m.subscriptionStrings(ctx, accountID, fnID, runID, hash, "clear")
 
-	fnRunState := m.s.FunctionRunState()
-	r, isSharded := fnRunState.Client(ctx, accountID, runID)
-	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Del().Key(fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID)).Build()
-	}).Error()
+	return err
+}
+
+// ClearSubscriptionWaiting clears the waiting flags of every inbox of a run.
+func (m shardedMgr) ClearSubscriptionWaiting(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) error {
+	_, err := m.subscriptionStrings(ctx, accountID, fnID, runID, "", "clearall")
+
+	return err
 }
