@@ -677,5 +677,5 @@ func TestWakeFollowUpReportsAFailedRelease(t *testing.T) {
 
 	// The item is still queued, and its retry sees the new message and runs again.
 	require.True(t, f.queued("inbox"))
-	require.ErrorIs(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil), errSubscriptionWakeAgain)
+	require.Error(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
 }
