@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -527,7 +528,7 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	md := runCtx.Metadata()
 	key := opts.Subscribe.Key
 	hash := subscriptionKeyHash(key)
-	token := subscriptionWaitToken(opts.Timer)
+	token := subscriptionWaitToken(opts.Timer, opts.Subscribe.Seq)
 	if err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token); err != nil {
 		if errors.Is(err, state.ErrRunNotFound) {
 			return nil
@@ -792,21 +793,31 @@ func isParkingOp(op *state.GeneratorOpcode) bool {
 // nothing, so a message and its timer never both run what follows the read.
 var subscriptionMessageWon = []byte(`"subscription-message"`)
 
-// subscriptionWaitToken is the token of one wait: unique, and ending in the ID of
-// the read's timer step when the read has one.
-func subscriptionWaitToken(timer string) string {
+// subscriptionWaitToken is the token of one wait: unique, and for a timed read
+// followed by the ID of the read's timer step and the number of the message the
+// read waits for.
+func subscriptionWaitToken(timer string, seq int) string {
 	token := uuid.NewString()
 	if timer == "" {
 		return token
 	}
 
-	return token + "." + timer
+	return fmt.Sprintf("%s.%s.%d", token, timer, seq)
 }
 
-// subscriptionTimerOfToken is the timer step ID a wait token ends in.
-func subscriptionTimerOfToken(token string) string {
-	_, timer, _ := strings.Cut(token, ".")
-	return timer
+// subscriptionTimerOfToken is the timer step ID and awaited message number a
+// wait token carries, empty for an untimed read.
+func subscriptionTimerOfToken(token string) (timer string, seq int) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", 0
+	}
+	seq, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", 0
+	}
+
+	return parts[1], seq
 }
 
 // markSubscriptionTimers tells each waiting read of a response which sleep is
@@ -849,19 +860,29 @@ func (e *executor) messageWonTimer(ctx context.Context, id sv2.ID, stepID string
 }
 
 // claimSubscriptionTimer runs for a wake before it does anything else. For a
-// timed read the wake claims the wait by saving the timer's step as won. It
-// returns false when the timer got there first: the timer's request runs the
+// timed read the wake claims the wait by saving the timer's step as won, but
+// only when the message the read waits for is saved: a wake for an earlier
+// message (a redelivery) or a close would otherwise end the read as a timeout.
+// It returns false when the timer got there first: the timer's request runs the
 // function, so this one must not. A rerun of the same wake finds its own mark
 // and carries on.
 func (e *executor) claimSubscriptionTimer(ctx context.Context, id sv2.ID, item queue.Item) (bool, error) {
 	v, _ := item.Metadata[subscriptionWakeMetaKey].(string)
-	_, token, ok := parseSubscriptionWakeMeta(v)
-	timer := subscriptionTimerOfToken(token)
+	hash, token, ok := parseSubscriptionWakeMeta(v)
+	timer, seq := subscriptionTimerOfToken(token)
 	if !ok || timer == "" {
 		return true, nil
 	}
 
-	_, err := e.smv2.SaveStep(ctx, id, timer, subscriptionMessageWon)
+	stack, err := e.smv2.LoadStack(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if len(subscriptionMessageIDsOfHash(stack, hash)) < seq {
+		return true, nil
+	}
+
+	_, err = e.smv2.SaveStep(ctx, id, timer, subscriptionMessageWon)
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		return e.messageWonTimer(ctx, id, timer)
 	}

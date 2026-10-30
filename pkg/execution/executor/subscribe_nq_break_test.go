@@ -85,13 +85,14 @@ func TestBreakWaitBesideAnAsyncWaitIsStillWakeable(t *testing.T) {
 // sees the duplicate and runs nothing.
 func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 	wakeItem := func(f *wakeFixture) queue.Item {
-		token := subscriptionWaitToken("timer")
+		token := subscriptionWaitToken("timer", 1)
 		return queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), token)}}
 	}
 
 	t.Run("MessageWins", func(t *testing.T) {
 		f := newWakeFixture(t, false)
 		item := wakeItem(f)
+		f.deliver("inbox")
 
 		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
 		require.NoError(t, err)
@@ -112,6 +113,7 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 
 	t.Run("TimerWins", func(t *testing.T) {
 		f := newWakeFixture(t, false)
+		f.deliver("inbox")
 		_, err := f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
 		require.NoError(t, err)
 
@@ -127,9 +129,21 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		require.False(t, won)
 	})
 
+	t.Run("MissingMessageClaimsNothing", func(t *testing.T) {
+		f := newWakeFixture(t, false)
+
+		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, wakeItem(f))
+		require.NoError(t, err)
+		require.True(t, ok)
+
+		// The timer step is still free for the timer to save.
+		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		require.NoError(t, err)
+	})
+
 	t.Run("UntimedWakeAlwaysRuns", func(t *testing.T) {
 		f := newWakeFixture(t, false)
-		item := queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), subscriptionWaitToken(""))}}
+		item := queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), subscriptionWaitToken("", 0))}}
 		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, item)
 		require.NoError(t, err)
 		require.True(t, ok)
