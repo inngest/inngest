@@ -1546,7 +1546,7 @@ func TestConstraintEnforcement(t *testing.T) {
 				},
 			}
 
-			_, _, _, fingerprint, err := buildRequestState(acquireReq)
+			_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 			require.NoError(t, err)
 
 			deps.acquireIdempotencyKey = fmt.Sprintf("acquire-%s", fingerprint)

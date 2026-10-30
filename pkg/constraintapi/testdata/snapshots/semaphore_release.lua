@@ -22,7 +22,7 @@ end
 local tracked = redis.call("EXISTS", keyUsage .. ":ownership") == 1
 if tracked then
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0
-	if tracked and usage == 0 then return 0 end
+	if usage == 0 then return 0 end
 	return -1
 end
 local existing = redis.call("GET", keyIdempotency)

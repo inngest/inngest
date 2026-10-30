@@ -146,28 +146,21 @@ for index, c in ipairs(constraints) do
 		call("ZREM", c.c.ilk, currentLeaseID)
 		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
-		-- semaphore: decrement for auto-release, or when force-released by the scavenger
-		if c.sem.rel == 0 or forceReleaseSemaphores then
+		if c.sem.rel == 1 and requestDetails.mso then
+			-- Expiry ends an attempt, not the run. Retain its admission so a
+			-- crashed start can retry; only finalization consumes this hold.
+			if manualHolds[index] > 0 then
+				call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
+			end
+		elseif c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w
 			if not weight or weight <= 0 then
 				weight = 1
 			end
-			local releaseWeight = toInteger(weight)
-			if c.sem.rel == 1 and requestDetails.mso then
-				local ownerKey = c.sem.k .. ":owner:" .. runID
-				local held = manualHolds[index]
-				releaseWeight = held
-				if held > 0 then
-					call("SET", ownerKey, "0:", "EX", 604800)
-				end
-			end
-			local newVal = call("DECRBY", c.sem.k, releaseWeight)
+			local newVal = call("DECRBY", c.sem.k, toInteger(weight))
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
 			end
-		elseif c.sem.rel == 1 and requestDetails.mso and manualHolds[index] > 0 then
-			-- Release the attempt, not the whole-run admission.
-			call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
 		end
 	end
 end

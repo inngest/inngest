@@ -33,7 +33,7 @@ if tracked then
 	-- A legacy zero does not prove that no old lease can be scavenged later.
 	-- Only an already-migrated key can safely treat an absent owner as a no-op.
 	local usage = tonumber(redis.call("GET", keyUsage)) or 0
-	if tracked and usage == 0 then return 0 end
+	if usage == 0 then return 0 end
 	return -1
 end
 

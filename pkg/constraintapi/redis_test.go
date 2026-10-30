@@ -86,7 +86,7 @@ func TestRedisCapacityManager_RateLimit(t *testing.T) {
 		MaximumLifetime: time.Minute,
 	}
 
-	_, _, _, fingerprint, err := buildRequestState(acquireReq)
+	_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 	require.NoError(t, err)
 
 	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)
@@ -331,7 +331,7 @@ func TestRedisCapacityManager_Concurrency(t *testing.T) {
 		MaximumLifetime: time.Minute,
 	}
 
-	_, _, _, fingerprint, err := buildRequestState(acquireReq)
+	_, _, _, fingerprint, err := buildRequestState(acquireReq, false)
 	require.NoError(t, err)
 
 	acquireIdempotencyKey := fmt.Sprintf("event1-%s", fingerprint)

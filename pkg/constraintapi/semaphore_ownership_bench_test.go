@@ -70,7 +70,7 @@ func BenchmarkManualSemaphoreOwnership(b *testing.B) {
 						attempt.LeaseRunIDs = map[string]ulid.ULID{"start": ulid.Make()}
 					}
 					for _, request := range []*CapacityAcquireRequest{req, &attempt} {
-						_, _, _, fingerprint, err := buildRequestStateWithOwnership(request, tracked)
+						_, _, _, fingerprint, err := buildRequestState(request, tracked)
 						require.NoError(b, err)
 						fixedKeys = append(fixedKeys, cm.keyConstraintCheckIdempotency(account, request.IdempotencyKey),
 							cm.keyOperationIdempotency(account, "acq", request.IdempotencyKey+"-"+fingerprint))

@@ -11,11 +11,12 @@ One record per run and manual constraint stores `weight:requestID`. The request
 ID already exists in the lease details and stays unchanged through renewal.
 
 - Acquire writes the record with the usage increment in the same Lua operation.
-- Ordinary release changes it to `weight:` while deleting the step lease. The
-  run still holds its admission, but its next start attempt may reuse it.
+- Ordinary release or scavenging changes it to `weight:` while deleting the
+  step lease. The run still holds its admission, but its next start attempt may
+  reuse it. Expiry alone is not evidence that the run finished.
 - A retry requires the same weight and an empty request ID. It claims the record
   without incrementing usage. A live attempt cannot be reused.
-- Finalization or scavenging consumes the held weight once, then writes `0:`
+- Only finalization consumes the held weight once, then writes `0:`
   with the existing seven-day retention. Cleanup of a different active request
   is rejected before writes. Finalization never trusts its supplied weight.
 

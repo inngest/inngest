@@ -178,6 +178,61 @@ func TestManualSemaphoreStartRetryConcurrent(t *testing.T) {
 	require.Zero(t, usage)
 }
 
+func TestManualSemaphoreStartRetryAfterScavenge(t *testing.T) {
+	cm, redis, _, clock := newSemaphoreTestEnv(t)
+	WithManualSemaphoreOwnership(func(uuid.UUID) bool { return true })(cm)
+	account, env, fn, run := uuid.New(), uuid.New(), uuid.New(), ulid.Make()
+	manual := SemaphoreConstraint{ID: SemaphoreIDFn(fn), Weight: 1, Release: SemaphoreReleaseManual}
+	worker := SemaphoreConstraint{ID: SemaphoreIDApp(uuid.New()), Weight: 1, Release: SemaphoreReleaseAuto}
+	require.NoError(t, redis.Set(manual.CapacityKey(account), "5"))
+	require.NoError(t, redis.Set(worker.CapacityKey(account), "1"))
+	config := ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{
+		{ID: manual.ID, Weight: 1, Release: manual.Release}, {ID: worker.ID, Weight: 1, Release: worker.Release},
+	}}
+	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &manual}, {Kind: ConstraintKindSemaphore, Semaphore: &worker}}
+	acquire := func(key string) *CapacityAcquireResponse {
+		t.Helper()
+		req := makeAcquireRequest(account, env, fn, clock, config, constraints, key)
+		req.LeaseRunIDs = map[string]ulid.ULID{"item0": run}
+		res, err := cm.Acquire(t.Context(), req)
+		require.NoError(t, err)
+		return res
+	}
+	usage := func(sem SemaphoreConstraint, want string) {
+		t.Helper()
+		got, err := redis.Get(sem.UsageKey(account))
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	}
+	first := acquire("crashed-start")
+	require.Len(t, first.Leases, 1)
+	clock.Advance(time.Minute)
+	redis.FastForward(time.Minute)
+	redis.SetTime(clock.Now())
+	result, err := cm.Scavenge(t.Context())
+	require.NoError(t, err)
+	require.EqualValues(t, 1, result.ReclaimedLeases)
+	usage(manual, "1")
+	usage(worker, "0")
+	ownerKey := manual.UsageKey(account) + ":owner:" + run.String()
+	owner, getErr := redis.Get(ownerKey)
+	require.NoError(t, getErr)
+	require.Equal(t, "1:", owner, "expiry releases the attempt, not the run's admission")
+	retry := acquire("retry-after-crash")
+	require.Len(t, retry.Leases, 1)
+	usage(manual, "1")
+	usage(worker, "1")
+	_, err = cm.Release(t.Context(), &CapacityReleaseRequest{AccountID: account, LeaseID: first.Leases[0].LeaseID,
+		IdempotencyKey: "late-old-cleanup", LeaseIssuedAt: clock.Now(), Source: LeaseSource{Location: CallerLocationLeaseScavenge}})
+	require.NoError(t, err)
+	owner, getErr = redis.Get(ownerKey)
+	require.NoError(t, getErr)
+	require.Equal(t, "1:"+retry.RequestID.String(), owner, "old cleanup cannot revoke the retry")
+	require.NoError(t, NewRedisSemaphoreManager(cm.client).ReleaseSemaphore(t.Context(), account, manual.ID, "", run.String(), 1))
+	usage(manual, "0")
+	require.Empty(t, acquire("after-finalization").Leases, "only finalization makes the run terminal")
+}
+
 func TestManualSemaphoreStartRetryDoesNotAdoptOldHolds(t *testing.T) {
 	for _, kind := range []string{"legacy", "old-record", "active-claim", "changed-weight", "invalid-owner", "wrong-type-owner", "invalid-attempt", "finalized"} {
 		t.Run(kind, func(t *testing.T) {
@@ -262,10 +317,10 @@ func TestManualSemaphoreStartRetryHonorsOtherConstraints(t *testing.T) {
 func TestManualSemaphoreOwnershipRejectsDuplicateConstraints(t *testing.T) {
 	run := ulid.Make()
 	sem := &SemaphoreConstraint{ID: "fn:run", Release: SemaphoreReleaseManual}
-	_, _, _, _, err := buildRequestStateWithOwnership(&CapacityAcquireRequest{
+	err := validateManualOwnershipRequest(&CapacityAcquireRequest{
 		Amount: 1, LeaseIdempotencyKeys: []string{"a"}, LeaseRunIDs: map[string]ulid.ULID{"a": run},
 		Constraints: []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: sem}, {Kind: ConstraintKindSemaphore, Semaphore: sem}},
-	}, true)
+	})
 	require.ErrorContains(t, err, "duplicate manual semaphore")
 }
 
