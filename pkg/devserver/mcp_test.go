@@ -222,6 +222,34 @@ func TestMCPNotImplementedIsToolError(t *testing.T) {
 	}, result.StructuredContent)
 }
 
+func TestMCPExecuteV2WithSigningKey(t *testing.T) {
+	signingKey := "signkey-test-secret"
+	var receivedAuthHeader string
+
+	handler := &MCPHandler{
+		signingKey: &signingKey,
+		v2: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedAuthHeader = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"status":"ok"}}`))
+		}),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+	result, err := handler.executeV2(context.Background(), apiv2endpoint.Endpoint{ToolName: "health"}, req)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer signkey-test-secret", receivedAuthHeader)
+
+	// If the request already has an Authorization header, it should be preserved
+	reqWithAuth := httptest.NewRequest(http.MethodGet, "/api/v2/health", nil)
+	reqWithAuth.Header.Set("Authorization", "Bearer client-custom-token")
+	result, err = handler.executeV2(context.Background(), apiv2endpoint.Endpoint{ToolName: "health"}, reqWithAuth)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Equal(t, "Bearer client-custom-token", receivedAuthHeader)
+}
+
 type listedMCPTool struct {
 	Name        string         `json:"name"`
 	Title       string         `json:"title"`

@@ -860,7 +860,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
 	}
 
-	mcpHandler := newMCPHandler(ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler)
+	mcpHandler := newMCPHandler(ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler, opts.SigningKey)
 	addMCPRoute(devAPI, mcpHandler)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
