@@ -96,3 +96,28 @@ func TestBufferWaitingReaderGetsTheMessageAsAStep(t *testing.T) {
 	require.Equal(t, 0, f.buffered("inbox"))
 	require.Equal(t, 1, f.accepts("inbox"))
 }
+
+// Two inboxes of one run keep separate buffers: the wait of one flushes only its
+// own messages, and the other stays buffered until it is asked.
+func TestBufferTwoInboxesFlushSeparately(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.burst("one", 3)
+	f.burst("two", 2)
+
+	require.Equal(t, 3, f.buffered("one"))
+	require.Equal(t, 2, f.buffered("two"))
+
+	f.begin("one").end()
+	f.settle("one")
+
+	require.Equal(t, 3, f.messageSteps("one"))
+	require.Equal(t, 0, f.buffered("one"))
+	require.Equal(t, 0, f.messageSteps("two"), "asking inbox one flushed inbox two")
+	require.Equal(t, 2, f.buffered("two"))
+
+	f.begin("two").end()
+	f.settle("two")
+
+	require.Equal(t, 2, f.messageSteps("two"))
+	require.Equal(t, 0, f.buffered("two"))
+}
