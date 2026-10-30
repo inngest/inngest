@@ -14,16 +14,15 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// Invoke pauses have deterministic IDs, so a lost correlation index need not
-// prevent delivery of a completion while the pause itself still exists.
-func (e *executor) invokePauseByID(ctx context.Context, evt event.TrackedEvent, correlationID string) (*state.Pause, error) {
+func (e *executor) invokePause(ctx context.Context, evt event.TrackedEvent, correlationID string) (*state.Pause, error) {
 	outcome := "error"
+	lookup := "id"
 	defer func() {
 		metrics.RecordCounterMetric(ctx, 1, metrics.CounterOpt{
 			PkgName:     pkgName,
-			MetricName:  "invoke_pause_lookup_fallback_total",
-			Description: "Invoke pause lookups after a missing correlation index",
-			Tags:        map[string]any{"outcome": outcome},
+			MetricName:  "invoke_pause_lookup_total",
+			Description: "Invoke pause lookups by method and outcome",
+			Tags:        map[string]any{"lookup": lookup, "outcome": outcome},
 		})
 	}()
 
@@ -41,6 +40,11 @@ func (e *executor) invokePauseByID(ctx context.Context, evt event.TrackedEvent, 
 		EventName:   event.FnFinishedName,
 	}, pauseID)
 	if errors.Is(err, state.ErrPauseNotFound) {
+		// Older executors created invoke pauses with random IDs.
+		lookup = "correlation"
+		pause, err = e.pm.PauseByInvokeCorrelationID(ctx, evt.GetWorkspaceID(), correlationID)
+	}
+	if errors.Is(err, state.ErrPauseNotFound) || errors.Is(err, state.ErrInvokePauseNotFound) {
 		outcome = "not_found"
 		return nil, state.ErrInvokePauseNotFound
 	}
@@ -48,23 +52,16 @@ func (e *executor) invokePauseByID(ctx context.Context, evt event.TrackedEvent, 
 		return nil, err
 	}
 
-	if pause == nil || pause.ID != pauseID ||
+	if pause == nil || (lookup == "id" && pause.ID != pauseID) ||
 		pause.Identifier.AccountID != evt.GetAccountID() ||
 		pause.WorkspaceID != evt.GetWorkspaceID() ||
 		pause.Identifier.RunID != runID || pause.DataKey != stepID ||
 		pause.InvokeCorrelationID == nil || *pause.InvokeCorrelationID != correlationID ||
 		!pause.IsInvoke() || pause.Event == nil || *pause.Event != event.FnFinishedName {
 		outcome = "invalid"
-		return nil, fmt.Errorf("invoke pause fallback identity mismatch for pause %s", pauseID)
+		return nil, fmt.Errorf("invoke pause lookup identity mismatch for pause %s", pauseID)
 	}
 
 	outcome = "found"
-	e.log.Warn("invoke pause found without correlation index",
-		"account_id", evt.GetAccountID(),
-		"workspace_id", evt.GetWorkspaceID(),
-		"event_id", evt.GetInternalID(),
-		"run_id", runID,
-		"pause_id", pauseID,
-	)
 	return pause, nil
 }
