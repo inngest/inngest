@@ -15,7 +15,7 @@ func TestManualSemaphoreRunRefusalDoesNotPoisonCache(t *testing.T) {
 	for _, state := range []string{"active", "finalized", "shared limit full"} {
 		t.Run(state, func(t *testing.T) {
 			cm, redis, client, clock := newSemaphoreTestEnv(t)
-			cm.manualSemaphoreOwnership = true
+			cm.manualSemaphoreOwnership = func(uuid.UUID) bool { return true }
 			cache := NewConstraintCache(WithConstraintCacheManager(cm), WithConstraintCacheClock(clock),
 				WithConstraintCacheEnable(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (bool, time.Duration, time.Duration) {
 					return true, time.Hour, time.Hour
@@ -71,7 +71,7 @@ func TestOwnedManualSemaphoreSkipsSharedRedisCache(t *testing.T) {
 	for _, tracked := range []bool{false, true} {
 		t.Run(fmt.Sprint(tracked), func(t *testing.T) {
 			cm, redis, _, clock := newSemaphoreTestEnv(t)
-			cm.manualSemaphoreOwnership = tracked
+			cm.manualSemaphoreOwnership = func(uuid.UUID) bool { return tracked }
 			cm.enableAcquireCache = enableAllCache()
 			cm.acquireCacheTTL = func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (time.Duration, time.Duration) {
 				return time.Minute, time.Minute

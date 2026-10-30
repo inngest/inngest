@@ -127,6 +127,9 @@ func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool)
 	state.LeaseRunIDs = leaseRunIDs
 	state.ManualSemaphoreOwnership = ownership
 	if ownership {
+		if req.Amount != 1 {
+			return nil, nil, nil, "", fmt.Errorf("manual semaphore ownership requires a single-job acquisition")
+		}
 		seenSemaphores := map[string]bool{}
 		for _, c := range req.Constraints {
 			if c.Kind != ConstraintKindSemaphore || c.Semaphore.Release != SemaphoreReleaseManual {
@@ -137,16 +140,10 @@ func buildRequestStateWithOwnership(req *CapacityAcquireRequest, ownership bool)
 				return nil, nil, nil, "", fmt.Errorf("duplicate manual semaphore constraint")
 			}
 			seenSemaphores[key] = true
-			seenRuns := map[ulid.ULID]bool{}
-			for _, key := range req.LeaseIdempotencyKeys {
-				runID := req.LeaseRunIDs[key]
-				if runID == (ulid.ULID{}) {
-					return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires a run ID for each lease")
-				}
-				if seenRuns[runID] {
-					return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires distinct run IDs")
-				}
-				seenRuns[runID] = true
+		}
+		for _, key := range req.LeaseIdempotencyKeys {
+			if req.LeaseRunIDs[key] == (ulid.ULID{}) {
+				return nil, nil, nil, "", fmt.Errorf("manual semaphore acquisition requires a run ID for each lease")
 			}
 		}
 	}
@@ -217,6 +214,15 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
+	ownership := false
+	if r.manualSemaphoreOwnership != nil {
+		for _, ci := range req.Constraints {
+			if ci.Kind == ConstraintKindSemaphore && ci.Semaphore != nil && ci.Semaphore.Release == SemaphoreReleaseManual {
+				ownership = r.manualSemaphoreOwnership(req.AccountID)
+				break
+			}
+		}
+	}
 
 	l = l.With(
 		"account_id", req.AccountID,
@@ -257,7 +263,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		initialLeaseIDs[i] = leaseID
 	}
 
-	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestStateWithOwnership(req, r.manualSemaphoreOwnership)
+	requestState, sortedConstraints, hashedLeaseIdempotencyKeysMap, fingerprint, err := buildRequestStateWithOwnership(req, ownership)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "could not build request state: %w", err)
 	}
@@ -270,7 +276,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if r.enableAcquireCache != nil {
 		for i, ci := range sortedConstraints {
 			// Shared exhaustion cannot rule out reuse of this run's admission.
-			if r.manualSemaphoreOwnership && ci.Kind == ConstraintKindSemaphore && ci.Semaphore != nil && ci.Semaphore.Release == SemaphoreReleaseManual {
+			if ownership && ci.Kind == ConstraintKindSemaphore && ci.Semaphore != nil && ci.Semaphore.Release == SemaphoreReleaseManual {
 				continue
 			}
 			if !r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci) {

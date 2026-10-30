@@ -3,9 +3,12 @@
 Tracking is opt-in and off by default. It does not repair legacy holds or
 authorize backlog recovery.
 
-With `WithManualSemaphoreOwnership()` enabled, one record per run and manual
-constraint stores `weight:requestID`. The request ID already exists in the lease
-details and stays unchanged through lease renewal.
+`WithManualSemaphoreOwnership(enabled func(uuid.UUID) bool)` selects accounts
+using an immutable startup policy. It applies only to requests containing manual
+semaphores, and requires exactly one job, matching the queue's per-item checks.
+Owned manual batches are rejected before writes; other batches are unchanged.
+One record per run and manual constraint stores `weight:requestID`. The request
+ID already exists in the lease details and stays unchanged through renewal.
 
 - Acquire writes the record with the usage increment in the same Lua operation.
 - Ordinary release changes it to `weight:` while deleting the step lease. The
@@ -16,8 +19,8 @@ details and stays unchanged through lease renewal.
   with the existing seven-day retention. Cleanup of a different active request
   is rejected before writes. Finalization never trusts its supplied weight.
 
-Run IDs, eligible batch prefixes and all other capacity checks remain required.
-Held admissions have no expiry.
+Run IDs and all other capacity checks remain required. Held admissions have no
+expiry; finalized records reject reacquisition for their seven-day retention.
 
 Shared exhaustion cannot rule out reuse of an owned manual admission. Redis
 acquisition excludes these constraints from its shared cache. In-process cache

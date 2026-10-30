@@ -25,7 +25,7 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 		t.Cleanup(client.Close)
 		cm.client = client
 	}
-	cm.manualSemaphoreOwnership = true
+	cm.manualSemaphoreOwnership = func(uuid.UUID) bool { return true }
 	sm := NewRedisSemaphoreManager(client)
 	ctx := context.Background()
 	account, env, fn := uuid.New(), uuid.New(), uuid.New()
@@ -104,11 +104,15 @@ func TestManualSemaphoreOwnership(t *testing.T) {
 }
 
 func TestManualSemaphoreOwnershipRequiresRunID(t *testing.T) {
-	_, _, _, clock := newSemaphoreTestEnv(t)
-	_, _, _, _, err := buildRequestStateWithOwnership(&CapacityAcquireRequest{
-		AccountID: uuid.New(), EnvID: uuid.New(), FunctionID: uuid.New(),
-		Constraints:          []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &SemaphoreConstraint{ID: "fn:test", Release: SemaphoreReleaseManual}}},
-		LeaseIdempotencyKeys: []string{"no-run"}, CurrentTime: clock.Now(),
-	}, true)
+	cm, redis, _, clock := newSemaphoreTestEnv(t)
+	WithManualSemaphoreOwnership(func(uuid.UUID) bool { return true })(cm)
+	account := uuid.New()
+	sem := SemaphoreConstraint{ID: "fn:test", Weight: 1, Release: SemaphoreReleaseManual}
+	config := ConstraintConfig{FunctionVersion: 1, Semaphores: []Semaphore{{ID: sem.ID, Weight: sem.Weight, Release: sem.Release}}}
+	req := makeAcquireRequest(account, uuid.New(), uuid.New(), clock, config,
+		[]ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}, "no-run")
+	req.LeaseRunIDs = nil
+	_, err := cm.Acquire(t.Context(), req)
 	require.ErrorContains(t, err, "requires a run ID")
+	require.False(t, redis.Exists(sem.UsageKey(account)), "reject before charging capacity")
 }
