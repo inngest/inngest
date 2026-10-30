@@ -57,6 +57,8 @@ type bufferKey struct {
 type pendingItem struct {
 	item BatchItem
 	fn   inngest.Function
+	// Reuse the size measured at append; do not marshal events again at flush.
+	byteSize int
 	// pending is shared between original and duplicate callers waiting for the
 	// same event to be flushed
 	pending *pendingResult
@@ -153,15 +155,16 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Create a shared pending result for this event
 	pr := &pendingResult{done: make(chan struct{})}
+	eventBytes := int64(bi.Event.Size())
 
 	// Add to buffer with pending result
 	buf.items = append(buf.items, pendingItem{
-		item:    bi,
-		fn:      fn,
-		pending: pr,
+		item:     bi,
+		fn:       fn,
+		byteSize: int(eventBytes),
+		pending:  pr,
 	})
 	buf.pendingResults[eventIDStr] = pr
-	eventBytes := int64(bi.Event.Size())
 	buf.byteSize += int(eventBytes)
 
 	// Set createdAt on first item
@@ -373,12 +376,17 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	// To avoid that, we make multiple BulkAppend calls with chunks of `batchMaxSize`
 	// items until we flush all the items in the buffer.
 	//
-	// Split items into chunks of batchMaxSize and call BulkAppend once per chunk.
-	// Each chunk is sized to fill at most one Redis batch, so subsequent chunks
-	// naturally flow into freshly-created batches after the previous one is filled
-	// and its pointer rotated — without relying on Lua-level overflow handling.
-	for start := 0; start < len(items); start += batchMaxSize {
-		end := min(start+batchMaxSize, len(items))
+	// The same race can overshoot the byte threshold. Bound chunks by both
+	// limits, allowing a single event larger than the buffer budget to travel alone.
+	for start, end := 0, 0; start < len(items); start = end {
+		chunkBytes := 0
+		for end < len(items) && end-start < batchMaxSize {
+			if end > start && chunkBytes+pending[end].byteSize > ab.maxByteSize {
+				break
+			}
+			chunkBytes += pending[end].byteSize
+			end++
+		}
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
 		storageStart := time.Now()

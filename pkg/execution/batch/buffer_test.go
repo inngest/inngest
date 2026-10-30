@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -119,6 +120,67 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 		// flush completed and notified the pending append
 	}
 	require.ErrorIs(t, pending.err, scheduleErr)
+}
+
+func TestBufferedOverfullSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		maxCount     int
+		bufferEvents int
+		batchSizes   []int
+	}{
+		{name: "exact byte boundary", maxCount: 50, bufferEvents: 2, batchSizes: []int{4, 4}},
+		{name: "event larger than buffer budget", maxCount: 50, bufferEvents: 0, batchSizes: []int{3, 3, 2}},
+		{name: "count bound still applies", maxCount: 3, bufferEvents: 2, batchSizes: []int{3, 3, 2}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			ctx := t.Context()
+			fn := inngest.Function{ID: uuid.New(), EventBatch: &inngest.EventBatchConfig{MaxSize: tc.maxCount, Timeout: "60s"}}
+			item := BatchItem{FunctionID: fn.ID, Event: event.Event{Name: "test/bytes", Data: map[string]any{"value": strings.Repeat("x", 100)}}}
+			encoded, err := json.Marshal(item)
+			require.NoError(t, err)
+			q := &fakeProducer{}
+			bm := NewRedisBatchManager(redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey), q,
+				WithRedisBatchSizeLimit(3*len(encoded)), WithBufferMaxByteSize(max(1, tc.bufferEvents*item.Event.Size())))
+			buffer := bm.(*redisBatchManager).buffer
+			// Arrange the snapshot concurrent appenders can leave before flush
+			// obtains the lock. No timing race is needed to reproduce the overflow.
+			buf := buffer.getOrCreateBuffer(bufferKey{FunctionID: fn.ID}, fn)
+			var expected []ulid.ULID
+			for range 8 {
+				item.EventID = ulid.Make()
+				expected = append(expected, item.EventID)
+				buf.items = append(buf.items, pendingItem{item: item, fn: fn, byteSize: item.Event.Size(), pending: &pendingResult{done: make(chan struct{})}})
+				buf.byteSize += item.Event.Size()
+			}
+			buffer.totalPendingItems.Store(int64(len(buf.items)))
+			buffer.totalPendingBytes.Store(int64(buf.byteSize))
+			// Two-event chunks cross the three-event byte threshold at four;
+			// one-event chunks reach it at three. This distinguishes accepting
+			// an exact buffer boundary from splitting prematurely.
+			require.NoError(t, bm.Close())
+			batches := map[ulid.ULID]bool{}
+			for _, job := range q.items {
+				batches[job.item.Payload.(ScheduleBatchPayload).BatchID] = true
+			}
+			var actual []ulid.ULID
+			var batchSizes []int
+			for id := range batches {
+				stored, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, id)
+				require.NoError(t, err)
+				batchSizes = append(batchSizes, len(stored))
+				for _, stored := range stored {
+					actual = append(actual, stored.EventID)
+				}
+			}
+			require.ElementsMatch(t, tc.batchSizes, batchSizes)
+			require.ElementsMatch(t, expected, actual, "every event must remain in a scheduled batch exactly once")
+		})
+	}
 }
 
 func TestBulkAppend(t *testing.T) {
