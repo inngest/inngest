@@ -12,6 +12,33 @@ import (
 
 const singletonMigrationCleanupLimit = 100
 
+var singletonAdmission = rueidis.NewLuaScript(`
+if redis.call("EXISTS", KEYS[1]) == 1 then return "migration" end
+local owner = redis.call("GET", KEYS[2])
+if ARGV[1] == "cancel" then redis.call("DEL", KEYS[2]) end
+return owner
+`)
+
+func (q *queue) SingletonAdmission(ctx context.Context, scope osqueue.Scope, key string, mode enums.SingletonMode) (*ulid.ULID, error) {
+	if scope.IsSystem {
+		return nil, fmt.Errorf("singleton migration requires a function scope")
+	}
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	if mode != enums.SingletonModeSkip && mode != enums.SingletonModeCancel {
+		return nil, fmt.Errorf("singleton mode %d not implemented", mode)
+	}
+	hold, _ := singletonMigrationKeys(q.RedisClient.kg, scope)
+	keys := []string{hold, q.RedisClient.kg.SingletonKey(&osqueue.Singleton{Key: key})}
+	value, err := singletonAdmission.Exec(ctx, q.RedisClient.unshardedRc, keys, []string{mode.String()}).ToString()
+	// A stored owner must be a ULID, so this result cannot alias a run.
+	if err == nil && value == "migration" {
+		return nil, osqueue.ErrSingletonMigrationInProgress
+	}
+	return parseRunIDFromRedisValue(value, err)
+}
+
 func singletonMigrationKeys(kg QueueKeyGenerator, scope osqueue.Scope) (hold, pending string) {
 	hold = kg.QueuePrefix() + ":singleton-migration:" + scope.FunctionID.String()
 	return hold, hold + ":pending"

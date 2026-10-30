@@ -8,9 +8,56 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/singleton"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSingletonMigrationBlocksAdmissionBeforeFirstCopy(t *testing.T) {
+	_, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	_, shard := newQueue(t, rc)
+	item := migrationTestItem()
+	item.Data.Singleton = &osqueue.Singleton{Key: "new-key"}
+	scope := osqueue.ScopeFromQueueItem(item)
+	registry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	manager := singleton.New(t.Context(), registry)
+	// A scheduler may pass the early check just before the hold is installed.
+	owner, err := manager.HandleSingleton(t.Context(), scope, "new-key", inngest.Singleton{Mode: enums.SingletonModeSkip})
+	require.NoError(t, err)
+	require.Nil(t, owner)
+	hold := shard.(osqueue.SingletonMigrationOperations)
+	require.NoError(t, hold.BeginSingletonMigration(t.Context(), scope, "migration"))
+	for _, mode := range []enums.SingletonMode{enums.SingletonModeSkip, enums.SingletonModeCancel} {
+		_, err := manager.HandleSingleton(t.Context(), scope, "new-key", inngest.Singleton{Mode: mode})
+		require.ErrorIs(t, err, osqueue.ErrSingletonMigrationInProgress)
+	}
+	_, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true})
+	require.ErrorIs(t, err, osqueue.ErrSingletonMigrationInProgress, "late enqueue must retry, not become a skipped singleton")
+	_, err = shard.LoadQueueItem(t.Context(), item.ID)
+	require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
+	// Existing runs and explicit migration copies can still make progress.
+	continuation := item
+	continuation.ID = uuid.NewString()
+	continuation.Data.Singleton = nil
+	stored, err := shard.EnqueueItem(t.Context(), continuation, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true})
+	require.NoError(t, err)
+	require.NoError(t, shard.Dequeue(t.Context(), stored))
+	stored, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true, SingletonMigrationKey: "new-key"})
+	require.NoError(t, err)
+	require.NoError(t, shard.Dequeue(t.Context(), stored))
+	done, err := hold.FinishSingletonMigration(t.Context(), scope, "migration")
+	require.NoError(t, err)
+	require.True(t, done)
+	owner, err = manager.HandleSingleton(t.Context(), scope, "new-key", inngest.Singleton{Mode: enums.SingletonModeSkip})
+	require.NoError(t, err)
+	require.Nil(t, owner)
+	item.ID = uuid.NewString()
+	_, err = shard.EnqueueItem(t.Context(), item, time.Now(), osqueue.EnqueueOpts{PassthroughJobId: true})
+	require.NoError(t, err, "scheduling resumes after migration cleanup")
+}
 
 func TestSingletonMigrationSourceDrained(t *testing.T) {
 	r, rc := initRedis(t)

@@ -184,6 +184,12 @@ type SingletonMigrationOperations interface {
 	FinishSingletonMigration(ctx context.Context, scope Scope, migrationID string) (done bool, err error)
 }
 
+// SingletonAdmissionOperations checks migration protection atomically with the
+// skip/cancel lock decision, without adding a scheduling round trip.
+type SingletonAdmissionOperations interface {
+	SingletonAdmission(ctx context.Context, scope Scope, key string, mode enums.SingletonMode) (*ulid.ULID, error)
+}
+
 // DebounceUpdateStatus describes the outcome of DebounceUpdate.
 type DebounceUpdateStatus int
 

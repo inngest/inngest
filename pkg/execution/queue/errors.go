@@ -66,6 +66,7 @@ var (
 	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
 	ErrQueueItemSingletonExists      = fmt.Errorf("singleton item already exists")
 	ErrSingletonMigrationConflict    = fmt.Errorf("singleton migration is owned by another migration")
+	ErrSingletonMigrationInProgress  = fmt.Errorf("singleton migration in progress; retry scheduling")
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")

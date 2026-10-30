@@ -242,6 +242,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		// Singletons
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 		kg.SingletonKey(singleton),
+		kg.QueuePrefix() + ":singleton-migration:" + i.FunctionID.String(),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
@@ -310,6 +311,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		return i, osqueue.QueueItemExists(i.ID, runID)
 	case 2:
 		return i, osqueue.ErrQueueItemSingletonExists
+	case 3:
+		return i, osqueue.ErrSingletonMigrationInProgress
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
