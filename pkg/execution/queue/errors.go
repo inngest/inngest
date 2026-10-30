@@ -69,6 +69,7 @@ var (
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
+	ErrPartitionLeaseMismatch        = fmt.Errorf("partition lease no longer owned")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")

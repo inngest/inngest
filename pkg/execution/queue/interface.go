@@ -33,6 +33,14 @@ type RequeueOptions struct {
 	CapacityLeased bool
 }
 
+// ExpiredCapacityLeaseRequeuer repairs undispatched refill reservations. The
+// shard must atomically verify partition ownership and the item's generation,
+// ready membership, expired capacity lease and absence of a live item lease.
+// A false result means the snapshot is no longer eligible and must be skipped.
+type ExpiredCapacityLeaseRequeuer interface {
+	RequeueExpiredCapacityLease(context.Context, QueueItem, ulid.ULID) (bool, error)
+}
+
 // RequeueCapacityLeased marks the requeued item as holding a capacity lease
 // that will be released after the requeue completes.
 func RequeueCapacityLeased() RequeueOptionFn {
