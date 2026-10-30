@@ -496,6 +496,16 @@ func (q *queueProcessor) releaseCapacityForMissingItem(ctx context.Context, item
 		outcome = "skipped_shared"
 		return
 	}
+	for _, sem := range item.Data.Semaphores {
+		if sem.Release == constraintapi.SemaphoreReleaseManual {
+			// Ordinary Release removes lease/scavenger records but deliberately
+			// keeps manual permits held. Cancellation may have already released
+			// the run before this stale scanner acquired its new permit, leaving
+			// nobody to return it. Preserve expiry recovery instead.
+			outcome = "skipped_manual"
+			return
+		}
+	}
 	lease := *res.CapacityLease
 	_, err := q.CapacityManager.Release(context.WithoutCancel(ctx), &constraintapi.CapacityReleaseRequest{
 		AccountID: item.Data.Identifier.AccountID,

@@ -775,7 +775,8 @@ func WithCapacityLeaseExtendInterval(interval time.Duration) QueueOpt {
 
 // WithReleaseCapacityOnItemGone releases newly acquired capacity when the item
 // disappears before its queue lease. It is disabled by default. Reused or
-// idempotently replayed capacity is never released by this cleanup.
+// idempotently replayed capacity is never released by this cleanup. Leases
+// carrying manual semaphores retain their recovery records for scavenging.
 func WithReleaseCapacityOnItemGone(enabled bool) QueueOpt {
 	return func(o *QueueOptions) { o.ReleaseCapacityOnItemGone = enabled }
 }
