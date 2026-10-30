@@ -231,16 +231,36 @@ func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duratio
 	}
 }
 
+type sanitizeMCPResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (w *sanitizeMCPResponseWriter) WriteHeader(statusCode int) {
+	delete(w.Header(), "transfer-encoding")
+	delete(w.Header(), "Transfer-Encoding")
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *sanitizeMCPResponseWriter) Write(b []byte) (int, error) {
+	delete(w.Header(), "transfer-encoding")
+	delete(w.Header(), "Transfer-Encoding")
+	return w.ResponseWriter.Write(b)
+}
+
 func (h *MCPHandler) handler() http.Handler {
 	originProtection := http.NewCrossOriginProtection()
 	//
 	// The dev server accepts cross-origin API requests so locally hosted UIs can connect.
 	originProtection.AddInsecureBypassPattern("/mcp")
-	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+	streamable := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return h.getMCPServer()
 	}, &mcp.StreamableHTTPOptions{
 		JSONResponse:          true, // Use JSON responses for better compatibility
 		CrossOriginProtection: originProtection,
+	})
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		streamable.ServeHTTP(&sanitizeMCPResponseWriter{ResponseWriter: w}, r)
 	})
 }
 
