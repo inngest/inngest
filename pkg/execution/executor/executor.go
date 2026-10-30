@@ -2163,6 +2163,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	// Before any state is read, so a message saved after this finds no flag, and
+	// a message saved before it is in the state this execution reads.
+	if err := e.startSubscriptionWake(ctx, sv2.ID{
+		RunID:      id.RunID,
+		FunctionID: id.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
+	}, jobID); err != nil {
+		return nil, err
+	}
+
 	_, span := e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      id.RunID,
@@ -2177,15 +2191,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// XXX: MetadataNotFound -> assume fn is deleted.
 	if err != nil {
 		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
-	}
-
-	if isSleepResume {
-		// A timed step.subscribe read ends with its timer. The request that
-		// follows reports any read that still waits, so a flag from before the
-		// timer is not left behind to wake a run that moved on.
-		if err := e.clearSubscriptionWaiting(ctx, md.ID); err != nil {
-			return nil, err
-		}
 	}
 
 	if isSleepResume {
@@ -4052,6 +4057,11 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 			"",
 		)
 	}
+
+	// A read that waits marks the run idle only when nothing else came with it
+	// but its own timer. With a planned step or other work in the response the
+	// run is busy, and a flag would let a message queue a discovery under it.
+	dropSubscriptionWaits(resp.Generator)
 
 	groups := opGroups(resp.Generator)
 

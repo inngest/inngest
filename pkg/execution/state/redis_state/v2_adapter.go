@@ -848,9 +848,14 @@ func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string
 	return nil
 }
 
-// TakeSubscriptionWaiting clears the waiting flag of a subscription and returns its token.
-func (v v2) TakeSubscriptionWaiting(ctx context.Context, id state.ID, hash string) (string, bool, error) {
-	return v.mgr.TakeSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash)
+// GetSubscriptionWaiting reads the waiting flag of a subscription.
+func (v v2) GetSubscriptionWaiting(ctx context.Context, id state.ID, hash string) (string, bool, error) {
+	return v.mgr.GetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash)
+}
+
+// ClearSubscriptionWaitingIf clears the flag if it holds the token.
+func (v v2) ClearSubscriptionWaitingIf(ctx context.Context, id state.ID, hash string, token string) error {
+	return v.mgr.ClearSubscriptionWaitingIf(ctx, id.Tenant.AccountID, id.RunID, hash, token)
 }
 
 // ClearSubscriptionWaiting clears the waiting flags of every subscription of a run.

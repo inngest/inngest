@@ -288,7 +288,11 @@ func TestOpenSubscriptionManyStreams(t *testing.T) {
 func (s *limitRunService) SetSubscriptionWaiting(context.Context, sv2.ID, string, string) error {
 	return nil
 }
-func (s *limitRunService) TakeSubscriptionWaiting(context.Context, sv2.ID, string) (string, bool, error) {
+func (s *limitRunService) GetSubscriptionWaiting(context.Context, sv2.ID, string) (string, bool, error) {
 	return "token", true, nil
 }
 func (s *limitRunService) ClearSubscriptionWaiting(context.Context, sv2.ID) error { return nil }
+
+func (s *limitRunService) ClearSubscriptionWaitingIf(context.Context, sv2.ID, string, string) error {
+	return nil
+}

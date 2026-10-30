@@ -254,9 +254,11 @@ type SubscriptionWaiter interface {
 	// hash of its key) to a token that is unique to this wait, replacing any
 	// token already there. It returns ErrRunNotFound when the run is gone.
 	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
-	// TakeSubscriptionWaiting tests and clears the flag in one atomic step. Of
-	// any number of concurrent callers, at most one gets ok and the token.
-	TakeSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
+	// GetSubscriptionWaiting reads the flag without changing it.
+	GetSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
+	// ClearSubscriptionWaitingIf clears the flag if it still holds the token,
+	// atomically. A flag with another token, or none, is not an error.
+	ClearSubscriptionWaitingIf(ctx context.Context, id ID, hash string, token string) error
 	// ClearSubscriptionWaiting clears the flags of every subscription of the run.
 	ClearSubscriptionWaiting(ctx context.Context, id ID) error
 }

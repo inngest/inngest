@@ -542,9 +542,9 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	return e.wakeSubscription(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, key, gen.ID)
 }
 
-// wakeSubscription wakes the run if it is waiting on the subscription: it takes
-// the flag and, only if it was set, queues a discovery that lets the function
-// see what the subscription saved.
+// wakeSubscription wakes the run if it is waiting on the subscription: it reads
+// the flag and, only if it is set, queues a discovery under the job ID of that
+// wait. The flag stays set; the discovery clears it when it starts.
 func (e *executor) wakeSubscription(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, key string, outgoing string) error {
 	waiter, err := e.subscriptionWaiter()
 	if err != nil {
@@ -552,24 +552,55 @@ func (e *executor) wakeSubscription(ctx context.Context, md *sv2.Metadata, incom
 	}
 
 	hash := subscriptionKeyHash(key)
-	token, waiting, err := waiter.TakeSubscriptionWaiting(ctx, md.ID, hash)
+	token, waiting, err := waiter.GetSubscriptionWaiting(ctx, md.ID, hash)
 	if err != nil || !waiting {
 		return err
 	}
 
-	if err := e.enqueueSubscriptionWake(ctx, md, incoming, maxAttempts, follows, hash, token, outgoing); err != nil {
-		// The flag goes back so that the delivery, retried, wakes the run.
-		_ = waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token)
-		return err
+	return e.enqueueSubscriptionWake(ctx, md, incoming, maxAttempts, follows, hash, token, outgoing)
+}
+
+// subscriptionWakeIdempotency is how long a wake's job ID stays taken after its
+// item is gone, so a late delivery that read the flag of that wait cannot queue
+// a second discovery for it.
+const subscriptionWakeIdempotency = 10 * time.Minute
+
+// parseSubscriptionWakeJobID splits the job ID of a wake into the subscription
+// hash and the token of the wait.
+func parseSubscriptionWakeJobID(jobID string) (hash string, token string, ok bool) {
+	_, rest, found := strings.Cut(jobID, "-subscription-wake-")
+	if !found {
+		return "", "", false
+	}
+	hash, token, found = strings.Cut(rest, "-")
+	if !found || hash == "" || token == "" {
+		return "", "", false
 	}
 
-	return nil
+	return hash, token, true
+}
+
+// startSubscriptionWake runs at the start of every execution, before the run's
+// state is read. A wake clears the flag of its own wait, so a message saved
+// after this point finds no flag. Any other execution runs the function while
+// the run is no longer idle, so every flag is stale.
+func (e *executor) startSubscriptionWake(ctx context.Context, id sv2.ID, jobID string) error {
+	waiter, ok := e.smv2.(sv2.SubscriptionWaiter)
+	if !ok {
+		return nil
+	}
+
+	if hash, token, ok := parseSubscriptionWakeJobID(jobID); ok {
+		return waiter.ClearSubscriptionWaitingIf(ctx, id, hash, token)
+	}
+
+	return waiter.ClearSubscriptionWaiting(ctx, id)
 }
 
 // enqueueSubscriptionWake queues the discovery that gives a waiting run the
 // chance to see what its subscription saved. It runs under the run's own mode
-// like any discovery after a step. The idempotency period is zero, so no key
-// outlives the item.
+// like any discovery after a step. The idempotency period keeps the job ID
+// taken after the item is gone, so a stale delivery of the same wait is refused.
 func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, hash string, token string, outgoing string) error {
 	jobID := subscriptionWakeJobID(md.ID.RunID.String(), hash, token)
 	item := queue.Item{
@@ -604,8 +635,8 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 		e.log.Debug("error creating span for a subscription wake", "error", err)
 	}
 
-	noKey := time.Duration(0)
-	err = e.queue.Enqueue(ctx, item, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &noKey})
+	period := subscriptionWakeIdempotency
+	err = e.queue.Enqueue(ctx, item, e.now(), queue.EnqueueOpts{IdempotencyPeriod: &period})
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
@@ -700,4 +731,28 @@ func (e *executor) openSubscriptionStream(ctx context.Context, runCtx execution.
 	}
 
 	return nil
+}
+
+// dropSubscriptionWaits turns the waiting reads of a response into plain
+// no-ops when the response holds anything besides waits and sleeps.
+func dropSubscriptionWaits(ops []*state.GeneratorOpcode) {
+	busy := false
+	for _, op := range ops {
+		if op == nil {
+			continue
+		}
+		if op.Op == enums.OpcodeSleep || (op.Op == enums.OpcodeNone && op.ID != "") {
+			continue
+		}
+		busy = true
+	}
+	if !busy {
+		return
+	}
+
+	for _, op := range ops {
+		if op != nil && op.Op == enums.OpcodeNone {
+			op.ID = ""
+		}
+	}
 }
