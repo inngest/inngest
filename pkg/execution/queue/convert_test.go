@@ -1167,9 +1167,10 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 // and server.
 func TestQueueProxyVariadicOptionCompatibilityGuard(t *testing.T) {
 	assertCoveredFields(t, reflect.TypeOf(RequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
-	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased"}})
+	assertCoveredFields(t, reflect.TypeOf(DequeueOptions{}), fieldCoverage{covered: []string{"CapacityLeased", "LeaseHeld"}})
 	require.NotNil(t, (&pb.RequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
 	require.NotNil(t, (&pb.DequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("capacity_leased"))
+	require.NotNil(t, (&pb.DequeueRequest{}).ProtoReflect().Descriptor().Fields().ByName("lease_held"))
 }
 
 func assertItemEqual(t *testing.T, expected, actual Item) {

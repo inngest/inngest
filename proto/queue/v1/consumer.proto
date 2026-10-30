@@ -13,6 +13,7 @@ message DequeueRequest {
   string shard_name = 1;
   QueueItem item = 2;
   bool capacity_leased = 3;
+  bool lease_held = 4;
 }
 
 message DequeueResponse {}
