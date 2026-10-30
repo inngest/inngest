@@ -124,7 +124,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 	// deleteStream removes the pause of this op's stream, so its events are no
 	// longer saved. Deleting a pause that is gone is not an error.
-	deleteStream := func() error {
+	deleteStreamOf := func(idx pauses.Index, pauseID uuid.UUID) error {
 		pause, err := e.pm.PauseByID(ctx, idx, pauseID)
 		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
 			return fmt.Errorf("error loading subscription pause: %w", err)
@@ -140,6 +140,9 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 
 		return nil
+	}
+	deleteStream := func() error {
+		return deleteStreamOf(idx, pauseID)
 	}
 
 	switch sub.Mode {
@@ -224,12 +227,16 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"stopped": true})
 
 	case state.SubscribeClose:
+		// One op ends every stream it lists. Its answer is the only step a close
+		// saves: the pauses are gone, so nothing more is delivered, and the SDK
+		// knows the subscription is closed.
 		if err := deleteStream(); err != nil {
 			return err
 		}
-
-		if err := e.endSubscription(ctx, md.ID, sub.Key, []byte("true")); err != nil {
-			return err
+		for _, extra := range sub.Streams {
+			if err := deleteStreamOf(pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: extra.Event}, subscriptionPauseID(runID, sub.Key, extra.Stream)); err != nil {
+				return err
+			}
 		}
 
 		ids, err := messages()
