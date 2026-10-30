@@ -43,6 +43,11 @@ type recordingQueue struct {
 	failEnqueues  int
 	failDequeues  int
 	beforeDequeue func()
+
+	// afterDequeue runs once after the next Dequeue was applied by the queue,
+	// and its error replaces the reply: the removal happened, the caller never
+	// learns it.
+	afterDequeue func() error
 }
 
 func (q *recordingQueue) Dequeue(ctx context.Context, shard string, i queue.QueueItem, opts ...queue.DequeueOptionFn) error {
@@ -55,7 +60,15 @@ func (q *recordingQueue) Dequeue(ctx context.Context, shard string, i queue.Queu
 		q.failDequeues--
 		return errors.New("transient redis error")
 	}
-	return q.Queue.Dequeue(ctx, shard, i, opts...)
+	err := q.Queue.Dequeue(ctx, shard, i, opts...)
+	if q.afterDequeue != nil {
+		hook := q.afterDequeue
+		q.afterDequeue = nil
+		if herr := hook(); herr != nil {
+			return herr
+		}
+	}
+	return err
 }
 
 func (q *recordingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
