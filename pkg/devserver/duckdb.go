@@ -21,7 +21,9 @@ import (
 // opens dual-write's own handle with (driver.Options.QuackConns),
 // overridable w/ INNGEST_DUCKDB_WRITE_CONNS. Above 1, database/sql can run
 // that many statements genuinely concurrently instead of serializing every
-// one of them behind a single mutex -- see driver.Options.QuackConns.
+// one of them behind a single mutex -- see driver.Options.QuackConns. The
+// read handle gets its own quack sessions either way (Connector.OpenShared),
+// so even 1 doesn't make reads share dual-write's connection.
 const dualWriteQuackConns = 16
 
 // duckDBReadConns is the default cap on the separate read handle
