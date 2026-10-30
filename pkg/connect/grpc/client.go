@@ -4,14 +4,28 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
 var ErrGatewayNotFound = fmt.Errorf("gateway not found")
+
+// ClientKeepalive pings idle and busy connections so a peer that disappears
+// without closing the TCP connection is detected within about 30s, failing
+// in-flight calls with Unavailable instead of hanging until the kernel gives up.
+// Timeout also sets TCP_USER_TIMEOUT, so it stays at the gRPC default of 20s to
+// ride out short network blips. Peers must accept this ping rate; see
+// ServerKeepaliveEnforcement.
+var ClientKeepalive = keepalive.ClientParameters{
+	Time:                10 * time.Second,
+	Timeout:             20 * time.Second,
+	PermitWithoutStream: true,
+}
 
 type PingableClient interface {
 	Ping(ctx context.Context, req *connectpb.PingRequest, opts ...grpcLib.CallOption) (*connectpb.PingResponse, error)
@@ -79,7 +93,10 @@ func (m *GRPCClientManager[T]) GetOrCreateClient(ctx context.Context, key string
 	// block lookups or client creation for unrelated peers.
 	m.logger.Info("grpc client not found, creating one dynamically", "key", key)
 
-	conn, err := m.dialer(grpcURL, grpcLib.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := m.dialer(grpcURL,
+		grpcLib.WithTransportCredentials(insecure.NewCredentials()),
+		grpcLib.WithKeepaliveParams(ClientKeepalive),
+	)
 	if err != nil {
 		var zero T
 		return zero, fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
