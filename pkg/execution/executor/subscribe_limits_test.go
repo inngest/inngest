@@ -296,3 +296,11 @@ func (s *limitRunService) ClearSubscriptionWaiting(context.Context, sv2.ID) erro
 func (s *limitRunService) ClearSubscriptionWaitingFor(context.Context, sv2.ID, string) error {
 	return nil
 }
+
+func (s *limitRunService) RegisterSubscriptionTimer(context.Context, sv2.ID, string) error {
+	return nil
+}
+
+func (s *limitRunService) ClaimSubscriptionTimer(context.Context, sv2.ID, string, string) (string, error) {
+	return "", nil
+}
