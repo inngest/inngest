@@ -2166,7 +2166,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) && err != nil {
 			return nil, err
 		}
-		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
+		// A retry of the save reports a duplicate as success, so a retried timer
+		// checks who saved the step as well.
+		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) || item.Attempt > 0 {
 			// A message that won a timed read saved this timer step first.
 			winner, err := e.timerWinner(ctx, runID, edge.Outgoing)
 			if err != nil {

@@ -897,12 +897,15 @@ func (e *executor) claimSubscriptionTimer(ctx context.Context, id sv2.ID, item q
 	}
 
 	_, err = e.smv2.SaveStep(ctx, id, timer, subscriptionMessageWon(token))
-	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		winner, err := e.timerWinner(ctx, id, timer)
-		return winner == token, err
+	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+		return false, err
 	}
 
-	return err == nil, err
+	// A retried save reports a duplicate as success, so the stored value says who
+	// won, whatever the save returned.
+	winner, err := e.timerWinner(ctx, id, timer)
+
+	return winner == token, err
 }
 
 // userStepID is the ID the user gave the op, empty when the SDK sent none.
