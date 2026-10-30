@@ -587,7 +587,11 @@ func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, f
 	return b.bulkAppend(ctx, items, fn, metricTags)
 }
 
-func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, metricTags map[string]any) (*BulkAppendResult, error) {
+// bulkAppend is the shared write path for BulkAppend and buffered flushes. It
+// is recorded as bulk_append_internal so store writes from both are counted.
+func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, metricTags map[string]any) (_ *BulkAppendResult, err error) {
+	defer func(start time.Time) { b.recordCall(ctx, "bulk_append_internal", start, err) }(time.Now())
+
 	config := fn.EventBatch
 	if config == nil {
 		return nil, fmt.Errorf("no batch config found for function: %s", fn.Slug)
