@@ -565,32 +565,39 @@ func (e *executor) wakeSubscription(ctx context.Context, md *sv2.Metadata, incom
 // a second discovery for it.
 const subscriptionWakeIdempotency = 10 * time.Minute
 
-// parseSubscriptionWakeJobID splits the job ID of a wake into the subscription
-// hash and the token of the wait.
-func parseSubscriptionWakeJobID(jobID string) (hash string, token string, ok bool) {
-	_, rest, found := strings.Cut(jobID, "-subscription-wake-")
-	if !found {
-		return "", "", false
-	}
-	hash, token, found = strings.Cut(rest, "-")
-	if !found || hash == "" || token == "" {
-		return "", "", false
-	}
+// subscriptionWakeMetaKey is the queue item metadata that names the wait a wake
+// belongs to. The queue replaces the job ID the item carries with a hash, so the
+// token cannot be read back from it.
+const subscriptionWakeMetaKey = "subscription_wake"
 
-	return hash, token, true
+// subscriptionWakeMeta is the metadata value of a wake: the subscription hash
+// and the token of the wait.
+func subscriptionWakeMeta(hash string, token string) string {
+	return hash + ":" + token
+}
+
+// parseSubscriptionWakeMeta splits the metadata value of a wake.
+func parseSubscriptionWakeMeta(v string) (hash string, token string, ok bool) {
+	hash, token, ok = strings.Cut(v, ":")
+	return hash, token, ok && hash != "" && token != ""
 }
 
 // startSubscriptionWake runs at the start of every execution, before the run's
 // state is read. A wake clears the flag of its own wait, so a message saved
 // after this point finds no flag. Any other execution runs the function while
 // the run is no longer idle, so every flag is stale.
-func (e *executor) startSubscriptionWake(ctx context.Context, id sv2.ID, jobID string) error {
+func (e *executor) startSubscriptionWake(ctx context.Context, id sv2.ID, item queue.Item) error {
 	waiter, ok := e.smv2.(sv2.SubscriptionWaiter)
 	if !ok {
 		return nil
 	}
 
-	if hash, token, ok := parseSubscriptionWakeJobID(jobID); ok {
+	if v, _ := item.Metadata[subscriptionWakeMetaKey].(string); v != "" {
+		hash, token, ok := parseSubscriptionWakeMeta(v)
+		if !ok {
+			return nil
+		}
+
 		return waiter.ClearSubscriptionWaitingIf(ctx, id, hash, token)
 	}
 
@@ -616,7 +623,7 @@ func (e *executor) enqueueSubscriptionWake(ctx context.Context, md *sv2.Metadata
 		Payload: queue.PayloadEdge{
 			Edge: inngest.Edge{Outgoing: outgoing, Incoming: incoming},
 		},
-		Metadata: map[string]any{},
+		Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(hash, token)},
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(

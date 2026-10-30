@@ -59,6 +59,8 @@ type hookedRunService struct {
 	sv2.RunService
 	afterSet   func()
 	afterStack func()
+	// lostClearReply makes the next compare-and-delete apply and then report an error.
+	lostClearReply bool
 }
 
 func (h *hookedRunService) SetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string, token string) error {
@@ -69,8 +71,8 @@ func (h *hookedRunService) SetSubscriptionWaiting(ctx context.Context, id sv2.ID
 	return err
 }
 
-func (h *hookedRunService) TakeSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string) (string, bool, error) {
-	return h.RunService.(sv2.SubscriptionWaiter).TakeSubscriptionWaiting(ctx, id, hash)
+func (h *hookedRunService) GetSubscriptionWaiting(ctx context.Context, id sv2.ID, hash string) (string, bool, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).GetSubscriptionWaiting(ctx, id, hash)
 }
 
 func (h *hookedRunService) ClearSubscriptionWaiting(ctx context.Context, id sv2.ID) error {
@@ -235,6 +237,14 @@ func (f *wakeFixture) begin(key string) *request {
 	return &request{f: f, key: key}
 }
 
+// beginAs starts a request the way Execute does: the start hook runs before the
+// request reads state. item is the wake item, empty for any other request.
+func (f *wakeFixture) beginAs(key string, item queue.Item) *request {
+	f.t.Helper()
+	require.NoError(f.t, f.e.startSubscriptionWake(f.ctx, f.md.ID, item))
+	return f.begin(key)
+}
+
 // start leases a queued wake and starts its request.
 func (f *wakeFixture) start(key string) *request {
 	f.t.Helper()
@@ -245,7 +255,7 @@ func (f *wakeFixture) start(key string) *request {
 		lease, err := f.shard.Lease(f.ctx, qi, 30*time.Second, time.Now())
 		require.NoError(f.t, err)
 		qi.LeaseID = lease
-		r := f.begin(key)
+		r := f.beginAs(key, qi.Data)
 		r.qi = &qi
 		return r
 	}
@@ -330,10 +340,9 @@ func (f *wakeFixture) requireNothingLost(keys ...string) {
 	for _, key := range keys {
 		require.False(f.t, f.queued(key), "wake of %q left queued", key)
 		require.Equal(f.t, f.delivered[key], f.saw[key], "messages of %q the function never saw", key)
-		_, waiting, err := waiter.TakeSubscriptionWaiting(f.ctx, f.md.ID, subscriptionKeyHash(key))
+		_, waiting, err := waiter.GetSubscriptionWaiting(f.ctx, f.md.ID, subscriptionKeyHash(key))
 		require.NoError(f.t, err)
 		require.True(f.t, waiting, "the run is not waiting on %q, so the next message would not wake it", key)
-		require.NoError(f.t, waiter.SetSubscriptionWaiting(f.ctx, f.md.ID, subscriptionKeyHash(key), uuid.NewString()))
 	}
 }
 
@@ -425,7 +434,7 @@ func TestWakeMessageBetweenFlagAndRecheck(t *testing.T) {
 	}
 	r.end()
 	require.Equal(t, 1, f.accepts("inbox"))
-	require.Zero(t, f.rq.rejected)
+	require.Equal(t, 1, f.rq.rejected, "the recheck refuses the delivery's wake of the same wait")
 
 	f.settle("inbox")
 	f.requireNothingLost("inbox")
@@ -480,7 +489,7 @@ func TestWakeBurstWhileBlocked(t *testing.T) {
 	f.burst("inbox", 20)
 
 	require.Equal(t, 1, f.accepts("inbox"))
-	require.Zero(t, f.rq.rejected, "later messages find no flag, they do not even try")
+	require.Equal(t, 19, f.rq.rejected, "later messages read the same flag and are refused")
 
 	f.settle("inbox")
 	f.requireNothingLost("inbox")
@@ -502,7 +511,7 @@ func TestWakeItemShape(t *testing.T) {
 		qi := items[0]
 		require.Equal(t, queue.KindEdge, qi.Data.Kind)
 		require.NotNil(t, qi.IdempotencyPeriod)
-		require.Zero(t, *qi.IdempotencyPeriod)
+		require.Equal(t, subscriptionWakeIdempotency, *qi.IdempotencyPeriod)
 		require.Equal(t, "step", qi.Data.Payload.(queue.PayloadEdge).Edge.Incoming)
 		// The run's metadata says whether the SDK plans before it runs, not the item.
 		require.Zero(t, qi.Data.ParallelMode)
@@ -575,7 +584,7 @@ func TestWakeTimedReadMessageWins(t *testing.T) {
 	f.settle("inbox")
 
 	// The timer of the read that got its message fires: its request waits again.
-	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, queue.Item{}))
 	f.begin("inbox").end()
 
 	f.deliver("inbox")
@@ -591,7 +600,7 @@ func TestWakeTimedReadTimerWins(t *testing.T) {
 	f.begin("inbox").end()
 
 	// The timer fires, and the request it runs is busy.
-	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, queue.Item{}))
 	r := f.begin("inbox")
 	r.readState()
 	f.deliver("inbox")
@@ -612,7 +621,7 @@ func TestWakeTimerClearsANewerWait(t *testing.T) {
 	// A message lands as the timer fires, before the timer's request reads.
 	f.deliver("inbox")
 	f.settle("inbox")
-	require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+	require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, queue.Item{}))
 	r := f.begin("inbox")
 	f.deliver("inbox")
 	r.end()
@@ -769,7 +778,7 @@ func TestWakeRandomInterleavings(t *testing.T) {
 					// A wake item is leased, or a timer fires and runs a request.
 					if r == nil {
 						if rng.Intn(4) == 0 {
-							require.NoError(t, f.e.clearSubscriptionWaiting(f.ctx, f.md.ID))
+							require.NoError(t, f.e.startSubscriptionWake(f.ctx, f.md.ID, queue.Item{}))
 							running[key] = f.begin(key)
 						} else {
 							running[key] = f.start(key)
@@ -803,4 +812,13 @@ func TestWakeRandomInterleavings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (h *hookedRunService) ClearSubscriptionWaitingIf(ctx context.Context, id sv2.ID, hash string, token string) error {
+	err := h.RunService.(sv2.SubscriptionWaiter).ClearSubscriptionWaitingIf(ctx, id, hash, token)
+	if err == nil && h.lostClearReply {
+		h.lostClearReply = false
+		return errors.New("reply lost")
+	}
+	return err
 }

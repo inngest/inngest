@@ -2173,7 +2173,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			EnvID:     id.WorkspaceID,
 			AccountID: id.AccountID,
 		},
-	}, jobID); err != nil {
+	}, item); err != nil {
 		return nil, err
 	}
 
