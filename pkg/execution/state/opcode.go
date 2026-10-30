@@ -648,6 +648,10 @@ type SubscribeOpts struct {
 	// that sends it must check the answer's `streams` count, since an executor
 	// that does not know the field opens only the first.
 	Streams []SubscribeStream `json:"streams,omitempty"`
+	// Output, on open, is a value the SDK computed before the op, saved with the
+	// answer (`output`). A replay reads it from the answer instead of computing
+	// it again, so work folded into the open is one step.
+	Output json.RawMessage `json:"output,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {

@@ -176,7 +176,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			}
 		}
 
-		return answer(map[string]any{"opened": true, "streams": len(sources)})
+		opened := map[string]any{"opened": true, "streams": len(sources)}
+		if len(sub.Output) > 0 {
+			opened["output"] = sub.Output
+		}
+
+		return answer(opened)
 
 	case state.SubscribePoll:
 		ids, err := messages()
