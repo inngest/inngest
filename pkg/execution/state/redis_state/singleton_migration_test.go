@@ -39,6 +39,38 @@ func TestSingletonMigrationSourceDrained(t *testing.T) {
 	require.True(t, drained)
 }
 
+func TestProtectSingletonMigrationRun(t *testing.T) {
+	r, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	_, shard := newQueue(t, rc)
+	scope := osqueue.ScopeFromQueueItem(migrationTestItem())
+	protector := shard.(interface {
+		ProtectSingletonMigrationRun(context.Context, osqueue.Scope, string, string, ulid.ULID) error
+	})
+	hold := shard.(osqueue.SingletonMigrationOperations)
+	run := ulid.Make()
+	ctx := t.Context()
+	require.NoError(t, hold.BeginSingletonMigration(ctx, scope, "migration"))
+	require.ErrorIs(t, protector.ProtectSingletonMigrationRun(ctx, scope, "other", "key", run), osqueue.ErrSingletonMigrationConflict)
+	require.NoError(t, protector.ProtectSingletonMigrationRun(ctx, scope, "migration", "key", run))
+	// Promote a lock previously copied by the legacy four-hour transfer.
+	kg := shard.Client().kg
+	r.SetTTL(kg.SingletonKey(&osqueue.Singleton{Key: "key"}), time.Hour)
+	r.SetTTL(kg.SingletonRunKey(run.String()), time.Hour)
+	require.NoError(t, protector.ProtectSingletonMigrationRun(ctx, scope, "migration", "key", run))
+	require.ErrorIs(t, protector.ProtectSingletonMigrationRun(ctx, scope, "migration", "key", ulid.Make()), osqueue.ErrQueueItemSingletonExists)
+	r.FastForward(5 * time.Hour)
+	owner, err := shard.SingletonGetRunID(ctx, scope, "key")
+	require.NoError(t, err)
+	require.Equal(t, &run, owner)
+	done, err := hold.FinishSingletonMigration(ctx, scope, "migration")
+	require.NoError(t, err)
+	require.True(t, done)
+	owner, err = shard.SingletonGetRunID(ctx, scope, "key")
+	require.NoError(t, err)
+	require.Nil(t, owner, "cleanup must not depend on a destination dequeue")
+}
+
 func TestSingletonMigrationHoldSurvivesLocalCompletionAndExpiry(t *testing.T) {
 	r, rc := initRedis(t)
 	t.Cleanup(rc.Close)

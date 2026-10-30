@@ -24,6 +24,43 @@ redis.call("SET", KEYS[1], ARGV[1])
 return 0
 `)
 
+var protectSingletonMigrationRun = rueidis.NewLuaScript(`
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then return -1 end
+local owner = redis.call("GET", KEYS[3])
+if owner and owner ~= ARGV[2] then return -2 end
+redis.call("SET", KEYS[3], ARGV[2])
+redis.call("SET", KEYS[4], KEYS[3])
+redis.call("SADD", KEYS[2], ARGV[2])
+return 0
+`)
+
+// ProtectSingletonMigrationRun copies ownership for a run still executing on
+// the source. Keep it durable and register cleanup atomically: there may never
+// be a destination job whose dequeue could register the deferred release.
+func (q *queue) ProtectSingletonMigrationRun(ctx context.Context, scope osqueue.Scope, migrationID, key string, runID ulid.ULID) error {
+	if err := validateSingletonMigration(scope, migrationID); err != nil {
+		return err
+	}
+	if key == "" {
+		return fmt.Errorf("singleton key is required")
+	}
+	kg := q.RedisClient.kg
+	hold, pending := singletonMigrationKeys(kg, scope)
+	keys := []string{hold, pending, kg.SingletonKey(&osqueue.Singleton{Key: key}), kg.SingletonRunKey(runID.String())}
+	result, err := protectSingletonMigrationRun.Exec(ctx, q.RedisClient.unshardedRc, keys, []string{migrationID, runID.String()}).AsInt64()
+	if err != nil {
+		return fmt.Errorf("protect in-flight singleton run: %w", err)
+	}
+	switch result {
+	case -1:
+		return osqueue.ErrSingletonMigrationConflict
+	case -2:
+		return osqueue.ErrQueueItemSingletonExists
+	default:
+		return nil
+	}
+}
+
 var singletonMigrationSourceDrained = rueidis.NewLuaScript(`
 for i = 1, #KEYS do
   if redis.call("ZCARD", KEYS[i]) ~= 0 then return 0 end
