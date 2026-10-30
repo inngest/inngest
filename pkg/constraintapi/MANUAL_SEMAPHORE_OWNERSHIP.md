@@ -1,7 +1,7 @@
-# Single-record retry experiment
+# Manual permits and start retries
 
-Local experiment only, not an approved rollout or legacy-backlog repair.
-The original two-record implementation remains on `fix/manual-semaphore-ownership`.
+Tracking is opt-in and off by default. It does not repair legacy holds or
+authorize backlog recovery.
 
 With `WithManualSemaphoreOwnership()` enabled, one record per run and manual
 constraint stores `weight:requestID`. The request ID already exists in the lease
@@ -16,20 +16,25 @@ details and stays unchanged through lease renewal.
   with the existing seven-day retention. Cleanup of a different active request
   is rejected before writes. Finalization never trusts its supplied weight.
 
-This removes the separate attempt key, the second request protocol marker, and
-the strict recovery API. It does not remove RunID validation, batch-prefix
-rules, other capacity checks, or the protection against caching a run-specific
-refusal as shared exhaustion. Held admissions still have no expiry.
+Run IDs, eligible batch prefixes and all other capacity checks remain required.
+Held admissions have no expiry.
+
+Shared exhaustion cannot rule out reuse of an owned manual admission. Redis
+acquisition excludes these constraints from its shared cache. In-process cache
+wrappers must do the same using `WithConstraintCacheShouldCacheForAccount` for
+the same enrolled accounts. Other constraints and legacy accounts keep caching.
 
 Default remains off. Compatible acquisition, ordinary release, finalization and
 scavenger code must be installed before enabling. Buckets must be drained of
 legacy holds first; missing ownership is not evidence that old usage is safe to
 decrement. The permanent bucket marker still forbids unsafe legacy release after
 a finalized record expires. Mixed legacy writers on an enabled bucket are not
-supported. This experimental record format is incompatible with the unshipped
-two-record draft. Do not enable either design in production from this branch.
+supported. This record format differs from the earlier unshipped two-record
+draft; those records are not converted automatically.
 
 Use the existing `BenchmarkManualSemaphoreOwnership` on a dedicated disposable
-localhost Redis with `SEMAPHORE_TEST_REDIS_ADDR`. Compare the draft and experiment
-on the same engine. Server CPU and retained memory still need measurement; fewer
-records do not prove production latency is unaffected.
+localhost Redis with `SEMAPHORE_TEST_REDIS_ADDR`. Compare revisions on the same
+engine. Owned manual requests must reach Redis even when the shared limit is
+full, so cache-hit avoidance cannot be assumed in load sizing. Fewer records do
+not prove production latency is unaffected; check CPU and memory headroom before
+enabling an account.

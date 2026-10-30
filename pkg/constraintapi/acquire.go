@@ -269,6 +269,10 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	cacheEnabled := false
 	if r.enableAcquireCache != nil {
 		for i, ci := range sortedConstraints {
+			// Shared exhaustion cannot rule out reuse of this run's admission.
+			if r.manualSemaphoreOwnership && ci.Kind == ConstraintKindSemaphore && ci.Semaphore != nil && ci.Semaphore.Release == SemaphoreReleaseManual {
+				continue
+			}
 			if !r.enableAcquireCache(ctx, req.AccountID, req.EnvID, req.FunctionID, ci) {
 				continue
 			}
