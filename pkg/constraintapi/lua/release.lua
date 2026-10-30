@@ -165,7 +165,7 @@ for index, c in ipairs(constraints) do
 			if tonumber(newVal) < 0 then
 				call("SET", c.sem.k, "0")
 			end
-		elseif requestDetails.mso and manualHolds[index] > 0 then
+		elseif c.sem.rel == 1 and requestDetails.mso and manualHolds[index] > 0 then
 			-- Release the attempt, not the whole-run admission.
 			call("SET", c.sem.k .. ":owner:" .. runID, tostring(manualHolds[index]) .. ":")
 		end

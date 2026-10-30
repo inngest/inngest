@@ -25,7 +25,10 @@ expiry; finalized records reject reacquisition for their seven-day retention.
 Shared exhaustion cannot rule out reuse of an owned manual admission. Redis
 acquisition excludes these constraints from its shared cache. In-process cache
 wrappers must do the same using `WithConstraintCacheShouldCacheForAccount` for
-the same enrolled accounts. Other constraints and legacy accounts keep caching.
+the same enrolled accounts. Queue processors must also receive
+`queue.WithManualSemaphoreOwnership` with that policy, so both Redis and FDB
+scanners avoid memoizing these refusals across runs in a pass. Other constraints
+and legacy accounts keep their caching and memoization.
 
 Default remains off. Compatible acquisition, ordinary release, finalization and
 scavenger code must be installed before enabling. Buckets must be drained of
@@ -40,4 +43,5 @@ localhost Redis with `SEMAPHORE_TEST_REDIS_ADDR`. Compare revisions on the same
 engine. Owned manual requests must reach Redis even when the shared limit is
 full, so cache-hit avoidance cannot be assumed in load sizing. Fewer records do
 not prove production latency is unaffected; check CPU and memory headroom before
-enabling an account.
+enabling an account. Finalization checks ownership even when new tracking is
+disabled; benchmark that legacy path as well as grants, refusals and retries.
