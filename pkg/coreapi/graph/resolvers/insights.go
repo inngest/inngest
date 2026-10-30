@@ -146,7 +146,10 @@ func toInsightsQueryResult(tr *insights.TranspileResult, result *insights.Result
 
 	return &models.InsightsQueryResult{
 		Columns: columns,
-		Rows:    result.Rows,
+		// JSONSafeValue's encoding, shared w/ the REST endpoint: Unknown's
+		// json.Marshal rejects NaN/Inf outright, and a JS client can't read
+		// an integer past 2^53 exactly.
+		Rows: insights.JSONSafeRows(result.Rows),
 		Info: &models.InsightsQueryInfo{
 			PrimaryTable: primaryTable,
 			Tables:       tr.Tables,
@@ -167,7 +170,7 @@ func toShortCircuitResult(sc *insights.ShortCircuitResult) *models.InsightsQuery
 	}
 	return &models.InsightsQueryResult{
 		Columns: columns,
-		Rows:    sc.Result.Rows,
+		Rows:    insights.JSONSafeRows(sc.Result.Rows),
 		Info:    &models.InsightsQueryInfo{Tables: sc.Tables},
 	}
 }
