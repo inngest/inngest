@@ -130,7 +130,6 @@ local singletonKey = redis.call("GET", singletonRunKey)
 
 if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
-  local singletonRunID = redis.call("GET", singletonKey)
 
   if tonumber(queueItemsCount) == 0 then
     -- Local emptiness is not run completion while jobs span migrating shards.
@@ -140,6 +139,7 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
       return 0
     end
     -- We just dequeued the last step
+     local singletonRunID = redis.call("GET", singletonKey)
      redis.call("DEL", singletonRunKey)
 
      if singletonRunID == runID then
