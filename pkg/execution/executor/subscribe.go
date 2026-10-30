@@ -590,9 +590,17 @@ func (e *executor) subscriptionWakeFollowUp(ctx context.Context, id sv2.ID, w su
 		return queue.RetryAtError(queue.AlwaysRetryError(errSubscriptionWakeAgain), &now)
 	}
 
-	if !e.releaseSubscriptionWake(ctx, id, w) {
+	freed, err := e.releaseSubscriptionWake(ctx, id, w)
+	if err != nil {
+		// The item is still queued: the queue retries it and checks again.
+		return err
+	}
+	if !freed {
 		return nil
 	}
+
+	// A shutdown during the retries below must not drop the wake.
+	ctx = context.WithoutCancel(ctx)
 
 	// The wake item is gone, so an error from here on cannot be left to the
 	// queue: its retry finds no item and is dropped, which would leave the
@@ -645,11 +653,12 @@ func retryInPlace(ctx context.Context, fn func() error) error {
 }
 
 // releaseSubscriptionWake removes the wake's own item, which frees its job ID.
-// It reports whether the ID was freed; without a shard to remove from, the
-// removal is left to the queue.
-func (e *executor) releaseSubscriptionWake(ctx context.Context, id sv2.ID, w subscriptionWake) bool {
+// It reports whether the ID was freed; without a shard registry, the removal is
+// left to the queue. An error means the item may still be queued.
+
+func (e *executor) releaseSubscriptionWake(ctx context.Context, id sv2.ID, w subscriptionWake) (bool, error) {
 	if e.shards == nil {
-		return false
+		return false, nil
 	}
 
 	shard, err := e.shards.Resolve(ctx, queue.Scope{
@@ -658,7 +667,7 @@ func (e *executor) releaseSubscriptionWake(ctx context.Context, id sv2.ID, w sub
 		FunctionID: id.FunctionID,
 	}, nil)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	// The wake holds no idempotency key, so removing it must not leave one.
@@ -670,7 +679,11 @@ func (e *executor) releaseSubscriptionWake(ctx context.Context, id sv2.ID, w sub
 		Data:              w.item,
 	})
 
-	return err == nil
+	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // removeSubscriptionPause deletes the pause of a subscription stream so its
