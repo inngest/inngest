@@ -1,0 +1,28 @@
+{
+  "sql": "SELECT NULL::STRUCT (a INT) AS s, NULL::MAP (VARCHAR, INT) AS m, 1::DECIMAL (10, 2) AS d, run_id::VARCHAR (10) AS v, NULL::INTEGER [] AS l FROM inngest.insights_runs(?, ?) AS runs LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs"
+  ],
+  "limited": true,
+  "columnHints": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "diagnostics": [
+    {
+      "start": "1:1",
+      "end": "1:181",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

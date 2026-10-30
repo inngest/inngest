@@ -445,19 +445,19 @@ func init() {
 			description: "Computes the approximate quantile using T-Digest.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates",
 			signature:   "approx_quantile(x, pos)",
-			returnType:  withArity(2, 2, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, numberOrArgDatetime)),
 		},
 		"arg_max": {
 			description: "Finds the row with the maximum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_maxarg-val",
 			signature:   "arg_max(arg, val)",
-			returnType:  withArity(2, 3, preservesArgTypeAndHint),
+			returnType:  withArity(2, 3, listWhenArgCount(3, preservesArgTypeAndHint)),
 		},
 		"arg_min": {
 			description: "Finds the row with the minimum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_minarg-val",
 			signature:   "arg_min(arg, val)",
-			returnType:  withArity(2, 3, preservesArgTypeAndHint),
+			returnType:  withArity(2, 3, listWhenArgCount(3, preservesArgTypeAndHint)),
 		},
 		"array_agg": {
 			description: "Returns a LIST containing all the values of a column.",
@@ -535,7 +535,7 @@ func init() {
 			description: "Calculates the average value for all tuples in x.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#avgarg",
 			signature:   "avg(arg)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(1, 1, numberOrArgDatetime),
 		},
 		"bit_and": {
 			description: "Returns the bitwise AND of all bits in a given expression.",
@@ -698,7 +698,7 @@ func init() {
 			description: "The number of complete partitions between the timestamps.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/date#date_subpart-startdate-enddate",
 			signature:   "date_sub(part, startdate, enddate)",
-			returnType:  withArity(3, 3, fixedType(ColumnTypeDatetime)),
+			returnType:  withArity(3, 3, fixedType(ColumnTypeNumber)),
 		},
 		"date_trunc": {
 			description: "Truncate to specified precision.",
@@ -758,7 +758,7 @@ func init() {
 			description: "Extract the epoch component in milliseconds from a temporal type.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/timestamp#epoch_mstimestamp",
 			signature:   "epoch_ms(timestamp)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(1, 1, epochMsReturnType),
 		},
 		"exp": {
 			description: "Computes e to the power of x.",
@@ -896,7 +896,7 @@ func init() {
 			description: "Extracts the value at the given path or key as a string.",
 			docsURL:     "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
 			signature:   "json_extract_string(json, path)",
-			returnType:  withArity(2, 2, fixedType(ColumnTypeString)),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, fixedType(ColumnTypeString))),
 		},
 		"json_group_array": {
 			description: "Aggregates values into a JSON array.",
@@ -1190,7 +1190,7 @@ func init() {
 			description: "Returns the maximum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#maxarg",
 			signature:   "max(arg)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenArgCount(2, preservesArgTypeAndHint)),
 		},
 		"md5": {
 			description: "Returns the MD5 hash of the string as a VARCHAR.",
@@ -1208,7 +1208,7 @@ func init() {
 			description: "Returns the minimum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#minarg",
 			signature:   "min(arg)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenArgCount(2, preservesArgTypeAndHint)),
 		},
 		"minute": {
 			description: "Extract the minute component from a date or timestamp.",
@@ -1292,13 +1292,13 @@ func init() {
 			description: "Returns the interpolated quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding interpolated quantiles.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_contx-pos",
 			signature:   "quantile_cont(x, pos)",
-			returnType:  withArity(2, 2, preservesArgType),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, preservesArgType)),
 		},
 		"quantile_disc": {
 			description: "Returns the exact quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding exact quantiles.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_discx-pos",
 			signature:   "quantile_disc(x, pos)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenListArg(1, true, preservesArgTypeAndHint)),
 		},
 		"quarter": {
 			description: "Extract the quarter component from a date or timestamp.",
@@ -1562,7 +1562,7 @@ func init() {
 			description: "Extract the timezone component from a date or timestamp.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/datepart#timezonedate",
 			signature:   "timezone(date)",
-			returnType:  withArity(1, 2, fixedType(ColumnTypeDatetime)),
+			returnType:  withArity(1, 2, timezoneReturnType),
 		},
 		"to_json": {
 			description: "Converts a value to JSON.",
