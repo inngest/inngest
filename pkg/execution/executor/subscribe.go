@@ -329,24 +329,33 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	// A message that would break a limit is dropped and the subscription is
 	// closed: its pause stops matching, and the reader sees the end after the
 	// messages already saved. A redelivery of a saved message is not new.
+	closeForLimit := func(limit string) error {
+		l.Warn("subscription limit reached, closing the subscription", "limit", limit, "key", key)
+
+		// What was buffered becomes steps first, so the reader sees every message
+		// saved before the limit, then the end.
+		if err := e.flushSubscription(ctx, id, key); err != nil {
+			return err
+		}
+
+		// Close first: it is idempotent, so a failure here is retried with the
+		// pause still there to find it.
+		reason, _ := json.Marshal(map[string]any{"limit": limit})
+		if err := e.endSubscription(ctx, id, key, reason); err != nil {
+			return err
+		}
+		idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
+		if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
+			return err
+		}
+
+		// A read waiting for a message that will not come sees the close.
+		return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, subscriptionClosedID(key))
+	}
 	if !slices.Contains(md.Stack, messageID) {
 		stepLimit, stateLimit := e.subscriptionLimits(id)
 		if limit := subscriptionMessageLimit(&md, key, len(data), stepLimit, stateLimit); limit != "" {
-			l.Warn("subscription limit reached, closing the subscription", "limit", limit, "key", key)
-
-			// Close first: it is idempotent, so a failure here is retried with the
-			// pause still there to find it.
-			reason, _ := json.Marshal(map[string]any{"limit": limit})
-			if err := e.endSubscription(ctx, id, key, reason); err != nil {
-				return err
-			}
-			idx := pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: *pause.Event}
-			if err := e.removeSubscriptionPause(ctx, &md, idx, pause); err != nil {
-				return err
-			}
-
-			// A read waiting for a message that will not come sees the close.
-			return e.wakeSubscription(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), key, subscriptionClosedID(key))
+			return closeForLimit(limit)
 		}
 	}
 	// A reader that is not waiting gets the message when it asks for it: until
@@ -361,8 +370,8 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 	} else if !waiting {
 		_, err := waiter.BufferSubscriptionMessage(ctx, id, subscriptionKeyHash(key), messageID, data, consts.MaxSubscriptionMessages)
 		if errors.Is(err, state.ErrSubscriptionBufferFull) {
-			l.Warn("subscription buffer full, dropping a message", "key", key)
-			return nil
+			// The messages nobody asked for reached the subscription's limit.
+			return closeForLimit(fmt.Sprintf("the subscription saved %d messages", consts.MaxSubscriptionMessages))
 		}
 
 		return err
