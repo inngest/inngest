@@ -26,6 +26,18 @@ type RunsV2Connection struct {
 	OrderBy []*RunsV2OrderBy
 }
 
+// SessionRunsConnection carries the query's filter so the totalCount
+// resolver can count the whole session (not just this page) lazily.
+type SessionRunsConnection struct {
+	Nodes    []*SessionRun `json:"nodes"`
+	PageInfo *PageInfo     `json:"pageInfo"`
+
+	SessionKey string
+	SessionID  string
+	From       time.Time
+	Until      time.Time
+}
+
 type RunTraceSpan struct {
 	AppID                 uuid.UUID                   `json:"appID"`
 	FunctionID            uuid.UUID                   `json:"functionID"`

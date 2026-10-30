@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +48,7 @@ func TestSessionKeys_RequiresDuckDB(t *testing.T) {
 	r := &Resolver{DuckDB: nil}
 	qr := r.Query().(*queryResolver)
 
-	_, err := qr.SessionKeys(t.Context(), nil)
+	_, err := qr.SessionKeys(t.Context(), nil, 20, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "requires dual-write")
 }
@@ -65,12 +66,17 @@ func TestSessionsEndToEnd(t *testing.T) {
 	insertGQLSessionRun(t, db, appID, functionID, "r1", "user", "u1", "Completed", now)
 	insertGQLSessionRun(t, db, appID, functionID, "r2", "user", "u1", "Failed", now)
 	insertGQLSessionRun(t, db, appID, functionID, "r3", "org", "o1", "Completed", now)
+	// Older sessions under the same key, so Sessions has >1 group to page
+	// through (ordered by last activity, so u1, u2, u3).
+	insertGQLSessionRun(t, db, appID, functionID, "r4", "user", "u2", "Completed", now.Add(-time.Minute))
+	insertGQLSessionRun(t, db, appID, functionID, "r5", "user", "u3", "Completed", now.Add(-2*time.Minute))
 
 	t.Run("SessionKeys", func(t *testing.T) {
-		keys, err := qr.SessionKeys(t.Context(), nil)
+		keys, err := qr.SessionKeys(t.Context(), nil, 20, nil)
 		require.NoError(t, err)
+		require.False(t, keys.PageInfo.HasNextPage)
 		names := map[string]bool{}
-		for _, k := range keys {
+		for _, k := range keys.Nodes {
 			names[k.SessionKey] = true
 		}
 		require.True(t, names["user"])
@@ -78,9 +84,11 @@ func TestSessionsEndToEnd(t *testing.T) {
 	})
 
 	t.Run("Sessions", func(t *testing.T) {
-		groups, err := qr.Sessions(t.Context(), "user", nil, nil)
+		conn, err := qr.Sessions(t.Context(), "user", nil, nil, 20, nil)
 		require.NoError(t, err)
-		require.Len(t, groups, 1)
+		require.False(t, conn.PageInfo.HasNextPage)
+		groups := conn.Nodes
+		require.Len(t, groups, 3)
 		require.Equal(t, "u1", groups[0].SessionID)
 		require.Equal(t, 2, groups[0].RunCount)
 		require.Equal(t, 1, groups[0].FailedRunCount)
@@ -90,8 +98,70 @@ func TestSessionsEndToEnd(t *testing.T) {
 	})
 
 	t.Run("SessionRuns", func(t *testing.T) {
-		runs, err := qr.SessionRuns(t.Context(), "user", "u1", nil)
+		runs, err := qr.SessionRuns(t.Context(), "user", "u1", nil, 20, nil)
 		require.NoError(t, err)
-		require.Len(t, runs, 2)
+		require.Len(t, runs.Nodes, 2)
+	})
+
+	t.Run("Pagination", func(t *testing.T) {
+		first, err := qr.SessionRuns(t.Context(), "user", "u1", nil, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, first.Nodes, 1)
+		require.True(t, first.PageInfo.HasNextPage)
+		require.NotNil(t, first.PageInfo.EndCursor)
+
+		second, err := qr.SessionRuns(t.Context(), "user", "u1", nil, 1, first.PageInfo.EndCursor)
+		require.NoError(t, err)
+		require.Len(t, second.Nodes, 1)
+		require.False(t, second.PageInfo.HasNextPage)
+		require.Nil(t, second.PageInfo.EndCursor)
+		require.NotEqual(t, first.Nodes[0].ID, second.Nodes[0].ID)
+
+		// totalCount is the whole session's, not the page's.
+		cr := r.SessionRunsConnection()
+		for _, page := range []*models.SessionRunsConnection{first, second} {
+			total, err := cr.TotalCount(t.Context(), page)
+			require.NoError(t, err)
+			require.Equal(t, 2, total)
+		}
+
+		var (
+			sessionIDs []string
+			after      *string
+		)
+		for page := 0; ; page++ {
+			require.Less(t, page, 3, "too many Sessions pages")
+			conn, err := qr.Sessions(t.Context(), "user", nil, nil, 1, after)
+			require.NoError(t, err)
+			require.Len(t, conn.Nodes, 1)
+			sessionIDs = append(sessionIDs, conn.Nodes[0].SessionID)
+			if page < 2 {
+				require.True(t, conn.PageInfo.HasNextPage)
+				require.NotNil(t, conn.PageInfo.EndCursor)
+				require.NotEqual(t, derefString(after), *conn.PageInfo.EndCursor)
+				after = conn.PageInfo.EndCursor
+				continue
+			}
+			require.False(t, conn.PageInfo.HasNextPage)
+			require.Nil(t, conn.PageInfo.EndCursor)
+			break
+		}
+		require.Equal(t, []string{"u1", "u2", "u3"}, sessionIDs)
+
+		keys, err := qr.SessionKeys(t.Context(), nil, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, keys.Nodes, 1)
+		require.True(t, keys.PageInfo.HasNextPage)
+		keys, err = qr.SessionKeys(t.Context(), nil, 1, keys.PageInfo.EndCursor)
+		require.NoError(t, err)
+		require.Len(t, keys.Nodes, 1)
+		require.False(t, keys.PageInfo.HasNextPage)
+	})
+
+	t.Run("FirstOutOfRange", func(t *testing.T) {
+		_, err := qr.SessionKeys(t.Context(), nil, 101, nil)
+		require.ErrorContains(t, err, "cannot exceed 100")
+		_, err = qr.Sessions(t.Context(), "user", nil, nil, 0, nil)
+		require.ErrorContains(t, err, "at least 1")
 	})
 }
