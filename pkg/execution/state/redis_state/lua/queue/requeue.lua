@@ -5,8 +5,9 @@ Re-enqueus a queue item within its queue, removing any lease.
 Output:
   0: Successfully re-enqueued item
   1: Queue item not found
-  2: Successfully re-queued to backlog -- TODO: this should be a temporary status
+  2: Expired-capacity repair precondition failed
   3: Observed lease no longer matches
+  4: Partition lease no longer owned
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
@@ -49,6 +50,10 @@ local shadowPartitionItem     = ARGV[9]
 local backlogID               = ARGV[10]
 local backlogItem             = ARGV[11]
 local expectedLeaseID         = ARGV[12]
+local expectedPartitionLease  = ARGV[13]
+local expectedGeneration      = tonumber(ARGV[14])
+local expectedCapacityLease   = ARGV[15]
+local expectedRefilledFrom    = ARGV[16]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -56,6 +61,7 @@ local expectedLeaseID         = ARGV[12]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
+-- $include(decode_ulid_time.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -71,6 +77,22 @@ if expectedLeaseID ~= nil and expectedLeaseID ~= "" then
   if currentLeaseID ~= expectedLeaseID then
     return 3
   end
+end
+
+if expectedPartitionLease ~= nil and expectedPartitionLease ~= "" then
+    local partition = get_partition_item(keyPartitionMap, partitionID)
+    if partition == nil or partition.leaseID ~= expectedPartitionLease or decode_ulid_time(expectedPartitionLease) <= nowMS then
+        return 4
+    end
+    -- Inspect current Redis state, not just the snapshot chosen by the scanner.
+    if requeueToBacklog ~= 1 or redis.call("ZSCORE", keyReadyQueue, queueID) == false or
+       (item.genID or 0) ~= expectedGeneration or
+       (item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS) or
+       item.cl == nil or item.cl == cjson.null or item.cl.l ~= expectedCapacityLease or
+       decode_ulid_time(item.cl.l) >= nowMS or item.at > nowMS or
+       item.rf == nil or item.rf == cjson.null or item.rf == "" or item.rf ~= expectedRefilledFrom then
+        return 2
+    end
 end
 
 -- Update the queue item with a nil lease, at, atMS, etc.

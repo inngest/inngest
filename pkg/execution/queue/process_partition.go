@@ -191,6 +191,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return err
 	}
 
+	queue, repairedExpiredCapacity, err := q.requeueExpiredCapacityLeases(ctx, p, queue)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+
 	l.Optional(p.AccountID, "queue").Debug(
 		"peeked",
 		"limit", peek,
@@ -394,8 +400,13 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// time with jitter. This is why we have to lease items above, else this may
 	// return an item that is about to be leased and processed by the worker.
 	requeueExtension := partitionRequeueExtensionWithJitter()
+	if repairedExpiredCapacity {
+		// Continue bounded repair promptly, including when reservation owners
+		// were beyond this peek. The shard still garbage-collects empty queues.
+		requeueExtension = 0
+	}
 	_, err = DurationWithTags(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
-		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), false)
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), repairedExpiredCapacity)
 		return nil, err
 	}, map[string]any{"no_peek": noPeek})
 	if err == ErrPartitionGarbageCollected {
