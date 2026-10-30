@@ -848,6 +848,16 @@ func (v v2) SetSubscriptionWaiting(ctx context.Context, id state.ID, hash string
 	return nil
 }
 
+// RegisterSubscriptionTimer registers the timer of a timed read.
+func (v v2) RegisterSubscriptionTimer(ctx context.Context, id state.ID, timer string) error {
+	return v.mgr.RegisterSubscriptionTimer(ctx, id.Tenant.AccountID, id.RunID, timer)
+}
+
+// ClaimSubscriptionTimer claims a timed read and returns who holds it.
+func (v v2) ClaimSubscriptionTimer(ctx context.Context, id state.ID, timer string, who string) (string, error) {
+	return v.mgr.ClaimSubscriptionTimer(ctx, id.Tenant.AccountID, id.RunID, timer, who)
+}
+
 // GetSubscriptionWaiting reads the waiting flag of a subscription.
 func (v v2) GetSubscriptionWaiting(ctx context.Context, id state.ID, hash string) (string, bool, error) {
 	return v.mgr.GetSubscriptionWaiting(ctx, id.Tenant.AccountID, id.RunID, hash)

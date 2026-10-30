@@ -533,6 +533,12 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	key := opts.Subscribe.Key
 	hash := subscriptionKeyHash(key)
 	token := subscriptionWaitToken(opts.Timer, opts.Subscribe.Seq)
+	if opts.Timer != "" {
+		// Before the flag, so the timer and a wake can both claim the read.
+		if err := waiter.RegisterSubscriptionTimer(ctx, md.ID, opts.Timer); err != nil {
+			return err
+		}
+	}
 	if err := waiter.SetSubscriptionWaiting(ctx, md.ID, hash, token); err != nil {
 		if errors.Is(err, state.ErrRunNotFound) {
 			return nil
@@ -791,18 +797,10 @@ func isParkingOp(op *state.GeneratorOpcode) bool {
 	return false
 }
 
-// subscriptionMessageWonPrefix starts what a message that wins a timed read saves
-// as the result of the read's timer step; the wake's token follows. The timer
-// saves null when it wins. Whichever is saved first is the winner, and the other
-// one sees the duplicate and runs nothing, so a message and its timer never both
-// run what follows the read. The token names the wake that won, so a second wake
-// of the same read (another token) stops too.
-const subscriptionMessageWonPrefix = "subscription-message:"
-
-// subscriptionMessageWon is the value a wake with the token saves.
-func subscriptionMessageWon(token string) []byte {
-	return []byte(strconv.Quote(subscriptionMessageWonPrefix + token))
-}
+// subscriptionTimerClaimant is who a timed read's timer claims it as. A wake
+// claims it as its token, so a message and its timer never both run what follows
+// the read: the state store holds the first claim and no step is saved for it.
+const subscriptionTimerClaimant = "timer"
 
 // subscriptionWaitToken is the token of one wait: unique, and for a timed read
 // followed by the ID of the read's timer step and the number of the message the
@@ -860,31 +858,13 @@ func markSubscriptionTimers(ops []*state.GeneratorOpcode) {
 	}
 }
 
-// timerWinner reads who saved the timer step: the token of the wake of a message
-// that won, or empty when the timer (or nothing) did.
-func (e *executor) timerWinner(ctx context.Context, id sv2.ID, stepID string) (string, error) {
-	steps, err := e.smv2.LoadStepsWithIDs(ctx, id, []string{stepID})
-	if err != nil {
-		return "", err
-	}
-
-	var v string
-	if err := json.Unmarshal(steps[stepID], &v); err != nil {
-		return "", nil
-	}
-
-	winner, _ := strings.CutPrefix(v, subscriptionMessageWonPrefix)
-
-	return winner, nil
-}
-
 // claimSubscriptionTimer runs for a wake before it does anything else. For a
-// timed read the wake claims the wait by saving the timer's step as won, but
-// only when the message the read waits for is saved: a wake for an earlier
-// message (a redelivery) or a close would otherwise end the read as a timeout.
-// It returns false when the timer got there first: the timer's request runs the
-// function, so this one must not. A rerun of the same wake finds its own token
-// and carries on; any other wake of the read stops, since the winner runs.
+// timed read the wake claims the wait in the state store, but only when the
+// message the read waits for is saved: a wake for an earlier message (a
+// redelivery) or a close would otherwise end the read as a timeout. It returns
+// false when the timer got there first: the timer's request runs the function,
+// so this one must not. A rerun of the same wake finds its own token and
+// carries on; any other wake of the read stops, since the winner runs.
 func (e *executor) claimSubscriptionTimer(ctx context.Context, id sv2.ID, item queue.Item) (bool, error) {
 	v, _ := item.Metadata[subscriptionWakeMetaKey].(string)
 	hash, token, ok := parseSubscriptionWakeMeta(v)
@@ -901,16 +881,32 @@ func (e *executor) claimSubscriptionTimer(ctx context.Context, id sv2.ID, item q
 		return true, nil
 	}
 
-	_, err = e.smv2.SaveStep(ctx, id, timer, subscriptionMessageWon(token))
-	if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
+	waiter, err := e.subscriptionWaiter()
+	if err != nil {
+		return false, err
+	}
+	holder, err := waiter.ClaimSubscriptionTimer(ctx, id, timer, token)
+	if err != nil {
 		return false, err
 	}
 
-	// A retried save reports a duplicate as success, so the stored value says who
-	// won, whatever the save returned.
-	winner, err := e.timerWinner(ctx, id, timer)
+	return holder == "" || holder == token, nil
+}
 
-	return winner == token, err
+// timerClaimLost runs when the timer of a sleep fires: it reports whether a
+// message already won the read the sleep times. A sleep that is no read's timer
+// is not registered and is never lost.
+func (e *executor) timerClaimLost(ctx context.Context, id sv2.ID, timer string) (bool, error) {
+	waiter, ok := e.smv2.(sv2.SubscriptionWaiter)
+	if !ok {
+		return false, nil
+	}
+	holder, err := waiter.ClaimSubscriptionTimer(ctx, id, timer, subscriptionTimerClaimant)
+	if err != nil {
+		return false, err
+	}
+
+	return holder != "" && holder != subscriptionTimerClaimant, nil
 }
 
 // userStepID is the ID the user gave the op, empty when the SDK sent none.

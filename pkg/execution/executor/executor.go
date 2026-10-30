@@ -2154,6 +2154,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l.Debug("error updating sleep resume span", "error", err)
 		}
 
+		// A message that won a timed read claimed it: the timer saves nothing
+		// and runs nothing.
+		if lost, err := e.timerClaimLost(ctx, runID, edge.Outgoing); err != nil {
+			return nil, err
+		} else if lost {
+			return nil, nil
+		}
+
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
@@ -2165,18 +2173,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}, edge.Outgoing, []byte("null"))
 		if !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) && err != nil {
 			return nil, err
-		}
-		// A retry of the save reports a duplicate as success, so a retried timer
-		// checks who saved the step as well.
-		if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) || item.Attempt > 0 {
-			// A message that won a timed read saved this timer step first.
-			winner, err := e.timerWinner(ctx, runID, edge.Outgoing)
-			if err != nil {
-				return nil, err
-			}
-			if winner != "" {
-				return nil, nil
-			}
 		}
 		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
 			// Other steps are pending before we re-enter the function, so

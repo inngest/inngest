@@ -822,3 +822,11 @@ func (h *hookedRunService) ClearSubscriptionWaitingFor(ctx context.Context, id s
 	}
 	return err
 }
+
+func (h *hookedRunService) RegisterSubscriptionTimer(ctx context.Context, id sv2.ID, timer string) error {
+	return h.RunService.(sv2.SubscriptionWaiter).RegisterSubscriptionTimer(ctx, id, timer)
+}
+
+func (h *hookedRunService) ClaimSubscriptionTimer(ctx context.Context, id sv2.ID, timer string, who string) (string, error) {
+	return h.RunService.(sv2.SubscriptionWaiter).ClaimSubscriptionTimer(ctx, id, timer, who)
+}

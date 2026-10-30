@@ -254,6 +254,13 @@ type SubscriptionWaiter interface {
 	// hash of its key) to a token that is unique to this wait, replacing any
 	// token already there. It returns ErrRunNotFound when the run is gone.
 	SetSubscriptionWaiting(ctx context.Context, id ID, hash string, token string) error
+	// RegisterSubscriptionTimer records the timer step of a timed read, so it
+	// can be claimed. Registering twice is harmless.
+	RegisterSubscriptionTimer(ctx context.Context, id ID, timer string) error
+	// ClaimSubscriptionTimer atomically claims a registered timer for who (the
+	// timer itself or a wake) unless it is claimed, and returns the holder. The
+	// holder is empty when the timer is not registered. No step is saved.
+	ClaimSubscriptionTimer(ctx context.Context, id ID, timer string, who string) (holder string, err error)
 	// GetSubscriptionWaiting reads the flag without changing it.
 	GetSubscriptionWaiting(ctx context.Context, id ID, hash string) (token string, ok bool, err error)
 	// ClearSubscriptionWaitingFor clears the flag of one subscription, whatever

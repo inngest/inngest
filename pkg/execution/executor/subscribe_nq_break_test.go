@@ -81,16 +81,23 @@ func TestBreakWaitBesideAnAsyncWaitIsStillWakeable(t *testing.T) {
 }
 
 // S9. A timed read's message and its timer both want to run what follows. Each
-// claims the wait by saving the timer's step; the first one wins and the other
-// sees the duplicate and runs nothing.
+// claims the wait in the state store, with no step saved; the first one wins and
+// the other runs nothing.
 func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 	wakeItem := func(f *wakeFixture) queue.Item {
 		token := subscriptionWaitToken("timer", 1)
 		return queue.Item{Metadata: map[string]any{subscriptionWakeMetaKey: subscriptionWakeMeta(subscriptionKeyHash("inbox"), token)}}
 	}
 
+	register := func(f *wakeFixture, timer string) {
+		w, err := f.e.subscriptionWaiter()
+		require.NoError(t, err)
+		require.NoError(t, w.RegisterSubscriptionTimer(f.ctx, f.md.ID, timer))
+	}
+
 	t.Run("MessageWins", func(t *testing.T) {
 		f := newWakeFixture(t, false)
+		register(f, "timer")
 		item := wakeItem(f)
 		f.deliver("inbox")
 
@@ -109,42 +116,50 @@ func TestBreakTimerAndWakeAreSingleWinner(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, ok)
 
-		// The timer saves null, sees the duplicate, and sees the message won.
-		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
-		require.Error(t, err)
-		winner, err := f.e.timerWinner(f.ctx, f.md.ID, "timer")
+		// The timer finds the read claimed and saves and runs nothing.
+		lost, err := f.e.timerClaimLost(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
-		require.NotEmpty(t, winner)
+		require.True(t, lost)
 	})
 
 	t.Run("TimerWins", func(t *testing.T) {
 		f := newWakeFixture(t, false)
+		register(f, "timer")
 		f.deliver("inbox")
-		_, err := f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		lost, err := f.e.timerClaimLost(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
+		require.False(t, lost)
 
 		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, wakeItem(f))
 		require.NoError(t, err)
 		require.False(t, ok, "the timer's request runs the function")
 
-		// A retry of the timer sees its own null, so it carries on.
-		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
-		require.Error(t, err)
-		winner, err := f.e.timerWinner(f.ctx, f.md.ID, "timer")
+		// A retry of the timer finds its own claim, so it carries on.
+		lost, err = f.e.timerClaimLost(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
-		require.Empty(t, winner)
+		require.False(t, lost)
 	})
 
 	t.Run("MissingMessageClaimsNothing", func(t *testing.T) {
 		f := newWakeFixture(t, false)
+		register(f, "timer")
 
 		ok, err := f.e.claimSubscriptionTimer(f.ctx, f.md.ID, wakeItem(f))
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		// The timer step is still free for the timer to save.
-		_, err = f.rs.SaveStep(f.ctx, f.md.ID, "timer", []byte("null"))
+		// The read is still free for the timer to claim.
+		lost, err := f.e.timerClaimLost(f.ctx, f.md.ID, "timer")
 		require.NoError(t, err)
+		require.False(t, lost)
+	})
+
+	t.Run("AnUnregisteredSleepIsNeverLost", func(t *testing.T) {
+		f := newWakeFixture(t, false)
+
+		lost, err := f.e.timerClaimLost(f.ctx, f.md.ID, "plain-sleep")
+		require.NoError(t, err)
+		require.False(t, lost)
 	})
 
 	t.Run("UntimedWakeAlwaysRuns", func(t *testing.T) {
@@ -329,7 +344,10 @@ func TestBreakLateFlagOfAFinishedTimedWait(t *testing.T) {
 	r.readState()
 
 	// The timer of the old wait fired; a newer wait set its flag.
-	_, err := f.rs.SaveStep(f.ctx, f.md.ID, "timer1", []byte("null"))
+	w, err := f.e.subscriptionWaiter()
+	require.NoError(t, err)
+	require.NoError(t, w.RegisterSubscriptionTimer(f.ctx, f.md.ID, "timer1"))
+	_, err = f.e.timerClaimLost(f.ctx, f.md.ID, "timer1")
 	require.NoError(t, err)
 	f.begin("inbox").end()
 	newer, ok := f.flag("inbox")

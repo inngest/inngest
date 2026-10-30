@@ -1197,6 +1197,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 		fnRunState.kg.SubscriptionWaiting(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionClaims(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
@@ -1834,7 +1835,7 @@ func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 		[]string{
 			fnRunState.kg.SubscriptionWaiting(ctx, isSharded, runID),
 			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
-			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
+			fnRunState.kg.SubscriptionClaims(ctx, isSharded, runID),
 		},
 		[]string{hash, token},
 	).AsInt64()
@@ -1843,6 +1844,42 @@ func (m shardedMgr) SetSubscriptionWaiting(ctx context.Context, accountID uuid.U
 	}
 
 	return set != 0, nil
+}
+
+// RegisterSubscriptionTimer records a timed read's timer, so its timer and the
+// wake of a message can claim it. Registering twice is harmless.
+func (m shardedMgr) RegisterSubscriptionTimer(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, timer string) error {
+	_, err := m.claimSubscriptionTimer(ctx, accountID, runID, timer, "register", "")
+
+	return err
+}
+
+// ClaimSubscriptionTimer claims a timed read for who unless something already
+// did, and returns the holder. The holder is empty when the timer was never
+// registered, so it is not a subscription timer.
+func (m shardedMgr) ClaimSubscriptionTimer(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, timer string, who string) (string, error) {
+	return m.claimSubscriptionTimer(ctx, accountID, runID, timer, "claim", who)
+}
+
+func (m shardedMgr) claimSubscriptionTimer(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, timer string, mode string, who string) (string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ClaimSubscriptionTimer"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+	res, err := retriableScripts["claimSubscriptionTimer"].Exec(
+		redis_telemetry.WithScriptName(ctx, "claimSubscriptionTimer"),
+		r,
+		[]string{fnRunState.kg.SubscriptionClaims(ctx, isSharded, runID)},
+		[]string{timer, mode, who},
+	).ToAny()
+	if err != nil {
+		return "", fmt.Errorf("error claiming a subscription timer: %w", err)
+	}
+	if held, ok := res.(string); ok {
+		return held, nil
+	}
+
+	return "", nil
 }
 
 // GetSubscriptionWaiting reads the waiting flag of a subscription without
