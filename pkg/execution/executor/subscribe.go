@@ -628,8 +628,13 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		if result == "buffered" {
 			continue
 		}
+		if result == "closed" {
+			// The inbox closed while the function ran (a limit): no flag is kept,
+			// so the read is woken under its own token to see the close.
+			return e.enqueueSubscriptionWake(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, hash, token, gen.ID)
+		}
 		if result != "set" {
-			// The wait is over, or the inbox is closed: nothing waits.
+			// The wait is over: nothing waits.
 			return nil
 		}
 		break
