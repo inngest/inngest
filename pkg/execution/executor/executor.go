@@ -2358,8 +2358,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		start:      start,
 	}
 
-	wake := newSubscriptionWake(item, md.Stack)
-
 	// This span will be updated with output as soon as execution finishes.
 	execAttrs := tracing.FunctionAttrs(&instance.f)
 	meta.AddAttr(execAttrs, meta.Attrs.StartedAt, &start)
@@ -2513,10 +2511,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		if handleErr != nil {
 			return resp, handleErr
-		}
-
-		if werr := e.subscriptionWakeFollowUp(ctx, md.ID, wake, resp, err); werr != nil {
-			return resp, werr
 		}
 
 		return resp, err

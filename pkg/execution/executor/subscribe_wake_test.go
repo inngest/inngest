@@ -87,14 +87,16 @@ func (q *recordingQueue) Enqueue(ctx context.Context, item queue.Item, at time.T
 }
 
 type wakeFixture struct {
-	t      *testing.T
-	ctx    context.Context
-	e      *executor
-	rq     *recordingQueue
-	shard  queue.QueueShard
-	rs     sv2.RunService
-	md     sv2.Metadata
-	events int
+	// leaseFor overrides the 30 second lease of started wakes.
+	leaseFor time.Duration
+	t        *testing.T
+	ctx      context.Context
+	e        *executor
+	rq       *recordingQueue
+	shard    queue.QueueShard
+	rs       sv2.RunService
+	md       sv2.Metadata
+	events   int
 
 	// delivered counts the messages saved per subscription.
 	delivered map[string]int
@@ -194,10 +196,9 @@ func (f *wakeFixture) queued(key string) bool {
 }
 
 type wakeRun struct {
-	f    *wakeFixture
-	key  string
-	qi   queue.QueueItem
-	wake subscriptionWake
+	f   *wakeFixture
+	key string
+	qi  queue.QueueItem
 	// done is set once the request has read the run's state.
 	done bool
 }
@@ -213,15 +214,17 @@ func (f *wakeFixture) start(key string) *wakeRun {
 	require.NoError(f.t, err)
 	require.Nil(f.t, qi.LeaseID, "a second wake started while one runs")
 
-	lease, err := f.shard.Lease(f.ctx, *qi, 30*time.Second, time.Now())
+	leaseFor := 30 * time.Second
+	if f.leaseFor > 0 {
+		leaseFor = f.leaseFor
+	}
+	lease, err := f.shard.Lease(f.ctx, *qi, leaseFor, time.Now())
 	require.NoError(f.t, err)
 	qi.LeaseID = lease
 
-	md, err := f.rs.LoadMetadata(f.ctx, f.md.ID)
-	require.NoError(f.t, err)
 	f.starts[key]++
 
-	return &wakeRun{f: f, key: key, qi: *qi, wake: newSubscriptionWake(qi.Data, md.Stack)}
+	return &wakeRun{f: f, key: key, qi: *qi}
 }
 
 // read is the SDK's request reading the run's state: what it holds now is what
@@ -234,32 +237,25 @@ func (r *wakeRun) read() {
 	r.done = true
 }
 
-// end handles the response: a follow-up error requeues the same item, as the
-// queue does for an always-retry error; any other outcome dequeues it.
+// end handles the response: a failed request is retried as the same item; any
+// other outcome is the processor removing the item, which keeps and requeues
+// it when a message was refused a wake meanwhile. It reports whether the wake
+// is queued to run again.
 func (r *wakeRun) end(resp *state.DriverResponse, driverErr error) (again bool) {
 	r.f.t.Helper()
 	// A request always reads the state it runs on.
 	if !r.done {
 		r.read()
 	}
-	err := r.f.e.subscriptionWakeFollowUp(r.f.ctx, r.f.md.ID, r.wake, resp, driverErr)
-
-	if queue.IsAlwaysRetryable(err) {
-		require.ErrorContains(r.f.t, err, errSubscriptionWakeAgain.Error())
-		require.NoError(r.f.t, r.f.rq.Requeue(r.f.ctx, r.f.shard.Name(), r.qi, time.Now()))
-		return true
-	}
-	require.NoError(r.f.t, err)
 
 	if driverErr != nil || (resp != nil && resp.Err != nil) {
-		// A failed request is retried as the same item, one attempt later.
 		r.qi.Data.Attempt++
 		require.NoError(r.f.t, r.f.rq.Requeue(r.f.ctx, r.f.shard.Name(), r.qi, time.Now()))
 		return false
 	}
 
 	r.f.queueRemoves(r.qi)
-	return false
+	return r.f.queued(r.key)
 }
 
 func okResp() *state.DriverResponse { return &state.DriverResponse{} }
@@ -484,7 +480,6 @@ func TestWakeRetriedRequestChecksOnItsFinalCompletion(t *testing.T) {
 	// The SDK request failed (a response error, then a transport error).
 	require.False(t, r.end(&state.DriverResponse{Err: new("boom")}, nil))
 	r = f.start("inbox")
-	require.Equal(t, 5, r.wake.seen, "the retry records the count at its own start")
 	require.False(t, r.end(okResp(), errors.New("connection reset")))
 
 	r = f.start("inbox")
@@ -502,7 +497,6 @@ func TestWakeOfARunThatEnded(t *testing.T) {
 
 	r := f.start("inbox")
 	r.read()
-	f.deliver("inbox")
 	require.NoError(t, f.rs.Delete(f.ctx, f.md.ID))
 
 	require.False(t, r.end(okResp(), nil))
@@ -512,15 +506,6 @@ func TestWakeOfARunThatEnded(t *testing.T) {
 	err := f.e.deliverSubscription(f.ctx, event.InternalEvent{ID: ulid.Make(), Event: event.Event{Name: "agent/message"}}, f.pause("inbox"), logger.VoidLogger())
 	require.ErrorIs(t, err, state.ErrRunNotFound)
 	require.False(t, f.queued("inbox"))
-}
-
-// An item that is not a wake never looks for messages.
-func TestWakeFollowUpIgnoresOtherItems(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-	other := newSubscriptionWake(queue.Item{Metadata: map[string]any{}}, nil)
-	require.NoError(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, other, okResp(), nil))
-	require.Zero(t, newSubscriptionWake(queue.Item{}, []string{subscriptionMessageID("inbox", "x")}).seen)
 }
 
 // Closing at a limit gives a waiting read the chance to see the close.
@@ -615,18 +600,15 @@ func TestWaitingThreadIsNotAStep(t *testing.T) {
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{empty}))
 }
 
-// A message saved after the wake's final check and before the queue removes the
-// item is refused a wake of its own (the ID is held until the removal) and is
-// not seen by this one. The wake must not be lost: the message gets a wake.
+// A message saved while the wake finishes is refused a wake of its own (the ID
+// is held until the removal) and is not seen by this one. The wake must not be
+// lost: the removal keeps the item and it runs again.
 func TestWakeMessageBetweenFinalCheckAndRemoval(t *testing.T) {
 	f := newWakeFixture(t, false)
 	f.deliver("inbox")
 
 	r := f.start("inbox")
 	r.read()
-
-	// The final check finds nothing new.
-	require.NoError(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
 
 	// A message lands before the queue's own removal of the item.
 	f.deliver("inbox")
@@ -647,48 +629,4 @@ func (f *wakeFixture) queueRemoves(qi queue.QueueItem) {
 	if !errors.Is(err, queue.ErrQueueItemNotFound) {
 		require.NoError(f.t, err)
 	}
-}
-
-// A message saved before the follow-up releases its item is refused a wake of
-// its own. If queueing the wake for it then fails once, the follow-up retries in
-// place: the queue's retry would find the item already gone and drop it.
-func TestWakeFollowUpRetriesEnqueueAfterRelease(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	r := f.start("inbox")
-	r.read()
-
-	f.rq.beforeDequeue = func() {
-		f.deliver("inbox")
-		f.rq.failEnqueues = 1
-	}
-
-	require.NoError(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
-
-	f.queueRemoves(r.qi)
-	f.drain("inbox")
-	f.requireNothingLost("inbox")
-}
-
-// If removing the wake's item fails, the item is still queued, so the follow-up
-// reports the error and the queue runs it again; nothing falls back to the
-// queue's own removal.
-func TestWakeFollowUpReportsAFailedRelease(t *testing.T) {
-	f := newWakeFixture(t, false)
-	f.deliver("inbox")
-
-	r := f.start("inbox")
-	r.read()
-
-	f.rq.beforeDequeue = func() {
-		f.deliver("inbox")
-		f.rq.failDequeues = 1
-	}
-
-	require.Error(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
-
-	// The item is still queued, and its retry sees the new message and runs again.
-	require.True(t, f.queued("inbox"))
-	require.Error(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
 }
