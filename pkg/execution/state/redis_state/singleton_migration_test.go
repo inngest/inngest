@@ -1,14 +1,43 @@
 package redis_state
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSingletonMigrationSourceDrained(t *testing.T) {
+	r, rc := initRedis(t)
+	t.Cleanup(rc.Close)
+	_, shard := newQueue(t, rc)
+	scope := osqueue.ScopeFromQueueItem(migrationTestItem())
+	checker := shard.(interface {
+		SingletonMigrationSourceDrained(context.Context, osqueue.Scope) (bool, error)
+	})
+	kg := shard.Client().kg
+	for _, key := range []string{
+		kg.PartitionQueueSet(enums.PartitionTypeDefault, scope.FunctionID.String(), ""),
+		kg.PartitionScavengerIndex(scope.FunctionID.String()),
+		kg.ShadowPartitionSet(scope.FunctionID.String()),
+	} {
+		// A past score must not hide an expired lease or stale backlog pointer.
+		_, err := r.ZAdd(key, 1, "outstanding")
+		require.NoError(t, err)
+		drained, err := checker.SingletonMigrationSourceDrained(t.Context(), scope)
+		require.NoError(t, err)
+		require.False(t, drained)
+		r.Del(key)
+	}
+	drained, err := checker.SingletonMigrationSourceDrained(t.Context(), scope)
+	require.NoError(t, err)
+	require.True(t, drained)
+}
 
 func TestSingletonMigrationHoldSurvivesLocalCompletionAndExpiry(t *testing.T) {
 	r, rc := initRedis(t)

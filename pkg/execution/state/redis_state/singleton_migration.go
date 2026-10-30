@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -22,6 +23,37 @@ if owner and owner ~= ARGV[1] then return -1 end
 redis.call("SET", KEYS[1], ARGV[1])
 return 0
 `)
+
+var singletonMigrationSourceDrained = rueidis.NewLuaScript(`
+for i = 1, #KEYS do
+  if redis.call("ZCARD", KEYS[i]) ~= 0 then return 0 end
+end
+return 1
+`)
+
+// SingletonMigrationSourceDrained includes ready jobs, all leases (even expired
+// leases awaiting scavenging), and backlog pointers. RunningCount deliberately
+// excludes expired leases and therefore cannot prove a migration source empty.
+// This is a source-only check: destination work may still be executing.
+func (q *queue) SingletonMigrationSourceDrained(ctx context.Context, scope osqueue.Scope) (bool, error) {
+	if scope.IsSystem {
+		return false, fmt.Errorf("singleton migration requires a function scope")
+	}
+	if err := scope.Validate(); err != nil {
+		return false, err
+	}
+	kg := q.RedisClient.kg
+	keys := []string{
+		kg.PartitionQueueSet(enums.PartitionTypeDefault, scope.FunctionID.String(), ""),
+		kg.PartitionScavengerIndex(scope.FunctionID.String()),
+		kg.ShadowPartitionSet(scope.FunctionID.String()),
+	}
+	result, err := singletonMigrationSourceDrained.Exec(ctx, q.RedisClient.unshardedRc, keys, nil).AsInt64()
+	if err != nil {
+		return false, fmt.Errorf("check singleton migration source: %w", err)
+	}
+	return result == 1, nil
+}
 
 var finishSingletonMigration = rueidis.NewLuaScript(`
 local owner = redis.call("GET", KEYS[1])
