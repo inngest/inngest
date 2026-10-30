@@ -332,3 +332,17 @@ func TestProcessorAccountShardReadsForEachWhenEnabled(t *testing.T) {
 	require.Equal(t, int32(1), atomic.LoadInt32(&shardB.runningCountCalls))
 	require.Equal(t, int32(1), atomic.LoadInt32(&shardB.statusCountCalls))
 }
+
+func TestSignalScanners(t *testing.T) {
+	a := make(chan struct{}, 1)
+	b := make(chan struct{}, 1)
+
+	signalScanners(a, b)
+	require.Len(t, a, 1)
+	require.Len(t, b, 1)
+
+	// A full channel must not block the caller.
+	signalScanners(a, b)
+	require.Len(t, a, 1)
+	require.Len(t, b, 1)
+}
