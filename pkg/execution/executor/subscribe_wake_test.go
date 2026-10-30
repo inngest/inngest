@@ -41,6 +41,7 @@ type recordingQueue struct {
 	// failEnqueues makes that many Enqueue calls fail; beforeDequeue runs once
 	// ahead of the next Dequeue.
 	failEnqueues  int
+	failDequeues  int
 	beforeDequeue func()
 }
 
@@ -49,6 +50,10 @@ func (q *recordingQueue) Dequeue(ctx context.Context, shard string, i queue.Queu
 		hook := q.beforeDequeue
 		q.beforeDequeue = nil
 		hook()
+	}
+	if q.failDequeues > 0 {
+		q.failDequeues--
+		return errors.New("transient redis error")
 	}
 	return q.Queue.Dequeue(ctx, shard, i, opts...)
 }
@@ -651,4 +656,26 @@ func TestWakeFollowUpRetriesEnqueueAfterRelease(t *testing.T) {
 	f.queueRemoves(r.qi)
 	f.drain("inbox")
 	f.requireNothingLost("inbox")
+}
+
+// If removing the wake's item fails, the item is still queued, so the follow-up
+// reports the error and the queue runs it again; nothing falls back to the
+// queue's own removal.
+func TestWakeFollowUpReportsAFailedRelease(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.deliver("inbox")
+
+	r := f.start("inbox")
+	r.read()
+
+	f.rq.beforeDequeue = func() {
+		f.deliver("inbox")
+		f.rq.failDequeues = 1
+	}
+
+	require.Error(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil))
+
+	// The item is still queued, and its retry sees the new message and runs again.
+	require.True(t, f.queued("inbox"))
+	require.ErrorIs(t, f.e.subscriptionWakeFollowUp(f.ctx, f.md.ID, r.wake, okResp(), nil), errSubscriptionWakeAgain)
 }
