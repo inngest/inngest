@@ -69,7 +69,8 @@ func (q *queueProcessor) ProcessItem(
 		requeueOpts = append(requeueOpts, RequeueCapacityLeased())
 	}
 
-	if held, _ := qi.Data.Metadata[MetadataLeaseHeldDequeue].(bool); held {
+	leaseHeld, _ := qi.Data.Metadata[MetadataLeaseHeldDequeue].(bool)
+	if leaseHeld {
 		dequeueOpts = append(dequeueOpts, DequeueLeaseHeld())
 	}
 
@@ -623,6 +624,12 @@ func (q *queueProcessor) ProcessItem(
 				return processResult, nil
 			}
 			return ProcessItemResult{}, err
+		}
+
+		// A lease-held removal may have requeued the item for a duplicate it
+		// refused, which is as much an enqueue as any other.
+		if q.wakeOnEnqueue && leaseHeld {
+			signalScanners(q.wakeShadow, q.wakeScan)
 		}
 	}
 

@@ -56,12 +56,7 @@ func New(
 	}
 	if o.wakeOnEnqueue {
 		producerOpts = append(producerOpts, WithProducerOnEnqueued(func() {
-			for _, ch := range []chan struct{}{wakeShadow, wakeScan} {
-				select {
-				case ch <- struct{}{}:
-				default:
-				}
-			}
+			signalScanners(wakeShadow, wakeScan)
 		}))
 	}
 
@@ -333,4 +328,14 @@ func (q *queueProcessor) capacity() int64 {
 
 func (q *queueProcessor) partitionCapacity() int64 {
 	return q.partitionSem.Available()
+}
+
+// signalScanners wakes the scanners behind the given channels without blocking.
+func signalScanners(chans ...chan struct{}) {
+	for _, ch := range chans {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
 }
