@@ -698,3 +698,13 @@ func TestRetriedTimerWinsAfterABufferedMessage(t *testing.T) {
 
 	require.True(t, f.fireTimer(timer, "next-1"))
 }
+
+// A next op is never a pending step: nothing saves a step under its ID, so a
+// parallel group holding one would wait for it forever.
+func TestNextOpIsNotAPendingStep(t *testing.T) {
+	next := &state.GeneratorOpcode{Op: enums.OpcodeWaitForEvent, ID: "next-1", Opts: map[string]any{"event": "e", "subscribe": map[string]any{"key": "inbox", "mode": "next"}}}
+	step := &state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: "step"}
+
+	require.Equal(t, []string{"step"}, opGroups([]*state.GeneratorOpcode{next, step}).NonLazyIDs())
+	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{next, step}))
+}

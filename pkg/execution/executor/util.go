@@ -80,6 +80,14 @@ type OpcodeGroups struct {
 	OtherGroup OpcodeGroup
 }
 
+// countsAsStep reports whether an op is a step the run waits for. Lazy ops piggyback
+// on a host op. A step.subscribe next op is answered by no step of its own (a
+// message or the end of the inbox shows the SDK what it waited for), so it is never
+// pending.
+func countsAsStep(op *state.GeneratorOpcode) bool {
+	return !enums.OpcodeIsLazy(op.Op) && !isSubscribeNext(op)
+}
+
 // nonLazyOpCount returns the count used to gate parallel-step behavior — see
 // enums.OpcodeIsLazy. Nil entries are skipped to mirror handleGeneratorGroup.
 func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
@@ -88,7 +96,7 @@ func nonLazyOpCount(opcodes []*state.GeneratorOpcode) int {
 		if op == nil {
 			continue
 		}
-		if !enums.OpcodeIsLazy(op.Op) {
+		if countsAsStep(op) {
 			n++
 		}
 	}
@@ -141,7 +149,7 @@ func (g OpcodeGroups) NonLazyIDs() []string {
 	ids := []string{}
 	for _, group := range g.All() {
 		for _, op := range group.Opcodes {
-			if enums.OpcodeIsLazy(op.Op) {
+			if !countsAsStep(op) {
 				continue
 			}
 			ids = append(ids, op.ID)
