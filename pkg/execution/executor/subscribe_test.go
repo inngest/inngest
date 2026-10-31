@@ -670,3 +670,16 @@ func (f *subscribeFixture) waiting(key string) string {
 
 	return state.Waiting
 }
+
+// The inbox hash goes with the run.
+func TestInboxStateIsDeletedWithTheRun(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	f.next("inbox", "next-1")
+	require.NotEmpty(t, f.field("inbox"))
+
+	require.NoError(t, f.rs.Delete(f.ctx, f.md.ID))
+	for _, k := range f.mr.Keys() {
+		require.NotContains(t, k, ":subs:")
+	}
+}
