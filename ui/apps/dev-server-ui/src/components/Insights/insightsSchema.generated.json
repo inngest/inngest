@@ -685,6 +685,12 @@
       "signature": "chr(code_point)"
     },
     {
+      "name": "coalesce",
+      "description": "Returns the first argument that is not NULL.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#coalesceexpr-",
+      "signature": "coalesce(expr, ...)"
+    },
+    {
       "name": "concat",
       "description": "Concatenates multiple strings or lists. NULL inputs are skipped. See also operator ||.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#concatvalue-",
@@ -1339,6 +1345,12 @@
       "signature": "ntile(num_buckets[ ORDER BY ordering])"
     },
     {
+      "name": "nullif",
+      "description": "Returns NULL if a = b, else returns a. Equivalent to CASE WHEN a = b THEN NULL ELSE a END.",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/utility#nullifa-b",
+      "signature": "nullif(a, b)"
+    },
+    {
       "name": "percent_rank",
       "description": "The relative rank of the current row as a fraction.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/window_functions#percent_rankorder-by-ordering",
@@ -1349,6 +1361,12 @@
       "description": "Returns the value of pi.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/numeric#pi",
       "signature": "pi()"
+    },
+    {
+      "name": "position",
+      "description": "Returns location of first occurrence of search_string in string, counting from 1. Returns 0 if no match found. Also spelled position(search_string IN string).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#positionsearch_string-in-string",
+      "signature": "position(string, search_string)"
     },
     {
       "name": "pow",
@@ -1621,6 +1639,12 @@
       "signature": "substr(string, start[, length])"
     },
     {
+      "name": "substring",
+      "description": "Extracts substring starting from character start up to the end of the string. If optional argument length is set, extracts a substring of length characters instead. Note that a start value of 1 refers to the first character of the string. Also spelled substring(string FROM start FOR length).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#substringstring-start-length",
+      "signature": "substring(string, start[, length])"
+    },
+    {
       "name": "sum",
       "description": "Calculates the sum value for all tuples in arg.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/aggregates#sumarg",
@@ -1673,6 +1697,12 @@
       "description": "Replaces each character in string that matches a character in the from set with the corresponding character in the to set. If from is longer than to, occurrences of the extra characters in from are deleted.",
       "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#translatestring-from-to",
       "signature": "translate(string, from, to)"
+    },
+    {
+      "name": "trim",
+      "description": "Removes any occurrences of any of the characters from either side of the string. characters defaults to space. Also spelled trim([BOTH | LEADING | TRAILING] [characters] FROM string).",
+      "docsUrl": "https://duckdb.org/docs/current/sql/functions/text#trimstring-characters",
+      "signature": "trim(string[, characters])"
     },
     {
       "name": "trunc",

@@ -20,8 +20,8 @@ func (a *adapter) adaptWithStatement(n *peg.Node) *CTE {
 	seq := body(n)
 	cte := &CTE{baseExpr: a.at(n), Name: literalText(seq.Children[0])}
 	// seq.Children[1] (InsertColumnList?) always resolves absent — see Step 3.
-	if _, ok := present(seq.Children[2]); ok {
-		panic("duckdb/parser: USING KEY on a CTE is not yet supported")
+	if uk, ok := present(seq.Children[2]); ok {
+		a.unsupported(uk, "USING KEY on a CTE")
 	}
 	if m, ok := present(seq.Children[4]); ok {
 		// Materialized <- 'NOT'? 'MATERIALIZED'
@@ -32,7 +32,7 @@ func (a *adapter) adaptWithStatement(n *peg.Node) *CTE {
 	// CTEBody <- CTESelectBody / CTEDMLBody ; CTESelectBody <- Parens(SelectStatementInternal)
 	bodyAlt := choice(body(seq.Children[5]))
 	if bodyAlt.Name != "CTESelectBody" {
-		panic("duckdb/parser: a non-SELECT CTE body is not supported")
+		a.unsupported(bodyAlt, "A non-SELECT CTE body")
 	}
 	cte.Select = a.adaptParenSelect(body(bodyAlt))
 	return cte
