@@ -1903,6 +1903,36 @@ service V2 {
     };
   }
 
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse) {
+    option (google.api.http) = { get: "/events" };
+    option (authz) = {
+      require_authz: true
+      permission: "events:read:list"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List events"
+      description: "Lists events in descending internal-ID order, excluding internal inngest/ events. Time filters use received time; client-seeded IDs can differ from received-time order. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
+      tags: "Events"
+      tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse) {
+    option (google.api.http) = { get: "/events/{event_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "events:read:get"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get an event"
+      description: "Gets an event by its internal ID. Internal inngest/ events are not returned. Payloads are omitted unless include=payload. The dev server returns events stored in its database, which is in-memory by default and lost on restart. Cloud returns the same events as the dashboard and v1 API, subject to the plan's event retention."
+      tags: "Events"
+      tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
   rpc SendEvent(SendEventRequest) returns (SendEventResponse) {
     option (google.api.http) = {
       post: "/events",
@@ -4327,6 +4357,102 @@ message ResumeFunctionRequest {
 message ResumeFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message ListEventsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages."
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 5; otherwise the default is 40. Zero uses the default. Events can be up to 5 MiB in Cloud (less on lower plans)."
+      default: "40"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive received-time lower bound. Defaults to one hour before until, or one hour before the current time if until is omitted. Must not be after until. The effective window is returned in metadata.timeRange."
+    }
+  ];
+  optional google.protobuf.Timestamp until = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive received-time upper bound. Defaults to the current time. When from is omitted, it defaults to one hour before this bound. The effective window is returned in metadata.timeRange."
+    }
+  ];
+  repeated string name = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Exact event names to include. Repeat to match any of up to 20 names, with up to 256 characters each and no backslashes or control characters."
+    }
+  ];
+  repeated string include = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads."
+      enum: "payload"
+    }
+  ];
+}
+
+message GetEventRequest {
+  string event_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ULID, also used by GetEventRuns."
+    }
+  ];
+  repeated string include = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event expansions. Use payload to return the stored event JSON. Payloads can contain personal data and be large, so request them only when needed. Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads. Events can be up to 5 MiB in Cloud (less on lower plans)."
+      enum: "payload"
+    }
+  ];
+}
+
+message ListEventsResponse {
+  repeated Event data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message GetEventResponse {
+  Event data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Event {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ULID, also used by GetEventRuns."
+    }
+  ];
+  string name = 2;
+  google.protobuf.Timestamp received_at = 3;
+  google.protobuf.Timestamp occurred_at = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event timestamp supplied by the sender. Omitted when the stored timestamp is zero."
+    }
+  ];
+  EventSource source = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event source, when available. Usually absent in the dev server."
+    }
+  ];
+  string idempotency_key = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sender-supplied event ID used for idempotency."
+    }
+  ];
+  optional string version = 7;
+  google.protobuf.Struct payload = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Stored event JSON (name, data, user, ts, id, v). Present only with include=payload. Payloads can contain personal data and be large, so request them only when needed. Numbers in payloads are JSON float64, so integers above 2^53 may lose precision."
+    }
+  ];
+}
+
+message EventSource {
+  optional string id = 1;
+  optional string name = 2;
 }
 
 message CreateReplayRequest {

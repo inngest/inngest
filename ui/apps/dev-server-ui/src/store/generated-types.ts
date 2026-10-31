@@ -452,7 +452,7 @@ export enum InsightsColumnHint {
   EventId = 'EVENT_ID',
   FunctionId = 'FUNCTION_ID',
   RunId = 'RUN_ID',
-  Session = 'SESSION'
+  Session = 'SESSION',
 }
 
 export enum InsightsColumnType {
@@ -461,7 +461,7 @@ export enum InsightsColumnType {
   Json = 'JSON',
   Number = 'NUMBER',
   String = 'STRING',
-  Unknown = 'UNKNOWN'
+  Unknown = 'UNKNOWN',
 }
 
 export type InsightsDiagnostic = {
@@ -482,7 +482,7 @@ export type InsightsDiagnosticPosition = {
 export enum InsightsDiagnosticSeverity {
   Error = 'ERROR',
   Info = 'INFO',
-  Warning = 'WARNING'
+  Warning = 'WARNING',
 }
 
 export type InsightsPathHint = {
@@ -648,11 +648,9 @@ export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
 };
 
-
 export type QueryInsightsArgs = {
   sql: Scalars['String'];
 };
-
 
 export type QueryRunArgs = {
   runID: Scalars['String'];
@@ -677,18 +675,15 @@ export type QueryRunsArgs = {
   orderBy: Array<RunsV2OrderBy>;
 };
 
-
 export type QuerySessionKeysArgs = {
   search: InputMaybe<Scalars['String']>;
 };
-
 
 export type QuerySessionRunsArgs = {
   sessionId: Scalars['String'];
   sessionKey: Scalars['String'];
   timeRange: InputMaybe<TimeRangeInput>;
 };
-
 
 export type QuerySessionsArgs = {
   sessionIdSearch: InputMaybe<Scalars['String']>;
@@ -2798,5 +2793,46 @@ export type ExecuteInsightsQueryQueryVariables = Exact<{
   sql: Scalars['String'];
 }>;
 
-
-export type ExecuteInsightsQueryQuery = { __typename?: 'Query', insights: { __typename?: 'InsightsQueryResult', rows: Array<Array<any | null>>, columns: Array<{ __typename?: 'InsightsQueryColumn', name: string, type: InsightsColumnType, pathHints: Array<{ __typename?: 'InsightsPathHint', hint: InsightsColumnHint, path: Array<{ __typename?: 'InsightsPathSegment', key: string | null, wildcard: boolean }> }> }>, info: { __typename?: 'InsightsQueryInfo', primaryTable: string | null, tables: Array<string>, limited: boolean }, diagnostics: Array<{ __typename?: 'InsightsDiagnostic', severity: InsightsDiagnosticSeverity, code: string, message: string, start: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number }, end: { __typename?: 'InsightsDiagnosticPosition', line: number, column: number } }> } };
+export type ExecuteInsightsQueryQuery = {
+  __typename?: 'Query';
+  insights: {
+    __typename?: 'InsightsQueryResult';
+    rows: Array<Array<any | null>>;
+    columns: Array<{
+      __typename?: 'InsightsQueryColumn';
+      name: string;
+      type: InsightsColumnType;
+      pathHints: Array<{
+        __typename?: 'InsightsPathHint';
+        hint: InsightsColumnHint;
+        path: Array<{
+          __typename?: 'InsightsPathSegment';
+          key: string | null;
+          wildcard: boolean;
+        }>;
+      }>;
+    }>;
+    info: {
+      __typename?: 'InsightsQueryInfo';
+      primaryTable: string | null;
+      tables: Array<string>;
+      limited: boolean;
+    };
+    diagnostics: Array<{
+      __typename?: 'InsightsDiagnostic';
+      severity: InsightsDiagnosticSeverity;
+      code: string;
+      message: string;
+      start: {
+        __typename?: 'InsightsDiagnosticPosition';
+        line: number;
+        column: number;
+      };
+      end: {
+        __typename?: 'InsightsDiagnosticPosition';
+        line: number;
+        column: number;
+      };
+    }>;
+  };
+};
