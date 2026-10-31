@@ -124,6 +124,11 @@ models:
     fields:
       totalCount:
         resolver: true
+  SessionRunsConnection:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.SessionRunsConnection
+    fields:
+      totalCount:
+        resolver: true
   ConnectV1WorkerConnectionsConnection:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.WorkerConnectionsConnection
     fields:

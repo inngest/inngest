@@ -74,6 +74,10 @@ func (r *Resolver) EventsConnection() generated.EventsConnectionResolver {
 	return &eventsConnectionResolver{r}
 }
 
+func (r *Resolver) SessionRunsConnection() generated.SessionRunsConnectionResolver {
+	return &sessionRunsConnResolver{r}
+}
+
 func (r *Resolver) EventV2() generated.EventV2Resolver {
 	return &eventV2Resolver{r}
 }
@@ -99,6 +103,7 @@ type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
 type runsV2ConnResolver struct{ *Resolver }
 type eventsConnectionResolver struct{ *Resolver }
+type sessionRunsConnResolver struct{ *Resolver }
 type runDeferResolver struct{ *Resolver }
 type runDeferredFromResolver struct{ *Resolver }
 

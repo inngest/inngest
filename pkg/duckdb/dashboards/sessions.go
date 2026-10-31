@@ -38,6 +38,8 @@ const (
 	KeySessionKeys = "session_keys"
 	KeySessions    = "sessions"
 	KeySessionRuns = "session_runs"
+
+	KeySessionRunsCount = "session_runs_count"
 )
 
 // defaultSessionWindow matches PR #4530's ("sessions oss") own default
@@ -228,6 +230,26 @@ FROM latest, UNNEST(sessions) AS s(session)%s
 ORDER BY queued_at DESC, run_id DESC
 LIMIT ?;`, where)
 	args = append(args, resolveLimit(scope.Limit)+1)
+
+	return query, args, nil
+}
+
+// buildSessionRunsCountSQL counts every run carrying one (key, id)
+// session pair in the time range, ignoring Cursor/Limit so it's the
+// session's total rather than what's left after the current page. This
+// is the same set buildSessionsSQL's run_count aggregates for that id.
+func buildSessionRunsCountSQL(scope Scope) (string, []any, error) {
+	if scope.SessionKey == "" || scope.SessionID == "" {
+		return "", nil, fmt.Errorf("session key and session id are required")
+	}
+
+	var args []any
+	query := latestRunsCTE(scope, &args)
+	query += `
+SELECT COUNT(*) AS total_count
+FROM latest, UNNEST(sessions) AS s(session)
+WHERE session.key = ? AND session.id = ? AND queued_at BETWEEN ? AND ?;`
+	args = append(args, scope.SessionKey, scope.SessionID, scope.From, scope.To)
 
 	return query, args, nil
 }
@@ -527,6 +549,36 @@ func ListSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID
 		runs = runs[:limit]
 	}
 	return &SessionRunsResult{Runs: runs, HasMore: hasMore}, nil
+}
+
+// CountSessionRuns returns the total number of runs ListSessionRuns
+// would page through for opts, ignoring opts.Cursor/opts.Limit.
+func CountSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionRunsOpts) (int, error) {
+	if opts.Key == "" || opts.ID == "" {
+		return 0, fmt.Errorf("dashboard: session key and session id are required")
+	}
+	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+
+	scope := Scope{
+		AccountID: accountID, EnvID: envID,
+		From: from, To: until,
+		SessionKey: opts.Key, SessionID: opts.ID,
+	}
+	result, err := Get(ctx, db, scope, KeySessionRunsCount)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: counting session runs: %w", err)
+	}
+	if len(result.Rows) != 1 {
+		return 0, fmt.Errorf("dashboard: counting session runs: expected 1 row, got %d", len(result.Rows))
+	}
+	count, err := asInt64(col(result.Rows[0], columnIndex(result.Columns), "total_count"), "total_count")
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+	return int(count), nil
 }
 
 func parseSessionRunRow(row []any, idx map[string]int) (SessionRun, error) {
