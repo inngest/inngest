@@ -119,6 +119,22 @@ type EnqueueOpts struct {
 	// the idempotency key immediately;  the same debounce key should become available
 	// for another debounced function run.
 	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
+	// CallerLease optionally asks the queue to write the item already leased
+	// for the caller, in the enqueue commit, when it lands on one of the
+	// caller's shards. The finalized item passed to OnEnqueued then carries
+	// the lease, and the caller runs it without leasing it again. Queues that
+	// do not support it ignore it and enqueue normally.
+	CallerLease *CallerLease `json:"-"`
+}
+
+// CallerLease is an enqueue's request to be leased for its caller.
+type CallerLease struct {
+	// Shards are the queue shards whose items the caller can run.
+	Shards []string
+	// LeaseID is the lease to write: chosen by the caller, unique per enqueue
+	// call (retries of the call reuse it), with its time set to the lease
+	// expiry.
+	LeaseID ulid.ULID
 }
 
 type Producer interface {

@@ -503,7 +503,28 @@ func EnqueueOptionsToProto(opts EnqueueOpts) *pb.EnqueueOptions {
 		NormalizeFromBacklogId: opts.NormalizeFromBacklogID,
 		IdempotencyPeriod:      durationPtrToProto(opts.IdempotencyPeriod),
 		SingletonMigrationKey:  opts.SingletonMigrationKey,
+		CallerLease:            callerLeaseToProto(opts.CallerLease),
 	}
+}
+
+func callerLeaseToProto(l *CallerLease) *pb.CallerLease {
+	if l == nil {
+		return nil
+	}
+	return &pb.CallerLease{Shards: l.Shards, LeaseId: l.LeaseID.String()}
+}
+
+// callerLeaseFromProto drops a request it cannot parse: the enqueue then
+// proceeds without a caller lease, which is always safe.
+func callerLeaseFromProto(msg *pb.CallerLease) *CallerLease {
+	if msg == nil || len(msg.GetShards()) == 0 {
+		return nil
+	}
+	id, err := ulid.Parse(msg.GetLeaseId())
+	if err != nil {
+		return nil
+	}
+	return &CallerLease{Shards: msg.GetShards(), LeaseID: id}
 }
 
 func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {
@@ -516,6 +537,7 @@ func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {
 		NormalizeFromBacklogID: msg.GetNormalizeFromBacklogId(),
 		IdempotencyPeriod:      durationPtrFromProto(msg.GetIdempotencyPeriod()),
 		SingletonMigrationKey:  msg.GetSingletonMigrationKey(),
+		CallerLease:            callerLeaseFromProto(msg.GetCallerLease()),
 	}
 }
 
