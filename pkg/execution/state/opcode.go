@@ -622,9 +622,9 @@ const (
 	// SubscribeStop deletes the pause of one stream, so its events are no longer
 	// saved, and leaves the rest of the subscription alone.
 	SubscribeStop = "stop"
-	// SubscribeCurrent answers how many messages the subscription has saved so
-	// far, without moving anything.
-	SubscribeCurrent = "current"
+	// SubscribeAll flushes the inbox's buffer and answers how many messages the
+	// subscription has saved so far. It never waits.
+	SubscribeAll = "all"
 )
 
 // SubscribeOpts are the step.subscribe options carried on a WaitForEvent op.

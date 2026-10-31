@@ -211,7 +211,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		}
 		return answer(stored.Data)
 
-	case state.SubscribeCurrent:
+	case state.SubscribeAll:
 		ids, err := messages()
 		if err != nil {
 			return err
@@ -660,19 +660,55 @@ func (e *executor) flushSubscription(ctx context.Context, id sv2.ID, key string)
 		return err
 	}
 
-	buffered, err := waiter.BufferedSubscriptionMessages(ctx, id, subscriptionKeyHash(key))
+	hash := subscriptionKeyHash(key)
+	buffered, err := waiter.BufferedSubscriptionMessages(ctx, id, hash)
 	if err != nil || len(buffered) == 0 {
 		return err
 	}
 
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if err != nil {
+		return err
+	}
+	stepLimit, stateLimit := e.subscriptionLimits(id)
+
+	// Limits are enforced here, where a message becomes a step. The messages
+	// that fit are saved in arrival order; the first one that would break a
+	// limit and everything after it are dropped, and the subscription closes, so
+	// the reader sees the end after the messages already saved.
+	overflow := ""
 	for _, msg := range buffered {
+		if !slices.Contains(md.Stack, msg.ID) {
+			if overflow = subscriptionMessageLimit(&md, key, len(msg.Value), stepLimit, stateLimit); overflow != "" {
+				break
+			}
+		}
+
 		_, err := e.smv2.SaveStep(ctx, id, msg.ID, msg.Value)
 		if err != nil && !errors.Is(err, state.ErrDuplicateResponse) && !errors.Is(err, state.ErrIdempotentResponse) {
 			return err
 		}
+
+		md.Stack = append(md.Stack, msg.ID)
+		md.Metrics.StepCount++
+		md.Metrics.StateSize += len(msg.Value)
 	}
 
-	return waiter.RemoveBufferedSubscriptionMessages(ctx, id, subscriptionKeyHash(key), buffered)
+	if err := waiter.RemoveBufferedSubscriptionMessages(ctx, id, hash, buffered); err != nil {
+		return err
+	}
+	if overflow == "" {
+		return nil
+	}
+
+	e.log.Warn("subscription limit reached on flush, closing the subscription", "limit", overflow, "key", key)
+
+	reason, _ := json.Marshal(map[string]any{"limit": overflow})
+	if err := e.endSubscription(ctx, id, key, reason); err != nil {
+		return err
+	}
+
+	return waiter.CloseSubscription(ctx, id, hash)
 }
 
 // wakeSubscription wakes the run if it is waiting on the subscription: it reads

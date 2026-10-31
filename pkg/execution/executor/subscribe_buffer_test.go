@@ -191,3 +191,25 @@ func TestEventMatchingTwoSourcesIsStoredOnce(t *testing.T) {
 	f.flush("inbox")
 	require.Equal(t, 1, f.messageSteps("inbox"))
 }
+
+// Limits are enforced when buffered messages become steps: the ones that fit
+// are saved in arrival order, the rest are dropped, and the inbox closes.
+func TestBufferFlushEnforcesTheRunLimit(t *testing.T) {
+	f := newWakeFixture(t, false)
+	f.burst("one", 200)
+	f.burst("two", 200)
+	f.burst("three", 200)
+
+	f.flush("one")
+	f.flush("two")
+	require.Equal(t, 200, f.messageSteps("one"))
+	require.Equal(t, 200, f.messageSteps("two"))
+
+	f.flush("three")
+	require.Equal(t, 100, f.messageSteps("three"), "500 messages per run")
+	require.Equal(t, 0, f.buffered("three"), "the overflow is dropped")
+
+	stack, err := f.rs.LoadStack(f.ctx, f.md.ID)
+	require.NoError(t, err)
+	require.Contains(t, stack, subscriptionClosedID("three"))
+}
