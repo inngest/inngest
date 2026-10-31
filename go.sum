@@ -608,8 +608,8 @@ github.com/inngest/go-httpstat v0.0.0-20261019161010-8683e00144e3 h1:blP9EuB+BJG
 github.com/inngest/go-httpstat v0.0.0-20261019161010-8683e00144e3/go.mod h1:7SNLkGaD+tiTey1IF9WUNDNurTfqNZqjbdPZo3CmLW4=
 github.com/inngest/grpc-gateway/v2 v2.0.0-20260911163156-0bd4dcb02324 h1:+203ekNNQVpz5C/E4vgJ8vrH/uTEwf03jKM8SIraX4Q=
 github.com/inngest/grpc-gateway/v2 v2.0.0-20260911163156-0bd4dcb02324/go.mod h1:JfhWUomR1baixubs02l85lZYYOm7LV6om4ceouMv45c=
-github.com/inngest/inngestgo v0.16.5 h1:Lrb5uLsOP7Jo0PvrzGZjQv/U5cl7GMXOYpHXLyFi9nA=
-github.com/inngest/inngestgo v0.16.5/go.mod h1:JQUYIyvybCHFHkR4cvGOUDAYpoW1rikG72GNL0+ipEc=
+github.com/inngest/inngestgo v0.16.6-0.20261020012702-4ed4d91b6ccf h1:FhQgecKFGoJJevjepyNWzlJTOSF2TkfSHEKhIY+Fdac=
+github.com/inngest/inngestgo v0.16.6-0.20261020012702-4ed4d91b6ccf/go.mod h1:/+Gfu9c50t9RqoRsJ63I9JPO6cfWMtlc/s9LDiQ085E=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=

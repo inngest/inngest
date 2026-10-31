@@ -160,6 +160,7 @@ func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *strin
 	resp, ops, err := invoke(
 		context.Background(),
 		h.client,
+		h.GetAPIBaseURL(),
 		mw,
 		fn,
 		h.GetSigningKey(),
