@@ -49,6 +49,30 @@ func TestStepStatusToGQL(t *testing.T) {
 	})
 }
 
+func TestOpcodeToGQL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    enums.Opcode
+		expected models.StepOp
+	}{
+		{"StepRun", enums.OpcodeStepRun, models.StepOpRun},
+		{"StepError", enums.OpcodeStepError, models.StepOpRun},
+		{"StepFailed", enums.OpcodeStepFailed, models.StepOpRun},
+		{"StepPlanned", enums.OpcodeStepPlanned, models.StepOpRun},
+		{"Sleep", enums.OpcodeSleep, models.StepOpSleep},
+		{"WaitForEvent", enums.OpcodeWaitForEvent, models.StepOpWaitForEvent},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			op := tt.input
+			result := opcodeToGQL(&op)
+			require.NotNil(t, result, "opcodeToGQL should not return nil for %s", tt.name)
+			assert.Equal(t, tt.expected, *result)
+		})
+	}
+}
+
 func TestRunTraceEnded(t *testing.T) {
 	terminal := []models.RunTraceSpanStatus{
 		models.RunTraceSpanStatusCompleted,

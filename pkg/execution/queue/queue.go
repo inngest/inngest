@@ -111,6 +111,9 @@ type EnqueueOpts struct {
 	PassthroughJobId       bool
 	ForceQueueShardName    string
 	NormalizeFromBacklogID string
+	// SingletonMigrationKey acquires this run's lock atomically with a migrated
+	// item, without adding start-item singleton metadata to continuation payloads.
+	SingletonMigrationKey string
 	// IdempotencyPeriod allows customizing the idempotency period for this queue
 	// item.  For example, after a debounce queue has been consumed we want to remove
 	// the idempotency key immediately;  the same debounce key should become available
