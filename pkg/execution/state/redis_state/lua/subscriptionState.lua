@@ -6,7 +6,9 @@ one of:
 
   absent:                    idle
   [{i, v}, ...]:             messages buffered, in arrival order (i: step ID, v: value)
-  {"waiting": "<op id>"}:    a next op of this inbox is waiting
+  {"waiting": "<op id>", "at": n}:  a next op of this inbox is waiting; n is the length of the
+                             stack when it began, which tells its wake from another wake of
+                             the same op ID
   "closed":                  the inbox is closed; deliveries are dropped
 
 A buffer and a waiting op never coexist: buffered messages are flushed, not waited for.
@@ -27,7 +29,8 @@ under its own ID and the field is "closed".
 
 Ops (the result is an array):
   deliver  step ID, value, limits: {"norun"}, {"closed"}, {"buffered"}, {"dup"},
-           {"wake", op id} (saved as a step, the op waits) or {"limit", reason, op id}
+           {"wake", op id, at} (saved as a step, the op waits) or
+           {"limit", reason, op id, at}
   next     op id, limits: {"norun"}, {"closed"}, {"waiting"}, {"flushed", n} or
            {"limit", reason}
   flush    limits: {"norun"}, {"flushed", n, total} or {"limit", reason, total}; total is the
@@ -55,7 +58,7 @@ end
 
 local function waitingOp(st)
   if type(st) == "table" and st.waiting then
-    return st.waiting
+    return st.waiting, st.at
   end
 
   return nil
@@ -182,16 +185,16 @@ if op == "deliver" then
 
   local id, value, a = ARGV[3], ARGV[4], limitArgs(5)
 
-  local w = waitingOp(st)
+  local w, at = waitingOp(st)
   if w then
     local reason = saveMessage(id, value, a)
     if reason then
       closeForLimit(reason)
 
-      return {"limit", reason, w}
+      return {"limit", reason, w, tostring(at)}
     end
 
-    return {"wake", w}
+    return {"wake", w, tostring(at)}
   end
 
   local buf = buffer(st)
@@ -209,7 +212,7 @@ if op == "deliver" then
     reason = reason or ("the subscription saved " .. a[1] .. " messages")
     closeForLimit(reason)
 
-    return {"limit", reason, ""}
+    return {"limit", reason, "", ""}
   end
 
   table.insert(buf, {i = id, v = value})
@@ -233,7 +236,7 @@ if op == "next" then
     return {"flushed", saved, inboxTotal()}
   end
 
-  redis.call("HSET", KEYS[1], field, cjson.encode({waiting = ARGV[3]}))
+  redis.call("HSET", KEYS[1], field, cjson.encode({waiting = ARGV[3], at = redis.call("LLEN", KEYS[4])}))
 
   return {"waiting"}
 end

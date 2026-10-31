@@ -299,12 +299,12 @@ func TestWaitingNextIsWokenByTheDelivery(t *testing.T) {
 	f := newSubscribeFixture(t)
 
 	f.next("inbox", "next-1")
-	require.JSONEq(t, `{"waiting":"next-1"}`, f.field("inbox"))
+	require.Equal(t, "next-1", f.waiting("inbox"))
 
 	evt := f.deliver("inbox")
 	require.Equal(t, []string{subscriptionMessageID("inbox", evt.GetInternalID().String())}, f.messages("inbox"))
 	require.Equal(t, 1, f.discoveries("inbox"))
-	require.JSONEq(t, `{"waiting":"next-1"}`, f.field("inbox"))
+	require.Equal(t, "next-1", f.waiting("inbox"))
 
 	f.startWake(*f.item(queue.KindEdge))
 	require.Empty(t, f.field("inbox"))
@@ -345,7 +345,7 @@ func TestCrashBetweenTheDeliveryAndTheEnqueue(t *testing.T) {
 	f.q.fail = nil
 
 	require.Len(t, f.messages("inbox"), 1)
-	require.JSONEq(t, `{"waiting":"next-1"}`, f.field("inbox"))
+	require.Equal(t, "next-1", f.waiting("inbox"))
 	require.Zero(t, f.discoveries("inbox"))
 
 	require.NoError(t, f.deliverEvent("inbox", evt))
@@ -365,7 +365,7 @@ func TestRerunOfAWakeLeavesALaterWait(t *testing.T) {
 	f.next("inbox", "next-2")
 	f.startWake(wake)
 
-	require.JSONEq(t, `{"waiting":"next-2"}`, f.field("inbox"))
+	require.Equal(t, "next-2", f.waiting("inbox"))
 }
 
 // A next op sent again (the SDK repeats the pending op after a replay) leaves one
@@ -376,7 +376,7 @@ func TestNextSentAgainWaitsOnce(t *testing.T) {
 	require.NoError(t, f.op("inbox", state.SubscribeNext, "next-1", "1h"))
 	require.NoError(t, f.op("inbox", state.SubscribeNext, "next-1", "1h"))
 
-	require.JSONEq(t, `{"waiting":"next-1"}`, f.field("inbox"))
+	require.Equal(t, "next-1", f.waiting("inbox"))
 	timers := 0
 	for _, item := range f.q.accepted {
 		if item.Kind == queue.KindSleep {
@@ -428,7 +428,7 @@ func TestTimedNext(t *testing.T) {
 		f.next("inbox", "next-2")
 
 		require.False(t, f.fireTimer(timer, "next-1"))
-		require.JSONEq(t, `{"waiting":"next-2"}`, f.field("inbox"))
+		require.Equal(t, "next-2", f.waiting("inbox"))
 	})
 }
 
@@ -645,4 +645,28 @@ func TestNextBesideABusyOpDoesNothing(t *testing.T) {
 
 	only := opGroups(ops[1:])
 	require.False(t, only.PriorityGroup.SubscribeBusy)
+}
+
+// A burst that arrives while an op waits is one discovery: the flag stays until
+// the discovery starts, and every message of the burst finds the same wait.
+func TestBurstWhileWaitingIsOneDiscovery(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	f.next("inbox", "next-1")
+	f.burst("inbox", 10)
+
+	require.Len(t, f.messages("inbox"), 10)
+	require.Equal(t, 1, f.discoveries("inbox"))
+}
+
+// waiting is the op the inbox waits for: "" when it waits for none.
+func (f *subscribeFixture) waiting(key string) string {
+	f.t.Helper()
+
+	var state struct {
+		Waiting string `json:"waiting"`
+	}
+	_ = json.Unmarshal([]byte(f.field(key)), &state)
+
+	return state.Waiting
 }

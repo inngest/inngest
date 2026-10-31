@@ -301,10 +301,11 @@ const subscriptionTimerMetaKey = "subscription_timer"
 const subscriptionDiscoveryIdempotency = 10 * time.Minute
 
 // enqueueSubscriptionDiscovery queues the discovery that shows the run what an
-// inbox saved. The job ID belongs to one next op and
-// to what woke it (unique: the message, the end, or the number of messages after a
-// flush), so a redelivery queues the same item and a later wake of the same op,
-// which a view that skips a message sends again, queues its own.
+// inbox saved. The job ID belongs to one next op and to the wait it wakes
+// (unique: where the wait began, or the number of messages after a flush), so
+// every message of a burst and every redelivery share one discovery, while a
+// later wake of the same op, which a view that skips a message sends again,
+// queues its own.
 func (e *executor) enqueueSubscriptionDiscovery(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, field string, opID string, outgoing string, unique string) error {
 	jobID := fmt.Sprintf("%s-subscription-wake-%s-%s-%s", md.ID.RunID, field, opID, unique)
 	item := queue.Item{
@@ -458,7 +459,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	switch res[0] {
 	case "wake":
-		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID, messageID)
+		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID, res[2])
 	case "limit":
 		e.log.Warn("subscription limit reached, closing the subscription", "limit", res[1], "key", key)
 
@@ -466,8 +467,8 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 			return err
 		}
 		// A next op waiting for a message that will not come sees the end.
-		if len(res) > 2 && res[2] != "" {
-			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key), "end")
+		if len(res) > 3 && res[2] != "" {
+			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key), res[3])
 		}
 	}
 
