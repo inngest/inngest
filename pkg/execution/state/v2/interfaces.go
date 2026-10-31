@@ -244,3 +244,11 @@ var (
 	// without importing v1.
 	ErrDeferMetaInvalid = state.ErrDeferMetaInvalid
 )
+
+// SubscriptionStore runs the atomic ops on the state of a run's step.subscribe
+// inboxes. Each op touches one inbox's field, and the messages it flushes become
+// steps of the run in the same script. See the redis store's
+// subscriptionState.lua for the ops and their results.
+type SubscriptionStore interface {
+	SubscriptionOp(ctx context.Context, id ID, field string, args ...string) ([]string, error)
+}

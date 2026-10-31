@@ -605,6 +605,43 @@ type WaitForEventOpts struct {
 	If      *string `json:"if"`
 	// Event is taken from GeneratorOpcode.Name if this is empty.
 	Event string `json:"event"`
+	// Subscribe marks this op as part of a step.subscribe inbox.
+	Subscribe *SubscribeOpts `json:"subscribe,omitempty"`
+}
+
+// Modes of a subscription op.
+const (
+	// SubscribeOpen writes the pause of every source of an inbox.
+	SubscribeOpen = "open"
+	// SubscribeNext flushes the inbox's buffer, or waits for a message.
+	SubscribeNext = "next"
+	// SubscribeAll flushes the inbox's buffer and never waits.
+	SubscribeAll = "all"
+	// SubscribeStop deletes the pauses of the listed sources.
+	SubscribeStop = "stop"
+	// SubscribeClose flushes the buffer, closes the inbox and deletes its pauses.
+	SubscribeClose = "close"
+)
+
+// SubscribeOpts are the step.subscribe options carried on a WaitForEvent op.
+type SubscribeOpts struct {
+	// Key is the unhashed ID of the inbox. A message step ID is made of it and
+	// the event ID.
+	Key string `json:"key"`
+	// Mode is one of the Subscribe* constants.
+	Mode string `json:"mode"`
+	// Timeout, on next, is how long to wait before the op gives up with null.
+	Timeout string `json:"timeout,omitempty"`
+	// Streams are the sources an open, stop or close lists. The op's own event
+	// and `if` are the first source, stream 0.
+	Streams []SubscribeStream `json:"streams,omitempty"`
+}
+
+// SubscribeStream is one event source of an inbox.
+type SubscribeStream struct {
+	Stream int     `json:"stream"`
+	Event  string  `json:"event"`
+	If     *string `json:"if,omitempty"`
 }
 
 func (w *WaitForEventOpts) UnmarshalAny(a any) error {

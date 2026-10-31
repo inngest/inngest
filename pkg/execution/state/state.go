@@ -54,6 +54,9 @@ var (
 	// ErrTimeoutTooLong is returned when a sleep or wait is scheduled further
 	// into the future than the maximum allowed duration (one year).
 	ErrTimeoutTooLong = fmt.Errorf("timeout exceeds the maximum duration")
+	// ErrSubscriptionLimit is returned when a step.subscribe op exceeds a limit
+	// or is malformed.
+	ErrSubscriptionLimit = fmt.Errorf("subscription limit exceeded")
 	// Error Connect Retry Errors
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
@@ -85,6 +88,8 @@ const (
 	InngestErrStateOverflowed = "InngestErrStateOverflowed"
 	// InngestErrTimeoutTooLong is the public error code for ErrTimeoutTooLong
 	InngestErrTimeoutTooLong = "InngestErrTimeoutTooLong"
+	// InngestErrSubscriptionLimit is the public error code for ErrSubscriptionLimit
+	InngestErrSubscriptionLimit = "InngestErrSubscriptionLimit"
 	// InngestErrInternal is the public error code for runs that can't
 	// continue because of a system error.
 	InngestErrInternal = "InngestErrInternal"

@@ -249,6 +249,10 @@ type Pause struct {
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
 
+	// Subscribe, when set, makes this a step.subscribe source: a matching event
+	// is delivered to the inbox and the pause is not consumed.
+	Subscribe *PauseSubscribe `json:"sub,omitempty"`
+
 	// ParallelMode controls discovery step scheduling after a parallel step
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
@@ -264,6 +268,14 @@ type Pause struct {
 	// timeframes are based on this timestamp (previously only available as the
 	// sort score in pause indexes).
 	CreatedAt time.Time `json:"ca"`
+}
+
+// PauseSubscribe describes the inbox a subscription pause delivers to.
+type PauseSubscribe struct {
+	// Key is the unhashed ID of the inbox.
+	Key string `json:"key"`
+	// Stream is which source of the inbox this pause is.
+	Stream int `json:"stream,omitempty"`
 }
 
 // CreatedAfter reports whether this pause was created after the given

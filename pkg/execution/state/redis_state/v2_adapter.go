@@ -835,3 +835,8 @@ func (v v2) retryableError(err error) bool {
 
 	return true
 }
+
+// SubscriptionOp runs one op of the subscription state script.
+func (v v2) SubscriptionOp(ctx context.Context, id state.ID, field string, args ...string) ([]string, error) {
+	return v.mgr.SubscriptionOp(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID, field, args...)
+}

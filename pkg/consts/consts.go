@@ -93,6 +93,22 @@ const (
 	// leap day still fits.
 	MaxWaitForEventTimeout = time.Hour * 24 * 366
 
+	// MaxSubscriptionKeyLength is the longest step.subscribe inbox ID.
+	MaxSubscriptionKeyLength = 256
+
+	// MaxSubscriptionPausesPerRun is the most pauses of any kind a run may hold
+	// when it opens a subscription source.
+	MaxSubscriptionPausesPerRun = 50
+
+	// MaxSubscriptionMessages is the most messages one inbox keeps. At this many
+	// the inbox closes.
+	MaxSubscriptionMessages = 200
+
+	// MaxSubscriptionMessagesPerRun is the most messages all inboxes of a run keep.
+	// Messages are steps, so they are also held to half of the run's step limit
+	// and to three quarters of its state size limit.
+	MaxSubscriptionMessagesPerRun = 500
+
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 

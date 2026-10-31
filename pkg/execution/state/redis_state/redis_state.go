@@ -1196,6 +1196,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.SubscriptionState(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
@@ -1817,4 +1818,44 @@ func StrSlice(args []any) ([]string, error) {
 		}
 	}
 	return res, nil
+}
+
+// SubscriptionOp runs one op of the subscription state script on the field of one
+// inbox, and returns its result. See lua/subscriptionState.lua for the ops.
+func (m shardedMgr) SubscriptionOp(ctx context.Context, accountID uuid.UUID, fnID uuid.UUID, runID ulid.ULID, field string, args ...string) ([]string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SubscriptionOp"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountID, runID)
+
+	res, err := retriableScripts["subscriptionState"].Exec(
+		redis_telemetry.WithScriptName(ctx, "subscriptionState"),
+		r,
+		[]string{
+			fnRunState.kg.SubscriptionState(ctx, isSharded, runID),
+			fnRunState.kg.Actions(ctx, isSharded, fnID, runID),
+			fnRunState.kg.RunMetadata(ctx, isSharded, runID),
+			fnRunState.kg.Stack(ctx, isSharded, runID),
+		},
+		append([]string{args[0], field}, args[1:]...),
+	).ToArray()
+	if err != nil {
+		return nil, fmt.Errorf("error running a subscription op: %w", err)
+	}
+
+	out := make([]string, 0, len(res))
+	for _, msg := range res {
+		if msg.IsInt64() {
+			n, _ := msg.AsInt64()
+			out = append(out, strconv.FormatInt(n, 10))
+			continue
+		}
+		str, err := msg.ToString()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, str)
+	}
+
+	return out, nil
 }

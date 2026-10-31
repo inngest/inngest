@@ -2144,6 +2144,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			l.Debug("error updating sleep resume span", "error", err)
 		}
 
+		// The timer of a next op saves nothing unless the op is still waiting.
+		if won, err := e.claimSubscriptionTimeout(ctx, id, item, edge.Outgoing); err != nil {
+			return nil, err
+		} else if !won {
+			return nil, nil
+		}
+
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
@@ -2161,6 +2168,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// we're now done with this execution.
 			return nil, nil
 		}
+	}
+
+	// Before any state is read, so a message delivered after this finds nothing
+	// waiting and is buffered.
+	if err := e.clearSubscriptionWait(ctx, id, item); err != nil {
+		return nil, err
 	}
 
 	_, span := e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
@@ -2548,7 +2561,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// Handle generator op responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict) || errors.Is(serr, state.ErrTimeoutTooLong)
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict) || errors.Is(serr, state.ErrTimeoutTooLong) || errors.Is(serr, state.ErrSubscriptionLimit)
 
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
@@ -3366,6 +3379,21 @@ func (e *executor) handlePause(
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
 		}
 
+		if pause.Subscribe != nil {
+			err := e.deliverSubscription(ctx, evt, pause)
+			if errors.Is(err, state.ErrRunNotFound) {
+				// The run is gone: the message is dropped.
+				cleanup(ctx)
+				return nil
+			}
+			if err != nil {
+				return fmt.Errorf("error delivering subscription message: %w", err)
+			}
+
+			atomic.AddInt32(&res[1], 1)
+			return nil
+		}
+
 		resumeData := pause.GetResumeData(evt.GetEvent())
 
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
@@ -3572,6 +3600,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// A subscription pause lives as long as the run: its expiry resumes nothing.
+	if pause.Subscribe != nil {
+		return nil
+	}
+
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
 	// trace lifecycles, which also require pauses.
@@ -5737,31 +5770,12 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
 	}
 
-	if opts.If != nil {
-		if err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If); err != nil {
-			if errors.Is(err, expressions.ErrValidationFailed) {
-				logger.StdlibLogger(ctx).
-					With("err", err.Error()).
-					With("expression", *opts.If).
-					Warn("waitForEvent If expression failed validation")
-				// "just log a warning right now, then we can collect stats and do our own alerting a week in" - Tony, 2025-05-07
-				// intentionally not returning; continue handling this as before for now
-			} else if errors.Is(err, expressions.ErrCompileFailed) {
-				return state.WrapInStandardError(
-					err,
-					"InvalidExpression",
-					"Wait for event If expression failed to compile",
-					err.Error(),
-				)
-			} else {
-				return state.WrapInStandardError(
-					err,
-					"InvalidExpression",
-					"Wait for event If expression is invalid",
-					err.Error(),
-				)
-			}
-		}
+	if opts.Subscribe != nil {
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, opts)
+	}
+
+	if err := validateWaitExpression(ctx, opts.If); err != nil {
+		return err
 	}
 
 	expires, err := opts.Expires()
@@ -5771,39 +5785,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 
-	expr := opts.If
-	if expr != nil && strings.Contains(*expr, "event.") {
-		// Remove `event` data from the expression and replace with actual event
-		// data as values, now that we have the event.
-		//
-		// This improves performance in matching, as we can then use the values within
-		// aggregate trees.
-		evt := event.Event{}
-		if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
-			logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
-		}
-
-		interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
-			"event": evt.Map(),
-		})
-		if err != nil {
-			var compileError *expressions.CompileError
-			if errors.As(err, &compileError) {
-				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
-					compileError,
-					"CompileError",
-					"Could not compile expression",
-					compileError.Message(),
-				))
-			}
-
-			return fmt.Errorf("error interpolating wait for event expression: %w", err)
-		}
-		expr = &interpolated
-
+	expr, interpolated, err := interpolateWaitExpression(ctx, runCtx, opts.If)
+	if err != nil {
+		return err
+	}
+	if interpolated {
 		// Update the generator to use the interpolated data, ensuring history
 		// is updated. Only `if` changes, so the SDK's other opts survive.
-		if err := gen.SetOpt("if", interpolated); err != nil {
+		if err := gen.SetOpt("if", *expr); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
 	}
@@ -6809,4 +6798,74 @@ func normalizeRunSessions(pairs meta.EventSessions) (meta.EventSessions, int) {
 	}
 
 	return pairs, dropped
+}
+
+// validateWaitExpression checks the `if` expression of a wait for event or of
+// a subscription source. A nil expression is valid.
+func validateWaitExpression(ctx context.Context, ifExpr *string) error {
+	if ifExpr == nil {
+		return nil
+	}
+
+	err := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *ifExpr)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, expressions.ErrValidationFailed):
+		logger.StdlibLogger(ctx).
+			With("err", err.Error()).
+			With("expression", *ifExpr).
+			Warn("waitForEvent If expression failed validation")
+		// "just log a warning right now, then we can collect stats and do our own alerting a week in" - Tony, 2025-05-07
+		// intentionally not returning; continue handling this as before for now
+		return nil
+	case errors.Is(err, expressions.ErrCompileFailed):
+		return state.WrapInStandardError(
+			err,
+			"InvalidExpression",
+			"Wait for event If expression failed to compile",
+			err.Error(),
+		)
+	default:
+		return state.WrapInStandardError(
+			err,
+			"InvalidExpression",
+			"Wait for event If expression is invalid",
+			err.Error(),
+		)
+	}
+}
+
+// interpolateWaitExpression replaces `event` references in an `if` expression
+// with the values of the run's trigger event. This improves performance in
+// matching, as we can then use the values within aggregate trees. It reports
+// whether the expression changed.
+func interpolateWaitExpression(ctx context.Context, runCtx execution.RunContext, ifExpr *string) (*string, bool, error) {
+	if ifExpr == nil || !strings.Contains(*ifExpr, "event.") {
+		return ifExpr, false, nil
+	}
+
+	evt := event.Event{}
+	if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
+		logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
+	}
+
+	interpolated, err := expressions.Interpolate(ctx, *ifExpr, map[string]any{
+		"event": evt.Map(),
+	})
+	if err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, false, fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
+				compileError,
+				"CompileError",
+				"Could not compile expression",
+				compileError.Message(),
+			))
+		}
+
+		return nil, false, fmt.Errorf("error interpolating wait for event expression: %w", err)
+	}
+
+	return &interpolated, true, nil
 }
