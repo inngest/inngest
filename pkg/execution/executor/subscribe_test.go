@@ -228,6 +228,14 @@ func (f *subscribeFixture) hasStep(id string) bool {
 	return ok
 }
 
+func (f *subscribeFixture) stepData(id string) string {
+	f.t.Helper()
+	steps, err := f.rs.LoadSteps(f.ctx, f.md.ID)
+	require.NoError(f.t, err)
+
+	return string(steps[id])
+}
+
 func (f *subscribeFixture) item(kind string) *queue.Item {
 	for i := len(f.q.accepted) - 1; i >= 0; i-- {
 		if f.q.accepted[i].Kind == kind {
@@ -447,6 +455,7 @@ func TestAllFlushesWithoutWaiting(t *testing.T) {
 
 	require.Len(t, f.messages("inbox"), 2)
 	require.True(t, f.hasStep("all-1"))
+	require.Contains(t, f.stepData("all-1"), `"total":2`)
 	require.Empty(t, f.field("inbox"))
 
 	require.NoError(t, f.op("inbox", state.SubscribeAll, "all-2", ""))
@@ -597,4 +606,20 @@ func TestMessagesAreInArrivalOrder(t *testing.T) {
 	f.next("inbox", "next-1")
 
 	require.Equal(t, want, f.messages("inbox"))
+}
+
+// A view that skips a message sends its next op again under the same ID. The
+// delivery that wakes it the second time is a wake of its own, not a repeat of the
+// first.
+func TestNextSentAgainAfterAWakeIsWokenAgain(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	f.next("inbox", "next-1")
+	f.deliver("inbox")
+	f.startWake(*f.item(queue.KindEdge))
+
+	f.next("inbox", "next-1")
+	f.deliver("inbox")
+
+	require.Equal(t, 2, f.discoveries("inbox"))
 }

@@ -187,12 +187,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"opened": true})
 
 	case state.SubscribeAll:
-		flushed, _, err := e.subscriptionFlush(ctx, store, md.ID, field, "flush")
+		total, err := e.subscriptionFlush(ctx, store, md.ID, field, "flush")
 		if err != nil {
 			return err
 		}
 
-		return answer(map[string]any{"flushed": flushed})
+		return answer(map[string]any{"total": total})
 
 	case state.SubscribeStop:
 		if err := e.removeSubscriptionSources(ctx, md, sub); err != nil {
@@ -205,12 +205,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if err := e.removeSubscriptionSources(ctx, md, sub); err != nil {
 			return err
 		}
-		flushed, _, err := e.subscriptionFlush(ctx, store, md.ID, field, "close")
+		total, err := e.subscriptionFlush(ctx, store, md.ID, field, "close")
 		if err != nil {
 			return err
 		}
 
-		return answer(map[string]any{"flushed": flushed})
+		return answer(map[string]any{"total": total})
 
 	case state.SubscribeNext:
 		return e.handleSubscribeNext(ctx, runCtx, gen, edge, sub)
@@ -220,28 +220,20 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 }
 
 // subscriptionFlush runs the flush or close op: the buffered messages become
-// steps. It returns how many, and the limit that closed the inbox on the way.
-func (e *executor) subscriptionFlush(ctx context.Context, store sv2.SubscriptionStore, id sv2.ID, field string, op string) (int, string, error) {
+// steps. It returns how many messages of the inbox are steps of the run.
+func (e *executor) subscriptionFlush(ctx context.Context, store sv2.SubscriptionStore, id sv2.ID, field string, op string) (int, error) {
 	res, err := store.SubscriptionOp(ctx, id, field, append([]string{op}, e.subscriptionLimitArgs(id)...)...)
 	if err != nil {
-		return 0, "", err
+		return 0, err
+	}
+	if len(res) == 0 || res[0] == "norun" {
+		return 0, state.ErrRunNotFound
+	}
+	if len(res) < 3 {
+		return 0, fmt.Errorf("unexpected subscription op result %v", res)
 	}
 
-	return subscriptionFlushResult(res)
-}
-
-func subscriptionFlushResult(res []string) (int, string, error) {
-	switch {
-	case len(res) == 0 || res[0] == "norun":
-		return 0, "", state.ErrRunNotFound
-	case res[0] == "limit" && len(res) > 1:
-		return 0, res[1], nil
-	case res[0] == "flushed" && len(res) > 1:
-		n, err := strconv.Atoi(res[1])
-		return n, "", err
-	}
-
-	return 0, "", fmt.Errorf("unexpected subscription op result %v", res)
+	return strconv.Atoi(res[2])
 }
 
 // handleSubscribeNext runs a next op. Buffered messages are flushed and a
@@ -276,7 +268,12 @@ func (e *executor) handleSubscribeNext(ctx context.Context, runCtx execution.Run
 	if res[0] != "waiting" {
 		// Flushed messages, or the end of the inbox: the SDK reads them from the
 		// stack once the discovery runs.
-		return e.enqueueSubscriptionDiscovery(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, field, gen.ID, gen.ID)
+		unique := "end"
+		if res[0] == "flushed" && len(res) > 2 {
+			unique = res[2]
+		}
+
+		return e.enqueueSubscriptionDiscovery(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, field, gen.ID, gen.ID, unique)
 	}
 	if timeoutAt.IsZero() {
 		return nil
@@ -298,10 +295,12 @@ const subscriptionTimerMetaKey = "subscription_timer"
 const subscriptionDiscoveryIdempotency = 10 * time.Minute
 
 // enqueueSubscriptionDiscovery queues the discovery that shows the run what an
-// inbox saved. The job ID belongs to one next op, so a redelivery that finds the
-// op still waiting queues the same item.
-func (e *executor) enqueueSubscriptionDiscovery(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, field string, opID string, outgoing string) error {
-	jobID := fmt.Sprintf("%s-subscription-wake-%s-%s", md.ID.RunID, field, opID)
+// inbox saved. The job ID belongs to one next op and
+// to what woke it (unique: the message, the end, or the number of messages after a
+// flush), so a redelivery queues the same item and a later wake of the same op,
+// which a view that skips a message sends again, queues its own.
+func (e *executor) enqueueSubscriptionDiscovery(ctx context.Context, md *sv2.Metadata, incoming string, maxAttempts *int, follows *meta.SpanReference, field string, opID string, outgoing string, unique string) error {
+	jobID := fmt.Sprintf("%s-subscription-wake-%s-%s-%s", md.ID.RunID, field, opID, unique)
 	item := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               uuid.New().String(),
@@ -453,7 +452,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	switch res[0] {
 	case "wake":
-		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID)
+		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID, messageID)
 	case "limit":
 		e.log.Warn("subscription limit reached, closing the subscription", "limit", res[1], "key", key)
 
@@ -462,7 +461,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		}
 		// A next op waiting for a message that will not come sees the end.
 		if len(res) > 2 && res[2] != "" {
-			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key))
+			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key), "end")
 		}
 	}
 

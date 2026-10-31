@@ -22,15 +22,16 @@ ARGV[3...] - per op
 Limits, where a message becomes a step: the last four ARGV of deliver, next, flush
 and close are the most messages one inbox keeps, the most messages one run keeps,
 the run's step limit and the run's state size limit. A message that would break one
-is dropped with everything after it, and the inbox closes: a marker step (the closed
-step ID) is saved and the field is "closed".
+is dropped with everything after it, and the inbox closes: the closed step is saved
+under its own ID and the field is "closed".
 
 Ops (the result is an array):
   deliver  step ID, value, limits: {"norun"}, {"closed"}, {"buffered"}, {"dup"},
            {"wake", op id} (saved as a step, the op waits) or {"limit", reason, op id}
   next     op id, limits: {"norun"}, {"closed"}, {"waiting"}, {"flushed", n} or
            {"limit", reason}
-  flush    limits: {"norun"}, {"flushed", n} or {"limit", reason}
+  flush    limits: {"norun"}, {"flushed", n, total} or {"limit", reason, total}; total is the
+           number of messages of the inbox that are steps
   close    limits: as flush, then the inbox is closed
   timeout  op id: {1} when the timer won (null is saved under the op id), else {0}
   clear    op id: drops the waiting flag when it holds this op id
@@ -133,6 +134,19 @@ local function closeForLimit(reason)
   redis.call("HSET", KEYS[1], field, cjson.encode("closed"))
 end
 
+-- inboxTotal is how many messages of this inbox are steps of the run.
+local function inboxTotal()
+  local inboxPrefix = messagePrefix .. field .. ":"
+  local total = 0
+  for _, id in ipairs(redis.call("LRANGE", KEYS[4], 0, -1)) do
+    if string.sub(id, 1, #inboxPrefix) == inboxPrefix then
+      total = total + 1
+    end
+  end
+
+  return total
+end
+
 -- flush saves the buffered messages as steps in arrival order, and empties the
 -- buffer. It returns how many were saved and the limit that stopped it, if any.
 local function flush(st, a)
@@ -216,7 +230,7 @@ if op == "next" then
       return {"limit", reason}
     end
 
-    return {"flushed", saved}
+    return {"flushed", saved, inboxTotal()}
   end
 
   redis.call("HSET", KEYS[1], field, cjson.encode({waiting = ARGV[3]}))
@@ -234,10 +248,10 @@ if op == "flush" or op == "close" then
     redis.call("HSET", KEYS[1], field, cjson.encode("closed"))
   end
   if reason then
-    return {"limit", reason}
+    return {"limit", reason, inboxTotal()}
   end
 
-  return {"flushed", saved}
+  return {"flushed", saved, inboxTotal()}
 end
 
 if op == "timeout" then
