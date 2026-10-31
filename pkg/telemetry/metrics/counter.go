@@ -403,6 +403,15 @@ func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64
 	})
 }
 
+func IncrConnectGatewayGRPCClientEvictedCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_evicted_total",
+		Description: "Total number of gRPC clients to connect gateways removed after a transport failure",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectRouterGRPCMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -1058,6 +1067,15 @@ func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_proxy.lease_expired_total",
 		Description: "Total number of expired leases",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectProxyForwardFailedAfterResponseCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.forward_failed_after_response_total",
+		Description: "Total number of failed forwards whose response had already arrived, so the request was not re-routed",
 		Tags:        opts.Tags,
 	})
 }

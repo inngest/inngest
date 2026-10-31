@@ -831,6 +831,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionPauser:      functionProvider,
 		Cancellations:       NewCancellationProvider(cancellation.NewRedisWriter(unshardedRc, rq, "")),
 		Runs:                NewRunProvider(gqlData, exec),
+		Events:              NewEventProvider(gqlData),
 		Replays: NewReplayProvider(dbcqrs, functionProvider, exec, func(id uuid.UUID) bool {
 			return !functionProvider.pauses.get(id).IsZero()
 		}),

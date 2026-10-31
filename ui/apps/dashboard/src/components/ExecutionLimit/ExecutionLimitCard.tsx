@@ -9,7 +9,10 @@ import {
   RiErrorWarningFill,
 } from '@remixicon/react';
 
-import { SidebarAlertCard } from '../NavigationV2/SidebarAlertCard';
+import {
+  boostedStyles,
+  SidebarAlertCard,
+} from '../NavigationV2/SidebarAlertCard';
 import { usageKind, type UsageBand } from './executionLimit';
 import { useDismissal } from './useDismissal';
 import { upgradeLinkProps, useExecutionLimit } from './useExecutionLimit';
@@ -31,6 +34,11 @@ const kindStyles = {
     collapsed: 'border-accent-xSubtle bg-accent-3xSubtle',
     icon: 'text-accent-subtle',
     link: 'text-accent-intense decoration-accent-intense hover:text-accent-2xIntense hover:decoration-accent-2xIntense',
+  },
+  boost: {
+    collapsed: boostedStyles.card,
+    icon: boostedStyles.icon,
+    link: boostedStyles.link,
   },
 } as const;
 
@@ -63,9 +71,17 @@ const limitReachedContent = {
   dismissable: false,
 };
 
+const graceContent = {
+  title: 'Hobby limit extended',
+  body: () =>
+    'Extra executions were added to keep your runs going. New runs pause once those are used up.',
+  dismissable: false,
+};
+
 function enhancedContent(band: UsageBand): CardContent | undefined {
   const kind = usageKind(band);
   if (kind === 'default') return undefined;
+  if (kind === 'boost') return { kind, ...graceContent };
   if (band === 'limitReached') return { kind, ...limitReachedContent };
   return { kind, ...pausedContent, dismissable: band !== '90' };
 }
@@ -89,13 +105,17 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
   if (content.dismissable && (!isReady || isDismissed)) return null;
 
   const styles = kindStyles[content.kind];
+  const boosted = content.kind === 'boost';
+  const upgradeRef = boosted
+    ? 'app-hobby-execution-grace-card'
+    : 'app-hobby-execution-limit-card';
 
   if (collapsed) {
     return (
       <MenuItem
         {...upgradeLinkProps(
           data.marketplaceBillingURL,
-          'app-hobby-execution-limit-card-collapsed',
+          `${upgradeRef}-collapsed`,
         )}
         className={cn('border', styles.collapsed)}
         collapsed={collapsed}
@@ -109,6 +129,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
     );
   }
 
+  const extendedLimit = data.usage + data.remaining;
   const formattedLimit = numberFormatter.format(data.limit);
   const formattedUsage = numberFormatter.format(data.usage);
 
@@ -118,10 +139,7 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       kind={content.kind}
       footer={
         <Link
-          {...upgradeLinkProps(
-            data.marketplaceBillingURL,
-            'app-hobby-execution-limit-card',
-          )}
+          {...upgradeLinkProps(data.marketplaceBillingURL, upgradeRef)}
           className={cn('gap-0.5 text-xs leading-5', styles.link)}
           iconAfter={<RiArrowRightLine className="h-3.5 w-3.5" />}
         >
@@ -152,12 +170,16 @@ export function ExecutionLimitCard({ collapsed }: { collapsed: boolean }) {
       <div className="mt-2 pt-1">
         <ProgressBar
           kind={content.kind}
-          limit={data.limit}
+          limit={boosted ? extendedLimit : data.limit}
           size="small"
           value={data.usage}
         />
         <p className="mt-[3px] text-xs font-bold leading-4">
-          {formattedUsage}/{formattedLimit} Executions
+          {boosted
+            ? `${numberFormatter.format(
+                data.remaining,
+              )} executions remaining this month`
+            : `${formattedUsage}/${formattedLimit} Executions`}
         </p>
       </div>
     </SidebarAlertCard>

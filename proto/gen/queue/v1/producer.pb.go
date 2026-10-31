@@ -358,6 +358,7 @@ type EnqueueOptions struct {
 	ForceQueueShardName    string                 `protobuf:"bytes,2,opt,name=force_queue_shard_name,json=forceQueueShardName,proto3" json:"force_queue_shard_name,omitempty"`
 	NormalizeFromBacklogId string                 `protobuf:"bytes,3,opt,name=normalize_from_backlog_id,json=normalizeFromBacklogId,proto3" json:"normalize_from_backlog_id,omitempty"`
 	IdempotencyPeriod      *durationpb.Duration   `protobuf:"bytes,4,opt,name=idempotency_period,json=idempotencyPeriod,proto3,oneof" json:"idempotency_period,omitempty"`
+	SingletonMigrationKey  string                 `protobuf:"bytes,5,opt,name=singleton_migration_key,json=singletonMigrationKey,proto3" json:"singleton_migration_key,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -420,6 +421,13 @@ func (x *EnqueueOptions) GetIdempotencyPeriod() *durationpb.Duration {
 	return nil
 }
 
+func (x *EnqueueOptions) GetSingletonMigrationKey() string {
+	if x != nil {
+		return x.SingletonMigrationKey
+	}
+	return ""
+}
+
 var File_queue_v1_producer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_producer_proto_rawDesc = "" +
@@ -448,12 +456,13 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
 	"\x05scope\x18\x04 \x01(\v2\x0f.queue.v1.ScopeR\x05scope\"\x18\n" +
-	"\x16RequeueByJobIDResponse\"\x94\x02\n" +
+	"\x16RequeueByJobIDResponse\"\xcc\x02\n" +
 	"\x0eEnqueueOptions\x12,\n" +
 	"\x12passthrough_job_id\x18\x01 \x01(\bR\x10passthroughJobId\x123\n" +
 	"\x16force_queue_shard_name\x18\x02 \x01(\tR\x13forceQueueShardName\x129\n" +
 	"\x19normalize_from_backlog_id\x18\x03 \x01(\tR\x16normalizeFromBacklogId\x12M\n" +
-	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01B\x15\n" +
+	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01\x126\n" +
+	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKeyB\x15\n" +
 	"\x13_idempotency_period2\xec\x01\n" +
 	"\x0fProducerService\x12@\n" +
 	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +

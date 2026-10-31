@@ -30,6 +30,7 @@ type Service struct {
 	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
+	events         EventProvider
 	replays        ReplayProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
@@ -58,6 +59,7 @@ type ServiceOptions struct {
 	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
+	Events              EventProvider
 	Replays             ReplayProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
@@ -89,6 +91,7 @@ func NewService(opts ServiceOptions) *Service {
 		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
+		events:         opts.Events,
 		replays:        opts.Replays,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,

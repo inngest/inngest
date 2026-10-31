@@ -17,6 +17,7 @@ package dashboards
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -70,6 +71,17 @@ const (
 	maxLimit     = 100
 )
 
+// getTimeout bounds every Get, mirroring pkg/duckdb/insights' Execute
+// (executeTimeout): Get runs on the same *sql.DB, so the same DuckDB
+// subprocess dual-write uses. A var rather than a const only so tests can
+// shrink it.
+var getTimeout = 30 * time.Second
+
+// errGetTimeout is the cause Get's own getTimeout deadline cancels its ctx
+// with, so a caller's own cancellation or (shorter) deadline isn't reported
+// as Get's time limit.
+var errGetTimeout = errors.New("dashboards: get timeout")
+
 // Get runs the registry query for one key. An unrecognized key returns
 // (nil, nil) rather than erroring -- keys are plain strings nothing
 // upstream validates ahead of time, matching the reference Get's own
@@ -89,8 +101,14 @@ func Get(ctx context.Context, db *sql.DB, scope Scope, key string) (*Result, err
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 
+	ctx, cancel := context.WithTimeoutCause(ctx, getTimeout, errGetTimeout)
+	defer cancel()
+
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
+		if errors.Is(context.Cause(ctx), errGetTimeout) {
+			return nil, fmt.Errorf("dashboard query (%s): exceeded the %s time limit: %w", key, getTimeout, err)
+		}
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 	defer rows.Close()

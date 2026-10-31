@@ -69,3 +69,22 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, "/events", byMethod["SendEvent"].Path)
 	require.Equal(t, "events:write:send", byMethod["SendEvent"].AuthzPermission)
 }
+
+func TestEventReadCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, command, tool, path, permission string }{
+		{"ListEvents", "list-events", "list_events", "/events", "events:read:list"},
+		{"GetEvent", "get-event", "get_event", "/events/{event_id}", "events:read:get"},
+	} {
+		endpoint := byMethod[tc.method]
+		require.Equal(t, tc.command, endpoint.CommandName)
+		require.Equal(t, tc.tool, endpoint.ToolName)
+		require.Equal(t, http.MethodGet, endpoint.HTTPMethod)
+		require.Equal(t, tc.path, endpoint.Path)
+		require.Equal(t, tc.permission, endpoint.AuthzPermission)
+		require.Equal(t, []string{"payload"}, FieldEnum(endpoint.Input.Fields().ByName("include")))
+	}
+}

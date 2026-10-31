@@ -75,6 +75,8 @@ const (
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
+	V2_ListEvents_FullMethodName                 = "/api.v2.V2/ListEvents"
+	V2_GetEvent_FullMethodName                   = "/api.v2.V2/GetEvent"
 	V2_SendEvent_FullMethodName                  = "/api.v2.V2/SendEvent"
 	V2_InvokeFunction_FullMethodName             = "/api.v2.V2/InvokeFunction"
 	V2_ListInsightsTables_FullMethodName         = "/api.v2.V2/ListInsightsTables"
@@ -150,6 +152,8 @@ type V2Client interface {
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
+	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
+	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error)
 	SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 	ListInsightsTables(ctx context.Context, in *ListInsightsTablesRequest, opts ...grpc.CallOption) (*ListInsightsTablesResponse, error)
@@ -748,6 +752,26 @@ func (c *v2Client) GetFunctions(ctx context.Context, in *GetFunctionsRequest, op
 	return out, nil
 }
 
+func (c *v2Client) ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEventsResponse)
+	err := c.cc.Invoke(ctx, V2_ListEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEventResponse)
+	err := c.cc.Invoke(ctx, V2_GetEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) SendEvent(ctx context.Context, in *SendEventRequest, opts ...grpc.CallOption) (*SendEventResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SendEventResponse)
@@ -920,6 +944,8 @@ type V2Server interface {
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
+	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
+	GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error)
 	SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error)
@@ -1105,6 +1131,12 @@ func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequ
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
+}
+func (UnimplementedV2Server) ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListEvents not implemented")
+}
+func (UnimplementedV2Server) GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEvent not implemented")
 }
 func (UnimplementedV2Server) SendEvent(context.Context, *SendEventRequest) (*SendEventResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendEvent not implemented")
@@ -2129,6 +2161,42 @@ func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListEvents(ctx, req.(*ListEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetEvent(ctx, req.(*GetEventRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_SendEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendEventRequest)
 	if err := dec(in); err != nil {
@@ -2541,6 +2609,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunctions",
 			Handler:    _V2_GetFunctions_Handler,
+		},
+		{
+			MethodName: "ListEvents",
+			Handler:    _V2_ListEvents_Handler,
+		},
+		{
+			MethodName: "GetEvent",
+			Handler:    _V2_GetEvent_Handler,
 		},
 		{
 			MethodName: "SendEvent",

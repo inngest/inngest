@@ -87,6 +87,11 @@ type EventPublisher interface {
 
 type EventSender func(context.Context, *event.Event) (string, error)
 
+type EventProvider interface {
+	GetEvent(ctx context.Context, id ulid.ULID) (*cqrs.Event, error)
+	GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error)
+}
+
 type FunctionPauser interface {
 	// idempotent pause and resume; may apply asynchronously
 	PauseFunction(context.Context, inngest.DeployedFunction) (inngest.DeployedFunction, error)
