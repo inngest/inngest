@@ -535,6 +535,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	tp := tracing.NewSqlcTracerProvider(adapter.Q())
+	// Flush pending spans + release the shared OTel SpanProcessor goroutines
+	// on process exit (part of #3892 fix). Uses a short detached context so
+	// shutdown runs even if the parent context has already been cancelled
+	// by a SIGINT / SIGTERM.
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			l.Warn("failed to shut down tracing provider cleanly", "error", err)
+		}
+	}()
 
 	// Opt-in, best-effort DuckDB dual-write: nil unless opts.EnableDuckDB is
 	// true (the `--duckdb` flag / INNGEST_DUCKDB env var), and nil on any
