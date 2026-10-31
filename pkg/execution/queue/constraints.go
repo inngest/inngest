@@ -169,6 +169,12 @@ type ItemLeaseConstraintCheckResult struct {
 	// while processing the item.
 	CapacityLease *CapacityLease
 
+	// CapacityLeaseAcquired is true when CapacityLease was granted by this
+	// check's Acquire as a new mutation: not reused from the item, and not
+	// replayed from the Constraint API's operation idempotency cache (where
+	// another attempt for the same item may own it).
+	CapacityLeaseAcquired bool
+
 	// ArchivedWorkspaceAppSemaphoreBypassed marks this lease as cleanup-only.
 	ArchivedWorkspaceAppSemaphoreBypassed bool
 
@@ -656,6 +662,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		LeaseID:    capacityLeaseID,
 		IssuedAtMS: now.UnixMilli(),
 	}
+	result.CapacityLeaseAcquired = !res.OperationIdempotencyHit
 	return result, nil
 }
 
