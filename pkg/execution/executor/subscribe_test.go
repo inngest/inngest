@@ -496,15 +496,16 @@ func TestOverlappingCloses(t *testing.T) {
 	require.Len(t, f.messages("b"), 1)
 }
 
-// A next on a closed inbox queues the discovery that shows the SDK the close.
-func TestNextOnAClosedInboxQueuesADiscovery(t *testing.T) {
+// A next that reaches an inbox already closed is answered with null, which the SDK
+// reads as the end.
+func TestNextOnAClosedInboxIsAnsweredNull(t *testing.T) {
 	f := newSubscribeFixture(t)
 
 	require.NoError(t, f.op("inbox", state.SubscribeClose, "close-1", ""))
 	f.next("inbox", "next-1")
 
-	require.Equal(t, 1, f.discoveries("inbox"))
-	require.False(t, f.hasStep("next-1"))
+	require.Zero(t, f.discoveries("inbox"))
+	require.JSONEq(t, `{"data":null}`, f.stepData("next-1"))
 }
 
 // Open writes one pause per source, with the listed streams, in one op; stop

@@ -147,16 +147,8 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	md := runCtx.Metadata()
 	field := subscriptionField(sub.Key)
 
-	// answer completes the op with a step under its own ID.
 	answer := func(output any) error {
-		byt, err := json.Marshal(output)
-		if err != nil {
-			return err
-		}
-		gen.Op = enums.OpcodeStepRun
-		gen.Data = byt
-
-		return e.handleGeneratorStep(ctx, runCtx, gen, edge)
+		return e.answerSubscribeOp(ctx, runCtx, gen, edge, output)
 	}
 
 	switch sub.Mode {
@@ -225,6 +217,18 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	return fmt.Errorf("unknown subscription mode %q", sub.Mode)
 }
 
+// answerSubscribeOp completes the op with a step under its own ID.
+func (e *executor) answerSubscribeOp(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, output any) error {
+	byt, err := json.Marshal(output)
+	if err != nil {
+		return err
+	}
+	gen.Op = enums.OpcodeStepRun
+	gen.Data = byt
+
+	return e.handleGeneratorStep(ctx, runCtx, gen, edge)
+}
+
 // subscriptionFlush runs the flush or close op: the buffered messages become
 // steps. It returns how many messages of the inbox are steps of the run.
 func (e *executor) subscriptionFlush(ctx context.Context, store sv2.SubscriptionStore, id sv2.ID, field string, op string) (int, error) {
@@ -271,9 +275,14 @@ func (e *executor) handleSubscribeNext(ctx context.Context, runCtx execution.Run
 		return state.ErrRunNotFound
 	}
 
+	if res[0] == "closed" {
+		// The inbox closed while this op was on its way: the op ends with null, which
+		// the SDK reads as the end.
+		return e.answerSubscribeOp(ctx, runCtx, gen, edge, nil)
+	}
 	if res[0] != "waiting" {
-		// Flushed messages, or the end of the inbox: the SDK reads them from the
-		// stack once the discovery runs.
+		// Flushed messages, or a limit that ended the inbox: the SDK reads them from
+		// the stack once the discovery runs.
 		unique := "end"
 		if res[0] == "flushed" && len(res) > 2 {
 			unique = "total-" + res[2]
