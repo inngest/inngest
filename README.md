@@ -172,6 +172,8 @@ Additionally, Inngest's website documentation is available for contribution in [
 
 Self-hosting the Inngest server is possible and easy to get started with. Learn more about self-hosting Inngest in [our docs guide](https://www.inngest.com/docs/self-hosting?ref=github-inngest-readme).
 
+For queue throughput tuning, see [parallel queue claiming](docs/queue-claim-concurrency.md).
+
 ## License
 
 The Inngest server and CLI are available under the Server Side Public License and delayed open source publication (DOSP) under Apache 2.0. [View the license here](/LICENSE.md).

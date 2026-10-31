@@ -87,10 +87,11 @@ import (
 )
 
 const (
-	DefaultTick         = 150
-	DefaultTickDuration = time.Millisecond * DefaultTick
-	DefaultPollInterval = 5
-	DefaultQueueWorkers = 100
+	DefaultTick                  = 150
+	DefaultTickDuration          = time.Millisecond * DefaultTick
+	DefaultPollInterval          = 5
+	DefaultQueueWorkers          = 100
+	DefaultQueueClaimConcurrency = 1
 
 	DefaultConnectGatewayPort      = connect.DefaultGatewayPort
 	DefaultConnectGatewayGRPCPort  = 50052
@@ -109,15 +110,16 @@ var defaultPartitionConstraintConfig = queue.PartitionConstraintConfig{
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config        config.Config `json:"-"`
-	RootDir       string        `json:"dir"`
-	URLs          []string      `json:"urls"`
-	Autodiscover  bool          `json:"autodiscover"`
-	Poll          bool          `json:"poll"`
-	PollInterval  int           `json:"poll_interval"`
-	Tick          time.Duration `json:"tick"`
-	RetryInterval int           `json:"retry_interval"`
-	QueueWorkers  int           `json:"queue_workers"`
+	Config                config.Config `json:"-"`
+	RootDir               string        `json:"dir"`
+	URLs                  []string      `json:"urls"`
+	Autodiscover          bool          `json:"autodiscover"`
+	Poll                  bool          `json:"poll"`
+	PollInterval          int           `json:"poll_interval"`
+	Tick                  time.Duration `json:"tick"`
+	RetryInterval         int           `json:"retry_interval"`
+	QueueWorkers          int           `json:"queue_workers"`
+	QueueClaimConcurrency int           `json:"queue_claim_concurrency"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -431,6 +433,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	if opts.RetryInterval > 0 {
 		retryBackoff = backoff.GetLinearBackoffFunc(time.Duration(opts.RetryInterval) * time.Second)
 		queueOpts = append(queueOpts, queue.WithBackoffFunc(retryBackoff))
+	}
+
+	if opts.QueueClaimConcurrency > 1 {
+		queueOpts = append(queueOpts,
+			queue.WithDisableFifoForAccounts(map[string]struct{}{consts.DevServerAccountID.String(): {}}),
+			queue.WithParallelClaimLimit(opts.QueueClaimConcurrency),
+		)
+		l.Warn("parallel queue claiming enabled; best-effort FIFO dispatch ordering is relaxed", "queue_claim_concurrency", opts.QueueClaimConcurrency)
 	}
 
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), queueOpts...)
