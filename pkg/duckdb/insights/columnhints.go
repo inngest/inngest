@@ -145,6 +145,7 @@ func unionColumnPathHints(stmt *parser.SelectStatement, ctes map[string]logicalT
 // recurses through the FunctionExpr case (listReturnType) and then this
 // same jsonPathAccess case again for its own base.
 func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
+	expr = unwrapCollate(expr)
 	if base, path, ok := jsonPathAccess(expr); ok {
 		segs, collects := queryPath(path)
 		return projectJSONSubPathHints(resolveColumnPathHints(base, scope), segs, collects)
@@ -169,7 +170,7 @@ func resolveColumnPathHints(expr parser.Expr, scope *tableScope) []PathHint {
 		return col.pathHints
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
-			col, ok := tbl.columns[id.Parts[1]]
+			col, ok := tbl.column(id.Parts[1])
 			if !ok {
 				return nil
 			}
@@ -272,30 +273,50 @@ type starColumn struct {
 // columnOrder, in scope order for a bare "*", or just the qualified
 // table's for "t.*".
 func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
-	excluded := map[string]bool{}
-	for _, c := range star.Exclude {
-		excluded[c] = true
-	}
-
-	var tables []logicalTable
-	if len(star.Qualifier) == 1 {
-		if tbl, ok := scope.lookup(star.Qualifier[0]); ok {
-			tables = []logicalTable{tbl}
-		}
-	} else {
-		for _, name := range scope.names() {
-			tbl, _ := scope.lookup(name)
-			tables = append(tables, tbl)
+	var excluded []excludeName
+	for i := range star.Exclude {
+		if x, _, ok := parseExcludeName(star, i); ok {
+			excluded = append(excluded, x)
 		}
 	}
+	isExcluded := func(alias, name string) bool {
+		for _, x := range excluded {
+			if x.matches(alias, name) {
+				return true
+			}
+		}
+		return false
+	}
 
+	// A bare "*" also applies the FROM clause's own join semantics,
+	// matching DuckDB's star expansion: a SEMI/ANTI join's right side
+	// isn't projected, and each USING/NATURAL-merged column is projected
+	// once, at its first copy not excluded by EXCLUDE (so "EXCLUDE (a.k)"
+	// moves k to b's position rather than dropping it). "t.*" is just t's
+	// own columns.
+	bare := len(star.Qualifier) == 0
+	emitted := map[int]bool{}
+	entries, _ := scope.starEntries(star.Qualifier)
 	var out []starColumn
-	for _, tbl := range tables {
-		for _, name := range tbl.columnOrder {
-			if excluded[name] {
+	for i, e := range entries {
+		if e.hidden() {
+			continue
+		}
+		for _, name := range e.table.columnOrder {
+			if isExcluded(e.alias, name) {
 				continue
 			}
-			out = append(out, starColumn{name: name, col: tbl.columns[name]})
+			col, _ := e.table.column(name)
+			if bare {
+				if id, ok := scope.using[usingColumn{entry: i, column: strings.ToLower(name)}]; ok {
+					if emitted[id] {
+						continue
+					}
+					emitted[id] = true
+					col = scope.usingCols[id]
+				}
+			}
+			out = append(out, starColumn{name: name, col: col})
 		}
 	}
 	return out
@@ -319,10 +340,24 @@ func resolveStarColumns(star *parser.StarExpr, scope *tableScope) []starColumn {
 // projection (only a path that explicitly declares a leading wc
 // contributes anything), not a fallback.
 func resolveItemHint(expr parser.Expr, scope *tableScope) ColumnHint {
+	expr = unwrapCollate(expr)
 	if id, ok := expr.(*parser.Ident); ok {
 		return resolveIdentHint(id, scope)
 	}
 	return rootHintOf(resolveColumnPathHints(expr, scope))
+}
+
+// unwrapCollate strips any "x COLLATE <name>" down to x: a collation only
+// changes how x compares, not its value or type (inferType's COLLATE
+// case), so run_id COLLATE nocase is still a run ID.
+func unwrapCollate(expr parser.Expr) parser.Expr {
+	for {
+		b, ok := expr.(*parser.BinaryExpr)
+		if !ok || !strings.EqualFold(b.Op, "COLLATE") {
+			return expr
+		}
+		expr = b.Left
+	}
 }
 
 // resolveArrayElementHint resolves the hint for one element of the array x
@@ -355,7 +390,7 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		return col.hint()
 	case 2:
 		if tbl, ok := scope.lookup(id.Parts[0]); ok {
-			col, ok := tbl.columns[id.Parts[1]]
+			col, ok := tbl.column(id.Parts[1])
 			if !ok {
 				return HintNone
 			}
@@ -379,7 +414,7 @@ func resolveIdentHint(id *parser.Ident, scope *tableScope) ColumnHint {
 		if !ok {
 			return HintNone
 		}
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok || !col.arrayOfStructs {
 			return HintNone
 		}

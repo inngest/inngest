@@ -87,3 +87,38 @@ func TestLogicalTablesColumnOrderMatchesColumns(t *testing.T) {
 		}
 	}
 }
+
+// Matches DuckDB's derived-table column naming, checked with DESCRIBE.
+func TestDedupeColumnNames(t *testing.T) {
+	require.Equal(t, []string{"x", "x_1", "x_2", "x_1_1"}, dedupeColumnNames([]string{"x", "x", "x", "x_1"}))
+	require.Equal(t, []string{"x", "x_1", "x_1_1"}, dedupeColumnNames([]string{"x", "x", "x_1"}))
+	require.Equal(t, []string{"x", "X_1"}, dedupeColumnNames([]string{"x", "X"}))
+}
+
+// A duplicate output name is renamed rather than collapsed, so the derived
+// table keeps every column (and "SELECT *" over it stays aligned); an
+// explicit column list applies before the renaming (DuckDB: t(p, x) over
+// (x, y, x) is (p, x, x_1)).
+func TestInferOutputColumnsRenamesDuplicates(t *testing.T) {
+	stmt := mustParse(t, "SELECT run_id AS x, app_id AS y, function_id AS x FROM runs")
+	scope, _, _, err := validate(stmt)
+	require.NoError(t, err)
+
+	order, cols, err := inferOutputColumns(stmt, scope, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"x", "y", "x_1"}, order)
+	require.Equal(t, HintFunctionID, cols["x_1"].hint())
+
+	order, cols, err = inferOutputColumns(stmt, scope, []string{"p", "x"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"p", "x", "x_1"}, order)
+	require.Equal(t, HintRunID, cols["p"].hint())
+	require.Equal(t, HintAppID, cols["x"].hint())
+	require.Equal(t, HintFunctionID, cols["x_1"].hint())
+}
+
+func TestValidateAcceptsRenamedDuplicateColumn(t *testing.T) {
+	stmt := mustParse(t, "WITH x AS (SELECT r.run_id, e.run_id FROM runs r JOIN extended_trace_spans e ON r.run_id = e.run_id) SELECT run_id_1 FROM x")
+	_, _, _, err := validate(stmt)
+	require.NoError(t, err)
+}

@@ -69,7 +69,7 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 			if err != nil {
 				return nil, nil, err
 			}
-			merged[cte.Name] = tbl
+			merged[strings.ToLower(cte.Name)] = tbl
 		}
 		ctes = merged
 	}
@@ -105,17 +105,53 @@ func validateWithCTEs(stmt *parser.SelectStatement, outerCTEs map[string]logical
 	// reuse it for traversals that must still see every expression.
 	skipAliasExprs := groupByOrderByAliasExprs(stmt, scope)
 
+	// A SEMI/ANTI join's ON is the only place its right side is visible
+	// (tableScope.onScope), so it gets its own validator.
+	onScopes := joinOnScopes(stmt.From, scope)
+
 	v := &exprValidator{scope: scope, ctes: ctes, diags: diags}
 	for _, n := range collectExprs(stmt) {
 		if skipAliasExprs[n] {
 			continue
 		}
-		parser.Walk(v, n)
-		if v.err != nil {
-			return nil, nil, v.err
+		nv := v
+		if os, ok := onScopes[n]; ok {
+			nv = &exprValidator{scope: os, ctes: ctes, diags: diags}
+		}
+		parser.Walk(nv, n)
+		if nv.err != nil {
+			return nil, nil, nv.err
 		}
 	}
 	return scope, ctes, nil
+}
+
+// joinOnScopes maps every JOIN ON expression in from whose scope differs
+// from scope itself (a SEMI/ANTI join's, see tableScope.onScope) to that
+// scope.
+func joinOnScopes(from *parser.FromClause, scope *tableScope) map[parser.Node]*tableScope {
+	if from == nil {
+		return nil
+	}
+	out := map[parser.Node]*tableScope{}
+	var walk func(parser.TableRef)
+	walk = func(ref parser.TableRef) {
+		r, ok := ref.(*parser.JoinRef)
+		if !ok {
+			return
+		}
+		if r.On != nil {
+			if os := scope.onScope(r); os != scope {
+				out[r.On] = os
+			}
+		}
+		walk(r.Left)
+		walk(r.Right)
+	}
+	for _, ref := range from.Refs {
+		walk(ref)
+	}
+	return out
 }
 
 // validateSetOpModifiers checks a set operation's own ORDER BY/LIMIT/OFFSET
@@ -185,7 +221,7 @@ func selectAliases(stmt *parser.SelectStatement) map[string]bool {
 	aliases := make(map[string]bool, len(stmt.Columns))
 	for _, item := range stmt.Columns {
 		if item.Alias != "" {
-			aliases[item.Alias] = true
+			aliases[strings.ToLower(item.Alias)] = true
 		}
 	}
 	return aliases
@@ -198,7 +234,7 @@ func isAliasOnlyReference(e parser.Expr, aliases map[string]bool, scope *tableSc
 	if !ok || len(id.Parts) != 1 {
 		return false
 	}
-	return aliases[id.Parts[0]] && scope.columnCount(id.Parts[0]) == 0
+	return aliases[strings.ToLower(id.Parts[0])] && scope.columnCount(id.Parts[0]) == 0
 }
 
 // collectExprs gathers every top-level expression stmt's clauses carry,
@@ -292,8 +328,8 @@ func groupByItemExprs(item parser.GroupByItem) []parser.Expr {
 
 // collectFromExprs walks ref's JOIN tree collecting every ON expression —
 // USING column lists aren't Exprs (they're plain strings), so they're
-// checked directly against scope in resolveScope's caller-agnostic
-// addRef; here we only need ON.
+// checked against each side of the join by resolveScope itself
+// (tableScope.addJoinColumns, scope.go); here we only need ON.
 func collectFromExprs(from *parser.FromClause) []parser.Expr {
 	if from == nil {
 		return nil
@@ -349,7 +385,7 @@ type exprValidator struct {
 }
 
 func (v *exprValidator) isBound(name string) bool {
-	return slices.Contains(v.boundVars, name)
+	return slices.ContainsFunc(v.boundVars, func(b string) bool { return strings.EqualFold(b, name) })
 }
 
 func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
@@ -368,6 +404,28 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 	case *parser.ListComprehensionExpr:
 		v.err = v.checkListComprehension(x)
 		return nil
+	case *parser.BinaryExpr:
+		// "x COLLATE nocase": the parser represents the collation name as
+		// an Ident on the right (dotted for "nocase.noaccent"), which isn't
+		// a column reference, so only the collated operand is checked
+		// (DuckDB rejects an unknown collation itself). Any other right
+		// operand (a subquery, a function call, ...) isn't a collation
+		// name at all and is rejected rather than skipped.
+		if strings.EqualFold(x.Op, "COLLATE") {
+			if _, ok := x.Right.(*parser.Ident); !ok {
+				v.err = &ValidationError{Pos: x.Pos(), End: x.End(), Message: "unsupported COLLATE expression"}
+				return nil
+			}
+			parser.Walk(v, x.Left)
+			return nil
+		}
+	case *parser.Parameter:
+		// remapTables binds every macro call's (account_id, env_id) to
+		// anonymous "?" placeholders, positionally. A user's own "?" would
+		// shift those bindings, and "$1"/"$name" could read them back, so
+		// user-written parameters are rejected outright (nothing could
+		// bind them anyway).
+		v.err = &ValidationError{Pos: x.Pos(), End: x.End(), Message: "query parameters are not supported"}
 	case *parser.SelectStatement:
 		// A subquery (scalar, IN, EXISTS) — validated with
 		// its own FROM scope plus any CTEs visible here, chained to this
@@ -439,7 +497,7 @@ func (v *exprValidator) checkQualifiedIdent(id *parser.Ident) error {
 		return nil
 	}
 	if tbl, ok := v.scope.lookup(id.Parts[0]); ok {
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok {
 			return &ValidationError{Pos: id.Pos(), End: id.End(), Message: fmt.Sprintf("unknown column %q on table %q", id.Parts[1], id.Parts[0])}
 		}
@@ -503,34 +561,34 @@ func (v *exprValidator) checkFunction(f *parser.FunctionExpr) error {
 // bogus_alias.*" or "SELECT * EXCLUDE (nonexistent_column)" would
 // otherwise reach remapTables/DuckDB completely unvalidated.
 func (v *exprValidator) checkStar(s *parser.StarExpr) error {
-	var tables []logicalTable
-	switch len(s.Qualifier) {
-	case 0:
-		for _, name := range v.scope.names() {
-			if tbl, ok := v.scope.lookup(name); ok {
-				tables = append(tables, tbl)
-			}
-		}
-	case 1:
-		tbl, ok := v.scope.lookup(s.Qualifier[0])
-		if !ok {
-			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
-		}
-		tables = []logicalTable{tbl}
-	default:
+	if len(s.Qualifier) > 1 {
 		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported qualifier %q", strings.Join(s.Qualifier, "."))}
 	}
+	entries, ok := v.scope.starEntries(s.Qualifier)
+	if !ok {
+		return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown table %q", s.Qualifier[0])}
+	}
 
-	for _, exclude := range s.Exclude {
+	// A qualified entry ("t.col") must name one of the tables this star
+	// expands over, matching DuckDB ("SELECT a.* EXCLUDE (b.k)" is a
+	// binder error).
+	for i := range s.Exclude {
+		x, raw, ok := parseExcludeName(s, i)
+		if !ok {
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unsupported EXCLUDE entry %q", raw)}
+		}
 		found := false
-		for _, tbl := range tables {
-			if _, ok := tbl.columns[exclude]; ok {
+		for _, e := range entries {
+			if e.hidden() || x.qualifier != "" && !strings.EqualFold(x.qualifier, e.alias) {
+				continue
+			}
+			if _, ok := e.table.column(x.column); ok {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", exclude)}
+			return &ValidationError{Pos: s.Pos(), End: s.End(), Message: fmt.Sprintf("unknown column %q in EXCLUDE", raw)}
 		}
 	}
 	return nil

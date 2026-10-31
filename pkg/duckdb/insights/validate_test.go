@@ -494,3 +494,162 @@ func TestValidateChecksSetOpModifiers(t *testing.T) {
 		})
 	}
 }
+
+// A user-written parameter would collide with the "?" placeholders
+// remapTables binds the macro calls' (account_id, env_id) to.
+func TestValidateRejectsParameters(t *testing.T) {
+	queries := []string{
+		"SELECT ? FROM runs",
+		"SELECT run_id FROM runs WHERE run_id = $1",
+		"SELECT run_id FROM runs WHERE run_id = $name",
+		"SELECT run_id FROM runs WHERE run_id IN (SELECT ? FROM events)",
+		"SELECT run_id FROM runs LIMIT ?",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "query parameters are not supported")
+		})
+	}
+}
+
+// DuckDB identifiers are case-insensitive (quoted ones too), so table,
+// column, alias, CTE, EXCLUDE and comprehension-variable names all resolve
+// regardless of case.
+func TestValidateIdentifiersCaseInsensitive(t *testing.T) {
+	queries := []string{
+		"SELECT Run_ID FROM RUNS",
+		`SELECT "RUN_ID" FROM "Runs"`,
+		"SELECT R.Run_Id FROM runs r",
+		"SELECT RUNS.run_id FROM runs",
+		"WITH X AS (SELECT run_id AS Foo FROM runs) SELECT x.FOO, foo FROM x",
+		"SELECT * EXCLUDE (RUN_ID) FROM runs",
+		"SELECT r.* FROM runs R",
+		"SELECT run_id AS Foo FROM runs ORDER BY foo",
+		"SELECT [S FOR s IN event_ids] AS x FROM runs",
+		"SELECT Inngest.score FROM runs",
+		"SELECT t.FOO FROM (SELECT run_id AS foo FROM runs) T",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.NoError(t, err)
+		})
+	}
+}
+
+// The parser represents "x COLLATE nocase"'s collation as an Ident, which
+// isn't a column reference.
+func TestValidateAcceptsCollate(t *testing.T) {
+	for _, q := range []string{
+		"SELECT status COLLATE nocase FROM runs",
+		"SELECT run_id FROM runs ORDER BY status COLLATE nocase",
+		`SELECT run_id FROM runs WHERE status COLLATE "nocase.noaccent" = 'completed'`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	// The collated operand itself is still checked.
+	_, _, _, err := validate(mustParse(t, "SELECT nope COLLATE nocase FROM runs"))
+	require.ErrorContains(t, err, `unknown column "nope"`)
+}
+
+// Only a (possibly dotted) collation name may follow COLLATE -- anything
+// else would otherwise skip validation entirely.
+func TestValidateRejectsNonNameCollate(t *testing.T) {
+	for _, q := range []string{
+		"SELECT status COLLATE (SELECT name FROM events) FROM runs",
+		"SELECT status COLLATE lower(status) FROM runs",
+		"SELECT status COLLATE read_csv('/etc/passwd') FROM runs",
+		"SELECT run_id FROM runs ORDER BY status COLLATE 'nocase'",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, "unsupported COLLATE expression", q)
+	}
+}
+
+// sessions.key on a COLLATE's right is a collation name, not an
+// array-of-struct access to rewrite.
+func TestRewriteArrayOfStructAccessSkipsCollation(t *testing.T) {
+	tr, err := Transpile("SELECT status COLLATE sessions.key AS s FROM runs", testAccountID, testEnvID)
+	require.NoError(t, err)
+	require.Contains(t, tr.SQL, "status COLLATE sessions.key AS s")
+}
+
+func TestValidateStarExcludeQualified(t *testing.T) {
+	for _, q := range []string{
+		"SELECT * EXCLUDE (runs.run_id) FROM runs",
+		`SELECT * EXCLUDE ("R"."run_id") FROM runs r`,
+		"SELECT * EXCLUDE (e.run_id) FROM runs JOIN extended_trace_spans e ON runs.run_id = e.run_id",
+		"SELECT r.* EXCLUDE (r.run_id) FROM runs r",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	for _, q := range []string{
+		// DuckDB: Column "events.id" in EXCLUDE list not found in runs.
+		"SELECT runs.* EXCLUDE (events.id) FROM runs, events",
+		"SELECT * EXCLUDE (runs.id) FROM runs, events",
+		"SELECT * EXCLUDE (bogus.run_id) FROM runs",
+		"SELECT * EXCLUDE (a.b.c) FROM runs",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.Error(t, err, q)
+	}
+}
+
+// Each USING column must exist, unambiguously, on both sides of its join
+// (DuckDB's own binder errors).
+func TestValidateChecksUsingColumns(t *testing.T) {
+	for q, msg := range map[string]string{
+		"SELECT * FROM runs JOIN events USING (bogus)":                                                         `column "bogus" does not exist on left side of join`,
+		"SELECT * FROM runs JOIN events USING (run_id)":                                                        `column "run_id" does not exist on right side of join`,
+		"SELECT * FROM runs r JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata USING (run_id)": `ambiguous column "run_id" on left side of join`,
+		"SELECT * FROM runs r JOIN extended_trace_spans e ON r.run_id = e.run_id NATURAL JOIN metadata":        `ambiguous column "run_id" on left side of join`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, msg, q)
+	}
+	for _, q := range []string{
+		// A merged column isn't ambiguous.
+		"SELECT run_id, span_id FROM metadata JOIN extended_trace_spans USING (run_id, span_id)",
+		"SELECT run_id FROM metadata m NATURAL JOIN extended_trace_spans e",
+		"SELECT run_id FROM runs JOIN extended_trace_spans USING (RUN_ID) JOIN metadata USING (run_id)",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+}
+
+// DuckDB only exposes a SEMI/ANTI join's left side: its right side is
+// visible inside that join's own ON and nowhere else (checked against a
+// real duckdb).
+func TestValidateSemiAntiJoinHidesRightSide(t *testing.T) {
+	for _, q := range []string{
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)",
+		"SELECT * FROM runs r ANTI JOIN extended_trace_spans e ON r.run_id = e.run_id NATURAL JOIN metadata m",
+		"SELECT run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id",
+		"SELECT run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)",
+		// The ON can still see both sides, and a hidden alias can be reused.
+		"SELECT r.run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id AND e.span_id IS NOT NULL",
+		"SELECT e.span_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN extended_trace_spans e ON r.run_id = e.run_id",
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.NoError(t, err, q)
+	}
+	for q, msg := range map[string]string{
+		"SELECT e.run_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                        `unknown table "e"`,
+		"SELECT r.run_id FROM runs r ANTI JOIN extended_trace_spans e ON r.run_id = e.run_id WHERE e.span_id IS NULL":                `unknown table "e"`,
+		"SELECT e.* FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                             `unknown table "e"`,
+		"SELECT span_id FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                                         `unknown column "span_id"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m ON e.run_id = m.run_id":        `unknown table "e"`,
+		"SELECT * EXCLUDE (e.span_id) FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id":                           `unknown column "e.span_id" in EXCLUDE`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON run_id = 'x'":                                                      `ambiguous column "run_id"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id, LATERAL (SELECT e.span_id AS s) l":            `unknown table "e"`,
+		"SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id WHERE EXISTS (SELECT 1 WHERE e.span_id = 'x')": `unknown table "e"`,
+	} {
+		_, _, _, err := validate(mustParse(t, q))
+		require.ErrorContains(t, err, msg, q)
+	}
+}
