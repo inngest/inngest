@@ -276,7 +276,7 @@ func (e *executor) handleSubscribeNext(ctx context.Context, runCtx execution.Run
 		// stack once the discovery runs.
 		unique := "end"
 		if res[0] == "flushed" && len(res) > 2 {
-			unique = res[2]
+			unique = "total-" + res[2]
 		}
 
 		return e.enqueueSubscriptionDiscovery(ctx, md, edge.Edge.Incoming, runCtx.MaxAttempts(), nil, field, gen.ID, gen.ID, unique)
@@ -459,7 +459,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 
 	switch res[0] {
 	case "wake":
-		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID, res[2])
+		return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[1], messageID, "at-"+res[2])
 	case "limit":
 		e.log.Warn("subscription limit reached, closing the subscription", "limit", res[1], "key", key)
 
@@ -468,7 +468,7 @@ func (e *executor) deliverSubscription(ctx context.Context, evt event.TrackedEve
 		}
 		// A next op waiting for a message that will not come sees the end.
 		if len(res) > 3 && res[2] != "" {
-			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key), res[3])
+			return e.enqueueSubscriptionDiscovery(ctx, &md, pause.Incoming, pause.MaxAttempts, tracing.SpanRefFromPause(pause), field, res[2], subscriptionClosedID(key), "at-"+res[3])
 		}
 	}
 

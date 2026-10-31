@@ -267,7 +267,7 @@ if op == "timeout" then
   end
 
   -- A retry of a timer that already won finds the step it saved.
-  if redis.call("HGET", KEYS[2], w) == "null" and redis.call("HEXISTS", KEYS[1], field) == 0 then
+  if redis.call("HGET", KEYS[2], w) == "null" then
     return {1}
   end
 

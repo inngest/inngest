@@ -683,3 +683,17 @@ func TestInboxStateIsDeletedWithTheRun(t *testing.T) {
 		require.NotContains(t, k, ":subs:")
 	}
 }
+
+// A timer that won and is retried still wins when a message was buffered between
+// the attempts, so its discovery is not dropped.
+func TestRetriedTimerWinsAfterABufferedMessage(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	require.NoError(t, f.op("inbox", state.SubscribeNext, "next-1", "1h"))
+	timer := *f.item("sleep")
+	require.True(t, f.fireTimer(timer, "next-1"))
+
+	f.deliver("inbox")
+
+	require.True(t, f.fireTimer(timer, "next-1"))
+}
