@@ -708,3 +708,24 @@ func TestNextOpIsNotAPendingStep(t *testing.T) {
 	require.Equal(t, []string{"step"}, opGroups([]*state.GeneratorOpcode{next, step}).NonLazyIDs())
 	require.Equal(t, 1, nonLazyOpCount([]*state.GeneratorOpcode{next, step}))
 }
+
+// A message redelivered after the op that saw it was answered wakes the next wait
+// with a spurious discovery, which must not take the job ID of the real message
+// that follows.
+func TestRedeliveryDoesNotShadowTheNextMessageWake(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	f.next("inbox", "next-1")
+	first := f.deliver("inbox")
+	f.startWake(*f.item("edge"))
+
+	f.next("inbox", "next-2")
+	require.NoError(t, f.deliverEvent("inbox", first))
+	f.startWake(*f.item("edge"))
+	f.next("inbox", "next-2")
+	before := f.discoveries("inbox")
+
+	f.deliver("inbox")
+
+	require.Equal(t, before+1, f.discoveries("inbox"))
+}

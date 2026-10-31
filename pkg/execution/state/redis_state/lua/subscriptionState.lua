@@ -187,6 +187,21 @@ if op == "deliver" then
 
   local w, at = waitingOp(st)
   if w then
+    -- A message that was a step before this wait began is a redelivery of one the
+    -- function has read: nothing to wake. One saved since is a retry of a delivery
+    -- that crashed before it queued the wake.
+    if redis.call("HEXISTS", KEYS[2], id) == 1 then
+      local since = false
+      for _, saved in ipairs(redis.call("LRANGE", KEYS[4], tonumber(at), -1)) do
+        if saved == id then
+          since = true
+        end
+      end
+      if not since then
+        return {"dup"}
+      end
+    end
+
     local reason = saveMessage(id, value, a)
     if reason then
       closeForLimit(reason)
