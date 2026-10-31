@@ -133,7 +133,7 @@ func (e *executor) subscriptionLimitArgs(id sv2.ID) []string {
 }
 
 // handleGeneratorSubscribe handles the WaitForEvent ops of a step.subscribe inbox.
-func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, opts *state.WaitForEventOpts) error {
+func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, opts *state.WaitForEventOpts) error {
 	sub := opts.Subscribe
 	if err := validateSubscribe(sub); err != nil {
 		return err
@@ -213,6 +213,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return answer(map[string]any{"total": total})
 
 	case state.SubscribeNext:
+		if group.SubscribeBusy {
+			// The other ops of the response give the run a discovery that runs the
+			// function again, and it sends this op again if it still has nothing.
+			return nil
+		}
+
 		return e.handleSubscribeNext(ctx, runCtx, gen, edge, sub)
 	}
 
@@ -595,4 +601,45 @@ func (e *executor) openSubscriptionSource(ctx context.Context, runCtx execution.
 	}
 
 	return nil
+}
+
+// subscribeBusy reports whether a response holds an op that is not only a wait.
+// Ops that only park the run (sleep, a signal, an invoke, an event wait, a
+// subscription next) leave it idle.
+func subscribeBusy(ops []*state.GeneratorOpcode) bool {
+	hasNext, busy := false, false
+	for _, op := range ops {
+		if op == nil {
+			continue
+		}
+		if isSubscribeNext(op) {
+			hasNext = true
+		} else if !isParkingOp(op) {
+			busy = true
+		}
+	}
+
+	return hasNext && busy
+}
+
+func isSubscribeNext(op *state.GeneratorOpcode) bool {
+	if op.Op != enums.OpcodeWaitForEvent {
+		return false
+	}
+	opts, err := op.WaitForEventOpts()
+
+	return err == nil && opts.Subscribe != nil && opts.Subscribe.Mode == state.SubscribeNext
+}
+
+func isParkingOp(op *state.GeneratorOpcode) bool {
+	switch op.Op {
+	case enums.OpcodeSleep, enums.OpcodeInvokeFunction, enums.OpcodeWaitForSignal:
+		return true
+	case enums.OpcodeWaitForEvent:
+		opts, err := op.WaitForEventOpts()
+
+		return err == nil && opts.Subscribe == nil
+	}
+
+	return false
 }

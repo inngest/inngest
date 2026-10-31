@@ -58,6 +58,12 @@ type OpcodeGroup struct {
 	// batch.  When non-empty, handlers use it to derive a deterministic
 	// discovery JobID so concurrent fan-in completions deduplicate to one step.
 	ParallelCoalesceKey string
+
+	// SubscribeBusy is true when the response holds an op that is not only a wait
+	// (a step the function ran or planned, a subscription op that answers). The
+	// run is not idle then, so a step.subscribe next op must not leave it waiting:
+	// a message would queue a discovery beside the one that op already has.
+	SubscribeBusy bool
 }
 
 // OpcodeGroups groups opcodes by processing priority. The priority group runs
@@ -114,6 +120,10 @@ func opGroups(opcodes []*state.GeneratorOpcode) OpcodeGroups {
 			groups.OtherGroup.Opcodes = append(groups.OtherGroup.Opcodes, op)
 		}
 	}
+
+	busy := subscribeBusy(opcodes)
+	groups.PriorityGroup.SubscribeBusy = busy
+	groups.OtherGroup.SubscribeBusy = busy
 
 	return groups
 }

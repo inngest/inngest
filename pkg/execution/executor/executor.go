@@ -5771,7 +5771,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 
 	if opts.Subscribe != nil {
-		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, opts)
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge, group, opts)
 	}
 
 	if err := validateWaitExpression(ctx, opts.If); err != nil {

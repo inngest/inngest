@@ -94,6 +94,7 @@ type subscribeFixture struct {
 	pm     *subscribePauses
 	md     sv2.Metadata
 	events int
+	group  OpcodeGroup
 }
 
 func newSubscribeFixture(t *testing.T) *subscribeFixture {
@@ -179,7 +180,7 @@ func (f *subscribeFixture) op(key string, mode string, id string, timeout string
 	gen := state.GeneratorOpcode{Op: enums.OpcodeWaitForEvent, ID: id}
 	opts := &state.WaitForEventOpts{Event: "agent/message", Subscribe: &state.SubscribeOpts{Key: key, Mode: mode, Timeout: timeout, Streams: streams}}
 
-	return f.e.handleGeneratorSubscribe(f.ctx, &mockRunContext{md: f.md}, gen, queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}, opts)
+	return f.e.handleGeneratorSubscribe(f.ctx, &mockRunContext{md: f.md}, gen, queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}, f.group, opts)
 }
 
 func (f *subscribeFixture) next(key string, id string) {
@@ -622,4 +623,26 @@ func TestNextSentAgainAfterAWakeIsWokenAgain(t *testing.T) {
 	f.deliver("inbox")
 
 	require.Equal(t, 2, f.discoveries("inbox"))
+}
+
+// A next op beside an op that is not only a wait leaves the run idle for nothing:
+// that op's discovery runs the function again, which sends the next op again.
+func TestNextBesideABusyOpDoesNothing(t *testing.T) {
+	f := newSubscribeFixture(t)
+
+	ops := []*state.GeneratorOpcode{
+		{Op: enums.OpcodeStepRun, ID: "step"},
+		{Op: enums.OpcodeWaitForEvent, ID: "next-1", Opts: map[string]any{"event": "e", "subscribe": map[string]any{"key": "inbox", "mode": "next"}}},
+	}
+	require.True(t, opGroups(ops).OtherGroup.SubscribeBusy)
+
+	f.group = opGroups(ops).PriorityGroup
+	f.burst("inbox", 2)
+	f.next("inbox", "next-1")
+
+	require.Empty(t, f.messages("inbox"))
+	require.Zero(t, f.discoveries("inbox"))
+
+	only := opGroups(ops[1:])
+	require.False(t, only.PriorityGroup.SubscribeBusy)
 }
