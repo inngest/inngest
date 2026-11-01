@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,17 +39,27 @@ func childNamed(span *cqrs.OtelSpan, id string) *cqrs.OtelSpan {
 	return nil
 }
 
-// Ticks never become rows: they ride on the row they belong to, and a read's
-// tick says when its message arrived as well as when it was read.
-func TestTicksRollOntoTheirParentRow(t *testing.T) {
+// A message is a child span of the row it belongs to: it is drawn dimmed in
+// the same group as its parent, an arrival spans no time, and a read's message
+// runs from its arrival to its read. A read row lists the ids it took.
+func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
 		arrived := testStart.Add(time.Second)
 		read := testStart.Add(2 * time.Second)
+		group := []meta.SpanPathElement{{ID: "next", Name: "next", Kind: "tag", Origin: "inngest@1.0.0"}}
+		path, err := json.Marshal(group)
+		require.NoError(t, err)
 
 		root := buildRoot(t, enc, []testSpanRow{
 			runRow(),
-			stepRow("inbox", nil),
-			stepRow("read", nil),
+			stepRow("inbox", map[string]any{
+				meta.Attrs.StepSpanPath.Key(): string(path),
+				meta.Attrs.StepOrigin.Key():   "inngest@1.0.0",
+			}),
+			stepRow("read", map[string]any{
+				meta.Attrs.StepSpanPath.Key(): string(path),
+				meta.Attrs.StepOrigin.Key():   "inngest@1.0.0",
+			}),
 			tickRow("arrival", "inbox", map[string]any{
 				meta.Attrs.TickID.Key():      "m1",
 				meta.Attrs.TickSources.Key(): []string{"p1"},
@@ -59,22 +71,31 @@ func TestTicksRollOntoTheirParentRow(t *testing.T) {
 			}),
 		})
 
-		require.Len(t, root.Children, 2, "ticks are not rows")
+		require.Len(t, root.Children, 2, "a message is a child of its row, not of the run")
 
 		inbox := childNamed(root, "inbox")
 		require.NotNil(t, inbox)
-		require.Len(t, inbox.Ticks, 1)
-		require.Equal(t, "m1", inbox.Ticks[0].ID)
-		require.Equal(t, []string{"p1"}, inbox.Ticks[0].Sources)
-		require.Equal(t, arrived.UnixMilli(), inbox.Ticks[0].At.UnixMilli())
-		require.Nil(t, inbox.Ticks[0].ReadAt)
+		require.Len(t, inbox.Children, 1)
+
+		arrival := inbox.Children[0]
+		require.Equal(t, "m1", *arrival.Attributes.StepName)
+		require.Equal(t, group, *arrival.Attributes.StepSpanPath, "it is in its parent's group")
+		require.Equal(t, "inngest@1.0.0", *arrival.Attributes.StepOrigin, "it is dimmed")
+		require.Equal(t, arrived.UnixMilli(), arrival.Attributes.StartedAt.UnixMilli())
+		require.Equal(t, arrived.UnixMilli(), arrival.Attributes.EndedAt.UnixMilli())
+		require.True(t, arrival.Status.IsEnded())
 
 		took := childNamed(root, "read")
 		require.NotNil(t, took)
-		require.Len(t, took.Ticks, 1)
-		require.Equal(t, arrived.UnixMilli(), took.Ticks[0].At.UnixMilli(), "a read's tick has the arrival time")
-		require.NotNil(t, took.Ticks[0].ReadAt)
-		require.Equal(t, read.UnixMilli(), took.Ticks[0].ReadAt.UnixMilli())
+		require.Len(t, took.Children, 1)
+
+		message := took.Children[0]
+		require.Equal(t, arrived.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
+		require.Equal(t, read.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
+
+		require.Len(t, took.Metadata, 1)
+		require.Equal(t, metadata.Kind("inngest.inbox"), took.Metadata[0].Kind)
+		require.JSONEq(t, `["m1"]`, string(took.Metadata[0].Values["messages"]))
 	})
 }
 
