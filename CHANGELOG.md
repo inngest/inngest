@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.50.0] - 2026-11-01
+
+### 🚀 Features
+
+- *(dashboard)* Simplify Runs AI plugin setup (#5078)
+- *(duckdb)* Dual-write duckdb POC (#4880)
+- *(duckdb)* Duckdb-backed Insights  (#4882)
+- *(duckdb)* Add Insights & Sessions UI pages (#4885)
+- *(batch)* Support account-scoped migration (#5104)
+- *(dashboard)* Show when a function is draining (#5077)
+- *(dashboard)* Show paused and draining status in function lists (#5115)
+- *(batch)* Report debug batch API results per store (#5127)
+- *(batch)* Tag batch metrics by store and add per-call metrics (#5139)
+- *(api)* V2 list and get events (#5095)
+
+### 🐛 Bug Fixes
+
+- *(connect)* Avoid blocking replies on unreachable executors (#5074)
+- *(queue)* Wake Redis partitions after confirmed capacity release (#5088)
+- *(insights)* Fix JSONPath index hang and list_aggregate argument forwarding (#5105)
+- *(connect)* Release leases for undispatched requests (#5101)
+- *(dashboard)* Add copyable chart tooltip timestamps (#5125)
+- *(executor)* Accept successful pause iterator completion (#5129)
+- *(pauses)* Delete from existing blocks regardless of feature flags (#5128)
+- *(queue)* Preserve singleton ownership and report migration read failures (#5131)
+- *(trace)* Failed step timing after sleep (#5130)
+- *(api)* Match REST Insights to GQL's info, hints and metrics (#5117)
+- *(connect)* Bound gateway Forward and accept keepalive pings (#5102)
+- *(connect)* Hash function config independent of function order (#5126)
+- *(duckdb)* Break latest-run-row ties by lifecycle stage (#5118)
+- *(executor)* Resume invoke pauses with missing correlation indexes (#5134)
+- *(connect)* Enable gRPC client keepalive for Connect peers (#5103)
+- *(api)* Encode non-finite floats and big ints in Insights results (#5116)
+
+### ⚡ Performance
+
+- *(duckdb)* Filter Sessions by time before collapsing runs (#5119)
+- *(executor)* Look up invoke pauses by deterministic ID first (#5140)
+
+### 🎨 Styling
+
+- *(ui)* Unify dropdown styling across dashboard and dev server (#5016)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add how to revert section to pr template (#5082)
+- Run DuckDB tests in the unit test job (#5123)
+
 ## [v1.49.0] - 2026-10-23
 
 ### 🚀 Features
@@ -14,6 +62,10 @@ All notable changes to this project will be documented in this file.
 - *(cqrs)* Include skipped runs and keep precise paging (#5015)
 - *(api)* Enforce request limits before parsing (#5025)
 - *(dashboard)* Show replay failures and correct skipped counts (#5018)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.49.0 (#5072)
 
 ## [v1.48.0] - 2026-10-22
 
