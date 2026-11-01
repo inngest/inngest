@@ -30,6 +30,11 @@ const (
 	RunService_SaveDefer_FullMethodName         = "/state.v2.RunService/SaveDefer"
 	RunService_SetDeferStatus_FullMethodName    = "/state.v2.RunService/SetDeferStatus"
 	RunService_SaveRejectedDefer_FullMethodName = "/state.v2.RunService/SaveRejectedDefer"
+	RunService_SaveInboxMessage_FullMethodName  = "/state.v2.RunService/SaveInboxMessage"
+	RunService_RecordInboxWait_FullMethodName   = "/state.v2.RunService/RecordInboxWait"
+	RunService_TimeoutInboxWait_FullMethodName  = "/state.v2.RunService/TimeoutInboxWait"
+	RunService_CloseInbox_FullMethodName        = "/state.v2.RunService/CloseInbox"
+	RunService_DeleteInboxWait_FullMethodName   = "/state.v2.RunService/DeleteInboxWait"
 	RunService_LoadMetadata_FullMethodName      = "/state.v2.RunService/LoadMetadata"
 	RunService_LoadEvents_FullMethodName        = "/state.v2.RunService/LoadEvents"
 	RunService_LoadSteps_FullMethodName         = "/state.v2.RunService/LoadSteps"
@@ -53,6 +58,11 @@ type RunServiceClient interface {
 	SaveDefer(ctx context.Context, in *SaveDeferRequest, opts ...grpc.CallOption) (*SaveDeferResponse, error)
 	SetDeferStatus(ctx context.Context, in *SetDeferStatusRequest, opts ...grpc.CallOption) (*SetDeferStatusResponse, error)
 	SaveRejectedDefer(ctx context.Context, in *SaveRejectedDeferRequest, opts ...grpc.CallOption) (*SaveRejectedDeferResponse, error)
+	SaveInboxMessage(ctx context.Context, in *SaveInboxMessageRequest, opts ...grpc.CallOption) (*SaveInboxMessageResponse, error)
+	RecordInboxWait(ctx context.Context, in *RecordInboxWaitRequest, opts ...grpc.CallOption) (*RecordInboxWaitResponse, error)
+	TimeoutInboxWait(ctx context.Context, in *TimeoutInboxWaitRequest, opts ...grpc.CallOption) (*TimeoutInboxWaitResponse, error)
+	CloseInbox(ctx context.Context, in *CloseInboxRequest, opts ...grpc.CallOption) (*CloseInboxResponse, error)
+	DeleteInboxWait(ctx context.Context, in *DeleteInboxWaitRequest, opts ...grpc.CallOption) (*DeleteInboxWaitResponse, error)
 	LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error)
 	LoadEvents(ctx context.Context, in *LoadEventsRequest, opts ...grpc.CallOption) (*LoadEventsResponse, error)
 	LoadSteps(ctx context.Context, in *LoadStepsRequest, opts ...grpc.CallOption) (*LoadStepsResponse, error)
@@ -179,6 +189,56 @@ func (c *runServiceClient) SaveRejectedDefer(ctx context.Context, in *SaveReject
 	return out, nil
 }
 
+func (c *runServiceClient) SaveInboxMessage(ctx context.Context, in *SaveInboxMessageRequest, opts ...grpc.CallOption) (*SaveInboxMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveInboxMessageResponse)
+	err := c.cc.Invoke(ctx, RunService_SaveInboxMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runServiceClient) RecordInboxWait(ctx context.Context, in *RecordInboxWaitRequest, opts ...grpc.CallOption) (*RecordInboxWaitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordInboxWaitResponse)
+	err := c.cc.Invoke(ctx, RunService_RecordInboxWait_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runServiceClient) TimeoutInboxWait(ctx context.Context, in *TimeoutInboxWaitRequest, opts ...grpc.CallOption) (*TimeoutInboxWaitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TimeoutInboxWaitResponse)
+	err := c.cc.Invoke(ctx, RunService_TimeoutInboxWait_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runServiceClient) CloseInbox(ctx context.Context, in *CloseInboxRequest, opts ...grpc.CallOption) (*CloseInboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloseInboxResponse)
+	err := c.cc.Invoke(ctx, RunService_CloseInbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *runServiceClient) DeleteInboxWait(ctx context.Context, in *DeleteInboxWaitRequest, opts ...grpc.CallOption) (*DeleteInboxWaitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteInboxWaitResponse)
+	err := c.cc.Invoke(ctx, RunService_DeleteInboxWait_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *runServiceClient) LoadMetadata(ctx context.Context, in *LoadMetadataRequest, opts ...grpc.CallOption) (*LoadMetadataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LoadMetadataResponse)
@@ -254,6 +314,11 @@ type RunServiceServer interface {
 	SaveDefer(context.Context, *SaveDeferRequest) (*SaveDeferResponse, error)
 	SetDeferStatus(context.Context, *SetDeferStatusRequest) (*SetDeferStatusResponse, error)
 	SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error)
+	SaveInboxMessage(context.Context, *SaveInboxMessageRequest) (*SaveInboxMessageResponse, error)
+	RecordInboxWait(context.Context, *RecordInboxWaitRequest) (*RecordInboxWaitResponse, error)
+	TimeoutInboxWait(context.Context, *TimeoutInboxWaitRequest) (*TimeoutInboxWaitResponse, error)
+	CloseInbox(context.Context, *CloseInboxRequest) (*CloseInboxResponse, error)
+	DeleteInboxWait(context.Context, *DeleteInboxWaitRequest) (*DeleteInboxWaitResponse, error)
 	LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error)
 	LoadEvents(context.Context, *LoadEventsRequest) (*LoadEventsResponse, error)
 	LoadSteps(context.Context, *LoadStepsRequest) (*LoadStepsResponse, error)
@@ -302,6 +367,21 @@ func (UnimplementedRunServiceServer) SetDeferStatus(context.Context, *SetDeferSt
 }
 func (UnimplementedRunServiceServer) SaveRejectedDefer(context.Context, *SaveRejectedDeferRequest) (*SaveRejectedDeferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SaveRejectedDefer not implemented")
+}
+func (UnimplementedRunServiceServer) SaveInboxMessage(context.Context, *SaveInboxMessageRequest) (*SaveInboxMessageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveInboxMessage not implemented")
+}
+func (UnimplementedRunServiceServer) RecordInboxWait(context.Context, *RecordInboxWaitRequest) (*RecordInboxWaitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordInboxWait not implemented")
+}
+func (UnimplementedRunServiceServer) TimeoutInboxWait(context.Context, *TimeoutInboxWaitRequest) (*TimeoutInboxWaitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TimeoutInboxWait not implemented")
+}
+func (UnimplementedRunServiceServer) CloseInbox(context.Context, *CloseInboxRequest) (*CloseInboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CloseInbox not implemented")
+}
+func (UnimplementedRunServiceServer) DeleteInboxWait(context.Context, *DeleteInboxWaitRequest) (*DeleteInboxWaitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteInboxWait not implemented")
 }
 func (UnimplementedRunServiceServer) LoadMetadata(context.Context, *LoadMetadataRequest) (*LoadMetadataResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadMetadata not implemented")
@@ -540,6 +620,96 @@ func _RunService_SaveRejectedDefer_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RunService_SaveInboxMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveInboxMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).SaveInboxMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_SaveInboxMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).SaveInboxMessage(ctx, req.(*SaveInboxMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RunService_RecordInboxWait_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordInboxWaitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).RecordInboxWait(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_RecordInboxWait_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).RecordInboxWait(ctx, req.(*RecordInboxWaitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RunService_TimeoutInboxWait_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TimeoutInboxWaitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).TimeoutInboxWait(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_TimeoutInboxWait_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).TimeoutInboxWait(ctx, req.(*TimeoutInboxWaitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RunService_CloseInbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseInboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).CloseInbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_CloseInbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).CloseInbox(ctx, req.(*CloseInboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RunService_DeleteInboxWait_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteInboxWaitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RunServiceServer).DeleteInboxWait(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RunService_DeleteInboxWait_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RunServiceServer).DeleteInboxWait(ctx, req.(*DeleteInboxWaitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RunService_LoadMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LoadMetadataRequest)
 	if err := dec(in); err != nil {
@@ -698,6 +868,26 @@ var RunService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveRejectedDefer",
 			Handler:    _RunService_SaveRejectedDefer_Handler,
+		},
+		{
+			MethodName: "SaveInboxMessage",
+			Handler:    _RunService_SaveInboxMessage_Handler,
+		},
+		{
+			MethodName: "RecordInboxWait",
+			Handler:    _RunService_RecordInboxWait_Handler,
+		},
+		{
+			MethodName: "TimeoutInboxWait",
+			Handler:    _RunService_TimeoutInboxWait_Handler,
+		},
+		{
+			MethodName: "CloseInbox",
+			Handler:    _RunService_CloseInbox_Handler,
+		},
+		{
+			MethodName: "DeleteInboxWait",
+			Handler:    _RunService_DeleteInboxWait_Handler,
 		},
 		{
 			MethodName: "LoadMetadata",

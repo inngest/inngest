@@ -272,6 +272,105 @@ message ConsumePauseResponse {
   ConsumePauseResult result = 1;
 }
 
+enum InboxSaveOutcome {
+  INBOX_SAVE_OUTCOME_UNSPECIFIED = 0;
+  INBOX_SAVE_OUTCOME_SAVED       = 1;
+  // The run already has as many steps as it is allowed. Nothing was saved.
+  INBOX_SAVE_OUTCOME_STEPS_FULL  = 2;
+  // The message would take the run's state past its size bound. Nothing was saved.
+  INBOX_SAVE_OUTCOME_STATE_FULL  = 3;
+}
+
+message InboxMessage {
+  string step_id        = 1;
+  string inbox          = 2;
+  bytes  value          = 3;
+  int64  max_steps      = 4;
+  int64  max_state_size = 5;
+}
+
+message InboxBatch {
+  bool          drain  = 1;
+  bool          unread = 2;
+  optional int64 room  = 3;
+}
+
+message InboxWait {
+  string               id                    = 1;
+  string               inbox                 = 2;
+  bytes                want                  = 3;
+  string               seen                  = 4;
+  bool                 timer                 = 5;
+  InboxBatch           batch                 = 6;
+  string               incoming              = 7;
+  string               group_id              = 8;
+  optional int64       max_attempts          = 9;
+  int64                parallel_mode         = 10;
+  string               parallel_coalesce_key = 11;
+}
+
+message InboxClose {
+  string          step_id = 1;
+  bytes           value   = 2;
+  repeated string waits   = 3;
+}
+
+message InboxWake {
+  InboxWait wait         = 1;
+  string    message_step = 2;
+  bool      timed_out    = 3;
+  bool      closed       = 4;
+  bool      has_pending  = 5;
+}
+
+message SaveInboxMessageRequest {
+  ID           id      = 1;
+  InboxMessage message = 2;
+}
+
+message SaveInboxMessageResponse {
+  InboxSaveOutcome outcome = 1;
+  repeated InboxWake wakes = 2;
+}
+
+message RecordInboxWaitRequest {
+  ID        id   = 1;
+  InboxWait wait = 2;
+}
+
+// wake is unset when no saved message satisfied the wait.
+message RecordInboxWaitResponse {
+  optional InboxWake wake = 1;
+}
+
+message TimeoutInboxWaitRequest {
+  ID     id      = 1;
+  string wait_id = 2;
+  bytes  data    = 3;
+}
+
+// wake is unset when the wait was no longer recorded.
+message TimeoutInboxWaitResponse {
+  optional InboxWake wake = 1;
+}
+
+message CloseInboxRequest {
+  ID         id      = 1;
+  InboxClose closing = 2;
+}
+
+message CloseInboxResponse {
+  repeated InboxWake wakes       = 1;
+  bool               has_pending = 2;
+}
+
+message DeleteInboxWaitRequest {
+  ID     id      = 1;
+  string wait_id = 2;
+}
+
+message DeleteInboxWaitResponse {}
+
 service RunService {
   rpc Create(CreateStateRequest) returns (CreateStateResponse) {}
   rpc Delete(DeleteStateRequest) returns (DeleteStateResponse) {}
@@ -285,6 +384,12 @@ service RunService {
   rpc SaveDefer(SaveDeferRequest) returns (SaveDeferResponse) {}
   rpc SetDeferStatus(SetDeferStatusRequest) returns (SetDeferStatusResponse) {}
   rpc SaveRejectedDefer(SaveRejectedDeferRequest) returns (SaveRejectedDeferResponse) {}
+
+  rpc SaveInboxMessage(SaveInboxMessageRequest) returns (SaveInboxMessageResponse) {}
+  rpc RecordInboxWait(RecordInboxWaitRequest) returns (RecordInboxWaitResponse) {}
+  rpc TimeoutInboxWait(TimeoutInboxWaitRequest) returns (TimeoutInboxWaitResponse) {}
+  rpc CloseInbox(CloseInboxRequest) returns (CloseInboxResponse) {}
+  rpc DeleteInboxWait(DeleteInboxWaitRequest) returns (DeleteInboxWaitResponse) {}
 
   rpc LoadMetadata(LoadMetadataRequest) returns (LoadMetadataResponse) {}
   rpc LoadEvents(LoadEventsRequest) returns (LoadEventsResponse) {}
