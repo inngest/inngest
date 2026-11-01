@@ -1,6 +1,7 @@
 package aigateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,63 +84,152 @@ func ParseUnknownInput(ctx context.Context, req json.RawMessage) (ParsedInferenc
 // * Groq (must include URL)
 func ParseInput(req Request) (ParsedInferenceRequest, error) {
 	switch req.Format {
+	case FormatAnthropic:
+		return parseAnthropicInput(req)
 	case FormatOpenAIChat:
 		// OpenAI Chat is the default format, so fall through to the default.
 		fallthrough
 	default:
-		// Parse everything as an OpenAI Chat request.
-		rf := OpenAIChatCompletionRequest{}
-		if err := json.Unmarshal(req.Body, &rf); err != nil {
-			return ParsedInferenceRequest{}, err
-		}
+		// Parse everything else as an OpenAI Chat request.
+		return parseOpenAIInput(req)
+	}
+}
 
-		// Parse the tool choice.
-		var toolChoice string
-		switch t := rf.ToolChoice.(type) {
-		case string:
-			toolChoice = t
-		case openai.ToolChoice:
-			toolChoice = t.Function.Name
-		}
+func parseOpenAIInput(req Request) (ParsedInferenceRequest, error) {
+	rf := OpenAIChatCompletionRequest{}
 
-		// Parse the tools.
-		tools := make([]ToolUseRequest, len(rf.Tools))
-		for i, t := range rf.Tools {
-			if t.Function == nil {
-				continue
-			}
-
-			var params json.RawMessage
-			switch typ := t.Function.Parameters.(type) {
-			case json.RawMessage:
-				params = typ
-			case []byte:
-				params = typ
-			case string:
-				params = json.RawMessage(typ)
-			}
-
-			tools[i] = ToolUseRequest{
-				Name:        t.Function.Name,
-				Description: t.Function.Description,
-				Parameters:  params,
-			}
-		}
-
-		return ParsedInferenceRequest{
-			URL:                 req.URL,
-			Model:               rf.Model,
-			Seed:                rf.Seed,
-			Temprature:          rf.Temperature,
-			TopP:                rf.TopP,
-			MaxTokens:           rf.MaxTokens,
-			MaxCompletionTokens: rf.MaxCompletionTokens,
-			StopSequences:       rf.Stop,
-			ToolChoice:          toolChoice,
-			Tools:               tools,
-		}, nil
+	// Decode numbers as json.Number so that values inside `any` fields, such
+	// as large integers in a tool's schema, are not rounded via float64 when
+	// they are re-marshalled below.
+	dec := json.NewDecoder(bytes.NewReader(req.Body))
+	dec.UseNumber()
+	if err := dec.Decode(&rf); err != nil {
+		return ParsedInferenceRequest{}, err
 	}
 
+	// Parse the tool choice.  ToolChoice is an `any`, so JSON decodes it as
+	// either a string ("auto", "none", "required") or a map when a specific
+	// function is forced: {"type":"function","function":{"name":"..."}}.
+	var toolChoice string
+	switch t := rf.ToolChoice.(type) {
+	case string:
+		toolChoice = t
+	case map[string]any:
+		if fn, ok := t["function"].(map[string]any); ok {
+			toolChoice, _ = fn["name"].(string)
+		}
+	}
+
+	// Parse the tools.
+	tools := make([]ToolUseRequest, 0, len(rf.Tools))
+	for _, t := range rf.Tools {
+		if t.Function == nil {
+			continue
+		}
+
+		tools = append(tools, ToolUseRequest{
+			Name:        t.Function.Name,
+			Description: t.Function.Description,
+			Parameters:  rawJSON(t.Function.Parameters),
+		})
+	}
+
+	return ParsedInferenceRequest{
+		URL:                 req.URL,
+		Model:               rf.Model,
+		Seed:                rf.Seed,
+		Temprature:          rf.Temperature,
+		TopP:                rf.TopP,
+		MaxTokens:           rf.MaxTokens,
+		MaxCompletionTokens: rf.MaxCompletionTokens,
+		StopSequences:       rf.Stop,
+		ToolChoice:          toolChoice,
+		Tools:               tools,
+	}, nil
+}
+
+// anthropicRequest is the subset of an Anthropic Messages request that we
+// record.  It differs from the OpenAI format: tools are flat with an
+// input_schema, stop sequences are named stop_sequences, and a forced tool is
+// {"type":"tool","name":"..."}.
+type anthropicRequest struct {
+	Model         string               `json:"model"`
+	MaxTokens     int                  `json:"max_tokens"`
+	Temperature   float32              `json:"temperature"`
+	TopP          float32              `json:"top_p"`
+	StopSequences []string             `json:"stop_sequences"`
+	Tools         []anthropicTool      `json:"tools"`
+	ToolChoice    *anthropicToolChoice `json:"tool_choice"`
+}
+
+type anthropicTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	InputSchema json.RawMessage `json:"input_schema"`
+}
+
+type anthropicToolChoice struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
+func parseAnthropicInput(req Request) (ParsedInferenceRequest, error) {
+	ar := anthropicRequest{}
+	if err := json.Unmarshal(req.Body, &ar); err != nil {
+		return ParsedInferenceRequest{}, err
+	}
+
+	// Mirror the OpenAI behaviour: record the forced tool's name, otherwise
+	// the choice mode ("auto" or "any").
+	var toolChoice string
+	if ar.ToolChoice != nil {
+		toolChoice = ar.ToolChoice.Type
+		if ar.ToolChoice.Type == "tool" {
+			toolChoice = ar.ToolChoice.Name
+		}
+	}
+
+	tools := make([]ToolUseRequest, 0, len(ar.Tools))
+	for _, t := range ar.Tools {
+		tools = append(tools, ToolUseRequest{
+			Name:        t.Name,
+			Description: t.Description,
+			Parameters:  t.InputSchema,
+		})
+	}
+
+	return ParsedInferenceRequest{
+		URL:           req.URL,
+		Model:         ar.Model,
+		Temprature:    ar.Temperature,
+		TopP:          ar.TopP,
+		MaxTokens:     ar.MaxTokens,
+		StopSequences: ar.StopSequences,
+		ToolChoice:    toolChoice,
+		Tools:         tools,
+	}, nil
+}
+
+// rawJSON converts a tool's parameter schema to raw JSON.  The schema is an
+// `any` in the OpenAI types, so decoded requests hold a map rather than raw
+// bytes.
+func rawJSON(v any) json.RawMessage {
+	switch p := v.(type) {
+	case nil:
+		return nil
+	case json.RawMessage:
+		return p
+	case []byte:
+		return p
+	case string:
+		return json.RawMessage(p)
+	default:
+		b, err := json.Marshal(p)
+		if err != nil {
+			return nil
+		}
+		return b
+	}
 }
 
 func ParseOutput(format string, response []byte) (ParsedInferenceResponse, error) {
