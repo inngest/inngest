@@ -507,6 +507,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 	var err error
+	var ticks []*cqrs.OtelSpan
 
 	info := spanRollupInfo{
 		dynamicRefs:      dynamicRefs,
@@ -525,6 +526,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		// in their own view.
 		switch newSpan.Name {
 		case meta.SpanNameMetadata, meta.SpanNameDefer:
+			continue
+		case meta.SpanNameTick:
+			// Ticks ride on their parent's row.
+			ticks = append(ticks, newSpan)
 			continue
 		}
 
@@ -739,6 +744,9 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
+	rollupTicks(ticks, resolveDynamic, spanMap)
+	endWaitingReads(root)
+
 	// Fold order doesn't matter: the builder rounds the summed cost to
 	// extractors.RoundCost's granularity, absorbing float addition's order
 	// sensitivity, and every other field is order-independent.
@@ -764,6 +772,61 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	computeAndAttachAISummaryMetadata(ctx, root, aiUsage)
 
 	return root, nil
+}
+
+// rollupTicks puts each tick on the row it is a child of. A tick of a read
+// that took a message has no arrival time of its own, so it takes the one of
+// the arrival tick of the same message.
+func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), spans *orderedmap.OrderedMap[string, *cqrs.OtelSpan]) {
+	arrivals := map[string]time.Time{}
+	for _, tick := range ticks {
+		if tick.Attributes != nil && tick.Attributes.TickID != nil && tick.Attributes.TickAt != nil {
+			arrivals[*tick.Attributes.TickID] = *tick.Attributes.TickAt
+		}
+	}
+
+	for _, tick := range ticks {
+		attrs := tick.Attributes
+		if attrs == nil || attrs.TickID == nil || tick.ParentSpanID == nil {
+			continue
+		}
+
+		parentID, ok := resolve(*tick.ParentSpanID)
+		if !ok {
+			continue
+		}
+		parent, _ := spans.Get(parentID)
+
+		rolled := &cqrs.SpanTick{ID: *attrs.TickID, Sources: []string{}, ReadAt: attrs.TickReadAt}
+		if attrs.TickSources != nil {
+			rolled.Sources = *attrs.TickSources
+		}
+		if at, ok := arrivals[rolled.ID]; ok {
+			rolled.At = at
+		}
+
+		parent.Ticks = append(parent.Ticks, rolled)
+	}
+}
+
+// endWaitingReads draws a read that is still waiting when its run has ended as
+// ended. A read that lost a race is never woken, so nothing else ends it.
+func endWaitingReads(root *cqrs.OtelSpan) {
+	if !root.Status.IsEnded() {
+		return
+	}
+
+	var walk func(span *cqrs.OtelSpan)
+	walk = func(span *cqrs.OtelSpan) {
+		if span.Status == enums.StepStatusWaiting && span.Attributes != nil && span.Attributes.StepOp != nil && *span.Attributes.StepOp == enums.OpcodeSubscribeWait {
+			span.Status = enums.StepStatusCancelled
+		}
+
+		for _, child := range span.Children {
+			walk(child)
+		}
+	}
+	walk(root)
 }
 
 // rollupSpanMetadataFromFragments folds a (span, kind)'s metadata fragments in

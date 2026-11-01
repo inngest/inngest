@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -198,6 +199,8 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		return err
 	}
 
+	e.emitInboxWaitSpan(ctx, runCtx, gen, group, wake == nil)
+
 	if err := runCtx.ReleaseCapacityLease(); err != nil {
 		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
@@ -207,6 +210,51 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	}
 
 	return e.wakeInboxRead(ctx, md.ID, *wake)
+}
+
+// emitInboxWaitSpan draws the row of a read: waiting if it is, or complete if
+// recording it found its message already there. The same row is drawn again
+// when the SDK reports the wait again.
+func (e *executor) emitInboxWaitSpan(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, group OpcodeGroup, waiting bool) {
+	attrs := tracing.GeneratorAttrs(&gen)
+	md := runCtx.Metadata()
+	tracing.AddMetadataTenantAttrs(attrs, md.ID)
+
+	handledAt := e.opcodeHandledAt(group)
+	status := enums.StepStatusCompleted
+	if waiting {
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
+		status = enums.StepStatusWaiting
+	} else {
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, handledAt, e.now())
+	}
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+
+	lifecycleItem := runCtx.LifecycleItem()
+	_, err := e.tracerProvider.CreateSpan(ctx, meta.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:        tracing.FinalizedStepDynamicSeed(gen.ID),
+		FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+		Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSubscribeWait"},
+		Metadata:    md,
+		QueueItem:   &lifecycleItem,
+		Parent:      runCtx.RootSpan(),
+		StartTime:   handledAt,
+		Attributes:  attrs,
+	})
+	if err != nil {
+		e.log.Debug("error creating span for an inbox read", "error", err)
+	}
+}
+
+// handleGeneratorSubscribeRead draws a read that was answered from state. It
+// is a lazy op: it saves nothing and moves nothing, and reporting it again
+// draws the same spans.
+func (e *executor) handleGeneratorSubscribeRead(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	if err := tracing.InboxRead(ctx, e.tracerProvider, runCtx.Metadata(), gen, e.now()); err != nil {
+		logger.StdlibLogger(ctx).Warn("could not draw an inbox read", "error", err)
+	}
+
+	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "SubscribeRead")
 }
 
 // inboxTimerJobID is the id of the queue item that times a read out. The wake
@@ -404,6 +452,8 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 		}
 	}
 
+	e.endInboxWaitSpan(ctx, md, wait.ID)
+
 	// The timer that is running is the one that found this read; any other
 	// timer is no longer needed.
 	if wait.Timer && !wake.TimedOut {
@@ -413,6 +463,20 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 	}
 
 	return e.smv2.DeleteInboxWait(ctx, id, wait.ID)
+}
+
+// endInboxWaitSpan ends the row of a read that a message or its timeout woke.
+func (e *executor) endInboxWaitSpan(ctx context.Context, md sv2.Metadata, wait string) {
+	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		Debug:      &tracing.SpanDebugData{Location: "executor.endInboxWaitSpan"},
+		Metadata:   &md,
+		Status:     enums.StepStatusCompleted,
+		TargetSpan: tracing.FinalizedStepSpanRefFromMetadataAndStepID(&md, wait),
+		EndTime:    e.now(),
+	})
+	if err != nil {
+		e.log.Debug("error ending the span of an inbox read", "error", err)
+	}
 }
 
 // inboxArrivals collects the pauses of inbox sources that one event matched, so
@@ -430,6 +494,9 @@ type inboxArrival struct {
 	// incoming is the step the inbox's open op leads to.
 	incoming string
 	src      []string
+	// ops are the sources' pauses by the op that owns them: the open op or a
+	// listen op. A message is a tick on the row of each.
+	ops map[string][]string
 }
 
 type inboxArrivalsKey struct{}
@@ -470,6 +537,11 @@ func (a *inboxArrivals) add(pause *state.Pause) {
 
 	if !slices.Contains(arrival.src, pause.ID.String()) {
 		arrival.src = append(arrival.src, pause.ID.String())
+
+		if arrival.ops == nil {
+			arrival.ops = map[string][]string{}
+		}
+		arrival.ops[pause.Outgoing] = append(arrival.ops[pause.Outgoing], pause.ID.String())
 	}
 }
 
@@ -524,6 +596,8 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 			continue
 		}
 
+		e.tickInboxArrival(ctx, arrival, stepID)
+
 		for _, wake := range wakes {
 			if err := e.wakeInboxRead(ctx, arrival.id, wake); err != nil {
 				goerr = errors.Join(goerr, err)
@@ -532,6 +606,26 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 	}
 
 	return goerr
+}
+
+// tickInboxArrival draws the message as a tick on the row of each op whose
+// sources it came through. Traces are best effort: a failure is logged.
+func (e *executor) tickInboxArrival(ctx context.Context, arrival *inboxArrival, stepID string) {
+	md, err := e.smv2.LoadMetadata(ctx, arrival.id)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("could not load metadata to draw an inbox arrival", "error", err)
+
+		return
+	}
+
+	now := e.now()
+	for op, pauses := range arrival.ops {
+		slices.Sort(pauses)
+
+		if err := tracing.InboxArrivalTick(ctx, e.tracerProvider, &md, op, stepID, pauses, now); err != nil {
+			logger.StdlibLogger(ctx).Warn("could not draw an inbox arrival", "error", err)
+		}
+	}
 }
 
 // inboxMaxSteps is the run's existing step bound, as checkStepLimit reads it.

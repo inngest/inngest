@@ -535,6 +535,7 @@ type ComplexityRoot struct {
 		StepInfo              func(childComplexity int) int
 		StepOp                func(childComplexity int) int
 		StepType              func(childComplexity int) int
+		Ticks                 func(childComplexity int) int
 		TraceID               func(childComplexity int) int
 		UserlandSpan          func(childComplexity int) int
 	}
@@ -621,6 +622,13 @@ type ComplexityRoot struct {
 		Scope     func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 		Values    func(childComplexity int) int
+	}
+
+	SpanTick struct {
+		At      func(childComplexity int) int
+		ID      func(childComplexity int) int
+		ReadAt  func(childComplexity int) int
+		Sources func(childComplexity int) int
 	}
 
 	StepError struct {
@@ -3215,6 +3223,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.StepType(childComplexity), true
 
+	case "RunTraceSpan.ticks":
+		if e.complexity.RunTraceSpan.Ticks == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.Ticks(childComplexity), true
+
 	case "RunTraceSpan.traceID":
 		if e.complexity.RunTraceSpan.TraceID == nil {
 			break
@@ -3543,6 +3558,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.SpanMetadata.Values(childComplexity), true
+
+	case "SpanTick.at":
+		if e.complexity.SpanTick.At == nil {
+			break
+		}
+
+		return e.complexity.SpanTick.At(childComplexity), true
+
+	case "SpanTick.id":
+		if e.complexity.SpanTick.ID == nil {
+			break
+		}
+
+		return e.complexity.SpanTick.ID(childComplexity), true
+
+	case "SpanTick.readAt":
+		if e.complexity.SpanTick.ReadAt == nil {
+			break
+		}
+
+		return e.complexity.SpanTick.ReadAt(childComplexity), true
+
+	case "SpanTick.sources":
+		if e.complexity.SpanTick.Sources == nil {
+			break
+		}
+
+		return e.complexity.SpanTick.Sources(childComplexity), true
 
 	case "StepError.cause":
 		if e.complexity.StepError.Cause == nil {
@@ -4738,7 +4781,15 @@ type RunTraceSpan {
   skipExistingRunID: String
   customConcurrencyKeys: [RunTraceConcurrencyKey!]!
   metadata: [SpanMetadata!]!
+  ticks: [SpanTick!]! # small events on this row, such as messages arriving at an inbox; never rows
   response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type SpanTick {
+  id: String! # what ticked, such as a message's step ID
+  sources: [String!]! # the pauses of the sources it came through
+  at: Time! # when it arrived
+  readAt: Time # when a read took it
 }
 
 type RunTraceConcurrencyKey {
@@ -12745,6 +12796,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "ticks":
+				return ec.fieldContext_RunTraceSpan_ticks(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
@@ -16641,6 +16694,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "ticks":
+				return ec.fieldContext_RunTraceSpan_ticks(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
@@ -20942,6 +20997,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "ticks":
+				return ec.fieldContext_RunTraceSpan_ticks(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
@@ -21391,6 +21448,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_customConcurrencyKeys(ctx, field)
 			case "metadata":
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
+			case "ticks":
+				return ec.fieldContext_RunTraceSpan_ticks(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
 			}
@@ -21816,6 +21875,60 @@ func (ec *executionContext) fieldContext_RunTraceSpan_metadata(ctx context.Conte
 				return ec.fieldContext_SpanMetadata_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SpanMetadata", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_ticks(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_ticks(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Ticks, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.SpanTick)
+	fc.Result = res
+	return ec.marshalNSpanTick2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanTickᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_ticks(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SpanTick_id(ctx, field)
+			case "sources":
+				return ec.fieldContext_SpanTick_sources(ctx, field)
+			case "at":
+				return ec.fieldContext_SpanTick_at(ctx, field)
+			case "readAt":
+				return ec.fieldContext_SpanTick_readAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SpanTick", field.Name)
 		},
 	}
 	return fc, nil
@@ -23843,6 +23956,179 @@ func (ec *executionContext) _SpanMetadata_updatedAt(ctx context.Context, field g
 func (ec *executionContext) fieldContext_SpanMetadata_updatedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SpanMetadata",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanTick_id(ctx context.Context, field graphql.CollectedField, obj *models.SpanTick) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanTick_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanTick_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanTick",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanTick_sources(ctx context.Context, field graphql.CollectedField, obj *models.SpanTick) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanTick_sources(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Sources, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanTick_sources(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanTick",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanTick_at(ctx context.Context, field graphql.CollectedField, obj *models.SpanTick) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanTick_at(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.At, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanTick_at(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanTick",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SpanTick_readAt(ctx context.Context, field graphql.CollectedField, obj *models.SpanTick) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SpanTick_readAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ReadAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SpanTick_readAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SpanTick",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -32030,6 +32316,13 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "ticks":
+
+			out.Values[i] = ec._RunTraceSpan_ticks(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "response":
 
 			out.Values[i] = ec._RunTraceSpan_response(ctx, field, obj)
@@ -32596,6 +32889,52 @@ func (ec *executionContext) _SpanMetadata(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var spanTickImplementors = []string{"SpanTick"}
+
+func (ec *executionContext) _SpanTick(ctx context.Context, sel ast.SelectionSet, obj *models.SpanTick) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, spanTickImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SpanTick")
+		case "id":
+
+			out.Values[i] = ec._SpanTick_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "sources":
+
+			out.Values[i] = ec._SpanTick_sources(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "at":
+
+			out.Values[i] = ec._SpanTick_at(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "readAt":
+
+			out.Values[i] = ec._SpanTick_readAt(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -35227,6 +35566,60 @@ func (ec *executionContext) marshalNSpanMetadataValues2githubᚗcomᚋinngestᚋ
 		return graphql.Null
 	}
 	return graphql.WrapContextMarshaler(ctx, v)
+}
+
+func (ec *executionContext) marshalNSpanTick2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanTickᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.SpanTick) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNSpanTick2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanTick(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSpanTick2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSpanTick(ctx context.Context, sel ast.SelectionSet, v *models.SpanTick) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SpanTick(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNStreamItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StreamItem) graphql.Marshaler {

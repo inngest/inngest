@@ -52,6 +52,10 @@ type ExtractedValues struct {
 	DeferParentRunIDs *[]string
 	DeferStatus *enums.DeferStatus
 	DeferUserlandID *string
+	TickID *string
+	TickSources *[]string
+	TickAt *time.Time
+	TickReadAt *time.Time
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
 	DynamicTraceID *string
@@ -156,6 +160,10 @@ var AttrsByKey = map[string]Serializer{
 	Attrs.DeferParentRunIDs.Key(): Attrs.DeferParentRunIDs,
 	Attrs.DeferStatus.Key(): Attrs.DeferStatus,
 	Attrs.DeferUserlandID.Key(): Attrs.DeferUserlandID,
+	Attrs.TickID.Key(): Attrs.TickID,
+	Attrs.TickSources.Key(): Attrs.TickSources,
+	Attrs.TickAt.Key(): Attrs.TickAt,
+	Attrs.TickReadAt.Key(): Attrs.TickReadAt,
 	Attrs.DynamicSpanID.Key(): Attrs.DynamicSpanID,
 	Attrs.DynamicStatus.Key(): Attrs.DynamicStatus,
 	Attrs.DynamicTraceID.Key(): Attrs.DynamicTraceID,

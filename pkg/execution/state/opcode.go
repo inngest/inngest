@@ -298,6 +298,27 @@ type SubscribeWaitOpts struct {
 	Timeout string `json:"timeout,omitempty"`
 }
 
+// SubscribeReadOpts are the options of an OpcodeSubscribeRead op, which reports
+// the messages a read of an inbox took.
+type SubscribeReadOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+	// Messages are the step ids of the messages the read took.
+	Messages []string `json:"messages"`
+	// Draw is whether the read has no row of its own yet: the read was answered
+	// from state, so no step drew it. A batch read is a step with a row already.
+	Draw bool `json:"draw,omitempty"`
+}
+
+func (g GeneratorOpcode) SubscribeReadOpts() (*SubscribeReadOpts, error) {
+	opts := &SubscribeReadOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
 func (g GeneratorOpcode) SubscribeOpts() (*SubscribeOpts, error) {
 	opts := &SubscribeOpts{}
 	if err := unmarshalOpts(g.Opts, opts); err != nil {

@@ -588,6 +588,16 @@ func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*mode
 
 	gqlSpan.Metadata = append(gqlSpan.Metadata, spanMetadataToGQL(span.Metadata)...)
 
+	gqlSpan.Ticks = make([]*models.SpanTick, 0, len(span.Ticks))
+	for _, tick := range span.Ticks {
+		gqlSpan.Ticks = append(gqlSpan.Ticks, &models.SpanTick{
+			ID:      tick.ID,
+			Sources: tick.Sources,
+			At:      tick.At,
+			ReadAt:  tick.ReadAt,
+		})
+	}
+
 	return gqlSpan, nil
 }
 
