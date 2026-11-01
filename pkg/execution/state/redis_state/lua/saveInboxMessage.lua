@@ -10,7 +10,8 @@ A message for a run that has ended, or for an inbox that was closed, is dropped.
 A new message that would take the run past its step bound or its state size
 bound is not saved. A bound of 0 means the bound is not checked.
 
-A satisfied batch read is also answered: a cut at the last message it covers is
+A wait is satisfied only by a message after the step it last saw. A satisfied
+batch read is also answered: a cut at the last message it covers is
 saved under its id, unless it already has a result.
 
 Output:
@@ -79,10 +80,22 @@ end
 
 local wait = cjson.decode(record)
 
+-- The wait is answered only if a message of the inbox is after the step it last
+-- saw. A message saved again after the run moved on is not that message: the
+-- wait recorded now is for a newer one.
+--
 -- A batch read is answered with a cut at the messages saved since it last saw
 -- the stack, this one included.
 if wait.batch ~= nil then
-	inbox_save_cut(keyStep, keyMetadata, keyStack, wait.id, inbox_cut(keyStep, keyStack, inbox, wait.seen, wait.batch.max))
+	local cut = inbox_cut(keyStep, keyStack, inbox, wait.seen, wait.batch.max)
+
+	if cut == nil then
+		return { status }
+	end
+
+	inbox_save_cut(keyStep, keyMetadata, keyStack, wait.id, cut)
+elseif inbox_cut(keyStep, keyStack, inbox, wait.seen, 1) == nil then
+	return { status }
 end
 
 redis.call("SREM", keyStepsPending, wait.id)
