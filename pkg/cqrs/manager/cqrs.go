@@ -792,6 +792,13 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		}
 	}
 
+	reads := map[string]time.Time{}
+	for _, tick := range ticks {
+		if tick.Attributes != nil && tick.Attributes.TickID != nil && tick.Attributes.TickReadAt != nil {
+			reads[*tick.Attributes.TickID] = *tick.Attributes.TickReadAt
+		}
+	}
+
 	took := map[string][]string{}
 	for _, tick := range ticks {
 		attrs := tick.Attributes
@@ -818,6 +825,19 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 
 			took[parentID] = append(took[parentID], *attrs.TickID)
 		}
+
+		// The tick also stays on its row, for a UI that draws it as a marker.
+		rolled := &cqrs.SpanTick{ID: *attrs.TickID, Sources: []string{}, ReadAt: attrs.TickReadAt}
+		if attrs.TickSources != nil {
+			rolled.Sources = *attrs.TickSources
+		}
+		if at, ok := arrivals[rolled.ID]; ok {
+			rolled.At = at
+		}
+		if readAt, ok := reads[rolled.ID]; ok && rolled.ReadAt == nil {
+			rolled.ReadAt = &readAt
+		}
+		parent.Ticks = append(parent.Ticks, rolled)
 
 		completed := enums.StepStatusCompleted
 		name := *attrs.TickID

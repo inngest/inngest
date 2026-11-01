@@ -40,6 +40,50 @@ describe('TimelineBar', () => {
     style: 'step.run' as const,
   };
 
+  describe('markers', () => {
+    const markers = [
+      { id: 'm1', startPercent: 30, filled: true, details: [{ label: 'Message', value: 'm1' }] },
+      { id: 'm2', startPercent: 60, filled: false, details: [{ label: 'Message', value: 'm2' }] },
+    ];
+
+    it('draws a circle at each marker position, hollow until filled', () => {
+      render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
+      const dots = screen.getAllByTestId('bar-marker');
+
+      expect(dots.map((dot) => dot.style.left)).toEqual(['30%', '60%']);
+      expect(dots.map((dot) => dot.getAttribute('data-filled'))).toEqual(['true', 'false']);
+    });
+
+    it('stays visible while the row is expanded', () => {
+      render(
+        <TimelineBar {...defaultProps} markers={markers} expandable expanded>
+          <div />
+        </TimelineBar>,
+        { wrapper: Wrapper }
+      );
+
+      expect(screen.getAllByTestId('bar-marker')).toHaveLength(2);
+    });
+
+    it('drops markers outside the visible window and rescales the rest', () => {
+      render(
+        <TimelineBar {...defaultProps} markers={markers} viewStartOffset={20} viewEndOffset={50} />,
+        { wrapper: Wrapper }
+      );
+      const dots = screen.getAllByTestId('bar-marker');
+
+      expect(dots).toHaveLength(1);
+      expect(dots[0]!.style.left).toBe('33.33333333333333%');
+    });
+
+    it('can be reached with the keyboard and is named for what it is', () => {
+      render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
+
+      expect(screen.getAllByTestId('bar-marker')[0]!.getAttribute('tabindex')).toBe('0');
+      expect(screen.getAllByTestId('bar-marker')[0]!.getAttribute('aria-label')).toContain('m1');
+    });
+  });
+
   // T009: renders bar with name and duration
   describe('renders bar with name and duration', () => {
     it('displays the step name', () => {

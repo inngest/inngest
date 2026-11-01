@@ -62,6 +62,7 @@ type RunTraceSpan struct {
 	SkipExistingRunID     *string                     `json:"skipExistingRunID,omitempty"`
 	CustomConcurrencyKeys []meta.CustomConcurrencyKey `json:"customConcurrencyKeys"`
 	Metadata              []*SpanMetadata             `json:"metadata,omitempty"`
+	Ticks                 []*SpanTick                 `json:"ticks"`
 	Response              *RunTraceSpanResponseInfo   `json:"response,omitempty"`
 
 	// Internal fields not exposed over GraphQL.
