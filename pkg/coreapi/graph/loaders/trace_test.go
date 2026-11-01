@@ -82,6 +82,29 @@ func TestOpcodeToGQL_InboxOpsWithoutAWait(t *testing.T) {
 	}
 }
 
+// TestConvertRunSpanToGQL_InboxWaitHasNoStepInfo checks an inbox op that waits
+// carries the wait step type but no wait step info, which would need a timeout
+// the op does not have.
+func TestConvertRunSpanToGQL_InboxWaitHasNoStepInfo(t *testing.T) {
+	for _, opcode := range []enums.Opcode{enums.OpcodeSubscribe, enums.OpcodeSubscribeWait} {
+		for name, convert := range runConverters {
+			t.Run(opcode.String()+"/"+name, func(t *testing.T) {
+				op := opcode
+				span := &cqrs.OtelSpan{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{StepOp: &op},
+				}
+
+				result, err := convert(context.Background(), span)
+				require.NoError(t, err)
+				require.NotNil(t, result.StepOp)
+				assert.Equal(t, models.StepOpWaitForEvent, *result.StepOp)
+				assert.Nil(t, result.StepInfo)
+			})
+		}
+	}
+}
+
 func TestRunTraceEnded(t *testing.T) {
 	terminal := []models.RunTraceSpanStatus{
 		models.RunTraceSpanStatusCompleted,
