@@ -1120,6 +1120,136 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	}
 }
 
+// SaveInboxMessage saves a message step of an inbox and returns the recorded
+// waits it satisfies.
+func (m shardedMgr) SaveInboxMessage(ctx context.Context, i state.Identifier, msg statev2.InboxMessage) ([]statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveInboxMessage"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{msg.StepID, string(msg.Value), msg.Inbox}
+
+	out, err := retriableScripts["saveInboxMessage"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveInboxMessage"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error saving inbox message: %w", err)
+	}
+
+	status, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox message status: %w", err)
+	}
+	if status == -1 {
+		return nil, state.ErrDuplicateResponse
+	}
+
+	wakes := []statev2.InboxWake{}
+	for n := 1; n+2 < len(out); n += 3 {
+		wake, err := inboxWakeFrom(out[n+1], out[n+2], msg.StepID)
+		if err != nil {
+			return nil, err
+		}
+		wakes = append(wakes, wake)
+	}
+
+	return wakes, nil
+}
+
+func inboxWakeFrom(record rueidis.RedisMessage, pending rueidis.RedisMessage, messageStep string) (statev2.InboxWake, error) {
+	raw, err := record.ToString()
+	if err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error reading inbox wait: %w", err)
+	}
+
+	wake := statev2.InboxWake{MessageStep: messageStep}
+	if err := json.Unmarshal([]byte(raw), &wake.Wait); err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error decoding inbox wait: %w", err)
+	}
+
+	hasPending, err := pending.AsInt64()
+	if err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error reading inbox pending: %w", err)
+	}
+	wake.HasPending = hasPending == 1
+
+	return wake, nil
+}
+
+// RecordInboxWait records a wait and returns it if a message already saved
+// after its last seen step satisfies it.
+func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wait statev2.InboxWait) (*statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RecordInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	record, err := json.Marshal(wait)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding inbox wait: %w", err)
+	}
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{wait.ID, string(record), wait.Inbox, wait.Seen}
+
+	out, err := retriableScripts["recordInboxWait"].Exec(
+		redis_telemetry.WithScriptName(ctx, "recordInboxWait"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error recording inbox wait: %w", err)
+	}
+
+	found, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait status: %w", err)
+	}
+	if found != 1 || len(out) < 3 {
+		return nil, nil
+	}
+
+	messageStep, err := out[1].ToString()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait message: %w", err)
+	}
+	hasPending, err := out[2].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+	}
+
+	return &statev2.InboxWake{Wait: wait, MessageStep: messageStep, HasPending: hasPending == 1}, nil
+}
+
+// DeleteInboxWait removes a recorded inbox wait.
+func (m shardedMgr) DeleteInboxWait(ctx context.Context, i state.Identifier, waitID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeleteInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	return r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hdel().Key(fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID)).Field(waitID).Build()
+	}).Error()
+}
+
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePending"), redis_telemetry.ScopeFnRunState)
 
@@ -1200,6 +1330,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersControlMeta(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {

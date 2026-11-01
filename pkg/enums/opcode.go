@@ -28,6 +28,12 @@ const (
 
 	OpcodeDeferAdd
 	OpcodeDeferAbort
+
+	// OpcodeSubscribe opens an inbox: one long-lived pause per source, then
+	// the open record.
+	OpcodeSubscribe
+	// OpcodeSubscribeWait reports a read of an inbox that has nothing unread.
+	OpcodeSubscribeWait
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -77,6 +83,10 @@ func OpcodeIsPriority(o Opcode) bool {
 		// that's sent by a function triggered by the SendEvent. If we don't
 		// finish processing the WaitForEvent before the SendEvent does its
 		// thing, then we may miss the event.
+		return true
+	case OpcodeSubscribe:
+		// An inbox must be listening before a sibling SendEvent in the same
+		// response sends what it is meant to receive.
 		return true
 	case OpcodeDeferAdd, OpcodeDeferAbort:
 		// Prioritize in case the SDK returned something like "[DeferAdd,

@@ -264,6 +264,47 @@ func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	return opts, nil
 }
 
+// SubscribeSource is one source of an inbox: an event name and an optional
+// expression, written like a function trigger.
+type SubscribeSource struct {
+	Event string  `json:"event"`
+	If    *string `json:"if,omitempty"`
+}
+
+// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox.
+type SubscribeOpts struct {
+	Sources []SubscribeSource `json:"sources"`
+}
+
+// SubscribeWaitOpts are the options of an OpcodeSubscribeWait op, a read of an
+// inbox that has nothing unread.
+type SubscribeWaitOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+	// Want is the read's filter. Empty means every message of the inbox.
+	Want json.RawMessage `json:"want,omitempty"`
+	// Seen is the last step id of the stack the SDK had loaded.
+	Seen string `json:"seen"`
+}
+
+func (g GeneratorOpcode) SubscribeOpts() (*SubscribeOpts, error) {
+	opts := &SubscribeOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+func (g GeneratorOpcode) SubscribeWaitOpts() (*SubscribeWaitOpts, error) {
+	opts := &SubscribeWaitOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
 		return opts, nil

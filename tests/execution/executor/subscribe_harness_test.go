@@ -98,6 +98,19 @@ func (s crashingState) SaveStep(ctx context.Context, id statev2.ID, stepID strin
 	return pending, s.crash.fire("after:SaveStep")
 }
 
+func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) ([]statev2.InboxWake, error) {
+	if err := s.crash.fire("before:SaveInboxMessage"); err != nil {
+		return nil, err
+	}
+
+	wakes, err := s.RunService.SaveInboxMessage(ctx, id, msg)
+	if err != nil {
+		return wakes, err
+	}
+
+	return wakes, s.crash.fire("after:SaveInboxMessage")
+}
+
 // crashingQueue fails a queue write around the real one.
 type crashingQueue struct {
 	queue.Queue
@@ -119,11 +132,15 @@ func (q crashingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Tim
 // subscribeHarness is a run waiting on pauses, with its executor, state and
 // queue in reach, and the crash points that stop the executor's handlers.
 type subscribeHarness struct {
-	t     *testing.T
-	infra *execTestInfra
-	exec  execution.Executor
-	crash *crashPoints
-	run   *statev2.Metadata
+	t      *testing.T
+	infra  *execTestInfra
+	exec   execution.Executor
+	crash  *crashPoints
+	run    *statev2.Metadata
+	driver *mockDriverV1
+	job    queue.JobResponse
+	item   *queue.QueueItem
+	edge   inngest.Edge
 }
 
 // newSubscribeHarness starts a run whose first request reports ops, then
@@ -165,12 +182,42 @@ func newSubscribeHarness(t *testing.T, ops ...*state.GeneratorOpcode) *subscribe
 	raw, ok := jobs[0].Raw.(*queue.QueueItem)
 	require.True(t, ok, "RunJobs Raw must be a *queue.QueueItem, got %T", jobs[0].Raw)
 
-	id := statev2.V1FromMetadata(*run)
-	edge := inngest.Edge{Incoming: "$trigger", Outgoing: "step"}
-	_, err = exec.Execute(queue.WithJobID(infra.ctx, jobs[0].JobID), id, raw.Data, edge)
-	require.NoError(t, err)
+	h := &subscribeHarness{
+		t:      t,
+		infra:  infra,
+		exec:   exec,
+		crash:  crash,
+		run:    run,
+		driver: driver,
+		job:    jobs[0],
+		item:   raw,
+		edge:   inngest.Edge{Incoming: "$trigger", Outgoing: "step"},
+	}
+	h.execute()
 
-	return &subscribeHarness{t: t, infra: infra, exec: exec, crash: crash, run: run}
+	return h
+}
+
+// execute runs the run's first request against the driver's current response.
+func (h *subscribeHarness) execute() {
+	h.t.Helper()
+
+	id := statev2.V1FromMetadata(*h.run)
+	_, err := h.exec.Execute(queue.WithJobID(h.infra.ctx, h.job.JobID), id, h.item.Data, h.edge)
+	require.NoError(h.t, err)
+}
+
+// report makes the SDK's next request report ops, as a later request of the
+// run would, and has the executor handle them.
+func (h *subscribeHarness) report(ops ...*state.GeneratorOpcode) {
+	h.t.Helper()
+
+	h.driver.response = &state.DriverResponse{
+		StatusCode:     206,
+		RequestVersion: 2,
+		Generator:      ops,
+	}
+	h.execute()
 }
 
 // waitOp is the op an SDK reports for step.waitForEvent.
@@ -203,8 +250,16 @@ func (h *subscribeHarness) pause(eventName, opID string) *state.Pause {
 func (h *subscribeHarness) deliver(evt event.Event) error {
 	h.t.Helper()
 
+	return h.deliverID(ulid.MustNew(ulid.Now(), rand.Reader), evt)
+}
+
+// deliverID delivers an event under a given internal ID, as a redelivery of
+// the same event does.
+func (h *subscribeHarness) deliverID(id ulid.ULID, evt event.Event) error {
+	h.t.Helper()
+
 	tracked := event.BaseTrackedEvent{
-		ID:          ulid.MustNew(ulid.Now(), rand.Reader),
+		ID:          id,
 		Event:       evt,
 		WorkspaceID: h.run.ID.Tenant.EnvID,
 	}

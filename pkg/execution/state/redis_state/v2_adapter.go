@@ -775,6 +775,52 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 	return hasPending, err
 }
 
+func inboxIdentifier(id state.ID) statev1.Identifier {
+	return statev1.Identifier{
+		RunID:      id.RunID,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+}
+
+// SaveInboxMessage saves a message step of an inbox and returns the waits it satisfies.
+func (v v2) SaveInboxMessage(ctx context.Context, id state.ID, msg state.InboxMessage) ([]state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.SaveInboxMessage",
+		func(ctx context.Context) ([]state.InboxWake, error) {
+			return v.mgr.SaveInboxMessage(ctx, inboxIdentifier(id), msg)
+		},
+		v.retryPolicy(),
+	)
+}
+
+// RecordInboxWait records a wait and returns it if a saved message satisfies it.
+func (v v2) RecordInboxWait(ctx context.Context, id state.ID, wait state.InboxWait) (*state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.RecordInboxWait",
+		func(ctx context.Context) (*state.InboxWake, error) {
+			return v.mgr.RecordInboxWait(ctx, inboxIdentifier(id), wait)
+		},
+		v.retryPolicy(),
+	)
+}
+
+// DeleteInboxWait removes a recorded inbox wait.
+func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, waitID string) error {
+	_, err := util.WithRetry(
+		ctx,
+		"state.DeleteInboxWait",
+		func(ctx context.Context) (bool, error) {
+			return false, v.mgr.DeleteInboxWait(ctx, inboxIdentifier(id), waitID)
+		},
+		v.retryPolicy(),
+	)
+
+	return err
+}
+
 // SavePending saves pending step IDs for the given run ID.
 func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) error {
 	v1id := statev1.Identifier{

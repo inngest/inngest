@@ -3111,6 +3111,8 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	evtID := evt.GetInternalID()
 	evtTime := evt.GetReceivedAt()
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
 
@@ -3189,6 +3191,10 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 	wg.Wait()
 
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
+
 	if err := iter.Error(); err != nil && err != context.Canceled {
 		goerr = errors.Join(goerr, fmt.Errorf("pause iteration error: %w", err))
 	}
@@ -3228,6 +3234,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		wg    sync.WaitGroup
 	)
 
+	ctx, arrivals := withInboxArrivals(ctx)
+
 	for _, i := range evals {
 		// Copy pause into function
 		pause := *i
@@ -3257,6 +3265,10 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		}()
 	}
 	wg.Wait()
+
+	if err := e.saveInboxMessages(ctx, evt, arrivals); err != nil {
+		goerr = errors.Join(goerr, err)
+	}
 
 	return res, goerr
 }
@@ -3309,6 +3321,16 @@ func (e *executor) handlePause(
 
 		// NOTE: Make sure the event that created the pause isn't also the one resuming it
 		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
+			return nil
+		}
+
+		// A source of an inbox is not consumed. The event is collected, and
+		// saved as a message once every matching pause has been handled.
+		if pause.Subscribe != nil {
+			if arrivals := inboxArrivalsFrom(ctx); arrivals != nil {
+				arrivals.add(pause)
+			}
+
 			return nil
 		}
 
@@ -4158,6 +4180,10 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorSleep(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribe:
+		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge)
+	case enums.OpcodeSubscribeWait:
+		return e.handleGeneratorSubscribeWait(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeInvokeFunction:
 		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeAIGateway:
@@ -6674,7 +6700,8 @@ func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 			enums.OpcodeSleep,
 			enums.OpcodeStepPlanned,
 			enums.OpcodeWaitForEvent,
-			enums.OpcodeWaitForSignal:
+			enums.OpcodeWaitForSignal,
+			enums.OpcodeSubscribeWait:
 			return true
 		}
 	}

@@ -83,6 +83,19 @@ type RunService interface {
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
+	// SaveInboxMessage saves a message step of an inbox, then returns every
+	// recorded wait on that inbox that the message satisfies. Each returned
+	// wait has left the run's pending set but is still recorded; delete it with
+	// DeleteInboxWait once its wake is queued. Saving a message that is already
+	// saved with the same value changes nothing and returns the same waits.
+	SaveInboxMessage(ctx context.Context, id ID, msg InboxMessage) ([]InboxWake, error)
+	// RecordInboxWait records a wait, then scans the steps saved after the
+	// wait's Seen step. If one is a message the wait wants, the wait is
+	// satisfied and returned; otherwise nil.
+	RecordInboxWait(ctx context.Context, id ID, wait InboxWait) (*InboxWake, error)
+	// DeleteInboxWait removes a recorded wait.
+	DeleteInboxWait(ctx context.Context, id ID, waitID string) error
+
 	SaveDefer(ctx context.Context, id ID, d Defer) error
 	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when
 	// no defer exists for hashedID. The Aborted transition also releases
