@@ -56,12 +56,15 @@ func InboxRead(ctx context.Context, tp TracerProvider, md *statev2.Metadata, op 
 		return fmt.Errorf("unable to parse subscribe read opts: %w", err)
 	}
 
-	rowID := op.ID
+	readID := op.ID
+
+	// A read whose op has an id of its own names the row it belongs to.
 	if opts.Row != "" {
-		rowID = opts.Row
+		op.ID = opts.Row
+		op.Name = opts.Row
 	}
 
-	row := FinalizedStepSpanRefFromMetadataAndStepID(md, rowID)
+	row := FinalizedStepSpanRefFromMetadataAndStepID(md, op.ID)
 
 	if opts.Draw {
 		attrs := GeneratorAttrs(&op)
@@ -90,7 +93,7 @@ func InboxRead(ctx context.Context, tp TracerProvider, md *statev2.Metadata, op 
 		AddMetadataTenantAttrs(attrs, md.ID)
 
 		if _, err := tp.CreateSpan(ctx, meta.SpanNameTick, &CreateSpanOptions{
-			Seed:       tickSeed("read", md.ID.RunID, op.ID, id),
+			Seed:       tickSeed("read", md.ID.RunID, readID, id),
 			Debug:      &SpanDebugData{Location: "tracing.InboxRead"},
 			Metadata:   md,
 			Parent:     row,

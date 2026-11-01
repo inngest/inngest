@@ -243,7 +243,7 @@ func TestSubscribeBatchReadTicksGoUnderTheReadsRow(t *testing.T) {
 		Op:   enums.OpcodeSubscribeRead,
 		ID:   "drain-1:read",
 		Name: "drain-1:read",
-		Opts: map[string]any{"inbox": "inbox", "messages": []string{msg}, "row": "drain-1"},
+		Opts: map[string]any{"inbox": "inbox", "messages": []string{msg}, "draw": true, "row": "drain-1"},
 	})
 
 	var readTicks []seenSpan
