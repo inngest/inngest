@@ -190,6 +190,10 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	for _, opt := range options {
 		opt(o)
 	}
+	if o.ExpiredCapacityLeasePartition != nil &&
+		(i.CapacityLease == nil || (i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "")) {
+		return nil
+	}
 
 	l := logger.StdlibLogger(ctx).With("item", i)
 
@@ -198,6 +202,15 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	now := q.Clock.Now()
 	if at.Before(now) {
 		at = now
+	}
+	expectedGeneration := i.GenerationID
+	expectedCapacityLease := ""
+	expectedRefilledFrom := i.RefilledFrom
+	partitionLease := ""
+	if o.ExpiredCapacityLeasePartition != nil {
+		partitionLease = o.ExpiredCapacityLeasePartition.String()
+		expectedCapacityLease = i.CapacityLease.LeaseID.String()
+		i.CapacityLease = nil
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -216,7 +229,9 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	i.RefilledAt = 0
 
 	// Reset enqueuedAt (used for latency calculation)
-	i.EnqueuedAt = now.UnixMilli()
+	if o.ExpiredCapacityLeasePartition == nil {
+		i.EnqueuedAt = now.UnixMilli()
+	}
 	i.EarliestPeekTime = 0
 
 	fnPartition := osqueue.ItemPartition(ctx, i)
@@ -309,6 +324,10 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		shadowPartition,
 		backlog.BacklogID,
 		backlog,
+		partitionLease,
+		expectedGeneration,
+		expectedCapacityLease,
+		expectedRefilledFrom,
 	})
 	if err != nil {
 		return err
@@ -352,9 +371,16 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 		return nil
 	case 1:
+		if o.ExpiredCapacityLeasePartition != nil {
+			return nil // The cleanup snapshot was deleted after peek.
+		}
 		// This should only ever happen if a run is cancelled and all queue items
 		// are deleted before requeueing.
 		return osqueue.ErrQueueItemNotFound
+	case 2:
+		return nil // A conditional repair lost eligibility; leave the item untouched.
+	case 3:
+		return osqueue.ErrPartitionLeaseMismatch
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}
