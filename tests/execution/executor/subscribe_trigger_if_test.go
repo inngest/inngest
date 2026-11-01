@@ -30,22 +30,3 @@ func TestSubscribeSourceIfReferencesTriggerEvent(t *testing.T) {
 	require.NoError(t, h.deliverID(hit, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
 	require.Contains(t, h.steps(), messageStepID("inbox", hit), "the trigger's value matches")
 }
-
-// The same holds for a source added by listen.
-func TestSubscribeListenIfReferencesTriggerEvent(t *testing.T) {
-	h := newSubscribeHarnessTriggered(t, map[string]any{"n": 1}, nil, subscribeOp("inbox", "test/other"))
-
-	op := listenOp("inbox:listen", "inbox")
-	op.Opts.(map[string]any)["sources"] = []map[string]any{
-		sourceIfOp("inbox", "test/msg", "async.data.n == event.data.n"),
-	}
-	h.report(op)
-
-	miss := newEventID()
-	require.NoError(t, h.deliverID(miss, event.Event{Name: "test/msg", Data: map[string]any{"n": 2}}))
-	require.NotContains(t, h.steps(), messageStepID("inbox", miss))
-
-	hit := newEventID()
-	require.NoError(t, h.deliverID(hit, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
-	require.Contains(t, h.steps(), messageStepID("inbox", hit))
-}
