@@ -92,6 +92,22 @@ func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cq
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 	search := meta.SpanPathElement{ID: "search", Name: "search tool"}
 
+	t.Run("a group row carries the ticks of the steps inside it", func(t *testing.T) {
+		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
+		open := groupedStep("in", 0, 1, completed, subscribe)
+		open.Ticks = []*cqrs.SpanTick{
+			{ID: "m1", Sources: []string{"p1"}, At: spanGroupsBase},
+			{ID: "m2", Sources: []string{"p1"}, At: spanGroupsBase.Add(time.Second)},
+		}
+
+		result := convertGroupedRun(t, open)
+
+		require.Len(t, result.ChildrenSpans, 1)
+		require.Len(t, result.ChildrenSpans[0].Ticks, 2)
+		assert.Equal(t, "m1", result.ChildrenSpans[0].Ticks[0].ID)
+		assert.Equal(t, "m2", result.ChildrenSpans[0].Ticks[1].ID)
+	})
+
 	t.Run("a group row lists the messages its read took", func(t *testing.T) {
 		read := meta.SpanPathElement{ID: "next", Name: "next", Kind: "tag"}
 		op := groupedStep("in:next", 0, 1, completed, read)

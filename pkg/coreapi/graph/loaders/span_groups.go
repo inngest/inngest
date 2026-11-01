@@ -73,6 +73,10 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 					parent.Metadata = append(parent.Metadata, md)
 				}
 			}
+
+			// Its bar draws the ticks of the steps inside it, so they show
+			// whether the group is collapsed or expanded.
+			parent.Ticks = append(parent.Ticks, child.Ticks...)
 		}
 		parent.ChildrenSpans = append(parent.ChildrenSpans, child)
 	}
