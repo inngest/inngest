@@ -308,7 +308,7 @@ func (e *executor) handleGeneratorSubscribeRead(ctx context.Context, runCtx exec
 // call that takes the read out of the pending set, before its wake is queued,
 // so the run that the wake starts finds the close recorded. A close that
 // crashed in between is repaired by being handled again.
-func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.SubscribeCloseOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse subscribe close opts: %w", err)
@@ -337,6 +337,13 @@ func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx exe
 
 	// The wake continues the run; a close that ended no read does it itself.
 	if wake != nil {
+		// The record holds the key of the response that first reported the
+		// read, and the close may arrive in a response that reports it again,
+		// whose own recording of the read is also ended by this close, under
+		// the key of that response. Both wakes carry the key of the response
+		// the close is in, so they are one job and the queue drops the second.
+		wake.Wait.ParallelCoalesceKey = group.ParallelCoalesceKey
+
 		return e.wakeInboxRead(ctx, md.ID, *wake)
 	}
 
