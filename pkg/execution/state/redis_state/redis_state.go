@@ -1227,6 +1227,14 @@ func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wai
 	if err != nil {
 		return nil, fmt.Errorf("error reading inbox wait status: %w", err)
 	}
+	if found == 2 && len(out) >= 2 {
+		hasPending, err := out[1].AsInt64()
+		if err != nil {
+			return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+		}
+
+		return &statev2.InboxWake{Wait: wait, Closed: true, HasPending: hasPending == 1}, nil
+	}
 	if found != 1 || len(out) < 3 {
 		return nil, nil
 	}
@@ -1285,6 +1293,50 @@ func (m shardedMgr) TimeoutInboxWait(ctx context.Context, i state.Identifier, wa
 	wake.TimedOut = true
 
 	return &wake, nil
+}
+
+// CloseInbox saves the result of a close op and ends the reads it names.
+func (m shardedMgr) CloseInbox(ctx context.Context, i state.Identifier, closing statev2.InboxClose) ([]statev2.InboxWake, bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CloseInbox"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := append([]string{closing.StepID, string(closing.Value)}, closing.Waits...)
+
+	out, err := retriableScripts["closeInbox"].Exec(
+		redis_telemetry.WithScriptName(ctx, "closeInbox"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, false, fmt.Errorf("error closing inbox: %w", err)
+	}
+
+	pending, err := out[0].AsInt64()
+	if err != nil {
+		return nil, false, fmt.Errorf("error reading inbox close pending: %w", err)
+	}
+
+	wakes := []statev2.InboxWake{}
+	for n := 1; n+1 < len(out); n += 2 {
+		wake, err := inboxWakeFrom(out[n+1], out[0], "")
+		if err != nil {
+			return nil, false, err
+		}
+		wake.Closed = true
+		wakes = append(wakes, wake)
+	}
+
+	return wakes, pending == 1, nil
 }
 
 // DeleteInboxWait removes a recorded inbox wait.

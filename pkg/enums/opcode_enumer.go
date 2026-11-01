@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunctionAIGatewayGatewayWaitForSignalRunCompleteStepFailedSyncRunCompleteDiscoveryRequestDeferAddDeferAbortSubscribeSubscribeWaitSubscribeRead"
+const _OpcodeName = "NoneStepStepRunStepErrorStepPlannedSleepWaitForEventInvokeFunctionAIGatewayGatewayWaitForSignalRunCompleteStepFailedSyncRunCompleteDiscoveryRequestDeferAddDeferAbortSubscribeSubscribeWaitSubscribeReadSubscribeClose"
 
-var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66, 75, 82, 95, 106, 116, 131, 147, 155, 165, 174, 187, 200}
+var _OpcodeIndex = [...]uint8{0, 4, 8, 15, 24, 35, 40, 52, 66, 75, 82, 95, 106, 116, 131, 147, 155, 165, 174, 187, 200, 214}
 
-const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunctionaigatewaygatewaywaitforsignalruncompletestepfailedsyncruncompletediscoveryrequestdeferadddeferabortsubscribesubscribewaitsubscriberead"
+const _OpcodeLowerName = "nonestepsteprunsteperrorstepplannedsleepwaitforeventinvokefunctionaigatewaygatewaywaitforsignalruncompletestepfailedsyncruncompletediscoveryrequestdeferadddeferabortsubscribesubscribewaitsubscribereadsubscribeclose"
 
 func (i Opcode) String() string {
 	if i < 0 || i >= Opcode(len(_OpcodeIndex)-1) {
@@ -45,9 +45,10 @@ func _OpcodeNoOp() {
 	_ = x[OpcodeSubscribe-(17)]
 	_ = x[OpcodeSubscribeWait-(18)]
 	_ = x[OpcodeSubscribeRead-(19)]
+	_ = x[OpcodeSubscribeClose-(20)]
 }
 
-var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction, OpcodeAIGateway, OpcodeGateway, OpcodeWaitForSignal, OpcodeRunComplete, OpcodeStepFailed, OpcodeSyncRunComplete, OpcodeDiscoveryRequest, OpcodeDeferAdd, OpcodeDeferAbort, OpcodeSubscribe, OpcodeSubscribeWait, OpcodeSubscribeRead}
+var _OpcodeValues = []Opcode{OpcodeNone, OpcodeStep, OpcodeStepRun, OpcodeStepError, OpcodeStepPlanned, OpcodeSleep, OpcodeWaitForEvent, OpcodeInvokeFunction, OpcodeAIGateway, OpcodeGateway, OpcodeWaitForSignal, OpcodeRunComplete, OpcodeStepFailed, OpcodeSyncRunComplete, OpcodeDiscoveryRequest, OpcodeDeferAdd, OpcodeDeferAbort, OpcodeSubscribe, OpcodeSubscribeWait, OpcodeSubscribeRead, OpcodeSubscribeClose}
 
 var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[0:4]:          OpcodeNone,
@@ -90,6 +91,8 @@ var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeLowerName[174:187]: OpcodeSubscribeWait,
 	_OpcodeName[187:200]:      OpcodeSubscribeRead,
 	_OpcodeLowerName[187:200]: OpcodeSubscribeRead,
+	_OpcodeName[200:214]:      OpcodeSubscribeClose,
+	_OpcodeLowerName[200:214]: OpcodeSubscribeClose,
 }
 
 var _OpcodeNames = []string{
@@ -113,6 +116,7 @@ var _OpcodeNames = []string{
 	_OpcodeName[165:174],
 	_OpcodeName[174:187],
 	_OpcodeName[187:200],
+	_OpcodeName[200:214],
 }
 
 // OpcodeString retrieves an enum value from the enum constants string name.
