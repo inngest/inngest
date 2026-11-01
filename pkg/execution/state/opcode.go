@@ -271,14 +271,9 @@ type SubscribeSource struct {
 	If    *string `json:"if,omitempty"`
 }
 
-// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox
-// or, with Inbox set, adds the sources of a listen view to one.
+// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox.
 type SubscribeOpts struct {
 	Sources []SubscribeSource `json:"sources"`
-	// Inbox is the id of the op that opened the inbox, when this op adds the
-	// sources of a view to an inbox that is already open. Empty when this op
-	// opens the inbox.
-	Inbox string `json:"inbox,omitempty"`
 }
 
 // SubscribeWaitOpts are the options of an OpcodeSubscribeWait op, a read of an
@@ -286,10 +281,6 @@ type SubscribeOpts struct {
 type SubscribeWaitOpts struct {
 	// Inbox is the id of the op that opened the inbox.
 	Inbox string `json:"inbox"`
-	// Want is the read's filter: `src` lists the pauses a message must have
-	// come through and `events` the event names it must have, and it must pass
-	// every part that is there. Empty means every message of the inbox.
-	Want json.RawMessage `json:"want,omitempty"`
 	// Seen is the last step id of the stack the SDK had loaded.
 	Seen string `json:"seen"`
 	// Timeout is how long the read waits for a message before it gets a null:
@@ -297,8 +288,8 @@ type SubscribeWaitOpts struct {
 	// the read waits for as long as the run lives.
 	Timeout string `json:"timeout,omitempty"`
 	// Batch is set when the read is a batch read (`drain()` or `nextBatch()`):
-	// the executor answers it with the wanted messages saved after Seen, and
-	// the answer is the read's result.
+	// the executor answers it with a cut at the last message saved after
+	// Seen, and the answer is the read's result.
 	Batch *SubscribeBatchOpts `json:"batch,omitempty"`
 }
 
@@ -310,9 +301,9 @@ type SubscribeBatchOpts struct {
 	// Unread is whether the SDK already holds unread messages from the state it
 	// loaded, so the read is answered at once even if nothing was saved since.
 	Unread bool `json:"unread,omitempty"`
-	// Room is how many messages the answer may hold, oldest first. Missing
+	// Max is how many messages the answer may cover, oldest first. Missing
 	// means all of them.
-	Room *int `json:"room,omitempty"`
+	Max *int `json:"max,omitempty"`
 }
 
 // SubscribeReadOpts are the options of an OpcodeSubscribeRead op, which reports
@@ -340,28 +331,11 @@ func (g GeneratorOpcode) SubscribeReadOpts() (*SubscribeReadOpts, error) {
 	return opts, nil
 }
 
-// SubscribeClosePause is a source pause that a close deletes. The event name is
-// part of where the pause is stored.
-type SubscribeClosePause struct {
-	ID    string `json:"id"`
-	Event string `json:"event"`
-}
-
 // SubscribeCloseOpts are the options of an OpcodeSubscribeClose op, which closes
-// an inbox or a view of one.
+// an inbox.
 type SubscribeCloseOpts struct {
 	// Inbox is the id of the op that opened the inbox.
 	Inbox string `json:"inbox"`
-	// IDs are the step ids of the messages the handle had not read, as the SDK
-	// computed them. They are saved as the op's result.
-	IDs []string `json:"ids"`
-	// Pauses are the source pauses of the handle and of every view under it.
-	Pauses []SubscribeClosePause `json:"pauses"`
-	// Waits are the ids of the reads under the handle that have not settled.
-	Waits []string `json:"waits"`
-	// Rows are the ids of the open and listen ops the close ends: the
-	// handle's own and those of the views under it. Their rows run until now.
-	Rows []string `json:"rows,omitempty"`
 }
 
 func (g GeneratorOpcode) SubscribeCloseOpts() (*SubscribeCloseOpts, error) {

@@ -18,21 +18,23 @@ func subscribeBatchOp(wait string, inbox string, seen string, batch map[string]a
 	return op
 }
 
-// answerOf is the answer a batch read was saved with: the step it was answered
-// after and the message step ids.
-func (h *subscribeHarness) answerOf(wait string) (string, []string) {
+// cutOfAnswer is the cut a batch read was saved with: the last message step
+// it covers, empty when it covers none.
+func (h *subscribeHarness) cutOfAnswer(wait string) string {
 	h.t.Helper()
 
 	saved, ok := h.steps()[wait]
 	require.True(h.t, ok, "the batch read %s has an answer", wait)
 
 	var answer struct {
-		Seen string   `json:"seen"`
-		IDs  []string `json:"ids"`
+		Cut *string `json:"cut"`
 	}
 	require.NoError(h.t, json.Unmarshal([]byte(saved), &answer))
+	if answer.Cut == nil {
+		return ""
+	}
 
-	return answer.Seen, answer.IDs
+	return *answer.Cut
 }
 
 func (h *subscribeHarness) deliverN(n int) []string {
@@ -48,47 +50,42 @@ func (h *subscribeHarness) deliverN(n int) []string {
 	return ids
 }
 
-// A drain is answered at once with the messages saved after the step the SDK
-// last saw, and wakes the run. It queues no timer: it never waits.
-func TestSubscribeDrainIsAnsweredWithWhatArrivedSince(t *testing.T) {
+// A drain is answered at once with a cut at the last message saved, and wakes
+// the run. It queues no timer: it never waits.
+func TestSubscribeDrainIsAnsweredWithACut(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 	msgs := h.deliverN(2)
 
 	h.report(subscribeBatchOp("drain-1", "inbox", "inbox", map[string]any{"drain": true}))
 
-	seen, ids := h.answerOf("drain-1")
-	require.Equal(t, "inbox", seen)
-	require.Equal(t, msgs, ids, "the answer lists the messages in the order they were saved")
+	require.Equal(t, msgs[1], h.cutOfAnswer("drain-1"))
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("drain-1", "")), "the run was woken")
 	require.Zero(t, timesIn(h.jobIDs(), h.timerJobID("drain-1")), "a drain queues no timer")
 }
 
-// With nothing saved since, a drain is answered with an empty list.
+// With nothing saved, a drain is answered with no cut.
 func TestSubscribeDrainWithNothingIsAnsweredEmpty(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 
 	h.report(subscribeBatchOp("drain-1", "inbox", "inbox", map[string]any{"drain": true}))
 
-	_, ids := h.answerOf("drain-1")
-	require.Empty(t, ids)
+	require.Equal(t, `{"cut":null}`, h.steps()["drain-1"])
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("drain-1", "")))
 }
 
-// Messages the SDK saw already are not in the answer, and the room bounds it,
-// oldest first.
-func TestSubscribeBatchAnswerStartsAfterSeenAndFitsTheRoom(t *testing.T) {
+// The cut covers messages saved after the step the SDK last saw, and no more
+// than max of them.
+func TestSubscribeBatchCutStartsAfterSeenAndFitsMax(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 	msgs := h.deliverN(3)
 
-	h.report(subscribeBatchOp("drain-1", "inbox", msgs[0], map[string]any{"drain": true, "room": 1}))
+	h.report(subscribeBatchOp("drain-1", "inbox", msgs[0], map[string]any{"drain": true, "max": 1}))
 
-	seen, ids := h.answerOf("drain-1")
-	require.Equal(t, msgs[0], seen)
-	require.Equal(t, []string{msgs[1]}, ids)
+	require.Equal(t, msgs[1], h.cutOfAnswer("drain-1"))
 }
 
 // A nextBatch with nothing unread waits like a read: it is recorded with a
-// timer, and the first message answers it with the messages saved since.
+// timer, and the first message answers it with a cut at that message.
 func TestSubscribeNextBatchWaitsAndTheFirstMessageAnswersIt(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 
@@ -99,29 +96,26 @@ func TestSubscribeNextBatchWaitsAndTheFirstMessageAnswersIt(t *testing.T) {
 
 	msgs := h.deliverN(1)
 
-	_, ids := h.answerOf("batch-1")
-	require.Equal(t, msgs, ids)
+	require.Equal(t, msgs[0], h.cutOfAnswer("batch-1"))
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("batch-1", "")))
 
-	// Later messages are not added to the answer.
+	// Later messages do not move the cut.
 	h.deliverN(1)
-	_, ids = h.answerOf("batch-1")
-	require.Equal(t, msgs, ids)
+	require.Equal(t, msgs[0], h.cutOfAnswer("batch-1"))
 }
 
 // A nextBatch that finds messages saved since is answered at once, and one
-// whose SDK holds unread messages is answered at once even with none.
+// whose SDK holds unread messages is answered at once even with none saved
+// since.
 func TestSubscribeNextBatchIsAnsweredAtOnceWhenSomethingIsUnread(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 	msgs := h.deliverN(1)
 
 	h.report(subscribeBatchOp("batch-1", "inbox", "inbox", map[string]any{}))
-	_, ids := h.answerOf("batch-1")
-	require.Equal(t, msgs, ids, "found in the gap")
+	require.Equal(t, msgs[0], h.cutOfAnswer("batch-1"), "found in the gap")
 
-	h.report(subscribeBatchOp("batch-2", "inbox", msgs[0], map[string]any{"unread": true, "room": 0}))
-	_, ids = h.answerOf("batch-2")
-	require.Empty(t, ids, "the SDK holds unread messages, so it does not wait")
+	h.report(subscribeBatchOp("batch-2", "inbox", msgs[0], map[string]any{"unread": true}))
+	require.Equal(t, msgs[0], h.cutOfAnswer("batch-2"), "the SDK holds unread messages, so it does not wait and the cut covers them")
 }
 
 // A timer and a message race for one nextBatch: the first write wins.

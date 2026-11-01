@@ -116,7 +116,7 @@ func TestSubscribeArrivalWakesWait(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(saved[msg]), &value))
 	require.Equal(t, "test/msg", value.Data["name"])
 	require.Equal(t, "inbox", value.Inbox)
-	require.Equal(t, []string{pause.ID.String()}, value.Src)
+	require.Empty(t, value.Src, "a message does not record the pauses it came through")
 
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-1", msg)), "the read was woken once")
 	require.NotContains(t, saved, "next-1", "nothing is saved under the read")
@@ -212,4 +212,69 @@ func TestSubscribeTwoMessagesWakeAReadOnce(t *testing.T) {
 	for _, id := range h.jobIDs() {
 		require.True(t, queued[id], "the second message queued no job of its own, got %s", id)
 	}
+}
+
+// An event that matches sources of two inboxes is saved once per inbox, and
+// wakes the read waiting on each.
+func TestSubscribeEventInTwoInboxesIsSavedOncePerInbox(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("one", "test/msg"), subscribeOp("two", "test/msg"))
+	h.report(subscribeWaitOp("next-one", "one", "one"))
+	h.report(subscribeWaitOp("next-two", "two", "two"))
+
+	id := newEventID()
+	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
+
+	saved := h.steps()
+	for _, inbox := range []string{"one", "two"} {
+		msg := messageStepID(inbox, id)
+		require.Contains(t, saved, msg, "the event is a message of %s", inbox)
+		require.Contains(t, saved[msg], `"inngest/inbox":"`+inbox+`"`)
+	}
+
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-one", "")), "the read of the first inbox was woken")
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-two", "")), "the read of the second inbox was woken")
+}
+
+// A message that is saved again after the run moved on does not answer a read
+// recorded since: the read is waiting for a newer message.
+func TestSubscribeRedeliveredMessageLeavesALaterReadWaiting(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+
+	id := newEventID()
+	evt := event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}
+	msg := messageStepID("inbox", id)
+	require.NoError(t, h.deliverID(id, evt))
+
+	// The SDK read the message, then waits for the next one.
+	h.report(subscribeWaitOp("next-2", "inbox", msg))
+	jobs := len(h.jobIDs())
+
+	require.NoError(t, h.deliverID(id, evt))
+
+	waits, err := h.infra.smv2.LoadInboxWaits(h.infra.ctx, h.run.ID)
+	require.NoError(t, err)
+	require.Len(t, waits.Waits, 1)
+	require.Equal(t, "next-2", waits.Waits[0].ID, "the read is still recorded")
+	require.Equal(t, jobs, len(h.jobIDs()), "the redelivery woke nothing")
+}
+
+// The same for a waiting batch read: the redelivery does not answer it with an
+// empty cut.
+func TestSubscribeRedeliveredMessageLeavesALaterBatchReadWaiting(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+
+	id := newEventID()
+	evt := event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}
+	msg := messageStepID("inbox", id)
+	require.NoError(t, h.deliverID(id, evt))
+
+	h.report(subscribeBatchOp("batch-2", "inbox", msg, map[string]any{}))
+	require.NotContains(t, h.steps(), "batch-2", "nothing is unread, so the read waits")
+
+	require.NoError(t, h.deliverID(id, evt))
+
+	require.NotContains(t, h.steps(), "batch-2", "the redelivery did not answer the read")
+	waits, err := h.infra.smv2.LoadInboxWaits(h.infra.ctx, h.run.ID)
+	require.NoError(t, err)
+	require.Len(t, waits.Waits, 1)
 }

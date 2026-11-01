@@ -88,6 +88,10 @@ const (
 	InboxSaveOutcome_INBOX_SAVE_OUTCOME_STEPS_FULL InboxSaveOutcome = 2
 	// The message would take the run's state past its size bound. Nothing was saved.
 	InboxSaveOutcome_INBOX_SAVE_OUTCOME_STATE_FULL InboxSaveOutcome = 3
+	// The message's inbox was closed. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_CLOSED InboxSaveOutcome = 4
+	// The run has ended. Nothing was saved.
+	InboxSaveOutcome_INBOX_SAVE_OUTCOME_RUN_GONE InboxSaveOutcome = 5
 )
 
 // Enum value maps for InboxSaveOutcome.
@@ -97,12 +101,16 @@ var (
 		1: "INBOX_SAVE_OUTCOME_SAVED",
 		2: "INBOX_SAVE_OUTCOME_STEPS_FULL",
 		3: "INBOX_SAVE_OUTCOME_STATE_FULL",
+		4: "INBOX_SAVE_OUTCOME_CLOSED",
+		5: "INBOX_SAVE_OUTCOME_RUN_GONE",
 	}
 	InboxSaveOutcome_value = map[string]int32{
 		"INBOX_SAVE_OUTCOME_UNSPECIFIED": 0,
 		"INBOX_SAVE_OUTCOME_SAVED":       1,
 		"INBOX_SAVE_OUTCOME_STEPS_FULL":  2,
 		"INBOX_SAVE_OUTCOME_STATE_FULL":  3,
+		"INBOX_SAVE_OUTCOME_CLOSED":      4,
+		"INBOX_SAVE_OUTCOME_RUN_GONE":    5,
 	}
 )
 
@@ -2765,7 +2773,7 @@ type InboxBatch struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Drain         bool                   `protobuf:"varint,1,opt,name=drain,proto3" json:"drain,omitempty"`
 	Unread        bool                   `protobuf:"varint,2,opt,name=unread,proto3" json:"unread,omitempty"`
-	Room          *int64                 `protobuf:"varint,3,opt,name=room,proto3,oneof" json:"room,omitempty"`
+	Max           *int64                 `protobuf:"varint,3,opt,name=max,proto3,oneof" json:"max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2814,9 +2822,9 @@ func (x *InboxBatch) GetUnread() bool {
 	return false
 }
 
-func (x *InboxBatch) GetRoom() int64 {
-	if x != nil && x.Room != nil {
-		return *x.Room
+func (x *InboxBatch) GetMax() int64 {
+	if x != nil && x.Max != nil {
+		return *x.Max
 	}
 	return 0
 }
@@ -2825,15 +2833,14 @@ type InboxWait struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Inbox               string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
-	Want                []byte                 `protobuf:"bytes,3,opt,name=want,proto3" json:"want,omitempty"`
-	Seen                string                 `protobuf:"bytes,4,opt,name=seen,proto3" json:"seen,omitempty"`
-	Timer               bool                   `protobuf:"varint,5,opt,name=timer,proto3" json:"timer,omitempty"`
-	Batch               *InboxBatch            `protobuf:"bytes,6,opt,name=batch,proto3" json:"batch,omitempty"`
-	Incoming            string                 `protobuf:"bytes,7,opt,name=incoming,proto3" json:"incoming,omitempty"`
-	GroupId             string                 `protobuf:"bytes,8,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	MaxAttempts         *int64                 `protobuf:"varint,9,opt,name=max_attempts,json=maxAttempts,proto3,oneof" json:"max_attempts,omitempty"`
-	ParallelMode        int64                  `protobuf:"varint,10,opt,name=parallel_mode,json=parallelMode,proto3" json:"parallel_mode,omitempty"`
-	ParallelCoalesceKey string                 `protobuf:"bytes,11,opt,name=parallel_coalesce_key,json=parallelCoalesceKey,proto3" json:"parallel_coalesce_key,omitempty"`
+	Seen                string                 `protobuf:"bytes,3,opt,name=seen,proto3" json:"seen,omitempty"`
+	Timer               bool                   `protobuf:"varint,4,opt,name=timer,proto3" json:"timer,omitempty"`
+	Batch               *InboxBatch            `protobuf:"bytes,5,opt,name=batch,proto3" json:"batch,omitempty"`
+	Incoming            string                 `protobuf:"bytes,6,opt,name=incoming,proto3" json:"incoming,omitempty"`
+	GroupId             string                 `protobuf:"bytes,7,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	MaxAttempts         *int64                 `protobuf:"varint,8,opt,name=max_attempts,json=maxAttempts,proto3,oneof" json:"max_attempts,omitempty"`
+	ParallelMode        int64                  `protobuf:"varint,9,opt,name=parallel_mode,json=parallelMode,proto3" json:"parallel_mode,omitempty"`
+	ParallelCoalesceKey string                 `protobuf:"bytes,10,opt,name=parallel_coalesce_key,json=parallelCoalesceKey,proto3" json:"parallel_coalesce_key,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -2880,13 +2887,6 @@ func (x *InboxWait) GetInbox() string {
 		return x.Inbox
 	}
 	return ""
-}
-
-func (x *InboxWait) GetWant() []byte {
-	if x != nil {
-		return x.Want
-	}
-	return nil
 }
 
 func (x *InboxWait) GetSeen() string {
@@ -2948,8 +2948,7 @@ func (x *InboxWait) GetParallelCoalesceKey() string {
 type InboxClose struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StepId        string                 `protobuf:"bytes,1,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
-	Value         []byte                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	Waits         []string               `protobuf:"bytes,3,rep,name=waits,proto3" json:"waits,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2991,18 +2990,11 @@ func (x *InboxClose) GetStepId() string {
 	return ""
 }
 
-func (x *InboxClose) GetValue() []byte {
+func (x *InboxClose) GetInbox() string {
 	if x != nil {
-		return x.Value
+		return x.Inbox
 	}
-	return nil
-}
-
-func (x *InboxClose) GetWaits() []string {
-	if x != nil {
-		return x.Waits
-	}
-	return nil
+	return ""
 }
 
 type InboxWake struct {
@@ -3133,10 +3125,11 @@ func (x *SaveInboxMessageRequest) GetMessage() *InboxMessage {
 	return nil
 }
 
+// wake is unset when the message did not satisfy the inbox's wait.
 type SaveInboxMessageResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Outcome       InboxSaveOutcome       `protobuf:"varint,1,opt,name=outcome,proto3,enum=state.v2.InboxSaveOutcome" json:"outcome,omitempty"`
-	Wakes         []*InboxWake           `protobuf:"bytes,2,rep,name=wakes,proto3" json:"wakes,omitempty"`
+	Wake          *InboxWake             `protobuf:"bytes,2,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3178,9 +3171,9 @@ func (x *SaveInboxMessageResponse) GetOutcome() InboxSaveOutcome {
 	return InboxSaveOutcome_INBOX_SAVE_OUTCOME_UNSPECIFIED
 }
 
-func (x *SaveInboxMessageResponse) GetWakes() []*InboxWake {
+func (x *SaveInboxMessageResponse) GetWake() *InboxWake {
 	if x != nil {
-		return x.Wakes
+		return x.Wake
 	}
 	return nil
 }
@@ -3285,8 +3278,9 @@ func (x *RecordInboxWaitResponse) GetWake() *InboxWake {
 type TimeoutInboxWaitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WaitId        string                 `protobuf:"bytes,2,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
-	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	WaitId        string                 `protobuf:"bytes,3,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
+	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3328,6 +3322,13 @@ func (x *TimeoutInboxWaitRequest) GetId() *ID {
 	return nil
 }
 
+func (x *TimeoutInboxWaitRequest) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
+}
+
 func (x *TimeoutInboxWaitRequest) GetWaitId() string {
 	if x != nil {
 		return x.WaitId
@@ -3342,7 +3343,7 @@ func (x *TimeoutInboxWaitRequest) GetData() []byte {
 	return nil
 }
 
-// wake is unset when the wait was no longer recorded.
+// wake is unset when the inbox's wait was no longer that wait.
 type TimeoutInboxWaitResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Wake          *InboxWake             `protobuf:"bytes,1,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
@@ -3439,9 +3440,10 @@ func (x *CloseInboxRequest) GetClosing() *InboxClose {
 	return nil
 }
 
+// wake is unset when the inbox had no wait recorded.
 type CloseInboxResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Wakes         []*InboxWake           `protobuf:"bytes,1,rep,name=wakes,proto3" json:"wakes,omitempty"`
+	Wake          *InboxWake             `protobuf:"bytes,1,opt,name=wake,proto3,oneof" json:"wake,omitempty"`
 	HasPending    bool                   `protobuf:"varint,2,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3477,9 +3479,9 @@ func (*CloseInboxResponse) Descriptor() ([]byte, []int) {
 	return file_state_v2_state_proto_rawDescGZIP(), []int{59}
 }
 
-func (x *CloseInboxResponse) GetWakes() []*InboxWake {
+func (x *CloseInboxResponse) GetWake() *InboxWake {
 	if x != nil {
-		return x.Wakes
+		return x.Wake
 	}
 	return nil
 }
@@ -3494,7 +3496,8 @@ func (x *CloseInboxResponse) GetHasPending() bool {
 type DeleteInboxWaitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WaitId        string                 `protobuf:"bytes,2,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
+	Inbox         string                 `protobuf:"bytes,2,opt,name=inbox,proto3" json:"inbox,omitempty"`
+	WaitId        string                 `protobuf:"bytes,3,opt,name=wait_id,json=waitId,proto3" json:"wait_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3534,6 +3537,13 @@ func (x *DeleteInboxWaitRequest) GetId() *ID {
 		return x.Id
 	}
 	return nil
+}
+
+func (x *DeleteInboxWaitRequest) GetInbox() string {
+	if x != nil {
+		return x.Inbox
+	}
+	return ""
 }
 
 func (x *DeleteInboxWaitRequest) GetWaitId() string {
@@ -3780,32 +3790,30 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\fR\x05value\x12\x1b\n" +
 	"\tmax_steps\x18\x04 \x01(\x03R\bmaxSteps\x12$\n" +
-	"\x0emax_state_size\x18\x05 \x01(\x03R\fmaxStateSize\"\\\n" +
+	"\x0emax_state_size\x18\x05 \x01(\x03R\fmaxStateSize\"Y\n" +
 	"\n" +
 	"InboxBatch\x12\x14\n" +
 	"\x05drain\x18\x01 \x01(\bR\x05drain\x12\x16\n" +
-	"\x06unread\x18\x02 \x01(\bR\x06unread\x12\x17\n" +
-	"\x04room\x18\x03 \x01(\x03H\x00R\x04room\x88\x01\x01B\a\n" +
-	"\x05_room\"\xe4\x02\n" +
+	"\x06unread\x18\x02 \x01(\bR\x06unread\x12\x15\n" +
+	"\x03max\x18\x03 \x01(\x03H\x00R\x03max\x88\x01\x01B\x06\n" +
+	"\x04_max\"\xd0\x02\n" +
 	"\tInboxWait\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x12\n" +
-	"\x04want\x18\x03 \x01(\fR\x04want\x12\x12\n" +
-	"\x04seen\x18\x04 \x01(\tR\x04seen\x12\x14\n" +
-	"\x05timer\x18\x05 \x01(\bR\x05timer\x12*\n" +
-	"\x05batch\x18\x06 \x01(\v2\x14.state.v2.InboxBatchR\x05batch\x12\x1a\n" +
-	"\bincoming\x18\a \x01(\tR\bincoming\x12\x19\n" +
-	"\bgroup_id\x18\b \x01(\tR\agroupId\x12&\n" +
-	"\fmax_attempts\x18\t \x01(\x03H\x00R\vmaxAttempts\x88\x01\x01\x12#\n" +
-	"\rparallel_mode\x18\n" +
-	" \x01(\x03R\fparallelMode\x122\n" +
-	"\x15parallel_coalesce_key\x18\v \x01(\tR\x13parallelCoalesceKeyB\x0f\n" +
-	"\r_max_attempts\"Q\n" +
+	"\x04seen\x18\x03 \x01(\tR\x04seen\x12\x14\n" +
+	"\x05timer\x18\x04 \x01(\bR\x05timer\x12*\n" +
+	"\x05batch\x18\x05 \x01(\v2\x14.state.v2.InboxBatchR\x05batch\x12\x1a\n" +
+	"\bincoming\x18\x06 \x01(\tR\bincoming\x12\x19\n" +
+	"\bgroup_id\x18\a \x01(\tR\agroupId\x12&\n" +
+	"\fmax_attempts\x18\b \x01(\x03H\x00R\vmaxAttempts\x88\x01\x01\x12#\n" +
+	"\rparallel_mode\x18\t \x01(\x03R\fparallelMode\x122\n" +
+	"\x15parallel_coalesce_key\x18\n" +
+	" \x01(\tR\x13parallelCoalesceKeyB\x0f\n" +
+	"\r_max_attempts\";\n" +
 	"\n" +
 	"InboxClose\x12\x17\n" +
 	"\astep_id\x18\x01 \x01(\tR\x06stepId\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value\x12\x14\n" +
-	"\x05waits\x18\x03 \x03(\tR\x05waits\"\xad\x01\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\"\xad\x01\n" +
 	"\tInboxWake\x12'\n" +
 	"\x04wait\x18\x01 \x01(\v2\x13.state.v2.InboxWaitR\x04wait\x12!\n" +
 	"\fmessage_step\x18\x02 \x01(\tR\vmessageStep\x12\x1b\n" +
@@ -3815,45 +3823,51 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"hasPending\"i\n" +
 	"\x17SaveInboxMessageRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x120\n" +
-	"\amessage\x18\x02 \x01(\v2\x16.state.v2.InboxMessageR\amessage\"{\n" +
+	"\amessage\x18\x02 \x01(\v2\x16.state.v2.InboxMessageR\amessage\"\x87\x01\n" +
 	"\x18SaveInboxMessageResponse\x124\n" +
-	"\aoutcome\x18\x01 \x01(\x0e2\x1a.state.v2.InboxSaveOutcomeR\aoutcome\x12)\n" +
-	"\x05wakes\x18\x02 \x03(\v2\x13.state.v2.InboxWakeR\x05wakes\"_\n" +
+	"\aoutcome\x18\x01 \x01(\x0e2\x1a.state.v2.InboxSaveOutcomeR\aoutcome\x12,\n" +
+	"\x04wake\x18\x02 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
+	"\x05_wake\"_\n" +
 	"\x16RecordInboxWaitRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12'\n" +
 	"\x04wait\x18\x02 \x01(\v2\x13.state.v2.InboxWaitR\x04wait\"P\n" +
 	"\x17RecordInboxWaitResponse\x12,\n" +
 	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
-	"\x05_wake\"d\n" +
+	"\x05_wake\"z\n" +
 	"\x17TimeoutInboxWaitRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x17\n" +
-	"\await_id\x18\x02 \x01(\tR\x06waitId\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\"Q\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x17\n" +
+	"\await_id\x18\x03 \x01(\tR\x06waitId\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\"Q\n" +
 	"\x18TimeoutInboxWaitResponse\x12,\n" +
 	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01B\a\n" +
 	"\x05_wake\"a\n" +
 	"\x11CloseInboxRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12.\n" +
-	"\aclosing\x18\x02 \x01(\v2\x14.state.v2.InboxCloseR\aclosing\"`\n" +
-	"\x12CloseInboxResponse\x12)\n" +
-	"\x05wakes\x18\x01 \x03(\v2\x13.state.v2.InboxWakeR\x05wakes\x12\x1f\n" +
+	"\aclosing\x18\x02 \x01(\v2\x14.state.v2.InboxCloseR\aclosing\"l\n" +
+	"\x12CloseInboxResponse\x12,\n" +
+	"\x04wake\x18\x01 \x01(\v2\x13.state.v2.InboxWakeH\x00R\x04wake\x88\x01\x01\x12\x1f\n" +
 	"\vhas_pending\x18\x02 \x01(\bR\n" +
-	"hasPending\"O\n" +
+	"hasPendingB\a\n" +
+	"\x05_wake\"e\n" +
 	"\x16DeleteInboxWaitRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x17\n" +
-	"\await_id\x18\x02 \x01(\tR\x06waitId\"\x19\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12\x14\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\x12\x17\n" +
+	"\await_id\x18\x03 \x01(\tR\x06waitId\"\x19\n" +
 	"\x17DeleteInboxWaitResponse*\x94\x01\n" +
 	"\vDeferStatus\x12\x18\n" +
 	"\x14DEFER_STATUS_UNKNOWN\x10\x00\x12\x1a\n" +
 	"\x16DEFER_STATUS_SCHEDULED\x10\x01\x12\x1a\n" +
 	"\x16DEFER_STATUS_AFTER_RUN\x10\x02\x12\x18\n" +
 	"\x14DEFER_STATUS_ABORTED\x10\x03\x12\x19\n" +
-	"\x15DEFER_STATUS_REJECTED\x10\x04*\x9a\x01\n" +
+	"\x15DEFER_STATUS_REJECTED\x10\x04*\xda\x01\n" +
 	"\x10InboxSaveOutcome\x12\"\n" +
 	"\x1eINBOX_SAVE_OUTCOME_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18INBOX_SAVE_OUTCOME_SAVED\x10\x01\x12!\n" +
 	"\x1dINBOX_SAVE_OUTCOME_STEPS_FULL\x10\x02\x12!\n" +
-	"\x1dINBOX_SAVE_OUTCOME_STATE_FULL\x10\x032\xfe\r\n" +
+	"\x1dINBOX_SAVE_OUTCOME_STATE_FULL\x10\x03\x12\x1d\n" +
+	"\x19INBOX_SAVE_OUTCOME_CLOSED\x10\x04\x12\x1f\n" +
+	"\x1bINBOX_SAVE_OUTCOME_RUN_GONE\x10\x052\xfe\r\n" +
 	"\n" +
 	"RunService\x12G\n" +
 	"\x06Create\x12\x1c.state.v2.CreateStateRequest\x1a\x1d.state.v2.CreateStateResponse\"\x00\x12G\n" +
@@ -4017,7 +4031,7 @@ var file_state_v2_state_proto_depIdxs = []int32{
 	3,  // 44: state.v2.SaveInboxMessageRequest.id:type_name -> state.v2.ID
 	49, // 45: state.v2.SaveInboxMessageRequest.message:type_name -> state.v2.InboxMessage
 	1,  // 46: state.v2.SaveInboxMessageResponse.outcome:type_name -> state.v2.InboxSaveOutcome
-	53, // 47: state.v2.SaveInboxMessageResponse.wakes:type_name -> state.v2.InboxWake
+	53, // 47: state.v2.SaveInboxMessageResponse.wake:type_name -> state.v2.InboxWake
 	3,  // 48: state.v2.RecordInboxWaitRequest.id:type_name -> state.v2.ID
 	51, // 49: state.v2.RecordInboxWaitRequest.wait:type_name -> state.v2.InboxWait
 	53, // 50: state.v2.RecordInboxWaitResponse.wake:type_name -> state.v2.InboxWake
@@ -4025,7 +4039,7 @@ var file_state_v2_state_proto_depIdxs = []int32{
 	53, // 52: state.v2.TimeoutInboxWaitResponse.wake:type_name -> state.v2.InboxWake
 	3,  // 53: state.v2.CloseInboxRequest.id:type_name -> state.v2.ID
 	52, // 54: state.v2.CloseInboxRequest.closing:type_name -> state.v2.InboxClose
-	53, // 55: state.v2.CloseInboxResponse.wakes:type_name -> state.v2.InboxWake
+	53, // 55: state.v2.CloseInboxResponse.wake:type_name -> state.v2.InboxWake
 	3,  // 56: state.v2.DeleteInboxWaitRequest.id:type_name -> state.v2.ID
 	31, // 57: state.v2.LoadDefersResponse.DefersEntry.value:type_name -> state.v2.Defer
 	32, // 58: state.v2.LoadDefersMetaResponse.DefersEntry.value:type_name -> state.v2.DeferMeta
@@ -4088,8 +4102,10 @@ func file_state_v2_state_proto_init() {
 	file_state_v2_state_proto_msgTypes[2].OneofWrappers = []any{}
 	file_state_v2_state_proto_msgTypes[48].OneofWrappers = []any{}
 	file_state_v2_state_proto_msgTypes[49].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[53].OneofWrappers = []any{}
 	file_state_v2_state_proto_msgTypes[55].OneofWrappers = []any{}
 	file_state_v2_state_proto_msgTypes[57].OneofWrappers = []any{}
+	file_state_v2_state_proto_msgTypes[59].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

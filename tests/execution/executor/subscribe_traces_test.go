@@ -205,28 +205,9 @@ func TestSubscribeOpenRowRunsUntilClose(t *testing.T) {
 	h := newTraceHarness(t, subscribeOp("inbox", "test/msg"))
 	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox"), "an open inbox is running")
 
-	pause := h.sourcePause("inbox", "test/msg")
-	require.NotNil(t, pause)
-	h.report(closeRowsOp("inbox:close", "inbox", []string{"inbox"}, nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}))
+	h.report(closeOp("inbox:close", "inbox"))
 
 	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox"), "the close ended the row")
-}
-
-// A listen closed before its inbox ends its own row and leaves the inbox's.
-func TestSubscribeListenRowEndsAtItsOwnClose(t *testing.T) {
-	h := newTraceHarness(t, subscribeOp("inbox", "test/a"))
-	h.report(listenOp("inbox:listen", "inbox", "test/b"))
-	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox:listen"))
-
-	listen := h.listenPause("inbox:listen", "test/b")
-	require.NotNil(t, listen)
-	h.report(closeRowsOp("inbox:listen:close", "inbox", []string{"inbox:listen"}, nil, []map[string]any{{"id": listen.ID.String(), "event": "test/b"}}))
-
-	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox:listen"))
-	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox"), "the inbox is still open")
-
-	h.report(closeRowsOp("inbox:close", "inbox", []string{"inbox"}, nil, nil))
-	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox"))
 }
 
 // A batch read's row is the read's own op. The lazy op that reports what it took

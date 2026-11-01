@@ -381,10 +381,10 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
 			partial := c.B().Hset().Key(inboxWaitsKey).FieldValue()
 			for n, wait := range s.InboxWaits.Waits {
-				partial = partial.FieldValue(wait.ID, records[n])
+				partial = partial.FieldValue(wait.Inbox, records[n])
 			}
-			for _, waitID := range s.InboxWaits.Closed {
-				partial = partial.FieldValue(inboxClosedPrefix+waitID, "{}")
+			for _, inbox := range s.InboxWaits.Closed {
+				partial = partial.FieldValue(inbox+inboxClosedSuffix, "1")
 			}
 			return partial.Build()
 		}).Error(); err != nil {
@@ -809,15 +809,17 @@ func inboxIdentifier(id state.ID) statev1.Identifier {
 	}
 }
 
-// SaveInboxMessage saves a message step of an inbox and returns the waits it satisfies.
-func (v v2) SaveInboxMessage(ctx context.Context, id state.ID, msg state.InboxMessage) ([]state.InboxWake, error) {
+// SaveInboxMessage saves a message step of an inbox and returns the wait it satisfies.
+func (v v2) SaveInboxMessage(ctx context.Context, id state.ID, msg state.InboxMessage) (*state.InboxWake, error) {
 	return util.WithRetry(
 		ctx,
 		"state.SaveInboxMessage",
-		func(ctx context.Context) ([]state.InboxWake, error) {
+		func(ctx context.Context) (*state.InboxWake, error) {
 			return v.mgr.SaveInboxMessage(ctx, inboxIdentifier(id), msg)
 		},
-		v.retryPolicy(util.WithRetryConfRetryableErrors(v.retryableError)),
+		v.retryPolicy(util.WithRetryConfRetryableErrors(func(err error) bool {
+			return v.retryableError(err) && !errors.Is(err, state.ErrRunNotFound)
+		})),
 	)
 }
 
@@ -833,22 +835,22 @@ func (v v2) RecordInboxWait(ctx context.Context, id state.ID, wait state.InboxWa
 	)
 }
 
-// TimeoutInboxWait times a recorded wait out, if it is still recorded.
-func (v v2) TimeoutInboxWait(ctx context.Context, id state.ID, waitID string, data []byte) (*state.InboxWake, error) {
+// TimeoutInboxWait times an inbox's wait out, if it is still recorded.
+func (v v2) TimeoutInboxWait(ctx context.Context, id state.ID, inbox string, waitID string, data []byte) (*state.InboxWake, error) {
 	return util.WithRetry(
 		ctx,
 		"state.TimeoutInboxWait",
 		func(ctx context.Context) (*state.InboxWake, error) {
-			return v.mgr.TimeoutInboxWait(ctx, inboxIdentifier(id), waitID, data)
+			return v.mgr.TimeoutInboxWait(ctx, inboxIdentifier(id), inbox, waitID, data)
 		},
 		v.retryPolicy(),
 	)
 }
 
-// CloseInbox saves a close and ends the reads under it.
-func (v v2) CloseInbox(ctx context.Context, id state.ID, closing state.InboxClose) ([]state.InboxWake, bool, error) {
+// CloseInbox saves a close and ends the inbox's wait.
+func (v v2) CloseInbox(ctx context.Context, id state.ID, closing state.InboxClose) (*state.InboxWake, bool, error) {
 	type closed struct {
-		wakes   []state.InboxWake
+		wake    *state.InboxWake
 		pending bool
 	}
 
@@ -856,23 +858,23 @@ func (v v2) CloseInbox(ctx context.Context, id state.ID, closing state.InboxClos
 		ctx,
 		"state.CloseInbox",
 		func(ctx context.Context) (closed, error) {
-			wakes, pending, err := v.mgr.CloseInbox(ctx, inboxIdentifier(id), closing)
+			wake, pending, err := v.mgr.CloseInbox(ctx, inboxIdentifier(id), closing)
 
-			return closed{wakes: wakes, pending: pending}, err
+			return closed{wake: wake, pending: pending}, err
 		},
 		v.retryPolicy(),
 	)
 
-	return out.wakes, out.pending, err
+	return out.wake, out.pending, err
 }
 
-// DeleteInboxWait removes a recorded inbox wait.
-func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, waitID string) error {
+// DeleteInboxWait removes the inbox's wait if it is the wait waitID.
+func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, inbox string, waitID string) error {
 	_, err := util.WithRetry(
 		ctx,
 		"state.DeleteInboxWait",
 		func(ctx context.Context) (bool, error) {
-			return false, v.mgr.DeleteInboxWait(ctx, inboxIdentifier(id), waitID)
+			return false, v.mgr.DeleteInboxWait(ctx, inboxIdentifier(id), inbox, waitID)
 		},
 		v.retryPolicy(),
 	)
@@ -948,7 +950,7 @@ func (v v2) retryableError(err error) bool {
 		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
 		return false
-	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull):
+	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull), errors.Is(err, state.ErrInboxClosed):
 		return false
 	}
 

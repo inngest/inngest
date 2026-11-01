@@ -1,6 +1,6 @@
 --[[
 
-Times a recorded inbox wait out. If the wait is still recorded, saves the timeout
+Times a recorded inbox wait out. If the inbox's wait is still this one, saves the timeout
 value under the wait's id, takes the wait out of the pending set and returns its
 record. The record stays until the caller has queued the wake. If the wait is
 not recorded, a message or a close already took it and nothing changes.
@@ -21,11 +21,14 @@ local keyStack = KEYS[3]
 local keyStepsPending = KEYS[4]
 local keyWaits = KEYS[5]
 
-local waitID = ARGV[1]
-local value = ARGV[2]
+local inbox = ARGV[1]
+local waitID = ARGV[2]
+local value = ARGV[3]
 
-local record = redis.call("HGET", keyWaits, waitID)
-if not record then
+-- The inbox's wait is recorded under the inbox. A different wait recorded
+-- there is a later read, and this one is long gone.
+local record = redis.call("HGET", keyWaits, inbox)
+if not record or cjson.decode(record).id ~= waitID then
 	return { 0 }
 end
 
