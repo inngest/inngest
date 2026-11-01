@@ -92,7 +92,7 @@ func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cq
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 	search := meta.SpanPathElement{ID: "search", Name: "search tool"}
 
-	t.Run("a group row of an inbox op that waits takes the wait step type", func(t *testing.T) {
+	t.Run("a group row of an inbox op that waits takes its step op", func(t *testing.T) {
 		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
 		next := meta.SpanPathElement{ID: "next", Name: "next", Kind: "tag"}
 		atOnce := meta.SpanPathElement{ID: "next-1", Name: "next", Kind: "tag"}
@@ -107,9 +107,9 @@ func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cq
 		result := convertGroupedRun(t, open, waited, answered)
 
 		require.Len(t, result.ChildrenSpans, 3)
-		for _, i := range []int{0, 1} {
+		for i, want := range []models.StepOp{models.StepOpSubscribe, models.StepOpInboxRead} {
 			require.NotNil(t, result.ChildrenSpans[i].StepOp)
-			assert.Equal(t, models.StepOpWaitForEvent, *result.ChildrenSpans[i].StepOp)
+			assert.Equal(t, want, *result.ChildrenSpans[i].StepOp)
 			assert.Equal(t, SpanGroupStepType, result.ChildrenSpans[i].StepType)
 		}
 		assert.Nil(t, result.ChildrenSpans[2].StepOp)

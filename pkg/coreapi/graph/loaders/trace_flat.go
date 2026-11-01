@@ -126,9 +126,6 @@ func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.
 				}
 			}
 		case models.StepOpWaitForEvent:
-			if isInboxWaitOpcode(span.Attributes.StepOp) {
-				break
-			}
 			si := &models.WaitForEventStepInfo{
 				Expression:   span.Attributes.StepWaitForEventIf,
 				TimedOut:     span.Attributes.StepWaitExpired,

@@ -4698,6 +4698,8 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
   WAIT_FOR_SIGNAL
+  SUBSCRIBE # open an inbox
+  INBOX_READ # a read of an inbox that waited
 }
 
 union StepInfo =

@@ -74,9 +74,9 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 				}
 			}
 
-			// An inbox op that waits has the wait step type and no wait info (see
-			// isInboxWaitOpcode), and its group draws as a wait too.
-			if child.StepOp != nil && *child.StepOp == models.StepOpWaitForEvent && child.StepInfo == nil {
+			// An inbox op that waits has its own step op, and its group row takes
+			// it so the row draws as a wait.
+			if child.StepOp != nil && (*child.StepOp == models.StepOpSubscribe || *child.StepOp == models.StepOpInboxRead) {
 				parent.StepOp = child.StepOp
 			}
 

@@ -107,23 +107,15 @@ func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	case enums.OpcodeWaitForEvent:
 		op := models.StepOpWaitForEvent
 		return &op
-	case enums.OpcodeSubscribe, enums.OpcodeSubscribeWait:
-		// An inbox that waits draws like any other wait, so the UI styles
-		// these rows through the step type it already has for a wait.
-		op := models.StepOpWaitForEvent
+	case enums.OpcodeSubscribe:
+		op := models.StepOpSubscribe
 		return &op
-	case enums.OpcodeWaitForSignal:
-		op := models.StepOpWaitForSignal
+	case enums.OpcodeSubscribeWait:
+		op := models.StepOpInboxRead
 		return &op
 	}
 
 	return nil
-}
-
-// isInboxWaitOpcode reports whether the op is one an inbox waits in. Those rows
-// have the wait step type for their style but none of a wait's details.
-func isInboxWaitOpcode(op *enums.Opcode) bool {
-	return op != nil && (*op == enums.OpcodeSubscribe || *op == enums.OpcodeSubscribeWait)
 }
 
 func stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
@@ -307,9 +299,6 @@ func convertDynamicRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*mode
 				}
 			}
 		case models.StepOpWaitForEvent:
-			if isInboxWaitOpcode(span.Attributes.StepOp) {
-				break
-			}
 			{
 				si := &models.WaitForEventStepInfo{
 					Expression:   span.Attributes.StepWaitForEventIf,
