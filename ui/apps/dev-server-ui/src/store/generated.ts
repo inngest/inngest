@@ -1092,9 +1092,11 @@ export type StepInfo = InvokeStepInfo | RunStepInfo | SleepStepInfo | WaitForEve
 
 export enum StepOp {
   AiGateway = 'AI_GATEWAY',
+  InboxRead = 'INBOX_READ',
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',
+  Subscribe = 'SUBSCRIBE',
   WaitForEvent = 'WAIT_FOR_EVENT',
   WaitForSignal = 'WAIT_FOR_SIGNAL'
 }

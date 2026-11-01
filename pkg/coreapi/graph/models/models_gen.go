@@ -1435,6 +1435,8 @@ const (
 	StepOpWaitForEvent  StepOp = "WAIT_FOR_EVENT"
 	StepOpAiGateway     StepOp = "AI_GATEWAY"
 	StepOpWaitForSignal StepOp = "WAIT_FOR_SIGNAL"
+	StepOpSubscribe     StepOp = "SUBSCRIBE"
+	StepOpInboxRead     StepOp = "INBOX_READ"
 )
 
 var AllStepOp = []StepOp{
@@ -1444,11 +1446,13 @@ var AllStepOp = []StepOp{
 	StepOpWaitForEvent,
 	StepOpAiGateway,
 	StepOpWaitForSignal,
+	StepOpSubscribe,
+	StepOpInboxRead,
 }
 
 func (e StepOp) IsValid() bool {
 	switch e {
-	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal:
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal, StepOpSubscribe, StepOpInboxRead:
 		return true
 	}
 	return false

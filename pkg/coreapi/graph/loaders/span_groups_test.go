@@ -92,6 +92,39 @@ func testGroupBySpanPath(t *testing.T, convertGroupedRun func(*testing.T, ...*cq
 	agent := meta.SpanPathElement{ID: "agent", Name: "Research agent", Kind: "agent"}
 	search := meta.SpanPathElement{ID: "search", Name: "search tool"}
 
+	t.Run("a group row of an inbox op that waits takes its step op", func(t *testing.T) {
+		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
+		next := meta.SpanPathElement{ID: "next", Name: "next", Kind: "tag"}
+		atOnce := meta.SpanPathElement{ID: "next-1", Name: "next", Kind: "tag"}
+
+		open := groupedStep("in", 0, 1, completed, subscribe)
+		open.Attributes.StepOp = new(enums.OpcodeSubscribe)
+		waited := groupedStep("in:next", 1, 1, completed, next)
+		waited.Attributes.StepOp = new(enums.OpcodeSubscribeWait)
+		answered := groupedStep("in:next:1", 2, 1, completed, atOnce)
+		answered.Attributes.StepOp = new(enums.OpcodeSubscribeRead)
+
+		result := convertGroupedRun(t, open, waited, answered)
+
+		require.Len(t, result.ChildrenSpans, 3)
+		for i, want := range []models.StepOp{models.StepOpSubscribe, models.StepOpInboxRead} {
+			require.NotNil(t, result.ChildrenSpans[i].StepOp)
+			assert.Equal(t, want, *result.ChildrenSpans[i].StepOp)
+			assert.Equal(t, SpanGroupStepType, result.ChildrenSpans[i].StepType)
+		}
+		assert.Nil(t, result.ChildrenSpans[2].StepOp)
+	})
+
+	t.Run("a group around a real wait stays a plain group", func(t *testing.T) {
+		wait := groupedStep("wait", 0, 1, completed, agent)
+		wait.Attributes.StepOp = new(enums.OpcodeWaitForEvent)
+
+		result := convertGroupedRun(t, wait)
+
+		require.Len(t, result.ChildrenSpans, 1)
+		assert.Nil(t, result.ChildrenSpans[0].StepOp)
+	})
+
 	t.Run("a group row carries the ticks of the steps inside it", func(t *testing.T) {
 		subscribe := meta.SpanPathElement{ID: "in", Name: "subscribe", Kind: "tag"}
 		open := groupedStep("in", 0, 1, completed, subscribe)

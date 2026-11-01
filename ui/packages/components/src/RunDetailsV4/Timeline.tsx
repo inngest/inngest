@@ -615,8 +615,6 @@ function TimelineBarRenderer({
       markers={bar.markers?.map((marker) => {
         return {
           id: marker.id,
-          filled: marker.filled,
-          details: marker.details,
           startPercent: calculateBarPosition(marker.at, marker.at, minTime, maxTime).startPercent,
         };
       })}

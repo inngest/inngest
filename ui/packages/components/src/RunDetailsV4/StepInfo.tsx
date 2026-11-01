@@ -59,6 +59,8 @@ const STEP_OP_LABELS: Record<string, string> = {
   WAIT_FOR_EVENT: 'step.waitForEvent',
   AI_GATEWAY: 'step.ai',
   WAIT_FOR_SIGNAL: 'step.waitForSignal',
+  SUBSCRIBE: 'step.subscribe',
+  INBOX_READ: 'inbox read',
 };
 
 type StepKindInfoProps = {

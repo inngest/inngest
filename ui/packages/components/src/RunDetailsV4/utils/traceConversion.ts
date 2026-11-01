@@ -83,6 +83,8 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
       return 'step.sleep';
     case 'WAIT_FOR_EVENT':
     case 'WAITFOREVENT':
+    case 'SUBSCRIBE':
+    case 'INBOX_READ':
       return 'step.waitForEvent';
     case 'INVOKE':
       return 'step.invoke';
@@ -354,27 +356,13 @@ function traceToBarData(
 }
 
 /**
- * Turns the ticks of a span into markers: a tick that something has taken is
- * drawn filled, and its tooltip says what ticked, where it came from and when.
+ * Turns the ticks of a span into markers: one dot at each tick's arrival.
  */
 function ticksToMarkers(ticks: Trace['ticks']): BarMarkerData[] | undefined {
   if (!ticks || ticks.length === 0) return undefined;
 
   return ticks.map((tick) => {
-    return {
-      id: tick.id,
-      at: new Date(tick.at),
-      filled: !!tick.readAt,
-      details: [
-        { label: 'Message', value: tick.id },
-        { label: 'Source', value: tick.sources.join(', ') },
-        { label: 'Arrived', value: new Date(tick.at).toISOString() },
-        {
-          label: 'Read',
-          value: tick.readAt ? new Date(tick.readAt).toISOString() : 'Not read yet',
-        },
-      ],
-    };
+    return { id: tick.id, at: new Date(tick.at) };
   });
 }
 

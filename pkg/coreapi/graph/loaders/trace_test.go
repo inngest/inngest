@@ -61,6 +61,8 @@ func TestOpcodeToGQL(t *testing.T) {
 		{"StepPlanned", enums.OpcodeStepPlanned, models.StepOpRun},
 		{"Sleep", enums.OpcodeSleep, models.StepOpSleep},
 		{"WaitForEvent", enums.OpcodeWaitForEvent, models.StepOpWaitForEvent},
+		{"Subscribe", enums.OpcodeSubscribe, models.StepOpSubscribe},
+		{"SubscribeWait", enums.OpcodeSubscribeWait, models.StepOpInboxRead},
 	}
 
 	for _, tt := range tests {
@@ -70,6 +72,40 @@ func TestOpcodeToGQL(t *testing.T) {
 			require.NotNil(t, result, "opcodeToGQL should not return nil for %s", tt.name)
 			assert.Equal(t, tt.expected, *result)
 		})
+	}
+}
+
+func TestOpcodeToGQL_InboxOpsWithoutAWait(t *testing.T) {
+	for _, op := range []enums.Opcode{enums.OpcodeSubscribeRead, enums.OpcodeSubscribeClose} {
+		op := op
+		assert.Nil(t, opcodeToGQL(&op), "%s answers at once and keeps the plain bar", op)
+	}
+}
+
+// TestConvertRunSpanToGQL_InboxOpsHaveNoStepInfo checks an inbox op that waits
+// carries its own step op and none of a wait's details, which would need a
+// timeout the op does not have.
+func TestConvertRunSpanToGQL_InboxOpsHaveNoStepInfo(t *testing.T) {
+	cases := map[enums.Opcode]models.StepOp{
+		enums.OpcodeSubscribe:     models.StepOpSubscribe,
+		enums.OpcodeSubscribeWait: models.StepOpInboxRead,
+	}
+	for opcode, want := range cases {
+		for name, convert := range runConverters {
+			t.Run(opcode.String()+"/"+name, func(t *testing.T) {
+				op := opcode
+				span := &cqrs.OtelSpan{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery},
+					Attributes:  &meta.ExtractedValues{StepOp: &op},
+				}
+
+				result, err := convert(context.Background(), span)
+				require.NoError(t, err)
+				require.NotNil(t, result.StepOp)
+				assert.Equal(t, want, *result.StepOp)
+				assert.Nil(t, result.StepInfo)
+			})
+		}
 	}
 }
 

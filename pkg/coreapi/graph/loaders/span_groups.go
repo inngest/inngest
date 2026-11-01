@@ -74,6 +74,12 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 				}
 			}
 
+			// An inbox op that waits has its own step op, and its group row takes
+			// it so the row draws as a wait.
+			if child.StepOp != nil && (*child.StepOp == models.StepOpSubscribe || *child.StepOp == models.StepOpInboxRead) {
+				parent.StepOp = child.StepOp
+			}
+
 			// Its bar draws the ticks of the steps inside it, so they show
 			// whether the group is collapsed or expanded.
 			parent.Ticks = append(parent.Ticks, child.Ticks...)

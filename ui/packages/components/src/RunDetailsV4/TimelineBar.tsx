@@ -692,9 +692,16 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
 }
 
 /**
- * Small circles on a bar, one per marker, centred vertically at the moment the
- * marker names. They are drawn beside the bar, so a collapsed or expanded row
- * shows them alike. A marker outside the visible window is not drawn.
+ * The theme's text colour at 45%: lighter than a bar in dark mode and darker in
+ * light mode, and still visible between the stripes of a wait bar.
+ */
+const MARKER_COLOR = 'rgb(var(--color-foreground-base) / 0.45)';
+
+/**
+ * Small tonal dots on a bar, one per marker, centred vertically at the moment
+ * the marker names. They are drawn beside the bar, so a collapsed or expanded
+ * row shows them alike, and they are decorative. A marker outside the visible
+ * window is not drawn.
  */
 function BarMarkers({
   markers,
@@ -717,39 +724,15 @@ function BarMarkers({
         }
 
         const left = ((marker.startPercent - viewStartOffset) / viewWidth) * 100;
-        const summary = marker.details
-          .map((detail) => `${detail.label}: ${detail.value}`)
-          .join(', ');
 
         return (
-          <Tooltip key={marker.id}>
-            <TooltipTrigger asChild>
-              <span
-                data-testid="bar-marker"
-                data-filled={marker.filled ? 'true' : 'false'}
-                role="img"
-                aria-label={summary}
-                tabIndex={0}
-                className={cn(
-                  'focus-visible:ring-primary-subtle absolute top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-help rounded-full border focus-visible:outline-none focus-visible:ring',
-                  marker.filled ? 'bg-contrast border-contrast' : 'bg-canvasBase border-contrast'
-                )}
-                style={{ left: `${left}%` }}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-                {marker.details.map((detail) => {
-                  return (
-                    <div key={detail.label} className="contents">
-                      <dt className="text-light">{detail.label}</dt>
-                      <dd className="break-all font-mono">{detail.value}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </TooltipContent>
-          </Tooltip>
+          <span
+            key={marker.id}
+            data-testid="bar-marker"
+            aria-hidden="true"
+            className="absolute top-1/2 z-10 h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: `${left}%`, backgroundColor: MARKER_COLOR }}
+          />
         );
       })}
     </>

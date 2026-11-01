@@ -42,16 +42,33 @@ describe('TimelineBar', () => {
 
   describe('markers', () => {
     const markers = [
-      { id: 'm1', startPercent: 30, filled: true, details: [{ label: 'Message', value: 'm1' }] },
-      { id: 'm2', startPercent: 60, filled: false, details: [{ label: 'Message', value: 'm2' }] },
+      { id: 'm1', startPercent: 30 },
+      { id: 'm2', startPercent: 60 },
     ];
 
-    it('draws a circle at each marker position, hollow until filled', () => {
+    it('draws a dot at each marker position', () => {
       render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
       const dots = screen.getAllByTestId('bar-marker');
 
       expect(dots.map((dot) => dot.style.left)).toEqual(['30%', '60%']);
-      expect(dots.map((dot) => dot.getAttribute('data-filled'))).toEqual(['true', 'false']);
+    });
+
+    it('draws every dot the same, whatever the bar pattern or state', () => {
+      const looks = [
+        { style: 'step.run' as const },
+        { style: 'step.waitForEvent' as const, status: 'RUNNING' as const },
+        { style: 'step.waitForEvent' as const, status: 'COMPLETED' as const },
+      ].map((props) => {
+        const { unmount } = render(<TimelineBar {...defaultProps} {...props} markers={markers} />, {
+          wrapper: Wrapper,
+        });
+        const classes = screen.getAllByTestId('bar-marker').map((dot) => dot.className);
+        unmount();
+
+        return classes;
+      });
+
+      expect(new Set(looks.flat()).size).toBe(1);
     });
 
     it('stays visible while the row is expanded', () => {
@@ -76,11 +93,13 @@ describe('TimelineBar', () => {
       expect(dots[0]!.style.left).toBe('33.33333333333333%');
     });
 
-    it('can be reached with the keyboard and is named for what it is', () => {
+    it('is decorative: not focusable, no label, no hover card', () => {
       render(<TimelineBar {...defaultProps} markers={markers} />, { wrapper: Wrapper });
+      const dot = screen.getAllByTestId('bar-marker')[0]!;
 
-      expect(screen.getAllByTestId('bar-marker')[0]!.getAttribute('tabindex')).toBe('0');
-      expect(screen.getAllByTestId('bar-marker')[0]!.getAttribute('aria-label')).toContain('m1');
+      expect(dot.getAttribute('aria-hidden')).toBe('true');
+      expect(dot.getAttribute('tabindex')).toBeNull();
+      expect(dot.getAttribute('aria-label')).toBeNull();
     });
   });
 

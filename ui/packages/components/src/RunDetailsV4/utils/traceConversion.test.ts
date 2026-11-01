@@ -32,7 +32,7 @@ describe('traceConversion', () => {
   });
 
   describe('traceToTimelineData', () => {
-    it('turns the ticks of a span into markers, filled once read', () => {
+    it('turns the ticks of a span into markers at their arrival times', () => {
       const trace = createTrace({
         isRoot: true,
         childrenSpans: [
@@ -56,24 +56,10 @@ describe('traceConversion', () => {
         {
           id: 'm1',
           at: new Date('2024-01-01T00:00:03Z'),
-          filled: true,
-          details: [
-            { label: 'Message', value: 'm1' },
-            { label: 'Source', value: 'p1' },
-            { label: 'Arrived', value: '2024-01-01T00:00:03.000Z' },
-            { label: 'Read', value: '2024-01-01T00:00:05.000Z' },
-          ],
         },
         {
           id: 'm2',
           at: new Date('2024-01-01T00:00:04Z'),
-          filled: false,
-          details: [
-            { label: 'Message', value: 'm2' },
-            { label: 'Source', value: 'p1, p2' },
-            { label: 'Arrived', value: '2024-01-01T00:00:04.000Z' },
-            { label: 'Read', value: 'Not read yet' },
-          ],
         },
       ]);
     });
@@ -204,6 +190,16 @@ describe('traceConversion', () => {
       const result = traceToTimelineData(trace, { runID: 'run-1' });
 
       expect(result.bars[0]?.children?.[0]?.style).toBe('step.sleep');
+    });
+
+    it.each(['SUBSCRIBE', 'INBOX_READ'])('returns "step.waitForEvent" for %s stepOp', (stepOp) => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ stepOp, spanID: 'inbox-step' })],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.style).toBe('step.waitForEvent');
     });
 
     it('returns "step.waitForEvent" for WAIT_FOR_EVENT stepOp', () => {
