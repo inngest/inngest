@@ -1,8 +1,9 @@
 --[[
 
 Records a wait on an inbox, then scans the steps saved after the step the wait
-last saw. If one of them is a message of the inbox, the wait is satisfied: it
-leaves the pending set but stays recorded until the caller has queued its wake.
+last saw. If one of them is a message of the inbox that the wait wants, the wait
+is satisfied: it leaves the pending set but stays recorded until the caller has
+queued its wake.
 
 The record is written before the scan, and an arrival saves before it looks at
 the records, so at least one of the two always sees the other.
@@ -19,10 +20,14 @@ local keyStack = KEYS[2]
 local keyStepsPending = KEYS[3]
 local keyWaits = KEYS[4]
 
+-- $include(inbox_wants.lua)
+
 local waitID = ARGV[1]
 local record = ARGV[2]
 local inbox = ARGV[3]
 local seen = ARGV[4]
+
+local want = cjson.decode(record)["want"]
 
 redis.call("HSET", keyWaits, waitID, record)
 
@@ -46,7 +51,7 @@ for _, stepID in ipairs(gap) do
 		local ok, decoded = pcall(cjson.decode, value)
 
 		-- Only the executor writes this key, in the value of a message step.
-		if ok and type(decoded) == "table" and decoded["inngest/inbox"] == inbox then
+		if ok and type(decoded) == "table" and decoded["inngest/inbox"] == inbox and inbox_wants(want, decoded) then
 			redis.call("SREM", keyStepsPending, waitID)
 
 			return { 1, stepID, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }

@@ -78,6 +78,15 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	now := e.now()
 	opcode := gen.Op.String()
 
+	// A listen op adds sources to an inbox that is open; its messages belong to
+	// that inbox, and its pauses are named by the listen op.
+	inbox := gen.ID
+	if opts.Inbox != "" {
+		inbox = opts.Inbox
+	}
+
+	pauseIDs := []string{}
+
 	for _, source := range opts.Sources {
 		if source.If != nil {
 			if err := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *source.If); err != nil && errors.Is(err, expressions.ErrCompileFailed) {
@@ -106,7 +115,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			Event:       &eventName,
 			Expression:  source.If,
 			MaxAttempts: runCtx.MaxAttempts(),
-			Subscribe:   &state.PauseSubscribe{Inbox: gen.ID},
+			Subscribe:   &state.PauseSubscribe{Inbox: inbox},
 			CreatedAt:   now,
 		}
 
@@ -118,11 +127,18 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 			return err
 		}
+
+		pauseIDs = append(pauseIDs, pause.ID.String())
 	}
 
-	// The open record. It carries no data: its only job is to show the SDK
-	// that the inbox is open.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, md.ID, gen.ID, []byte(`{"data":null}`))
+	// The open record names the pauses of the sources, so that the SDK can tell
+	// which messages came through them.
+	record, err := json.Marshal(map[string]any{"data": map[string]any{"pauses": pauseIDs}})
+	if err != nil {
+		return fmt.Errorf("error encoding the record of an inbox: %w", err)
+	}
+
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, md.ID, gen.ID, record)
 	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
 		err = nil
 	}

@@ -271,9 +271,14 @@ type SubscribeSource struct {
 	If    *string `json:"if,omitempty"`
 }
 
-// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox.
+// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox
+// or, with Inbox set, adds the sources of a listen view to one.
 type SubscribeOpts struct {
 	Sources []SubscribeSource `json:"sources"`
+	// Inbox is the id of the op that opened the inbox, when this op adds the
+	// sources of a view to an inbox that is already open. Empty when this op
+	// opens the inbox.
+	Inbox string `json:"inbox,omitempty"`
 }
 
 // SubscribeWaitOpts are the options of an OpcodeSubscribeWait op, a read of an
@@ -281,7 +286,9 @@ type SubscribeOpts struct {
 type SubscribeWaitOpts struct {
 	// Inbox is the id of the op that opened the inbox.
 	Inbox string `json:"inbox"`
-	// Want is the read's filter. Empty means every message of the inbox.
+	// Want is the read's filter: `src` lists the pauses a message must have
+	// come through and `events` the event names it must have, and it must pass
+	// every part that is there. Empty means every message of the inbox.
 	Want json.RawMessage `json:"want,omitempty"`
 	// Seen is the last step id of the stack the SDK had loaded.
 	Seen string `json:"seen"`

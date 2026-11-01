@@ -1,7 +1,7 @@
 --[[
 
 Saves a message step of an inbox, then finds the recorded waits on that inbox
-that the message satisfies. Each satisfied wait leaves the pending set; it stays
+that want the message. Each satisfied wait leaves the pending set; it stays
 recorded until the caller has queued its wake.
 
 Saving the same step with the same value again saves nothing but still finds the
@@ -26,6 +26,8 @@ local keyMetadata = KEYS[2]
 local keyStack = KEYS[3]
 local keyStepsPending = KEYS[4]
 local keyWaits = KEYS[5]
+
+-- $include(inbox_wants.lua)
 
 local stepID = ARGV[1]
 local value = ARGV[2]
@@ -57,12 +59,13 @@ else
 end
 
 local result = { status }
+local message = cjson.decode(value)
 
 local waits = redis.call("HGETALL", keyWaits)
 for i = 1, #waits, 2 do
 	local wait = cjson.decode(waits[i + 1])
 
-	if wait.inbox == inbox then
+	if wait.inbox == inbox and inbox_wants(wait.want, message) then
 		redis.call("SREM", keyStepsPending, waits[i])
 
 		result[#result + 1] = waits[i]
