@@ -161,7 +161,8 @@ func TestSubscribeCloseTakesReadsOutOfThePendingSet(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 	pause := h.sourcePause("inbox", "test/msg")
 	h.report(plannedOp("work"), subscribeWaitOp("next-1", "inbox", "inbox"))
-	queued := len(h.jobIDs())
+	// The read's timer leaves the queue when the read is satisfied or closed.
+	queued := len(h.jobIDs()) - 1
 
 	h.report(closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}, "next-1"))
 	require.Equal(t, queued, len(h.jobIDs()), "the step is still pending, so the close queued no discovery")

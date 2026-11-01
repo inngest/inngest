@@ -25,7 +25,8 @@ func plannedOp(id string) *state.GeneratorOpcode {
 func TestSubscribeParallelReadLeavesThePendingSetOnArrival(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 	h.report(plannedOp("work"), subscribeWaitOp("next-1", "inbox", "inbox"))
-	queued := len(h.jobIDs())
+	// The read's timer leaves the queue when the read is satisfied or closed.
+	queued := len(h.jobIDs()) - 1
 
 	id := newEventID()
 	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
@@ -48,7 +49,8 @@ func TestSubscribeParallelReadIsLastPending(t *testing.T) {
 	hasPending, err := h.infra.smv2.SaveStep(h.infra.ctx, h.run.ID, "work", []byte(`{"data":"done"}`))
 	require.NoError(t, err)
 	require.True(t, hasPending, "the read is still pending")
-	queued := len(h.jobIDs())
+	// The read's timer leaves the queue when the read is satisfied or closed.
+	queued := len(h.jobIDs()) - 1
 
 	id := newEventID()
 	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
@@ -66,7 +68,8 @@ func TestSubscribeRacingReadWakesWhileStepPending(t *testing.T) {
 	racing := subscribeWaitOp("next-1", "inbox", "inbox")
 	racing.Opts.(map[string]any)["parallelMode"] = "race"
 	h.report(plannedOp("work"), racing)
-	queued := len(h.jobIDs())
+	// The read's timer leaves the queue when the read is satisfied or closed.
+	queued := len(h.jobIDs()) - 1
 
 	id := newEventID()
 	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))

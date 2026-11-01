@@ -175,12 +175,11 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	md := runCtx.Metadata()
 
 	// The timer is queued before the wait is recorded, so a recorded wait
-	// always has one. Queuing it again is a no-op.
-	timer := opts.Timeout != ""
-	if timer {
-		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
-			return err
-		}
+	// always has one. Queuing it again is a no-op. A read with no timeout
+	// still has one, so the run holds a queue item while it waits: the
+	// function's singleton lock is released when the run has none.
+	if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
+		return err
 	}
 
 	wake, err := e.smv2.RecordInboxWait(ctx, md.ID, sv2.InboxWait{
@@ -188,7 +187,7 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		Inbox:               opts.Inbox,
 		Want:                opts.Want,
 		Seen:                opts.Seen,
-		Timer:               timer,
+		Timer:               true,
 		Incoming:            edge.Edge.Incoming,
 		GroupID:             runCtx.GroupID(),
 		MaxAttempts:         runCtx.MaxAttempts(),
@@ -367,10 +366,21 @@ func inboxTimerJobID(md *sv2.Metadata, wait string) string {
 
 // queueInboxTimer queues the item that times a read out when its timeout
 // passes. It is a pause timeout item, like the one of waitForEvent.
+//
+// A read with no timeout (an empty `timeout`) is timed at the furthest a wait
+// can be: its timer does nothing when it fires, and exists to keep the run's
+// queue item.
 func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, timeout string) error {
-	expires, err := state.WaitForEventOpts{Timeout: timeout}.Expires()
-	if err != nil {
-		return fmt.Errorf("unable to parse the timeout of an inbox read: %w", err)
+	untimed := timeout == ""
+
+	expires := e.now().Add(consts.MaxWaitForEventTimeout)
+	if !untimed {
+		var err error
+
+		expires, err = state.WaitForEventOpts{Timeout: timeout}.Expires()
+		if err != nil {
+			return fmt.Errorf("unable to parse the timeout of an inbox read: %w", err)
+		}
 	}
 
 	md := runCtx.Metadata()
@@ -391,11 +401,11 @@ func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunCont
 		MaxAttempts:         runCtx.MaxAttempts(),
 		ParallelMode:        gen.ParallelMode(),
 		ParallelCoalesceKey: group.ParallelCoalesceKey,
-		Subscribe:           &state.PauseSubscribe{},
+		Subscribe:           &state.PauseSubscribe{Untimed: untimed},
 		CreatedAt:           e.now(),
 	}
 
-	err = e.queue.Enqueue(ctx, queue.Item{
+	err := e.queue.Enqueue(ctx, queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           md.ID.Tenant.EnvID,
 		GroupID:               runCtx.GroupID(),
@@ -451,6 +461,11 @@ func (e *executor) dequeueInboxTimer(ctx context.Context, md sv2.Metadata, wait 
 // timeoutInboxRead is what the timer of a read does when it runs: if the read
 // is still waiting it gets a null and the run is woken, otherwise nothing.
 func (e *executor) timeoutInboxRead(ctx context.Context, pause state.Pause) error {
+	// The timer of a read with no timeout only holds the run's queue item.
+	if pause.Subscribe != nil && pause.Subscribe.Untimed {
+		return nil
+	}
+
 	id := sv2.IDFromPause(pause)
 
 	wake, err := e.smv2.TimeoutInboxWait(ctx, id, pause.DataKey, []byte("null"))

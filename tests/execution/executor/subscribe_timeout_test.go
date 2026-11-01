@@ -209,3 +209,39 @@ func indexIn(ids []string, want string) int {
 
 	return -1
 }
+
+// A read with no timeout still arms a timer, so the run holds a queue item
+// while it waits (the function's singleton lock is released when it has none).
+// The timer does nothing when it fires: the read keeps waiting and a message
+// still wakes it.
+func TestSubscribeUntimedReadHoldsAQueueItem(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
+
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.timerJobID("next-1")), "the untimed read armed a timer")
+
+	tm := h.timerOf("next-1")
+	require.NoError(t, h.runTimer(tm))
+
+	require.NotContains(t, h.steps(), "next-1", "the timer saved nothing")
+	require.Zero(t, timesIn(h.jobIDs(), h.timeoutJobID("next-1")), "the timer woke nothing")
+
+	id := newEventID()
+	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
+	msg := messageStepID("inbox", id)
+
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-1", msg)), "the read was still waiting")
+	require.Zero(t, timesIn(h.jobIDs(), tm.jobID), "the message took the timer away")
+}
+
+// Closing the inbox ends an untimed read and takes its timer away.
+func TestSubscribeCloseTakesAnUntimedTimerAway(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
+	tm := h.timerOf("next-1")
+
+	h.report(closeOp("close", "inbox", nil, nil, "next-1"))
+
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.closeJobID("next-1")), "the close woke the read")
+	require.Zero(t, timesIn(h.jobIDs(), tm.jobID), "the close took the timer away")
+}

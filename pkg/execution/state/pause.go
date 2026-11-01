@@ -275,6 +275,11 @@ type Pause struct {
 type PauseSubscribe struct {
 	// Inbox is the id of the op that opened the inbox.
 	Inbox string `json:"inbox"`
+
+	// Untimed marks the timer of a read that has no timeout. The timer exists
+	// only so the run always holds a queue item while it waits, and does nothing
+	// when it fires.
+	Untimed bool `json:"untimed,omitempty"`
 }
 
 // CreatedAfter reports whether this pause was created after the given
