@@ -37,7 +37,7 @@ import (
 // inboxMessageValue is the value saved for a message step.
 type inboxMessageValue struct {
 	Data  map[string]any `json:"data"`
-	Inbox string         `json:"inbox"`
+	Inbox string         `json:"inngest/inbox"`
 	Src   []string       `json:"src"`
 }
 

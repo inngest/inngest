@@ -26,28 +26,30 @@ local seen = ARGV[4]
 
 redis.call("HSET", keyWaits, waitID, record)
 
-local stack = redis.call("LRANGE", keyStack, 0, -1)
+-- Walk back from the tail to the step the SDK last saw; those are the steps
+-- saved since, and the only ones worth reading.
+local gap = {}
+for i = redis.call("LLEN", keyStack) - 1, 0, -1 do
+	local stepID = redis.call("LINDEX", keyStack, i)
 
-local first = 1
-if seen ~= "" then
-	for i = #stack, 1, -1 do
-		if stack[i] == seen then
-			first = i + 1
-			break
-		end
+	if stepID == seen then
+		break
 	end
+
+	table.insert(gap, 1, stepID)
 end
 
-for i = first, #stack do
-	local value = redis.call("HGET", keyStep, stack[i])
+for _, stepID in ipairs(gap) do
+	local value = redis.call("HGET", keyStep, stepID)
 
 	if value then
 		local ok, decoded = pcall(cjson.decode, value)
 
-		if ok and type(decoded) == "table" and decoded.inbox == inbox then
+		-- Only the executor writes this key, in the value of a message step.
+		if ok and type(decoded) == "table" and decoded["inngest/inbox"] == inbox then
 			redis.call("SREM", keyStepsPending, waitID)
 
-			return { 1, stack[i], redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+			return { 1, stepID, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
 		end
 	end
 end

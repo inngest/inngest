@@ -109,7 +109,7 @@ func TestSubscribeArrivalWakesWait(t *testing.T) {
 
 	var value struct {
 		Data  map[string]any `json:"data"`
-		Inbox string         `json:"inbox"`
+		Inbox string         `json:"inngest/inbox"`
 		Src   []string       `json:"src"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(saved[msg]), &value))

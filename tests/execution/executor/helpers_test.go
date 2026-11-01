@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -45,6 +46,8 @@ type execTestInfra struct {
 	queueShard    redis_state.RedisQueueShard
 	shardRegistry queue.ShardRegistryController
 	rq            queue.Queue
+	// runState is the redis that holds run state, for tests that watch it.
+	runState *miniredis.Miniredis
 }
 
 // newExecTestInfra builds the shared executor test infra. stepID is
@@ -83,7 +86,7 @@ func newExecTestInfra(t *testing.T, stepID string) *execTestInfra {
 	})
 	require.NoError(t, err)
 
-	_, shardedRc, err := createInmemoryRedis(t)
+	runState, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
 	t.Cleanup(func() { shardedRc.Close() })
 
@@ -133,6 +136,7 @@ func newExecTestInfra(t *testing.T, stepID string) *execTestInfra {
 		queueShard:    queueShard,
 		shardRegistry: shardRegistry,
 		rq:            rq,
+		runState:      runState,
 	}
 }
 
