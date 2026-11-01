@@ -38,12 +38,58 @@ var errCrash = errors.New("injected crash")
 // crashPoints holds the armed crash points. A point is "after:<Method>" or
 // "before:<Method>" and fires once, then disarms.
 type crashPoints struct {
-	mu    sync.Mutex
-	armed map[string]bool
+	mu      sync.Mutex
+	armed   map[string]bool
+	holds   map[string]string
+	reached map[string]chan struct{}
 }
 
 func newCrashPoints() *crashPoints {
-	return &crashPoints{armed: map[string]bool{}}
+	return &crashPoints{
+		armed:   map[string]bool{},
+		holds:   map[string]string{},
+		reached: map[string]chan struct{}{},
+	}
+}
+
+// reachedChan is closed once a point has been passed. The caller holds mu.
+func (c *crashPoints) reachedChan(point string) chan struct{} {
+	ch, ok := c.reached[point]
+	if !ok {
+		ch = make(chan struct{})
+		c.reached[point] = ch
+	}
+
+	return ch
+}
+
+// hold makes the point wait until the other point was passed, so a test can
+// fix the order of two handlers that the executor runs at the same time.
+func (c *crashPoints) hold(point string, until string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.holds[point] = until
+}
+
+// await blocks at a held point until the point it waits for was passed.
+func (c *crashPoints) await(point string) {
+	c.mu.Lock()
+	until, ok := c.holds[point]
+	var ch chan struct{}
+	if ok {
+		ch = c.reachedChan(until)
+	}
+	c.mu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	select {
+	case <-ch:
+	case <-time.After(10 * time.Second):
+	}
 }
 
 func (c *crashPoints) arm(point string) {
@@ -57,6 +103,10 @@ func (c *crashPoints) fire(point string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if ch := c.reachedChan(point); !isClosed(ch) {
+		close(ch)
+	}
+
 	if c.armed[point] {
 		delete(c.armed, point)
 
@@ -64,6 +114,15 @@ func (c *crashPoints) fire(point string) error {
 	}
 
 	return nil
+}
+
+func isClosed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // crashingState fails a state write after it was made.
@@ -124,7 +183,20 @@ func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, inbo
 	return wake, s.crash.fire("after:TimeoutInboxWait")
 }
 
+func (s crashingState) RecordInboxWait(ctx context.Context, id statev2.ID, wait statev2.InboxWait) (*statev2.InboxWake, error) {
+	s.crash.await("before:RecordInboxWait")
+
+	wake, err := s.RunService.RecordInboxWait(ctx, id, wait)
+	if err != nil {
+		return wake, err
+	}
+
+	return wake, s.crash.fire("after:RecordInboxWait")
+}
+
 func (s crashingState) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) (*statev2.InboxWake, bool, error) {
+	s.crash.await("before:CloseInbox")
+
 	if err := s.crash.fire("before:CloseInbox"); err != nil {
 		return nil, false, err
 	}
