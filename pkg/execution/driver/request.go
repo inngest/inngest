@@ -41,6 +41,10 @@ func JobIDFromContext(ctx context.Context) string {
 	return id
 }
 
+// CapabilitySubscribe is listed in SDKRequestContext.Capabilities by an
+// executor that handles the inbox opcodes behind step.subscribe.
+const CapabilitySubscribe = "subscribe"
+
 type SDKRequest struct {
 	Event   map[string]any   `json:"event"`
 	Events  []map[string]any `json:"events"`
@@ -120,6 +124,11 @@ type SDKRequestContext struct {
 	// This is a way to get around serverless provider's request body
 	// size limits.
 	UseAPI bool `json:"use_api"`
+
+	// Capabilities lists the optional features this executor supports, so an
+	// SDK can refuse to use one an older executor would not understand. An
+	// executor that predates the field sends none.
+	Capabilities []string `json:"capabilities"`
 
 	// XXX: Pass in opentracing context within ctx.
 }
