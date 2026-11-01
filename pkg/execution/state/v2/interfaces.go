@@ -44,6 +44,9 @@ type MigrateState struct {
 	Stack        []string
 	PendingSteps []string
 	Defers       map[string]Defer
+	// InboxWaits are the reads of inboxes that are waiting, and the reads
+	// whose handle was closed.
+	InboxWaits InboxWaitSet
 }
 
 type RunService interface {
@@ -108,6 +111,9 @@ type RunService interface {
 	CloseInbox(ctx context.Context, id ID, closing InboxClose) ([]InboxWake, bool, error)
 	// DeleteInboxWait removes a recorded wait.
 	DeleteInboxWait(ctx context.Context, id ID, waitID string) error
+	// LoadInboxWaits returns the waits recorded for a run, and the reads whose
+	// handle was closed. A run migrates with them so a read keeps waiting.
+	LoadInboxWaits(ctx context.Context, id ID) (InboxWaitSet, error)
 
 	SaveDefer(ctx context.Context, id ID, d Defer) error
 	// SetDeferStatus atomically flips a Defer's ScheduleStatus. Errors when

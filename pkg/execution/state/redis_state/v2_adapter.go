@@ -366,6 +366,32 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 		}
 	}
 
+	if len(s.InboxWaits.Waits) > 0 || len(s.InboxWaits.Closed) > 0 {
+		inboxWaitsKey := fnRunState.kg.InboxWaits(ctx, isSharded, id.FunctionID, id.RunID)
+
+		records := make([]string, 0, len(s.InboxWaits.Waits))
+		for _, wait := range s.InboxWaits.Waits {
+			record, err := json.Marshal(wait)
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal inbox wait %s: %w", wait.ID, err)
+			}
+			records = append(records, string(record))
+		}
+
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(inboxWaitsKey).FieldValue()
+			for n, wait := range s.InboxWaits.Waits {
+				partial = partial.FieldValue(wait.ID, records[n])
+			}
+			for _, waitID := range s.InboxWaits.Closed {
+				partial = partial.FieldValue(inboxClosedPrefix+waitID, "{}")
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate inbox waits: %w", err)
+		}
+	}
+
 	var startedAtMS int64
 	if !cfg.StartedAt.IsZero() {
 		startedAtMS = cfg.StartedAt.UnixMilli()
@@ -852,6 +878,18 @@ func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, waitID string) err
 	)
 
 	return err
+}
+
+// LoadInboxWaits returns the waits recorded for a run and the reads whose handle was closed.
+func (v v2) LoadInboxWaits(ctx context.Context, id state.ID) (state.InboxWaitSet, error) {
+	return util.WithRetry(
+		ctx,
+		"state.LoadInboxWaits",
+		func(ctx context.Context) (state.InboxWaitSet, error) {
+			return v.mgr.LoadInboxWaits(ctx, inboxIdentifier(id))
+		},
+		v.retryPolicy(),
+	)
 }
 
 // SavePending saves pending step IDs for the given run ID.
