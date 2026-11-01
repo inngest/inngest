@@ -791,7 +791,7 @@ func (v v2) SaveInboxMessage(ctx context.Context, id state.ID, msg state.InboxMe
 		func(ctx context.Context) ([]state.InboxWake, error) {
 			return v.mgr.SaveInboxMessage(ctx, inboxIdentifier(id), msg)
 		},
-		v.retryPolicy(),
+		v.retryPolicy(util.WithRetryConfRetryableErrors(v.retryableError)),
 	)
 }
 
@@ -876,6 +876,8 @@ func (v v2) retryableError(err error) bool {
 	case errors.Is(err, statev1.ErrIdempotentResponse):
 		return false
 	case errors.Is(err, statev1.ErrDuplicateResponse):
+		return false
+	case errors.Is(err, state.ErrInboxStepsFull), errors.Is(err, state.ErrInboxStateFull):
 		return false
 	}
 

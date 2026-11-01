@@ -7,8 +7,14 @@ recorded until the caller has queued its wake.
 Saving the same step with the same value again saves nothing but still finds the
 waits, so a redelivered event repairs a wake that was lost.
 
+A new message that would take the run past its step bound or its state size
+bound is not saved. A bound of 0 means the bound is not checked.
+
 Output:
   { -1 }                         different data is already saved under the step
+  { -3 }                         the run is at its step bound; nothing was saved
+  { -4 }                         the message would pass the state size bound;
+                                 nothing was saved
   { 0|-2, id, record, pending... }  saved (0) or already saved (-2), then for each
                                   satisfied wait its id, its record and whether
                                   pending steps remain (1) or not (0)
@@ -24,6 +30,8 @@ local keyWaits = KEYS[5]
 local stepID = ARGV[1]
 local value = ARGV[2]
 local inbox = ARGV[3]
+local maxSteps = tonumber(ARGV[4])
+local maxState = tonumber(ARGV[5])
 
 local status = 0
 
@@ -34,6 +42,14 @@ if redis.call("HEXISTS", keyStep, stepID) == 1 then
 
 	status = -2
 else
+	if maxSteps > 0 and tonumber(redis.call("HGET", keyMetadata, "step_count") or "0") >= maxSteps then
+		return { -3 }
+	end
+
+	if maxState > 0 and tonumber(redis.call("HGET", keyMetadata, "state_size") or "0") + #value > maxState then
+		return { -4 }
+	end
+
 	redis.call("HINCRBY", keyMetadata, "state_size", #value)
 	redis.call("HINCRBY", keyMetadata, "step_count", 1)
 	redis.call("HSET", keyStep, stepID, value)

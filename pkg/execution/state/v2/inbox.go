@@ -2,8 +2,18 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/inngest/inngest/pkg/enums"
+)
+
+var (
+	// ErrInboxStepsFull is returned when a message was not saved because the
+	// run already has as many steps as it is allowed.
+	ErrInboxStepsFull = errors.New("inbox message not saved: the run is at its step bound")
+	// ErrInboxStateFull is returned when a message was not saved because it
+	// would take the run's state past its size bound.
+	ErrInboxStateFull = errors.New("inbox message not saved: the run is at its state size bound")
 )
 
 // InboxMessage is one event an inbox received, saved as its own step.
@@ -14,6 +24,11 @@ type InboxMessage struct {
 	Inbox string
 	// Value is the step's saved value: the event plus the inbox and sources.
 	Value []byte
+	// MaxSteps and MaxStateSize are the run's existing step and state size
+	// bounds. Zero means unchecked. A message that would pass either is not
+	// saved.
+	MaxSteps     int
+	MaxStateSize int
 }
 
 // InboxWait is a read of an inbox that had nothing unread. It stays recorded
