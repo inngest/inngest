@@ -62,6 +62,7 @@ func InboxRead(ctx context.Context, tp TracerProvider, md *statev2.Metadata, op 
 	if opts.Row != "" {
 		op.ID = opts.Row
 		op.Name = opts.Row
+		op.DisplayName = &opts.Row
 	}
 
 	row := FinalizedStepSpanRefFromMetadataAndStepID(md, op.ID)
