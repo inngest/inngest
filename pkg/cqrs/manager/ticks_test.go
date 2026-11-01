@@ -98,3 +98,30 @@ func TestWaitingReadIsEndedWithItsRun(t *testing.T) {
 		require.True(t, childNamed(root, "read").Status.IsEnded(), "status %s", childNamed(root, "read").Status)
 	})
 }
+
+// An inbox that is never closed is drawn ended with its run; while the run is
+// going it is running.
+func TestOpenInboxRowIsEndedWithItsRun(t *testing.T) {
+	open := map[string]any{
+		meta.Attrs.StepOp.Key():        enums.OpcodeSubscribe.String(),
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusRunning.String(),
+	}
+	ended := map[string]any{
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusCompleted.String(),
+		meta.Attrs.EndedAt.Key():       millis(testStart.Add(time.Minute)),
+	}
+
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		root := buildRoot(t, enc, []testSpanRow{runRow(), stepRow("inbox", open)})
+		require.Equal(t, enums.StepStatusRunning, childNamed(root, "inbox").Status)
+
+		finished := runRow()
+		finished.fragments[0]["attributes"] = ended
+		root = buildRoot(t, enc, []testSpanRow{finished, stepRow("inbox", open)})
+
+		row := childNamed(root, "inbox")
+		require.Equal(t, enums.StepStatusCompleted, row.Status)
+		require.NotNil(t, row.Attributes.EndedAt, "it ends when the run does")
+		require.Equal(t, testStart.Add(time.Minute).UnixMilli(), row.Attributes.EndedAt.UnixMilli())
+	})
+}

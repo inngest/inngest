@@ -338,6 +338,9 @@ type SubscribeCloseOpts struct {
 	Pauses []SubscribeClosePause `json:"pauses"`
 	// Waits are the ids of the reads under the handle that have not settled.
 	Waits []string `json:"waits"`
+	// Rows are the ids of the open and listen ops the close ends: the
+	// handle's own and those of the views under it. Their rows run until now.
+	Rows []string `json:"rows,omitempty"`
 }
 
 func (g GeneratorOpcode) SubscribeCloseOpts() (*SubscribeCloseOpts, error) {

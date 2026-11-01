@@ -809,8 +809,10 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 	}
 }
 
-// endWaitingReads draws a read that is still waiting when its run has ended as
-// ended. A read that lost a race is never woken, so nothing else ends it.
+// endWaitingReads draws what a run leaves open as ended once the run has ended:
+// a read that is still waiting (it lost a race, so nothing woke it), and an
+// inbox or listen row that was never closed. The first ends cancelled, since
+// it never got an answer; the second ends with the run.
 func endWaitingReads(root *cqrs.OtelSpan) {
 	if !root.Status.IsEnded() {
 		return
@@ -818,8 +820,23 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 
 	var walk func(span *cqrs.OtelSpan)
 	walk = func(span *cqrs.OtelSpan) {
-		if span.Status == enums.StepStatusWaiting && span.Attributes != nil && span.Attributes.StepOp != nil && *span.Attributes.StepOp == enums.OpcodeSubscribeWait {
-			span.Status = enums.StepStatusCancelled
+		if span.Attributes != nil && span.Attributes.StepOp != nil {
+			switch {
+			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
+				span.Status = enums.StepStatusCancelled
+				span.Attributes.DynamicStatus = &span.Status
+			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
+				span.Status = enums.StepStatusCompleted
+				span.Attributes.DynamicStatus = &span.Status
+
+				if span.Attributes.EndedAt == nil {
+					endedAt := root.EndTime
+					if root.Attributes != nil && root.Attributes.EndedAt != nil {
+						endedAt = *root.Attributes.EndedAt
+					}
+					span.Attributes.EndedAt = &endedAt
+				}
+			}
 		}
 
 		for _, child := range span.Children {
