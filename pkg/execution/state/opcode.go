@@ -285,6 +285,10 @@ type SubscribeWaitOpts struct {
 	Want json.RawMessage `json:"want,omitempty"`
 	// Seen is the last step id of the stack the SDK had loaded.
 	Seen string `json:"seen"`
+	// Timeout is how long the read waits for a message before it gets a null:
+	// a duration or a timestamp, like the timeout of waitForEvent. Empty means
+	// the read waits for as long as the run lives.
+	Timeout string `json:"timeout,omitempty"`
 }
 
 func (g GeneratorOpcode) SubscribeOpts() (*SubscribeOpts, error) {

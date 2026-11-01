@@ -433,6 +433,9 @@ func (m *mockRunService) SaveInboxMessage(ctx context.Context, id statev2.ID, ms
 func (m *mockRunService) RecordInboxWait(ctx context.Context, id statev2.ID, wait statev2.InboxWait) (*statev2.InboxWake, error) {
 	return nil, nil
 }
+func (m *mockRunService) TimeoutInboxWait(ctx context.Context, id statev2.ID, waitID string, data []byte) (*statev2.InboxWake, error) {
+	return nil, nil
+}
 func (m *mockRunService) DeleteInboxWait(ctx context.Context, id statev2.ID, waitID string) error {
 	return nil
 }

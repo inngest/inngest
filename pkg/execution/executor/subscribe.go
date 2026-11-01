@@ -157,11 +157,21 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 
 	md := runCtx.Metadata()
 
+	// The timer is queued before the wait is recorded, so a recorded wait
+	// always has one. Queuing it again is a no-op.
+	timer := opts.Timeout != ""
+	if timer {
+		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
+			return err
+		}
+	}
+
 	wake, err := e.smv2.RecordInboxWait(ctx, md.ID, sv2.InboxWait{
 		ID:                  gen.ID,
 		Inbox:               opts.Inbox,
 		Want:                opts.Want,
 		Seen:                opts.Seen,
+		Timer:               timer,
 		Incoming:            edge.Edge.Incoming,
 		GroupID:             runCtx.GroupID(),
 		MaxAttempts:         runCtx.MaxAttempts(),
@@ -181,6 +191,116 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	}
 
 	return e.wakeInboxRead(ctx, md.ID, *wake)
+}
+
+// inboxTimerJobID is the id of the queue item that times a read out. The wake
+// that follows a timeout has an id of its own, so it is never deduped against
+// the timer that is still running when it is queued.
+func inboxTimerJobID(md *sv2.Metadata, wait string) string {
+	return fmt.Sprintf("%s-%s-timer", md.IdempotencyKey(), wait)
+}
+
+// queueInboxTimer queues the item that times a read out when its timeout
+// passes. It is a pause timeout item, like the one of waitForEvent.
+func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, timeout string) error {
+	expires, err := state.WaitForEventOpts{Timeout: timeout}.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse the timeout of an inbox read: %w", err)
+	}
+
+	md := runCtx.Metadata()
+	opcode := gen.Op.String()
+	jobID := inboxTimerJobID(md, gen.ID)
+
+	pause := state.Pause{
+		ID:                  inngest.DeterministicSha1UUID(md.ID.RunID.String() + gen.ID),
+		WorkspaceID:         md.ID.Tenant.EnvID,
+		Identifier:          sv2.NewPauseIdentifier(md.ID),
+		GroupID:             runCtx.GroupID(),
+		Outgoing:            gen.ID,
+		Incoming:            edge.Edge.Incoming,
+		StepName:            gen.UserDefinedName(),
+		Opcode:              &opcode,
+		Expires:             state.Time(expires),
+		DataKey:             gen.ID,
+		MaxAttempts:         runCtx.MaxAttempts(),
+		ParallelMode:        gen.ParallelMode(),
+		ParallelCoalesceKey: group.ParallelCoalesceKey,
+		Subscribe:           &state.PauseSubscribe{},
+		CreatedAt:           e.now(),
+	}
+
+	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           md.ID.Tenant.EnvID,
+		GroupID:               runCtx.GroupID(),
+		Kind:                  queue.KindPause,
+		Identifier:            sv2.V1FromMetadata(*md),
+		PriorityFactor:        runCtx.PriorityFactor(),
+		CustomConcurrencyKeys: runCtx.ConcurrencyKeys(),
+		Payload: queue.PayloadPauseTimeout{
+			PauseID: pause.ID,
+			Pause:   pause,
+		},
+		Metadata:     make(map[string]any),
+		ParallelMode: gen.ParallelMode(),
+	}, expires, queue.EnqueueOpts{})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+		return fmt.Errorf("error enqueueing the timer of an inbox read: %w", err)
+	}
+
+	return nil
+}
+
+// dequeueInboxTimer takes a read's timer off the queue. A timer that is already
+// running finds the read gone and does nothing.
+func (e *executor) dequeueInboxTimer(ctx context.Context, md sv2.Metadata, wait string) error {
+	if e.shards == nil {
+		return nil
+	}
+
+	shard, err := e.shards.Resolve(ctx, queue.Scope{
+		AccountID:  md.ID.Tenant.AccountID,
+		EnvID:      md.ID.Tenant.EnvID,
+		FunctionID: md.ID.FunctionID,
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("could not find the shard of an inbox read's timer: %w", err)
+	}
+
+	err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
+		ID:         queue.HashID(ctx, inboxTimerJobID(&md, wait)),
+		FunctionID: md.ID.FunctionID,
+		Data: queue.Item{
+			Kind:       queue.KindPause,
+			Identifier: sv2.V1FromMetadata(md),
+		},
+	})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
+		return fmt.Errorf("error dequeueing the timer of an inbox read: %w", err)
+	}
+
+	return nil
+}
+
+// timeoutInboxRead is what the timer of a read does when it runs: if the read
+// is still waiting it gets a null and the run is woken, otherwise nothing.
+func (e *executor) timeoutInboxRead(ctx context.Context, pause state.Pause) error {
+	id := sv2.IDFromPause(pause)
+
+	wake, err := e.smv2.TimeoutInboxWait(ctx, id, pause.DataKey, []byte("null"))
+	if err != nil {
+		if errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+
+		return err
+	}
+	if wake == nil {
+		return nil
+	}
+
+	return e.wakeInboxRead(ctx, id, *wake)
 }
 
 // wakeInboxRead queues the step after a read that a message satisfied, then
@@ -216,7 +336,12 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 		if wait.ParallelCoalesceKey != "" && wait.ParallelMode != enums.ParallelModeRace {
 			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, wait.ParallelCoalesceKey)
 		} else {
-			jobID = fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, wake.MessageStep)
+			suffix := wake.MessageStep
+			if wake.TimedOut {
+				suffix = "timeout"
+			}
+
+			jobID = fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)
 		}
 
 		nextItem := queue.Item{
@@ -260,6 +385,14 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 			nextStepSpan.Drop()
 
 			return fmt.Errorf("error enqueueing after an inbox read: %w", err)
+		}
+	}
+
+	// The timer that is running is the one that found this read; any other
+	// timer is no longer needed.
+	if wait.Timer && !wake.TimedOut {
+		if err := e.dequeueInboxTimer(ctx, md, wait.ID); err != nil {
+			return err
 		}
 	}
 

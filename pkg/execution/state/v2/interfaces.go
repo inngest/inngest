@@ -93,6 +93,12 @@ type RunService interface {
 	// wait's Seen step. If one is a message the wait wants, the wait is
 	// satisfied and returned; otherwise nil.
 	RecordInboxWait(ctx context.Context, id ID, wait InboxWait) (*InboxWake, error)
+	// TimeoutInboxWait times a recorded wait out: if the wait is still
+	// recorded, it saves data under the wait's id, takes the wait out of the
+	// pending set and returns it (still recorded, as with SaveInboxMessage);
+	// otherwise it changes nothing and returns nil. Saving again returns the
+	// wait again, so a timer that ran twice repairs a lost wake.
+	TimeoutInboxWait(ctx context.Context, id ID, waitID string, data []byte) (*InboxWake, error)
 	// DeleteInboxWait removes a recorded wait.
 	DeleteInboxWait(ctx context.Context, id ID, waitID string) error
 

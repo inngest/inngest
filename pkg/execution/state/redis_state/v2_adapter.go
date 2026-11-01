@@ -807,6 +807,18 @@ func (v v2) RecordInboxWait(ctx context.Context, id state.ID, wait state.InboxWa
 	)
 }
 
+// TimeoutInboxWait times a recorded wait out, if it is still recorded.
+func (v v2) TimeoutInboxWait(ctx context.Context, id state.ID, waitID string, data []byte) (*state.InboxWake, error) {
+	return util.WithRetry(
+		ctx,
+		"state.TimeoutInboxWait",
+		func(ctx context.Context) (*state.InboxWake, error) {
+			return v.mgr.TimeoutInboxWait(ctx, inboxIdentifier(id), waitID, data)
+		},
+		v.retryPolicy(),
+	)
+}
+
 // DeleteInboxWait removes a recorded inbox wait.
 func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, waitID string) error {
 	_, err := util.WithRetry(

@@ -42,6 +42,8 @@ type InboxWait struct {
 	Want json.RawMessage `json:"want,omitempty"`
 	// Seen is the last step id of the stack the SDK had loaded.
 	Seen string `json:"seen"`
+	// Timer is whether a timer is queued to time the read out.
+	Timer bool `json:"timer,omitempty"`
 
 	// The rest is what waking the read needs.
 	Incoming            string             `json:"incoming"`
@@ -56,6 +58,8 @@ type InboxWake struct {
 	Wait InboxWait
 	// MessageStep is the step id of the message that satisfied the read.
 	MessageStep string
+	// TimedOut is whether the read's timer satisfied it, so there is no message.
+	TimedOut bool
 	// HasPending is whether the run has other pending steps once the read has
 	// left the pending set.
 	HasPending bool
