@@ -228,3 +228,30 @@ func TestSubscribeListenRowEndsAtItsOwnClose(t *testing.T) {
 	h.report(closeRowsOp("inbox:close", "inbox", []string{"inbox"}, nil, nil))
 	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox"))
 }
+
+// A batch read's row is the read's own op. The lazy op that reports what it took
+// has an id of its own and names the row, so the ticks go under that row.
+func TestSubscribeBatchReadTicksGoUnderTheReadsRow(t *testing.T) {
+	h := newTraceHarness(t, subscribeOp("inbox", "test/msg"))
+
+	id := newEventID()
+	require.NoError(t, h.deliverID(id, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
+	msg := messageStepID("inbox", id)
+
+	h.report(subscribeBatchOp("drain-1", "inbox", "inbox", map[string]any{"drain": true}))
+	h.report(&state.GeneratorOpcode{
+		Op:   enums.OpcodeSubscribeRead,
+		ID:   "drain-1:read",
+		Name: "drain-1:read",
+		Opts: map[string]any{"inbox": "inbox", "messages": []string{msg}, "row": "drain-1"},
+	})
+
+	var readTicks []seenSpan
+	for _, tick := range ticksOf(h.seen(meta.SpanNameTick), msg) {
+		if _, ok := tick.attrs[meta.Attrs.TickReadAt.Key()]; ok {
+			readTicks = append(readTicks, tick)
+		}
+	}
+	require.Len(t, readTicks, 1)
+	require.Equal(t, rowID("drain-1"), readTicks[0].parent, "the read tick is under the batch read's row")
+}

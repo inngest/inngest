@@ -56,7 +56,12 @@ func InboxRead(ctx context.Context, tp TracerProvider, md *statev2.Metadata, op 
 		return fmt.Errorf("unable to parse subscribe read opts: %w", err)
 	}
 
-	row := FinalizedStepSpanRefFromMetadataAndStepID(md, op.ID)
+	rowID := op.ID
+	if opts.Row != "" {
+		rowID = opts.Row
+	}
+
+	row := FinalizedStepSpanRefFromMetadataAndStepID(md, rowID)
 
 	if opts.Draw {
 		attrs := GeneratorAttrs(&op)

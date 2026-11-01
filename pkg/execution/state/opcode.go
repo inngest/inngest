@@ -325,6 +325,10 @@ type SubscribeReadOpts struct {
 	// Draw is whether the read has no row of its own yet: the read was answered
 	// from state, so no step drew it. A batch read is a step with a row already.
 	Draw bool `json:"draw,omitempty"`
+	// Row is the step whose row the messages go under, when the read is a step
+	// whose op has an id of its own (a batch read). Empty means the read's own
+	// id.
+	Row string `json:"row,omitempty"`
 }
 
 func (g GeneratorOpcode) SubscribeReadOpts() (*SubscribeReadOpts, error) {
