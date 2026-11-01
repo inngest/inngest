@@ -809,8 +809,10 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 	}
 }
 
-// endWaitingReads draws a read that is still waiting when its run has ended as
-// ended. A read that lost a race is never woken, so nothing else ends it.
+// endWaitingReads draws what a run leaves open as ended once the run has ended:
+// a read that is still waiting (it lost a race, so nothing woke it), and an
+// inbox or listen row that was never closed. The first ends cancelled, since
+// it never got an answer; the second ends with the run.
 func endWaitingReads(root *cqrs.OtelSpan) {
 	if !root.Status.IsEnded() {
 		return
@@ -818,8 +820,17 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 
 	var walk func(span *cqrs.OtelSpan)
 	walk = func(span *cqrs.OtelSpan) {
-		if span.Status == enums.StepStatusWaiting && span.Attributes != nil && span.Attributes.StepOp != nil && *span.Attributes.StepOp == enums.OpcodeSubscribeWait {
-			span.Status = enums.StepStatusCancelled
+		if span.Attributes != nil && span.Attributes.StepOp != nil {
+			switch {
+			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
+				span.Status = enums.StepStatusCancelled
+			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
+				span.Status = enums.StepStatusCompleted
+
+				if span.Attributes.EndedAt == nil && root.Attributes != nil {
+					span.Attributes.EndedAt = root.Attributes.EndedAt
+				}
+			}
 		}
 
 		for _, child := range span.Children {

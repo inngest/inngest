@@ -178,3 +178,53 @@ func TestSubscribeReadOpDrawsRowAndReadTicks(t *testing.T) {
 		}
 	}
 }
+
+// statusOf is the last status a row was given: the span that drew it, then any
+// update that ended it.
+func (h *traceHarness) statusOf(step string) string {
+	h.t.Helper()
+
+	id := rowID(step)
+	status := ""
+	for _, name := range []string{meta.SpanNameStep, meta.SpanNameDynamicExtension} {
+		for _, span := range h.seen(name) {
+			if span.attrs[meta.Attrs.DynamicSpanID.Key()].AsString() != id {
+				continue
+			}
+			if value, ok := span.attrs[meta.Attrs.DynamicStatus.Key()]; ok {
+				status = value.AsString()
+			}
+		}
+	}
+
+	return status
+}
+
+// The row of an open inbox runs until its close ends it.
+func TestSubscribeOpenRowRunsUntilClose(t *testing.T) {
+	h := newTraceHarness(t, subscribeOp("inbox", "test/msg"))
+	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox"), "an open inbox is running")
+
+	pause := h.sourcePause("inbox", "test/msg")
+	require.NotNil(t, pause)
+	h.report(closeRowsOp("inbox:close", "inbox", []string{"inbox"}, nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}))
+
+	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox"), "the close ended the row")
+}
+
+// A listen closed before its inbox ends its own row and leaves the inbox's.
+func TestSubscribeListenRowEndsAtItsOwnClose(t *testing.T) {
+	h := newTraceHarness(t, subscribeOp("inbox", "test/a"))
+	h.report(listenOp("inbox:listen", "inbox", "test/b"))
+	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox:listen"))
+
+	listen := h.listenPause("inbox:listen", "test/b")
+	require.NotNil(t, listen)
+	h.report(closeRowsOp("inbox:listen:close", "inbox", []string{"inbox:listen"}, nil, []map[string]any{{"id": listen.ID.String(), "event": "test/b"}}))
+
+	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox:listen"))
+	require.Equal(t, enums.StepStatusRunning.String(), h.statusOf("inbox"), "the inbox is still open")
+
+	h.report(closeRowsOp("inbox:close", "inbox", []string{"inbox"}, nil, nil))
+	require.Equal(t, enums.StepStatusCompleted.String(), h.statusOf("inbox"))
+}

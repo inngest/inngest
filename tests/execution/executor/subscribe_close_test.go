@@ -16,6 +16,15 @@ import (
 // computed, the source pauses to delete, and the reads that were waiting under
 // the handle.
 func closeOp(close string, inbox string, ids []string, pauses []map[string]any, waits ...string) *state.GeneratorOpcode {
+	return closeRowsOp(close, inbox, nil, ids, pauses, waits...)
+}
+
+// closeRowsOp is closeOp for a handle whose rows are the open and listen ops
+// it closes.
+func closeRowsOp(close string, inbox string, rows []string, ids []string, pauses []map[string]any, waits ...string) *state.GeneratorOpcode {
+	if rows == nil {
+		rows = []string{}
+	}
 	if ids == nil {
 		ids = []string{}
 	}
@@ -30,7 +39,7 @@ func closeOp(close string, inbox string, ids []string, pauses []map[string]any, 
 		Op:   enums.OpcodeSubscribeClose,
 		ID:   close,
 		Name: close,
-		Opts: map[string]any{"inbox": inbox, "ids": ids, "pauses": pauses, "waits": waits},
+		Opts: map[string]any{"inbox": inbox, "ids": ids, "pauses": pauses, "waits": waits, "rows": rows},
 	}
 }
 

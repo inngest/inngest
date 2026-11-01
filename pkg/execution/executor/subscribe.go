@@ -147,7 +147,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		return err
 	}
 
-	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+	e.emitInboxOpenSpan(ctx, runCtx, gen)
 
 	if err := runCtx.ReleaseCapacityLease(); err != nil {
 		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
@@ -164,6 +164,33 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 		hasPendingSteps,
 		runCtx.LifecycleItem().ParallelCoalesceKey,
 	)
+}
+
+// emitInboxOpenSpan draws the row of an open or listen op. It runs until a close
+// ends it; an inbox that is never closed is drawn ended with its run when the
+// trace is read.
+func (e *executor) emitInboxOpenSpan(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) {
+	md := runCtx.Metadata()
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddMetadataTenantAttrs(attrs, md.ID)
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusRunning))
+
+	queuedAt, scheduledAt, startedAt, _ := e.opcodeTiming(ctx, runCtx, &gen)
+	tracing.AddTimingAttrs(attrs, queuedAt, scheduledAt, startedAt, time.Time{})
+
+	lifecycleItem := runCtx.LifecycleItem()
+	_, err := e.tracerProvider.CreateSpan(ctx, meta.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:       tracing.FinalizedStepDynamicSeed(gen.ID),
+		Debug:      &tracing.SpanDebugData{Location: "executor.emitInboxOpenSpan"},
+		Metadata:   md,
+		QueueItem:  &lifecycleItem,
+		Parent:     runCtx.RootSpan(),
+		StartTime:  queuedAt,
+		Attributes: attrs,
+	})
+	if err != nil {
+		e.log.Debug("error creating the row of an inbox", "error", err)
+	}
 }
 
 func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
@@ -295,6 +322,7 @@ func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx exe
 	}
 
 	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+	e.endInboxRows(ctx, md, opts.Rows)
 
 	if err := runCtx.ReleaseCapacityLease(); err != nil {
 		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
@@ -567,6 +595,22 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 	}
 
 	return e.smv2.DeleteInboxWait(ctx, id, wait.ID)
+}
+
+// endInboxRows ends the rows of the open and listen ops a close names.
+func (e *executor) endInboxRows(ctx context.Context, md *sv2.Metadata, rows []string) {
+	for _, row := range rows {
+		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "executor.endInboxRows"},
+			Metadata:   md,
+			Status:     enums.StepStatusCompleted,
+			TargetSpan: tracing.FinalizedStepSpanRefFromMetadataAndStepID(md, row),
+			EndTime:    e.now(),
+		})
+		if err != nil {
+			e.log.Debug("error ending the row of an inbox", "error", err)
+		}
+	}
 }
 
 // endInboxWaitSpan ends the row of a read that a message or its timeout woke.
