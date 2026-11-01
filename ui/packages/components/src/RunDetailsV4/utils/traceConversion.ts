@@ -9,6 +9,7 @@ import { max, min } from 'date-fns';
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { hasMetadataKind } from '../../RunDetailsShared/metadataKind';
 import type {
+  BarMarkerData,
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
@@ -347,8 +348,34 @@ function traceToBarData(
     warnings: getWarnings(trace.metadata),
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
+    markers: ticksToMarkers(trace.ticks),
     dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
   };
+}
+
+/**
+ * Turns the ticks of a span into markers: a tick that something has taken is
+ * drawn filled, and its tooltip says what ticked, where it came from and when.
+ */
+function ticksToMarkers(ticks: Trace['ticks']): BarMarkerData[] | undefined {
+  if (!ticks || ticks.length === 0) return undefined;
+
+  return ticks.map((tick) => {
+    return {
+      id: tick.id,
+      at: new Date(tick.at),
+      filled: !!tick.readAt,
+      details: [
+        { label: 'Message', value: tick.id },
+        { label: 'Source', value: tick.sources.join(', ') },
+        { label: 'Arrived', value: new Date(tick.at).toISOString() },
+        {
+          label: 'Read',
+          value: tick.readAt ? new Date(tick.readAt).toISOString() : 'Not read yet',
+        },
+      ],
+    };
+  });
 }
 
 /**

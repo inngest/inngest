@@ -39,6 +39,7 @@ import { cn } from '../utils/classNames';
 import type {
   BarHeight,
   BarIcon,
+  BarMarker,
   BarPattern,
   BarSegment,
   BarStyle,
@@ -690,6 +691,71 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
   );
 }
 
+/**
+ * Small circles on a bar, one per marker, centred vertically at the moment the
+ * marker names. They are drawn beside the bar, so a collapsed or expanded row
+ * shows them alike. A marker outside the visible window is not drawn.
+ */
+function BarMarkers({
+  markers,
+  viewStartOffset,
+  viewEndOffset,
+}: {
+  markers: BarMarker[];
+  viewStartOffset: number;
+  viewEndOffset: number;
+}) {
+  const viewWidth = viewEndOffset - viewStartOffset;
+
+  if (viewWidth <= 0) return null;
+
+  return (
+    <>
+      {markers.map((marker) => {
+        if (marker.startPercent < viewStartOffset || marker.startPercent > viewEndOffset) {
+          return null;
+        }
+
+        const left = ((marker.startPercent - viewStartOffset) / viewWidth) * 100;
+        const summary = marker.details
+          .map((detail) => `${detail.label}: ${detail.value}`)
+          .join(', ');
+
+        return (
+          <Tooltip key={marker.id}>
+            <TooltipTrigger asChild>
+              <span
+                data-testid="bar-marker"
+                data-filled={marker.filled ? 'true' : 'false'}
+                role="img"
+                aria-label={summary}
+                tabIndex={0}
+                className={cn(
+                  'focus-visible:ring-primary-subtle absolute top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-help rounded-full border focus-visible:outline-none focus-visible:ring',
+                  marker.filled ? 'bg-basis border-basis' : 'bg-canvasBase border-basis'
+                )}
+                style={{ left: `${left}%` }}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs whitespace-normal text-xs shadow-lg">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                {marker.details.map((detail) => {
+                  return (
+                    <div key={detail.label} className="contents">
+                      <dt className="text-light">{detail.label}</dt>
+                      <dd className="break-all font-mono">{detail.value}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </>
+  );
+}
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
@@ -879,6 +945,7 @@ export function TimelineBar({
   sandbox,
   groupKind,
   dimmed,
+  markers,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -1103,6 +1170,14 @@ export function TimelineBar({
               </>
             )}
           </div>
+
+          {markers && markers.length > 0 && (
+            <BarMarkers
+              markers={markers}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+            />
+          )}
         </div>
       </div>
 
