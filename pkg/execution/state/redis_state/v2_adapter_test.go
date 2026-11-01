@@ -1232,3 +1232,80 @@ func TestV2AdapterDeleteWithIsMigration(t *testing.T) {
 	require.NoError(t, svc.Delete(ctx, id2, state.WithIsMigration()))
 	assert.Equal(t, before, rec.calls, "Delete with WithIsMigration must skip pause cleanup")
 }
+
+// A run migrated while a read waits keeps the read: the next message of its
+// inbox wakes it on the destination, and a read whose handle was closed stays
+// closed.
+func TestV2AdapterMigrateKeepsInboxWaits(t *testing.T) {
+	ctx := context.Background()
+	srcSvc, _ := mustV2Service(t, ctx)
+	dstSvc, _ := mustV2Service(t, ctx)
+
+	id := statev2.ID{
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		FunctionID: uuid.New(),
+		Tenant:     statev2.Tenant{AccountID: uuid.New(), EnvID: uuid.New(), AppID: uuid.New()},
+	}
+	event, err := json.Marshal(map[string]any{"name": "migrate.test"})
+	require.NoError(t, err)
+
+	_, err = srcSvc.Create(ctx, statev2.CreateState{
+		Metadata: statev2.Metadata{
+			ID:     id,
+			Config: *statev2.InitConfig(&statev2.Config{SpanID: "src-span", Idempotency: "migrate-waits-" + id.RunID.String()}),
+		},
+		Events: []json.RawMessage{event},
+	})
+	require.NoError(t, err)
+	require.NoError(t, srcSvc.SavePending(ctx, id, []string{"read-1", "close-1"}))
+
+	wait := statev2.InboxWait{ID: "read-1", Inbox: "inbox-1", Seen: "", Timer: true, Incoming: "read-1", GroupID: "group-1"}
+	wake, err := srcSvc.RecordInboxWait(ctx, id, wait)
+	require.NoError(t, err)
+	require.Nil(t, wake, "nothing to read yet")
+
+	_, _, err = srcSvc.CloseInbox(ctx, id, statev2.InboxClose{StepID: "close-1", Value: []byte(`{"closed":true}`), Waits: []string{"read-2"}})
+	require.NoError(t, err)
+
+	recorded, err := srcSvc.LoadInboxWaits(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, []statev2.InboxWait{wait}, recorded.Waits)
+	require.Equal(t, []string{"read-2"}, recorded.Closed)
+
+	md, err := srcSvc.LoadMetadata(ctx, id)
+	require.NoError(t, err)
+	events, err := srcSvc.LoadEvents(ctx, id)
+	require.NoError(t, err)
+	steps, err := srcSvc.LoadSteps(ctx, id)
+	require.NoError(t, err)
+	pending, err := srcSvc.LoadPending(ctx, id)
+	require.NoError(t, err)
+
+	require.NoError(t, dstSvc.Migrate(ctx, statev2.MigrateState{
+		Metadata:     md,
+		Events:       events,
+		Steps:        steps,
+		Stack:        md.Stack,
+		PendingSteps: pending,
+		InboxWaits:   recorded,
+	}))
+
+	moved, err := dstSvc.LoadInboxWaits(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, recorded, moved)
+
+	wakes, err := dstSvc.SaveInboxMessage(ctx, id, statev2.InboxMessage{
+		StepID: "m1",
+		Inbox:  "inbox-1",
+		Value:  []byte(`{"inngest/inbox":"inbox-1","data":{"name":"a.b"}}`),
+	})
+	require.NoError(t, err)
+	require.Len(t, wakes, 1)
+	require.Equal(t, "read-1", wakes[0].Wait.ID)
+	require.Equal(t, "m1", wakes[0].MessageStep)
+
+	late, err := dstSvc.RecordInboxWait(ctx, id, statev2.InboxWait{ID: "read-2", Inbox: "inbox-1"})
+	require.NoError(t, err)
+	require.NotNil(t, late)
+	require.True(t, late.Closed, "a read recorded after its handle closed is ended")
+}

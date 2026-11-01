@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1359,6 +1360,47 @@ func (m shardedMgr) DeleteInboxWait(ctx context.Context, i state.Identifier, wai
 		return client.B().Hdel().Key(fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID)).Field(waitID).Build()
 	}).Error()
 }
+
+// LoadInboxWaits returns the waits recorded for a run, and the reads whose
+// handle was closed, each sorted by id.
+func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (statev2.InboxWaitSet, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadInboxWaits"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	recorded, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return statev2.InboxWaitSet{}, fmt.Errorf("error loading inbox waits: %w", err)
+	}
+
+	set := statev2.InboxWaitSet{}
+	for field, record := range recorded {
+		if waitID, closed := strings.CutPrefix(field, inboxClosedPrefix); closed {
+			set.Closed = append(set.Closed, waitID)
+
+			continue
+		}
+
+		var wait statev2.InboxWait
+		if err := json.Unmarshal([]byte(record), &wait); err != nil {
+			return statev2.InboxWaitSet{}, fmt.Errorf("error decoding inbox wait %s: %w", field, err)
+		}
+
+		set.Waits = append(set.Waits, wait)
+	}
+
+	sort.Slice(set.Waits, func(a, b int) bool { return set.Waits[a].ID < set.Waits[b].ID })
+	sort.Strings(set.Closed)
+
+	return set, nil
+}
+
+// inboxClosedPrefix starts the field of a read whose handle was closed in the
+// hash of a run's inbox waits. The closeInbox script writes it.
+const inboxClosedPrefix = "closed:"
 
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePending"), redis_telemetry.ScopeFnRunState)

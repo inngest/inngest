@@ -443,6 +443,11 @@ func (m *mockRunService) CloseInbox(ctx context.Context, id statev2.ID, closing 
 func (m *mockRunService) DeleteInboxWait(ctx context.Context, id statev2.ID, waitID string) error {
 	return nil
 }
+
+func (m *mockRunService) LoadInboxWaits(ctx context.Context, id statev2.ID) (statev2.InboxWaitSet, error) {
+	return statev2.InboxWaitSet{}, nil
+}
+
 func (m *mockRunService) LoadDefers(ctx context.Context, id statev2.ID) (map[string]statev2.Defer, error) {
 	return nil, nil
 }

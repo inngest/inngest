@@ -56,6 +56,15 @@ type InboxWait struct {
 	ParallelCoalesceKey string             `json:"pck,omitempty"`
 }
 
+// InboxWaitSet is what a run holds for its waiting reads.
+type InboxWaitSet struct {
+	// Waits are the recorded waits.
+	Waits []InboxWait
+	// Closed are the ids of the reads whose handle was closed, so a read
+	// recorded later under one of them is ended.
+	Closed []string
+}
+
 // InboxBatch is what makes a read a batch read.
 type InboxBatch struct {
 	// Drain is whether the read never waits.
