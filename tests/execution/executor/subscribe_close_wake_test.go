@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/stretchr/testify/require"
 )
@@ -65,4 +66,20 @@ func TestSubscribeCloseOfAReadReportedAgainWakesOnce(t *testing.T) {
 			require.Len(t, h.newJobs(before), 1, "one job continues the run after the close")
 		})
 	}
+}
+
+// A message wakes a read once when the SDK reports the read again after the
+// message arrived, alone, so under no coalesce key.
+func TestSubscribeMessageWakeOfAReadReportedAgainIsOneJob(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"), sleepOp("nap"))
+
+	_, err := h.infra.smv2.SaveStep(h.infra.ctx, h.run.ID, "nap", []byte(`{"data":null}`))
+	require.NoError(t, err)
+	before := h.jobIDs()
+
+	require.NoError(t, h.deliver(event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
+
+	require.Len(t, h.newJobs(before), 1, "one job continues the run after the message")
 }

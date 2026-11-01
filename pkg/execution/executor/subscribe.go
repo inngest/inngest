@@ -337,13 +337,6 @@ func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx exe
 
 	// The wake continues the run; a close that ended no read does it itself.
 	if wake != nil {
-		// The record holds the key of the response that first reported the
-		// read, and the close may arrive in a response that reports it again,
-		// whose own recording of the read is also ended by this close, under
-		// the key of that response. Both wakes carry the key of the response
-		// the close is in, so they are one job and the queue drops the second.
-		wake.Wait.ParallelCoalesceKey = group.ParallelCoalesceKey
-
 		return e.wakeInboxRead(ctx, md.ID, *wake)
 	}
 
@@ -562,22 +555,19 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 			return fmt.Errorf("error resetting force step plan: %w", err)
 		}
 
-		// A parallel batch shares one discovery job; a lone read has its own,
-		// named by the read and the message that woke it.
-		var jobID string
-		if wait.ParallelCoalesceKey != "" && wait.ParallelMode != enums.ParallelModeRace {
-			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, wait.ParallelCoalesceKey)
-		} else {
-			suffix := "message"
-			switch {
-			case wake.TimedOut:
-				suffix = "timeout"
-			case wake.Closed:
-				suffix = "close"
-			}
-
-			jobID = fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)
+		// A read has one job per way it can end, named by the read and the
+		// reason. The response that reported the read is no part of the name:
+		// the SDK reports a pending read again, in responses with other ops,
+		// and every path that ends the read must name the same job.
+		suffix := "message"
+		switch {
+		case wake.TimedOut:
+			suffix = "timeout"
+		case wake.Closed:
+			suffix = "close"
 		}
+
+		jobID := fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)
 
 		nextItem := queue.Item{
 			JobID:                 &jobID,
