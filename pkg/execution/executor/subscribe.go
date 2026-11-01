@@ -544,7 +544,7 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 		if wait.ParallelCoalesceKey != "" && wait.ParallelMode != enums.ParallelModeRace {
 			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, wait.ParallelCoalesceKey)
 		} else {
-			suffix := wake.MessageStep
+			suffix := "message"
 			switch {
 			case wake.TimedOut:
 				suffix = "timeout"
