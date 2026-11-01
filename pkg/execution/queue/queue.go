@@ -135,6 +135,11 @@ type CallerLease struct {
 	// call (retries of the call reuse it), with its time set to the lease
 	// expiry.
 	LeaseID ulid.ULID
+	// AtLimit: the caller hands the item its run's concurrency slot (it holds
+	// the previous item's capacity lease), so a queue that supports it may
+	// lease the item while its function or key is at a limit, oldest run
+	// first, instead of queueing it behind the limit.
+	AtLimit bool
 }
 
 type Producer interface {

@@ -444,9 +444,13 @@ func (x *EnqueueOptions) GetCallerLease() *CallerLease {
 // expiry), unique per enqueue call; a retry of the same call carries the same
 // lease_id and gets the same lease back.
 type CallerLease struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Shards        []string               `protobuf:"bytes,1,rep,name=shards,proto3" json:"shards,omitempty"`
-	LeaseId       string                 `protobuf:"bytes,2,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Shards  []string               `protobuf:"bytes,1,rep,name=shards,proto3" json:"shards,omitempty"`
+	LeaseId string                 `protobuf:"bytes,2,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	// at_limit: the caller takes over its run's concurrency slot for this item
+	// (it holds the previous item's capacity lease), so the queue may lease it
+	// while the function or key is at its limit, oldest run first.
+	AtLimit       bool `protobuf:"varint,3,opt,name=at_limit,json=atLimit,proto3" json:"at_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -495,6 +499,13 @@ func (x *CallerLease) GetLeaseId() string {
 	return ""
 }
 
+func (x *CallerLease) GetAtLimit() bool {
+	if x != nil {
+		return x.AtLimit
+	}
+	return false
+}
+
 var File_queue_v1_producer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_producer_proto_rawDesc = "" +
@@ -531,10 +542,11 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01\x126\n" +
 	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKey\x128\n" +
 	"\fcaller_lease\x18\x06 \x01(\v2\x15.queue.v1.CallerLeaseR\vcallerLeaseB\x15\n" +
-	"\x13_idempotency_period\"@\n" +
+	"\x13_idempotency_period\"[\n" +
 	"\vCallerLease\x12\x16\n" +
 	"\x06shards\x18\x01 \x03(\tR\x06shards\x12\x19\n" +
-	"\blease_id\x18\x02 \x01(\tR\aleaseId2\xec\x01\n" +
+	"\blease_id\x18\x02 \x01(\tR\aleaseId\x12\x19\n" +
+	"\bat_limit\x18\x03 \x01(\bR\aatLimit2\xec\x01\n" +
 	"\x0fProducerService\x12@\n" +
 	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +
 	"\aRequeue\x12\x18.queue.v1.RequeueRequest\x1a\x19.queue.v1.RequeueResponse\"\x00\x12U\n" +

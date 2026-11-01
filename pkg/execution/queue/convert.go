@@ -511,7 +511,7 @@ func callerLeaseToProto(l *CallerLease) *pb.CallerLease {
 	if l == nil {
 		return nil
 	}
-	return &pb.CallerLease{Shards: l.Shards, LeaseId: l.LeaseID.String()}
+	return &pb.CallerLease{Shards: l.Shards, LeaseId: l.LeaseID.String(), AtLimit: l.AtLimit}
 }
 
 // callerLeaseFromProto drops a request it cannot parse: the enqueue then
@@ -524,7 +524,7 @@ func callerLeaseFromProto(msg *pb.CallerLease) *CallerLease {
 	if err != nil {
 		return nil
 	}
-	return &CallerLease{Shards: msg.GetShards(), LeaseID: id}
+	return &CallerLease{Shards: msg.GetShards(), LeaseID: id, AtLimit: msg.GetAtLimit()}
 }
 
 func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {

@@ -63,4 +63,8 @@ message EnqueueOptions {
 message CallerLease {
   repeated string shards = 1;
   string lease_id = 2;
+  // at_limit: the caller takes over its run's concurrency slot for this item
+  // (it holds the previous item's capacity lease), so the queue may lease it
+  // while the function or key is at its limit, oldest run first.
+  bool at_limit = 3;
 }

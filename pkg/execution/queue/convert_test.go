@@ -585,7 +585,7 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 		NormalizeFromBacklogID: "backlog-a",
 		SingletonMigrationKey:  "singleton-a",
 		IdempotencyPeriod:      &idempotencyPeriod,
-		CallerLease:            &CallerLease{Shards: []string{"shard-a", "shard-b"}, LeaseID: ulid.Make()},
+		CallerLease:            &CallerLease{Shards: []string{"shard-a", "shard-b"}, LeaseID: ulid.Make(), AtLimit: true},
 	}
 
 	msg := EnqueueOptionsToProto(original)
