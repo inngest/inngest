@@ -51,13 +51,6 @@ func (rc *redisCommands) times(cmd string) int {
 	return n
 }
 
-func (rc *redisCommands) reset() {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-
-	rc.seen = nil
-}
-
 // saveStep saves a step the way a step.run result is saved.
 func (h *subscribeHarness) saveStep(id string, data string) {
 	h.t.Helper()
