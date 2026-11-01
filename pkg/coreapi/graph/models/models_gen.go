@@ -475,13 +475,6 @@ type SpanMetadata struct {
 	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
-type SpanTick struct {
-	ID      string     `json:"id"`
-	Sources []string   `json:"sources"`
-	At      time.Time  `json:"at"`
-	ReadAt  *time.Time `json:"readAt,omitempty"`
-}
-
 type StepError struct {
 	Message string      `json:"message"`
 	Name    *string     `json:"name,omitempty"`

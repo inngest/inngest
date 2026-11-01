@@ -11,11 +11,10 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
-// A tick is a small span on the row of its parent: something that happened to
-// the parent that is not a row of its own. An inbox draws one under its open
-// row for each message that arrives, and one under a read's row for
-// each message the read took. The trace API rolls ticks onto their parent's
-// row, so no tick is drawn as a row.
+// A tick is stored as a small span under the row of its parent: an inbox draws
+// one under its open row for each message that arrives, and one under a read's
+// row for each message the read took. The trace API turns each tick into a
+// child span of that row, in the row's group and dimmed.
 
 // tickSeed names a tick. The same tick drawn again is the same span.
 func tickSeed(kind string, runID fmt.Stringer, row string, id string) []byte {
