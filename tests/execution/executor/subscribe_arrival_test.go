@@ -72,7 +72,7 @@ func messageStepID(inbox string, eventID ulid.ULID) string {
 // a message, as the queue stores it (hashed). A read has one such job whichever
 // message woke it.
 func (h *subscribeHarness) wakeJobID(wait string, _ string) string {
-	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-message", h.run.IdempotencyKey(), wait))
+	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-wake", h.run.IdempotencyKey(), wait))
 }
 
 func newEventID() ulid.ULID {
