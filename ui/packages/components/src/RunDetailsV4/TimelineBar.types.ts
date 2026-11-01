@@ -103,8 +103,7 @@ export interface BarStyle {
 }
 
 /**
- * A small circle drawn on a bar at one moment, whatever the row's state. Hovering
- * or focusing it shows `details`.
+ * A small tonal dot drawn on a bar at one moment, whatever the row's state.
  */
 export interface BarMarker {
   /** Unique identifier for the marker */
@@ -113,11 +112,6 @@ export interface BarMarker {
   /** Position on the timeline as a percentage of its width (0-100) */
   startPercent: number;
 
-  /** Draw it solid, not hollow */
-  filled?: boolean;
-
-  /** Label and value pairs shown in the tooltip */
-  details: { label: string; value: string }[];
 }
 
 /**
@@ -126,8 +120,6 @@ export interface BarMarker {
 export interface BarMarkerData {
   id: string;
   at: Date;
-  filled?: boolean;
-  details: { label: string; value: string }[];
 }
 
 /**
