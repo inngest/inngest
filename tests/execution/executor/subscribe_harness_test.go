@@ -183,7 +183,16 @@ func newSubscribeHarness(t *testing.T, ops ...*state.GeneratorOpcode) *subscribe
 func newSubscribeHarnessWith(t *testing.T, opts []executor.ExecutorOpt, ops ...*state.GeneratorOpcode) *subscribeHarness {
 	t.Helper()
 
+	return newSubscribeHarnessTriggered(t, nil, opts, ops...)
+}
+
+// newSubscribeHarnessTriggered is newSubscribeHarnessWith for a run whose
+// trigger event carries data.
+func newSubscribeHarnessTriggered(t *testing.T, triggerData map[string]any, opts []executor.ExecutorOpt, ops ...*state.GeneratorOpcode) *subscribeHarness {
+	t.Helper()
+
 	infra := newExecTestInfra(t, "step")
+	infra.triggerData = triggerData
 	crash := newCrashPoints()
 	driver := &mockDriverV1{
 		t: t,

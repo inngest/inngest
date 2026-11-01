@@ -5761,6 +5761,40 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	return err
 }
 
+// interpolateTriggerEvent replaces `event.` references in an expression with the
+// run's trigger event data, as values. Matching is faster with values, because
+// the expression can then go into aggregate trees. An expression without an
+// `event.` reference, or none at all, is returned as it was.
+func (e *executor) interpolateTriggerEvent(ctx context.Context, runCtx execution.RunContext, expr *string) (*string, error) {
+	if expr == nil || !strings.Contains(*expr, "event.") {
+		return expr, nil
+	}
+
+	evt := event.Event{}
+	if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
+		logger.StdlibLogger(ctx).Error("error unmarshalling trigger event", "error", err)
+	}
+
+	interpolated, err := expressions.Interpolate(ctx, *expr, map[string]any{
+		"event": evt.Map(),
+	})
+	if err != nil {
+		var compileError *expressions.CompileError
+		if errors.As(err, &compileError) {
+			return nil, state.WrapInStandardError(
+				compileError,
+				"CompileError",
+				"Could not compile expression",
+				compileError.Message(),
+			)
+		}
+
+		return nil, err
+	}
+
+	return &interpolated, nil
+}
+
 func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
@@ -5801,39 +5835,14 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	pauseID := inngest.DeterministicSha1UUID(runCtx.Metadata().ID.RunID.String() + gen.ID)
 
-	expr := opts.If
-	if expr != nil && strings.Contains(*expr, "event.") {
-		// Remove `event` data from the expression and replace with actual event
-		// data as values, now that we have the event.
-		//
-		// This improves performance in matching, as we can then use the values within
-		// aggregate trees.
-		evt := event.Event{}
-		if err := json.Unmarshal(runCtx.Events()[0], &evt); err != nil {
-			logger.StdlibLogger(ctx).Error("error unmarshalling trigger event in waitForEvent op", "error", err)
-		}
-
-		interpolated, err := expressions.Interpolate(ctx, *opts.If, map[string]any{
-			"event": evt.Map(),
-		})
-		if err != nil {
-			var compileError *expressions.CompileError
-			if errors.As(err, &compileError) {
-				return fmt.Errorf("error interpolating wait for event expression: %w", state.WrapInStandardError(
-					compileError,
-					"CompileError",
-					"Could not compile expression",
-					compileError.Message(),
-				))
-			}
-
-			return fmt.Errorf("error interpolating wait for event expression: %w", err)
-		}
-		expr = &interpolated
-
+	expr, err := e.interpolateTriggerEvent(ctx, runCtx, opts.If)
+	if err != nil {
+		return fmt.Errorf("error interpolating wait for event expression: %w", err)
+	}
+	if expr != nil && opts.If != nil && *expr != *opts.If {
 		// Update the generator to use the interpolated data, ensuring history
 		// is updated. Only `if` changes, so the SDK's other opts survive.
-		if err := gen.SetOpt("if", interpolated); err != nil {
+		if err := gen.SetOpt("if", *expr); err != nil {
 			return fmt.Errorf("error updating wait for event opts: %w", err)
 		}
 	}

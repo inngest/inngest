@@ -48,6 +48,8 @@ type execTestInfra struct {
 	rq            queue.Queue
 	// runState is the redis that holds run state, for tests that watch it.
 	runState *miniredis.Miniredis
+	// triggerData is the data of the event scheduleRun triggers a run with.
+	triggerData map[string]any
 }
 
 // newExecTestInfra builds the shared executor test infra. stepID is
@@ -183,7 +185,7 @@ func (i *execTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *stat
 	_, run, err := exec.Schedule(i.ctx, execution.ScheduleRequest{
 		Function: i.fn, At: &now, AccountID: i.aID, WorkspaceID: i.wsID, AppID: i.appID,
 		Events: []event.TrackedEvent{
-			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event"}, evtID),
+			event.NewBaseTrackedEventWithID(event.Event{Name: "test/event", Data: i.triggerData}, evtID),
 		},
 	})
 	require.NoError(t, err)

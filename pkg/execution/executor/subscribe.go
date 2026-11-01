@@ -100,6 +100,14 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			}
 		}
 
+		// The pause matches on the trigger's values, but its id hashes the
+		// expression as written: the same on every retry and replay, and the
+		// same as before sources could reference the trigger.
+		matchIf, err := e.interpolateTriggerEvent(ctx, runCtx, source.If)
+		if err != nil {
+			return fmt.Errorf("error interpolating subscribe source expression: %w", err)
+		}
+
 		eventName := source.Event
 		pause := state.Pause{
 			ID:          sourcePauseID(md.ID.RunID, gen.ID, source),
@@ -114,7 +122,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			// when the run does.
 			Expires:     state.Time(now.Add(consts.MaxWaitForEventTimeout)),
 			Event:       &eventName,
-			Expression:  source.If,
+			Expression:  matchIf,
 			MaxAttempts: runCtx.MaxAttempts(),
 			Subscribe:   &state.PauseSubscribe{Inbox: inbox},
 			CreatedAt:   now,
@@ -122,7 +130,7 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 
 		idx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: source.Event}
 
-		_, err := util.WithRetry(ctx, "pause.handleGeneratorSubscribe", func(ctx context.Context) (int, error) {
+		_, err = util.WithRetry(ctx, "pause.handleGeneratorSubscribe", func(ctx context.Context) (int, error) {
 			return e.pm.Write(ctx, idx, &pause)
 		}, util.NewRetryConf(util.WithRetryConfRetryableErrors(pauses.WritePauseRetryableError)))
 		if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
