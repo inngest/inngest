@@ -124,6 +124,19 @@ func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, wait
 	return wake, s.crash.fire("after:TimeoutInboxWait")
 }
 
+func (s crashingState) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) ([]statev2.InboxWake, bool, error) {
+	if err := s.crash.fire("before:CloseInbox"); err != nil {
+		return nil, false, err
+	}
+
+	wakes, pending, err := s.RunService.CloseInbox(ctx, id, closing)
+	if err != nil {
+		return wakes, pending, err
+	}
+
+	return wakes, pending, s.crash.fire("after:CloseInbox")
+}
+
 // crashingQueue fails a queue write around the real one.
 type crashingQueue struct {
 	queue.Queue
@@ -225,9 +238,17 @@ func newSubscribeHarnessWith(t *testing.T, opts []executor.ExecutorOpt, ops ...*
 func (h *subscribeHarness) execute() {
 	h.t.Helper()
 
+	require.NoError(h.t, h.tryExecute())
+}
+
+// tryExecute is execute for a test that expects the request to fail.
+func (h *subscribeHarness) tryExecute() error {
+	h.t.Helper()
+
 	id := statev2.V1FromMetadata(*h.run)
 	_, err := h.exec.Execute(queue.WithJobID(h.infra.ctx, h.job.JobID), id, h.item.Data, h.edge)
-	require.NoError(h.t, err)
+
+	return err
 }
 
 // report makes the SDK's next request report ops, as a later request of the

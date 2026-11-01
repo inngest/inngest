@@ -8,10 +8,14 @@ queued its wake.
 The record is written before the scan, and an arrival saves before it looks at
 the records, so at least one of the two always sees the other.
 
+A read whose handle was closed (the close marked it) is not recorded: it
+leaves the pending set and is ended.
+
 Output:
   { 0 }                           recorded; nothing for it to read
   { 1, messageStepID, pending }   recorded and satisfied; pending is 1 when
                                   pending steps remain, else 0
+  { 2, pending }                  not recorded; its handle was closed
 
 ]]
 
@@ -28,6 +32,12 @@ local inbox = ARGV[3]
 local seen = ARGV[4]
 
 local want = cjson.decode(record)["want"]
+
+if redis.call("HEXISTS", keyWaits, "closed:" .. waitID) == 1 then
+	redis.call("SREM", keyStepsPending, waitID)
+
+	return { 2, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+end
 
 redis.call("HSET", keyWaits, waitID, record)
 

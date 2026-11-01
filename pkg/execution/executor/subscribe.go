@@ -209,6 +209,107 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	return e.wakeInboxRead(ctx, md.ID, *wake)
 }
 
+// handleGeneratorSubscribeClose closes a handle of an inbox: it deletes the
+// pauses of the handle's sources, saves the ids the SDK computed as the op's
+// result, and ends the reads waiting under the handle. The result is saved in
+// the same call that takes those reads out of the pending set, before their
+// wakes are queued, so the run that the wake starts finds the close recorded. A
+// close that crashed in between is repaired by being handled again.
+func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	opts, err := gen.SubscribeCloseOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse subscribe close opts: %w", err)
+	}
+
+	md := runCtx.Metadata()
+
+	if err := e.deleteSourcePauses(ctx, md, opts.Pauses); err != nil {
+		return err
+	}
+
+	ids := opts.IDs
+	if ids == nil {
+		ids = []string{}
+	}
+
+	record, err := json.Marshal(map[string]any{"data": ids})
+	if err != nil {
+		return fmt.Errorf("error encoding the record of a close: %w", err)
+	}
+
+	wakes, hasPendingSteps, err := e.smv2.CloseInbox(ctx, md.ID, sv2.InboxClose{
+		StepID: gen.ID,
+		Value:  record,
+		Waits:  opts.Waits,
+	})
+	if err != nil {
+		return err
+	}
+
+	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+
+	if err := runCtx.ReleaseCapacityLease(); err != nil {
+		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
+	}
+
+	// The wakes continue the run; a close that ended no read does it itself.
+	if len(wakes) == 0 {
+		groupID := uuid.New().String()
+
+		return e.maybeEnqueueDiscoveryStep(
+			state.WithGroupID(ctx, groupID),
+			runCtx,
+			gen,
+			edge,
+			groupID,
+			hasPendingSteps,
+			runCtx.LifecycleItem().ParallelCoalesceKey,
+		)
+	}
+
+	var goerr error
+	for _, wake := range wakes {
+		if err := e.wakeInboxRead(ctx, md.ID, wake); err != nil {
+			goerr = errors.Join(goerr, err)
+		}
+	}
+
+	return goerr
+}
+
+// deleteSourcePauses deletes the pauses of the sources a close names. A pause
+// that is already gone is a close that ran before.
+func (e *executor) deleteSourcePauses(ctx context.Context, md *sv2.Metadata, sources []state.SubscribeClosePause) error {
+	for _, source := range sources {
+		id, err := uuid.Parse(source.ID)
+		if err != nil {
+			return fmt.Errorf("invalid source pause id %q: %w", source.ID, err)
+		}
+
+		idx := pauses.Index{WorkspaceID: md.ID.Tenant.EnvID, EventName: source.Event}
+
+		pause, err := e.pm.PauseByID(ctx, idx, id)
+		if errors.Is(err, state.ErrPauseNotFound) || (err == nil && pause == nil) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("error loading a source pause to close: %w", err)
+		}
+
+		if err := e.pm.Delete(ctx, idx, *pause); err != nil {
+			return fmt.Errorf("error deleting a source pause: %w", err)
+		}
+
+		if e.exprAggregator != nil {
+			if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
+				logger.StdlibLogger(ctx).Warn("error removing a source pause from the aggregator", "error", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // inboxTimerJobID is the id of the queue item that times a read out. The wake
 // that follows a timeout has an id of its own, so it is never deduped against
 // the timer that is still running when it is queued.
@@ -353,8 +454,11 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, wait.ParallelCoalesceKey)
 		} else {
 			suffix := wake.MessageStep
-			if wake.TimedOut {
+			switch {
+			case wake.TimedOut:
 				suffix = "timeout"
+			case wake.Closed:
+				suffix = "close"
 			}
 
 			jobID = fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)

@@ -298,6 +298,36 @@ type SubscribeWaitOpts struct {
 	Timeout string `json:"timeout,omitempty"`
 }
 
+// SubscribeClosePause is a source pause that a close deletes. The event name is
+// part of where the pause is stored.
+type SubscribeClosePause struct {
+	ID    string `json:"id"`
+	Event string `json:"event"`
+}
+
+// SubscribeCloseOpts are the options of an OpcodeSubscribeClose op, which closes
+// an inbox or a view of one.
+type SubscribeCloseOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+	// IDs are the step ids of the messages the handle had not read, as the SDK
+	// computed them. They are saved as the op's result.
+	IDs []string `json:"ids"`
+	// Pauses are the source pauses of the handle and of every view under it.
+	Pauses []SubscribeClosePause `json:"pauses"`
+	// Waits are the ids of the reads under the handle that have not settled.
+	Waits []string `json:"waits"`
+}
+
+func (g GeneratorOpcode) SubscribeCloseOpts() (*SubscribeCloseOpts, error) {
+	opts := &SubscribeCloseOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
 func (g GeneratorOpcode) SubscribeOpts() (*SubscribeOpts, error) {
 	opts := &SubscribeOpts{}
 	if err := unmarshalOpts(g.Opts, opts); err != nil {

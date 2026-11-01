@@ -99,6 +99,13 @@ type RunService interface {
 	// otherwise it changes nothing and returns nil. Saving again returns the
 	// wait again, so a timer that ran twice repairs a lost wake.
 	TimeoutInboxWait(ctx context.Context, id ID, waitID string, data []byte) (*InboxWake, error)
+	// CloseInbox saves the close op's result, then ends the reads it names: each
+	// that is recorded leaves the pending set and is returned (still recorded,
+	// as with SaveInboxMessage), and each is marked closed so that a read
+	// recorded after the close is ended by RecordInboxWait. It also returns
+	// whether pending steps remain. Closing again saves nothing and returns
+	// the same reads while they are recorded.
+	CloseInbox(ctx context.Context, id ID, closing InboxClose) ([]InboxWake, bool, error)
 	// DeleteInboxWait removes a recorded wait.
 	DeleteInboxWait(ctx context.Context, id ID, waitID string) error
 

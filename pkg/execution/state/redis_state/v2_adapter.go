@@ -819,6 +819,27 @@ func (v v2) TimeoutInboxWait(ctx context.Context, id state.ID, waitID string, da
 	)
 }
 
+// CloseInbox saves a close and ends the reads under it.
+func (v v2) CloseInbox(ctx context.Context, id state.ID, closing state.InboxClose) ([]state.InboxWake, bool, error) {
+	type closed struct {
+		wakes   []state.InboxWake
+		pending bool
+	}
+
+	out, err := util.WithRetry(
+		ctx,
+		"state.CloseInbox",
+		func(ctx context.Context) (closed, error) {
+			wakes, pending, err := v.mgr.CloseInbox(ctx, inboxIdentifier(id), closing)
+
+			return closed{wakes: wakes, pending: pending}, err
+		},
+		v.retryPolicy(),
+	)
+
+	return out.wakes, out.pending, err
+}
+
 // DeleteInboxWait removes a recorded inbox wait.
 func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, waitID string) error {
 	_, err := util.WithRetry(

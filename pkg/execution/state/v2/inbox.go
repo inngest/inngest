@@ -53,6 +53,17 @@ type InboxWait struct {
 	ParallelCoalesceKey string             `json:"pck,omitempty"`
 }
 
+// InboxClose closes a handle of an inbox.
+type InboxClose struct {
+	// StepID is the id of the close op.
+	StepID string
+	// Value is the close op's saved result.
+	Value []byte
+	// Waits are the ids of the reads under the handle that have not settled.
+	// Each is ended, and marked closed so a read recorded later is ended too.
+	Waits []string
+}
+
 // InboxWake is a read that a message satisfied.
 type InboxWake struct {
 	Wait InboxWait
@@ -60,6 +71,9 @@ type InboxWake struct {
 	MessageStep string
 	// TimedOut is whether the read's timer satisfied it, so there is no message.
 	TimedOut bool
+	// Closed is whether closing the read's handle satisfied it, so there is no
+	// message.
+	Closed bool
 	// HasPending is whether the run has other pending steps once the read has
 	// left the pending set.
 	HasPending bool

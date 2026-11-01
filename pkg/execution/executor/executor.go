@@ -4189,6 +4189,8 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorSubscribe(ctx, runCtx, gen, edge)
 	case enums.OpcodeSubscribeWait:
 		return e.handleGeneratorSubscribeWait(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSubscribeClose:
+		return e.handleGeneratorSubscribeClose(ctx, runCtx, gen, edge)
 	case enums.OpcodeInvokeFunction:
 		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeAIGateway:
