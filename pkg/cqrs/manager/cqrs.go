@@ -824,11 +824,17 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 			switch {
 			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
 				span.Status = enums.StepStatusCancelled
+				span.Attributes.DynamicStatus = &span.Status
 			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
 				span.Status = enums.StepStatusCompleted
+				span.Attributes.DynamicStatus = &span.Status
 
-				if span.Attributes.EndedAt == nil && root.Attributes != nil {
-					span.Attributes.EndedAt = root.Attributes.EndedAt
+				if span.Attributes.EndedAt == nil {
+					endedAt := root.EndTime
+					if root.Attributes != nil && root.Attributes.EndedAt != nil {
+						endedAt = *root.Attributes.EndedAt
+					}
+					span.Attributes.EndedAt = &endedAt
 				}
 			}
 		}
