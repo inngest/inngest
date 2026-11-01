@@ -44,8 +44,8 @@ type MigrateState struct {
 	Stack        []string
 	PendingSteps []string
 	Defers       map[string]Defer
-	// InboxWaits are the reads of inboxes that are waiting, and the reads
-	// whose handle was closed.
+	// InboxWaits are the reads of inboxes that are waiting, and the inboxes
+	// that were closed.
 	InboxWaits InboxWaitSet
 }
 
@@ -86,33 +86,36 @@ type RunService interface {
 	// this is usually not the function you want to call directly.
 	ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error)
 
-	// SaveInboxMessage saves a message step of an inbox, then returns every
-	// recorded wait on that inbox that the message satisfies. Each returned
-	// wait has left the run's pending set but is still recorded; delete it with
-	// DeleteInboxWait once its wake is queued. Saving a message that is already
-	// saved with the same value changes nothing and returns the same waits.
-	SaveInboxMessage(ctx context.Context, id ID, msg InboxMessage) ([]InboxWake, error)
-	// RecordInboxWait records a wait, then scans the steps saved after the
-	// wait's Seen step. If one is a message the wait wants, the wait is
+	// SaveInboxMessage saves a message step of an inbox, then returns the
+	// inbox's recorded wait if the message satisfies it. The wait has left the
+	// run's pending set but is still recorded; delete it with DeleteInboxWait
+	// once its wake is queued. Saving a message that is already saved with the
+	// same value changes nothing and returns the same wait. A message for an
+	// inbox that was closed returns ErrInboxClosed, and one for a run that has
+	// ended returns ErrRunNotFound; neither is saved.
+	SaveInboxMessage(ctx context.Context, id ID, msg InboxMessage) (*InboxWake, error)
+	// RecordInboxWait records the wait of an inbox, then scans the steps saved
+	// after the wait's Seen step. If one is a message of the inbox, the wait is
 	// satisfied and returned; otherwise nil.
 	RecordInboxWait(ctx context.Context, id ID, wait InboxWait) (*InboxWake, error)
-	// TimeoutInboxWait times a recorded wait out: if the wait is still
-	// recorded, it saves data under the wait's id, takes the wait out of the
-	// pending set and returns it (still recorded, as with SaveInboxMessage);
+	// TimeoutInboxWait times an inbox's wait out: if the inbox's wait is still
+	// the wait waitID, it saves data under the wait's id, takes the wait out of
+	// the pending set and returns it (still recorded, as with SaveInboxMessage);
 	// otherwise it changes nothing and returns nil. Saving again returns the
 	// wait again, so a timer that ran twice repairs a lost wake.
-	TimeoutInboxWait(ctx context.Context, id ID, waitID string, data []byte) (*InboxWake, error)
-	// CloseInbox saves the close op's result, then ends the reads it names: each
-	// that is recorded leaves the pending set and is returned (still recorded,
-	// as with SaveInboxMessage), and each is marked closed so that a read
-	// recorded after the close is ended by RecordInboxWait. It also returns
-	// whether pending steps remain. Closing again saves nothing and returns
-	// the same reads while they are recorded.
-	CloseInbox(ctx context.Context, id ID, closing InboxClose) ([]InboxWake, bool, error)
-	// DeleteInboxWait removes a recorded wait.
-	DeleteInboxWait(ctx context.Context, id ID, waitID string) error
-	// LoadInboxWaits returns the waits recorded for a run, and the reads whose
-	// handle was closed. A run migrates with them so a read keeps waiting.
+	TimeoutInboxWait(ctx context.Context, id ID, inbox string, waitID string, data []byte) (*InboxWake, error)
+	// CloseInbox saves the close op's result, a cut at the last message the
+	// inbox has, then ends the inbox's wait: if it is recorded it leaves the
+	// pending set and is returned (still recorded, as with SaveInboxMessage).
+	// The inbox is marked closed, so a read recorded after the close is ended
+	// by RecordInboxWait and a later message is dropped. It also returns
+	// whether pending steps remain. Closing again saves nothing and returns the
+	// same wait while it is recorded.
+	CloseInbox(ctx context.Context, id ID, closing InboxClose) (*InboxWake, bool, error)
+	// DeleteInboxWait removes the inbox's wait if it is the wait waitID.
+	DeleteInboxWait(ctx context.Context, id ID, inbox string, waitID string) error
+	// LoadInboxWaits returns the waits recorded for a run, and the inboxes
+	// that were closed. A run migrates with them so a read keeps waiting.
 	LoadInboxWaits(ctx context.Context, id ID) (InboxWaitSet, error)
 
 	SaveDefer(ctx context.Context, id ID, d Defer) error

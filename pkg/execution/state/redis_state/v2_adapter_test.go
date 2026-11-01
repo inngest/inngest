@@ -1234,7 +1234,7 @@ func TestV2AdapterDeleteWithIsMigration(t *testing.T) {
 }
 
 // A run migrated while a read waits keeps the read: the next message of its
-// inbox wakes it on the destination, and a read whose handle was closed stays
+// inbox wakes it on the destination, and an inbox that was closed stays
 // closed.
 func TestV2AdapterMigrateKeepsInboxWaits(t *testing.T) {
 	ctx := context.Background()
@@ -1264,13 +1264,13 @@ func TestV2AdapterMigrateKeepsInboxWaits(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, wake, "nothing to read yet")
 
-	_, _, err = srcSvc.CloseInbox(ctx, id, statev2.InboxClose{StepID: "close-1", Value: []byte(`{"closed":true}`), Waits: []string{"read-2"}})
+	_, _, err = srcSvc.CloseInbox(ctx, id, statev2.InboxClose{StepID: "close-1", Inbox: "inbox-2"})
 	require.NoError(t, err)
 
 	recorded, err := srcSvc.LoadInboxWaits(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, []statev2.InboxWait{wait}, recorded.Waits)
-	require.Equal(t, []string{"read-2"}, recorded.Closed)
+	require.Equal(t, []string{"inbox-2"}, recorded.Closed)
 
 	md, err := srcSvc.LoadMetadata(ctx, id)
 	require.NoError(t, err)
@@ -1294,18 +1294,25 @@ func TestV2AdapterMigrateKeepsInboxWaits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, recorded, moved)
 
-	wakes, err := dstSvc.SaveInboxMessage(ctx, id, statev2.InboxMessage{
+	wake, err = dstSvc.SaveInboxMessage(ctx, id, statev2.InboxMessage{
 		StepID: "m1",
 		Inbox:  "inbox-1",
 		Value:  []byte(`{"inngest/inbox":"inbox-1","data":{"name":"a.b"}}`),
 	})
 	require.NoError(t, err)
-	require.Len(t, wakes, 1)
-	require.Equal(t, "read-1", wakes[0].Wait.ID)
-	require.Equal(t, "m1", wakes[0].MessageStep)
+	require.NotNil(t, wake)
+	require.Equal(t, "read-1", wake.Wait.ID)
+	require.Equal(t, "m1", wake.MessageStep)
 
-	late, err := dstSvc.RecordInboxWait(ctx, id, statev2.InboxWait{ID: "read-2", Inbox: "inbox-1"})
+	_, err = dstSvc.SaveInboxMessage(ctx, id, statev2.InboxMessage{
+		StepID: "m2",
+		Inbox:  "inbox-2",
+		Value:  []byte(`{"inngest/inbox":"inbox-2","data":{"name":"a.b"}}`),
+	})
+	require.ErrorIs(t, err, statev2.ErrInboxClosed, "a message for a closed inbox is dropped")
+
+	late, err := dstSvc.RecordInboxWait(ctx, id, statev2.InboxWait{ID: "read-2", Inbox: "inbox-2"})
 	require.NoError(t, err)
 	require.NotNil(t, late)
-	require.True(t, late.Closed, "a read recorded after its handle closed is ended")
+	require.True(t, late.Closed, "a read recorded after its inbox closed is ended")
 }

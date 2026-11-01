@@ -98,25 +98,25 @@ func (s crashingState) SaveStep(ctx context.Context, id statev2.ID, stepID strin
 	return pending, s.crash.fire("after:SaveStep")
 }
 
-func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) ([]statev2.InboxWake, error) {
+func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) (*statev2.InboxWake, error) {
 	if err := s.crash.fire("before:SaveInboxMessage"); err != nil {
 		return nil, err
 	}
 
-	wakes, err := s.RunService.SaveInboxMessage(ctx, id, msg)
+	wake, err := s.RunService.SaveInboxMessage(ctx, id, msg)
 	if err != nil {
-		return wakes, err
+		return wake, err
 	}
 
-	return wakes, s.crash.fire("after:SaveInboxMessage")
+	return wake, s.crash.fire("after:SaveInboxMessage")
 }
 
-func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, waitID string, data []byte) (*statev2.InboxWake, error) {
+func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, inbox string, waitID string, data []byte) (*statev2.InboxWake, error) {
 	if err := s.crash.fire("before:TimeoutInboxWait"); err != nil {
 		return nil, err
 	}
 
-	wake, err := s.RunService.TimeoutInboxWait(ctx, id, waitID, data)
+	wake, err := s.RunService.TimeoutInboxWait(ctx, id, inbox, waitID, data)
 	if err != nil {
 		return wake, err
 	}
@@ -124,17 +124,17 @@ func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, wait
 	return wake, s.crash.fire("after:TimeoutInboxWait")
 }
 
-func (s crashingState) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) ([]statev2.InboxWake, bool, error) {
+func (s crashingState) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) (*statev2.InboxWake, bool, error) {
 	if err := s.crash.fire("before:CloseInbox"); err != nil {
 		return nil, false, err
 	}
 
-	wakes, pending, err := s.RunService.CloseInbox(ctx, id, closing)
+	wake, pending, err := s.RunService.CloseInbox(ctx, id, closing)
 	if err != nil {
-		return wakes, pending, err
+		return wake, pending, err
 	}
 
-	return wakes, pending, s.crash.fire("after:CloseInbox")
+	return wake, pending, s.crash.fire("after:CloseInbox")
 }
 
 // crashingQueue fails a queue write around the real one.

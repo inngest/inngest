@@ -279,6 +279,10 @@ enum InboxSaveOutcome {
   INBOX_SAVE_OUTCOME_STEPS_FULL  = 2;
   // The message would take the run's state past its size bound. Nothing was saved.
   INBOX_SAVE_OUTCOME_STATE_FULL  = 3;
+  // The message's inbox was closed. Nothing was saved.
+  INBOX_SAVE_OUTCOME_CLOSED      = 4;
+  // The run has ended. Nothing was saved.
+  INBOX_SAVE_OUTCOME_RUN_GONE    = 5;
 }
 
 message InboxMessage {
@@ -290,29 +294,27 @@ message InboxMessage {
 }
 
 message InboxBatch {
-  bool          drain  = 1;
-  bool          unread = 2;
-  optional int64 room  = 3;
+  bool           drain  = 1;
+  bool           unread = 2;
+  optional int64 max    = 3;
 }
 
 message InboxWait {
   string               id                    = 1;
   string               inbox                 = 2;
-  bytes                want                  = 3;
-  string               seen                  = 4;
-  bool                 timer                 = 5;
-  InboxBatch           batch                 = 6;
-  string               incoming              = 7;
-  string               group_id              = 8;
-  optional int64       max_attempts          = 9;
-  int64                parallel_mode         = 10;
-  string               parallel_coalesce_key = 11;
+  string               seen                  = 3;
+  bool                 timer                 = 4;
+  InboxBatch           batch                 = 5;
+  string               incoming              = 6;
+  string               group_id              = 7;
+  optional int64       max_attempts          = 8;
+  int64                parallel_mode         = 9;
+  string               parallel_coalesce_key = 10;
 }
 
 message InboxClose {
-  string          step_id = 1;
-  bytes           value   = 2;
-  repeated string waits   = 3;
+  string step_id = 1;
+  string inbox   = 2;
 }
 
 message InboxWake {
@@ -328,9 +330,10 @@ message SaveInboxMessageRequest {
   InboxMessage message = 2;
 }
 
+// wake is unset when the message did not satisfy the inbox's wait.
 message SaveInboxMessageResponse {
-  InboxSaveOutcome outcome = 1;
-  repeated InboxWake wakes = 2;
+  InboxSaveOutcome   outcome = 1;
+  optional InboxWake wake    = 2;
 }
 
 message RecordInboxWaitRequest {
@@ -345,11 +348,12 @@ message RecordInboxWaitResponse {
 
 message TimeoutInboxWaitRequest {
   ID     id      = 1;
-  string wait_id = 2;
-  bytes  data    = 3;
+  string inbox   = 2;
+  string wait_id = 3;
+  bytes  data    = 4;
 }
 
-// wake is unset when the wait was no longer recorded.
+// wake is unset when the inbox's wait was no longer that wait.
 message TimeoutInboxWaitResponse {
   optional InboxWake wake = 1;
 }
@@ -359,14 +363,16 @@ message CloseInboxRequest {
   InboxClose closing = 2;
 }
 
+// wake is unset when the inbox had no wait recorded.
 message CloseInboxResponse {
-  repeated InboxWake wakes       = 1;
+  optional InboxWake wake        = 1;
   bool               has_pending = 2;
 }
 
 message DeleteInboxWaitRequest {
   ID     id      = 1;
-  string wait_id = 2;
+  string inbox   = 2;
+  string wait_id = 3;
 }
 
 message DeleteInboxWaitResponse {}

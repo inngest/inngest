@@ -100,7 +100,7 @@ func TestSubscribeWaitScanReadsOnlyTheGap(t *testing.T) {
 func TestSubscribeStepShapedLikeAMessageIsNotAMessage(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
 
-	h.saveStep("lookalike", `{"data":{"name":"test/msg"},"inbox":"inbox","src":[]}`)
+	h.saveStep("lookalike", `{"data":{"name":"test/msg"},"inbox":"inbox"}`)
 
 	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
 
@@ -135,8 +135,7 @@ func TestSubscribeRedeliveredEventChangesNothing(t *testing.T) {
 	require.Equal(t, md.Metrics.StepCount, after.Metrics.StepCount, "the redelivery cost no step")
 }
 
-// One event that matches two sources of one inbox is one message that lists
-// both sources.
+// One event that matches two sources of one inbox is one message.
 func TestSubscribeEventMatchingTwoSourcesIsOneMessage(t *testing.T) {
 	both := &state.GeneratorOpcode{
 		Op:   enums.OpcodeSubscribe,
@@ -154,8 +153,7 @@ func TestSubscribeEventMatchingTwoSourcesIsOneMessage(t *testing.T) {
 
 	messages := 0
 	var value struct {
-		Inbox string   `json:"inngest/inbox"`
-		Src   []string `json:"src"`
+		Inbox string `json:"inngest/inbox"`
 	}
 	for stepID, data := range h.steps() {
 		if stepID == messageStepID("inbox", id) {
@@ -166,7 +164,4 @@ func TestSubscribeEventMatchingTwoSourcesIsOneMessage(t *testing.T) {
 
 	require.Equal(t, 1, messages, "saved once")
 	require.Equal(t, "inbox", value.Inbox)
-	require.Len(t, value.Src, 2, "both sources are listed")
-	require.NotEqual(t, value.Src[0], value.Src[1])
-
 }

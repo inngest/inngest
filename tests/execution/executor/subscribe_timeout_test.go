@@ -240,7 +240,7 @@ func TestSubscribeCloseTakesAnUntimedTimerAway(t *testing.T) {
 	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
 	tm := h.timerOf("next-1")
 
-	h.report(closeOp("close", "inbox", nil, nil, "next-1"))
+	h.report(closeOp("close", "inbox"))
 
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.closeJobID("next-1")), "the close woke the read")
 	require.Zero(t, timesIn(h.jobIDs(), tm.jobID), "the close took the timer away")

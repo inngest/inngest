@@ -1,23 +1,24 @@
 --[[
 
-Records a wait on an inbox, then scans the steps saved after the step the wait
-last saw. If one of them is a message of the inbox that the wait wants, the wait
-is satisfied: it leaves the pending set but stays recorded until the caller has
-queued its wake.
+Records the wait of an inbox, then scans the steps saved after the step the wait
+last saw. If one of them is a message of the inbox, the wait is satisfied: it
+leaves the pending set but stays recorded until the caller has queued its wake.
+
+An inbox has one reader, so it has at most one wait, recorded under the inbox's
+id.
 
 The record is written before the scan, and an arrival saves before it looks at
-the records, so at least one of the two always sees the other.
+the record, so at least one of the two always sees the other.
 
-A read whose handle was closed (the close marked it) is not recorded: it
-leaves the pending set and is ended.
+A read of an inbox that was closed is not recorded: it leaves the pending set
+and is ended.
 
 Output:
   { 0 }                           recorded; nothing for it to read
   { 1, messageStepID, pending }   recorded and satisfied; pending is 1 when
                                   pending steps remain, else 0
-  { 2, pending }                  not recorded; its handle was closed
-  { 3, pending }                  a batch read, recorded and answered with the
-                                  messages saved since it last saw the stack
+  { 2, pending }                  not recorded; its inbox was closed
+  { 3, pending }                  a batch read, recorded and answered with a cut
 
 ]]
 
@@ -27,7 +28,6 @@ local keyStepsPending = KEYS[3]
 local keyWaits = KEYS[4]
 local keyMetadata = KEYS[5]
 
--- $include(inbox_wants.lua)
 -- $include(inbox_batch.lua)
 
 local waitID = ARGV[1]
@@ -35,27 +35,31 @@ local record = ARGV[2]
 local inbox = ARGV[3]
 local seen = ARGV[4]
 
-local decodedRecord = cjson.decode(record)
-local want = decodedRecord["want"]
-local batch = decodedRecord["batch"]
+local batch = cjson.decode(record)["batch"]
 
-if redis.call("HEXISTS", keyWaits, "closed:" .. waitID) == 1 then
+-- The record that an inbox is closed. See closeInbox.lua.
+if redis.call("HEXISTS", keyWaits, inbox .. ":closed") == 1 then
 	redis.call("SREM", keyStepsPending, waitID)
 
 	return { 2, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
 end
 
-redis.call("HSET", keyWaits, waitID, record)
+redis.call("HSET", keyWaits, inbox, record)
 
--- A batch read is answered with the messages it wants saved since it last saw
+-- A batch read is answered with a cut at the messages saved since it last saw
 -- the stack. It is answered at once if it never waits, if the SDK already holds
 -- unread messages, or if there are any. Otherwise it stays recorded and a
 -- message (or its timer) answers it.
 if batch ~= nil then
-	local ids = inbox_batch_ids(keyStep, keyStack, inbox, want, seen, batch["room"])
+	local cut = inbox_cut(keyStep, keyStack, inbox, seen, batch["max"])
 
-	if batch["drain"] or batch["unread"] or #ids > 0 then
-		inbox_batch_save(keyStep, keyMetadata, keyStack, waitID, seen, ids)
+	-- Unread messages the SDK holds are before the step it saw.
+	if cut == nil and batch["unread"] then
+		cut = inbox_cut(keyStep, keyStack, inbox, "", nil)
+	end
+
+	if batch["drain"] or batch["unread"] or cut ~= nil then
+		inbox_save_cut(keyStep, keyMetadata, keyStack, waitID, cut)
 		redis.call("SREM", keyStepsPending, waitID)
 
 		return { 3, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
@@ -64,32 +68,12 @@ if batch ~= nil then
 	return { 0 }
 end
 
--- Walk back from the tail to the step the SDK last saw; those are the steps
--- saved since, and the only ones worth reading.
-local gap = {}
-for i = redis.call("LLEN", keyStack) - 1, 0, -1 do
-	local stepID = redis.call("LINDEX", keyStack, i)
+local first = inbox_cut(keyStep, keyStack, inbox, seen, 1)
 
-	if stepID == seen then
-		break
-	end
+if first ~= nil then
+	redis.call("SREM", keyStepsPending, waitID)
 
-	table.insert(gap, 1, stepID)
-end
-
-for _, stepID in ipairs(gap) do
-	local value = redis.call("HGET", keyStep, stepID)
-
-	if value then
-		local ok, decoded = pcall(cjson.decode, value)
-
-		-- Only the executor writes this key, in the value of a message step.
-		if ok and type(decoded) == "table" and decoded["inngest/inbox"] == inbox and inbox_wants(want, decoded) then
-			redis.call("SREM", keyStepsPending, waitID)
-
-			return { 1, stepID, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
-		end
-	end
+	return { 1, first, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
 end
 
 return { 0 }

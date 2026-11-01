@@ -1,18 +1,19 @@
 --[[
 
-Closes a handle of an inbox. Saves the close op's result, takes the close op out
-of the pending set, then ends the reads the op names. A read that is recorded
-leaves the pending set and is returned with its record, which stays until the
-caller has queued its wake. Every named read is marked closed, so a read that
-is recorded after this call (the two ops can arrive in one response, in either
-order) is ended as it is recorded.
+Closes an inbox. Saves the close op's result, a cut at the last message the
+inbox has, takes the close op out of the pending set, records that the inbox is
+closed, then ends the inbox's wait. A wait that is recorded leaves the pending
+set and is returned with its record, which stays until the caller has queued its
+wake. The record of the close means a read that is recorded after this call
+(the two ops can arrive in one response, in either order) is ended as it is
+recorded, and a message that arrives after it is dropped.
 
-Closing again saves nothing, and returns the reads that are still recorded, so
-a close that crashed before its wakes were queued is repaired by running again.
+Closing again saves nothing, and returns the wait if it is still recorded, so a
+close that crashed before its wake was queued is repaired by running again.
 
 Output:
-  { pending, id, record, ... }  pending is 1 when pending steps remain, else 0;
-                                then each recorded read's id and record
+  { pending }          pending is 1 when pending steps remain, else 0; no wait
+  { pending, record }  the same, and the record of the wait that was ended
 
 ]]
 
@@ -22,38 +23,25 @@ local keyStack = KEYS[3]
 local keyStepsPending = KEYS[4]
 local keyWaits = KEYS[5]
 
+-- $include(inbox_batch.lua)
+
 local stepID = ARGV[1]
-local value = ARGV[2]
+local inbox = ARGV[2]
 
 if redis.call("HEXISTS", keyStep, stepID) == 0 then
-	redis.call("HINCRBY", keyMetadata, "state_size", #value)
-	redis.call("HINCRBY", keyMetadata, "step_count", 1)
-	redis.call("HSET", keyStep, stepID, value)
-	redis.call("RPUSH", keyStack, stepID)
+	inbox_save_cut(keyStep, keyMetadata, keyStack, stepID, inbox_cut(keyStep, keyStack, inbox, "", nil))
 end
 
 redis.call("SREM", keyStepsPending, stepID)
 
-local ended = {}
+-- The record that the inbox is closed: the close op that closed it.
+redis.call("HSET", keyWaits, inbox .. ":closed", stepID)
 
-for i = 3, #ARGV do
-	local waitID = ARGV[i]
-	local record = redis.call("HGET", keyWaits, waitID)
+local record = redis.call("HGET", keyWaits, inbox)
+if record then
+	redis.call("SREM", keyStepsPending, cjson.decode(record).id)
 
-	if record then
-		redis.call("SREM", keyStepsPending, waitID)
-
-		table.insert(ended, waitID)
-		table.insert(ended, record)
-	end
-
-	-- A decoded mark has no inbox, so an arrival passes over it.
-	redis.call("HSET", keyWaits, "closed:" .. waitID, "{}")
+	return { redis.call("SCARD", keyStepsPending) > 0 and 1 or 0, record }
 end
 
-local result = { redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
-for _, v in ipairs(ended) do
-	table.insert(result, v)
-end
-
-return result
+return { redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }

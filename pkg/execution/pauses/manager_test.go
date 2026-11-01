@@ -427,20 +427,20 @@ func (m *mockRunService) SetDeferStatus(ctx context.Context, id statev2.ID, hash
 func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id statev2.ID, fnSlug string, hashedID string) error {
 	return nil
 }
-func (m *mockRunService) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) ([]statev2.InboxWake, error) {
+func (m *mockRunService) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) (*statev2.InboxWake, error) {
 	return nil, nil
 }
 func (m *mockRunService) RecordInboxWait(ctx context.Context, id statev2.ID, wait statev2.InboxWait) (*statev2.InboxWake, error) {
 	return nil, nil
 }
-func (m *mockRunService) TimeoutInboxWait(ctx context.Context, id statev2.ID, waitID string, data []byte) (*statev2.InboxWake, error) {
+func (m *mockRunService) TimeoutInboxWait(ctx context.Context, id statev2.ID, inbox string, waitID string, data []byte) (*statev2.InboxWake, error) {
 	return nil, nil
 }
-func (m *mockRunService) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) ([]statev2.InboxWake, bool, error) {
+func (m *mockRunService) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) (*statev2.InboxWake, bool, error) {
 	return nil, false, nil
 }
 
-func (m *mockRunService) DeleteInboxWait(ctx context.Context, id statev2.ID, waitID string) error {
+func (m *mockRunService) DeleteInboxWait(ctx context.Context, id statev2.ID, inbox string, waitID string) error {
 	return nil
 }
 

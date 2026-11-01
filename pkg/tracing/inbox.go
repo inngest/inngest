@@ -12,8 +12,8 @@ import (
 )
 
 // A tick is a small span on the row of its parent: something that happened to
-// the parent that is not a row of its own. An inbox draws one under its open or
-// listen row for each message that arrives, and one under a read's row for
+// the parent that is not a row of its own. An inbox draws one under its open
+// row for each message that arrives, and one under a read's row for
 // each message the read took. The trace API rolls ticks onto their parent's
 // row, so no tick is drawn as a row.
 

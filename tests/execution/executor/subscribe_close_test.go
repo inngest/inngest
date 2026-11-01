@@ -9,37 +9,19 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/stretchr/testify/require"
 )
 
-// closeOp is the op an SDK reports for handle.close(): the unread ids it
-// computed, the source pauses to delete, and the reads that were waiting under
-// the handle.
-func closeOp(close string, inbox string, ids []string, pauses []map[string]any, waits ...string) *state.GeneratorOpcode {
-	return closeRowsOp(close, inbox, nil, ids, pauses, waits...)
-}
-
-// closeRowsOp is closeOp for a handle whose rows are the open and listen ops
-// it closes.
-func closeRowsOp(close string, inbox string, rows []string, ids []string, pauses []map[string]any, waits ...string) *state.GeneratorOpcode {
-	if rows == nil {
-		rows = []string{}
-	}
-	if ids == nil {
-		ids = []string{}
-	}
-	if pauses == nil {
-		pauses = []map[string]any{}
-	}
-	if waits == nil {
-		waits = []string{}
-	}
-
+// closeOp is the op an SDK reports for inbox.close(): it names the inbox and
+// nothing else. The executor knows the inbox's pauses, its waiting read and its
+// last message.
+func closeOp(close string, inbox string) *state.GeneratorOpcode {
 	return &state.GeneratorOpcode{
 		Op:   enums.OpcodeSubscribeClose,
 		ID:   close,
 		Name: close,
-		Opts: map[string]any{"inbox": inbox, "ids": ids, "pauses": pauses, "waits": waits, "rows": rows},
+		Opts: map[string]any{"inbox": inbox},
 	}
 }
 
@@ -49,80 +31,100 @@ func (h *subscribeHarness) closeJobID(wait string) string {
 	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-close", h.run.IdempotencyKey(), wait))
 }
 
-// closedIDs is the ids a close op saved as its result.
-func (h *subscribeHarness) closedIDs(close string) []string {
+// cutOf is the cut a close op saved as its result: the last message of the
+// inbox at the time of the close, empty if the inbox had none.
+func (h *subscribeHarness) cutOf(close string) string {
 	h.t.Helper()
 
 	saved, ok := h.steps()[close]
 	require.True(h.t, ok, "the record of %s is saved", close)
 
 	var record struct {
-		Data []string `json:"data"`
+		Cut *string `json:"cut"`
 	}
 	require.NoError(h.t, json.Unmarshal([]byte(saved), &record))
+	if record.Cut == nil {
+		return ""
+	}
 
-	return record.Data
+	return *record.Cut
 }
 
-// Closing a view deletes the pauses it names and saves the ids the SDK gave as
-// the op's result. The inbox's own source keeps receiving.
-func TestSubscribeCloseDeletesItsPausesAndSavesTheIds(t *testing.T) {
-	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a"))
-	h.report(listenOp("inbox:listen", "inbox", "test/b"))
-
-	listen := h.listenPause("inbox:listen", "test/b")
-	require.NotNil(t, listen)
-
-	a1 := newEventID()
-	require.NoError(t, h.deliverID(a1, event.Event{Name: "test/a", Data: map[string]any{"n": 1}}))
-
-	h.report(closeOp("inbox:listen:close", "inbox", []string{"one", "two"}, []map[string]any{
-		{"id": listen.ID.String(), "event": "test/b"},
-	}))
-
-	require.Nil(t, h.listenPause("inbox:listen", "test/b"), "the view's pause is deleted")
-	require.NotNil(t, h.sourcePause("inbox", "test/a"), "the inbox's own pause stays")
-	require.Equal(t, []string{"one", "two"}, h.closedIDs("inbox:listen:close"), "the SDK's ids are the result")
-
-	b := newEventID()
-	require.NoError(t, h.deliverID(b, event.Event{Name: "test/b", Data: map[string]any{"n": 2}}))
-	require.NotContains(t, h.steps(), messageStepID("inbox", b), "nothing arrives through a closed view's source")
-
-	a2 := newEventID()
-	require.NoError(t, h.deliverID(a2, event.Event{Name: "test/a", Data: map[string]any{"n": 3}}))
-	require.Contains(t, h.steps(), messageStepID("inbox", a2), "the inbox still receives its own source")
-}
-
-// A message that lands before the close is handled is not in the ids the SDK
-// computed, and the executor does not add it.
-func TestSubscribeCloseIdsAreTheSDKs(t *testing.T) {
-	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a"))
-	pause := h.sourcePause("inbox", "test/a")
-	require.NotNil(t, pause)
+// Closing deletes the pauses of every source of the inbox, and saves the last
+// message the inbox had as the op's cut.
+func TestSubscribeCloseDeletesTheInboxPausesAndSavesTheCut(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a", "test/b"))
+	require.NotNil(t, h.sourcePause("inbox", "test/a"))
+	require.NotNil(t, h.sourcePause("inbox", "test/b"))
 
 	first := newEventID()
 	require.NoError(t, h.deliverID(first, event.Event{Name: "test/a", Data: map[string]any{"n": 1}}))
-	computed := []string{messageStepID("inbox", first)}
+	last := newEventID()
+	require.NoError(t, h.deliverID(last, event.Event{Name: "test/b", Data: map[string]any{"n": 2}}))
 
-	late := newEventID()
-	require.NoError(t, h.deliverID(late, event.Event{Name: "test/a", Data: map[string]any{"n": 2}}))
+	h.report(closeOp("inbox:close", "inbox"))
 
-	h.report(closeOp("inbox:close", "inbox", computed, []map[string]any{{"id": pause.ID.String(), "event": "test/a"}}))
+	require.Nil(t, h.sourcePause("inbox", "test/a"), "every source pause is deleted")
+	require.Nil(t, h.sourcePause("inbox", "test/b"), "every source pause is deleted")
+	require.Equal(t, messageStepID("inbox", last), h.cutOf("inbox:close"), "the cut is the last message")
 
-	require.Contains(t, h.steps(), messageStepID("inbox", late), "the late message is in state")
-	require.Equal(t, computed, h.closedIDs("inbox:close"), "but it is not in the ids")
-	require.Nil(t, h.sourcePause("inbox", "test/a"))
+	after := newEventID()
+	require.NoError(t, h.deliverID(after, event.Event{Name: "test/a", Data: map[string]any{"n": 3}}))
+	require.NotContains(t, h.steps(), messageStepID("inbox", after), "nothing arrives through a closed inbox")
 }
 
-// A read that is waiting when its handle closes loses its record and its timer,
+// A close of an inbox that received nothing has no cut.
+func TestSubscribeCloseOfAnEmptyInboxHasNoCut(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a"))
+
+	h.report(closeOp("inbox:close", "inbox"))
+
+	require.Equal(t, `{"cut":null}`, h.steps()["inbox:close"])
+}
+
+// An arrival that matched a pause before the close deleted it is dropped when
+// it reaches state after the close: the inbox is closed.
+func TestSubscribeMessageAfterCloseIsDropped(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a"))
+	h.report(closeOp("inbox:close", "inbox"))
+
+	id := newEventID()
+	_, err := h.infra.smv2.SaveInboxMessage(h.infra.ctx, h.run.ID, statev2.InboxMessage{
+		StepID: messageStepID("inbox", id),
+		Inbox:  "inbox",
+		Value:  []byte(`{"data":{"name":"test/a"},"inngest/inbox":"inbox"}`),
+	})
+	require.ErrorIs(t, err, statev2.ErrInboxClosed)
+	require.NotContains(t, h.steps(), messageStepID("inbox", id))
+}
+
+// An arrival for a run that has ended is dropped and does not bring its keys
+// back.
+func TestSubscribeMessageAfterRunEndIsDropped(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/a"))
+	require.NoError(t, h.infra.smv2.Delete(h.infra.ctx, h.run.ID))
+
+	id := newEventID()
+	_, err := h.infra.smv2.SaveInboxMessage(h.infra.ctx, h.run.ID, statev2.InboxMessage{
+		StepID: messageStepID("inbox", id),
+		Inbox:  "inbox",
+		Value:  []byte(`{"data":{"name":"test/a"},"inngest/inbox":"inbox"}`),
+	})
+	require.ErrorIs(t, err, state.ErrRunNotFound)
+
+	exists, err := h.infra.smv2.Exists(h.infra.ctx, h.run.ID)
+	require.NoError(t, err)
+	require.False(t, exists)
+}
+
+// A read that is waiting when its inbox closes loses its record and its timer,
 // and the run is woken once with a job named by the read and the close.
 func TestSubscribeCloseEndsWaitingReads(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
-	pause := h.sourcePause("inbox", "test/msg")
 	h.report(subscribeWaitTimeoutOp("next-1", "inbox", "inbox", "1m"))
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.timerJobID("next-1")), "the read armed a timer")
 
-	h.report(closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}, "next-1"))
+	h.report(closeOp("inbox:close", "inbox"))
 
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.closeJobID("next-1")), "the run was woken for the read")
 	require.Zero(t, timesIn(h.jobIDs(), h.timerJobID("next-1")), "the read's timer is gone")
@@ -133,10 +135,9 @@ func TestSubscribeCloseEndsWaitingReads(t *testing.T) {
 // saved but before the wake is queued loses nothing.
 func TestSubscribeCloseCrashBeforeWakeIsRepaired(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
-	pause := h.sourcePause("inbox", "test/msg")
 	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
 
-	op := closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}, "next-1")
+	op := closeOp("inbox:close", "inbox")
 
 	h.crash.arm("after:CloseInbox")
 	h.driver.response = &state.DriverResponse{StatusCode: 206, RequestVersion: 2, Generator: []*state.GeneratorOpcode{op}}
@@ -153,9 +154,8 @@ func TestSubscribeCloseCrashBeforeWakeIsRepaired(t *testing.T) {
 // handles first, the read is ended and the run is woken.
 func TestSubscribeCloseBeforeTheReadItEnds(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
-	pause := h.sourcePause("inbox", "test/msg")
 
-	h.report(closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}, "next-1"))
+	h.report(closeOp("inbox:close", "inbox"))
 	require.Zero(t, timesIn(h.jobIDs(), h.closeJobID("next-1")), "no read was waiting yet")
 
 	// The read is recorded after the close was handled.
@@ -168,12 +168,11 @@ func TestSubscribeCloseBeforeTheReadItEnds(t *testing.T) {
 // pending and the run is woken by the close.
 func TestSubscribeCloseTakesReadsOutOfThePendingSet(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
-	pause := h.sourcePause("inbox", "test/msg")
 	h.report(plannedOp("work"), subscribeWaitOp("next-1", "inbox", "inbox"))
 	// The read's timer leaves the queue when the read is satisfied or closed.
 	queued := len(h.jobIDs()) - 1
 
-	h.report(closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}, "next-1"))
+	h.report(closeOp("inbox:close", "inbox"))
 	require.Equal(t, queued, len(h.jobIDs()), "the step is still pending, so the close queued no discovery")
 
 	hasPending, err := h.infra.smv2.SaveStep(h.infra.ctx, h.run.ID, "work", []byte(`{"data":"done"}`))
@@ -185,9 +184,8 @@ func TestSubscribeCloseTakesReadsOutOfThePendingSet(t *testing.T) {
 // close() has to continue.
 func TestSubscribeCloseWithNoReadsWakesTheRun(t *testing.T) {
 	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
-	pause := h.sourcePause("inbox", "test/msg")
 	before := len(h.jobIDs())
 
-	h.report(closeOp("inbox:close", "inbox", nil, []map[string]any{{"id": pause.ID.String(), "event": "test/msg"}}))
+	h.report(closeOp("inbox:close", "inbox"))
 	require.Equal(t, before+1, len(h.jobIDs()), "one job continues the run")
 }

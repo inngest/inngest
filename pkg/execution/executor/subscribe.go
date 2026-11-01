@@ -33,13 +33,12 @@ import (
 // then a record that the inbox is open. A matching event is saved as a message
 // step of the inbox, and wakes a read only while one is waiting. A read with
 // nothing unread reports an OpcodeSubscribeWait op, which is recorded in run
-// state and satisfied by the first message it wants.
+// state and satisfied by the first message of the inbox.
 
 // inboxMessageValue is the value saved for a message step.
 type inboxMessageValue struct {
 	Data  map[string]any `json:"data"`
 	Inbox string         `json:"inngest/inbox"`
-	Src   []string       `json:"src"`
 }
 
 // An arrival that does not fit in the run's step or state size bounds saves
@@ -79,14 +78,9 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	now := e.now()
 	opcode := gen.Op.String()
 
-	// A listen op adds sources to an inbox that is open; its messages belong to
-	// that inbox, and its pauses are named by the listen op.
 	inbox := gen.ID
-	if opts.Inbox != "" {
-		inbox = opts.Inbox
-	}
 
-	pauseIDs := []string{}
+	sources := []inboxSourcePause{}
 
 	for _, source := range opts.Sources {
 		if source.If != nil {
@@ -137,12 +131,12 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 			return err
 		}
 
-		pauseIDs = append(pauseIDs, pause.ID.String())
+		sources = append(sources, inboxSourcePause{ID: pause.ID.String(), Event: source.Event})
 	}
 
-	// The open record names the pauses of the sources, so that the SDK can tell
-	// which messages came through them.
-	record, err := json.Marshal(map[string]any{"data": map[string]any{"pauses": pauseIDs}})
+	// The open record names the pauses of the sources, so that a close can
+	// delete them.
+	record, err := json.Marshal(map[string]any{"data": map[string]any{"pauses": sources}})
 	if err != nil {
 		return fmt.Errorf("error encoding the record of an inbox: %w", err)
 	}
@@ -174,7 +168,14 @@ func (e *executor) handleGeneratorSubscribe(ctx context.Context, runCtx executio
 	)
 }
 
-// emitInboxOpenSpan draws the row of an open or listen op. It runs until a close
+// inboxSourcePause is a source pause as the open record of an inbox names it.
+// The event name is part of where the pause is stored.
+type inboxSourcePause struct {
+	ID    string `json:"id"`
+	Event string `json:"event"`
+}
+
+// emitInboxOpenSpan draws the row of an open op. It runs until a close
 // ends it; an inbox that is never closed is drawn ended with its run when the
 // trace is read.
 func (e *executor) emitInboxOpenSpan(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) {
@@ -217,20 +218,19 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	// A read that never waits (`drain()`) is answered at once and needs none.
 	drain := opts.Batch != nil && opts.Batch.Drain
 	if !drain {
-		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
+		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Inbox, opts.Timeout); err != nil {
 			return err
 		}
 	}
 
 	var batch *sv2.InboxBatch
 	if opts.Batch != nil {
-		batch = &sv2.InboxBatch{Drain: opts.Batch.Drain, Unread: opts.Batch.Unread, Room: opts.Batch.Room}
+		batch = &sv2.InboxBatch{Drain: opts.Batch.Drain, Unread: opts.Batch.Unread, Max: opts.Batch.Max}
 	}
 
 	wake, err := e.smv2.RecordInboxWait(ctx, md.ID, sv2.InboxWait{
 		ID:                  gen.ID,
 		Inbox:               opts.Inbox,
-		Want:                opts.Want,
 		Seen:                opts.Seen,
 		Timer:               !drain,
 		Batch:               batch,
@@ -302,12 +302,12 @@ func (e *executor) handleGeneratorSubscribeRead(ctx context.Context, runCtx exec
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "SubscribeRead")
 }
 
-// handleGeneratorSubscribeClose closes a handle of an inbox: it deletes the
-// pauses of the handle's sources, saves the ids the SDK computed as the op's
-// result, and ends the reads waiting under the handle. The result is saved in
-// the same call that takes those reads out of the pending set, before their
-// wakes are queued, so the run that the wake starts finds the close recorded. A
-// close that crashed in between is repaired by being handled again.
+// handleGeneratorSubscribeClose closes an inbox: it deletes the pauses of the
+// inbox's sources, saves a cut at the last message the inbox has as the op's
+// result, and ends the inbox's waiting read. The result is saved in the same
+// call that takes the read out of the pending set, before its wake is queued,
+// so the run that the wake starts finds the close recorded. A close that
+// crashed in between is repaired by being handled again.
 func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	opts, err := gen.SubscribeCloseOpts()
 	if err != nil {
@@ -316,65 +316,63 @@ func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx exe
 
 	md := runCtx.Metadata()
 
-	if err := e.deleteSourcePauses(ctx, md, opts.Pauses); err != nil {
+	if err := e.deleteSourcePauses(ctx, md, opts.Inbox); err != nil {
 		return err
 	}
 
-	ids := opts.IDs
-	if ids == nil {
-		ids = []string{}
-	}
-
-	record, err := json.Marshal(map[string]any{"data": ids})
-	if err != nil {
-		return fmt.Errorf("error encoding the record of a close: %w", err)
-	}
-
-	wakes, hasPendingSteps, err := e.smv2.CloseInbox(ctx, md.ID, sv2.InboxClose{
+	wake, hasPendingSteps, err := e.smv2.CloseInbox(ctx, md.ID, sv2.InboxClose{
 		StepID: gen.ID,
-		Value:  record,
-		Waits:  opts.Waits,
+		Inbox:  opts.Inbox,
 	})
 	if err != nil {
 		return err
 	}
 
 	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
-	e.endInboxRows(ctx, md, opts.Rows)
+	e.endInboxRow(ctx, md, opts.Inbox)
 
 	if err := runCtx.ReleaseCapacityLease(); err != nil {
 		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
 	}
 
-	// The wakes continue the run; a close that ended no read does it itself.
-	if len(wakes) == 0 {
-		groupID := uuid.New().String()
-
-		return e.maybeEnqueueDiscoveryStep(
-			state.WithGroupID(ctx, groupID),
-			runCtx,
-			gen,
-			edge,
-			groupID,
-			hasPendingSteps,
-			runCtx.LifecycleItem().ParallelCoalesceKey,
-		)
+	// The wake continues the run; a close that ended no read does it itself.
+	if wake != nil {
+		return e.wakeInboxRead(ctx, md.ID, *wake)
 	}
 
-	var goerr error
-	for _, wake := range wakes {
-		if err := e.wakeInboxRead(ctx, md.ID, wake); err != nil {
-			goerr = errors.Join(goerr, err)
+	groupID := uuid.New().String()
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		runCtx,
+		gen,
+		edge,
+		groupID,
+		hasPendingSteps,
+		runCtx.LifecycleItem().ParallelCoalesceKey,
+	)
+}
+
+// deleteSourcePauses deletes the pauses of an inbox's sources, which its open
+// record names. A pause that is already gone is a close that ran before.
+func (e *executor) deleteSourcePauses(ctx context.Context, md *sv2.Metadata, inbox string) error {
+	saved, err := e.smv2.LoadStepsWithIDs(ctx, md.ID, []string{inbox})
+	if err != nil {
+		return fmt.Errorf("error loading the record of an inbox to close: %w", err)
+	}
+
+	var record struct {
+		Data struct {
+			Pauses []inboxSourcePause `json:"pauses"`
+		} `json:"data"`
+	}
+	if raw, ok := saved[inbox]; ok {
+		if err := json.Unmarshal(raw, &record); err != nil {
+			return fmt.Errorf("error decoding the record of an inbox to close: %w", err)
 		}
 	}
 
-	return goerr
-}
-
-// deleteSourcePauses deletes the pauses of the sources a close names. A pause
-// that is already gone is a close that ran before.
-func (e *executor) deleteSourcePauses(ctx context.Context, md *sv2.Metadata, sources []state.SubscribeClosePause) error {
-	for _, source := range sources {
+	for _, source := range record.Data.Pauses {
 		id, err := uuid.Parse(source.ID)
 		if err != nil {
 			return fmt.Errorf("invalid source pause id %q: %w", source.ID, err)
@@ -417,7 +415,7 @@ func inboxTimerJobID(md *sv2.Metadata, wait string) string {
 // A read with no timeout (an empty `timeout`) is timed at the furthest a wait
 // can be: its timer does nothing when it fires, and exists to keep the run's
 // queue item.
-func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, timeout string) error {
+func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, inbox string, timeout string) error {
 	untimed := timeout == ""
 
 	expires := e.now().Add(consts.MaxWaitForEventTimeout)
@@ -448,7 +446,7 @@ func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunCont
 		MaxAttempts:         runCtx.MaxAttempts(),
 		ParallelMode:        gen.ParallelMode(),
 		ParallelCoalesceKey: group.ParallelCoalesceKey,
-		Subscribe:           &state.PauseSubscribe{Untimed: untimed},
+		Subscribe:           &state.PauseSubscribe{Inbox: inbox, Untimed: untimed},
 		CreatedAt:           e.now(),
 	}
 
@@ -515,7 +513,7 @@ func (e *executor) timeoutInboxRead(ctx context.Context, pause state.Pause) erro
 
 	id := sv2.IDFromPause(pause)
 
-	wake, err := e.smv2.TimeoutInboxWait(ctx, id, pause.DataKey, []byte("null"))
+	wake, err := e.smv2.TimeoutInboxWait(ctx, id, pause.Subscribe.Inbox, pause.DataKey, []byte("null"))
 	if err != nil {
 		if errors.Is(err, state.ErrRunNotFound) {
 			return nil
@@ -628,22 +626,20 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 		}
 	}
 
-	return e.smv2.DeleteInboxWait(ctx, id, wait.ID)
+	return e.smv2.DeleteInboxWait(ctx, id, wait.Inbox, wait.ID)
 }
 
-// endInboxRows ends the rows of the open and listen ops a close names.
-func (e *executor) endInboxRows(ctx context.Context, md *sv2.Metadata, rows []string) {
-	for _, row := range rows {
-		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "executor.endInboxRows"},
-			Metadata:   md,
-			Status:     enums.StepStatusCompleted,
-			TargetSpan: tracing.FinalizedStepSpanRefFromMetadataAndStepID(md, row),
-			EndTime:    e.now(),
-		})
-		if err != nil {
-			e.log.Debug("error ending the row of an inbox", "error", err)
-		}
+// endInboxRow ends the row of the open op a close names.
+func (e *executor) endInboxRow(ctx context.Context, md *sv2.Metadata, row string) {
+	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		Debug:      &tracing.SpanDebugData{Location: "executor.endInboxRow"},
+		Metadata:   md,
+		Status:     enums.StepStatusCompleted,
+		TargetSpan: tracing.FinalizedStepSpanRefFromMetadataAndStepID(md, row),
+		EndTime:    e.now(),
+	})
+	if err != nil {
+		e.log.Debug("error ending the row of an inbox", "error", err)
 	}
 }
 
@@ -675,10 +671,9 @@ type inboxArrival struct {
 	inbox string
 	// incoming is the step the inbox's open op leads to.
 	incoming string
-	src      []string
-	// ops are the sources' pauses by the op that owns them: the open op or a
-	// listen op. A message is a tick on the row of each.
-	ops map[string][]string
+	// src are the pauses of the sources the event matched. They are drawn on
+	// the message's tick, and not saved with the message.
+	src []string
 }
 
 type inboxArrivalsKey struct{}
@@ -719,11 +714,6 @@ func (a *inboxArrivals) add(pause *state.Pause) {
 
 	if !slices.Contains(arrival.src, pause.ID.String()) {
 		arrival.src = append(arrival.src, pause.ID.String())
-
-		if arrival.ops == nil {
-			arrival.ops = map[string][]string{}
-		}
-		arrival.ops[pause.Outgoing] = append(arrival.ops[pause.Outgoing], pause.ID.String())
 	}
 }
 
@@ -733,14 +723,9 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 	var goerr error
 
 	for _, arrival := range arrivals.arrivals {
-		// Sources are listed in a stable order, so a redelivery saves the same
-		// value.
-		slices.Sort(arrival.src)
-
 		value, err := json.Marshal(inboxMessageValue{
 			Data:  evt.GetEvent().Map(),
 			Inbox: arrival.inbox,
-			Src:   arrival.src,
 		})
 		if err != nil {
 			goerr = errors.Join(goerr, fmt.Errorf("error encoding inbox message: %w", err))
@@ -750,7 +735,7 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 
 		stepID := inboxMessageStepID(arrival.inbox, evt.GetInternalID())
 
-		wakes, err := e.smv2.SaveInboxMessage(ctx, arrival.id, sv2.InboxMessage{
+		wake, err := e.smv2.SaveInboxMessage(ctx, arrival.id, sv2.InboxMessage{
 			StepID:       stepID,
 			Inbox:        arrival.inbox,
 			Value:        value,
@@ -764,7 +749,9 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 
 			continue
 		}
-		if errors.Is(err, state.ErrRunNotFound) {
+		// A message that reaches state after its inbox closed or its run ended
+		// is not wanted by anyone.
+		if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrInboxClosed) {
 			continue
 		}
 		if errors.Is(err, state.ErrDuplicateResponse) {
@@ -780,8 +767,8 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 
 		e.tickInboxArrival(ctx, arrival, stepID)
 
-		for _, wake := range wakes {
-			if err := e.wakeInboxRead(ctx, arrival.id, wake); err != nil {
+		if wake != nil {
+			if err := e.wakeInboxRead(ctx, arrival.id, *wake); err != nil {
 				goerr = errors.Join(goerr, err)
 			}
 		}
@@ -790,8 +777,8 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 	return goerr
 }
 
-// tickInboxArrival draws the message as a tick on the row of each op whose
-// sources it came through. Traces are best effort: a failure is logged.
+// tickInboxArrival draws the message as a tick on the row of the inbox. Traces
+// are best effort: a failure is logged.
 func (e *executor) tickInboxArrival(ctx context.Context, arrival *inboxArrival, stepID string) {
 	md, err := e.smv2.LoadMetadata(ctx, arrival.id)
 	if err != nil {
@@ -800,13 +787,10 @@ func (e *executor) tickInboxArrival(ctx context.Context, arrival *inboxArrival, 
 		return
 	}
 
-	now := e.now()
-	for op, pauses := range arrival.ops {
-		slices.Sort(pauses)
+	slices.Sort(arrival.src)
 
-		if err := tracing.InboxArrivalTick(ctx, e.tracerProvider, &md, op, stepID, pauses, now); err != nil {
-			logger.StdlibLogger(ctx).Warn("could not draw an inbox arrival", "error", err)
-		}
+	if err := tracing.InboxArrivalTick(ctx, e.tracerProvider, &md, arrival.inbox, stepID, arrival.src, e.now()); err != nil {
+		logger.StdlibLogger(ctx).Warn("could not draw an inbox arrival", "error", err)
 	}
 }
 
