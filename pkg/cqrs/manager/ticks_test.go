@@ -95,6 +95,19 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 		require.Equal(t, arrived.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
 		require.Equal(t, read.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
 
+		// The arrival is also a tick on the row of the inbox, which the trace
+		// draws as a circle on its bar; a read's tick has the arrival time too.
+		require.Len(t, inbox.Ticks, 1)
+		require.Equal(t, "m1", inbox.Ticks[0].ID)
+		require.Equal(t, []string{"p1"}, inbox.Ticks[0].Sources)
+		require.Equal(t, arrived.UnixMilli(), inbox.Ticks[0].At.UnixMilli())
+		require.Nil(t, inbox.Ticks[0].ReadAt)
+
+		require.Len(t, took.Ticks, 1)
+		require.Equal(t, arrived.UnixMilli(), took.Ticks[0].At.UnixMilli())
+		require.NotNil(t, took.Ticks[0].ReadAt)
+		require.Equal(t, read.UnixMilli(), took.Ticks[0].ReadAt.UnixMilli())
+
 		require.Len(t, took.Metadata, 1)
 		require.Equal(t, metadata.Kind("inngest.inbox"), took.Metadata[0].Kind)
 		require.JSONEq(t, `["m1"]`, string(took.Metadata[0].Values["messages"]))

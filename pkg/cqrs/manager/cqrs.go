@@ -819,6 +819,16 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 			took[parentID] = append(took[parentID], *attrs.TickID)
 		}
 
+		// The tick also stays on its row, for a UI that draws it as a marker.
+		rolled := &cqrs.SpanTick{ID: *attrs.TickID, Sources: []string{}, ReadAt: attrs.TickReadAt}
+		if attrs.TickSources != nil {
+			rolled.Sources = *attrs.TickSources
+		}
+		if at, ok := arrivals[rolled.ID]; ok {
+			rolled.At = at
+		}
+		parent.Ticks = append(parent.Ticks, rolled)
+
 		completed := enums.StepStatusCompleted
 		name := *attrs.TickID
 		tick.Name = meta.SpanNameStep
