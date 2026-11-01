@@ -28,7 +28,7 @@ func closeOp(close string, inbox string) *state.GeneratorOpcode {
 // closeJobID is the id of the job that runs the step after a read that a close
 // ended, as the queue stores it (hashed).
 func (h *subscribeHarness) closeJobID(wait string) string {
-	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-close", h.run.IdempotencyKey(), wait))
+	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-wake", h.run.IdempotencyKey(), wait))
 }
 
 // cutOf is the cut a close op saved as its result: the last message of the

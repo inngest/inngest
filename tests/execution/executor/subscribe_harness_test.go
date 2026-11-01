@@ -171,6 +171,8 @@ func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg 
 }
 
 func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, inbox string, waitID string, data []byte) (*statev2.InboxWake, error) {
+	s.crash.await("before:TimeoutInboxWait")
+
 	if err := s.crash.fire("before:TimeoutInboxWait"); err != nil {
 		return nil, err
 	}
@@ -192,6 +194,17 @@ func (s crashingState) RecordInboxWait(ctx context.Context, id statev2.ID, wait 
 	}
 
 	return wake, s.crash.fire("after:RecordInboxWait")
+}
+
+func (s crashingState) DeleteInboxWait(ctx context.Context, id statev2.ID, inbox string, waitID string) error {
+	s.crash.await("before:DeleteInboxWait")
+
+	err := s.RunService.DeleteInboxWait(ctx, id, inbox, waitID)
+	if err != nil {
+		return err
+	}
+
+	return s.crash.fire("after:DeleteInboxWait")
 }
 
 func (s crashingState) CloseInbox(ctx context.Context, id statev2.ID, closing statev2.InboxClose) (*statev2.InboxWake, bool, error) {

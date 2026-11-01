@@ -83,3 +83,62 @@ func TestSubscribeMessageWakeOfAReadReportedAgainIsOneJob(t *testing.T) {
 
 	require.Len(t, h.newJobs(before), 1, "one job continues the run after the message")
 }
+
+// discoveries is the queue items made since before, other than the timer of a
+// read: each is a job that runs every step after the read.
+func (h *subscribeHarness) discoveries(before []string) int {
+	h.t.Helper()
+
+	n := 0
+	for _, id := range h.newJobs(before) {
+		if id != h.timerJobID("next-1") {
+			n++
+		}
+	}
+
+	return n
+}
+
+// A message takes a read out of the pending set but leaves its record until its
+// wake is queued and the record deleted. A close that runs in that window finds
+// the same record. The read is woken once.
+func TestSubscribeCloseDuringAMessageWakeWakesOnce(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
+	before := h.jobIDs()
+
+	h.crash.hold("before:CloseInbox", "after:SaveInboxMessage")
+	h.crash.hold("before:DeleteInboxWait", "after:CloseInbox")
+
+	delivered := make(chan error, 1)
+	go func() {
+		delivered <- h.deliver(event.Event{Name: "test/msg", Data: map[string]any{"n": 1}})
+	}()
+
+	h.report(closeOp("inbox:close", "inbox"))
+	require.NoError(t, <-delivered)
+
+	require.Equal(t, 1, h.discoveries(before), "one job continues the run after the read")
+}
+
+// The same for the timer of the read: it runs between the message's save and
+// the deletion of the record.
+func TestSubscribeTimeoutDuringAMessageWakeWakesOnce(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitTimeoutOp("next-1", "inbox", "inbox", "1m"))
+	tm := h.timerOf("next-1")
+	before := h.jobIDs()
+
+	h.crash.hold("before:TimeoutInboxWait", "after:SaveInboxMessage")
+	h.crash.hold("before:DeleteInboxWait", "after:TimeoutInboxWait")
+
+	delivered := make(chan error, 1)
+	go func() {
+		delivered <- h.deliver(event.Event{Name: "test/msg", Data: map[string]any{"n": 1}})
+	}()
+
+	require.NoError(t, h.runTimer(tm))
+	require.NoError(t, <-delivered)
+
+	require.Equal(t, 1, h.discoveries(before), "one job continues the run after the read")
+}

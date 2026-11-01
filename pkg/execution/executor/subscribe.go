@@ -555,19 +555,13 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 			return fmt.Errorf("error resetting force step plan: %w", err)
 		}
 
-		// A read has one job per way it can end, named by the read and the
-		// reason. The response that reported the read is no part of the name:
-		// the SDK reports a pending read again, in responses with other ops,
-		// and every path that ends the read must name the same job.
-		suffix := "message"
-		switch {
-		case wake.TimedOut:
-			suffix = "timeout"
-		case wake.Closed:
-			suffix = "close"
-		}
-
-		jobID := fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)
+		// A read ends once, so it has one wake job, named by the read alone.
+		// The response that reported the read is no part of the name (the SDK
+		// reports a pending read again, in responses with other ops), and
+		// neither is the reason: a message, a timeout and a close can each
+		// find the read's record before the first of them has deleted it, and
+		// every one of them must name the same job.
+		jobID := fmt.Sprintf("%s-%s-wake", md.IdempotencyKey(), wait.ID)
 
 		nextItem := queue.Item{
 			JobID:                 &jobID,
