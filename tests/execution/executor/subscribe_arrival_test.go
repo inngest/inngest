@@ -234,3 +234,47 @@ func TestSubscribeEventInTwoInboxesIsSavedOncePerInbox(t *testing.T) {
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-one", "")), "the read of the first inbox was woken")
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-two", "")), "the read of the second inbox was woken")
 }
+
+// A message that is saved again after the run moved on does not answer a read
+// recorded since: the read is waiting for a newer message.
+func TestSubscribeRedeliveredMessageLeavesALaterReadWaiting(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+
+	id := newEventID()
+	evt := event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}
+	msg := messageStepID("inbox", id)
+	require.NoError(t, h.deliverID(id, evt))
+
+	// The SDK read the message, then waits for the next one.
+	h.report(subscribeWaitOp("next-2", "inbox", msg))
+	jobs := len(h.jobIDs())
+
+	require.NoError(t, h.deliverID(id, evt))
+
+	waits, err := h.infra.smv2.LoadInboxWaits(h.infra.ctx, h.run.ID)
+	require.NoError(t, err)
+	require.Len(t, waits.Waits, 1)
+	require.Equal(t, "next-2", waits.Waits[0].ID, "the read is still recorded")
+	require.Equal(t, jobs, len(h.jobIDs()), "the redelivery woke nothing")
+}
+
+// The same for a waiting batch read: the redelivery does not answer it with an
+// empty cut.
+func TestSubscribeRedeliveredMessageLeavesALaterBatchReadWaiting(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+
+	id := newEventID()
+	evt := event.Event{Name: "test/msg", Data: map[string]any{"n": 1}}
+	msg := messageStepID("inbox", id)
+	require.NoError(t, h.deliverID(id, evt))
+
+	h.report(subscribeBatchOp("batch-2", "inbox", msg, map[string]any{}))
+	require.NotContains(t, h.steps(), "batch-2", "nothing is unread, so the read waits")
+
+	require.NoError(t, h.deliverID(id, evt))
+
+	require.NotContains(t, h.steps(), "batch-2", "the redelivery did not answer the read")
+	waits, err := h.infra.smv2.LoadInboxWaits(h.infra.ctx, h.run.ID)
+	require.NoError(t, err)
+	require.Len(t, waits.Waits, 1)
+}
