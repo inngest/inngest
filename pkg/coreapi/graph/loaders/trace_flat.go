@@ -151,7 +151,6 @@ func convertFlatRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.
 	}
 
 	gqlSpan.Metadata = spanMetadataToGQL(span.Metadata)
-	gqlSpan.Ticks = spanTicksToGQL(span.Ticks)
 
 	gqlSpan.ChildrenSpans = make([]*models.RunTraceSpan, 0, len(span.Children))
 	for _, cs := range span.Children {

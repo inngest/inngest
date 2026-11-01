@@ -616,7 +616,7 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 		}
 	}
 
-	e.endInboxWaitSpan(ctx, md, wait.ID)
+	e.endInboxWaitSpan(ctx, md, wait.ID, wake)
 
 	// The timer that is running is the one that found this read; any other
 	// timer is no longer needed.
@@ -643,12 +643,35 @@ func (e *executor) endInboxRow(ctx context.Context, md *sv2.Metadata, row string
 	}
 }
 
-// endInboxWaitSpan ends the row of a read that a message or its timeout woke.
-func (e *executor) endInboxWaitSpan(ctx context.Context, md sv2.Metadata, wait string) {
+// inboxReadEnd says how a read ended, for its row: a message completed it, its
+// timeout passed (timed out, with the wait expired), or its inbox was closed
+// with nothing to read (cancelled, as a read that lost a race ends).
+func inboxReadEnd(wake sv2.InboxWake) (status enums.StepStatus, expired bool) {
+	switch {
+	case wake.TimedOut:
+		return enums.StepStatusTimedOut, true
+	case wake.Closed:
+		return enums.StepStatusCancelled, false
+	}
+
+	return enums.StepStatusCompleted, false
+}
+
+// endInboxWaitSpan ends the row of a read that a message, its timeout or a
+// close woke.
+func (e *executor) endInboxWaitSpan(ctx context.Context, md sv2.Metadata, wait string, wake sv2.InboxWake) {
+	status, expired := inboxReadEnd(wake)
+
+	var attrs *meta.SerializableAttrs
+	if expired {
+		attrs = meta.NewAttrSet(meta.Attr(meta.Attrs.StepWaitExpired, &expired))
+	}
+
 	err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+		Attributes: attrs,
 		Debug:      &tracing.SpanDebugData{Location: "executor.endInboxWaitSpan"},
 		Metadata:   &md,
-		Status:     enums.StepStatusCompleted,
+		Status:     status,
 		TargetSpan: tracing.FinalizedStepSpanRefFromMetadataAndStepID(&md, wait),
 		EndTime:    e.now(),
 	})

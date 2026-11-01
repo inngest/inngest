@@ -774,9 +774,16 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-// rollupTicks puts each tick on the row it is a child of. A tick of a read
-// that took a message has no arrival time of its own, so it takes the one of
-// the arrival tick of the same message.
+// kindInboxMetadata is the metadata kind of an inbox read's row. Its
+// `messages` value lists the ids of the messages the read took.
+const kindInboxMetadata metadata.Kind = "inngest.inbox"
+
+// rollupTicks turns each tick into a child span of the row it belongs to. A
+// message is drawn like an op of its parent: in the parent's group and with its
+// origin, so it shows dimmed inside the group. An arrival has no duration. A
+// read's message runs from the time it arrived, which it takes from the arrival
+// tick of the same message, to the time it was read. A read's row lists the
+// ids it took in its metadata.
 func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), spans *orderedmap.OrderedMap[string, *cqrs.OtelSpan]) {
 	arrivals := map[string]time.Time{}
 	for _, tick := range ticks {
@@ -785,6 +792,7 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		}
 	}
 
+	took := map[string][]string{}
 	for _, tick := range ticks {
 		attrs := tick.Attributes
 		if attrs == nil || attrs.TickID == nil || tick.ParentSpanID == nil {
@@ -797,15 +805,59 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		}
 		parent, _ := spans.Get(parentID)
 
-		rolled := &cqrs.SpanTick{ID: *attrs.TickID, Sources: []string{}, ReadAt: attrs.TickReadAt}
-		if attrs.TickSources != nil {
-			rolled.Sources = *attrs.TickSources
+		start, end := time.Time{}, time.Time{}
+		if attrs.TickAt != nil {
+			start, end = *attrs.TickAt, *attrs.TickAt
 		}
-		if at, ok := arrivals[rolled.ID]; ok {
-			rolled.At = at
+		if attrs.TickReadAt != nil {
+			end = *attrs.TickReadAt
+			start = end
+			if at, ok := arrivals[*attrs.TickID]; ok {
+				start = at
+			}
+
+			took[parentID] = append(took[parentID], *attrs.TickID)
 		}
 
-		parent.Ticks = append(parent.Ticks, rolled)
+		completed := enums.StepStatusCompleted
+		name := *attrs.TickID
+		tick.Name = meta.SpanNameStep
+		tick.Status = completed
+		attrs.StepName = &name
+		attrs.StepID = &name
+		attrs.DynamicStatus = &completed
+		attrs.StartedAt = &start
+		attrs.EndedAt = &end
+		if parent.Attributes != nil {
+			attrs.StepSpanPath = parent.Attributes.StepSpanPath
+			attrs.StepOrigin = parent.Attributes.StepOrigin
+		}
+
+		// A message is a sibling of its parent row, so the trace API puts it in
+		// the same group. Under the row it would be taken for an attempt.
+		holder := parent
+		if parent.ParentSpanID != nil {
+			if grandparentID, ok := resolve(*parent.ParentSpanID); ok {
+				holder, _ = spans.Get(grandparentID)
+			}
+		}
+		tick.ParentSpanID = &holder.SpanID
+		holder.Children = append(holder.Children, tick)
+	}
+
+	for parentID, ids := range took {
+		parent, _ := spans.Get(parentID)
+		values, err := json.Marshal(ids)
+		if err != nil {
+			continue
+		}
+
+		parent.Metadata = append(parent.Metadata, &cqrs.SpanMetadata{
+			Scope:     enums.MetadataScopeStep,
+			Kind:      kindInboxMetadata,
+			Values:    metadata.Values{"messages": values},
+			UpdatedAt: parent.EndTime,
+		})
 	}
 }
 
