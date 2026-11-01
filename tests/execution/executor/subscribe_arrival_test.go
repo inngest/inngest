@@ -69,9 +69,10 @@ func messageStepID(inbox string, eventID ulid.ULID) string {
 }
 
 // wakeJobID is the id of the job that runs the step after a read is woken by
-// a message, as the queue stores it (hashed).
-func (h *subscribeHarness) wakeJobID(wait string, messageStep string) string {
-	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-%s", h.run.IdempotencyKey(), wait, messageStep))
+// a message, as the queue stores it (hashed). A read has one such job whichever
+// message woke it.
+func (h *subscribeHarness) wakeJobID(wait string, _ string) string {
+	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-message", h.run.IdempotencyKey(), wait))
 }
 
 func newEventID() ulid.ULID {
@@ -182,4 +183,33 @@ func TestSubscribeCrashAfterMessageSave(t *testing.T) {
 
 	require.Equal(t, saved, h.steps(), "the redelivery saved the same message")
 	require.Equal(t, 1, timesIn(h.jobIDs(), h.wakeJobID("next-1", msg)), "the redelivery woke the read once")
+}
+
+// Two messages that both find a read still recorded (the first one's delete
+// of it has not happened yet) wake it once: the read has one wake job, not one
+// per message, so a burst does not start several replays of the run at once.
+func TestSubscribeTwoMessagesWakeAReadOnce(t *testing.T) {
+	h := newSubscribeHarness(t, subscribeOp("inbox", "test/msg"))
+	h.report(subscribeWaitOp("next-1", "inbox", "inbox"))
+
+	first := newEventID()
+	second := newEventID()
+
+	// The first message queues the wake and then crashes before the read is
+	// deleted, as a second arrival running at the same time would find it.
+	before := len(h.jobIDs())
+	h.crash.arm("after:Enqueue")
+	_ = h.deliverID(first, event.Event{Name: "test/msg", Data: map[string]any{"n": 1}})
+	require.Equal(t, before+1, len(h.jobIDs()), "the first message queued the wake")
+
+	queued := map[string]bool{}
+	for _, id := range h.jobIDs() {
+		queued[id] = true
+	}
+
+	require.NoError(t, h.deliverID(second, event.Event{Name: "test/msg", Data: map[string]any{"n": 2}}))
+
+	for _, id := range h.jobIDs() {
+		require.True(t, queued[id], "the second message queued no job of its own, got %s", id)
+	}
 }
