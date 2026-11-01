@@ -61,6 +61,8 @@ func TestOpcodeToGQL(t *testing.T) {
 		{"StepPlanned", enums.OpcodeStepPlanned, models.StepOpRun},
 		{"Sleep", enums.OpcodeSleep, models.StepOpSleep},
 		{"WaitForEvent", enums.OpcodeWaitForEvent, models.StepOpWaitForEvent},
+		{"Subscribe", enums.OpcodeSubscribe, models.StepOpWaitForEvent},
+		{"SubscribeWait", enums.OpcodeSubscribeWait, models.StepOpWaitForEvent},
 	}
 
 	for _, tt := range tests {
@@ -70,6 +72,13 @@ func TestOpcodeToGQL(t *testing.T) {
 			require.NotNil(t, result, "opcodeToGQL should not return nil for %s", tt.name)
 			assert.Equal(t, tt.expected, *result)
 		})
+	}
+}
+
+func TestOpcodeToGQL_InboxOpsWithoutAWait(t *testing.T) {
+	for _, op := range []enums.Opcode{enums.OpcodeSubscribeRead, enums.OpcodeSubscribeClose} {
+		op := op
+		assert.Nil(t, opcodeToGQL(&op), "%s answers at once and keeps the plain bar", op)
 	}
 }
 

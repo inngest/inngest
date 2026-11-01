@@ -107,6 +107,11 @@ func opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	case enums.OpcodeWaitForEvent:
 		op := models.StepOpWaitForEvent
 		return &op
+	case enums.OpcodeSubscribe, enums.OpcodeSubscribeWait:
+		// An inbox that waits draws like any other wait, so the UI styles
+		// these rows through the step type it already has for a wait.
+		op := models.StepOpWaitForEvent
+		return &op
 	case enums.OpcodeWaitForSignal:
 		op := models.StepOpWaitForSignal
 		return &op
