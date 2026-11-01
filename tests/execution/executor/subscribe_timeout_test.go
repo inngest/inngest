@@ -29,7 +29,7 @@ func (h *subscribeHarness) timerJobID(wait string) string {
 // timeoutJobID is the id of the job that runs the step after a read timed out
 // (hashed).
 func (h *subscribeHarness) timeoutJobID(wait string) string {
-	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-timeout", h.run.IdempotencyKey(), wait))
+	return queue.HashID(h.infra.ctx, fmt.Sprintf("%s-%s-wake", h.run.IdempotencyKey(), wait))
 }
 
 // timer is the queue item that times a read out, as it is queued.
@@ -119,7 +119,7 @@ func TestSubscribeMessageBeforeTimeout(t *testing.T) {
 	// A timer that was already running when the message came still runs.
 	require.NoError(t, h.runTimer(tm))
 	require.NotContains(t, h.steps(), "next-1", "no null was saved for a read that was satisfied")
-	require.Zero(t, timesIn(h.jobIDs(), h.timeoutJobID("next-1")))
+	require.Equal(t, 1, timesIn(h.jobIDs(), h.timeoutJobID("next-1")), "the read has the one wake job the message queued")
 }
 
 // A message found by the wait's own scan also takes the timer away, so a read

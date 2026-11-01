@@ -308,7 +308,7 @@ func (e *executor) handleGeneratorSubscribeRead(ctx context.Context, runCtx exec
 // call that takes the read out of the pending set, before its wake is queued,
 // so the run that the wake starts finds the close recorded. A close that
 // crashed in between is repaired by being handled again.
-func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorSubscribeClose(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.SubscribeCloseOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse subscribe close opts: %w", err)
@@ -555,22 +555,13 @@ func (e *executor) wakeInboxRead(ctx context.Context, id sv2.ID, wake sv2.InboxW
 			return fmt.Errorf("error resetting force step plan: %w", err)
 		}
 
-		// A parallel batch shares one discovery job; a lone read has its own,
-		// named by the read and the message that woke it.
-		var jobID string
-		if wait.ParallelCoalesceKey != "" && wait.ParallelMode != enums.ParallelModeRace {
-			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, wait.ParallelCoalesceKey)
-		} else {
-			suffix := "message"
-			switch {
-			case wake.TimedOut:
-				suffix = "timeout"
-			case wake.Closed:
-				suffix = "close"
-			}
-
-			jobID = fmt.Sprintf("%s-%s-%s", md.IdempotencyKey(), wait.ID, suffix)
-		}
+		// A read ends once, so it has one wake job, named by the read alone.
+		// The response that reported the read is no part of the name (the SDK
+		// reports a pending read again, in responses with other ops), and
+		// neither is the reason: a message, a timeout and a close can each
+		// find the read's record before the first of them has deleted it, and
+		// every one of them must name the same job.
+		jobID := fmt.Sprintf("%s-%s-wake", md.IdempotencyKey(), wait.ID)
 
 		nextItem := queue.Item{
 			JobID:                 &jobID,
