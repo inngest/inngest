@@ -296,6 +296,23 @@ type SubscribeWaitOpts struct {
 	// a duration or a timestamp, like the timeout of waitForEvent. Empty means
 	// the read waits for as long as the run lives.
 	Timeout string `json:"timeout,omitempty"`
+	// Batch is set when the read is a batch read (`drain()` or `nextBatch()`):
+	// the executor answers it with the wanted messages saved after Seen, and
+	// the answer is the read's result.
+	Batch *SubscribeBatchOpts `json:"batch,omitempty"`
+}
+
+// SubscribeBatchOpts are what a batch read adds to a SubscribeWaitOpts.
+type SubscribeBatchOpts struct {
+	// Drain is whether the read never waits: it is answered at once, with no
+	// messages if there are none.
+	Drain bool `json:"drain,omitempty"`
+	// Unread is whether the SDK already holds unread messages from the state it
+	// loaded, so the read is answered at once even if nothing was saved since.
+	Unread bool `json:"unread,omitempty"`
+	// Room is how many messages the answer may hold, oldest first. Missing
+	// means all of them.
+	Room *int `json:"room,omitempty"`
 }
 
 // SubscribeReadOpts are the options of an OpcodeSubscribeRead op, which reports

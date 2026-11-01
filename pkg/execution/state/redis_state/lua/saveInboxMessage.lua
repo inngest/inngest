@@ -10,6 +10,9 @@ waits, so a redelivered event repairs a wake that was lost.
 A new message that would take the run past its step bound or its state size
 bound is not saved. A bound of 0 means the bound is not checked.
 
+A satisfied batch read is also answered: the ids of the messages it wants saved
+since the step it last saw are saved under its id, unless it already has a result.
+
 Output:
   { -1 }                         different data is already saved under the step
   { -3 }                         the run is at its step bound; nothing was saved
@@ -28,6 +31,7 @@ local keyStepsPending = KEYS[4]
 local keyWaits = KEYS[5]
 
 -- $include(inbox_wants.lua)
+-- $include(inbox_batch.lua)
 
 local stepID = ARGV[1]
 local value = ARGV[2]
@@ -66,6 +70,14 @@ for i = 1, #waits, 2 do
 	local wait = cjson.decode(waits[i + 1])
 
 	if wait.inbox == inbox and inbox_wants(wait.want, message) then
+		-- A batch read is answered with every message it wants saved since it
+		-- last saw the stack, this one included.
+		if wait.batch ~= nil then
+			local ids = inbox_batch_ids(keyStep, keyStack, inbox, wait.want, wait.seen, wait.batch.room)
+
+			inbox_batch_save(keyStep, keyMetadata, keyStack, waits[i], wait.seen, ids)
+		end
+
 		redis.call("SREM", keyStepsPending, waits[i])
 
 		result[#result + 1] = waits[i]

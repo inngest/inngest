@@ -16,6 +16,8 @@ Output:
   { 1, messageStepID, pending }   recorded and satisfied; pending is 1 when
                                   pending steps remain, else 0
   { 2, pending }                  not recorded; its handle was closed
+  { 3, pending }                  a batch read, recorded and answered with the
+                                  messages saved since it last saw the stack
 
 ]]
 
@@ -23,15 +25,19 @@ local keyStep = KEYS[1]
 local keyStack = KEYS[2]
 local keyStepsPending = KEYS[3]
 local keyWaits = KEYS[4]
+local keyMetadata = KEYS[5]
 
 -- $include(inbox_wants.lua)
+-- $include(inbox_batch.lua)
 
 local waitID = ARGV[1]
 local record = ARGV[2]
 local inbox = ARGV[3]
 local seen = ARGV[4]
 
-local want = cjson.decode(record)["want"]
+local decodedRecord = cjson.decode(record)
+local want = decodedRecord["want"]
+local batch = decodedRecord["batch"]
 
 if redis.call("HEXISTS", keyWaits, "closed:" .. waitID) == 1 then
 	redis.call("SREM", keyStepsPending, waitID)
@@ -40,6 +46,23 @@ if redis.call("HEXISTS", keyWaits, "closed:" .. waitID) == 1 then
 end
 
 redis.call("HSET", keyWaits, waitID, record)
+
+-- A batch read is answered with the messages it wants saved since it last saw
+-- the stack. It is answered at once if it never waits, if the SDK already holds
+-- unread messages, or if there are any. Otherwise it stays recorded and a
+-- message (or its timer) answers it.
+if batch ~= nil then
+	local ids = inbox_batch_ids(keyStep, keyStack, inbox, want, seen, batch["room"])
+
+	if batch["drain"] or batch["unread"] or #ids > 0 then
+		inbox_batch_save(keyStep, keyMetadata, keyStack, waitID, seen, ids)
+		redis.call("SREM", keyStepsPending, waitID)
+
+		return { 3, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+	end
+
+	return { 0 }
+end
 
 -- Walk back from the tail to the step the SDK last saw; those are the steps
 -- saved since, and the only ones worth reading.

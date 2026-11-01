@@ -44,6 +44,9 @@ type InboxWait struct {
 	Seen string `json:"seen"`
 	// Timer is whether a timer is queued to time the read out.
 	Timer bool `json:"timer,omitempty"`
+	// Batch is set for a batch read, whose result is the list of messages the
+	// executor found for it.
+	Batch *InboxBatch `json:"batch,omitempty"`
 
 	// The rest is what waking the read needs.
 	Incoming            string             `json:"incoming"`
@@ -51,6 +54,16 @@ type InboxWait struct {
 	MaxAttempts         *int               `json:"maxAtts,omitempty"`
 	ParallelMode        enums.ParallelMode `json:"pm,omitempty"`
 	ParallelCoalesceKey string             `json:"pck,omitempty"`
+}
+
+// InboxBatch is what makes a read a batch read.
+type InboxBatch struct {
+	// Drain is whether the read never waits.
+	Drain bool `json:"drain,omitempty"`
+	// Unread is whether the SDK holds unread messages already.
+	Unread bool `json:"unread,omitempty"`
+	// Room is how many messages the answer may hold. Missing means all.
+	Room *int `json:"room,omitempty"`
 }
 
 // InboxClose closes a handle of an inbox.

@@ -1210,6 +1210,7 @@ func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wai
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 	}
 	args := []string{wait.ID, string(record), wait.Inbox, wait.Seen}
 
@@ -1226,6 +1227,14 @@ func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wai
 	found, err := out[0].AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error reading inbox wait status: %w", err)
+	}
+	if found == 3 && len(out) >= 2 {
+		hasPending, err := out[1].AsInt64()
+		if err != nil {
+			return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+		}
+
+		return &statev2.InboxWake{Wait: wait, HasPending: hasPending == 1}, nil
 	}
 	if found == 2 && len(out) >= 2 {
 		hasPending, err := out[1].AsInt64()

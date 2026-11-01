@@ -205,8 +205,18 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	// always has one. Queuing it again is a no-op. A read with no timeout
 	// still has one, so the run holds a queue item while it waits: the
 	// function's singleton lock is released when the run has none.
-	if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
-		return err
+	//
+	// A read that never waits (`drain()`) is answered at once and needs none.
+	drain := opts.Batch != nil && opts.Batch.Drain
+	if !drain {
+		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Timeout); err != nil {
+			return err
+		}
+	}
+
+	var batch *sv2.InboxBatch
+	if opts.Batch != nil {
+		batch = &sv2.InboxBatch{Drain: opts.Batch.Drain, Unread: opts.Batch.Unread, Room: opts.Batch.Room}
 	}
 
 	wake, err := e.smv2.RecordInboxWait(ctx, md.ID, sv2.InboxWait{
@@ -214,7 +224,8 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		Inbox:               opts.Inbox,
 		Want:                opts.Want,
 		Seen:                opts.Seen,
-		Timer:               true,
+		Timer:               !drain,
+		Batch:               batch,
 		Incoming:            edge.Edge.Incoming,
 		GroupID:             runCtx.GroupID(),
 		MaxAttempts:         runCtx.MaxAttempts(),
