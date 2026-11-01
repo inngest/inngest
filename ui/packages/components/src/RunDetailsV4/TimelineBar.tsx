@@ -692,10 +692,10 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
 }
 
 /**
- * Translucent white reads as a shade lighter than any bar colour, and it stays
- * visible on the gaps of a striped bar, where a darker dot would vanish.
+ * The theme's text colour at 45%: lighter than a bar in dark mode and darker in
+ * light mode, and still visible between the stripes of a wait bar.
  */
-const MARKER_COLOR = 'rgba(255, 255, 255, 0.6)';
+const MARKER_COLOR = 'rgb(var(--color-foreground-base) / 0.45)';
 
 /**
  * Small tonal dots on a bar, one per marker, centred vertically at the moment

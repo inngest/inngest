@@ -83,6 +83,8 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
       return 'step.sleep';
     case 'WAIT_FOR_EVENT':
     case 'WAITFOREVENT':
+    case 'SUBSCRIBE':
+    case 'INBOX_READ':
       return 'step.waitForEvent';
     case 'INVOKE':
       return 'step.invoke';

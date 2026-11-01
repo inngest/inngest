@@ -192,6 +192,16 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.children?.[0]?.style).toBe('step.sleep');
     });
 
+    it.each(['SUBSCRIBE', 'INBOX_READ'])('returns "step.waitForEvent" for %s stepOp', (stepOp) => {
+      const trace = createTrace({
+        isRoot: true,
+        childrenSpans: [createTrace({ stepOp, spanID: 'inbox-step' })],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.children?.[0]?.style).toBe('step.waitForEvent');
+    });
+
     it('returns "step.waitForEvent" for WAIT_FOR_EVENT stepOp', () => {
       const trace = createTrace({
         isRoot: true,
