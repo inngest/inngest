@@ -1243,6 +1243,50 @@ func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wai
 	return &statev2.InboxWake{Wait: wait, MessageStep: messageStep, HasPending: hasPending == 1}, nil
 }
 
+// TimeoutInboxWait saves data under a recorded wait and returns the wait, or
+// returns nil if the wait is no longer recorded.
+func (m shardedMgr) TimeoutInboxWait(ctx context.Context, i state.Identifier, waitID string, data []byte) (*statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "TimeoutInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{waitID, string(data)}
+
+	out, err := retriableScripts["timeoutInboxWait"].Exec(
+		redis_telemetry.WithScriptName(ctx, "timeoutInboxWait"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error timing out inbox wait: %w", err)
+	}
+
+	found, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox timeout status: %w", err)
+	}
+	if found != 1 || len(out) < 3 {
+		return nil, nil
+	}
+
+	wake, err := inboxWakeFrom(out[1], out[2], "")
+	if err != nil {
+		return nil, err
+	}
+	wake.TimedOut = true
+
+	return &wake, nil
+}
+
 // DeleteInboxWait removes a recorded inbox wait.
 func (m shardedMgr) DeleteInboxWait(ctx context.Context, i state.Identifier, waitID string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeleteInboxWait"), redis_telemetry.ScopeFnRunState)

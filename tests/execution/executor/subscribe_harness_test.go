@@ -111,6 +111,19 @@ func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg 
 	return wakes, s.crash.fire("after:SaveInboxMessage")
 }
 
+func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, waitID string, data []byte) (*statev2.InboxWake, error) {
+	if err := s.crash.fire("before:TimeoutInboxWait"); err != nil {
+		return nil, err
+	}
+
+	wake, err := s.RunService.TimeoutInboxWait(ctx, id, waitID, data)
+	if err != nil {
+		return wake, err
+	}
+
+	return wake, s.crash.fire("after:TimeoutInboxWait")
+}
+
 // crashingQueue fails a queue write around the real one.
 type crashingQueue struct {
 	queue.Queue
