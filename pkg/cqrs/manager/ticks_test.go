@@ -101,7 +101,8 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 		require.Equal(t, "m1", inbox.Ticks[0].ID)
 		require.Equal(t, []string{"p1"}, inbox.Ticks[0].Sources)
 		require.Equal(t, arrived.UnixMilli(), inbox.Ticks[0].At.UnixMilli())
-		require.Nil(t, inbox.Ticks[0].ReadAt)
+		require.NotNil(t, inbox.Ticks[0].ReadAt, "an arrival says when its message was read")
+		require.Equal(t, read.UnixMilli(), inbox.Ticks[0].ReadAt.UnixMilli())
 
 		require.Len(t, took.Ticks, 1)
 		require.Equal(t, arrived.UnixMilli(), took.Ticks[0].At.UnixMilli())

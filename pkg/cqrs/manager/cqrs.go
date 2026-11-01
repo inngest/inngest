@@ -792,6 +792,13 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		}
 	}
 
+	reads := map[string]time.Time{}
+	for _, tick := range ticks {
+		if tick.Attributes != nil && tick.Attributes.TickID != nil && tick.Attributes.TickReadAt != nil {
+			reads[*tick.Attributes.TickID] = *tick.Attributes.TickReadAt
+		}
+	}
+
 	took := map[string][]string{}
 	for _, tick := range ticks {
 		attrs := tick.Attributes
@@ -826,6 +833,9 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		}
 		if at, ok := arrivals[rolled.ID]; ok {
 			rolled.At = at
+		}
+		if readAt, ok := reads[rolled.ID]; ok && rolled.ReadAt == nil {
+			rolled.ReadAt = &readAt
 		}
 		parent.Ticks = append(parent.Ticks, rolled)
 
