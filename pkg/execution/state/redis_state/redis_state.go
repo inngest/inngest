@@ -1135,7 +1135,7 @@ func (m shardedMgr) SaveInboxMessage(ctx context.Context, i state.Identifier, ms
 		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
-	args := []string{msg.StepID, string(msg.Value), msg.Inbox}
+	args := []string{msg.StepID, string(msg.Value), msg.Inbox, strconv.Itoa(msg.MaxSteps), strconv.Itoa(msg.MaxStateSize)}
 
 	out, err := retriableScripts["saveInboxMessage"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveInboxMessage"),
@@ -1151,8 +1151,13 @@ func (m shardedMgr) SaveInboxMessage(ctx context.Context, i state.Identifier, ms
 	if err != nil {
 		return nil, fmt.Errorf("error reading inbox message status: %w", err)
 	}
-	if status == -1 {
+	switch status {
+	case -1:
 		return nil, state.ErrDuplicateResponse
+	case -3:
+		return nil, statev2.ErrInboxStepsFull
+	case -4:
+		return nil, statev2.ErrInboxStateFull
 	}
 
 	wakes := []statev2.InboxWake{}

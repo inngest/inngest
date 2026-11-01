@@ -149,6 +149,14 @@ type subscribeHarness struct {
 func newSubscribeHarness(t *testing.T, ops ...*state.GeneratorOpcode) *subscribeHarness {
 	t.Helper()
 
+	return newSubscribeHarnessWith(t, nil, ops...)
+}
+
+// newSubscribeHarnessWith is newSubscribeHarness with extra executor options,
+// such as lowered step or state size limits.
+func newSubscribeHarnessWith(t *testing.T, opts []executor.ExecutorOpt, ops ...*state.GeneratorOpcode) *subscribeHarness {
+	t.Helper()
+
 	infra := newExecTestInfra(t, "step")
 	crash := newCrashPoints()
 	driver := &mockDriverV1{
@@ -161,13 +169,15 @@ func newSubscribeHarness(t *testing.T, ops ...*state.GeneratorOpcode) *subscribe
 	}
 	exec := infra.newExecutorWithQueue(t,
 		crashingQueue{Queue: infra.rq, crash: crash},
-		executor.WithStateManager(crashingState{RunService: infra.smv2, crash: crash}),
-		executor.WithDriverV1(driver),
-		// Event matching evaluates pauses through the aggregator, as the Dev
-		// Server wires it.
-		executor.WithExpressionAggregator(
-			expragg.NewAggregator(infra.ctx, 100, 100, infra.pauseMgr, expressions.ExprEvaluator, nil, nil),
-		),
+		append([]executor.ExecutorOpt{
+			executor.WithStateManager(crashingState{RunService: infra.smv2, crash: crash}),
+			executor.WithDriverV1(driver),
+			// Event matching evaluates pauses through the aggregator, as the Dev
+			// Server wires it.
+			executor.WithExpressionAggregator(
+				expragg.NewAggregator(infra.ctx, 100, 100, infra.pauseMgr, expressions.ExprEvaluator, nil, nil),
+			),
+		}, opts...)...,
 	)
 	run := infra.scheduleRun(t, exec)
 

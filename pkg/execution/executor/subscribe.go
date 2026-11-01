@@ -41,6 +41,15 @@ type inboxMessageValue struct {
 	Src   []string       `json:"src"`
 }
 
+// An arrival that does not fit in the run's step or state size bounds saves
+// nothing and queues one call for the run instead. The call finds the run at its
+// step bound, or carries a mark that the state did not fit, and ends the run
+// with the usual error.
+const (
+	inboxOverflowKey   = "inboxOverflow"
+	inboxOverflowState = "state"
+)
+
 // inboxMessageStepID is the id of the step a message is saved as.
 func inboxMessageStepID(inbox string, eventID ulid.ULID) string {
 	sum := sha1.Sum([]byte(inbox + eventID.String()))
@@ -269,7 +278,9 @@ type inboxArrivals struct {
 type inboxArrival struct {
 	id    sv2.ID
 	inbox string
-	src   []string
+	// incoming is the step the inbox's open op leads to.
+	incoming string
+	src      []string
 }
 
 type inboxArrivalsKey struct{}
@@ -302,7 +313,8 @@ func (a *inboxArrivals) add(pause *state.Pause) {
 					AccountID: pause.Identifier.AccountID,
 				},
 			},
-			inbox: pause.Subscribe.Inbox,
+			inbox:    pause.Subscribe.Inbox,
+			incoming: pause.Incoming,
 		}
 		a.arrivals[key] = arrival
 	}
@@ -336,10 +348,19 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 		stepID := inboxMessageStepID(arrival.inbox, evt.GetInternalID())
 
 		wakes, err := e.smv2.SaveInboxMessage(ctx, arrival.id, sv2.InboxMessage{
-			StepID: stepID,
-			Inbox:  arrival.inbox,
-			Value:  value,
+			StepID:       stepID,
+			Inbox:        arrival.inbox,
+			Value:        value,
+			MaxSteps:     e.inboxMaxSteps(arrival.id),
+			MaxStateSize: e.inboxMaxStateSize(arrival.id),
 		})
+		if errors.Is(err, sv2.ErrInboxStepsFull) || errors.Is(err, sv2.ErrInboxStateFull) {
+			if err := e.queueInboxOverflow(ctx, arrival, errors.Is(err, sv2.ErrInboxStateFull)); err != nil {
+				goerr = errors.Join(goerr, err)
+			}
+
+			continue
+		}
 		if errors.Is(err, state.ErrRunNotFound) {
 			continue
 		}
@@ -362,4 +383,72 @@ func (e *executor) saveInboxMessages(ctx context.Context, evt event.TrackedEvent
 	}
 
 	return goerr
+}
+
+// inboxMaxSteps is the run's existing step bound, as checkStepLimit reads it.
+func (e *executor) inboxMaxSteps(id sv2.ID) int {
+	max := 0
+	if e.steplimit != nil {
+		max = e.steplimit(id)
+	}
+	if max == 0 {
+		max = consts.DefaultMaxStepLimit
+	}
+
+	return max
+}
+
+// inboxMaxStateSize is the run's existing state size bound, as
+// validateStateSize reads it. Zero when state size is not checked.
+func (e *executor) inboxMaxStateSize(id sv2.ID) int {
+	if e.stateSizeLimit == nil {
+		return 0
+	}
+
+	max := e.stateSizeLimit(id)
+	if max == 0 {
+		max = consts.DefaultMaxStateSizeLimit
+	}
+
+	return max
+}
+
+// queueInboxOverflow queues the one call that ends a run an arrival did not fit
+// in. The job id names the run only, so any number of arrivals queue one call,
+// and a redelivery queues the same one.
+func (e *executor) queueInboxOverflow(ctx context.Context, arrival *inboxArrival, stateFull bool) error {
+	md, err := e.smv2.LoadMetadata(ctx, arrival.id)
+	if err != nil {
+		if errors.Is(err, state.ErrRunNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("error loading metadata to end an overflowing run: %w", err)
+	}
+
+	jobID := fmt.Sprintf("%s-inbox-overflow", md.ID.RunID)
+	item := queue.Item{
+		JobID:                 &jobID,
+		GroupID:               uuid.New().String(),
+		WorkspaceID:           arrival.id.Tenant.EnvID,
+		Kind:                  queue.KindEdge,
+		Identifier:            sv2.V1FromMetadata(md),
+		PriorityFactor:        md.Config.PriorityFactor,
+		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+		Semaphores:            stepSemaphores(md),
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{Outgoing: arrival.inbox, Incoming: arrival.incoming},
+		},
+		Metadata: make(map[string]any),
+	}
+	if stateFull {
+		item.Metadata[inboxOverflowKey] = inboxOverflowState
+	}
+
+	err = e.queue.Enqueue(ctx, item, e.now(), queue.EnqueueOpts{})
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
+		return fmt.Errorf("error enqueueing the end of an overflowing run: %w", err)
+	}
+
+	return nil
 }
