@@ -71,13 +71,14 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 			}),
 		})
 
-		require.Len(t, root.Children, 2, "a message is a child of its row, not of the run")
+		require.Len(t, root.Children, 4, "a message is a sibling of its row, so it lands in its group")
 
 		inbox := childNamed(root, "inbox")
 		require.NotNil(t, inbox)
-		require.Len(t, inbox.Children, 1)
+		require.Empty(t, inbox.Children, "under the row it would be taken for an attempt")
 
-		arrival := inbox.Children[0]
+		arrival := childNamed(root, "arrival")
+		require.NotNil(t, arrival)
 		require.Equal(t, "m1", *arrival.Attributes.StepName)
 		require.Equal(t, group, *arrival.Attributes.StepSpanPath, "it is in its parent's group")
 		require.Equal(t, "inngest@1.0.0", *arrival.Attributes.StepOrigin, "it is dimmed")
@@ -87,9 +88,10 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 
 		took := childNamed(root, "read")
 		require.NotNil(t, took)
-		require.Len(t, took.Children, 1)
+		require.Empty(t, took.Children)
 
-		message := took.Children[0]
+		message := childNamed(root, "took")
+		require.NotNil(t, message)
 		require.Equal(t, arrived.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
 		require.Equal(t, read.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
 

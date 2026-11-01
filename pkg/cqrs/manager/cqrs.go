@@ -833,7 +833,16 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 			attrs.StepOrigin = parent.Attributes.StepOrigin
 		}
 
-		parent.Children = append(parent.Children, tick)
+		// A message is a sibling of its parent row, so the trace API puts it in
+		// the same group. Under the row it would be taken for an attempt.
+		holder := parent
+		if parent.ParentSpanID != nil {
+			if grandparentID, ok := resolve(*parent.ParentSpanID); ok {
+				holder, _ = spans.Get(grandparentID)
+			}
+		}
+		tick.ParentSpanID = &holder.SpanID
+		holder.Children = append(holder.Children, tick)
 	}
 
 	for parentID, ids := range took {

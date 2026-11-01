@@ -65,6 +65,14 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 
 		if parent != run {
 			child.ParentSpanID = &parent.SpanID
+
+			// The group row is the statement the user wrote, so it lists what the
+			// statement's ops took: the messages an inbox read took.
+			for _, md := range child.Metadata {
+				if md.Kind == inboxMetadataKind {
+					parent.Metadata = append(parent.Metadata, md)
+				}
+			}
 		}
 		parent.ChildrenSpans = append(parent.ChildrenSpans, child)
 	}
@@ -75,6 +83,10 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 		}
 	}
 }
+
+// inboxMetadataKind is the metadata kind of an inbox read; its `messages`
+// value lists the message ids the read took.
+const inboxMetadataKind = "inngest.inbox"
 
 func pathIDs(path []meta.SpanPathElement) []string {
 	ids := make([]string, len(path))
