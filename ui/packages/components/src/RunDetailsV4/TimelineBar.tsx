@@ -732,7 +732,7 @@ function BarMarkers({
                 tabIndex={0}
                 className={cn(
                   'focus-visible:ring-primary-subtle absolute top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-help rounded-full border focus-visible:outline-none focus-visible:ring',
-                  marker.filled ? 'bg-basis border-basis' : 'bg-canvasBase border-basis'
+                  marker.filled ? 'bg-contrast border-contrast' : 'bg-canvasBase border-contrast'
                 )}
                 style={{ left: `${left}%` }}
               />
