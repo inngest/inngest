@@ -97,4 +97,8 @@ type InboxWake struct {
 	// HasPending is whether the run has other pending steps once the read has
 	// left the pending set.
 	HasPending bool
+	// Ended is set by RecordInboxWait when another path ended the read before
+	// this report of it arrived. Nothing was recorded, and the run is already
+	// continued by the path that ended it.
+	Ended bool
 }

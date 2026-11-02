@@ -145,6 +145,8 @@ func (s crashingState) ConsumePause(ctx context.Context, p state.Pause, opts sta
 }
 
 func (s crashingState) SaveStep(ctx context.Context, id statev2.ID, stepID string, data []byte) (bool, error) {
+	s.crash.await("before:SaveStep")
+
 	if err := s.crash.fire("before:SaveStep"); err != nil {
 		return false, err
 	}
@@ -158,6 +160,8 @@ func (s crashingState) SaveStep(ctx context.Context, id statev2.ID, stepID strin
 }
 
 func (s crashingState) SaveInboxMessage(ctx context.Context, id statev2.ID, msg statev2.InboxMessage) (*statev2.InboxWake, error) {
+	s.crash.await("before:SaveInboxMessage")
+
 	if err := s.crash.fire("before:SaveInboxMessage"); err != nil {
 		return nil, err
 	}
