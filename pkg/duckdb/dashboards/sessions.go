@@ -556,7 +556,7 @@ func CountSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUI
 	if opts.Key == "" || opts.ID == "" {
 		return 0, fmt.Errorf("dashboard: session key and session id are required")
 	}
-	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
 	if err != nil {
 		return 0, fmt.Errorf("dashboard: %w", err)
 	}
