@@ -194,3 +194,44 @@ func TestCompletedChildDoesNotEndAnOpenInboxOrWaitingRead(t *testing.T) {
 		require.Equal(t, enums.StepStatusWaiting, childNamed(root, "read").Status)
 	})
 }
+
+// A tick drawn again (a read reported twice, a message delivered twice) is the
+// same span, so its fragments fold into one. The first time it was drawn is
+// the time it happened, so a later fragment does not move it.
+func TestTickDrawnAgainKeepsItsFirstTimes(t *testing.T) {
+	first := testStart.Add(time.Second)
+	later := testStart.Add(time.Minute)
+
+	fragment := func(at time.Time, attrs map[string]any) map[string]any {
+		return map[string]any{
+			"span_id":    "otel-took",
+			"name":       meta.SpanNameTick,
+			"start_time": at.Format(time.RFC3339Nano),
+			"end_time":   at.Format(time.RFC3339Nano),
+			"attributes": attrs,
+		}
+	}
+
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		took := tickRow("took", "read", nil)
+		took.fragments = []map[string]any{
+			fragment(first, map[string]any{
+				meta.Attrs.TickID.Key():     "m1",
+				meta.Attrs.TickAt.Key():     millis(first),
+				meta.Attrs.TickReadAt.Key(): millis(first),
+			}),
+			fragment(later, map[string]any{
+				meta.Attrs.TickID.Key():     "m1",
+				meta.Attrs.TickAt.Key():     millis(later),
+				meta.Attrs.TickReadAt.Key(): millis(later),
+			}),
+		}
+
+		root := buildRoot(t, enc, []testSpanRow{runRow(), stepRow("read", nil), took})
+
+		message := childNamed(root, "took")
+		require.NotNil(t, message)
+		require.Equal(t, first.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
+		require.Equal(t, first.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
+	})
+}

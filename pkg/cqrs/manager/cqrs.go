@@ -429,6 +429,16 @@ fragmentLoop:
 				return nil, err
 			}
 
+			// A tick drawn again is the same span. The first time it was drawn
+			// is when it happened, so a later fragment does not move it.
+			if name, _ := fragment["name"].(string); name == meta.SpanNameTick {
+				for _, key := range []string{meta.Attrs.TickAt.Key(), meta.Attrs.TickReadAt.Key()} {
+					if _, seen := newSpan.RawOtelSpan.Attributes[key]; seen {
+						delete(fragmentAttr, key)
+					}
+				}
+			}
+
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
