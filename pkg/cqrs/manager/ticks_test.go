@@ -94,6 +94,9 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 		require.NotNil(t, message)
 		require.Equal(t, arrived.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
 		require.Equal(t, read.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
+		require.Equal(t, arrived.UnixMilli(), message.GetQueuedAtTime().UnixMilli(), "the trace API queues it when it arrived")
+		require.Equal(t, arrived.UnixMilli(), message.StartTime.UnixMilli())
+		require.Equal(t, read.UnixMilli(), message.EndTime.UnixMilli())
 
 		// The arrival is also a tick on the row of the inbox, which the trace
 		// draws as a circle on its bar; a read's tick has the arrival time too.
@@ -133,6 +136,7 @@ func TestWaitingReadIsEndedWithItsRun(t *testing.T) {
 		finished.fragments[0]["attributes"] = ended
 		root = buildRoot(t, enc, []testSpanRow{finished, stepRow("read", waiting)})
 		require.True(t, childNamed(root, "read").Status.IsEnded(), "status %s", childNamed(root, "read").Status)
+		require.NotNil(t, childNamed(root, "read").Attributes.EndedAt, "the bar stops when the run does")
 	})
 }
 
@@ -160,5 +164,74 @@ func TestOpenInboxRowIsEndedWithItsRun(t *testing.T) {
 		require.Equal(t, enums.StepStatusCompleted, row.Status)
 		require.NotNil(t, row.Attributes.EndedAt, "it ends when the run does")
 		require.Equal(t, testStart.Add(time.Minute).UnixMilli(), row.Attributes.EndedAt.UnixMilli())
+	})
+}
+
+// A run that is still going stays going when one of its steps has completed:
+// the root takes the status of a completed child, but that is a guess, so its
+// open inbox and waiting read are not ended by it.
+func TestCompletedChildDoesNotEndAnOpenInboxOrWaitingRead(t *testing.T) {
+	done := map[string]any{meta.Attrs.DynamicStatus.Key(): enums.StepStatusCompleted.String()}
+	open := map[string]any{
+		meta.Attrs.StepOp.Key():        enums.OpcodeSubscribe.String(),
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusRunning.String(),
+	}
+	waiting := map[string]any{
+		meta.Attrs.StepOp.Key():        enums.OpcodeSubscribeWait.String(),
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusWaiting.String(),
+	}
+
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		root := buildRoot(t, enc, []testSpanRow{
+			runRow(),
+			stepRow("done", done),
+			stepRow("inbox", open),
+			stepRow("read", waiting),
+		})
+
+		require.Equal(t, enums.StepStatusRunning, childNamed(root, "inbox").Status)
+		require.Nil(t, childNamed(root, "inbox").Attributes.EndedAt)
+		require.Equal(t, enums.StepStatusWaiting, childNamed(root, "read").Status)
+	})
+}
+
+// A tick drawn again (a read reported twice, a message delivered twice) is the
+// same span, so its fragments fold into one. The first time it was drawn is
+// the time it happened, so a later fragment does not move it.
+func TestTickDrawnAgainKeepsItsFirstTimes(t *testing.T) {
+	first := testStart.Add(time.Second)
+	later := testStart.Add(time.Minute)
+
+	fragment := func(at time.Time, attrs map[string]any) map[string]any {
+		return map[string]any{
+			"span_id":    "otel-took",
+			"name":       meta.SpanNameTick,
+			"start_time": at.Format(time.RFC3339Nano),
+			"end_time":   at.Format(time.RFC3339Nano),
+			"attributes": attrs,
+		}
+	}
+
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		took := tickRow("took", "read", nil)
+		took.fragments = []map[string]any{
+			fragment(first, map[string]any{
+				meta.Attrs.TickID.Key():     "m1",
+				meta.Attrs.TickAt.Key():     millis(first),
+				meta.Attrs.TickReadAt.Key(): millis(first),
+			}),
+			fragment(later, map[string]any{
+				meta.Attrs.TickID.Key():     "m1",
+				meta.Attrs.TickAt.Key():     millis(later),
+				meta.Attrs.TickReadAt.Key(): millis(later),
+			}),
+		}
+
+		root := buildRoot(t, enc, []testSpanRow{runRow(), stepRow("read", nil), took})
+
+		message := childNamed(root, "took")
+		require.NotNil(t, message)
+		require.Equal(t, first.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
+		require.Equal(t, first.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
 	})
 }

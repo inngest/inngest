@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 )
 
 // SpanGroupStepType is the step type of a virtual span that groups the steps
@@ -69,7 +70,7 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 			// The group row is the statement the user wrote, so it lists what the
 			// statement's ops took: the messages an inbox read took.
 			for _, md := range child.Metadata {
-				if md.Kind == inboxMetadataKind {
+				if md.Kind == metadata.KindInngestInbox {
 					parent.Metadata = append(parent.Metadata, md)
 				}
 			}
@@ -93,10 +94,6 @@ func GroupBySpanPath(run *models.RunTraceSpan) {
 		}
 	}
 }
-
-// inboxMetadataKind is the metadata kind of an inbox read; its `messages`
-// value lists the message ids the read took.
-const inboxMetadataKind = "inngest.inbox"
 
 func pathIDs(path []meta.SpanPathElement) []string {
 	ids := make([]string, len(path))

@@ -429,6 +429,16 @@ fragmentLoop:
 				return nil, err
 			}
 
+			// A tick drawn again is the same span. The first time it was drawn
+			// is when it happened, so a later fragment does not move it.
+			if name, _ := fragment["name"].(string); name == meta.SpanNameTick {
+				for _, key := range []string{meta.Attrs.TickAt.Key(), meta.Attrs.TickReadAt.Key()} {
+					if _, seen := newSpan.RawOtelSpan.Attributes[key]; seen {
+						delete(fragmentAttr, key)
+					}
+				}
+			}
+
 			maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 			if outputRef, ok := fragment["output_span_id"].(string); ok && info != nil {
@@ -636,6 +646,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 	}
 
+	// inferredStatus holds the spans whose status was taken from a child, as
+	// opposed to the one they report themselves.
+	inferredStatus := map[*cqrs.OtelSpan]bool{}
+
 	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
@@ -680,6 +694,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			// still running
 			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
 				parent.Status = span.Status
+				inferredStatus[parent] = true
 			}
 
 			item, _ := spanMap.Get(span.SpanID)
@@ -745,7 +760,9 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	}
 
 	rollupTicks(ticks, resolveDynamic, spanMap)
-	endWaitingReads(root)
+	if !inferredStatus[root] {
+		endWaitingReads(root)
+	}
 
 	// Fold order doesn't matter: the builder rounds the summed cost to
 	// extractors.RoundCost's granularity, absorbing float addition's order
@@ -773,10 +790,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 	return root, nil
 }
-
-// kindInboxMetadata is the metadata kind of an inbox read's row. Its
-// `messages` value lists the ids of the messages the read took.
-const kindInboxMetadata metadata.Kind = "inngest.inbox"
 
 // rollupTicks turns each tick into a child span of the row it belongs to. A
 // message is drawn like an op of its parent: in the parent's group and with its
@@ -848,6 +861,9 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		attrs.DynamicStatus = &completed
 		attrs.StartedAt = &start
 		attrs.EndedAt = &end
+		attrs.QueuedAt = &start
+		tick.StartTime = start
+		tick.EndTime = end
 		if parent.Attributes != nil {
 			attrs.StepSpanPath = parent.Attributes.StepSpanPath
 			attrs.StepOrigin = parent.Attributes.StepOrigin
@@ -874,7 +890,7 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 
 		parent.Metadata = append(parent.Metadata, &cqrs.SpanMetadata{
 			Scope:     enums.MetadataScopeStep,
-			Kind:      kindInboxMetadata,
+			Kind:      metadata.KindInngestInbox,
 			Values:    metadata.Values{"messages": values},
 			UpdatedAt: parent.EndTime,
 		})
@@ -890,6 +906,11 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 		return
 	}
 
+	endedAt := root.EndTime
+	if root.Attributes != nil && root.Attributes.EndedAt != nil {
+		endedAt = *root.Attributes.EndedAt
+	}
+
 	var walk func(span *cqrs.OtelSpan)
 	walk = func(span *cqrs.OtelSpan) {
 		if span.Attributes != nil && span.Attributes.StepOp != nil {
@@ -897,15 +918,15 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
 				span.Status = enums.StepStatusCancelled
 				span.Attributes.DynamicStatus = &span.Status
+
+				if span.Attributes.EndedAt == nil {
+					span.Attributes.EndedAt = &endedAt
+				}
 			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
 				span.Status = enums.StepStatusCompleted
 				span.Attributes.DynamicStatus = &span.Status
 
 				if span.Attributes.EndedAt == nil {
-					endedAt := root.EndTime
-					if root.Attributes != nil && root.Attributes.EndedAt != nil {
-						endedAt = *root.Attributes.EndedAt
-					}
 					span.Attributes.EndedAt = &endedAt
 				}
 			}
