@@ -2998,12 +2998,15 @@ func (x *InboxClose) GetInbox() string {
 }
 
 type InboxWake struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Wait          *InboxWait             `protobuf:"bytes,1,opt,name=wait,proto3" json:"wait,omitempty"`
-	MessageStep   string                 `protobuf:"bytes,2,opt,name=message_step,json=messageStep,proto3" json:"message_step,omitempty"`
-	TimedOut      bool                   `protobuf:"varint,3,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
-	Closed        bool                   `protobuf:"varint,4,opt,name=closed,proto3" json:"closed,omitempty"`
-	HasPending    bool                   `protobuf:"varint,5,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Wait        *InboxWait             `protobuf:"bytes,1,opt,name=wait,proto3" json:"wait,omitempty"`
+	MessageStep string                 `protobuf:"bytes,2,opt,name=message_step,json=messageStep,proto3" json:"message_step,omitempty"`
+	TimedOut    bool                   `protobuf:"varint,3,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	Closed      bool                   `protobuf:"varint,4,opt,name=closed,proto3" json:"closed,omitempty"`
+	HasPending  bool                   `protobuf:"varint,5,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
+	// Set by RecordInboxWait when another path already ended the read. Nothing was
+	// recorded and the run is already continued.
+	Ended         bool `protobuf:"varint,6,opt,name=ended,proto3" json:"ended,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3069,6 +3072,13 @@ func (x *InboxWake) GetClosed() bool {
 func (x *InboxWake) GetHasPending() bool {
 	if x != nil {
 		return x.HasPending
+	}
+	return false
+}
+
+func (x *InboxWake) GetEnded() bool {
+	if x != nil {
+		return x.Ended
 	}
 	return false
 }
@@ -3813,14 +3823,15 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\n" +
 	"InboxClose\x12\x17\n" +
 	"\astep_id\x18\x01 \x01(\tR\x06stepId\x12\x14\n" +
-	"\x05inbox\x18\x02 \x01(\tR\x05inbox\"\xad\x01\n" +
+	"\x05inbox\x18\x02 \x01(\tR\x05inbox\"\xc3\x01\n" +
 	"\tInboxWake\x12'\n" +
 	"\x04wait\x18\x01 \x01(\v2\x13.state.v2.InboxWaitR\x04wait\x12!\n" +
 	"\fmessage_step\x18\x02 \x01(\tR\vmessageStep\x12\x1b\n" +
 	"\ttimed_out\x18\x03 \x01(\bR\btimedOut\x12\x16\n" +
 	"\x06closed\x18\x04 \x01(\bR\x06closed\x12\x1f\n" +
 	"\vhas_pending\x18\x05 \x01(\bR\n" +
-	"hasPending\"i\n" +
+	"hasPending\x12\x14\n" +
+	"\x05ended\x18\x06 \x01(\bR\x05ended\"i\n" +
 	"\x17SaveInboxMessageRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x120\n" +
 	"\amessage\x18\x02 \x01(\v2\x16.state.v2.InboxMessageR\amessage\"\x87\x01\n" +
