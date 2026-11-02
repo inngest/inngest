@@ -9504,6 +9504,304 @@ func (x *ResumeFunctionResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type PauseFunctionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionIds   []string               `protobuf:"bytes,2,rep,name=function_ids,json=functionIds,proto3" json:"function_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PauseFunctionsRequest) Reset() {
+	*x = PauseFunctionsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[141]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PauseFunctionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PauseFunctionsRequest) ProtoMessage() {}
+
+func (x *PauseFunctionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[141]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PauseFunctionsRequest.ProtoReflect.Descriptor instead.
+func (*PauseFunctionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{141}
+}
+
+func (x *PauseFunctionsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *PauseFunctionsRequest) GetFunctionIds() []string {
+	if x != nil {
+		return x.FunctionIds
+	}
+	return nil
+}
+
+type PauseFunctionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*FunctionPauseResult `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PauseFunctionsResponse) Reset() {
+	*x = PauseFunctionsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[142]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PauseFunctionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PauseFunctionsResponse) ProtoMessage() {}
+
+func (x *PauseFunctionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[142]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PauseFunctionsResponse.ProtoReflect.Descriptor instead.
+func (*PauseFunctionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{142}
+}
+
+func (x *PauseFunctionsResponse) GetData() []*FunctionPauseResult {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *PauseFunctionsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ResumeFunctionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionIds   []string               `protobuf:"bytes,2,rep,name=function_ids,json=functionIds,proto3" json:"function_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeFunctionsRequest) Reset() {
+	*x = ResumeFunctionsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[143]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeFunctionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeFunctionsRequest) ProtoMessage() {}
+
+func (x *ResumeFunctionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[143]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeFunctionsRequest.ProtoReflect.Descriptor instead.
+func (*ResumeFunctionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{143}
+}
+
+func (x *ResumeFunctionsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *ResumeFunctionsRequest) GetFunctionIds() []string {
+	if x != nil {
+		return x.FunctionIds
+	}
+	return nil
+}
+
+type ResumeFunctionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*FunctionPauseResult `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeFunctionsResponse) Reset() {
+	*x = ResumeFunctionsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[144]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeFunctionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeFunctionsResponse) ProtoMessage() {}
+
+func (x *ResumeFunctionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[144]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeFunctionsResponse.ProtoReflect.Descriptor instead.
+func (*ResumeFunctionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{144}
+}
+
+func (x *ResumeFunctionsResponse) GetData() []*FunctionPauseResult {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ResumeFunctionsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type FunctionPauseResult struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	// Types that are valid to be assigned to Result:
+	//
+	//	*FunctionPauseResult_Function
+	//	*FunctionPauseResult_Error
+	Result        isFunctionPauseResult_Result `protobuf_oneof:"result"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionPauseResult) Reset() {
+	*x = FunctionPauseResult{}
+	mi := &file_api_v2_service_proto_msgTypes[145]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionPauseResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionPauseResult) ProtoMessage() {}
+
+func (x *FunctionPauseResult) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[145]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionPauseResult.ProtoReflect.Descriptor instead.
+func (*FunctionPauseResult) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{145}
+}
+
+func (x *FunctionPauseResult) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *FunctionPauseResult) GetResult() isFunctionPauseResult_Result {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *FunctionPauseResult) GetFunction() *Function {
+	if x != nil {
+		if x, ok := x.Result.(*FunctionPauseResult_Function); ok {
+			return x.Function
+		}
+	}
+	return nil
+}
+
+func (x *FunctionPauseResult) GetError() *Error {
+	if x != nil {
+		if x, ok := x.Result.(*FunctionPauseResult_Error); ok {
+			return x.Error
+		}
+	}
+	return nil
+}
+
+type isFunctionPauseResult_Result interface {
+	isFunctionPauseResult_Result()
+}
+
+type FunctionPauseResult_Function struct {
+	Function *Function `protobuf:"bytes,2,opt,name=function,proto3,oneof"`
+}
+
+type FunctionPauseResult_Error struct {
+	Error *Error `protobuf:"bytes,3,opt,name=error,proto3,oneof"`
+}
+
+func (*FunctionPauseResult_Function) isFunctionPauseResult_Result() {}
+
+func (*FunctionPauseResult_Error) isFunctionPauseResult_Result() {}
+
 type ListEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
@@ -9518,7 +9816,7 @@ type ListEventsRequest struct {
 
 func (x *ListEventsRequest) Reset() {
 	*x = ListEventsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[141]
+	mi := &file_api_v2_service_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9530,7 +9828,7 @@ func (x *ListEventsRequest) String() string {
 func (*ListEventsRequest) ProtoMessage() {}
 
 func (x *ListEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[141]
+	mi := &file_api_v2_service_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9543,7 +9841,7 @@ func (x *ListEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventsRequest.ProtoReflect.Descriptor instead.
 func (*ListEventsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{141}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *ListEventsRequest) GetCursor() string {
@@ -9598,7 +9896,7 @@ type GetEventRequest struct {
 
 func (x *GetEventRequest) Reset() {
 	*x = GetEventRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[142]
+	mi := &file_api_v2_service_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9610,7 +9908,7 @@ func (x *GetEventRequest) String() string {
 func (*GetEventRequest) ProtoMessage() {}
 
 func (x *GetEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[142]
+	mi := &file_api_v2_service_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9623,7 +9921,7 @@ func (x *GetEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEventRequest.ProtoReflect.Descriptor instead.
 func (*GetEventRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{142}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *GetEventRequest) GetEventId() string {
@@ -9651,7 +9949,7 @@ type ListEventsResponse struct {
 
 func (x *ListEventsResponse) Reset() {
 	*x = ListEventsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[143]
+	mi := &file_api_v2_service_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9663,7 +9961,7 @@ func (x *ListEventsResponse) String() string {
 func (*ListEventsResponse) ProtoMessage() {}
 
 func (x *ListEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[143]
+	mi := &file_api_v2_service_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9676,7 +9974,7 @@ func (x *ListEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventsResponse.ProtoReflect.Descriptor instead.
 func (*ListEventsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{143}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *ListEventsResponse) GetData() []*Event {
@@ -9710,7 +10008,7 @@ type GetEventResponse struct {
 
 func (x *GetEventResponse) Reset() {
 	*x = GetEventResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[144]
+	mi := &file_api_v2_service_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9722,7 +10020,7 @@ func (x *GetEventResponse) String() string {
 func (*GetEventResponse) ProtoMessage() {}
 
 func (x *GetEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[144]
+	mi := &file_api_v2_service_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9735,7 +10033,7 @@ func (x *GetEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEventResponse.ProtoReflect.Descriptor instead.
 func (*GetEventResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{144}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *GetEventResponse) GetData() *Event {
@@ -9768,7 +10066,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_api_v2_service_proto_msgTypes[145]
+	mi := &file_api_v2_service_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9780,7 +10078,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[145]
+	mi := &file_api_v2_service_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9793,7 +10091,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{145}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *Event) GetId() string {
@@ -9862,7 +10160,7 @@ type EventSource struct {
 
 func (x *EventSource) Reset() {
 	*x = EventSource{}
-	mi := &file_api_v2_service_proto_msgTypes[146]
+	mi := &file_api_v2_service_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9874,7 +10172,7 @@ func (x *EventSource) String() string {
 func (*EventSource) ProtoMessage() {}
 
 func (x *EventSource) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[146]
+	mi := &file_api_v2_service_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9887,7 +10185,7 @@ func (x *EventSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventSource.ProtoReflect.Descriptor instead.
 func (*EventSource) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{146}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *EventSource) GetId() string {
@@ -9918,7 +10216,7 @@ type CreateReplayRequest struct {
 
 func (x *CreateReplayRequest) Reset() {
 	*x = CreateReplayRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[147]
+	mi := &file_api_v2_service_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9930,7 +10228,7 @@ func (x *CreateReplayRequest) String() string {
 func (*CreateReplayRequest) ProtoMessage() {}
 
 func (x *CreateReplayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[147]
+	mi := &file_api_v2_service_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9943,7 +10241,7 @@ func (x *CreateReplayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReplayRequest.ProtoReflect.Descriptor instead.
 func (*CreateReplayRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{147}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *CreateReplayRequest) GetAppId() string {
@@ -9998,7 +10296,7 @@ type CreateReplayResponse struct {
 
 func (x *CreateReplayResponse) Reset() {
 	*x = CreateReplayResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[148]
+	mi := &file_api_v2_service_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10010,7 +10308,7 @@ func (x *CreateReplayResponse) String() string {
 func (*CreateReplayResponse) ProtoMessage() {}
 
 func (x *CreateReplayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[148]
+	mi := &file_api_v2_service_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10023,7 +10321,7 @@ func (x *CreateReplayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReplayResponse.ProtoReflect.Descriptor instead.
 func (*CreateReplayResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{148}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *CreateReplayResponse) GetData() *Replay {
@@ -10055,7 +10353,7 @@ type Replay struct {
 
 func (x *Replay) Reset() {
 	*x = Replay{}
-	mi := &file_api_v2_service_proto_msgTypes[149]
+	mi := &file_api_v2_service_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10067,7 +10365,7 @@ func (x *Replay) String() string {
 func (*Replay) ProtoMessage() {}
 
 func (x *Replay) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[149]
+	mi := &file_api_v2_service_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10080,7 +10378,7 @@ func (x *Replay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Replay.ProtoReflect.Descriptor instead.
 func (*Replay) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{149}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *Replay) GetId() string {
@@ -10960,7 +11258,25 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"functionId\"t\n" +
 	"\x16ResumeFunctionResponse\x12$\n" +
 	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xad\v\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa9\x01\n" +
+	"\x15PauseFunctionsRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12y\n" +
+	"\ffunction_ids\x18\x02 \x03(\tBV\x92AP2HFunction IDs in the app, as used in single pause/resume paths. 1 to 100.\xa0\x01d\xa8\x01\x01\xe0A\x02R\vfunctionIds\"\x7f\n" +
+	"\x16PauseFunctionsResponse\x12/\n" +
+	"\x04data\x18\x01 \x03(\v2\x1b.api.v2.FunctionPauseResultR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xaa\x01\n" +
+	"\x16ResumeFunctionsRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12y\n" +
+	"\ffunction_ids\x18\x02 \x03(\tBV\x92AP2HFunction IDs in the app, as used in single pause/resume paths. 1 to 100.\xa0\x01d\xa8\x01\x01\xe0A\x02R\vfunctionIds\"\x80\x01\n" +
+	"\x17ResumeFunctionsResponse\x12/\n" +
+	"\x04data\x18\x01 \x03(\v2\x1b.api.v2.FunctionPauseResultR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x97\x01\n" +
+	"\x13FunctionPauseResult\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12.\n" +
+	"\bfunction\x18\x02 \x01(\v2\x10.api.v2.FunctionH\x00R\bfunction\x12%\n" +
+	"\x05error\x18\x03 \x01(\v2\r.api.v2.ErrorH\x00R\x05errorB\b\n" +
+	"\x06result\"\xad\v\n" +
 	"\x11ListEventsRequest\x12\x9f\x01\n" +
 	"\x06cursor\x18\x01 \x01(\tB\x81\x01\x92A~2|ID of the last returned event from the previous response. Reuse the same filters and metadata.timeRange on subsequent pages.H\x00R\x06cursor\x88\x01\x01\x12\xf5\x01\n" +
 	"\x05limit\x18\x02 \x01(\x05B\xd9\x01\x92A\xd5\x012\xce\x01Number of events per page (min: 1, max: 50). With include=payload the maximum and default are 5; otherwise the default is 40. Zero uses the default. Events can be up to 5 MiB in Cloud (less on lower plans).:\x0240H\x01R\x05limit\x88\x01\x01\x12\x8e\x02\n" +
@@ -11097,7 +11413,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xa2\xe4\x01\n" +
+	"\x04INFO\x10\x032\xb7\xf1\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -11611,19 +11927,31 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\x97\a\n" +
-	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\xc8\x06\x92A\xf3\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12functions:read:get\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xb0\a\n" +
+	"\rPauseFunction\x12\x1c.api.v2.PauseFunctionRequest\x1a\x1d.api.v2.PauseFunctionResponse\"\xe1\x06\x92A\x8c\x06\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x10Pause a function\x1a\xbb\x05Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. No bulk pause; call once per function.b\x10\n" +
+	"\x04Beta\x12\x10Pause a function\x1a\xd4\x05Pauses a function. Idempotent: pausing a paused function returns 200 and changes nothing. Send no request body. Runs already executing may continue. In Cloud, the pause can take up to a minute to apply, new runs are skipped while paused, and runs still unfinished after 7 days paused are cancelled, same as pausing in the dashboard. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, the pause applies right away, new runs stay queued, and it lasts until resumed or restarted. Use PauseFunctions to pause up to 100 functions in one request.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02.\",/apps/{app_id}/functions/{function_id}/pause\x12\x89\b\n" +
-	"\x0eResumeFunction\x12\x1d.api.v2.ResumeFunctionRequest\x1a\x1e.api.v2.ResumeFunctionResponse\"\xb7\a\x92A\xe0\x06\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02.\",/apps/{app_id}/functions/{function_id}/pause\x12\xa3\b\n" +
+	"\x0eResumeFunction\x12\x1d.api.v2.ResumeFunctionRequest\x1a\x1e.api.v2.ResumeFunctionResponse\"\xd1\a\x92A\xfa\x06\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\x11Resume a function\x1a\xa7\x06Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false. The dev server still wakes the queue so retries can recover a failed wake. Send no request body. In Cloud, the response reflects the requested state; the resume can take up to a minute to apply. A future scheduled pause returns 409 and is left unchanged. New runs skipped while paused are not recreated. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, resume clears the pause after waking the queue; a failed wake leaves the pause in place. Queued runs can then start. No bulk resume; call once per function.b\x10\n" +
+	"\x04Beta\x12\x11Resume a function\x1a\xc1\x06Resumes a paused function. Idempotent: resuming a function that is not paused returns 200 with isPaused: false. The dev server still wakes the queue so retries can recover a failed wake. Send no request body. In Cloud, the response reflects the requested state; the resume can take up to a minute to apply. A future scheduled pause returns 409 and is left unchanged. New runs skipped while paused are not recreated. Wait for a pause or resume to finish before sending the opposite action: requests sent close together can be skipped or apply out of order. Confirm with GetFunction after the cache has refreshed and retry if needed. In the dev server, resume clears the pause after waking the queue; a failed wake leaves the pause in place. Queued runs can then start. Use ResumeFunctions to resume up to 100 functions in one request.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16functions:write:resume\x82\xd3\xe4\x93\x02/\"-/apps/{app_id}/functions/{function_id}/resume\x12\xf8\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16functions:write:resume\x82\xd3\xe4\x93\x02/\"-/apps/{app_id}/functions/{function_id}/resume\x12\x80\x06\n" +
+	"\x0ePauseFunctions\x12\x1d.api.v2.PauseFunctionsRequest\x1a\x1e.api.v2.PauseFunctionsResponse\"\xae\x05\x92A\xe4\x04\n" +
+	"\tFunctions\n" +
+	"\x04Beta\x12\x0fPause functions\x1a\xad\x04Pauses up to 100 functions in one app. Idempotent. Returns one result per ID in request order; failures do not stop the rest. Runs already executing may continue. In Cloud, pauses can take up to a minute to apply, new runs are skipped, and unfinished runs are cancelled after 7 days paused. Wait for each pause or resume request to finish before sending the opposite action; confirm with GetFunction after the cache refreshes and retry if needed. In the dev server, pauses apply immediately, new runs stay queued, and pauses last until resumed or restarted.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15functions:write:pause\x82\xd3\xe4\x93\x02#:\x01*\"\x1e/apps/{app_id}/functions/pause\x12\xdc\x06\n" +
+	"\x0fResumeFunctions\x12\x1e.api.v2.ResumeFunctionsRequest\x1a\x1f.api.v2.ResumeFunctionsResponse\"\x87\x06\x92A\xbb\x05\n" +
+	"\tFunctions\n" +
+	"\x04Beta\x12\x10Resume functions\x1a\x83\x05Resumes up to 100 functions in one app. Idempotent. Returns one result per ID in request order; failures do not stop the rest. In Cloud, the response reflects the requested state; resumes can take up to a minute to apply. Future scheduled pauses return per-function errors and stay unchanged. Skipped runs are not recreated. Wait for each pause or resume request to finish before sending the opposite action; confirm with GetFunction after the cache refreshes and retry if needed. In the dev server, each queue is woken before its pause is cleared so queued runs can start; a failed wake leaves that function paused. Retries wake queues again.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x1a\b\x01\x12\x16functions:write:resume\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/apps/{app_id}/functions/resume\x12\xf8\x01\n" +
 	"\fGetFunctions\x12\x1b.api.v2.GetFunctionsRequest\x1a\x1c.api.v2.GetFunctionsResponse\"\xac\x01\x92An\n" +
 	"\tFunctions\n" +
 	"\x04Beta\x12\rGet functions\x1a:Lists function configuration and status details for an appb\x10\n" +
@@ -11861,7 +12189,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 12)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 151)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 156)
 var file_api_v2_service_proto_goTypes = []any{
 	(FunctionRunStatus)(0),                        // 0: api.v2.FunctionRunStatus
 	(TraceSpanStatus)(0),                          // 1: api.v2.TraceSpanStatus
@@ -12016,80 +12344,85 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*PauseFunctionResponse)(nil),                 // 150: api.v2.PauseFunctionResponse
 	(*ResumeFunctionRequest)(nil),                 // 151: api.v2.ResumeFunctionRequest
 	(*ResumeFunctionResponse)(nil),                // 152: api.v2.ResumeFunctionResponse
-	(*ListEventsRequest)(nil),                     // 153: api.v2.ListEventsRequest
-	(*GetEventRequest)(nil),                       // 154: api.v2.GetEventRequest
-	(*ListEventsResponse)(nil),                    // 155: api.v2.ListEventsResponse
-	(*GetEventResponse)(nil),                      // 156: api.v2.GetEventResponse
-	(*Event)(nil),                                 // 157: api.v2.Event
-	(*EventSource)(nil),                           // 158: api.v2.EventSource
-	(*CreateReplayRequest)(nil),                   // 159: api.v2.CreateReplayRequest
-	(*CreateReplayResponse)(nil),                  // 160: api.v2.CreateReplayResponse
-	(*Replay)(nil),                                // 161: api.v2.Replay
-	nil,                                           // 162: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),                 // 163: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                       // 164: google.protobuf.Struct
-	(*structpb.ListValue)(nil),                    // 165: google.protobuf.ListValue
-	(*structpb.Value)(nil),                        // 166: google.protobuf.Value
-	(*CreateBuildRequest)(nil),                    // 167: api.v2.CreateBuildRequest
-	(*CommitBuildRequest)(nil),                    // 168: api.v2.CommitBuildRequest
-	(*GetBuildRequest)(nil),                       // 169: api.v2.GetBuildRequest
-	(*ListBuildsRequest)(nil),                     // 170: api.v2.ListBuildsRequest
-	(*CancelBuildRequest)(nil),                    // 171: api.v2.CancelBuildRequest
-	(*CreateSandboxRequest)(nil),                  // 172: api.v2.CreateSandboxRequest
-	(*ListSandboxesRequest)(nil),                  // 173: api.v2.ListSandboxesRequest
-	(*GetSandboxRequest)(nil),                     // 174: api.v2.GetSandboxRequest
-	(*DestroySandboxRequest)(nil),                 // 175: api.v2.DestroySandboxRequest
-	(*PauseSandboxRequest)(nil),                   // 176: api.v2.PauseSandboxRequest
-	(*ResumeSandboxRequest)(nil),                  // 177: api.v2.ResumeSandboxRequest
-	(*CreateSandboxSnapshotRequest)(nil),          // 178: api.v2.CreateSandboxSnapshotRequest
-	(*ListSandboxSnapshotsRequest)(nil),           // 179: api.v2.ListSandboxSnapshotsRequest
-	(*GetSandboxSnapshotRequest)(nil),             // 180: api.v2.GetSandboxSnapshotRequest
-	(*DeleteSandboxSnapshotRequest)(nil),          // 181: api.v2.DeleteSandboxSnapshotRequest
-	(*ExecSandboxRequest)(nil),                    // 182: api.v2.ExecSandboxRequest
-	(*StreamSandboxLogsRequest)(nil),              // 183: api.v2.StreamSandboxLogsRequest
-	(*WriteSandboxFileRequest)(nil),               // 184: api.v2.WriteSandboxFileRequest
-	(*ReadSandboxFileRequest)(nil),                // 185: api.v2.ReadSandboxFileRequest
-	(*StartSandboxProcessRequest)(nil),            // 186: api.v2.StartSandboxProcessRequest
-	(*ListSandboxProcessesRequest)(nil),           // 187: api.v2.ListSandboxProcessesRequest
-	(*GetSandboxProcessRequest)(nil),              // 188: api.v2.GetSandboxProcessRequest
-	(*SignalSandboxProcessRequest)(nil),           // 189: api.v2.SignalSandboxProcessRequest
-	(*WaitSandboxProcessRequest)(nil),             // 190: api.v2.WaitSandboxProcessRequest
-	(*GetSandboxProcessOutputRequest)(nil),        // 191: api.v2.GetSandboxProcessOutputRequest
-	(*StreamSandboxProcessOutputRequest)(nil),     // 192: api.v2.StreamSandboxProcessOutputRequest
-	(*CreateBuildResponse)(nil),                   // 193: api.v2.CreateBuildResponse
-	(*BuildResponse)(nil),                         // 194: api.v2.BuildResponse
-	(*ListBuildsResponse)(nil),                    // 195: api.v2.ListBuildsResponse
-	(*CreateSandboxResponse)(nil),                 // 196: api.v2.CreateSandboxResponse
-	(*ListSandboxesResponse)(nil),                 // 197: api.v2.ListSandboxesResponse
-	(*GetSandboxResponse)(nil),                    // 198: api.v2.GetSandboxResponse
-	(*DestroySandboxResponse)(nil),                // 199: api.v2.DestroySandboxResponse
-	(*PauseSandboxResponse)(nil),                  // 200: api.v2.PauseSandboxResponse
-	(*ResumeSandboxResponse)(nil),                 // 201: api.v2.ResumeSandboxResponse
-	(*CreateSandboxSnapshotResponse)(nil),         // 202: api.v2.CreateSandboxSnapshotResponse
-	(*ListSandboxSnapshotsResponse)(nil),          // 203: api.v2.ListSandboxSnapshotsResponse
-	(*GetSandboxSnapshotResponse)(nil),            // 204: api.v2.GetSandboxSnapshotResponse
-	(*DeleteSandboxSnapshotResponse)(nil),         // 205: api.v2.DeleteSandboxSnapshotResponse
-	(*ExecSandboxResponse)(nil),                   // 206: api.v2.ExecSandboxResponse
-	(*StreamSandboxLogsResponse)(nil),             // 207: api.v2.StreamSandboxLogsResponse
-	(*WriteSandboxFileResponse)(nil),              // 208: api.v2.WriteSandboxFileResponse
-	(*httpbody.HttpBody)(nil),                     // 209: google.api.HttpBody
-	(*StartSandboxProcessResponse)(nil),           // 210: api.v2.StartSandboxProcessResponse
-	(*ListSandboxProcessesResponse)(nil),          // 211: api.v2.ListSandboxProcessesResponse
-	(*GetSandboxProcessResponse)(nil),             // 212: api.v2.GetSandboxProcessResponse
-	(*SignalSandboxProcessResponse)(nil),          // 213: api.v2.SignalSandboxProcessResponse
-	(*WaitSandboxProcessResponse)(nil),            // 214: api.v2.WaitSandboxProcessResponse
-	(*GetSandboxProcessOutputResponse)(nil),       // 215: api.v2.GetSandboxProcessOutputResponse
-	(*StreamSandboxProcessOutputResponse)(nil),    // 216: api.v2.StreamSandboxProcessOutputResponse
+	(*PauseFunctionsRequest)(nil),                 // 153: api.v2.PauseFunctionsRequest
+	(*PauseFunctionsResponse)(nil),                // 154: api.v2.PauseFunctionsResponse
+	(*ResumeFunctionsRequest)(nil),                // 155: api.v2.ResumeFunctionsRequest
+	(*ResumeFunctionsResponse)(nil),               // 156: api.v2.ResumeFunctionsResponse
+	(*FunctionPauseResult)(nil),                   // 157: api.v2.FunctionPauseResult
+	(*ListEventsRequest)(nil),                     // 158: api.v2.ListEventsRequest
+	(*GetEventRequest)(nil),                       // 159: api.v2.GetEventRequest
+	(*ListEventsResponse)(nil),                    // 160: api.v2.ListEventsResponse
+	(*GetEventResponse)(nil),                      // 161: api.v2.GetEventResponse
+	(*Event)(nil),                                 // 162: api.v2.Event
+	(*EventSource)(nil),                           // 163: api.v2.EventSource
+	(*CreateReplayRequest)(nil),                   // 164: api.v2.CreateReplayRequest
+	(*CreateReplayResponse)(nil),                  // 165: api.v2.CreateReplayResponse
+	(*Replay)(nil),                                // 166: api.v2.Replay
+	nil,                                           // 167: api.v2.TraceSpanMetadata.ValuesEntry
+	(*timestamppb.Timestamp)(nil),                 // 168: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                       // 169: google.protobuf.Struct
+	(*structpb.ListValue)(nil),                    // 170: google.protobuf.ListValue
+	(*structpb.Value)(nil),                        // 171: google.protobuf.Value
+	(*CreateBuildRequest)(nil),                    // 172: api.v2.CreateBuildRequest
+	(*CommitBuildRequest)(nil),                    // 173: api.v2.CommitBuildRequest
+	(*GetBuildRequest)(nil),                       // 174: api.v2.GetBuildRequest
+	(*ListBuildsRequest)(nil),                     // 175: api.v2.ListBuildsRequest
+	(*CancelBuildRequest)(nil),                    // 176: api.v2.CancelBuildRequest
+	(*CreateSandboxRequest)(nil),                  // 177: api.v2.CreateSandboxRequest
+	(*ListSandboxesRequest)(nil),                  // 178: api.v2.ListSandboxesRequest
+	(*GetSandboxRequest)(nil),                     // 179: api.v2.GetSandboxRequest
+	(*DestroySandboxRequest)(nil),                 // 180: api.v2.DestroySandboxRequest
+	(*PauseSandboxRequest)(nil),                   // 181: api.v2.PauseSandboxRequest
+	(*ResumeSandboxRequest)(nil),                  // 182: api.v2.ResumeSandboxRequest
+	(*CreateSandboxSnapshotRequest)(nil),          // 183: api.v2.CreateSandboxSnapshotRequest
+	(*ListSandboxSnapshotsRequest)(nil),           // 184: api.v2.ListSandboxSnapshotsRequest
+	(*GetSandboxSnapshotRequest)(nil),             // 185: api.v2.GetSandboxSnapshotRequest
+	(*DeleteSandboxSnapshotRequest)(nil),          // 186: api.v2.DeleteSandboxSnapshotRequest
+	(*ExecSandboxRequest)(nil),                    // 187: api.v2.ExecSandboxRequest
+	(*StreamSandboxLogsRequest)(nil),              // 188: api.v2.StreamSandboxLogsRequest
+	(*WriteSandboxFileRequest)(nil),               // 189: api.v2.WriteSandboxFileRequest
+	(*ReadSandboxFileRequest)(nil),                // 190: api.v2.ReadSandboxFileRequest
+	(*StartSandboxProcessRequest)(nil),            // 191: api.v2.StartSandboxProcessRequest
+	(*ListSandboxProcessesRequest)(nil),           // 192: api.v2.ListSandboxProcessesRequest
+	(*GetSandboxProcessRequest)(nil),              // 193: api.v2.GetSandboxProcessRequest
+	(*SignalSandboxProcessRequest)(nil),           // 194: api.v2.SignalSandboxProcessRequest
+	(*WaitSandboxProcessRequest)(nil),             // 195: api.v2.WaitSandboxProcessRequest
+	(*GetSandboxProcessOutputRequest)(nil),        // 196: api.v2.GetSandboxProcessOutputRequest
+	(*StreamSandboxProcessOutputRequest)(nil),     // 197: api.v2.StreamSandboxProcessOutputRequest
+	(*CreateBuildResponse)(nil),                   // 198: api.v2.CreateBuildResponse
+	(*BuildResponse)(nil),                         // 199: api.v2.BuildResponse
+	(*ListBuildsResponse)(nil),                    // 200: api.v2.ListBuildsResponse
+	(*CreateSandboxResponse)(nil),                 // 201: api.v2.CreateSandboxResponse
+	(*ListSandboxesResponse)(nil),                 // 202: api.v2.ListSandboxesResponse
+	(*GetSandboxResponse)(nil),                    // 203: api.v2.GetSandboxResponse
+	(*DestroySandboxResponse)(nil),                // 204: api.v2.DestroySandboxResponse
+	(*PauseSandboxResponse)(nil),                  // 205: api.v2.PauseSandboxResponse
+	(*ResumeSandboxResponse)(nil),                 // 206: api.v2.ResumeSandboxResponse
+	(*CreateSandboxSnapshotResponse)(nil),         // 207: api.v2.CreateSandboxSnapshotResponse
+	(*ListSandboxSnapshotsResponse)(nil),          // 208: api.v2.ListSandboxSnapshotsResponse
+	(*GetSandboxSnapshotResponse)(nil),            // 209: api.v2.GetSandboxSnapshotResponse
+	(*DeleteSandboxSnapshotResponse)(nil),         // 210: api.v2.DeleteSandboxSnapshotResponse
+	(*ExecSandboxResponse)(nil),                   // 211: api.v2.ExecSandboxResponse
+	(*StreamSandboxLogsResponse)(nil),             // 212: api.v2.StreamSandboxLogsResponse
+	(*WriteSandboxFileResponse)(nil),              // 213: api.v2.WriteSandboxFileResponse
+	(*httpbody.HttpBody)(nil),                     // 214: google.api.HttpBody
+	(*StartSandboxProcessResponse)(nil),           // 215: api.v2.StartSandboxProcessResponse
+	(*ListSandboxProcessesResponse)(nil),          // 216: api.v2.ListSandboxProcessesResponse
+	(*GetSandboxProcessResponse)(nil),             // 217: api.v2.GetSandboxProcessResponse
+	(*SignalSandboxProcessResponse)(nil),          // 218: api.v2.SignalSandboxProcessResponse
+	(*WaitSandboxProcessResponse)(nil),            // 219: api.v2.WaitSandboxProcessResponse
+	(*GetSandboxProcessOutputResponse)(nil),       // 220: api.v2.GetSandboxProcessOutputResponse
+	(*StreamSandboxProcessOutputResponse)(nil),    // 221: api.v2.StreamSandboxProcessOutputResponse
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	15,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	18,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	16,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	163, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	163, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	168, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	168, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	19,  // 5: api.v2.ResponseMetadata.time_range:type_name -> api.v2.TimeRange
-	163, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
-	163, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
+	168, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
+	168, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
 	21,  // 8: api.v2.FunctionRef.app:type_name -> api.v2.AppRef
 	3,   // 9: api.v2.FunctionTrigger.type:type_name -> api.v2.FunctionTriggerType
 	4,   // 10: api.v2.FunctionConcurrencyConfiguration.scope:type_name -> api.v2.FunctionConcurrencyScope
@@ -12110,11 +12443,11 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	20,  // 25: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
 	21,  // 26: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
 	0,   // 27: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	163, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	163, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	163, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	168, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	168, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	168, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
 	36,  // 31: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	164, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	169, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
 	148, // 33: api.v2.FunctionRun.deferred_from:type_name -> api.v2.RunDeferredFrom
 	37,  // 34: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
 	18,  // 35: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -12122,18 +12455,18 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	18,  // 37: api.v2.GetEventRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 38: api.v2.GetEventRunsResponse.page:type_name -> api.v2.Page
 	43,  // 39: api.v2.RerunRequest.from_step:type_name -> api.v2.RerunFromStep
-	165, // 40: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
+	170, // 40: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
 	45,  // 41: api.v2.RerunResponse.data:type_name -> api.v2.RerunData
 	18,  // 42: api.v2.RerunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	162, // 43: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	163, // 44: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	167, // 43: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	168, // 44: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
 	1,   // 45: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
 	2,   // 46: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	163, // 47: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	163, // 48: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	163, // 49: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	164, // 50: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	164, // 51: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	168, // 47: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	168, // 48: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	168, // 49: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	169, // 50: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	169, // 51: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
 	46,  // 52: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
 	47,  // 53: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
 	47,  // 54: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
@@ -12142,10 +12475,10 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	35,  // 57: api.v2.GetFunctionResponse.data:type_name -> api.v2.Function
 	18,  // 58: api.v2.GetFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
 	6,   // 59: api.v2.App.method:type_name -> api.v2.AppMethod
-	163, // 60: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
-	163, // 61: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
+	168, // 60: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
+	168, // 61: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
 	54,  // 62: api.v2.App.latest_sync:type_name -> api.v2.AppSync
-	163, // 63: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
+	168, // 63: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
 	53,  // 64: api.v2.GetAppResponse.data:type_name -> api.v2.App
 	18,  // 65: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	53,  // 66: api.v2.GetAppsResponse.data:type_name -> api.v2.App
@@ -12159,27 +12492,27 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	65,  // 74: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	18,  // 75: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	7,   // 76: api.v2.Env.type:type_name -> api.v2.EnvType
-	163, // 77: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	163, // 78: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	163, // 79: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	168, // 77: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 78: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 79: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	70,  // 80: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	18,  // 81: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 82: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	70,  // 83: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	18,  // 84: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	163, // 85: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	163, // 86: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	168, // 85: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 86: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	74,  // 87: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	18,  // 88: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 89: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	163, // 90: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 90: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	65,  // 91: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	18,  // 92: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 93: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	79,  // 94: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	18,  // 95: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 96: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	163, // 97: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 97: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	82,  // 98: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	85,  // 99: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	18,  // 100: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -12188,26 +12521,26 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	18,  // 103: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 104: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	82,  // 105: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	163, // 106: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	163, // 107: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	168, // 106: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	168, // 107: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	65,  // 108: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	18,  // 109: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	164, // 110: api.v2.SendEventRequest.data:type_name -> google.protobuf.Struct
-	164, // 111: api.v2.SendEventRequest.user:type_name -> google.protobuf.Struct
+	169, // 110: api.v2.SendEventRequest.data:type_name -> google.protobuf.Struct
+	169, // 111: api.v2.SendEventRequest.user:type_name -> google.protobuf.Struct
 	90,  // 112: api.v2.SendEventResponse.data:type_name -> api.v2.SendEventData
 	18,  // 113: api.v2.SendEventResponse.metadata:type_name -> api.v2.ResponseMetadata
-	164, // 114: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	169, // 114: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	93,  // 115: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	18,  // 116: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	163, // 117: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	163, // 118: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	163, // 119: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	168, // 117: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	168, // 118: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	168, // 119: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
 	95,  // 120: api.v2.CreateScoreRequest.scores:type_name -> api.v2.CreateScoreInput
-	166, // 121: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
+	171, // 121: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
 	96,  // 122: api.v2.CreateScoreInput.experiment:type_name -> api.v2.ScoreExperiment
 	98,  // 123: api.v2.CreateScoreResponse.data:type_name -> api.v2.Score
 	18,  // 124: api.v2.CreateScoreResponse.metadata:type_name -> api.v2.ResponseMetadata
-	166, // 125: api.v2.Score.value:type_name -> google.protobuf.Value
+	171, // 125: api.v2.Score.value:type_name -> google.protobuf.Value
 	96,  // 126: api.v2.Score.experiment:type_name -> api.v2.ScoreExperiment
 	101, // 127: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	18,  // 128: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -12222,7 +12555,7 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	108, // 137: api.v2.InsightsOutputColumn.path_hints:type_name -> api.v2.InsightsPathHint
 	109, // 138: api.v2.InsightsPathHint.path:type_name -> api.v2.InsightsPathSegment
 	9,   // 139: api.v2.InsightsPathHint.hint:type_name -> api.v2.InsightsColumnHint
-	166, // 140: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	171, // 140: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
 	11,  // 141: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
 	112, // 142: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
 	115, // 143: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
@@ -12233,49 +12566,49 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	122, // 148: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
 	18,  // 149: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 150: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	164, // 151: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	163, // 152: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 153: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
+	169, // 151: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	168, // 152: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 153: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
 	125, // 154: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
 	18,  // 155: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 156: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
 	20,  // 157: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
-	163, // 158: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
-	163, // 159: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
-	163, // 160: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 161: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
+	168, // 158: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
+	168, // 159: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
+	168, // 160: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 161: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
 	128, // 162: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
 	18,  // 163: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
 	129, // 164: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
 	131, // 165: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
-	163, // 166: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
-	163, // 167: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
+	168, // 166: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
+	168, // 167: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
 	130, // 168: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
 	134, // 169: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
 	18,  // 170: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 171: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
-	163, // 172: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
-	163, // 173: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 174: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
+	168, // 172: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
+	168, // 173: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 174: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
 	137, // 175: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
 	18,  // 176: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 177: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
-	163, // 178: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
+	168, // 178: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
 	20,  // 179: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
-	163, // 180: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 181: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	168, // 180: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 181: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
 	140, // 182: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
 	18,  // 183: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 184: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
 	20,  // 185: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
 	0,   // 186: api.v2.SessionRun.status:type_name -> api.v2.FunctionRunStatus
-	163, // 187: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
-	163, // 188: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
-	163, // 189: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
-	163, // 190: api.v2.ListRunsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 191: api.v2.ListRunsRequest.until:type_name -> google.protobuf.Timestamp
-	163, // 192: api.v2.ListFunctionRunsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 193: api.v2.ListFunctionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	168, // 187: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
+	168, // 188: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
+	168, // 189: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
+	168, // 190: api.v2.ListRunsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 191: api.v2.ListRunsRequest.until:type_name -> google.protobuf.Timestamp
+	168, // 192: api.v2.ListFunctionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 193: api.v2.ListFunctionRunsRequest.until:type_name -> google.protobuf.Timestamp
 	37,  // 194: api.v2.ListRunsResponse.data:type_name -> api.v2.FunctionRun
 	18,  // 195: api.v2.ListRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 196: api.v2.ListRunsResponse.page:type_name -> api.v2.Page
@@ -12288,163 +12621,173 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	18,  // 203: api.v2.PauseFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
 	35,  // 204: api.v2.ResumeFunctionResponse.data:type_name -> api.v2.Function
 	18,  // 205: api.v2.ResumeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	163, // 206: api.v2.ListEventsRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 207: api.v2.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
-	157, // 208: api.v2.ListEventsResponse.data:type_name -> api.v2.Event
-	18,  // 209: api.v2.ListEventsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 210: api.v2.ListEventsResponse.page:type_name -> api.v2.Page
-	157, // 211: api.v2.GetEventResponse.data:type_name -> api.v2.Event
-	18,  // 212: api.v2.GetEventResponse.metadata:type_name -> api.v2.ResponseMetadata
-	163, // 213: api.v2.Event.received_at:type_name -> google.protobuf.Timestamp
-	163, // 214: api.v2.Event.occurred_at:type_name -> google.protobuf.Timestamp
-	158, // 215: api.v2.Event.source:type_name -> api.v2.EventSource
-	164, // 216: api.v2.Event.payload:type_name -> google.protobuf.Struct
-	163, // 217: api.v2.CreateReplayRequest.from:type_name -> google.protobuf.Timestamp
-	163, // 218: api.v2.CreateReplayRequest.until:type_name -> google.protobuf.Timestamp
-	161, // 219: api.v2.CreateReplayResponse.data:type_name -> api.v2.Replay
-	18,  // 220: api.v2.CreateReplayResponse.metadata:type_name -> api.v2.ResponseMetadata
-	163, // 221: api.v2.Replay.created_at:type_name -> google.protobuf.Timestamp
-	163, // 222: api.v2.Replay.from:type_name -> google.protobuf.Timestamp
-	163, // 223: api.v2.Replay.until:type_name -> google.protobuf.Timestamp
-	12,  // 224: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	12,  // 225: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	61,  // 226: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	63,  // 227: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	67,  // 228: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	13,  // 229: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	75,  // 230: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	72,  // 231: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	77,  // 232: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	80,  // 233: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	83,  // 234: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	86,  // 235: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	38,  // 236: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	141, // 237: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
-	142, // 238: api.v2.V2.ListFunctionRuns:input_type -> api.v2.ListFunctionRunsRequest
-	40,  // 239: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
-	159, // 240: api.v2.V2.CreateReplay:input_type -> api.v2.CreateReplayRequest
-	42,  // 241: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
-	145, // 242: api.v2.V2.CancelRun:input_type -> api.v2.CancelRunRequest
-	55,  // 243: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
-	57,  // 244: api.v2.V2.GetApps:input_type -> api.v2.GetAppsRequest
-	167, // 245: api.v2.V2.CreateBuild:input_type -> api.v2.CreateBuildRequest
-	168, // 246: api.v2.V2.CommitBuild:input_type -> api.v2.CommitBuildRequest
-	169, // 247: api.v2.V2.GetBuild:input_type -> api.v2.GetBuildRequest
-	170, // 248: api.v2.V2.ListBuilds:input_type -> api.v2.ListBuildsRequest
-	171, // 249: api.v2.V2.CancelBuild:input_type -> api.v2.CancelBuildRequest
-	172, // 250: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
-	173, // 251: api.v2.V2.ListSandboxes:input_type -> api.v2.ListSandboxesRequest
-	174, // 252: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
-	175, // 253: api.v2.V2.DestroySandbox:input_type -> api.v2.DestroySandboxRequest
-	176, // 254: api.v2.V2.PauseSandbox:input_type -> api.v2.PauseSandboxRequest
-	177, // 255: api.v2.V2.ResumeSandbox:input_type -> api.v2.ResumeSandboxRequest
-	178, // 256: api.v2.V2.CreateSandboxSnapshot:input_type -> api.v2.CreateSandboxSnapshotRequest
-	179, // 257: api.v2.V2.ListSandboxSnapshots:input_type -> api.v2.ListSandboxSnapshotsRequest
-	180, // 258: api.v2.V2.GetSandboxSnapshot:input_type -> api.v2.GetSandboxSnapshotRequest
-	181, // 259: api.v2.V2.DeleteSandboxSnapshot:input_type -> api.v2.DeleteSandboxSnapshotRequest
-	182, // 260: api.v2.V2.ExecSandbox:input_type -> api.v2.ExecSandboxRequest
-	183, // 261: api.v2.V2.StreamSandboxLogs:input_type -> api.v2.StreamSandboxLogsRequest
-	184, // 262: api.v2.V2.WriteSandboxFile:input_type -> api.v2.WriteSandboxFileRequest
-	185, // 263: api.v2.V2.ReadSandboxFile:input_type -> api.v2.ReadSandboxFileRequest
-	186, // 264: api.v2.V2.StartSandboxProcess:input_type -> api.v2.StartSandboxProcessRequest
-	187, // 265: api.v2.V2.ListSandboxProcesses:input_type -> api.v2.ListSandboxProcessesRequest
-	188, // 266: api.v2.V2.GetSandboxProcess:input_type -> api.v2.GetSandboxProcessRequest
-	189, // 267: api.v2.V2.SignalSandboxProcess:input_type -> api.v2.SignalSandboxProcessRequest
-	190, // 268: api.v2.V2.WaitSandboxProcess:input_type -> api.v2.WaitSandboxProcessRequest
-	191, // 269: api.v2.V2.GetSandboxProcessOutput:input_type -> api.v2.GetSandboxProcessOutputRequest
-	192, // 270: api.v2.V2.StreamSandboxProcessOutput:input_type -> api.v2.StreamSandboxProcessOutputRequest
-	94,  // 271: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
-	99,  // 272: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	49,  // 273: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	51,  // 274: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
-	149, // 275: api.v2.V2.PauseFunction:input_type -> api.v2.PauseFunctionRequest
-	151, // 276: api.v2.V2.ResumeFunction:input_type -> api.v2.ResumeFunctionRequest
-	59,  // 277: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
-	153, // 278: api.v2.V2.ListEvents:input_type -> api.v2.ListEventsRequest
-	154, // 279: api.v2.V2.GetEvent:input_type -> api.v2.GetEventRequest
-	88,  // 280: api.v2.V2.SendEvent:input_type -> api.v2.SendEventRequest
-	91,  // 281: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	113, // 282: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	120, // 283: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	117, // 284: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	103, // 285: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	123, // 286: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
-	126, // 287: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
-	132, // 288: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
-	135, // 289: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
-	138, // 290: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
-	14,  // 291: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	17,  // 292: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	62,  // 293: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	64,  // 294: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	68,  // 295: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	69,  // 296: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	76,  // 297: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	73,  // 298: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	78,  // 299: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	81,  // 300: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	84,  // 301: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	87,  // 302: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	39,  // 303: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	143, // 304: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
-	144, // 305: api.v2.V2.ListFunctionRuns:output_type -> api.v2.ListFunctionRunsResponse
-	41,  // 306: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
-	160, // 307: api.v2.V2.CreateReplay:output_type -> api.v2.CreateReplayResponse
-	44,  // 308: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
-	146, // 309: api.v2.V2.CancelRun:output_type -> api.v2.CancelRunResponse
-	56,  // 310: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
-	58,  // 311: api.v2.V2.GetApps:output_type -> api.v2.GetAppsResponse
-	193, // 312: api.v2.V2.CreateBuild:output_type -> api.v2.CreateBuildResponse
-	194, // 313: api.v2.V2.CommitBuild:output_type -> api.v2.BuildResponse
-	194, // 314: api.v2.V2.GetBuild:output_type -> api.v2.BuildResponse
-	195, // 315: api.v2.V2.ListBuilds:output_type -> api.v2.ListBuildsResponse
-	194, // 316: api.v2.V2.CancelBuild:output_type -> api.v2.BuildResponse
-	196, // 317: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
-	197, // 318: api.v2.V2.ListSandboxes:output_type -> api.v2.ListSandboxesResponse
-	198, // 319: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse
-	199, // 320: api.v2.V2.DestroySandbox:output_type -> api.v2.DestroySandboxResponse
-	200, // 321: api.v2.V2.PauseSandbox:output_type -> api.v2.PauseSandboxResponse
-	201, // 322: api.v2.V2.ResumeSandbox:output_type -> api.v2.ResumeSandboxResponse
-	202, // 323: api.v2.V2.CreateSandboxSnapshot:output_type -> api.v2.CreateSandboxSnapshotResponse
-	203, // 324: api.v2.V2.ListSandboxSnapshots:output_type -> api.v2.ListSandboxSnapshotsResponse
-	204, // 325: api.v2.V2.GetSandboxSnapshot:output_type -> api.v2.GetSandboxSnapshotResponse
-	205, // 326: api.v2.V2.DeleteSandboxSnapshot:output_type -> api.v2.DeleteSandboxSnapshotResponse
-	206, // 327: api.v2.V2.ExecSandbox:output_type -> api.v2.ExecSandboxResponse
-	207, // 328: api.v2.V2.StreamSandboxLogs:output_type -> api.v2.StreamSandboxLogsResponse
-	208, // 329: api.v2.V2.WriteSandboxFile:output_type -> api.v2.WriteSandboxFileResponse
-	209, // 330: api.v2.V2.ReadSandboxFile:output_type -> google.api.HttpBody
-	210, // 331: api.v2.V2.StartSandboxProcess:output_type -> api.v2.StartSandboxProcessResponse
-	211, // 332: api.v2.V2.ListSandboxProcesses:output_type -> api.v2.ListSandboxProcessesResponse
-	212, // 333: api.v2.V2.GetSandboxProcess:output_type -> api.v2.GetSandboxProcessResponse
-	213, // 334: api.v2.V2.SignalSandboxProcess:output_type -> api.v2.SignalSandboxProcessResponse
-	214, // 335: api.v2.V2.WaitSandboxProcess:output_type -> api.v2.WaitSandboxProcessResponse
-	215, // 336: api.v2.V2.GetSandboxProcessOutput:output_type -> api.v2.GetSandboxProcessOutputResponse
-	216, // 337: api.v2.V2.StreamSandboxProcessOutput:output_type -> api.v2.StreamSandboxProcessOutputResponse
-	97,  // 338: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
-	100, // 339: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	50,  // 340: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	52,  // 341: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
-	150, // 342: api.v2.V2.PauseFunction:output_type -> api.v2.PauseFunctionResponse
-	152, // 343: api.v2.V2.ResumeFunction:output_type -> api.v2.ResumeFunctionResponse
-	60,  // 344: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
-	155, // 345: api.v2.V2.ListEvents:output_type -> api.v2.ListEventsResponse
-	156, // 346: api.v2.V2.GetEvent:output_type -> api.v2.GetEventResponse
-	89,  // 347: api.v2.V2.SendEvent:output_type -> api.v2.SendEventResponse
-	92,  // 348: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	114, // 349: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	121, // 350: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	118, // 351: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	104, // 352: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	124, // 353: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
-	127, // 354: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
-	133, // 355: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
-	136, // 356: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
-	139, // 357: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
-	291, // [291:358] is the sub-list for method output_type
-	224, // [224:291] is the sub-list for method input_type
-	224, // [224:224] is the sub-list for extension type_name
-	224, // [224:224] is the sub-list for extension extendee
-	0,   // [0:224] is the sub-list for field type_name
+	157, // 206: api.v2.PauseFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
+	18,  // 207: api.v2.PauseFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	157, // 208: api.v2.ResumeFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
+	18,  // 209: api.v2.ResumeFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	35,  // 210: api.v2.FunctionPauseResult.function:type_name -> api.v2.Function
+	16,  // 211: api.v2.FunctionPauseResult.error:type_name -> api.v2.Error
+	168, // 212: api.v2.ListEventsRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 213: api.v2.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
+	162, // 214: api.v2.ListEventsResponse.data:type_name -> api.v2.Event
+	18,  // 215: api.v2.ListEventsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 216: api.v2.ListEventsResponse.page:type_name -> api.v2.Page
+	162, // 217: api.v2.GetEventResponse.data:type_name -> api.v2.Event
+	18,  // 218: api.v2.GetEventResponse.metadata:type_name -> api.v2.ResponseMetadata
+	168, // 219: api.v2.Event.received_at:type_name -> google.protobuf.Timestamp
+	168, // 220: api.v2.Event.occurred_at:type_name -> google.protobuf.Timestamp
+	163, // 221: api.v2.Event.source:type_name -> api.v2.EventSource
+	169, // 222: api.v2.Event.payload:type_name -> google.protobuf.Struct
+	168, // 223: api.v2.CreateReplayRequest.from:type_name -> google.protobuf.Timestamp
+	168, // 224: api.v2.CreateReplayRequest.until:type_name -> google.protobuf.Timestamp
+	166, // 225: api.v2.CreateReplayResponse.data:type_name -> api.v2.Replay
+	18,  // 226: api.v2.CreateReplayResponse.metadata:type_name -> api.v2.ResponseMetadata
+	168, // 227: api.v2.Replay.created_at:type_name -> google.protobuf.Timestamp
+	168, // 228: api.v2.Replay.from:type_name -> google.protobuf.Timestamp
+	168, // 229: api.v2.Replay.until:type_name -> google.protobuf.Timestamp
+	12,  // 230: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	12,  // 231: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	61,  // 232: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	63,  // 233: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	67,  // 234: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	13,  // 235: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	75,  // 236: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	72,  // 237: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	77,  // 238: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	80,  // 239: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	83,  // 240: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	86,  // 241: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	38,  // 242: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	141, // 243: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
+	142, // 244: api.v2.V2.ListFunctionRuns:input_type -> api.v2.ListFunctionRunsRequest
+	40,  // 245: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
+	164, // 246: api.v2.V2.CreateReplay:input_type -> api.v2.CreateReplayRequest
+	42,  // 247: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
+	145, // 248: api.v2.V2.CancelRun:input_type -> api.v2.CancelRunRequest
+	55,  // 249: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
+	57,  // 250: api.v2.V2.GetApps:input_type -> api.v2.GetAppsRequest
+	172, // 251: api.v2.V2.CreateBuild:input_type -> api.v2.CreateBuildRequest
+	173, // 252: api.v2.V2.CommitBuild:input_type -> api.v2.CommitBuildRequest
+	174, // 253: api.v2.V2.GetBuild:input_type -> api.v2.GetBuildRequest
+	175, // 254: api.v2.V2.ListBuilds:input_type -> api.v2.ListBuildsRequest
+	176, // 255: api.v2.V2.CancelBuild:input_type -> api.v2.CancelBuildRequest
+	177, // 256: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
+	178, // 257: api.v2.V2.ListSandboxes:input_type -> api.v2.ListSandboxesRequest
+	179, // 258: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
+	180, // 259: api.v2.V2.DestroySandbox:input_type -> api.v2.DestroySandboxRequest
+	181, // 260: api.v2.V2.PauseSandbox:input_type -> api.v2.PauseSandboxRequest
+	182, // 261: api.v2.V2.ResumeSandbox:input_type -> api.v2.ResumeSandboxRequest
+	183, // 262: api.v2.V2.CreateSandboxSnapshot:input_type -> api.v2.CreateSandboxSnapshotRequest
+	184, // 263: api.v2.V2.ListSandboxSnapshots:input_type -> api.v2.ListSandboxSnapshotsRequest
+	185, // 264: api.v2.V2.GetSandboxSnapshot:input_type -> api.v2.GetSandboxSnapshotRequest
+	186, // 265: api.v2.V2.DeleteSandboxSnapshot:input_type -> api.v2.DeleteSandboxSnapshotRequest
+	187, // 266: api.v2.V2.ExecSandbox:input_type -> api.v2.ExecSandboxRequest
+	188, // 267: api.v2.V2.StreamSandboxLogs:input_type -> api.v2.StreamSandboxLogsRequest
+	189, // 268: api.v2.V2.WriteSandboxFile:input_type -> api.v2.WriteSandboxFileRequest
+	190, // 269: api.v2.V2.ReadSandboxFile:input_type -> api.v2.ReadSandboxFileRequest
+	191, // 270: api.v2.V2.StartSandboxProcess:input_type -> api.v2.StartSandboxProcessRequest
+	192, // 271: api.v2.V2.ListSandboxProcesses:input_type -> api.v2.ListSandboxProcessesRequest
+	193, // 272: api.v2.V2.GetSandboxProcess:input_type -> api.v2.GetSandboxProcessRequest
+	194, // 273: api.v2.V2.SignalSandboxProcess:input_type -> api.v2.SignalSandboxProcessRequest
+	195, // 274: api.v2.V2.WaitSandboxProcess:input_type -> api.v2.WaitSandboxProcessRequest
+	196, // 275: api.v2.V2.GetSandboxProcessOutput:input_type -> api.v2.GetSandboxProcessOutputRequest
+	197, // 276: api.v2.V2.StreamSandboxProcessOutput:input_type -> api.v2.StreamSandboxProcessOutputRequest
+	94,  // 277: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
+	99,  // 278: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	49,  // 279: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	51,  // 280: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
+	149, // 281: api.v2.V2.PauseFunction:input_type -> api.v2.PauseFunctionRequest
+	151, // 282: api.v2.V2.ResumeFunction:input_type -> api.v2.ResumeFunctionRequest
+	153, // 283: api.v2.V2.PauseFunctions:input_type -> api.v2.PauseFunctionsRequest
+	155, // 284: api.v2.V2.ResumeFunctions:input_type -> api.v2.ResumeFunctionsRequest
+	59,  // 285: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
+	158, // 286: api.v2.V2.ListEvents:input_type -> api.v2.ListEventsRequest
+	159, // 287: api.v2.V2.GetEvent:input_type -> api.v2.GetEventRequest
+	88,  // 288: api.v2.V2.SendEvent:input_type -> api.v2.SendEventRequest
+	91,  // 289: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	113, // 290: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	120, // 291: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	117, // 292: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	103, // 293: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	123, // 294: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
+	126, // 295: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
+	132, // 296: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
+	135, // 297: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
+	138, // 298: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
+	14,  // 299: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	17,  // 300: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	62,  // 301: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	64,  // 302: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	68,  // 303: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	69,  // 304: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	76,  // 305: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	73,  // 306: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	78,  // 307: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	81,  // 308: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	84,  // 309: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	87,  // 310: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	39,  // 311: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	143, // 312: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
+	144, // 313: api.v2.V2.ListFunctionRuns:output_type -> api.v2.ListFunctionRunsResponse
+	41,  // 314: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
+	165, // 315: api.v2.V2.CreateReplay:output_type -> api.v2.CreateReplayResponse
+	44,  // 316: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
+	146, // 317: api.v2.V2.CancelRun:output_type -> api.v2.CancelRunResponse
+	56,  // 318: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
+	58,  // 319: api.v2.V2.GetApps:output_type -> api.v2.GetAppsResponse
+	198, // 320: api.v2.V2.CreateBuild:output_type -> api.v2.CreateBuildResponse
+	199, // 321: api.v2.V2.CommitBuild:output_type -> api.v2.BuildResponse
+	199, // 322: api.v2.V2.GetBuild:output_type -> api.v2.BuildResponse
+	200, // 323: api.v2.V2.ListBuilds:output_type -> api.v2.ListBuildsResponse
+	199, // 324: api.v2.V2.CancelBuild:output_type -> api.v2.BuildResponse
+	201, // 325: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
+	202, // 326: api.v2.V2.ListSandboxes:output_type -> api.v2.ListSandboxesResponse
+	203, // 327: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse
+	204, // 328: api.v2.V2.DestroySandbox:output_type -> api.v2.DestroySandboxResponse
+	205, // 329: api.v2.V2.PauseSandbox:output_type -> api.v2.PauseSandboxResponse
+	206, // 330: api.v2.V2.ResumeSandbox:output_type -> api.v2.ResumeSandboxResponse
+	207, // 331: api.v2.V2.CreateSandboxSnapshot:output_type -> api.v2.CreateSandboxSnapshotResponse
+	208, // 332: api.v2.V2.ListSandboxSnapshots:output_type -> api.v2.ListSandboxSnapshotsResponse
+	209, // 333: api.v2.V2.GetSandboxSnapshot:output_type -> api.v2.GetSandboxSnapshotResponse
+	210, // 334: api.v2.V2.DeleteSandboxSnapshot:output_type -> api.v2.DeleteSandboxSnapshotResponse
+	211, // 335: api.v2.V2.ExecSandbox:output_type -> api.v2.ExecSandboxResponse
+	212, // 336: api.v2.V2.StreamSandboxLogs:output_type -> api.v2.StreamSandboxLogsResponse
+	213, // 337: api.v2.V2.WriteSandboxFile:output_type -> api.v2.WriteSandboxFileResponse
+	214, // 338: api.v2.V2.ReadSandboxFile:output_type -> google.api.HttpBody
+	215, // 339: api.v2.V2.StartSandboxProcess:output_type -> api.v2.StartSandboxProcessResponse
+	216, // 340: api.v2.V2.ListSandboxProcesses:output_type -> api.v2.ListSandboxProcessesResponse
+	217, // 341: api.v2.V2.GetSandboxProcess:output_type -> api.v2.GetSandboxProcessResponse
+	218, // 342: api.v2.V2.SignalSandboxProcess:output_type -> api.v2.SignalSandboxProcessResponse
+	219, // 343: api.v2.V2.WaitSandboxProcess:output_type -> api.v2.WaitSandboxProcessResponse
+	220, // 344: api.v2.V2.GetSandboxProcessOutput:output_type -> api.v2.GetSandboxProcessOutputResponse
+	221, // 345: api.v2.V2.StreamSandboxProcessOutput:output_type -> api.v2.StreamSandboxProcessOutputResponse
+	97,  // 346: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
+	100, // 347: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	50,  // 348: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	52,  // 349: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
+	150, // 350: api.v2.V2.PauseFunction:output_type -> api.v2.PauseFunctionResponse
+	152, // 351: api.v2.V2.ResumeFunction:output_type -> api.v2.ResumeFunctionResponse
+	154, // 352: api.v2.V2.PauseFunctions:output_type -> api.v2.PauseFunctionsResponse
+	156, // 353: api.v2.V2.ResumeFunctions:output_type -> api.v2.ResumeFunctionsResponse
+	60,  // 354: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
+	160, // 355: api.v2.V2.ListEvents:output_type -> api.v2.ListEventsResponse
+	161, // 356: api.v2.V2.GetEvent:output_type -> api.v2.GetEventResponse
+	89,  // 357: api.v2.V2.SendEvent:output_type -> api.v2.SendEventResponse
+	92,  // 358: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	114, // 359: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	121, // 360: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	118, // 361: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	104, // 362: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	124, // 363: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
+	127, // 364: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
+	133, // 365: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
+	136, // 366: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
+	139, // 367: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
+	299, // [299:368] is the sub-list for method output_type
+	230, // [230:299] is the sub-list for method input_type
+	230, // [230:230] is the sub-list for extension type_name
+	230, // [230:230] is the sub-list for extension extendee
+	0,   // [0:230] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -12510,16 +12853,20 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[129].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[130].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[136].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[141].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[145].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[145].OneofWrappers = []any{
+		(*FunctionPauseResult_Function)(nil),
+		(*FunctionPauseResult_Error)(nil),
+	}
 	file_api_v2_service_proto_msgTypes[146].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[150].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[151].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      12,
-			NumMessages:   151,
+			NumMessages:   156,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

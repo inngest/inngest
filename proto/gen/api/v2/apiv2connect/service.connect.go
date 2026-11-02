@@ -146,6 +146,10 @@ const (
 	V2PauseFunctionProcedure = "/api.v2.V2/PauseFunction"
 	// V2ResumeFunctionProcedure is the fully-qualified name of the V2's ResumeFunction RPC.
 	V2ResumeFunctionProcedure = "/api.v2.V2/ResumeFunction"
+	// V2PauseFunctionsProcedure is the fully-qualified name of the V2's PauseFunctions RPC.
+	V2PauseFunctionsProcedure = "/api.v2.V2/PauseFunctions"
+	// V2ResumeFunctionsProcedure is the fully-qualified name of the V2's ResumeFunctions RPC.
+	V2ResumeFunctionsProcedure = "/api.v2.V2/ResumeFunctions"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
 	V2GetFunctionsProcedure = "/api.v2.V2/GetFunctions"
 	// V2ListEventsProcedure is the fully-qualified name of the V2's ListEvents RPC.
@@ -235,6 +239,8 @@ type V2Client interface {
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
+	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
 	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
@@ -580,6 +586,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ResumeFunction")),
 			connect.WithClientOptions(opts...),
 		),
+		pauseFunctions: connect.NewClient[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse](
+			httpClient,
+			baseURL+V2PauseFunctionsProcedure,
+			connect.WithSchema(v2Methods.ByName("PauseFunctions")),
+			connect.WithClientOptions(opts...),
+		),
+		resumeFunctions: connect.NewClient[v2.ResumeFunctionsRequest, v2.ResumeFunctionsResponse](
+			httpClient,
+			baseURL+V2ResumeFunctionsProcedure,
+			connect.WithSchema(v2Methods.ByName("ResumeFunctions")),
+			connect.WithClientOptions(opts...),
+		),
 		getFunctions: connect.NewClient[v2.GetFunctionsRequest, v2.GetFunctionsResponse](
 			httpClient,
 			baseURL+V2GetFunctionsProcedure,
@@ -722,6 +740,8 @@ type v2Client struct {
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	resumeFunction             *connect.Client[v2.ResumeFunctionRequest, v2.ResumeFunctionResponse]
+	pauseFunctions             *connect.Client[v2.PauseFunctionsRequest, v2.PauseFunctionsResponse]
+	resumeFunctions            *connect.Client[v2.ResumeFunctionsRequest, v2.ResumeFunctionsResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
 	listEvents                 *connect.Client[v2.ListEventsRequest, v2.ListEventsResponse]
 	getEvent                   *connect.Client[v2.GetEventRequest, v2.GetEventResponse]
@@ -1003,6 +1023,16 @@ func (c *v2Client) ResumeFunction(ctx context.Context, req *connect.Request[v2.R
 	return c.resumeFunction.CallUnary(ctx, req)
 }
 
+// PauseFunctions calls api.v2.V2.PauseFunctions.
+func (c *v2Client) PauseFunctions(ctx context.Context, req *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {
+	return c.pauseFunctions.CallUnary(ctx, req)
+}
+
+// ResumeFunctions calls api.v2.V2.ResumeFunctions.
+func (c *v2Client) ResumeFunctions(ctx context.Context, req *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error) {
+	return c.resumeFunctions.CallUnary(ctx, req)
+}
+
 // GetFunctions calls api.v2.V2.GetFunctions.
 func (c *v2Client) GetFunctions(ctx context.Context, req *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {
 	return c.getFunctions.CallUnary(ctx, req)
@@ -1131,6 +1161,8 @@ type V2Handler interface {
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
+	PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error)
+	ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
 	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
 	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
@@ -1472,6 +1504,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ResumeFunction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2PauseFunctionsHandler := connect.NewUnaryHandler(
+		V2PauseFunctionsProcedure,
+		svc.PauseFunctions,
+		connect.WithSchema(v2Methods.ByName("PauseFunctions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ResumeFunctionsHandler := connect.NewUnaryHandler(
+		V2ResumeFunctionsProcedure,
+		svc.ResumeFunctions,
+		connect.WithSchema(v2Methods.ByName("ResumeFunctions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetFunctionsHandler := connect.NewUnaryHandler(
 		V2GetFunctionsProcedure,
 		svc.GetFunctions,
@@ -1664,6 +1708,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2PauseFunctionHandler.ServeHTTP(w, r)
 		case V2ResumeFunctionProcedure:
 			v2ResumeFunctionHandler.ServeHTTP(w, r)
+		case V2PauseFunctionsProcedure:
+			v2PauseFunctionsHandler.ServeHTTP(w, r)
+		case V2ResumeFunctionsProcedure:
+			v2ResumeFunctionsHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
 			v2GetFunctionsHandler.ServeHTTP(w, r)
 		case V2ListEventsProcedure:
@@ -1911,6 +1959,14 @@ func (UnimplementedV2Handler) PauseFunction(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeFunction is not implemented"))
+}
+
+func (UnimplementedV2Handler) PauseFunctions(context.Context, *connect.Request[v2.PauseFunctionsRequest]) (*connect.Response[v2.PauseFunctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.PauseFunctions is not implemented"))
+}
+
+func (UnimplementedV2Handler) ResumeFunctions(context.Context, *connect.Request[v2.ResumeFunctionsRequest]) (*connect.Response[v2.ResumeFunctionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ResumeFunctions is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {

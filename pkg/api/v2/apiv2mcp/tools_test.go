@@ -298,3 +298,26 @@ func TestEventReadTools(t *testing.T) {
 		}
 	}
 }
+
+func TestFunctionsPauseResumeRequest(t *testing.T) {
+	for _, action := range []struct{ method, name string }{{"PauseFunctions", "pause"}, {"ResumeFunctions", "resume"}} {
+		t.Run(action.name, func(t *testing.T) {
+			endpoint := endpointByMethod(t, action.method)
+			req, err := Request(t.Context(), endpoint, map[string]any{
+				"appId": "my app", "functionIds": []string{"echo", "hello/world"},
+			}, Options{})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, req.Method)
+			require.Equal(t, "/api/v2/apps/my%20app/functions/"+action.name, req.URL.EscapedPath())
+			body, err := io.ReadAll(req.Body)
+			require.NoError(t, err)
+			require.JSONEq(t, `{"functionIds":["echo","hello/world"]}`, string(body))
+			require.Empty(t, req.URL.RawQuery)
+			require.ElementsMatch(t, []string{"appId", "functionIds"}, InputSchema(endpoint)["required"])
+			tool := Tool(endpoint)
+			require.Equal(t, action.name+"_functions", tool.Name)
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+		})
+	}
+}
