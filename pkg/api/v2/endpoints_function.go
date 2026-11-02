@@ -176,6 +176,7 @@ func (s *Service) setFunctionsPaused(ctx context.Context, appID string, function
 		if failure != nil {
 			item.Result = &apiv2.FunctionPauseResult_Error{Error: &apiv2.Error{Code: failure.code, Message: failure.message}}
 		} else {
+			// limit is account-wide, fetch once
 			if !planLimitLoaded {
 				planLimit = s.planConcurrencyLimit(ctx, fn)
 				planLimitLoaded = true
