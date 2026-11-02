@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,10 +34,10 @@ func TestHTTPGateway_FunctionsPauseResume(t *testing.T) {
 					appID = "missing"
 				}
 				t.Run(appID, func(t *testing.T) {
-					ids := []string{"echo", "nope", "archived", "lookup-error", "write-error", "scope-miss", "scheduled", "hello%2Fworld", "echo"}
+					ids := []string{"nope", "echo", "archived", "lookup-error", "write-error", "scope-miss", "scheduled", "hello%2Fworld", "hello/world"}
 					functions := &mockFunctionProvider{}
 					state := map[uuid.UUID]time.Time{}
-					for _, id := range []string{"echo", "nope", "archived", "lookup-error", "write-error", "scope-miss", "scheduled", "hello/world"} {
+					for _, id := range ids {
 						fn := inngest.DeployedFunction{ID: uuid.New(), Slug: "my app-" + id, Function: inngest.Function{Name: id, Slug: id}}
 						if !action.paused {
 							state[fn.ID] = time.Now().Add(-time.Hour)
@@ -51,11 +52,7 @@ func TestHTTPGateway_FunctionsPauseResume(t *testing.T) {
 						if unknownApp || id == "nope" {
 							lookupErr = ErrFunctionNotFound
 						}
-						count := 2
-						if id == "echo" {
-							count = 4
-						}
-						functions.On("GetFunctionByApp", mock.Anything, appID, id).Return(fn, lookupErr).Times(count)
+						functions.On("GetFunctionByApp", mock.Anything, appID, id).Return(fn, lookupErr).Twice()
 					}
 					limiter := &mockRateLimitProvider{}
 					limiter.On("CheckRateLimit", mock.Anything, action.method).Return(RateLimitResult{}).Twice()
@@ -81,9 +78,15 @@ func TestHTTPGateway_FunctionsPauseResume(t *testing.T) {
 						fn.PausedAt = state[fn.ID]
 						return fn, nil
 					})
-					handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Functions: functions, FunctionPauser: pauser, RateLimitProvider: limiter}, HTTPHandlerOptions{})
+					planCalls := 0
+					config := functionConfigProviderFunc(func(_ context.Context, fn inngest.DeployedFunction) int {
+						planCalls++
+						require.Equal(t, "echo", fn.Function.Slug)
+						return 37
+					})
+					handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Functions: functions, FunctionPauser: pauser, RateLimitProvider: limiter, FunctionConfig: config}, HTTPHandlerOptions{})
 					require.NoError(t, err)
-					body, err := json.Marshal(map[string]any{"functionIds": ids})
+					body, err := json.Marshal(map[string]any{"functionIds": ids, "appId": "ignored-body-app"})
 					require.NoError(t, err)
 					var first []map[string]json.RawMessage
 					for repeat := 0; repeat < 2; repeat++ {
@@ -130,20 +133,25 @@ func TestHTTPGateway_FunctionsPauseResume(t *testing.T) {
 							}
 							require.NotContains(t, item, "error")
 							var fn struct {
-								ID       string `json:"id"`
-								IsPaused bool   `json:"isPaused"`
-								App      struct {
+								ID            string `json:"id"`
+								IsPaused      bool   `json:"isPaused"`
+								Configuration struct {
+									Concurrency []struct {
+										Limit struct {
+											Value int `json:"value"`
+										} `json:"limit"`
+									} `json:"concurrency"`
+								} `json:"configuration"`
+								App struct {
 									ID string `json:"id"`
 								} `json:"app"`
 							}
 							require.NoError(t, json.Unmarshal(item["function"], &fn))
-							wantID := "echo"
-							if id == "hello%2Fworld" {
-								wantID = "hello/world"
-							}
-							require.Equal(t, wantID, fn.ID)
+							require.Equal(t, id, fn.ID)
 							require.Equal(t, "my app", fn.App.ID)
 							require.Equal(t, action.paused, fn.IsPaused)
+							require.Len(t, fn.Configuration.Concurrency, 1)
+							require.Equal(t, 37, fn.Configuration.Concurrency[0].Limit.Value)
 						}
 						if repeat == 0 {
 							first = response.Data
@@ -153,8 +161,10 @@ func TestHTTPGateway_FunctionsPauseResume(t *testing.T) {
 					}
 					if unknownApp {
 						require.Empty(t, applied)
+						require.Zero(t, planCalls)
 					} else {
-						require.Equal(t, []string{"echo", "write-error", "scope-miss", "scheduled", "hello/world", "echo", "echo", "write-error", "scope-miss", "scheduled", "hello/world", "echo"}, applied)
+						require.Equal(t, []string{"echo", "write-error", "scope-miss", "scheduled", "hello%2Fworld", "hello/world", "echo", "write-error", "scope-miss", "scheduled", "hello%2Fworld", "hello/world"}, applied)
+						require.Equal(t, 2, planCalls)
 					}
 					functions.AssertExpectations(t)
 					limiter.AssertExpectations(t)
@@ -172,7 +182,7 @@ func TestHTTPGateway_FunctionsPauseResumeRequestErrors(t *testing.T) {
 		t.Run(action.name, func(t *testing.T) {
 			ids := make([]string, 101)
 			for i := range ids {
-				ids[i] = "echo"
+				ids[i] = fmt.Sprintf("fn-%d", i)
 			}
 			tooMany, err := json.Marshal(map[string]any{"functionIds": ids})
 			require.NoError(t, err)
@@ -184,6 +194,9 @@ func TestHTTPGateway_FunctionsPauseResumeRequestErrors(t *testing.T) {
 				{name: "missing", body: `{}`, status: 400, code: "missing_field"},
 				{name: "empty", body: `{"functionIds":[]}`, status: 400, code: "missing_field"},
 				{name: "empty id", body: `{"functionIds":["echo","","flaky"]}`, status: 400, code: "missing_field"},
+				{name: "duplicate", body: `{"functionIds":["echo","flaky","echo"]}`, status: 400, code: "invalid_field_format"},
+				{name: "long id", body: `{"functionIds":["echo","` + strings.Repeat("x", 257) + `"]}`, status: 400, code: "invalid_field_format"},
+				{name: "long multibyte id", body: `{"functionIds":["` + strings.Repeat("é", 129) + `"]}`, status: 400, code: "invalid_field_format"},
 				{name: "too many", body: string(tooMany), status: 400, code: "invalid_field_format"},
 				{name: "unknown field", body: `{"functionIds":["echo"],"extra":true}`, status: 400, code: "invalid_request"},
 				{name: "wrong type", body: `{"functionIds":"echo"}`, status: 400, code: "api_error"},
@@ -219,6 +232,12 @@ func TestHTTPGateway_FunctionsPauseResumeRequestErrors(t *testing.T) {
 					if tc.code == "missing_field" {
 						require.JSONEq(t, `{"errors":[{"code":"missing_field","message":"App ID and function IDs are required"}]}`, rec.Body.String())
 					}
+					switch tc.name {
+					case "duplicate":
+						require.Equal(t, "Function IDs must be unique", response.Errors[0].Message)
+					case "long id", "long multibyte id":
+						require.Equal(t, "Function IDs cannot exceed 256 bytes", response.Errors[0].Message)
+					}
 					limiter.AssertExpectations(t)
 					functions.AssertExpectations(t)
 				})
@@ -244,7 +263,19 @@ func TestHTTPGateway_FunctionsPauseResumeLimitAndSingleResponse(t *testing.T) {
 			id := "11111111-1111-1111-1111-111111111111"
 			fn := inngest.DeployedFunction{ID: uuid.MustParse(id), Slug: "app-echo", Function: inngest.Function{Name: "Echo", Slug: "echo"}}
 			functions := &mockFunctionProvider{}
-			functions.On("GetFunctionByApp", mock.Anything, "app", id).Return(fn, nil).Times(101)
+			ids := make([]string, 100)
+			for i := range ids {
+				ids[i] = fmt.Sprintf("fn-%d", i)
+			}
+			ids[0] = id
+			ids[99] = strings.Repeat("é", 128)
+			for i, functionID := range ids {
+				count := 1
+				if i == 0 {
+					count = 2
+				}
+				functions.On("GetFunctionByApp", mock.Anything, "app", functionID).Return(fn, nil).Times(count)
+			}
 			limiter := &mockRateLimitProvider{}
 			limiter.On("CheckRateLimit", mock.Anything, action.single).Return(RateLimitResult{}).Once()
 			limiter.On("CheckRateLimit", mock.Anything, action.bulk).Return(RateLimitResult{}).Once()
@@ -264,10 +295,6 @@ func TestHTTPGateway_FunctionsPauseResumeLimitAndSingleResponse(t *testing.T) {
 				Data json.RawMessage `json:"data"`
 			}
 			require.NoError(t, json.Unmarshal(single.Body.Bytes(), &one))
-			ids := make([]string, 100)
-			for i := range ids {
-				ids[i] = id
-			}
 			body, err := json.Marshal(map[string]any{"functionIds": ids})
 			require.NoError(t, err)
 			bulk := httptest.NewRecorder()
@@ -281,12 +308,99 @@ func TestHTTPGateway_FunctionsPauseResumeLimitAndSingleResponse(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal(bulk.Body.Bytes(), &many))
 			require.Len(t, many.Data, 100)
-			for _, item := range many.Data {
-				require.Equal(t, id, item.FunctionID)
+			for i, item := range many.Data {
+				require.Equal(t, ids[i], item.FunctionID)
 				require.JSONEq(t, string(one.Data), string(item.Function))
 			}
 			functions.AssertExpectations(t)
 			limiter.AssertExpectations(t)
+		})
+	}
+}
+
+type functionConfigProviderFunc func(context.Context, inngest.DeployedFunction) int
+
+func (f functionConfigProviderFunc) PlanConcurrencyLimit(ctx context.Context, fn inngest.DeployedFunction) int {
+	return f(ctx, fn)
+}
+
+func TestService_FunctionsPauseResumeStopsOnCancel(t *testing.T) {
+	for _, action := range []struct{ name, method string }{
+		{"pause", apiv2.V2_PauseFunctions_FullMethodName},
+		{"resume", apiv2.V2_ResumeFunctions_FullMethodName},
+	} {
+		for _, before := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/before=%t", action.name, before), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				fn := inngest.DeployedFunction{ID: uuid.New(), Function: inngest.Function{Slug: "echo"}}
+				functions := &mockFunctionProvider{}
+				if before {
+					cancel()
+				} else {
+					functions.On("GetFunctionByApp", mock.Anything, "app", "echo").Return(fn, nil).Once()
+				}
+				limiter := &mockRateLimitProvider{}
+				limiter.On("CheckRateLimit", mock.Anything, action.method).Return(RateLimitResult{}).Once()
+				var applied []string
+				svc := NewService(ServiceOptions{
+					Functions: functions, RateLimitProvider: limiter,
+					FunctionPauser: functionPauserFunc(func(_ context.Context, resolved inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+						require.Equal(t, fn, resolved)
+						applied = append(applied, resolved.Function.Slug)
+						cancel()
+						return resolved, nil
+					}),
+				})
+				ids := []string{"echo", "flaky"}
+				var err error
+				if action.name == "pause" {
+					_, err = svc.PauseFunctions(ctx, &apiv2.PauseFunctionsRequest{AppId: "app", FunctionIds: ids})
+				} else {
+					_, err = svc.ResumeFunctions(ctx, &apiv2.ResumeFunctionsRequest{AppId: "app", FunctionIds: ids})
+				}
+				require.ErrorIs(t, err, context.Canceled)
+				if before {
+					require.Empty(t, applied)
+				} else {
+					require.Equal(t, []string{"echo"}, applied)
+				}
+				functions.AssertExpectations(t)
+				limiter.AssertExpectations(t)
+			})
+		}
+	}
+}
+
+func TestHTTPGateway_SingleFunctionPauseResumeDecodesPath(t *testing.T) {
+	for _, action := range []string{"pause", "resume"} {
+		t.Run(action, func(t *testing.T) {
+			fn := inngest.DeployedFunction{ID: uuid.New(), Slug: "my app-hello/world", Function: inngest.Function{Slug: "hello/world"}}
+			functions := &mockFunctionProvider{}
+			functions.On("GetFunctionByApp", mock.Anything, "my app", "hello/world").Return(fn, nil).Once()
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{
+				Functions: functions,
+				FunctionPauser: functionPauserFunc(func(_ context.Context, resolved inngest.DeployedFunction) (inngest.DeployedFunction, error) {
+					require.Equal(t, fn, resolved)
+					return resolved, nil
+				}),
+			}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v2/apps/my%2520app/functions/hello%252Fworld/"+action, nil))
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			var response struct {
+				Data struct {
+					ID  string `json:"id"`
+					App struct {
+						ID string `json:"id"`
+					} `json:"app"`
+				} `json:"data"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			require.Equal(t, "hello/world", response.Data.ID)
+			require.Equal(t, "my app", response.Data.App.ID)
+			functions.AssertExpectations(t)
 		})
 	}
 }

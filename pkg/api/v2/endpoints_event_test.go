@@ -350,6 +350,8 @@ func TestHTTPGateway_RequestBodyLimitsNormalizePaths(t *testing.T) {
 	}{
 		{"/api/v2/events/", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
 		{"/v2/events", `{"name":"test/event"}`, consts.AbsoluteMaxEventSize},
+		{"/v2/apps/my-app/functions/pause", `{"functionIds":["echo"]}`, 64 << 10},
+		{"/api/v2/apps/my-app/functions/resume/", `{"functionIds":["echo"]}`, 64 << 10},
 		{"/v2/apps/my-app/functions/orders-created/replays", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
 		{"/api/v2/apps/my-app/functions/orders-created/replays/", `{"name":"Replay test","functionId":"orders-created","from":"2026-01-01T00:00:00Z","until":"2026-01-02T00:00:00Z","statuses":["ALL"]}`, 64 << 10},
 	} {
