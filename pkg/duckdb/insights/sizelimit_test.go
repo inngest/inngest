@@ -71,12 +71,10 @@ func TestSizeLimitedComposition(t *testing.T) {
 	accepts := []string{
 		"SELECT [x * 2 for x in [1, 2, 3]] AS r",
 		"SELECT [x || 'a' for x in string_split(run_id, '-')] AS r FROM runs",
-		"SELECT [run_id for x in [1, 2, 3]] AS r FROM runs",
 		"SELECT [x.a for x in [{'a': 1}]] AS r",
 		"SELECT range(5000) AS a, range(5000) AS b",
 		"SELECT repeat('-', 20) AS a FROM runs UNION ALL SELECT repeat('=', 20) AS a FROM runs",
 		"SELECT unnest(range(1000)) AS r",
-		"SELECT * FROM unnest(range(1000))",
 		"SELECT range(10) AS r FROM runs WHERE run_id IN (SELECT run_id FROM runs)",
 		"SELECT range(9223372036854770000, 9223372036854775000) AS r",
 		"SELECT range(010) AS r",
@@ -91,6 +89,7 @@ func TestSizeLimitedComposition(t *testing.T) {
 
 	const inComprehension = "can't be used inside a list comprehension"
 	const inSubquery = "can't be used inside a CTE or subquery"
+	const inFrom = "can't be used in a FROM clause"
 	const total = "output size is limited to 10000, counting every size-limited call"
 	rejects := map[string]string{
 		// The original repro.
@@ -108,10 +107,13 @@ func TestSizeLimitedComposition(t *testing.T) {
 		"WITH t AS (SELECT range(10000) AS r) SELECT [x for x in t.r] AS c FROM t":                                 "RANGE " + inSubquery,
 		"WITH c AS (SELECT range(10000) AS r) SELECT [r for y in string_split(run_id, '-')] AS x FROM c, runs":     "RANGE " + inSubquery,
 		"WITH c AS (SELECT range(1000) AS r) SELECT list_value(r, r, r, r, r, r, r, r, r, r, r) AS x FROM c, runs": "RANGE " + inSubquery,
-		"SELECT [#1 for y in string_split(run_id, '-')] AS x FROM (SELECT range(10000) AS r) s, runs":              "RANGE " + inSubquery,
-		"SELECT x FROM (SELECT repeat('a', 3) AS x) s":                                                             "REPEAT " + inSubquery,
+		"SELECT [#1 for y in string_split(run_id, '-')] AS x FROM (SELECT range(10000) AS r) s, runs":              "RANGE " + inFrom,
+		"SELECT x FROM (SELECT repeat('a', 3) AS x) s":                                                             "REPEAT " + inFrom,
+		"SELECT * FROM unnest(range(1000))":                                                                        "RANGE " + inFrom,
+		"SELECT run_id FROM runs, unnest(range(10000)) u":                                                          "RANGE " + inFrom,
+		"SELECT run_id FROM runs JOIN unnest([repeat('a', 3)]) u ON true":                                          "REPEAT " + inFrom,
 		"SELECT run_id FROM runs WHERE run_id IN (SELECT repeat('a', 3))":                                          "REPEAT " + inSubquery,
-		"SELECT (SELECT range(3)) AS r": "RANGE " + inSubquery,
+		"SELECT (SELECT range(3)) AS r":                                                                            "RANGE " + inSubquery,
 		// Sibling calls add up.
 		"SELECT list_value(range(5000), range(5000), range(1)) AS r":                    "RANGE " + total,
 		"SELECT rpad(run_id, 10000, ' ') AS a, lpad(run_id, 1, ' ') AS b FROM runs":     "LPAD " + total,

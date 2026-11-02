@@ -1,0 +1,53 @@
+package insights
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+// TestComprehensionFanOut pins checkComprehensionFanOut's rules: no
+// comprehension nested in another's body/filter, and a body/filter can only
+// reference its own variables.
+func TestComprehensionFanOut(t *testing.T) {
+	accepts := []string{
+		"SELECT [x.key FOR x IN runs.sessions] AS k FROM runs",
+		"SELECT [x.key FOR x IN sessions] AS k FROM runs",
+		"SELECT [x FOR x IN event_ids IF x != ''] AS e FROM runs",
+		"SELECT [upper(x) || '-' FOR x IN string_split(run_id, '-') IF length(x) > 2] AS p FROM runs",
+		"SELECT [x FOR x IN [y FOR y IN event_ids]] AS e FROM runs",
+		"SELECT [CASE WHEN x IS NULL THEN 0 ELSE 1 END FOR x IN event_ids] AS e FROM runs",
+		"SELECT [x->>'key' FOR x IN sessions] AS k FROM runs",
+		"SELECT [{'a': x, 'b': [x, 1]} FOR x IN event_ids IF x IN ('a', 'b')] AS e FROM runs",
+		"WITH c AS (SELECT [x FOR x IN event_ids] AS e FROM runs) SELECT e FROM c",
+	}
+	for _, q := range accepts {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.NoError(t, err)
+		})
+	}
+
+	const own = "a list comprehension can only reference its own variables"
+	const nested = "a list comprehension can't be nested inside another list comprehension"
+	rejects := map[string]string{
+		"SELECT [run_id FOR x IN string_split(run_id, '')] AS r FROM runs":                                own + `, not "run_id"`,
+		"SELECT [x || run_id FOR x IN event_ids] AS r FROM runs":                                          own + `, not "run_id"`,
+		"SELECT [x FOR x IN event_ids IF x <> run_id] AS r FROM runs":                                     own + `, not "run_id"`,
+		"SELECT [runs.run_id FOR x IN event_ids] AS r FROM runs":                                          own + `, not "runs.run_id"`,
+		"SELECT [runs.run_id FOR runs IN event_ids] AS r FROM runs":                                       own + `, not "runs.run_id"`,
+		"SELECT [#1 FOR x IN event_ids] AS r FROM runs":                                                   "can only use its own variables, literals",
+		"SELECT [x FOR x IN event_ids IF x = (SELECT max(run_id) FROM runs)] AS r FROM runs":              "can only use its own variables, literals",
+		"SELECT [[y FOR y IN string_split(run_id, '')] FOR x IN string_split(run_id, '')] AS r FROM runs": nested,
+		"SELECT [x FOR x IN event_ids IF len([y FOR y IN event_ids]) > 0] AS r FROM runs":                 nested,
+		"SELECT [x FOR x IN [[y FOR y IN [z FOR z IN event_ids]] FOR w IN event_ids]] AS r FROM runs":     nested,
+		"WITH c AS (SELECT [run_id FOR x IN event_ids] AS e FROM runs) SELECT e FROM c":                   own + `, not "run_id"`,
+		"SELECT run_id FROM runs WHERE len([run_id FOR x IN event_ids]) > 0":                              own + `, not "run_id"`,
+	}
+	for q, want := range rejects {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.ErrorContains(t, err, want)
+		})
+	}
+}

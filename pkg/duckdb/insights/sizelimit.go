@@ -359,8 +359,9 @@ func maxDigitRun(s string) float64 {
 //     produced, once per element.
 //  2. A guarded call can only appear in the statement's own top-level SELECT
 //     (or a UNION/INTERSECT/EXCEPT operand of it), never in a CTE, a FROM
-//     subquery, or an expression subquery. So its output can't be referenced
-//     (and copied) by name: every copy is its own call site in the query text.
+//     subquery, an expression subquery, or anywhere else in a FROM clause (a
+//     table function like UNNEST). So its output can't be referenced (and
+//     copied) by name: every copy is its own call site in the query text.
 //  3. The sizes of every guarded call in the statement add up to at most
 //     maxSizeArgument, so sibling calls (and repeating a call in the query
 //     text) can't add up past what one call may ask for.
@@ -404,6 +405,11 @@ func (c *sizeComposition) walkTopLevel(stmt *parser.SelectStatement) {
 	for _, n := range stmt.Children() {
 		if c.err != nil {
 			return
+		}
+		if stmt.From != nil && n == parser.Node(stmt.From) {
+			// Rule 2: a table function's (UNNEST's) output is named too.
+			c.err = rejectSizeLimitedCalls(n, "can't be used in a FROM clause, only in the query's top-level SELECT")
+			continue
 		}
 		parser.Walk(c, n)
 	}
