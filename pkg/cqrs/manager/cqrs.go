@@ -774,10 +774,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	return root, nil
 }
 
-// kindInboxMetadata is the metadata kind of an inbox read's row. Its
-// `messages` value lists the ids of the messages the read took.
-const kindInboxMetadata metadata.Kind = "inngest.inbox"
-
 // rollupTicks turns each tick into a child span of the row it belongs to. A
 // message is drawn like an op of its parent: in the parent's group and with its
 // origin, so it shows dimmed inside the group. An arrival has no duration. A
@@ -874,7 +870,7 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 
 		parent.Metadata = append(parent.Metadata, &cqrs.SpanMetadata{
 			Scope:     enums.MetadataScopeStep,
-			Kind:      kindInboxMetadata,
+			Kind:      metadata.KindInngestInbox,
 			Values:    metadata.Values{"messages": values},
 			UpdatedAt: parent.EndTime,
 		})
