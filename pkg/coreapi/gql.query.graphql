@@ -40,17 +40,27 @@ type Query {
 
   insights(sql: String!): InsightsQueryResult!
 
-  sessionKeys(search: String): [SessionKey!]!
+  # Sessions pagination matches /v2/sessions: first is 1-100 (default
+  # 20), after is the previous page's pageInfo.endCursor.
+  sessionKeys(
+    search: String
+    first: Int! = 20
+    after: String
+  ): SessionKeysConnection!
   sessions(
     sessionKey: String!
     sessionIdSearch: String
     timeRange: TimeRangeInput
-  ): [SessionGroup!]!
+    first: Int! = 20
+    after: String
+  ): SessionGroupsConnection!
   sessionRuns(
     sessionKey: String!
     sessionId: String!
     timeRange: TimeRangeInput
-  ): [SessionRun!]!
+    first: Int! = 20
+    after: String
+  ): SessionRunsConnection!
 
   workerConnections(
     first: Int! = 100
