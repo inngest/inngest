@@ -17,7 +17,7 @@ import (
 )
 
 func TestSetupDualWriteReturnsNilListenerWhenBinaryMissing(t *testing.T) {
-	l, db := setupDualWrite(context.Background(), true, true, "/nonexistent/duckdb", t.TempDir(), "")
+	l, db, _ := setupDualWrite(context.Background(), true, true, "/nonexistent/duckdb", t.TempDir(), "")
 	require.Nil(t, l)
 	require.Nil(t, db)
 }
@@ -52,7 +52,7 @@ func TestSetupDualWriteReturnsListenerWhenBinaryPresent(t *testing.T) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	l, _ := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
+	l, _, _ := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l)
 	stopDualWrite(context.Background(), l)
 }
@@ -64,7 +64,7 @@ func TestSetupDualWriteReturnsListenerWhenBinaryPresent(t *testing.T) {
 func TestSetupDualWriteNeverBlocksOnFailure(t *testing.T) {
 	done := make(chan execution.SyncLifecycleListener, 1)
 	go func() {
-		l, _ := setupDualWrite(context.Background(), true, true, "/nonexistent/duckdb", t.TempDir(), "")
+		l, _, _ := setupDualWrite(context.Background(), true, true, "/nonexistent/duckdb", t.TempDir(), "")
 		done <- l
 	}()
 
@@ -90,7 +90,7 @@ func TestSetupDualWriteIsOptInAndOffByDefault(t *testing.T) {
 
 	stateDir := t.TempDir()
 
-	l, db := setupDualWrite(context.Background(), false, true, binPath, stateDir, "")
+	l, db, _ := setupDualWrite(context.Background(), false, true, binPath, stateDir, "")
 	require.Nil(t, l)
 	require.Nil(t, db)
 	require.NoDirExists(t, filepath.Join(stateDir, "duckdb"),
@@ -111,7 +111,7 @@ func TestSetupDualWriteInMemoryWhenNotPersisting(t *testing.T) {
 
 	stateDir := t.TempDir()
 
-	l, db := setupDualWrite(context.Background(), true, false, binPath, stateDir, "")
+	l, db, _ := setupDualWrite(context.Background(), true, false, binPath, stateDir, "")
 	require.NotNil(t, l)
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
@@ -137,7 +137,7 @@ func TestSetupDualWriteResolvesRelativeStateDir(t *testing.T) {
 	wd := t.TempDir()
 	t.Chdir(wd)
 
-	l, _ := setupDualWrite(context.Background(), true, true, binPath, "relative-state", "")
+	l, _, _ := setupDualWrite(context.Background(), true, true, binPath, "relative-state", "")
 	require.NotNil(t, l)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
@@ -162,7 +162,7 @@ func TestSetupDualWriteResolvesPinnedBinaryWhenBinaryPathEmpty(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(cached), 0o755))
 	require.NoError(t, os.WriteFile(cached, data, 0o755))
 
-	l, db := setupDualWrite(context.Background(), true, true, "", stateDir, "")
+	l, db, _ := setupDualWrite(context.Background(), true, true, "", stateDir, "")
 	require.NotNil(t, l)
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
@@ -179,7 +179,7 @@ func TestSetupDualWriteIsolatesExtensionDirectory(t *testing.T) {
 	}
 	stateDir := t.TempDir()
 
-	l, _ := setupDualWrite(context.Background(), true, true, binPath, stateDir, "")
+	l, _, _ := setupDualWrite(context.Background(), true, true, binPath, stateDir, "")
 	require.NotNil(t, l)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
 
@@ -191,7 +191,7 @@ func TestSetupDualWriteReturnsDBHandleOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	l, db := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
+	l, db, _ := setupDualWrite(context.Background(), true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l)
 	require.NotNil(t, db)
 	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
@@ -207,7 +207,7 @@ func TestSetupDualWriteSandboxesExternalAccess(t *testing.T) {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
 	for _, persist := range []bool{true, false} {
-		l, db := setupDualWrite(context.Background(), true, persist, binPath, t.TempDir(), "")
+		l, db, _ := setupDualWrite(context.Background(), true, persist, binPath, t.TempDir(), "")
 		require.NotNil(t, l, "persist=%v", persist)
 		require.NotNil(t, db, "persist=%v", persist)
 		t.Cleanup(func() { stopDualWrite(context.Background(), l) })
@@ -243,7 +243,7 @@ func TestDualWriteEndToEndDoesNotAffectPrimaryPath(t *testing.T) {
 	stateDir := t.TempDir()
 	ctx := t.Context()
 
-	l, _ := setupDualWrite(ctx, true, true, binPath, stateDir, "")
+	l, _, _ := setupDualWrite(ctx, true, true, binPath, stateDir, "")
 	require.NotNil(t, l)
 
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "smoke/test"}, nil)
@@ -352,7 +352,7 @@ func TestStopDualWriteStopsBatcherGoroutines(t *testing.T) {
 	ctx := t.Context()
 	stateDir := t.TempDir()
 
-	l, _ := setupDualWrite(ctx, true, true, binPath, stateDir, "")
+	l, _, _ := setupDualWrite(ctx, true, true, binPath, stateDir, "")
 	require.NotNil(t, l)
 
 	done := make(chan struct{})
@@ -380,11 +380,11 @@ func TestSetupDualWriteTwoInstancesDoNotCollideOnQuackPort(t *testing.T) {
 	}
 	ctx := t.Context()
 
-	l1, _ := setupDualWrite(ctx, true, true, binPath, t.TempDir(), "")
+	l1, _, _ := setupDualWrite(ctx, true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l1, "first instance should start dual-write successfully")
 	t.Cleanup(func() { stopDualWrite(context.Background(), l1) })
 
-	l2, _ := setupDualWrite(ctx, true, true, binPath, t.TempDir(), "")
+	l2, _, _ := setupDualWrite(ctx, true, true, binPath, t.TempDir(), "")
 	require.NotNil(t, l2, "second instance must not fail to start dual-write just because the first is already running")
 	t.Cleanup(func() { stopDualWrite(context.Background(), l2) })
 }
@@ -414,4 +414,106 @@ func TestValidateDuckDBPersistenceFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSetupDualWriteReadsCantStarveWrites pins that the read handle is its
+// own capped pool: with every read connection held (as slow Insights
+// queries would), dual-write's handle still runs statements, and closing the
+// read handle leaves the subprocess up for writes.
+func TestSetupDualWriteReadsCantStarveWrites(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
+	require.NotNil(t, readDB)
+	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
+	require.Equal(t, duckDBReadConns, readDB.Stats().MaxOpenConnections)
+
+	for range duckDBReadConns {
+		c, err := readDB.Conn(t.Context())
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = c.Close() })
+	}
+	// The read pool is exhausted, so another read waits...
+	waitCtx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	_, err = readDB.Conn(waitCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+	// ...but writes still get a connection.
+	writeCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	var one int
+	require.NoError(t, db.QueryRowContext(writeCtx, "SELECT 1;").Scan(&one))
+
+	require.NoError(t, readDB.Close())
+	require.NoError(t, db.QueryRowContext(writeCtx, "SELECT 1;").Scan(&one))
+}
+
+func TestDuckDBConnLimit(t *testing.T) {
+	ctx := context.Background()
+	for _, c := range []struct {
+		name, value string
+		want        int
+	}{
+		{"unset", "", 7},
+		{"set", "3", 3},
+		{"one", "1", 1},
+		{"zero", "0", 7},
+		{"negative", "-2", 7},
+		{"not a number", "lots", 7},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("INNGEST_TEST_DUCKDB_CONNS", c.value)
+			require.Equal(t, c.want, duckDBConnLimit(ctx, "INNGEST_TEST_DUCKDB_CONNS", 7))
+		})
+	}
+}
+
+// TestSetupDualWriteReadConnsFromEnv pins that INNGEST_DUCKDB_READ_CONNS
+// sizes the read handle's pool.
+func TestSetupDualWriteReadConnsFromEnv(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	t.Setenv(duckDBReadConnsEnv, "3")
+	t.Setenv(duckDBWriteConnsEnv, "5")
+	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
+	require.NotNil(t, readDB)
+	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
+	require.Equal(t, 3, readDB.Stats().MaxOpenConnections)
+	require.Equal(t, 5, db.Stats().MaxOpenConnections)
+}
+
+// TestSetupDualWriteReadsDontShareASingleWriteConn pins that the read handle
+// gets its own quack sessions even w/ INNGEST_DUCKDB_WRITE_CONNS=1, where
+// every write runs on the primary connection: a read must not wait behind a
+// slow write.
+func TestSetupDualWriteReadsDontShareASingleWriteConn(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	t.Setenv(duckDBWriteConnsEnv, "1")
+	l, db, readDB := setupDualWrite(context.Background(), true, false, binPath, t.TempDir(), "")
+	require.NotNil(t, readDB)
+	t.Cleanup(func() { stopDualWrite(context.Background(), l) })
+
+	// Constant-folded, so it's slow w/o needing any data or much memory.
+	slow := make(chan error, 1)
+	go func() {
+		var n int
+		slow <- db.QueryRowContext(context.Background(), "SELECT levenshtein(repeat('a', 60000), repeat('b', 60000));").Scan(&n)
+	}()
+	time.Sleep(300 * time.Millisecond)
+
+	start := time.Now()
+	var one int
+	require.NoError(t, readDB.QueryRowContext(t.Context(), "SELECT 1;").Scan(&one))
+	readTook := time.Since(start)
+
+	require.NoError(t, <-slow)
+	require.Less(t, readTook, time.Second, "read waited behind the write")
 }

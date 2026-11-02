@@ -558,11 +558,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		// directly regardless — DuckDB has no apps/functions tables and
 		// dual-write only covers reads.
 		gqlData = dbcqrs
-		// dwDB is the raw DuckDB connection dual-write writes through —
-		// nil unless dual-write started successfully (opts.EnableDuckDB),
-		// same gate as gqlData's query.Wrap. Threaded into
-		// coreapi.Options below so insights can execute
-		// against it directly, independently of whether
+		// dwDB is the read handle on dual-write's DuckDB subprocess (its own
+		// pool, separate from the one dual-write writes through, so reads
+		// can't starve flushes) -- nil unless dual-write started
+		// successfully (opts.EnableDuckDB), same gate as gqlData's
+		// query.Wrap. Threaded into coreapi.Options below so insights can
+		// execute against it directly, independently of whether
 		// EnableDuckDBReads (which only affects gqlData) is also set.
 		dwDB *sql.DB
 	)
@@ -573,13 +574,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	// is only honored alongside those same two gates (see duckLakeOptionsFor):
 	// a persisted DuckLake catalog reuses the same Postgres database as its
 	// catalog store when one is already configured, instead of a local file.
-	if dwListener, db := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && enableDuckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI); dwListener != nil {
-		dwDB = db
+	if dwListener, _, readDB := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && enableDuckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI); dwListener != nil {
+		dwDB = readDB
 		l.Info("dual-write enabled: syncing executions to DuckDB subprocess")
 		syncListeners = append(syncListeners, dwListener)
 		if opts.EnableDuckDBReads {
 			l.Info("dual-write reads enabled: serving GQL/REST trace and run data from DuckDB")
-			gqlData = query.Wrap(dbcqrs, db)
+			gqlData = query.Wrap(dbcqrs, readDB)
 		}
 		defer func() {
 			// Bounded like every other service.Service's Stop (see
@@ -588,6 +589,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			// wedges on an unresponsive subprocess.
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
+			// Before stopDualWrite, which closes the write handle and with it
+			// the subprocess readDB's connections run against.
+			_ = readDB.Close()
 			stopDualWrite(shutdownCtx, dwListener)
 			if opts.DuckDBClosed != nil {
 				close(opts.DuckDBClosed)

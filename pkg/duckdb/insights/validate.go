@@ -15,10 +15,19 @@ import (
 // each operand is validated, and scoped, independently), so callers never
 // need to call resolveScope a second time, plus every non-fatal Diagnostic
 // (e.g. a function called with too few arguments) noted along the way. See
-// validateWithCTEs for CTEs.
+// validateWithCTEs for CTEs. Once the statement is otherwise valid, it also
+// bounds how size-limited calls compose across the whole statement (see
+// checkSizeComposition) and how much a list comprehension can fan out (see
+// checkComprehensionFanOut).
 func validate(stmt *parser.SelectStatement) (*tableScope, map[string]logicalTable, []Diagnostic, error) {
 	var diags []Diagnostic
 	scope, ctes, err := validateWithCTEs(stmt, nil, nil, &diags)
+	if err == nil {
+		err = checkSizeComposition(stmt)
+	}
+	if err == nil {
+		err = checkComprehensionFanOut(stmt)
+	}
 	return scope, ctes, diags, err
 }
 

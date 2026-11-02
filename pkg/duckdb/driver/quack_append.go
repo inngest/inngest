@@ -142,6 +142,9 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 	var sess *quack.Session
 	switch s := c.sess.(type) {
 	case *quack.Session:
+		if s.Abandoned() {
+			return nil, fmt.Errorf("duckdb: %s: quack session was abandoned mid-statement", errPrefix)
+		}
 		sess = s
 	case *pooledQuackConn:
 		var err error
@@ -151,7 +154,7 @@ func resolveQuackSessionForAppender(ctx context.Context, driverConn any, catalog
 		}
 	case *process:
 		var err error
-		sess, err = s.currentQuackSession()
+		sess, err = s.currentQuackSession(ctx)
 		if err != nil {
 			return nil, err
 		}
