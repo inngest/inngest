@@ -42,6 +42,7 @@ const executionCapQuery = graphql(`
       executionCap {
         usage
         limit
+        overageLimit
         enforced
         exceeded
       }
@@ -55,6 +56,7 @@ type ExecutionLimitData = {
   isCapHit: boolean;
   usage: number;
   limit: number;
+  remaining: number;
   isVercel: boolean;
   marketplaceBillingURL: string | null;
   enhanced: boolean;
@@ -96,10 +98,16 @@ export function useExecutionLimit(): ExecutionLimitData | null {
 
   return {
     accountID: account.id,
-    band: usageBand({ usage: cap.usage, limit: cap.limit, capHit }),
+    band: usageBand({
+      usage: cap.usage,
+      limit: cap.limit,
+      overageLimit: cap.overageLimit,
+      capHit,
+    }),
     isCapHit: capHit,
     usage: cap.usage,
     limit: cap.limit,
+    remaining: Math.max(cap.limit + cap.overageLimit - cap.usage, 0),
     isVercel:
       'marketplace' in account && account.marketplace === Marketplace.Vercel,
     marketplaceBillingURL: account.marketplaceBillingURL ?? null,

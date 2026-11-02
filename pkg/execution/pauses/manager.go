@@ -232,6 +232,9 @@ func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) 
 	// lookup of [pause ID] -> "created at".
 
 	pause, err := m.buf.PauseByID(ctx, index, pauseID)
+	if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
+		return nil, err
+	}
 	if pause != nil && err == nil {
 		return pause, err
 	}
@@ -353,8 +356,7 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opt
 	// This lets us skip deleting from the buffer, as this is a longer and more complex
 	// transaction than a single lookup.
 
-	blockFlushEnabled := m.blockFlushEnabled(ctx, pause.WorkspaceID)
-	if blockFlushEnabled && pause.CreatedAt.IsZero() {
+	if m.bs != nil && pause.CreatedAt.IsZero() {
 		// Try to get the pause's creation timestamp before deleting it from the buffer
 		ts, err := m.buf.PauseTimestamp(ctx, index, pause)
 		if err != nil && !errors.Is(err, state.ErrPauseNotFound) {
@@ -373,10 +375,8 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opt
 		return err
 	}
 
-	// We check the block flushing feature flag because block store delete will only
-	// just mark pauses as deleted in Redis. Without compaction it won't really do
-	// anything.
-	if m.bs == nil || !blockFlushEnabled {
+	// Mark the pause as deleted in existing blocks.
+	if m.bs == nil {
 		return nil
 	}
 
@@ -387,10 +387,8 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause, opt
 
 // DeletePauseByID deletes a pause by ID from block storage and the buffer.
 func (m manager) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
-	// We check the block flushing feature flag because block store delete will only
-	// just mark pauses as deleted in Redis. It's done before the buffer delete because
-	// we need the pause block index to be there to mark the block deletion
-	if m.bs != nil && m.blockFlushEnabled(ctx, workspaceID) {
+	// Mark block deletion before buffer deletion removes the pause-to-block locator.
+	if m.bs != nil {
 		if err := m.bs.DeleteByID(ctx, pauseID, workspaceID); err != nil {
 			return err
 		}

@@ -103,6 +103,7 @@ type WorkspaceEventsOpts struct {
 	// cutoff will not be loaded.
 	Oldest                time.Time
 	IncludeInternalEvents bool
+	OmitEventData         bool // skips loading event payloads when not needed
 	// CEL is an optional CEL expression to filter events by. Only the
 	// duckdb-backed EventReader (pkg/cqrs/duckdbquery) implements this;
 	// the SQLite/Postgres wrapper (pkg/cqrs/manager) rejects a non-empty

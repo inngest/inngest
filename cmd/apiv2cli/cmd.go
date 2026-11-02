@@ -411,12 +411,17 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 		return err
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	responseLimit := int64(maxResponseBytes)
+	if ep.name == "list-events" {
+		// sender ids and versions can fill summaries and repeat in payloads
+		responseLimit = 160 << 20
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, responseLimit+1))
 	if err != nil {
 		return err
 	}
-	if int64(len(body)) > maxResponseBytes {
-		return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
+	if int64(len(body)) > responseLimit {
+		return fmt.Errorf("response body exceeded %d bytes", responseLimit)
 	}
 
 	if cmd.Bool("raw") {

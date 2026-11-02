@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,8 +25,8 @@ const (
 	// DefaultMaxBufferSize is the default max events per buffer key before flush
 	DefaultMaxBufferSize = 50
 
-	// DefaultMaxBufferByteSize is the default max cumulative byte size of buffered
-	// events before flushing
+	// DefaultMaxBufferByteSize is the default max serialized byte size of buffered
+	// items before flushing
 	DefaultMaxBufferByteSize = 4 * 1024 * 1024
 )
 
@@ -40,7 +41,10 @@ type appendBuffer struct {
 	closed            chan struct{} // signals shutdown to unblock waiting appends
 	log               logger.Logger
 	totalPendingItems atomic.Int64 // tracks total items across all buffers
-	totalPendingBytes atomic.Int64 // tracks event payload bytes across all buffers
+	totalPendingBytes atomic.Int64 // tracks serialized item bytes across all buffers
+	// storeName is the owning manager's store, tagged as backend on every
+	// buffer metric so buffers for different stores report separate series.
+	storeName string
 }
 
 // bufferKey identifies a unique buffer based on function and batch pointer,
@@ -54,6 +58,8 @@ type bufferKey struct {
 type pendingItem struct {
 	item BatchItem
 	fn   inngest.Function
+	// Reuse the exact bytes measured for chunking when sending to Redis.
+	encoded []byte
 	// pending is shared between original and duplicate callers waiting for the
 	// same event to be flushed
 	pending *pendingResult
@@ -72,7 +78,7 @@ type batchBuffer struct {
 	mu             sync.Mutex
 	key            bufferKey
 	items          []pendingItem
-	byteSize       int                       // cumulative byte size of buffered events
+	byteSize       int                       // cumulative serialized size of buffered items
 	pendingResults map[string]*pendingResult // Local dedup + result sharing
 	timer          *time.Timer
 	fn             inngest.Function // Function config for batch settings
@@ -114,6 +120,12 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		return nil, err
 	}
 	key := bufferKey{FunctionID: fn.ID, BatchPointer: batchPointer}
+	tags := map[string]any{"backend": ab.storeName}
+
+	encoded, err := json.Marshal(bi)
+	if err != nil {
+		return nil, err
+	}
 
 	buf := ab.getOrCreateBuffer(key, fn)
 	buf.mu.Lock()
@@ -124,7 +136,7 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		// the original flush to complete so we don't ACK the event before flushing
 		buf.mu.Unlock()
 
-		metrics.IncrBatchBufferDedupCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+		metrics.IncrBatchBufferDedupCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
 
 		select {
 		case <-existing.done:
@@ -149,15 +161,16 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Create a shared pending result for this event
 	pr := &pendingResult{done: make(chan struct{})}
+	eventBytes := int64(len(encoded))
 
 	// Add to buffer with pending result
 	buf.items = append(buf.items, pendingItem{
 		item:    bi,
 		fn:      fn,
+		encoded: encoded,
 		pending: pr,
 	})
 	buf.pendingResults[eventIDStr] = pr
-	eventBytes := int64(bi.Event.Size())
 	buf.byteSize += int(eventBytes)
 
 	// Set createdAt on first item
@@ -167,10 +180,10 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 
 	// Track pending items gauge
 	pending := ab.totalPendingItems.Add(1)
-	metrics.GaugeBatchBufferItemsPending(ctx, pending, metrics.GaugeOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferItemsPending(ctx, pending, metrics.GaugeOpt{PkgName: pkgName, Tags: tags})
 	pendingBytes := ab.totalPendingBytes.Add(eventBytes)
-	metrics.GaugeBatchBufferBytesPending(ctx, pendingBytes, metrics.GaugeOpt{PkgName: pkgName})
-	metrics.IncrBatchBufferBytesAddedCounter(ctx, eventBytes, metrics.CounterOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferBytesPending(ctx, pendingBytes, metrics.GaugeOpt{PkgName: pkgName, Tags: tags})
+	metrics.IncrBatchBufferBytesAddedCounter(ctx, eventBytes, metrics.CounterOpt{PkgName: pkgName, Tags: tags})
 
 	// Check if we should flush based on function's batch config or buffer's global max
 	batchMaxSize := ab.maxSize
@@ -212,13 +225,13 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	case <-ctx.Done():
 		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"error_type": "context_cancelled"},
+			Tags:    withBatchMetricTags(tags, map[string]any{"error_type": "context_cancelled"}),
 		})
 		return nil, ctx.Err()
 	case <-ab.closed:
 		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"error_type": "context_cancelled"},
+			Tags:    withBatchMetricTags(tags, map[string]any{"error_type": "context_cancelled"}),
 		})
 		return nil, context.Canceled
 	}
@@ -256,7 +269,7 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 	}
 	ab.buffers[key] = buf
 
-	metrics.GaugeBatchBufferKeysActive(context.Background(), int64(len(ab.buffers)), metrics.GaugeOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferKeysActive(context.Background(), int64(len(ab.buffers)), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 
 	return buf
 }
@@ -267,7 +280,7 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 type batchBufferManager interface {
 	BatchManager
 	accountScopedMetricTags(context.Context, uuid.UUID, uuid.UUID) map[string]any
-	bulkAppend(context.Context, []BatchItem, inngest.Function, map[string]any) (*BulkAppendResult, error)
+	bulkAppend(context.Context, []BatchItem, [][]byte, inngest.Function, map[string]any) (*BulkAppendResult, error)
 }
 
 var _ batchBufferManager = (*redisBatchManager)(nil)
@@ -307,13 +320,13 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	buf.mu.Unlock()
 
 	ctx := context.Background()
-	triggerTags := map[string]any{"trigger": trigger}
+	triggerTags := map[string]any{"backend": ab.storeName, "trigger": trigger}
 
 	// Decrement pending items and record gauge
 	newPending := ab.totalPendingItems.Add(-flushCount)
-	metrics.GaugeBatchBufferItemsPending(ctx, newPending, metrics.GaugeOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferItemsPending(ctx, newPending, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 	newPendingBytes := ab.totalPendingBytes.Add(-flushBytes)
-	metrics.GaugeBatchBufferBytesPending(ctx, newPendingBytes, metrics.GaugeOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferBytesPending(ctx, newPendingBytes, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 	if flushBytes > 0 {
 		metrics.IncrBatchBufferBytesRemovedCounter(ctx, flushBytes, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
 	}
@@ -326,8 +339,10 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 
 	// extract BatchItems for the bulk call
 	items := make([]BatchItem, len(pending))
+	encoded := make([][]byte, len(pending))
 	for i, p := range pending {
 		items[i] = p.item
+		encoded[i] = p.encoded
 	}
 
 	batchMaxSize := ab.maxSize
@@ -348,9 +363,9 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	go func() {
 		metrics.IncrBatchBufferFlushCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
 		metrics.IncrBatchBufferItemsFlushedCounter(ctx, flushCount, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
-		metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName})
+		metrics.HistogramBatchBufferFlushSize(ctx, flushCount, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 		if waitDurationMs > 0 {
-			metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+			metrics.HistogramBatchBufferWaitDuration(ctx, waitDurationMs, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 		}
 	}()
 
@@ -369,19 +384,24 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	// To avoid that, we make multiple BulkAppend calls with chunks of `batchMaxSize`
 	// items until we flush all the items in the buffer.
 	//
-	// Split items into chunks of batchMaxSize and call BulkAppend once per chunk.
-	// Each chunk is sized to fill at most one Redis batch, so subsequent chunks
-	// naturally flow into freshly-created batches after the previous one is filled
-	// and its pointer rotated — without relying on Lua-level overflow handling.
-	for start := 0; start < len(items); start += batchMaxSize {
-		end := min(start+batchMaxSize, len(items))
+	// The same race can overshoot the byte threshold. Bound chunks by both
+	// limits, allowing a single event larger than the buffer budget to travel alone.
+	for start, end := 0, 0; start < len(items); start = end {
+		chunkBytes := 0
+		for end < len(items) && end-start < batchMaxSize {
+			if end > start && chunkBytes+len(encoded[end]) > ab.maxByteSize {
+				break
+			}
+			chunkBytes += len(encoded[end])
+			end++
+		}
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
 		storageStart := time.Now()
 		var bulkResult *BulkAppendResult
 		var err error
 		if hasMetricManager {
-			bulkResult, err = metricMgr.bulkAppend(ctx, chunk, fn, metricTags)
+			bulkResult, err = metricMgr.bulkAppend(ctx, chunk, encoded[start:end], fn, metricTags)
 		} else {
 			bulkResult, err = mgr.BulkAppend(ctx, chunk, fn)
 		}
@@ -449,7 +469,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	buf.mu.Unlock()
 	ab.mu.Unlock()
 
-	metrics.GaugeBatchBufferKeysActive(ctx, activeKeys, metrics.GaugeOpt{PkgName: pkgName})
+	metrics.GaugeBatchBufferKeysActive(ctx, activeKeys, metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"backend": ab.storeName}})
 }
 
 // mapBulkStatus maps a bulk append status to an individual item status.
@@ -526,7 +546,7 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 		ab.log.Error("failed to parse batch ID", "error", err, "batchID", rawBatchID)
 		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"error_type": "parse_batch_id"},
+			Tags:    map[string]any{"backend": ab.storeName, "error_type": "parse_batch_id"},
 		})
 		return err
 	}
@@ -554,17 +574,17 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 		)
 		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"schedule_type": scheduleType, "status": "error"},
+			Tags:    map[string]any{"backend": ab.storeName, "schedule_type": scheduleType, "status": "error"},
 		})
 		metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"error_type": "schedule"},
+			Tags:    map[string]any{"backend": ab.storeName, "error_type": "schedule"},
 		})
 		return scheduleErr
 	} else {
 		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"schedule_type": scheduleType, "status": "success"},
+			Tags:    map[string]any{"backend": ab.storeName, "schedule_type": scheduleType, "status": "success"},
 		})
 	}
 	return nil

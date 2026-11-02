@@ -274,6 +274,28 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
+func TestEventReadHelp(t *testing.T) {
+	for _, name := range []string{"list-events", "get-event"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			require.NoError(t, cmd.Run(t.Context(), []string{"api", name, "--help"}))
+			require.Contains(t, out.String(), "Payloads can contain personal data and be large, so request them only when needed.")
+			require.Contains(t, out.String(), "Default CLI and MCP OAuth scopes include events:read:*, so agents can read payloads.")
+			require.Contains(t, out.String(), "Events can be up to 5 MiB in Cloud (less on lower plans).")
+			if name == "list-events" {
+				require.Contains(t, out.String(), "With include=payload the maximum and default are 5")
+				require.Contains(t, out.String(), "up to 20 names, with up to 256 characters each and no backslashes or control characters")
+				require.Contains(t, out.String(), "ID of the last returned event from the previous response.")
+				require.Contains(t, out.String(), "Defaults to one hour before until, or one hour before the current time if until is omitted.")
+			} else {
+				require.Contains(t, out.String(), "Internal inngest/ events are not returned.")
+			}
+		})
+	}
+}
+
 func TestDeprecatedEndpointFlagsAreHidden(t *testing.T) {
 	var trace endpoint
 	for _, ep := range discoverEndpoints() {
@@ -1286,4 +1308,56 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 			require.Equal(t, tt.expected, actual)
 		})
 	}
+}
+
+func TestCommandReadsEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name, path string
+		args       []string
+		query      url.Values
+	}{
+		{"list-events", "/api/v2/events", []string{"--name", "order/placed", "--name", "order/paid", "--include", "payload", "--limit", "5", "--cursor", "01J00000000000000000000000", "--from", "2026-10-27T11:00:00Z", "--until", "2026-10-27T12:00:00Z"}, url.Values{"name": {"order/placed", "order/paid"}, "include": {"payload"}, "limit": {"5"}, "cursor": {"01J00000000000000000000000"}, "from": {"2026-10-27T11:00:00Z"}, "until": {"2026-10-27T12:00:00Z"}}},
+		{"get-event", "/api/v2/events/01J00000000000000000000000", []string{"01J00000000000000000000000", "--include", "payload"}, url.Values{"include": {"payload"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				require.Equal(t, http.MethodGet, r.Method)
+				require.Equal(t, tc.path, r.URL.Path)
+				require.Equal(t, tc.query, r.URL.Query())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			args := append([]string{"api", tc.name, "--api-host", srv.URL}, tc.args...)
+			require.NoError(t, cmd.Run(t.Context(), args))
+			require.Equal(t, 1, calls)
+			require.JSONEq(t, `{"data":{"id":"01J00000000000000000000000","name":"order/placed"}}`, out.String())
+		})
+	}
+}
+
+func TestListEventsAcceptsLargePayloadPage(t *testing.T) {
+	senderID := strings.Repeat("s", 1024*1024)
+	payload := `{"name":"large","id":"` + senderID + `","data":{"value":"` + strings.Repeat("x", 4*1024*1024-1024) + `"}}`
+	require.Less(t, len(payload), 5*1024*1024)
+	event := `{"id":"01J00000000000000000000000","name":"large","idempotencyKey":"` + senderID + `","payload":` + payload + `}`
+	body := `{"data":[` + strings.TrimSuffix(strings.Repeat(event+",", 5), ",") + `],"page":{"hasMore":false,"limit":5}}`
+	require.Greater(t, len(body), maxResponseBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v2/events", r.URL.Path)
+		require.Equal(t, "payload", r.URL.Query().Get("include"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	cmd := Command()
+	var out bytes.Buffer
+	cmd.Writer = &out
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "list-events", "--api-host", srv.URL, "--include", "payload", "--raw"}))
+	require.Equal(t, body+"\n", out.String())
 }

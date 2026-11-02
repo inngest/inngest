@@ -38,6 +38,8 @@ const (
 	KeySessionKeys = "session_keys"
 	KeySessions    = "sessions"
 	KeySessionRuns = "session_runs"
+
+	KeySessionRunsCount = "session_runs_count"
 )
 
 // defaultSessionWindow matches PR #4530's ("sessions oss") own default
@@ -46,6 +48,21 @@ const (
 // sessions.go) and REST (pkg/api/v2/endpoints_sessions.go) callers rely on
 // this default rather than each hardcoding their own.
 const defaultSessionWindow = 7 * 24 * time.Hour
+
+// latestRunOrder picks each run's latest lifecycle row, matching the
+// inngest.insights_runs macro's own QUALIFY (pkg/db/duckdb/migrations/
+// 000002_insights_views.sql): timestamps are ms precision so rows can tie
+// (a Queued and a Running row in the same ms), and the tiebreaks prefer the
+// furthest-along row (ended, then terminal > in-progress > queued status)
+// instead of whichever row happened to be inserted first.
+const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
+    ended_at IS NOT NULL DESC,
+    CASE
+      WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2
+      WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1
+      ELSE 0
+    END DESC,
+    status DESC`
 
 // latestRunsCTE returns the `WITH latest AS (...)` prefix every session
 // query builds on, appending (accountID, envID) to args in the order
@@ -59,14 +76,21 @@ const defaultSessionWindow = 7 * 24 * time.Hour
 // already, and adding the reverse edge (insights-adjacent packages
 // depending back on duckdbquery) for a two-line window function isn't
 // worth the coupling.
+//
+// scope.From/To bound queued_at *inside* the CTE, below the window:
+// queued_at is the run ID's own ULID timestamp on every lifecycle row
+// (pkg/duckdb/tracing's materializeRuns writes run_queued_at), so filtering
+// first never splits a run's rows or changes which one wins, and DuckDB only
+// window-sorts the runs in range instead of every run in the env (it can't
+// push a queued_at filter through a window partitioned by run_id itself).
 func latestRunsCTE(scope Scope, args *[]any) string {
-	*args = append(*args, scope.AccountID.String(), scope.EnvID.String())
+	*args = append(*args, scope.AccountID.String(), scope.EnvID.String(), scope.From, scope.To)
 	return fmt.Sprintf(`WITH latest AS (
   SELECT run_id, app_id, app_name, function_slug, status, queued_at, started_at, ended_at, sessions, inputs
   FROM %s.runs
-  WHERE account_id = ? AND env_id = ?
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC) = 1
-)`, driver.DuckLakeAlias)
+  WHERE account_id = ? AND env_id = ? AND queued_at BETWEEN ? AND ?
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY %s) = 1
+)`, driver.DuckLakeAlias, latestRunOrder)
 }
 
 // escapeLikeSearch escapes a caller-supplied search string for embedding
@@ -82,13 +106,22 @@ func escapeLikeSearch(search string) string {
 // sessions/keys.go's session_keys table + upserter), this queries
 // inngest.runs directly -- a dev server's data volume doesn't warrant a
 // second write path just to keep key listing cheap.
+//
+// Unlike the other builders this skips latestRunsCTE's latest-row collapse:
+// sessions comes from the triggering events, which every run lifecycle row
+// carries (pkg/duckdb/tracing's addRunEventAttrs), and queued_at is constant
+// per run, so DISTINCT keys and MIN(queued_at) are the same over every row
+// as over the latest ones, w/o window-sorting the env's runs (~650ms ->
+// ~12ms on 3M rows / 1M runs). It's deliberately not time bounded by
+// default: created_at is "first seen", which a window would silently
+// redefine, and a key w/ no recent runs would vanish from the listing
+// that's the entry point to everything else.
 func buildSessionKeysSQL(scope Scope) (string, []any, error) {
-	var args []any
-	query := latestRunsCTE(scope, &args)
+	args := []any{scope.AccountID.String(), scope.EnvID.String()}
 
-	where := ""
+	where := "\nWHERE account_id = ? AND env_id = ?"
 	if search := escapeLikeSearch(strings.TrimSpace(scope.Search)); search != "" {
-		where = "\nWHERE session.key ILIKE ? ESCAPE '\\'"
+		where += " AND session.key ILIKE ? ESCAPE '\\'"
 		args = append(args, "%"+search+"%")
 	}
 
@@ -98,18 +131,16 @@ func buildSessionKeysSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
-	query += fmt.Sprintf(`
+	query := fmt.Sprintf(`
 SELECT session.key AS key, MIN(queued_at) AS created_at
-FROM latest, UNNEST(sessions) AS s(session)%s
+FROM %s.runs, UNNEST(sessions) AS s(session)%s
 GROUP BY session.key%s
 ORDER BY created_at DESC, key DESC
-LIMIT ?;`, where, having)
+LIMIT ?;`, driver.DuckLakeAlias, where, having)
 	args = append(args, resolveLimit(scope.Limit)+1)
 
 	return query, args, nil
@@ -132,8 +163,6 @@ func buildSessionsSQL(scope Scope) (string, []any, error) {
 		where += " AND session.id ILIKE ? ESCAPE '\\'"
 		args = append(args, "%"+search+"%")
 	}
-	where += " AND queued_at BETWEEN ? AND ?"
-	args = append(args, scope.From, scope.To)
 
 	having := ""
 	if scope.Cursor != "" {
@@ -141,10 +170,8 @@ func buildSessionsSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -177,18 +204,16 @@ func buildSessionRunsSQL(scope Scope) (string, []any, error) {
 	var args []any
 	query := latestRunsCTE(scope, &args)
 
-	where := "\nWHERE session.key = ? AND session.id = ? AND queued_at BETWEEN ? AND ?"
-	args = append(args, scope.SessionKey, scope.SessionID, scope.From, scope.To)
+	where := "\nWHERE session.key = ? AND session.id = ?"
+	args = append(args, scope.SessionKey, scope.SessionID)
 
 	if scope.Cursor != "" {
 		cur, err := decodeSessionCursor(scope.Cursor, "queued_at")
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -203,6 +228,26 @@ LIMIT ?;`, where)
 	return query, args, nil
 }
 
+// buildSessionRunsCountSQL counts every run carrying one (key, id)
+// session pair in the time range, ignoring Cursor/Limit so it's the
+// session's total rather than what's left after the current page. This
+// is the same set buildSessionsSQL's run_count aggregates for that id.
+func buildSessionRunsCountSQL(scope Scope) (string, []any, error) {
+	if scope.SessionKey == "" || scope.SessionID == "" {
+		return "", nil, fmt.Errorf("session key and session id are required")
+	}
+
+	var args []any
+	query := latestRunsCTE(scope, &args)
+	query += `
+SELECT COUNT(*) AS total_count
+FROM latest, UNNEST(sessions) AS s(session)
+WHERE session.key = ? AND session.id = ? AND queued_at BETWEEN ? AND ?;`
+	args = append(args, scope.SessionKey, scope.SessionID, scope.From, scope.To)
+
+	return query, args, nil
+}
+
 type sessionCursor struct {
 	at time.Time
 	id string
@@ -213,19 +258,20 @@ type sessionCursor struct {
 // with the row/group identifier as the final tiebreak. Reuses
 // cqrs.TracePageCursor (the same codec pkg/cqrs/duckdbquery's own runs/
 // events pagination already uses) rather than a bespoke cursor type per
-// entry. Returns nil, nil for the first page (no cursor, or nothing under
-// this field).
+// entry. Returns nil, nil for the first page (no cursor). A cursor that
+// decodes but isn't keyed on field (e.g. a sessions cursor sent to session
+// runs) is an *InvalidArgumentError, not a silent restart at page 1.
 func decodeSessionCursor(cursorStr, field string) (*sessionCursor, error) {
 	if cursorStr == "" {
 		return nil, nil
 	}
 	cur := &cqrs.TracePageCursor{}
 	if err := cur.Decode(cursorStr); err != nil {
-		return nil, fmt.Errorf("dashboard: decoding cursor: %w", err)
+		return nil, invalidArgumentf("invalid cursor")
 	}
 	tc := cur.Find(field)
 	if tc == nil || cur.ID == "" {
-		return nil, nil
+		return nil, invalidArgumentf("invalid cursor: not a cursor for this listing")
 	}
 	return &sessionCursor{at: time.UnixMilli(tc.Value), id: cur.ID}, nil
 }
@@ -242,18 +288,22 @@ func encodeSessionCursor(id, field string, at time.Time) (string, error) {
 	return c.Encode()
 }
 
-// resolveSessionTimeRange applies defaultSessionWindow when the caller
-// specifies no range at all, matching the reference's own
-// sessions.resolveTimeRange default; an explicit range is validated
-// (from < to) but otherwise passed through unbounded by any retention
-// window -- OSS has no billing-tier history limit to enforce.
-func resolveSessionTimeRange(from, until time.Time) (time.Time, time.Time, error) {
-	if from.IsZero() && until.IsZero() {
-		to := time.Now().UTC()
-		return to.Add(-defaultSessionWindow), to, nil
+// ResolveSessionTimeRange is the one time-range defaulting rule every
+// Sessions caller (REST and GQL) shares: a zero until means now, a zero
+// from means defaultSessionWindow before until (so no range at all is the
+// last 7 days, matching the reference's own sessions.resolveTimeRange
+// default). The resolved range must satisfy from < until, else it's an
+// *InvalidArgumentError. It's otherwise unbounded by any retention window
+// -- OSS has no billing-tier history limit to enforce.
+func ResolveSessionTimeRange(from, until time.Time) (time.Time, time.Time, error) {
+	if until.IsZero() {
+		until = time.Now().UTC()
+	}
+	if from.IsZero() {
+		from = until.Add(-defaultSessionWindow)
 	}
 	if !from.Before(until) {
-		return time.Time{}, time.Time{}, fmt.Errorf(
+		return time.Time{}, time.Time{}, invalidArgumentf(
 			"invalid time range: from (%s) must be before until (%s)",
 			from.Format(time.RFC3339), until.Format(time.RFC3339),
 		)
@@ -347,8 +397,8 @@ func (g SessionGroup) FailureRate() float64 {
 	return float64(g.FailedRunCount) / float64(g.RunCount)
 }
 
-// SessionsOpts are ListSessions' caller-provided parameters. From/Until
-// zero means "use the default window" (see resolveSessionTimeRange).
+// SessionsOpts are ListSessions' caller-provided parameters. A zero
+// From/Until is defaulted by ResolveSessionTimeRange.
 type SessionsOpts struct {
 	Key      string
 	IDSearch string
@@ -368,9 +418,9 @@ type SessionsResult struct {
 // under one session key, most-recently-active first.
 func ListSessions(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionsOpts) (*SessionsResult, error) {
 	if opts.Key == "" {
-		return nil, fmt.Errorf("dashboard: session key is required")
+		return nil, invalidArgumentf("session key is required")
 	}
-	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard: %w", err)
 	}
@@ -464,9 +514,9 @@ type SessionRunsResult struct {
 // session pair, most-recently-queued first.
 func ListSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionRunsOpts) (*SessionRunsResult, error) {
 	if opts.Key == "" || opts.ID == "" {
-		return nil, fmt.Errorf("dashboard: session key and session id are required")
+		return nil, invalidArgumentf("session key and session id are required")
 	}
-	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard: %w", err)
 	}
@@ -498,6 +548,36 @@ func ListSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID
 		runs = runs[:limit]
 	}
 	return &SessionRunsResult{Runs: runs, HasMore: hasMore}, nil
+}
+
+// CountSessionRuns returns the total number of runs ListSessionRuns
+// would page through for opts, ignoring opts.Cursor/opts.Limit.
+func CountSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionRunsOpts) (int, error) {
+	if opts.Key == "" || opts.ID == "" {
+		return 0, fmt.Errorf("dashboard: session key and session id are required")
+	}
+	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+
+	scope := Scope{
+		AccountID: accountID, EnvID: envID,
+		From: from, To: until,
+		SessionKey: opts.Key, SessionID: opts.ID,
+	}
+	result, err := Get(ctx, db, scope, KeySessionRunsCount)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: counting session runs: %w", err)
+	}
+	if len(result.Rows) != 1 {
+		return 0, fmt.Errorf("dashboard: counting session runs: expected 1 row, got %d", len(result.Rows))
+	}
+	count, err := asInt64(col(result.Rows[0], columnIndex(result.Columns), "total_count"), "total_count")
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+	return int(count), nil
 }
 
 func parseSessionRunRow(row []any, idx map[string]int) (SessionRun, error) {

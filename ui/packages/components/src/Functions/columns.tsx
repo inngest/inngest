@@ -7,7 +7,7 @@ import { getHumanReadableCron } from '@inngest/components/hooks/useCron';
 import { type Function } from '@inngest/components/types/function';
 import { TriggerTypes } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiInformationLine } from '@remixicon/react';
+import { RiHourglassLine, RiInformationLine, RiPauseCircleLine } from '@remixicon/react';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
 import { FunctionsTable } from './FunctionsTable';
@@ -100,6 +100,19 @@ function UsageCell({
   );
 }
 
+function StatusIcon({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span aria-label={label} className="flex shrink-0">
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function useColumns({
   pathCreator,
   getFunctionVolume,
@@ -111,7 +124,7 @@ export function useColumns({
     columnHelper.accessor('name', {
       cell: ({ row }: { row: Row<Function> }) => {
         const name = row.original.name;
-        const { isPaused, isArchived } = row.original;
+        const { isPaused, isArchived, isDraining } = row.original;
 
         return (
           <div className="flex items-center gap-2">
@@ -126,6 +139,16 @@ export function useColumns({
               )}
             />
             <TextCell>{name}</TextCell>
+            {isPaused && !isArchived && (
+              <StatusIcon label="Paused">
+                <RiPauseCircleLine className="text-warning h-4 w-4" />
+              </StatusIcon>
+            )}
+            {isDraining && !isArchived && (
+              <StatusIcon label="Draining">
+                <RiHourglassLine className="text-warning h-4 w-4" />
+              </StatusIcon>
+            )}
           </div>
         );
       },

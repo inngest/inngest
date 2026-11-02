@@ -682,3 +682,78 @@ func TestGetTraceRunsCountRespectsAppNameFilter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, count)
 }
+
+// Lifecycle rows that tie on COALESCE(ended_at, started_at, queued_at) (a
+// Running row whose started_at equals queued_at, or a finished row whose
+// ended_at equals the Running row's started_at) must still resolve to the
+// furthest-along row (finished, then terminal > in-progress > queued) in
+// every runs query, regardless of insert order.
+func TestLatestRunRowTiebreaksOnLifecycleStage(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	queuedAt := time.Now().UTC().Add(-time.Minute).Truncate(time.Millisecond)
+	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	type row struct {
+		status         enums.StepStatus
+		started, ended *time.Time
+	}
+	queued := row{status: enums.StepStatusQueued}
+	running := row{status: enums.StepStatusRunning, started: &queuedAt}
+	completed := row{status: enums.StepStatusCompleted, started: &queuedAt, ended: &queuedAt}
+	failed := row{status: enums.StepStatusFailed, started: &queuedAt, ended: &queuedAt}
+	pairs := []struct {
+		first, second row
+		want          enums.RunStatus
+	}{
+		{queued, running, enums.RunStatusRunning},
+		{running, completed, enums.RunStatusCompleted},
+		{running, failed, enums.RunStatusFailed},
+	}
+
+	want := map[string]enums.RunStatus{}
+	for _, p := range pairs {
+		for _, rows := range [][]row{{p.first, p.second}, {p.second, p.first}} {
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			want[runID.String()] = p.want
+			for _, r := range rows {
+				status := r.status
+				seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &status, r.started, r.ended, nil)
+			}
+			_, err := m.db.ExecContext(ctx, "UPDATE inngest.runs SET event_ids = [?] WHERE run_id = ?;", eventID.String(), runID.String())
+			require.NoError(t, err)
+		}
+	}
+
+	for runID, status := range want {
+		run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: ulid.MustParse(runID)})
+		require.NoError(t, err)
+		require.Equal(t, status, run.Status, "GetTraceRun %s", runID)
+	}
+
+	byTrigger, err := m.GetTraceRunsByTriggerID(ctx, eventID)
+	require.NoError(t, err)
+	require.Len(t, byTrigger, len(want))
+	for _, run := range byTrigger {
+		require.Equal(t, want[run.RunID], run.Status, "GetTraceRunsByTriggerID %s", run.RunID)
+	}
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: envID,
+			From:        queuedAt.Add(-time.Hour),
+			Until:       queuedAt.Add(time.Hour),
+		},
+		Items: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, len(want))
+	for _, run := range runs {
+		require.Equal(t, want[run.RunID], run.Status, "GetTraceRuns %s", run.RunID)
+	}
+}

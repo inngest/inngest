@@ -939,3 +939,23 @@ type SessionRun {
   startedAt: Time
   endedAt: Time
 }
+
+# One page of a Sessions listing. pageInfo.hasNextPage/endCursor are
+# /v2/sessions' page.hasMore/page.cursor; hasPreviousPage/startCursor are
+# always false/null (forward-only, like REST).
+type SessionKeysConnection {
+  nodes: [SessionKey!]!
+  pageInfo: PageInfo!
+}
+
+type SessionGroupsConnection {
+  nodes: [SessionGroup!]!
+  pageInfo: PageInfo!
+}
+
+type SessionRunsConnection {
+  nodes: [SessionRun!]!
+  pageInfo: PageInfo!
+  # Every run in the session for the time range, across all pages.
+  totalCount: Int!
+}

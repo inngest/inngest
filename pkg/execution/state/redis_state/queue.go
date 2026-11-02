@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	"strconv"
 	"strings"
@@ -49,6 +50,8 @@ type RedisQueueShard interface {
 	osqueue.QueueShard
 	osqueue.BacklogOperations
 	Client() *QueueClient
+	ItemsByPartitionSeq2(context.Context, osqueue.Scope, string, time.Time, time.Time, ...osqueue.QueueIterOpt) (iter.Seq2[*osqueue.QueueItem, error], error)
+	SingletonMigrationKey(context.Context, osqueue.QueueItem) (string, error)
 
 	QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error)
 }
@@ -131,6 +134,13 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
 
 	kg := q.RedisClient.kg
+	singleton := i.Data.Singleton
+	if opts.SingletonMigrationKey != "" {
+		if !opts.PassthroughJobId || opts.NormalizeFromBacklogID != "" {
+			return i, fmt.Errorf("singleton migration requires a preserved job ID and no normalization")
+		}
+		singleton = &osqueue.Singleton{Key: opts.SingletonMigrationKey}
+	}
 
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
@@ -231,7 +241,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 		// Singletons
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
-		kg.SingletonKey(i.Data.Singleton),
+		kg.SingletonKey(singleton),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
@@ -262,6 +272,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		backlog.BacklogID,
 
 		opts.NormalizeFromBacklogID,
+		opts.SingletonMigrationKey != "",
 	})
 	if err != nil {
 		return i, err

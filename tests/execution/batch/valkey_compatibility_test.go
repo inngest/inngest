@@ -157,21 +157,27 @@ func TestBatchValkeyCompatibility(t *testing.T) {
 				_, err = bm.Append(ctx, newItem(fn, map[string]any{"tenant": "b"}), fn)
 				require.NoError(t, err)
 
-				info, err := bm.GetBatchInfo(ctx, fn.ID, "a")
+				infos, err := bm.GetBatchInfo(ctx, fn.ID, "a")
 				require.NoError(t, err)
+				require.Len(t, infos, 1)
+				info := infos[0]
 				require.Len(t, info.Items, 1)
 				require.Equal(t, enums.BatchStatusPending.String(), info.Status)
 
-				deleted, err := bm.DeleteBatch(ctx, fn.ID, "a")
+				results, err := bm.DeleteBatch(ctx, fn.ID, "a")
 				require.NoError(t, err)
+				require.Len(t, results, 1)
+				deleted := results[0]
 				require.True(t, deleted.Deleted)
 
 				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, ulid.MustParse(info.BatchID))
 				require.NoError(t, err)
 				require.Empty(t, items)
 
-				info, err = bm.GetBatchInfo(ctx, fn.ID, "b")
+				infos, err = bm.GetBatchInfo(ctx, fn.ID, "b")
 				require.NoError(t, err)
+				require.Len(t, infos, 1)
+				info = infos[0]
 				require.Len(t, info.Items, 1)
 			})
 		})

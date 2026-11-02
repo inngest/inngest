@@ -134,6 +134,22 @@ func (q *queue) RunningCount(ctx context.Context, scope osqueue.Scope) (int64, e
 }
 
 func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
+	items, err := q.ItemsByPartitionSeq2(ctx, scope, partitionID, from, until, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return func(yield func(*osqueue.QueueItem) bool) {
+		for item, err := range items {
+			if err != nil || !yield(item) {
+				return
+			}
+		}
+	}, nil
+}
+
+// ItemsByPartitionSeq2 reports page failures instead of treating them as exhaustion.
+// Migration must use this variant before acknowledging that the source is empty.
+func (q *queue) ItemsByPartitionSeq2(ctx context.Context, scope osqueue.Scope, partitionID string, from time.Time, until time.Time, opts ...osqueue.QueueIterOpt) (iter.Seq2[*osqueue.QueueItem, error], error) {
 	l := logger.StdlibLogger(ctx)
 
 	opt := osqueue.QueueIterOptions{
@@ -174,7 +190,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 		l = l.With("env_id", pt.EnvID.String())
 	}
 
-	return func(yield func(*osqueue.QueueItem) bool) {
+	return func(yield func(*osqueue.QueueItem, error) bool) {
 		ptFrom := from
 
 		for {
@@ -193,6 +209,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error peeking items for partition iterator")
 				}
+				yield(nil, err)
 				return
 			}
 			l.Info("peeked partition items", "raw_count", result.RawCount, "last_score", result.LastScore, "item_count", len(result.Items))
@@ -203,7 +220,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 					continue
 				}
 
-				if !yield(qi) {
+				if !yield(qi, nil) {
 					return
 				}
 
@@ -237,7 +254,8 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 					"last_score", result.LastScore,
 					"raw_count", result.RawCount,
 				)
-				break
+				yield(nil, fmt.Errorf("partition iterator returned invalid score %d", result.LastScore))
+				return
 			}
 
 			if iterated == 0 {
@@ -272,13 +290,18 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 		cmd := rc.B().Hget().Key(hash).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return // Legacy partitions need not have a shadow partition.
+			}
 			l.Warn("error retrieving shadow partition from queue", "error", err)
+			yield(nil, err)
 			return
 		}
 
 		var spt osqueue.QueueShadowPartition
 		if err := json.Unmarshal(byt, &spt); err != nil {
 			l.ReportError(err, "error unmarshalling shadow partition")
+			yield(nil, err)
 			return
 		}
 
@@ -293,6 +316,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error peeking backlogs for partition")
 				}
+				yield(nil, err)
 				return
 			}
 
@@ -312,6 +336,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 					l.ReportError(err, "error retrieving queue items from backlog",
 						logger.WithErrorReportTags(errTags),
 					)
+					yield(nil, err)
 					return
 				}
 
@@ -321,7 +346,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, scope osqueue.Scope, parti
 						continue
 					}
 
-					if !yield(qi) {
+					if !yield(qi, nil) {
 						return
 					}
 					iterated++

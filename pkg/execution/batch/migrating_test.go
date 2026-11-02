@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"crypto/rand"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -59,8 +60,8 @@ func newMigratingTestEnv(t *testing.T) *migratingTestEnv {
 	bcCurrent := redis_state.NewBatchClient(rcCurrent, redis_state.QueueDefaultKey)
 	bcNext := redis_state.NewBatchClient(rcNext, redis_state.QueueDefaultKey)
 
-	bmCurrent := NewRedisBatchManager(bcCurrent, nil, WithoutBuffer())
-	bmNext := NewRedisBatchManager(bcNext, nil, WithoutBuffer())
+	bmCurrent := NewRedisBatchManager(bcCurrent, nil, WithoutBuffer(), WithStoreName("current"))
+	bmNext := NewRedisBatchManager(bcNext, nil, WithoutBuffer(), WithStoreName("next"))
 
 	env := &migratingTestEnv{
 		t:                  t,
@@ -218,10 +219,14 @@ func TestMigratingIntegration_WriteToCurrent(t *testing.T) {
 	})
 
 	t.Run("GetBatchInfo", func(t *testing.T) {
-		info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+		infos, err := env.migBM.GetBatchInfo(ctx, fnID, "")
 		require.NoError(t, err)
-		require.Equal(t, res.BatchID, info.BatchID)
-		require.Len(t, info.Items, 1)
+		require.Len(t, infos, 2)
+		require.Equal(t, "current", infos[0].Store)
+		require.Equal(t, res.BatchID, infos[0].BatchID)
+		require.Len(t, infos[0].Items, 1)
+		require.Equal(t, "next", infos[1].Store)
+		require.Empty(t, infos[1].BatchID)
 	})
 
 	t.Run("StartExecution", func(t *testing.T) {
@@ -269,11 +274,14 @@ func TestMigratingIntegration_WriteToCurrent(t *testing.T) {
 		newFn := newFunction(newFnID)
 		appendItem(ctx, t, env.migBM, newFnID, newFn)
 
-		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{
+		// RunBatch returns one result per cluster, current first. Only current has a batch to run.
+		results, err := env.migBM.RunBatch(ctx, RunBatchOpts{
 			FunctionID: newFnID,
 		})
 		require.NoError(t, err)
-		require.True(t, result.Scheduled)
+		require.Len(t, results, 2)
+		require.True(t, results[0].Scheduled)
+		require.False(t, results[1].Scheduled)
 	})
 
 	t.Run("DeleteBatch", func(t *testing.T) {
@@ -281,15 +289,19 @@ func TestMigratingIntegration_WriteToCurrent(t *testing.T) {
 		delFn := newFunction(delFnID)
 		appendItem(ctx, t, env.migBM, delFnID, delFn)
 
-		result, err := env.migBM.DeleteBatch(ctx, delFnID, "")
+		// DeleteBatch returns one result per cluster, current first. Only current has a batch to delete.
+		results, err := env.migBM.DeleteBatch(ctx, delFnID, "")
 		require.NoError(t, err)
-		require.True(t, result.Deleted)
-		require.Equal(t, 1, result.ItemCount)
+		require.Len(t, results, 2)
+		require.True(t, results[0].Deleted)
+		require.Equal(t, 1, results[0].ItemCount)
+		require.False(t, results[1].Deleted)
 
 		// Verify batch is gone.
-		info, err := env.migBM.GetBatchInfo(ctx, delFnID, "")
+		infos, err := env.migBM.GetBatchInfo(ctx, delFnID, "")
 		require.NoError(t, err)
-		require.Equal(t, "", info.BatchID)
+		require.Empty(t, infos[0].BatchID)
+		require.Empty(t, infos[1].BatchID)
 	})
 
 	t.Run("DeleteKeys", func(t *testing.T) {
@@ -374,10 +386,11 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.Len(t, items, 1)
 		require.Equal(t, biCur.EventID, items[0].EventID)
 
-		// GetBatchInfo through migrating — next has nothing, falls back to current.
-		info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+		// GetBatchInfo through migrating reports each cluster: current has the batch.
+		infos, err := env.migBM.GetBatchInfo(ctx, fnID, "")
 		require.NoError(t, err)
-		require.Equal(t, resCur.BatchID, info.BatchID)
+		require.Equal(t, resCur.BatchID, infos[0].BatchID)
+		require.Empty(t, infos[1].BatchID)
 	})
 
 	t.Run("BulkAppend writes to current", func(t *testing.T) {
@@ -451,10 +464,12 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		fn := newFunction(fnID)
 		appendItem(ctx, t, env.bmNext, fnID, fn)
 
-		result, err := env.migBM.DeleteBatch(ctx, fnID, "")
+		// One result per cluster, current first. Only next has a batch to delete.
+		results, err := env.migBM.DeleteBatch(ctx, fnID, "")
 		require.NoError(t, err)
-		require.True(t, result.Deleted)
-		require.Equal(t, 1, result.ItemCount)
+		require.False(t, results[0].Deleted)
+		require.True(t, results[1].Deleted)
+		require.Equal(t, 1, results[1].ItemCount)
 
 		// Data only on current.
 		env2 := newMigratingTestEnv(t)
@@ -463,10 +478,12 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		fn2 := newFunction(fnID2)
 		appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
 
-		result2, err := env2.migBM.DeleteBatch(ctx, fnID2, "")
+		// Only current has a batch to delete.
+		results2, err := env2.migBM.DeleteBatch(ctx, fnID2, "")
 		require.NoError(t, err)
-		require.True(t, result2.Deleted)
-		require.Equal(t, 1, result2.ItemCount)
+		require.True(t, results2[0].Deleted)
+		require.Equal(t, 1, results2[0].ItemCount)
+		require.False(t, results2[1].Deleted)
 	})
 
 	t.Run("RunBatch finds batch in either cluster", func(t *testing.T) {
@@ -477,9 +494,11 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		fn := newFunction(fnID)
 		appendItem(ctx, t, env.bmNext, fnID, fn)
 
-		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+		// One result per cluster, current first. Only next has a batch to run.
+		results, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
 		require.NoError(t, err)
-		require.True(t, result.Scheduled)
+		require.False(t, results[0].Scheduled)
+		require.True(t, results[1].Scheduled)
 
 		// Data only on current.
 		env2 := newMigratingTestEnv(t)
@@ -488,9 +507,11 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		fn2 := newFunction(fnID2)
 		appendItem(ctx, t, env2.bmCurrent, fnID2, fn2)
 
-		result2, err := env2.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID2})
+		// Only current has a batch to run.
+		results2, err := env2.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID2})
 		require.NoError(t, err)
-		require.True(t, result2.Scheduled)
+		require.True(t, results2[0].Scheduled)
+		require.False(t, results2[1].Scheduled)
 	})
 
 	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
@@ -548,10 +569,11 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 	require.Len(t, items, 1)
 	require.Equal(t, bi.EventID, items[0].EventID)
 
-	// GetBatchInfo reads from next.
-	info, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+	// GetBatchInfo reports the batch in next.
+	infos, err := env.migBM.GetBatchInfo(ctx, fnID, "")
 	require.NoError(t, err)
-	require.Equal(t, res.BatchID, info.BatchID)
+	require.Empty(t, infos[0].BatchID)
+	require.Equal(t, res.BatchID, infos[1].BatchID)
 
 	t.Run("BulkAppend writes to next", func(t *testing.T) {
 		baFnID := uuid.New()
@@ -593,9 +615,11 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 		dbFn := newFunction(dbFnID)
 		appendItem(ctx, t, env.bmNext, dbFnID, dbFn)
 
-		result, err := env.migBM.DeleteBatch(ctx, dbFnID, "")
+		// One result per cluster, current first. The batch is only in next.
+		results, err := env.migBM.DeleteBatch(ctx, dbFnID, "")
 		require.NoError(t, err)
-		require.True(t, result.Deleted)
+		require.False(t, results[0].Deleted)
+		require.True(t, results[1].Deleted)
 	})
 
 	t.Run("RunBatch from next", func(t *testing.T) {
@@ -603,9 +627,11 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 		rbFn := newFunction(rbFnID)
 		appendItem(ctx, t, env.bmNext, rbFnID, rbFn)
 
-		result, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: rbFnID})
+		// One result per cluster, current first. The batch is only in next.
+		results, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: rbFnID})
 		require.NoError(t, err)
-		require.True(t, result.Scheduled)
+		require.False(t, results[0].Scheduled)
+		require.True(t, results[1].Scheduled)
 	})
 
 	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
@@ -760,17 +786,22 @@ func TestMigratingIntegration_DeleteBatchClearsBothClusters(t *testing.T) {
 	appendItem(ctx, t, env.bmCurrent, fnID, fn)
 	resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
 
-	result, err := env.migBM.DeleteBatch(ctx, fnID, "")
+	// Both clusters hold an open batch, so DeleteBatch deletes each and reports both, current first.
+	results, err := env.migBM.DeleteBatch(ctx, fnID, "")
 	require.NoError(t, err)
-	require.True(t, result.Deleted)
-	require.Equal(t, resNext.BatchID, result.BatchID)
-	require.Equal(t, 3, result.ItemCount)
+	require.Len(t, results, 2)
+	require.Equal(t, DeleteBatchResult{Store: "current", Deleted: true, BatchID: results[0].BatchID, ItemCount: 2}, results[0])
+	require.Equal(t, DeleteBatchResult{Store: "next", Deleted: true, BatchID: resNext.BatchID, ItemCount: 1}, results[1])
 
-	infoCur, err := env.bmCurrent.GetBatchInfo(ctx, fnID, "")
+	infosCur, err := env.bmCurrent.GetBatchInfo(ctx, fnID, "")
 	require.NoError(t, err)
+	require.Len(t, infosCur, 1)
+	infoCur := infosCur[0]
 	require.Empty(t, infoCur.BatchID)
-	infoNext, err := env.bmNext.GetBatchInfo(ctx, fnID, "")
+	infosNext, err := env.bmNext.GetBatchInfo(ctx, fnID, "")
 	require.NoError(t, err)
+	require.Len(t, infosNext, 1)
+	infoNext := infosNext[0]
 	require.Empty(t, infoNext.BatchID)
 }
 
@@ -778,4 +809,75 @@ func TestMigratingIntegration_Close(t *testing.T) {
 	env := newMigratingTestEnv(t)
 	err := env.migBM.Close()
 	require.NoError(t, err)
+}
+
+func TestMigratingIntegration_DebugAPIsReportBothClusters(t *testing.T) {
+	ctx := context.Background()
+	env := newMigratingTestEnv(t)
+	fnID := uuid.New()
+	fn := newFunction(fnID)
+
+	// Right after a flag flip both clusters can hold an open batch for the same pointer.
+	resCur, _ := appendItem(ctx, t, env.bmCurrent, fnID, fn)
+	appendItem(ctx, t, env.bmCurrent, fnID, fn)
+	resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+
+	infos, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+	require.NoError(t, err)
+	require.Len(t, infos, 2)
+	require.Equal(t, "current", infos[0].Store)
+	require.Equal(t, resCur.BatchID, infos[0].BatchID)
+	require.Len(t, infos[0].Items, 2)
+	require.Equal(t, "next", infos[1].Store)
+	require.Equal(t, resNext.BatchID, infos[1].BatchID)
+	require.Len(t, infos[1].Items, 1)
+
+	// Both clusters hold an open batch, so RunBatch schedules each and reports both, current first.
+	results, err := env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+	require.NoError(t, err)
+	require.Equal(t, []RunBatchResult{
+		{Store: "current", Scheduled: true, BatchID: resCur.BatchID, ItemCount: 2},
+		{Store: "next", Scheduled: true, BatchID: resNext.BatchID, ItemCount: 1},
+	}, results)
+}
+
+func TestMigratingIntegration_DebugAPIErrorsNameFailingCluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		failCurrent bool
+		failNext    bool
+	}{
+		{name: "next fails", failNext: true},
+		{name: "current fails", failCurrent: true},
+		{name: "both fail", failCurrent: true, failNext: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			env := newMigratingTestEnv(t)
+			fnID := uuid.New()
+			if tt.failCurrent {
+				env.rCurrent.SetError("unavailable")
+			}
+			if tt.failNext {
+				env.rNext.SetError("unavailable")
+			}
+
+			// A failing cluster fails the debug call, and the error names each
+			// failing cluster so an operator knows which store to check.
+			checkErr := func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.Equal(t, tt.failCurrent, strings.Contains(err.Error(), "batch store current:"))
+				require.Equal(t, tt.failNext, strings.Contains(err.Error(), "batch store next:"))
+			}
+
+			_, err := env.migBM.GetBatchInfo(ctx, fnID, "")
+			checkErr(t, err)
+			_, err = env.migBM.RunBatch(ctx, RunBatchOpts{FunctionID: fnID})
+			checkErr(t, err)
+			_, err = env.migBM.DeleteBatch(ctx, fnID, "")
+			checkErr(t, err)
+		})
+	}
 }

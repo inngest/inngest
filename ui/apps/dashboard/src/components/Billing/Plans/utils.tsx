@@ -263,3 +263,31 @@ export function isHobbyPlan(
 ): boolean {
   return isHobbyFreePlan(plan);
 }
+
+export function executionUsageDescription(
+  plan: Pick<BillingPlan, 'name' | 'slug'>,
+  includedExecutions: number | null,
+): string {
+  if (isHobbyPlan(plan)) {
+    return 'The maximum number of executions per month';
+  }
+
+  if (isEnterprisePlan(plan) || includedExecutions === null) {
+    return 'Additional usage billed at the start of the next billing cycle.';
+  }
+
+  // Match executionOverageTiers in monorepo/pkg/billing/invoice/consts.go.
+  // Tier boundaries include the account's execution allowance, not just overages.
+  const pricePerMillion =
+    includedExecutions < 5_000_000
+      ? 50
+      : includedExecutions < 15_000_000
+      ? 25
+      : includedExecutions < 50_000_000
+      ? 20
+      : 15;
+
+  return `Usage beyond ${includedExecutions.toLocaleString(
+    'en-US',
+  )} is billed at $${pricePerMillion} per 1,000,000 at the start of the next billing cycle.`;
+}

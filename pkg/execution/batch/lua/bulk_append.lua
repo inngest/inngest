@@ -93,6 +93,7 @@ local capacity = batchLimit - currentLen
 -- Determine how many events fit in current batch
 local eventsForCurrentBatch = {}
 local eventsForOverflow = {}
+local overflowBytes = 0
 
 if #eventsToAdd <= capacity then
   -- All events fit in current batch
@@ -104,6 +105,7 @@ else
   end
   for i = capacity + 1, #eventsToAdd do
     table.insert(eventsForOverflow, eventsToAdd[i])
+    overflowBytes = overflowBytes + string.len(eventsToAdd[i])
   end
 end
 
@@ -114,7 +116,7 @@ if #eventsForCurrentBatch > 0 then
 end
 
 -- Check batch size limit
-local batchMemorySize = redis.call("MEMORY", "USAGE", batchKey) or 0
+local batchBytes = update_batch_bytes(batchKey, batchMetadataKey, currentLen, finalLen, committedBytes - overflowBytes)
 
 -- Determine the result status
 local status = "append"
@@ -127,7 +129,7 @@ if currentLen == 0 then
 end
 
 -- Check if batch is full (count or size limit)
-local batchFull = finalLen >= batchLimit or batchMemorySize >= batchSizeLimit
+local batchFull = finalLen >= batchLimit or batchBytes >= batchSizeLimit
 
 if batchFull then
   -- NOTE: We intentionally do NOT set status to "started" here.
@@ -149,6 +151,7 @@ if batchFull then
     -- Add overflow events to new batch
     redis.call("RPUSH", overflowBatchKey, unpack(eventsForOverflow))
     set_batch_status(overflowMetadataKey, batchStatusAppending)
+    update_batch_bytes(overflowBatchKey, overflowMetadataKey, 0, #eventsForOverflow, overflowBytes)
 
     overflowCount = #eventsForOverflow
     status = "overflow"
@@ -156,7 +159,7 @@ if batchFull then
     -- No overflow, just rotate the pointer for next batch
     update_pointer(batchPointerKey, overflowULID)
 
-    if batchMemorySize >= batchSizeLimit then
+    if batchBytes >= batchSizeLimit then
       status = "maxsize"
     else
       status = "full"

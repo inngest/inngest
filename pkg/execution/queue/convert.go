@@ -502,6 +502,7 @@ func EnqueueOptionsToProto(opts EnqueueOpts) *pb.EnqueueOptions {
 		ForceQueueShardName:    opts.ForceQueueShardName,
 		NormalizeFromBacklogId: opts.NormalizeFromBacklogID,
 		IdempotencyPeriod:      durationPtrToProto(opts.IdempotencyPeriod),
+		SingletonMigrationKey:  opts.SingletonMigrationKey,
 	}
 }
 
@@ -514,6 +515,7 @@ func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {
 		ForceQueueShardName:    msg.GetForceQueueShardName(),
 		NormalizeFromBacklogID: msg.GetNormalizeFromBacklogId(),
 		IdempotencyPeriod:      durationPtrFromProto(msg.GetIdempotencyPeriod()),
+		SingletonMigrationKey:  msg.GetSingletonMigrationKey(),
 	}
 }
 

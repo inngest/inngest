@@ -17,6 +17,7 @@ package dashboards
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -63,12 +64,25 @@ var registry = map[string]registryEntry{
 	KeySessionKeys: {build: buildSessionKeysSQL},
 	KeySessions:    {build: buildSessionsSQL},
 	KeySessionRuns: {build: buildSessionRunsSQL},
+
+	KeySessionRunsCount: {build: buildSessionRunsCountSQL},
 }
 
 const (
 	defaultLimit = 20
 	maxLimit     = 100
 )
+
+// getTimeout bounds every Get, mirroring pkg/duckdb/insights' Execute
+// (executeTimeout): Get runs on the same *sql.DB, so the same DuckDB
+// subprocess dual-write uses. A var rather than a const only so tests can
+// shrink it.
+var getTimeout = 30 * time.Second
+
+// errGetTimeout is the cause Get's own getTimeout deadline cancels its ctx
+// with, so a caller's own cancellation or (shorter) deadline isn't reported
+// as Get's time limit.
+var errGetTimeout = errors.New("dashboards: get timeout")
 
 // Get runs the registry query for one key. An unrecognized key returns
 // (nil, nil) rather than erroring -- keys are plain strings nothing
@@ -89,8 +103,14 @@ func Get(ctx context.Context, db *sql.DB, scope Scope, key string) (*Result, err
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 
+	ctx, cancel := context.WithTimeoutCause(ctx, getTimeout, errGetTimeout)
+	defer cancel()
+
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
+		if errors.Is(context.Cause(ctx), errGetTimeout) {
+			return nil, fmt.Errorf("dashboard query (%s): exceeded the %s time limit: %w", key, getTimeout, err)
+		}
 		return nil, fmt.Errorf("dashboard query (%s): %w", key, err)
 	}
 	defer rows.Close()
@@ -124,10 +144,23 @@ func validateScope(scope Scope) error {
 		return fmt.Errorf("dashboard query: accountID and envID are required")
 	}
 	if !scope.From.IsZero() && !scope.To.IsZero() && !scope.From.Before(scope.To) {
-		return fmt.Errorf("dashboard query: invalid time range: from (%s) must be before to (%s)",
+		return invalidArgumentf("invalid time range: from (%s) must be before until (%s)",
 			scope.From.Format(time.RFC3339), scope.To.Format(time.RFC3339))
 	}
 	return nil
+}
+
+// InvalidArgumentError is a caller error (bad cursor, inverted time range,
+// missing session key, ...) as opposed to a query/database failure, so an
+// API layer can return a 400 w/ Message instead of a 500.
+type InvalidArgumentError struct {
+	Message string
+}
+
+func (e *InvalidArgumentError) Error() string { return e.Message }
+
+func invalidArgumentf(format string, args ...any) error {
+	return &InvalidArgumentError{Message: fmt.Sprintf(format, args...)}
 }
 
 func resolveLimit(requested int) int {

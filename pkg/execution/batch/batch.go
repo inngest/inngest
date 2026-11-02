@@ -75,14 +75,15 @@ type BatchManager interface {
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 
 	DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error
-	// GetBatchInfo retrieves information about the current batch for a function and batch key.
-	// This is used for debugging and introspection.
-	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) (*BatchInfo, error)
-	// DeleteBatch deletes the current batch for a function and batch key.
-	// Returns information about the deleted batch.
-	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) (*DeleteBatchResult, error)
-	// RunBatch schedules immediate execution of a batch by creating a timeout job that runs in one second.
-	RunBatch(ctx context.Context, opts RunBatchOpts) (*RunBatchResult, error)
+	// GetBatchInfo retrieves information about the current batch for a function and batch key,
+	// with one entry per batch store. This is used for debugging and introspection.
+	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error)
+	// DeleteBatch deletes the current batch for a function and batch key in every batch store.
+	// Returns one result per batch store.
+	DeleteBatch(ctx context.Context, functionID uuid.UUID, batchKey string) ([]DeleteBatchResult, error)
+	// RunBatch schedules immediate execution of the current batch in every batch store by
+	// creating a timeout job that runs in one second. Returns one result per batch store.
+	RunBatch(ctx context.Context, opts RunBatchOpts) ([]RunBatchResult, error)
 	// Close gracefully shuts down the batch manager, flushing any pending buffers.
 	Close() error
 }
@@ -98,6 +99,8 @@ type BatchMetricRecorder interface {
 
 // BatchInfo contains information about a batch for debugging purposes.
 type BatchInfo struct {
+	// Store is the name of the batch store the batch lives in.
+	Store string
 	// BatchID is the current batch ULID if one exists.
 	BatchID string
 	// Items contains the batch items.
@@ -108,6 +111,8 @@ type BatchInfo struct {
 
 // DeleteBatchResult contains information about a deleted batch.
 type DeleteBatchResult struct {
+	// Store is the name of the batch store the batch was deleted from.
+	Store string
 	// Deleted indicates whether a batch was found and deleted.
 	Deleted bool
 	// BatchID is the ULID of the deleted batch, if one was deleted.
@@ -127,6 +132,8 @@ type RunBatchOpts struct {
 
 // RunBatchResult contains information about a scheduled batch execution.
 type RunBatchResult struct {
+	// Store is the name of the batch store the batch lives in.
+	Store string
 	// Scheduled indicates whether a batch was found and scheduled.
 	Scheduled bool
 	// BatchID is the ULID of the batch that was scheduled.

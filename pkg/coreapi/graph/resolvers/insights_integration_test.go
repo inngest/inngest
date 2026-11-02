@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -263,4 +263,110 @@ func TestInsightsErrorsCleanlyWhenDualWriteOff(t *testing.T) {
 	result, err := qr.Insights(context.Background(), "SELECT run_id FROM runs")
 	require.Nil(t, result)
 	require.Error(t, err)
+}
+
+// TestInsightsExecutionErrorNamesLogicalTables matches the REST endpoint's
+// test of the same name: DuckDB's error text about the rewritten SQL reads
+// as the logical table names.
+func TestInsightsExecutionErrorNamesLogicalTables(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+
+	result, err := qr.Insights(context.Background(), "SELECT length(queued_at) FROM runs")
+	require.NoError(t, err)
+	require.Len(t, result.Diagnostics, 1)
+	require.Contains(t, result.Diagnostics[0].Message, "length(TIMESTAMP WITH TIME ZONE)")
+	require.NotContains(t, result.Diagnostics[0].Message, "insights_runs")
+	require.NotContains(t, result.Diagnostics[0].Message, "LINE 1")
+}
+
+// TestInsightsRunsLatestRowTiebreak covers the insights_runs macro's
+// latest-row collapse when lifecycle rows tie on their ms timestamp: the
+// furthest-along row (finished, then terminal > in-progress > queued) wins
+// regardless of insert order.
+func TestInsightsRunsLatestRowTiebreak(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	acct, env := consts.DevServerAccountID, consts.DevServerEnvID
+
+	// Each pair is inserted in both orders, under run IDs <name>-a/<name>-b.
+	// A finished row's ended_at ties the other row's queued_at.
+	pairs := []struct {
+		name          string
+		first, second string
+		endSecond     bool
+		want          string
+	}{
+		{name: "queued-running", first: "Queued", second: "Running", want: "Running"},
+		{name: "running-completed", first: "Running", second: "Completed", endSecond: true, want: "Completed"},
+		{name: "running-failed", first: "Running", second: "Failed", endSecond: true, want: "Failed"},
+	}
+	var want [][]any
+	for _, p := range pairs {
+		var ended *time.Time
+		if p.endSecond {
+			ended = &now
+		}
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-a", p.first, now, nil)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-a", p.second, now, ended)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-b", p.second, now, ended)
+		insertRunRowEndedAt(t, db, acct, env, p.name+"-b", p.first, now, nil)
+		want = append(want, []any{p.name + "-a", p.want}, []any{p.name + "-b", p.want})
+	}
+
+	result, err := qr.Insights(context.Background(), "SELECT run_id, status FROM runs ORDER BY run_id")
+	require.NoError(t, err)
+	require.ElementsMatch(t, want, result.Rows)
+}
+
+// insertRunRowEndedAt is insertRunRow w/ an optional ended_at.
+func insertRunRowEndedAt(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, status string, queuedAt time.Time, endedAt *time.Time) {
+	t.Helper()
+	_, err := db.ExecContext(t.Context(),
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, ended_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID, queuedAt, queuedAt, endedAt, uuid.New().String(), "test-app", uuid.New().String(), "test-fn", status, "{}", "{}",
+	)
+	require.NoError(t, err)
+}
+
+// TestInsightsEncodesUnrepresentableNumbers matches the REST endpoint's
+// TestQueryInsights_EncodesUnrepresentableNumbers: non-finite floats and
+// integers past 2^53 come back as strings, and the row marshals w/o
+// MarshalUnknown panicking. Quack transport, like production.
+func TestInsightsEncodesUnrepresentableNumbers(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	quackAddr := driver.EphemeralQuackAddr
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &quackAddr})
+	if err != nil {
+		t.Skipf("opening quack duckdb: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	qr := (&Resolver{DuckDB: db}).Query().(*queryResolver)
+
+	result, err := qr.Insights(context.Background(),
+		"SELECT 'inf'::DOUBLE AS a, '-inf'::DOUBLE AS b, 'nan'::DOUBLE AS c, 9007199254740993::BIGINT AS d, 42::BIGINT AS e")
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+	require.Equal(t, []any{"Infinity", "-Infinity", "NaN", "9007199254740993", int64(42)}, result.Rows[0])
+
+	raw, err := json.Marshal(result.Rows)
+	require.NoError(t, err)
+	require.JSONEq(t, `[["Infinity","-Infinity","NaN","9007199254740993",42]]`, string(raw))
 }

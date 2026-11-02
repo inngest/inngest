@@ -15,7 +15,9 @@ export const ConnectWorkerPercentage = ({
 }) => {
   const metrics =
     workspace &&
-    mapEntityLines(workspace.workerPercentageUsed.metrics, entities);
+    mapEntityLines(workspace.workerPercentageUsed.metrics, entities, {
+      nameBy: 'tag',
+    });
 
   // Override yAxis for percentage formatting
   const chartData = metrics
@@ -75,7 +77,9 @@ export const ConnectWorkerTotalCapacity = ({
 }) => {
   const chartData =
     workspace &&
-    mapEntityLines(workspace.workerTotalCapacity.metrics, entities);
+    mapEntityLines(workspace.workerTotalCapacity.metrics, entities, {
+      nameBy: 'tag',
+    });
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">

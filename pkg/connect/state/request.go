@@ -211,6 +211,18 @@ func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uui
 	return nil
 }
 
+// ReleaseRequestLease removes an unsent request's lease without deleting a newer lease.
+func (r *redisConnectionStateManager) ReleaseRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID) error {
+	_, err := scripts["release_lease"].Exec(ctx, r.client,
+		[]string{r.keyRequestLease(envID, requestID)},
+		[]string{leaseID.String()},
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("could not release request lease: %w", err)
+	}
+	return nil
+}
+
 // GetExecutorIP retrieves the IP of the executor that owns the request's lease.
 func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error) {
 	cmd := r.client.B().Get().Key(r.keyRequestLease(envID, requestID)).Build()
