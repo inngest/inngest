@@ -217,8 +217,13 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	//
 	// A read that never waits (`drain()`) is answered at once and needs none.
 	drain := opts.Batch != nil && opts.Batch.Drain
+
+	var timer state.Pause
 	if !drain {
-		if err := e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Inbox, opts.Timeout); err != nil {
+		var err error
+
+		timer, err = e.queueInboxTimer(ctx, runCtx, gen, edge, group, opts.Inbox, opts.Timeout)
+		if err != nil {
 			return err
 		}
 	}
@@ -261,6 +266,14 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 	}
 
 	if wake == nil {
+		// The timer is queued before the read is recorded, so one that was due
+		// at once can have run, found no read and been acknowledged. A read
+		// recorded after its timeout has passed times out now. The timer's own
+		// path does it, and it repairs a read the timer already ended.
+		if !drain && !time.Time(timer.Expires).After(e.now()) {
+			return e.timeoutInboxRead(ctx, timer)
+		}
+
 		return nil
 	}
 
@@ -425,7 +438,7 @@ func inboxTimerJobID(md *sv2.Metadata, wait string) string {
 // A read with no timeout (an empty `timeout`) is timed at the furthest a wait
 // can be: its timer does nothing when it fires, and exists to keep the run's
 // queue item.
-func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, inbox string, timeout string) error {
+func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup, inbox string, timeout string) (state.Pause, error) {
 	untimed := timeout == ""
 
 	expires := e.now().Add(consts.MaxWaitForEventTimeout)
@@ -434,7 +447,7 @@ func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunCont
 
 		expires, err = state.WaitForEventOpts{Timeout: timeout}.Expires()
 		if err != nil {
-			return fmt.Errorf("unable to parse the timeout of an inbox read: %w", err)
+			return state.Pause{}, fmt.Errorf("unable to parse the timeout of an inbox read: %w", err)
 		}
 	}
 
@@ -476,10 +489,10 @@ func (e *executor) queueInboxTimer(ctx context.Context, runCtx execution.RunCont
 		ParallelMode: gen.ParallelMode(),
 	}, expires, queue.EnqueueOpts{})
 	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-		return fmt.Errorf("error enqueueing the timer of an inbox read: %w", err)
+		return state.Pause{}, fmt.Errorf("error enqueueing the timer of an inbox read: %w", err)
 	}
 
-	return nil
+	return pause, nil
 }
 
 // dequeueInboxTimer takes a read's timer off the queue. A timer that is already
