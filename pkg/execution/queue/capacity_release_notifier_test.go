@@ -192,6 +192,67 @@ func TestProcessItemRetriesFailedEarlyCapacityReleaseDuringCleanup(t *testing.T)
 	require.Equal(t, item.ID, shard.notifiedItem.ID)
 }
 
+// Retries of one queue item hold different capacity leases. Each release must
+// use a key unique to its lease, otherwise the Constraint API's operation
+// idempotency cache answers a later release with an earlier lease's result.
+func TestProcessItemReleaseIdempotencyKeyIsPerLease(t *testing.T) {
+	ctx := context.Background()
+	events := make(chan string, 8)
+	shard := &capacityReleaseNotifierShard{
+		mockShardForIterator: &mockShardForIterator{name: "test"},
+		events:               events,
+	}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	var keys []string
+	var leaseIDs []ulid.ULID
+	q, err := New(ctx, "test", registry, WithCapacityManager(capacityReleaseTestManager{
+		events: events,
+		onRelease: func(req *constraintapi.CapacityReleaseRequest) {
+			keys = append(keys, req.IdempotencyKey)
+			leaseIDs = append(leaseIDs, req.LeaseID)
+		},
+	}))
+	require.NoError(t, err)
+
+	itemLeaseID := ulid.Make()
+	item := QueueItem{
+		ID:         "same-item",
+		FunctionID: uuid.New(),
+		LeaseID:    &itemLeaseID,
+		Data: Item{Identifier: state.Identifier{
+			AccountID:   uuid.New(),
+			WorkspaceID: uuid.New(),
+			WorkflowID:  uuid.New(),
+			RunID:       ulid.Make(),
+		}},
+	}
+
+	for range 2 {
+		capacityLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(time.Minute)), rand.Reader)
+		require.NoError(t, err)
+		_, err = q.ProcessItem(ctx, ProcessItem{
+			I: item,
+			CapacityLease: &CapacityLease{
+				LeaseID:    capacityLeaseID,
+				IssuedAtMS: time.Now().UnixMilli(),
+			},
+		}, func(context.Context, RunInfo, Item) (RunResult, error) {
+			return RunResult{}, nil
+		})
+		require.NoError(t, err)
+		// Cleanup runs asynchronously; wait for the release to be confirmed.
+		for receiveCapacityReleaseEvent(t, events) != "notify" {
+		}
+	}
+
+	require.Len(t, keys, 2)
+	require.NotEqual(t, keys[0], keys[1])
+	require.Equal(t, leaseIDs[0].String(), keys[0])
+	require.Equal(t, leaseIDs[1].String(), keys[1])
+}
+
 func receiveCapacityReleaseEvent(t *testing.T, events <-chan string) string {
 	t.Helper()
 	select {
@@ -250,6 +311,7 @@ type capacityReleaseTestManager struct {
 	attemptCount        *atomic.Int32
 	attempts            chan<- int32
 	failFirst           bool
+	onRelease           func(*constraintapi.CapacityReleaseRequest)
 }
 
 func (m capacityReleaseTestManager) Check(context.Context, *constraintapi.CapacityCheckRequest) (*constraintapi.CapacityCheckResponse, errs.UserError, errs.InternalError) {
@@ -264,7 +326,10 @@ func (m capacityReleaseTestManager) ExtendLease(context.Context, *constraintapi.
 	return nil, nil
 }
 
-func (m capacityReleaseTestManager) Release(context.Context, *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+func (m capacityReleaseTestManager) Release(_ context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
+	if m.onRelease != nil {
+		m.onRelease(req)
+	}
 	m.events <- "release"
 	if m.attemptCount != nil {
 		attempt := m.attemptCount.Add(1)
