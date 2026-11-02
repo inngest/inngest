@@ -253,7 +253,7 @@ export function FirstRun({
           </Link>
         </div>
       )}
-      {pending && (error || runs.isError) && (
+      {pending && (
         <Button
           kind="secondary"
           appearance="outlined"

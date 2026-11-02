@@ -436,7 +436,7 @@ it('opens an identified agent run automatically from the full guide', () => {
   expect(fixtures.invoke).not.toHaveBeenCalled();
 });
 
-it('links to the full runs list after an uncertain invocation without automatically resending', async () => {
+it('preserves explicit retry recovery after checking Runs and returning with no matching run', async () => {
   fixtures.invoke.mockReturnValue({
     unwrap: async () => {
       throw new Error('Lost response');
@@ -451,6 +451,13 @@ it('links to the full runs list after an uncertain invocation without automatica
   ).toBe('/runs?showAllRuns=true');
   expect(fixtures.setAttempt).not.toHaveBeenCalledWith(null);
   expect(invokeButton().disabled).toBe(true);
+  // Following View all runs unmounts FirstRun; the provider retains the attempt
+  // (and restores it from session storage on reload), but local errors are lost.
+  view.unmount();
+  const returnedView = render(<FirstRun />);
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(invokeButton().disabled).toBe(true);
+  expect(fixtures.invoke).toHaveBeenCalledTimes(1);
   fireEvent.click(
     screen.getByRole('button', {
       name: 'I checked Runs — allow another invocation',
@@ -458,4 +465,9 @@ it('links to the full runs list after an uncertain invocation without automatica
   );
   expect(fixtures.setAttempt).toHaveBeenLastCalledWith(null);
   expect(fixtures.invoke).toHaveBeenCalledTimes(1);
+  fixtures.context.attempt = null;
+  returnedView.rerender(<FirstRun />);
+  expect(invokeButton().disabled).toBe(false);
+  await act(async () => fireEvent.click(invokeButton()));
+  expect(fixtures.invoke).toHaveBeenCalledTimes(2);
 });
