@@ -470,7 +470,8 @@ func (f Function) Validate(ctx context.Context) error {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
 		}
 		switch uri.Scheme {
-		case "http", "https", "ws", "wss":
+		// inngest is an Inngest-hosted app, such as inngest://serve.
+		case "http", "https", "ws", "wss", "inngest":
 			continue
 		default:
 			err = multierror.Append(err, fmt.Errorf("Non-supported step schema: %s", uri.Scheme))
