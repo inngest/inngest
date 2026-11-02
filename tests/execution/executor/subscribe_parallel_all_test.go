@@ -26,8 +26,8 @@ func stepRunOp(id string, data string) *state.GeneratorOpcode {
 // response of the step's request, which reports the still-pending read again
 // (R). The executor handles S and R at the same time and M comes from the event
 // stream, so every order of the three is possible. Whichever order happens, the
-// run must end up with a job that continues it: the last of the three to run
-// finds nothing else pending and wakes the run.
+// run must end up with exactly one job that continues it, so the steps after
+// the Promise.all run once.
 func TestSubscribeParallelAllLateStepAlwaysWakes(t *testing.T) {
 	points := map[string]string{
 		"M": "SaveInboxMessage",
@@ -59,7 +59,7 @@ func TestSubscribeParallelAllLateStepAlwaysWakes(t *testing.T) {
 			require.NoError(t, <-delivered)
 
 			require.Contains(t, h.steps(), "work")
-			require.NotZero(t, h.discoveries(before), "nothing continues the run: it stays running")
+			require.Equal(t, 1, h.discoveries(before), "one job continues the run")
 		})
 	}
 }
