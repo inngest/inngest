@@ -107,6 +107,16 @@ afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
 });
+it('stays ready when a new invocation starts its run-status query', () => {
+  const view = render(<TestApp />);
+  expect(state.ready).toBe(true);
+  fixtures.runs = { isLoading: true };
+  act(() => state.setAttempt(attempt));
+  view.rerender(<TestApp />);
+  expect(state.ready).toBe(true);
+  expect(state.attempt).toEqual(attempt);
+  expect(state.run).toBeUndefined();
+});
 it('sends returning users with a retained successful run directly to Runs', () => {
   setRuns(run);
   render(<TestApp />);

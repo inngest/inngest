@@ -160,8 +160,8 @@ function useQuickstartState() {
         apps.isError ||
         (!!apps.data &&
           (functions.length === 0 ||
-            (observedAttempt?.mode === 'agent' &&
-              !observedAttempt.functionID) ||
+            // Keep the invocation form mounted while its run query starts.
+            !!observedAttempt ||
             !!runs.currentData ||
             runs.isError))),
   };
