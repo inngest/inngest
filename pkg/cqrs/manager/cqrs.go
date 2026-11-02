@@ -896,6 +896,11 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 		return
 	}
 
+	endedAt := root.EndTime
+	if root.Attributes != nil && root.Attributes.EndedAt != nil {
+		endedAt = *root.Attributes.EndedAt
+	}
+
 	var walk func(span *cqrs.OtelSpan)
 	walk = func(span *cqrs.OtelSpan) {
 		if span.Attributes != nil && span.Attributes.StepOp != nil {
@@ -903,15 +908,15 @@ func endWaitingReads(root *cqrs.OtelSpan) {
 			case span.Status == enums.StepStatusWaiting && *span.Attributes.StepOp == enums.OpcodeSubscribeWait:
 				span.Status = enums.StepStatusCancelled
 				span.Attributes.DynamicStatus = &span.Status
+
+				if span.Attributes.EndedAt == nil {
+					span.Attributes.EndedAt = &endedAt
+				}
 			case span.Status == enums.StepStatusRunning && *span.Attributes.StepOp == enums.OpcodeSubscribe:
 				span.Status = enums.StepStatusCompleted
 				span.Attributes.DynamicStatus = &span.Status
 
 				if span.Attributes.EndedAt == nil {
-					endedAt := root.EndTime
-					if root.Attributes != nil && root.Attributes.EndedAt != nil {
-						endedAt = *root.Attributes.EndedAt
-					}
 					span.Attributes.EndedAt = &endedAt
 				}
 			}

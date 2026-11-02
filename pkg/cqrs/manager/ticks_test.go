@@ -136,6 +136,7 @@ func TestWaitingReadIsEndedWithItsRun(t *testing.T) {
 		finished.fragments[0]["attributes"] = ended
 		root = buildRoot(t, enc, []testSpanRow{finished, stepRow("read", waiting)})
 		require.True(t, childNamed(root, "read").Status.IsEnded(), "status %s", childNamed(root, "read").Status)
+		require.NotNil(t, childNamed(root, "read").Attributes.EndedAt, "the bar stops when the run does")
 	})
 }
 
