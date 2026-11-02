@@ -102,7 +102,9 @@ func upperASCII(buf []byte, s string) []byte {
 }
 
 // scanQuotedIdentifier scans a `"..."` token starting at pos (input[pos] ==
-// '"'), unescaping "" -> " as it goes.
+// '"'), unescaping "" -> " as it goes. An empty `""` doesn't match: DuckDB
+// rejects a zero-length delimited identifier everywhere, so accepting one
+// would only let Write drop it (an empty alias prints as no alias at all).
 func scanQuotedIdentifier(input string, pos int) (decoded string, next int, ok bool) {
 	var b strings.Builder
 	i := pos + 1
@@ -115,6 +117,9 @@ func scanQuotedIdentifier(input string, pos int) (decoded string, next int, ok b
 				b.WriteByte('"')
 				i += 2
 				continue
+			}
+			if b.Len() == 0 {
+				return "", 0, false
 			}
 			return b.String(), i + 1, true
 		}
@@ -191,6 +196,28 @@ func keywordCategoryPrimitive(set map[string]struct{}) peg.Primitive {
 	}
 }
 
+// scanDigits advances past a run of decimal digits starting at i, allowing
+// a single '_' separator between two digits (`1_000`) like DuckDB's lexer.
+// A '_' that isn't followed by a digit ends the number, so `1_a` is `1` and
+// then an identifier.
+func scanDigits(input string, i int) int {
+	for i < len(input) {
+		c := input[i]
+		if c >= '0' && c <= '9' {
+			i++
+			continue
+		}
+		if c == '_' && i > 0 && isDigit(input[i-1]) && i+1 < len(input) && isDigit(input[i+1]) {
+			i++
+			continue
+		}
+		break
+	}
+	return i
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
+
 func numberLiteralPrimitive() peg.Primitive {
 	return func(newNode func(peg.Node) *peg.Node, input string, pos int) (*peg.Node, int, bool) {
 		i := pos
@@ -198,16 +225,13 @@ func numberLiteralPrimitive() peg.Primitive {
 			i++
 		}
 		start := i
-		for i < len(input) && input[i] >= '0' && input[i] <= '9' {
-			i++
-		}
+		i = scanDigits(input, i)
 		hasDigits := i > start
 		if i < len(input) && input[i] == '.' {
 			i++
-			for i < len(input) && input[i] >= '0' && input[i] <= '9' {
-				i++
-				hasDigits = true
-			}
+			fracStart := i
+			i = scanDigits(input, i)
+			hasDigits = hasDigits || i > fracStart
 		}
 		if !hasDigits {
 			return nil, 0, false
@@ -218,9 +242,7 @@ func numberLiteralPrimitive() peg.Primitive {
 				j++
 			}
 			expStart := j
-			for j < len(input) && input[j] >= '0' && input[j] <= '9' {
-				j++
-			}
+			j = scanDigits(input, j)
 			if j > expStart {
 				i = j
 			}

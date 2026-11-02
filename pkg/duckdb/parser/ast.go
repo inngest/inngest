@@ -203,12 +203,12 @@ func (l *LikeExpr) String() string   { return fmt.Sprintf("LikeExpr(%s,not=%v)",
 type CastExpr struct {
 	baseExpr
 	X       Expr
-	Type    string
+	Type    *TypeName
 	TryCast bool
 }
 
-func (c *CastExpr) Children() []Node { return []Node{c.X} }
-func (c *CastExpr) String() string   { return fmt.Sprintf("CastExpr(%s,try=%v)", c.Type, c.TryCast) }
+func (c *CastExpr) Children() []Node { return []Node{c.X, c.Type} }
+func (c *CastExpr) String() string   { return fmt.Sprintf("CastExpr(try=%v)", c.TryCast) }
 
 type CaseWhen struct {
 	baseExpr
@@ -264,10 +264,16 @@ type SubqueryExpr struct {
 	Select *SelectStatement
 	Exists bool
 	Not    bool
+	// Array is `ARRAY(SELECT ...)`: the subquery's rows collected into a
+	// list, not a scalar subquery. Never set alongside Exists/Not.
+	Array bool
 }
 
 func (s *SubqueryExpr) Children() []Node { return []Node{s.Select} }
 func (s *SubqueryExpr) String() string {
+	if s.Array {
+		return "SubqueryExpr(array=true)"
+	}
 	return fmt.Sprintf("SubqueryExpr(exists=%v,not=%v)", s.Exists, s.Not)
 }
 
@@ -334,12 +340,12 @@ func (i *IntervalExpr) String() string   { return "IntervalExpr(" + i.Unit + ")"
 
 type TypeLiteral struct {
 	baseExpr
-	Type  string
+	Type  *TypeName
 	Value string
 }
 
-func (t *TypeLiteral) Children() []Node { return nil }
-func (t *TypeLiteral) String() string   { return fmt.Sprintf("TypeLiteral(%s,%s)", t.Type, t.Value) }
+func (t *TypeLiteral) Children() []Node { return []Node{t.Type} }
+func (t *TypeLiteral) String() string   { return fmt.Sprintf("TypeLiteral(%s)", t.Value) }
 
 type NamedArg struct {
 	baseExpr
@@ -364,6 +370,11 @@ type FunctionExpr struct {
 	Within       *OrderByClause
 	Export       bool
 	Over         *WindowSpec
+	// Syntax marks a call desugared from a keyword syntax form that has no
+	// catalog function behind it (only COALESCE(...) today, which DuckDB
+	// parses straight into an operator), so Write prints it back in that
+	// form rather than as a call.
+	Syntax bool
 }
 
 func (f *FunctionExpr) Children() []Node {
@@ -918,11 +929,23 @@ func (w *WindowDef) String() string   { return "WindowDef(" + w.Name + ")" }
 type PivotColumn struct {
 	baseExpr
 	Header Expr
-	In     []string
+	// In is the IN list's entries as source text. The adapter only accepts
+	// literals and bare names there (see adaptPivotValueList), since Walk
+	// can't see into raw text.
+	In []string
+	// Enum is the unparenthesized `IN enum_type` form: In holds that one
+	// type name, and DuckDB pivots on the enum's values rather than a
+	// value list.
+	Enum bool
 }
 
 func (p *PivotColumn) Children() []Node { return []Node{p.Header} }
-func (p *PivotColumn) String() string   { return fmt.Sprintf("PivotColumn(in=%v)", p.In) }
+func (p *PivotColumn) String() string {
+	if p.Enum {
+		return fmt.Sprintf("PivotColumn(enum=%v)", p.In[0])
+	}
+	return fmt.Sprintf("PivotColumn(in=%v)", p.In)
+}
 
 type PivotRef struct {
 	baseTableRefNode

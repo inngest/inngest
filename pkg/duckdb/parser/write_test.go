@@ -278,6 +278,10 @@ func TestWriteBetweenInLikeOperandParens(t *testing.T) {
 		{"other operator needs no parens", "SELECT a || b LIKE 'x'", "SELECT a || b LIKE 'x'"},
 		{"escape binds a comparison", "SELECT a LIKE 'x' ESCAPE b = c", "SELECT a LIKE 'x' ESCAPE b = c"},
 		{"escape keeps parens around or", "SELECT a LIKE 'x' ESCAPE (b OR c)", "SELECT a LIKE 'x' ESCAPE (b OR c)"},
+		{"escape like under comparison", "SELECT (a LIKE b ESCAPE c) = d", "SELECT (a LIKE b ESCAPE c) = d"},
+		{"escape like ending a comparison under comparison", "SELECT (x = a LIKE b ESCAPE c) = d", "SELECT (x = a LIKE b ESCAPE c) = d"},
+		{"escape like right of comparison stays flat", "SELECT d = (a LIKE b ESCAPE c)", "SELECT d = a LIKE b ESCAPE c"},
+		{"escape like under and stays flat", "SELECT (a LIKE b ESCAPE c) AND d", "SELECT a LIKE b ESCAPE c AND d"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -373,7 +377,62 @@ func TestWriteQuotesBoundNames(t *testing.T) {
 func TestWritePivotEnumTargetKeepsQuoting(t *testing.T) {
 	stmt, err := ParseString(`SELECT * FROM t PIVOT (sum(x) FOR y IN "a b")`)
 	require.NoError(t, err)
-	require.Contains(t, String(stmt), `IN ("a b")`)
+	require.Contains(t, String(stmt), `IN "a b"`)
+}
+
+// TestWritePivotEnumAndValueList checks the unparenthesized `IN enum_type`
+// form stays unparenthesized (`IN (a)` is a one-value list instead).
+func TestWritePivotEnumAndValueList(t *testing.T) {
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN a)", "SELECT * FROM t PIVOT (sum(x) FOR y IN a)")
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN (a))", "SELECT * FROM t PIVOT (sum(x) FOR y IN (a))")
+	requireWriteRoundTrip(t, "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))", "SELECT * FROM t PIVOT (sum(x) FOR y IN (a, 'b', 1, -2, 'c' AS d))")
+}
+
+// TestWritePivotTupleAndTypedValues checks the PIVOT IN entries that can't
+// hide an expression but aren't plain literals (tuples for a multi-column
+// FOR, typed literals, casts of literals) parse and print verbatim.
+func TestWritePivotTupleAndTypedValues(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT * FROM t PIVOT (sum(v) FOR (a, b) IN ((1, 2)))",
+		"SELECT * FROM t PIVOT (sum(v) FOR (a, b) IN ((1, -2), (1, (2)), ('x', DATE '2024-01-01') AS c))",
+		"SELECT * FROM t PIVOT (sum(v) FOR a IN ((1,)))",
+		"SELECT * FROM t PIVOT (sum(v) FOR d IN (DATE '2024-01-01', TIMESTAMP '2024-01-01 00:00:00' AS x))",
+		"SELECT * FROM t PIVOT (sum(v) FOR d IN ('2024-01-01'::DATE, CAST('2024-01-02' AS DATE), TRY_CAST('3' AS INT)))",
+	} {
+		requireWriteRoundTrip(t, sql, sql)
+	}
+}
+
+// TestRejectsExpressionsInRawTextFields checks PivotColumn.In, kept as
+// source text, only ever holds literals and names: Walk can't see into it,
+// so an expression there would reach DuckDB unvalidated. Type modifiers
+// are Walk-visible TypeName children but stay literal-only too.
+func TestRejectsExpressionsInRawTextFields(t *testing.T) {
+	for _, c := range []struct{ sql, msg string }{
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ((SELECT 1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN (f(1)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR (y, z) IN ((1, f(2))))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR (y, z) IN ((1, (SELECT 2))))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN (CAST((SELECT 1) AS INT)))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ([1, f(2)]))", "A PIVOT IN entry other than a literal or a name is not supported"},
+		{"SELECT * FROM t PIVOT (sum(x) FOR y IN ('1'::VARCHAR((SELECT 1))))", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT x::VARCHAR((SELECT 1)) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT x::INT[(SELECT 1)] FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT CAST(x AS VARCHAR(f(1))) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT x::STRUCT(a VARCHAR((SELECT 1))) FROM t", "A type modifier other than a number or string literal is not supported"},
+		{"SELECT VARCHAR(1 + 1) 'x'", "A type modifier other than a number or string literal is not supported"},
+	} {
+		_, err := ParseString(c.sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr, c.sql)
+		require.Equal(t, c.msg, perr.Message, c.sql)
+	}
+	for _, sql := range []string{
+		"SELECT x::DECIMAL(10, 2), x::INT[3], x::STRUCT(a VARCHAR(10), b INT[2]), x::TIMESTAMP(3), x::MAP(VARCHAR, INT) FROM t",
+	} {
+		_, err := ParseString(sql)
+		require.NoError(t, err, sql)
+	}
 }
 
 // TestWriteOffsetOnly checks an OFFSET with no LIMIT (a LimitClause with a
@@ -429,4 +488,233 @@ func TestWriteStarExcludeNames(t *testing.T) {
 	// ExcludeParts disagreeing with Exclude is an error, not printed.
 	star.Exclude[1] = "b"
 	require.ErrorContains(t, Write(&strings.Builder{}, stmt), "ExcludeParts doesn't match Exclude")
+}
+
+// TestWriteParenthesizesIdentUnderFieldAccess checks a parenthesized Ident
+// under a field access or method call keeps its parens: printed flat, it
+// merges into the dotted name (`(t).x`, a struct field, becomes column x
+// of table t, and `(x).f(1)` a schema-qualified function).
+func TestWriteParenthesizesIdentUnderFieldAccess(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"field of ident", "SELECT (t).x FROM t", "SELECT (t).x FROM t"},
+		{"field of qualified ident", "SELECT (t.a).x FROM t", "SELECT (t.a).x FROM t"},
+		{"nested field", "SELECT ((t).a).x FROM t", "SELECT (t).a.x FROM t"},
+		{"method on ident", "SELECT (x).f(1) FROM t", "SELECT (x).f(1) FROM t"},
+		{"method on qualified ident", "SELECT (t.a).f(1) FROM t", "SELECT (t.a).f(1) FROM t"},
+		{"plain dotted name stays flat", "SELECT t.a.b FROM t", "SELECT t.a.b FROM t"},
+		{"field of call stays flat", "SELECT f(x).a FROM t", "SELECT f(x).a FROM t"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteKeepsSubqueryNot checks a SubqueryExpr's own NOT prefix is
+// printed when it isn't also EXISTS.
+func TestWriteKeepsSubqueryNot(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"not subquery", "SELECT TRUE IS NOT DISTINCT FROM NOT (SELECT TRUE)", "SELECT TRUE IS NOT DISTINCT FROM NOT (SELECT TRUE)"},
+		{"not exists", "SELECT TRUE IS DISTINCT FROM NOT EXISTS (SELECT TRUE)", "SELECT TRUE IS DISTINCT FROM NOT EXISTS (SELECT TRUE)"},
+		{"under prefix", "SELECT -NOT (SELECT 1)", "SELECT -NOT (SELECT 1)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteParenthesizesCastUnderIndirection checks a `::` cast keeps its
+// parens under a subscript or field access, since its Type would otherwise
+// take the indirection as part of the type (`a::INT[1]` is a cast to an
+// array type). A number under a field access needs them too, or its dot
+// lexes as a decimal point.
+func TestWriteParenthesizesCastUnderIndirection(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"subscript of cast", "SELECT (a::INT)[1] FROM t", "SELECT (a::INT)[1] FROM t"},
+		{"subscript of CAST call", "SELECT CAST(a AS INT)[1] FROM t", "SELECT (a::INT)[1] FROM t"},
+		{"subscript of array cast", "SELECT (a::INT[])[1] FROM t", "SELECT (a::INT[])[1] FROM t"},
+		{"field of cast", "SELECT (a::t).k FROM t", "SELECT (a::t).k FROM t"},
+		{"method on cast", "SELECT (a::t).f(1) FROM t", "SELECT (a::t).f(1) FROM t"},
+		{"subscript of try_cast stays flat", "SELECT TRY_CAST(a AS INT)[1] FROM t", "SELECT TRY_CAST(a AS INT)[1] FROM t"},
+		{"cast of cast stays flat", "SELECT (a::INT)::TEXT FROM t", "SELECT a::INT::TEXT FROM t"},
+		{"array type with a bound", "SELECT a::INT[][1] FROM t", "SELECT a::INT[][1] FROM t"},
+		{"field of number", "SELECT (1).x", "SELECT (1).x"},
+		{"subscript of number stays flat", "SELECT (1)[1]", "SELECT 1[1]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+
+	// The whole `INT[][1]` is the cast's type, matching DuckDB, not a
+	// subscript of a cast to `INT[]`.
+	stmt, err := ParseString("SELECT a::INT[][1] FROM t")
+	require.NoError(t, err)
+	cast, ok := stmt.Columns[0].Expr.(*CastExpr)
+	require.True(t, ok, "got %T", stmt.Columns[0].Expr)
+	require.Equal(t, "INT[][1]", String(cast.Type))
+}
+
+// TestWriteQuotesKeywordFunctionNames checks a function whose name is a
+// keyword FunctionName rejects, or that starts some other syntax, is
+// quoted, so it reparses as a call to that same function.
+func TestWriteQuotesKeywordFunctionNames(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"reserved keyword", `SELECT "not"(x) FROM t`, `SELECT "not"(x) FROM t`},
+		{"interval", `SELECT "interval"(x) FROM t`, `SELECT "interval"(x) FROM t`},
+		{"distinct", `SELECT "distinct"(x) FROM t`, `SELECT "distinct"(x) FROM t`},
+		{"grouping_id", `SELECT "grouping_id"(x) FROM t`, `SELECT "grouping_id"(x) FROM t`},
+		{"special function syntax", `SELECT "position"(a, b) FROM t`, `SELECT "position"(a, b) FROM t`},
+		{"func-name keyword stays bare", "SELECT left(a, 1), right(a, 1) FROM t", "SELECT left(a, 1), right(a, 1) FROM t"},
+		{"keyword schema", `SELECT "select".f(x) FROM t`, `SELECT "select".f(x) FROM t`},
+		{"keyword after schema stays bare", `SELECT s."not"(x) FROM t`, `SELECT s.not(x) FROM t`},
+		{"keyword method stays bare", "SELECT (x).not(1) FROM t", "SELECT (x).not(1) FROM t"},
+		{"case-sensitive name", `SELECT "Foo"(x) FROM t`, `SELECT Foo(x) FROM t`},
+		{"non-identifier name", `SELECT "a b"(x) FROM t`, `SELECT "a b"(x) FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteSpecialFunctions checks the keyword-argument call forms adapt
+// to the plain function call DuckDB itself desugars them to, and print as
+// that call.
+func TestWriteSpecialFunctions(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"coalesce", "SELECT coalesce(a, b) FROM t", "SELECT COALESCE(a, b) FROM t"},
+		// COALESCE is parser syntax, not a catalog function, so a quoted
+		// call stays one and fails DuckDB's function lookup instead of
+		// becoming COALESCE.
+		{"quoted coalesce", `SELECT "coalesce"(a) FROM t`, `SELECT "coalesce"(a) FROM t`},
+		{"quoted coalesce w/o args", `SELECT "coalesce"() FROM t`, `SELECT "coalesce"() FROM t`},
+		{"quoted coalesce window", `SELECT "coalesce"(a) OVER () FROM t`, `SELECT "coalesce"(a) OVER () FROM t`},
+		{"quoted coalesce distinct", `SELECT "coalesce"(DISTINCT a) FROM t`, `SELECT "coalesce"(DISTINCT a) FROM t`},
+		{"nullif", "SELECT NULLIF(a, b) FROM t", `SELECT "nullif"(a, b) FROM t`},
+		{"extract keyword", "SELECT EXTRACT(year FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
+		{"extract plural keyword", "SELECT EXTRACT(years FROM a) FROM t", "SELECT date_part('YEAR', a) FROM t"},
+		{"extract identifier", "SELECT EXTRACT(epoch FROM a) FROM t", "SELECT date_part('epoch', a) FROM t"},
+		{"extract quoted identifier", `SELECT EXTRACT("Foo" FROM a) FROM t`, "SELECT date_part('Foo', a) FROM t"},
+		{"extract string", "SELECT EXTRACT('Epoch' FROM a) FROM t", "SELECT date_part('Epoch', a) FROM t"},
+		{"trim", "SELECT TRIM(a) FROM t", `SELECT "trim"(a) FROM t`},
+		{"trim list", "SELECT TRIM(a, 'x') FROM t", `SELECT "trim"(a, 'x') FROM t`},
+		{"trim both from", "SELECT TRIM(BOTH 'x' FROM a) FROM t", `SELECT "trim"(a, 'x') FROM t`},
+		{"trim from", "SELECT TRIM(FROM a) FROM t", `SELECT "trim"(a) FROM t`},
+		{"trim leading", "SELECT TRIM(LEADING 'x' FROM a) FROM t", "SELECT ltrim(a, 'x') FROM t"},
+		{"trim trailing", "SELECT TRIM(TRAILING FROM a) FROM t", "SELECT rtrim(a) FROM t"},
+		{"trim source then list", "SELECT TRIM('x' FROM a, b) FROM t", `SELECT "trim"(a, b, 'x') FROM t`},
+		{"substring from for", "SELECT SUBSTRING(a FROM 1 FOR 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"substring from", "SELECT SUBSTRING(a FROM 2) FROM t", `SELECT "substring"(a, 2) FROM t`},
+		{"substring for", "SELECT SUBSTRING(a FOR 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"substring list", "SELECT SUBSTRING(a, 1, 2) FROM t", `SELECT "substring"(a, 1, 2) FROM t`},
+		{"position", "SELECT POSITION('a' IN b) FROM t", `SELECT "position"(b, 'a') FROM t`},
+		{"overlay", "SELECT OVERLAY(a PLACING b FROM 1 FOR 2) FROM t", `SELECT "overlay"(a, b, 1, 2) FROM t`},
+		{"overlay list", "SELECT OVERLAY(a, b, 1) FROM t", `SELECT "overlay"(a, b, 1) FROM t`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteKeepsArraySubqueryFrameExcludeAndTuples checks shapes the
+// adapter used to drop: ARRAY(SELECT ...) is a list, not a scalar
+// subquery; a window frame's two-word EXCLUDE options; a one-element tuple.
+func TestWriteKeepsArraySubqueryFrameExcludeAndTuples(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"array subquery", "SELECT ARRAY(SELECT 1)", "SELECT ARRAY(SELECT 1)"},
+		{"array subquery subscript", "SELECT ARRAY(SELECT a FROM t)[1]", "SELECT ARRAY(SELECT a FROM t)[1]"},
+		{"exclude current row", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE CURRENT ROW) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE CURRENT ROW) FROM t"},
+		{"exclude no others", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE NO OTHERS) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE NO OTHERS) FROM t"},
+		{"exclude group", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE GROUP) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE GROUP) FROM t"},
+		{"exclude ties", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE TIES) FROM t", "SELECT sum(a) OVER (ORDER BY a ROWS 1 PRECEDING EXCLUDE TIES) FROM t"},
+		{"one-element tuple", "SELECT (1,)", "SELECT (1,)"},
+		{"two-element tuple", "SELECT (1, 2,)", "SELECT (1, 2)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+func TestWriteQuotesRecursiveCTEName(t *testing.T) {
+	requireWriteRoundTrip(t, `WITH "recursive" AS (SELECT 1) SELECT * FROM "recursive"`, `WITH "recursive" AS (SELECT 1) SELECT * FROM recursive`)
+	requireWriteRoundTrip(t, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`, `WITH a AS (SELECT 1), "Recursive" AS (SELECT 2) SELECT * FROM a`)
+}
+
+// TestWriteQuantifiedSubqueryOperand checks which subquery shapes under
+// ANY/ALL print bare and which get wrapped, and that each reparses to the
+// same AST (DuckDB parses both spellings of each the same way).
+func TestWriteQuantifiedSubqueryOperand(t *testing.T) {
+	cases := []struct{ name, sql, want string }{
+		{"plain", "SELECT x = ANY (SELECT 1)", "SELECT x = ANY (SELECT 1)"},
+		{"array", "SELECT x = ANY (ARRAY(SELECT 1))", "SELECT x = ANY (ARRAY(SELECT 1))"},
+		{"bare array", "SELECT x = ANY ARRAY(SELECT 1)", "SELECT x = ANY (ARRAY(SELECT 1))"},
+		{"array subscript", "SELECT x = ANY (ARRAY(SELECT 1)[1:2])", "SELECT x = ANY (ARRAY(SELECT 1)[1:2])"},
+		{"exists", "SELECT x = ANY (EXISTS (SELECT 1))", "SELECT x = ANY (EXISTS (SELECT 1))"},
+		{"not", "SELECT x = ANY NOT (SELECT TRUE)", "SELECT x = ANY NOT (SELECT TRUE)"},
+		{"not exists", "SELECT x = ANY NOT EXISTS (SELECT 1)", "SELECT x = ANY NOT EXISTS (SELECT 1)"},
+		{"parenthesized not", "SELECT x = ANY (NOT (SELECT TRUE))", "SELECT x = ANY (NOT (SELECT TRUE))"},
+		{"parenthesized not exists", "SELECT x = ANY (NOT EXISTS (SELECT 1))", "SELECT x = ANY (NOT EXISTS (SELECT 1))"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			requireWriteRoundTrip(t, c.sql, c.want)
+		})
+	}
+}
+
+// TestWriteRoundTripsEveryKeywordAsFunctionName checks every vendored
+// keyword, called as a quoted function in each call shape, either fails to
+// parse or writes and reparses to the same AST, so syntaxFunctionNames (and
+// the COALESCE special case) can't drift from the grammar.
+func TestWriteRoundTripsEveryKeywordAsFunctionName(t *testing.T) {
+	_, kl, err := grammar.Load()
+	require.NoError(t, err)
+	shapes := []string{
+		`SELECT "%[1]s"(x) FROM t`,
+		`SELECT "%[1]s"() FROM t`,
+		`SELECT "%[1]s"(x, y) FROM t`,
+		`SELECT "%[1]s"(DISTINCT x ORDER BY y) FILTER (WHERE z) FROM t`,
+		`SELECT "%[1]s"(x) OVER () FROM t`,
+		`SELECT s."%[1]s"(x) FROM t`,
+		`SELECT (x)."%[1]s"(y) FROM t`,
+		`SELECT * FROM "%[1]s"(x)`,
+	}
+	for _, list := range [][]string{kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName} {
+		for _, kw := range list {
+			for _, shape := range shapes {
+				src := fmt.Sprintf(shape, strings.ToLower(kw))
+				stmt, err := ParseString(src)
+				if err != nil {
+					var perr *ParseError
+					require.ErrorAs(t, err, &perr, src)
+					continue
+				}
+				out := String(stmt)
+				reparsed, err := ParseString(out)
+				require.NoError(t, err, "%s: reparsing %q", src, out)
+				require.Equal(t, Dump(stmt), Dump(reparsed), "%s: %q", src, out)
+			}
+		}
+	}
+}
+
+// TestWriteSyntaxCoalesceMustBeSpellable checks a hand-built Syntax call that
+// COALESCE(...) can't spell is a Write error, not a silently different call.
+func TestWriteSyntaxCoalesceMustBeSpellable(t *testing.T) {
+	stmt, err := ParseString("SELECT COALESCE(a, b) FROM t")
+	require.NoError(t, err)
+	f := stmt.Columns[0].Expr.(*FunctionExpr)
+	require.True(t, f.Syntax)
+	f.Distinct = true
+	require.ErrorContains(t, Write(&strings.Builder{}, stmt), "can't be written as COALESCE(...)")
 }

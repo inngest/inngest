@@ -33,9 +33,9 @@ func inferType(expr parser.Expr, scope *tableScope) ColumnType {
 	case *parser.Ident:
 		return identType(e, scope)
 	case *parser.CastExpr:
-		return DuckDBToColumnType(e.Type)
+		return typeNameColumnType(e.Type)
 	case *parser.TypeLiteral:
-		return DuckDBToColumnType(e.Type)
+		return typeNameColumnType(e.Type)
 	case *parser.IntervalExpr:
 		return ColumnTypeDatetime
 	case *parser.CaseExpr:
@@ -218,7 +218,7 @@ func isListExpr(e parser.Expr) bool {
 	case *parser.ListComprehensionExpr:
 		return true
 	case *parser.CastExpr:
-		return strings.HasSuffix(strings.TrimSpace(x.Type), "]")
+		return len(x.Type.Arrays) > 0
 	case *parser.FunctionExpr:
 		switch strings.ToLower(strings.Join(x.Name, ".")) {
 		case "list", "array_agg", "list_value":
@@ -234,9 +234,9 @@ func isListExpr(e parser.Expr) bool {
 func isDateExpr(e parser.Expr) bool {
 	switch x := e.(type) {
 	case *parser.CastExpr:
-		return strings.EqualFold(strings.TrimSpace(x.Type), "DATE")
+		return isDateType(x.Type)
 	case *parser.TypeLiteral:
-		return strings.EqualFold(strings.TrimSpace(x.Type), "DATE")
+		return isDateType(x.Type)
 	case *parser.FunctionExpr:
 		switch strings.ToLower(strings.Join(x.Name, ".")) {
 		case "current_date", "today":
@@ -244,6 +244,10 @@ func isDateExpr(e parser.Expr) bool {
 		}
 	}
 	return false
+}
+
+func isDateType(t *parser.TypeName) bool {
+	return len(t.Arrays) == 0 && t.BaseTypeName() == "DATE"
 }
 
 // listWhenArgCount wraps next for an aggregate whose extra trailing "n"

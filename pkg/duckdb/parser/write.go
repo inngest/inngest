@@ -157,6 +157,24 @@ func binaryPrec(op string) int {
 	}
 }
 
+// endsInEscape reports whether e, printed flat, ends in a LIKE's ESCAPE
+// operand. EscapeClause takes a whole ComparisonExpression, so a comparison
+// printed after it would join the escape: `(a LIKE b ESCAPE c) = d` printed
+// flat reparses as `a LIKE b ESCAPE (c = d)`. Only a comparison's own right
+// operand can be a flat LikeExpr (every tighter operator parenthesizes
+// one), so that's the only spine to follow.
+func endsInEscape(e Expr) bool {
+	switch v := e.(type) {
+	case *LikeExpr:
+		return v.Escape != nil
+	case *BinaryExpr:
+		if binaryPrec(v.Op) == precComparison && prec(v.Right) > precComparison {
+			return endsInEscape(v.Right)
+		}
+	}
+	return false
+}
+
 // exprAtLeast prints e, parenthesizing it if its precedence is lower than
 // minPrec — i.e. if printing it flat at this position would reparse with
 // different grouping than the tree actually has.
@@ -285,6 +303,10 @@ func (sw *sqlWriter) node(n Node) {
 		sw.frameClause(v)
 	case *FrameBound:
 		sw.frameBound(v)
+	case *TypeName:
+		sw.typeName(v)
+	case *TypeField:
+		sw.typeField(v)
 	case Expr:
 		sw.exprTop(v)
 	case TableRef:
@@ -309,7 +331,13 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *BinaryExpr:
 		requireOp(v.Op)
 		p := binaryPrec(v.Op)
-		sw.exprAtLeast(v.Left, p)
+		if p == precComparison && endsInEscape(v.Left) {
+			sw.str("(")
+			sw.exprTop(v.Left)
+			sw.str(")")
+		} else {
+			sw.exprAtLeast(v.Left, p)
+		}
 		sw.str(" ")
 		sw.str(v.Op)
 		sw.str(" ")
@@ -323,9 +351,14 @@ func (sw *sqlWriter) exprTop(e Expr) {
 		sw.str(" ")
 		sw.str(v.Quantifier)
 		sw.str(" ")
-		// The grammar accepts any BitwiseExpression here, but DuckDB's
-		// executing parser requires `ANY (...)`, so always parenthesize.
-		if sub, ok := v.Right.(*SubqueryExpr); ok && !sub.Exists {
+		// The grammar accepts any BitwiseExpression here, so parenthesize
+		// the operand to keep its extent unambiguous (`ANY (...)`). A plain
+		// or NOT subquery already brings its own parens and is kept bare,
+		// since `ANY (NOT EXISTS (...))` would reparse as a NOT over the
+		// EXISTS rather than one SubqueryExpr. An ARRAY(...) or EXISTS
+		// subquery doesn't start with a paren, so it's wrapped like any
+		// other operand.
+		if sub, ok := v.Right.(*SubqueryExpr); ok && !sub.Array && (!sub.Exists || sub.Not) {
 			sw.exprTop(sub)
 		} else {
 			sw.str("(")
@@ -412,13 +445,13 @@ func (sw *sqlWriter) exprTop(e Expr) {
 			sw.str("TRY_CAST(")
 			sw.exprTop(v.X)
 			sw.str(" AS ")
-			sw.str(v.Type)
+			sw.typeName(v.Type)
 			sw.str(")")
 			return
 		}
 		sw.exprAtLeast(v.X, precAtom)
 		sw.str("::")
-		sw.str(v.Type)
+		sw.typeName(v.Type)
 	case *CaseWhen:
 		sw.str("WHEN ")
 		sw.exprTop(v.Cond)
@@ -429,10 +462,17 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *StarExpr:
 		sw.starExpr(v)
 	case *SubqueryExpr:
+		// Not is set without Exists too: SubqueryNot is its own optional
+		// prefix in SubqueryExpression, reachable wherever a NOT keyword
+		// can't parse as LogicalNotExpression (`x IS DISTINCT FROM NOT
+		// (SELECT ...)`).
+		if v.Array {
+			sw.str("ARRAY")
+		}
+		if v.Not {
+			sw.str("NOT ")
+		}
 		if v.Exists {
-			if v.Not {
-				sw.str("NOT ")
-			}
 			sw.str("EXISTS ")
 		}
 		sw.str("(")
@@ -477,7 +517,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 			sw.str(v.Unit)
 		}
 	case *TypeLiteral:
-		sw.str(v.Type)
+		sw.typeName(v.Type)
 		sw.str(" '")
 		sw.str(strings.ReplaceAll(v.Value, "'", "''"))
 		sw.str("'")
@@ -490,7 +530,7 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	case *WindowSpec:
 		sw.windowSpec(v)
 	case *DotExpr:
-		sw.exprAtLeast(v.X, precAtom)
+		sw.indirectionBase(v.X, true)
 		sw.str(".")
 		writeIdentPart(sw, v.Field)
 	case *SliceExpr:
@@ -511,6 +551,37 @@ func (sw *sqlWriter) exprTop(e Expr) {
 	default:
 		panic(fmt.Sprintf("duckdb/parser: Write: unhandled Expr %T", e))
 	}
+}
+
+// indirectionBase prints the operand of a field access or method call
+// (field) or a subscript (!field), parenthesizing the shapes that would
+// otherwise absorb the indirection:
+//   - A bare Ident under a field access only comes from parenthesized
+//     source (`(t).x`, since an unparenthesized `t.x` is a single two-part
+//     Ident), and printed flat it would merge into the dotted name: `(t).x`,
+//     a struct field, would reparse as column x of table t, and `(x).f(1)`
+//     as a schema-qualified function.
+//   - A number would lex its trailing dot as a decimal point: `(1).x` as
+//     `1. AS x`.
+//   - A `::` cast's Type would take the indirection as part of the type:
+//     `(a::INT)[1]` as a cast to `INT[1]`, `(a::t).k` as a cast to `t.k`.
+func (sw *sqlWriter) indirectionBase(x Expr, field bool) {
+	parens := false
+	switch v := x.(type) {
+	case *CastExpr:
+		parens = !v.TryCast
+	case *Ident:
+		parens = field
+	case *Literal:
+		parens = field && v.Kind == LitNumber
+	}
+	if parens {
+		sw.str("(")
+		sw.exprTop(x)
+		sw.str(")")
+		return
+	}
+	sw.exprAtLeast(x, precAtom)
 }
 
 func (sw *sqlWriter) literal(l *Literal) {
@@ -622,11 +693,15 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 
 // listExpr prints both ListExpr shapes: Paren=false is a bracketed array
 // literal ("[a, b]"), Paren=true is a parenthesized tuple / grouping-parens
-// literal ("(a, b)" or "()" — see adaptParenthesisExpression).
+// literal ("(a, b)" or "()" — see adaptParenthesisExpression). A one-element
+// tuple keeps its trailing comma: `(a)` would reparse as grouping parens.
 func (sw *sqlWriter) listExpr(l *ListExpr) {
 	if l.Paren {
 		sw.str("(")
 		sw.exprListTop(l.Elems)
+		if len(l.Elems) == 1 {
+			sw.str(",")
+		}
 		sw.str(")")
 		return
 	}
@@ -640,7 +715,7 @@ func (sw *sqlWriter) listExpr(l *ListExpr) {
 // (an element). A step implies a stop colon in the grammar; checking the
 // other fields too keeps a hand-built AST printing a valid slice.
 func (sw *sqlWriter) sliceExpr(s *SliceExpr) {
-	sw.exprAtLeast(s.X, precAtom)
+	sw.indirectionBase(s.X, false)
 	sw.str("[")
 	if s.Start != nil {
 		sw.exprTop(s.Start)
@@ -696,20 +771,10 @@ func (sw *sqlWriter) listComprehensionExpr(l *ListComprehensionExpr) {
 
 func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 	if f.Receiver != nil {
-		sw.exprAtLeast(f.Receiver, precAtom)
+		sw.indirectionBase(f.Receiver, true)
 		sw.str(".")
 	}
-	// Function names skip writeIdentPart's keyword check: keyword-named
-	// functions (left, right, ...) are spelled bare in DuckDB, and quoting
-	// them would needlessly depend on quoted function-name resolution.
-	for i, p := range f.Name {
-		sw.sep(i, ".")
-		if isSimpleIdent(p) {
-			sw.str(p)
-		} else {
-			writeIdentPart(sw, p)
-		}
-	}
+	sw.functionName(f)
 	sw.str("(")
 	if f.Distinct {
 		sw.str("DISTINCT ")
@@ -750,6 +815,81 @@ func (sw *sqlWriter) functionExpr(f *FunctionExpr) {
 	if f.Over != nil {
 		sw.windowSpec(f.Over)
 	}
+}
+
+// syntaxFunctionNames are the words that, followed by '(', start a
+// SingleExpression alternative tried before FunctionExpression (a
+// SpecialFunctionExpression, CAST, GROUPING, INTERVAL, a subquery, ...).
+// A function by one of these names has to be quoted or it reparses as that
+// syntax instead: `"nullif"(x)` printed bare is a NULLIF missing its second
+// argument, `"position"(b, a)` a POSITION missing its IN.
+var syntaxFunctionNames = map[string]bool{
+	"ARRAY": true, "CASE": true, "CAST": true, "COLUMNS": true, "EXISTS": true,
+	"EXTRACT": true, "GROUPING": true, "GROUPING_ID": true, "INTERVAL": true,
+	"LAMBDA": true, "NOT": true, "NULLIF": true, "OVERLAY": true, "POSITION": true,
+	"ROW": true, "SUBSTRING": true, "TRIM": true, "TRY": true, "TRY_CAST": true,
+	"UNPACK": true,
+}
+
+// functionName prints f's name so it reparses as a call to the same
+// function. An unqualified name is quoted unless FunctionName accepts it
+// bare (keyword-named functions like left/right are spelled bare in
+// DuckDB, but `"not"(x)` printed bare is `NOT x`) and no earlier syntax
+// claims it (see syntaxFunctionNames). A qualified name's first part is a
+// CatalogName/SchemaName, quoted like any identifier; the rest are
+// Reserved* names that take any keyword.
+//
+// A Syntax call (the adapter's desugared COALESCE(...)) is printed back as
+// that syntax: COALESCE is parser syntax for an operator, not a catalog
+// function, even though DuckDB documents it as one. A source
+// `"coalesce"(x)` call isn't Syntax, so it stays a quoted call and fails
+// the catalog lookup, same as in DuckDB itself.
+func (sw *sqlWriter) functionName(f *FunctionExpr) {
+	if f.Receiver != nil || len(f.Name) > 1 {
+		for i, p := range f.Name {
+			sw.sep(i, ".")
+			if i == 0 && f.Receiver == nil || !isSimpleIdent(p) {
+				writeIdentPart(sw, p)
+			} else {
+				sw.str(p)
+			}
+		}
+		return
+	}
+	if len(f.Name) == 0 {
+		panic("duckdb/parser: Write: FunctionExpr with no name")
+	}
+	p := f.Name[0]
+	up := strings.ToUpper(p)
+	switch {
+	case f.Syntax:
+		if up != "COALESCE" || !isCoalesceSyntax(f) {
+			panic(fmt.Sprintf("duckdb/parser: Write: Syntax FunctionExpr %q can't be written as COALESCE(...)", p))
+		}
+		sw.str("COALESCE")
+	case isSimpleIdent(p) && !syntaxFunctionNames[up] && isFuncNameIdent(p):
+		sw.str(p)
+	default:
+		sw.str(`"`)
+		sw.str(strings.ReplaceAll(p, `"`, `""`))
+		sw.str(`"`)
+	}
+}
+
+// isCoalesceSyntax reports whether f is something the COALESCE(...) syntax
+// (`'COALESCE' Parens(List(Expression))`) can spell: one or more plain
+// arguments and none of a call's other clauses.
+func isCoalesceSyntax(f *FunctionExpr) bool {
+	if len(f.Args) == 0 || f.Distinct || f.All || f.OrderBy != nil || f.IgnoreNulls || f.RespectNulls ||
+		f.Within != nil || f.Filter != nil || f.Export || f.Over != nil {
+		return false
+	}
+	for _, a := range f.Args {
+		if _, ok := a.(*NamedArg); ok {
+			return false
+		}
+	}
+	return true
 }
 
 // windowSpec prints a FunctionExpr's OVER clause. A spec that's just a bare
@@ -949,7 +1089,15 @@ func (sw *sqlWriter) withClause(w *WithClause) {
 }
 
 func (sw *sqlWriter) cte(c *CTE) {
-	writeIdentPart(sw, c.Name)
+	// RECURSIVE is unreserved, so writeIdentPart leaves it bare, but as a
+	// CTE name it would read as WITH's own RECURSIVE keyword.
+	if strings.EqualFold(c.Name, "recursive") {
+		sw.str(`"`)
+		sw.str(c.Name)
+		sw.str(`"`)
+	} else {
+		writeIdentPart(sw, c.Name)
+	}
 	if len(c.ColumnNames) > 0 {
 		sw.str(" (")
 		for i, n := range c.ColumnNames {
@@ -1067,6 +1215,14 @@ func (sw *sqlWriter) tableRef(t TableRef) {
 func (sw *sqlWriter) pivotColumn(p *PivotColumn) {
 	sw.exprTop(p.Header)
 	if len(p.In) == 0 {
+		return
+	}
+	if p.Enum {
+		if len(p.In) != 1 {
+			panic("duckdb/parser: Write: an enum PivotColumn needs exactly one In entry")
+		}
+		sw.str(" IN ")
+		sw.str(p.In[0]) // the source's own spelling of a single identifier
 		return
 	}
 	sw.str(" IN (")

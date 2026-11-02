@@ -131,3 +131,64 @@ func BenchmarkGrammarLoad(b *testing.B) {
 		}
 	}
 }
+
+// largeQuery repeats item as a comma-separated SELECT list until the query
+// is about n bytes.
+func largeQuery(n int, item string) string {
+	var sb strings.Builder
+	sb.WriteString("SELECT ")
+	for sb.Len() < n-len(item)-2 {
+		if sb.Len() > len("SELECT ") {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(item)
+	}
+	return sb.String()
+}
+
+var largeQueries = []struct {
+	name string
+	sql  string
+}{
+	{"Valid4KiB", largeQuery(4<<10, "a")},
+	{"Valid16KiB", largeQuery(16<<10, "a")},
+	{"Valid64KiB", largeQuery(64<<10, "a")},
+	{"Failing64KiB", ") " + largeQuery(64<<10, "a")},
+}
+
+// BenchmarkParseStringLarge measures the memory a large (valid or failing)
+// input costs through the pooled entry point, the case the packrat
+// memo/slab budget (maxParseEntries) exists for.
+func BenchmarkParseStringLarge(b *testing.B) {
+	if _, err := ParseString("SELECT 1"); err != nil {
+		b.Fatal(err)
+	}
+	for _, c := range largeQueries {
+		b.Run(c.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(c.sql)))
+			for b.Loop() {
+				_, _ = ParseString(c.sql)
+			}
+		})
+	}
+}
+
+// BenchmarkPegParseLarge is BenchmarkParseStringLarge through a fresh
+// evaluator every time (peg.Parser.Parse), so B/op includes all the
+// buffer growth a cold parse of that input pays.
+func BenchmarkPegParseLarge(b *testing.B) {
+	p, err := loadPegParser()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for _, c := range largeQueries {
+		b.Run(c.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(c.sql)))
+			for b.Loop() {
+				_, _ = p.Parse(c.sql, "SelectStatement")
+			}
+		})
+	}
+}
