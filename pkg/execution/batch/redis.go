@@ -584,12 +584,13 @@ func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, f
 		return nil, fmt.Errorf("no items to append")
 	}
 	metricTags := b.accountScopedMetricTags(ctx, items[0].AccountID, items[0].WorkspaceID)
-	return b.bulkAppend(ctx, items, fn, metricTags)
+	return b.bulkAppend(ctx, items, nil, fn, metricTags)
 }
 
 // bulkAppend is the shared write path for BulkAppend and buffered flushes. It
 // is recorded as bulk_append_internal so store writes from both are counted.
-func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, metricTags map[string]any) (_ *BulkAppendResult, err error) {
+// Buffered flushes supply encoded items to reuse their measured bytes.
+func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, encoded [][]byte, fn inngest.Function, metricTags map[string]any) (_ *BulkAppendResult, err error) {
 	defer func(start time.Time) { b.recordCall(ctx, "bulk_append_internal", start, err) }(time.Now())
 
 	config := fn.EventBatch
@@ -626,8 +627,12 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 	}
 
 	// Add event pairs: eventID1, event1, eventID2, event2, ...
-	for _, item := range items {
-		baseArgs = append(baseArgs, item.EventID.String(), item)
+	for i, item := range items {
+		if encoded != nil {
+			baseArgs = append(baseArgs, item.EventID.String(), encoded[i])
+		} else {
+			baseArgs = append(baseArgs, item.EventID.String(), item)
+		}
 	}
 
 	args, err := redis_state.StrSlice(baseArgs)
