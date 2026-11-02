@@ -25,7 +25,7 @@ type appProviderReader interface {
 
 // NewAppProvider returns an AppProvider that looks up apps by external ID or
 // UUID using the given AppReader.
-func NewAppProvider(reader appProviderReader) apiv2.AppProvider {
+func NewAppProvider(reader appProviderReader) *cqrsAppProvider {
 	return &cqrsAppProvider{reader: reader}
 }
 
@@ -121,4 +121,12 @@ func toApp(app *cqrs.App, functionCount int) apiv2.App {
 		result.Method = method
 	}
 	return result
+}
+
+func (p *cqrsAppProvider) ListAppSyncs(ctx context.Context, app apiv2.App, opts apiv2.ListAppSyncsOpts) (*apiv2.ListAppSyncsResult, error) {
+	return &apiv2.ListAppSyncsResult{}, nil
+}
+
+func (p *cqrsAppProvider) GetAppSync(ctx context.Context, app apiv2.App, syncID uuid.UUID) (apiv2.AppSyncRecord, error) {
+	return apiv2.AppSyncRecord{}, apiv2.ErrAppSyncNotFound
 }

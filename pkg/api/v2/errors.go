@@ -11,6 +11,7 @@ var (
 	ErrFunctionPaused              = errors.New("function is paused")
 	ErrFunctionPauseScheduled      = errors.New("function pause is scheduled")
 	ErrAppNotFound                 = errors.New("app not found")
+	ErrAppSyncNotFound             = errors.New("sync not found")
 	ErrRunNotFound                 = errors.New("run not found")
 	ErrEventNotFound               = errors.New("event not found")
 	ErrCronRerunNotSupported       = errors.New("cron rerun is not supported")

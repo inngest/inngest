@@ -69,6 +69,8 @@ const (
 	V2_StreamSandboxProcessOutput_FullMethodName = "/api.v2.V2/StreamSandboxProcessOutput"
 	V2_CreateScore_FullMethodName                = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
+	V2_ListAppSyncs_FullMethodName               = "/api.v2.V2/ListAppSyncs"
+	V2_GetAppSync_FullMethodName                 = "/api.v2.V2/GetAppSync"
 	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
@@ -145,6 +147,8 @@ type V2Client interface {
 	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
+	ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error)
+	GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
@@ -690,6 +694,26 @@ func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *v2Client) ListAppSyncs(ctx context.Context, in *ListAppSyncsRequest, opts ...grpc.CallOption) (*ListAppSyncsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAppSyncsResponse)
+	err := c.cc.Invoke(ctx, V2_ListAppSyncs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetAppSync(ctx context.Context, in *GetAppSyncRequest, opts ...grpc.CallOption) (*GetAppSyncResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAppSyncResponse)
+	err := c.cc.Invoke(ctx, V2_GetAppSync_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionTraceResponse)
@@ -926,6 +950,8 @@ type V2Server interface {
 	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
+	ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error)
+	GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
@@ -1100,6 +1126,12 @@ func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (
 }
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
+}
+func (UnimplementedV2Server) ListAppSyncs(context.Context, *ListAppSyncsRequest) (*ListAppSyncsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAppSyncs not implemented")
+}
+func (UnimplementedV2Server) GetAppSync(context.Context, *GetAppSyncRequest) (*GetAppSyncResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAppSync not implemented")
 }
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
@@ -2037,6 +2069,42 @@ func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListAppSyncs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAppSyncsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListAppSyncs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListAppSyncs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListAppSyncs(ctx, req.(*ListAppSyncsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetAppSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAppSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetAppSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetAppSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetAppSync(ctx, req.(*GetAppSyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionTraceRequest)
 	if err := dec(in); err != nil {
@@ -2551,6 +2619,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncApp",
 			Handler:    _V2_SyncApp_Handler,
+		},
+		{
+			MethodName: "ListAppSyncs",
+			Handler:    _V2_ListAppSyncs_Handler,
+		},
+		{
+			MethodName: "GetAppSync",
+			Handler:    _V2_GetAppSync_Handler,
 		},
 		{
 			MethodName: "GetFunctionTrace",

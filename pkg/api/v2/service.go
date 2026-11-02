@@ -25,6 +25,7 @@ type Service struct {
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
 	apps           AppProvider
+	appSyncs       AppSyncProvider
 	functions      FunctionProvider
 	functionPauser FunctionPauser
 	functionConfig FunctionConfigProvider
@@ -53,6 +54,7 @@ type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
 	Apps                AppProvider
+	AppSyncs            AppSyncProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
 	FunctionConfig      FunctionConfigProvider
@@ -84,6 +86,7 @@ func NewService(opts ServiceOptions) *Service {
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
 		apps:           opts.Apps,
+		appSyncs:       opts.AppSyncs,
 		functions:      opts.Functions,
 		functionPauser: opts.FunctionPauser,
 		functionConfig: opts.FunctionConfig,

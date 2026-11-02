@@ -138,6 +138,10 @@ const (
 	V2CreateScoreProcedure = "/api.v2.V2/CreateScore"
 	// V2SyncAppProcedure is the fully-qualified name of the V2's SyncApp RPC.
 	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
+	// V2ListAppSyncsProcedure is the fully-qualified name of the V2's ListAppSyncs RPC.
+	V2ListAppSyncsProcedure = "/api.v2.V2/ListAppSyncs"
+	// V2GetAppSyncProcedure is the fully-qualified name of the V2's GetAppSync RPC.
+	V2GetAppSyncProcedure = "/api.v2.V2/GetAppSync"
 	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
 	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
@@ -231,6 +235,8 @@ type V2Client interface {
 	StreamSandboxProcessOutput(context.Context, *connect.Request[v2.StreamSandboxProcessOutputRequest]) (*connect.ServerStreamForClient[v2.StreamSandboxProcessOutputResponse], error)
 	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error)
+	GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
@@ -556,6 +562,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("SyncApp")),
 			connect.WithClientOptions(opts...),
 		),
+		listAppSyncs: connect.NewClient[v2.ListAppSyncsRequest, v2.ListAppSyncsResponse](
+			httpClient,
+			baseURL+V2ListAppSyncsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListAppSyncs")),
+			connect.WithClientOptions(opts...),
+		),
+		getAppSync: connect.NewClient[v2.GetAppSyncRequest, v2.GetAppSyncResponse](
+			httpClient,
+			baseURL+V2GetAppSyncProcedure,
+			connect.WithSchema(v2Methods.ByName("GetAppSync")),
+			connect.WithClientOptions(opts...),
+		),
 		getFunctionTrace: connect.NewClient[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse](
 			httpClient,
 			baseURL+V2GetFunctionTraceProcedure,
@@ -718,6 +736,8 @@ type v2Client struct {
 	streamSandboxProcessOutput *connect.Client[v2.StreamSandboxProcessOutputRequest, v2.StreamSandboxProcessOutputResponse]
 	createScore                *connect.Client[v2.CreateScoreRequest, v2.CreateScoreResponse]
 	syncApp                    *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
+	listAppSyncs               *connect.Client[v2.ListAppSyncsRequest, v2.ListAppSyncsResponse]
+	getAppSync                 *connect.Client[v2.GetAppSyncRequest, v2.GetAppSyncResponse]
 	getFunctionTrace           *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction                *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
@@ -983,6 +1003,16 @@ func (c *v2Client) SyncApp(ctx context.Context, req *connect.Request[v2.SyncAppR
 	return c.syncApp.CallUnary(ctx, req)
 }
 
+// ListAppSyncs calls api.v2.V2.ListAppSyncs.
+func (c *v2Client) ListAppSyncs(ctx context.Context, req *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error) {
+	return c.listAppSyncs.CallUnary(ctx, req)
+}
+
+// GetAppSync calls api.v2.V2.GetAppSync.
+func (c *v2Client) GetAppSync(ctx context.Context, req *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error) {
+	return c.getAppSync.CallUnary(ctx, req)
+}
+
 // GetFunctionTrace calls api.v2.V2.GetFunctionTrace.
 func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
 	return c.getFunctionTrace.CallUnary(ctx, req)
@@ -1127,6 +1157,8 @@ type V2Handler interface {
 	StreamSandboxProcessOutput(context.Context, *connect.Request[v2.StreamSandboxProcessOutputRequest], *connect.ServerStream[v2.StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
+	ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error)
+	GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
@@ -1448,6 +1480,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("SyncApp")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListAppSyncsHandler := connect.NewUnaryHandler(
+		V2ListAppSyncsProcedure,
+		svc.ListAppSyncs,
+		connect.WithSchema(v2Methods.ByName("ListAppSyncs")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetAppSyncHandler := connect.NewUnaryHandler(
+		V2GetAppSyncProcedure,
+		svc.GetAppSync,
+		connect.WithSchema(v2Methods.ByName("GetAppSync")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetFunctionTraceHandler := connect.NewUnaryHandler(
 		V2GetFunctionTraceProcedure,
 		svc.GetFunctionTrace,
@@ -1656,6 +1700,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateScoreHandler.ServeHTTP(w, r)
 		case V2SyncAppProcedure:
 			v2SyncAppHandler.ServeHTTP(w, r)
+		case V2ListAppSyncsProcedure:
+			v2ListAppSyncsHandler.ServeHTTP(w, r)
+		case V2GetAppSyncProcedure:
+			v2GetAppSyncHandler.ServeHTTP(w, r)
 		case V2GetFunctionTraceProcedure:
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
 		case V2GetFunctionProcedure:
@@ -1895,6 +1943,14 @@ func (UnimplementedV2Handler) CreateScore(context.Context, *connect.Request[v2.C
 
 func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SyncApp is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListAppSyncs(context.Context, *connect.Request[v2.ListAppSyncsRequest]) (*connect.Response[v2.ListAppSyncsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListAppSyncs is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetAppSync(context.Context, *connect.Request[v2.GetAppSyncRequest]) (*connect.Response[v2.GetAppSyncResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetAppSync is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {

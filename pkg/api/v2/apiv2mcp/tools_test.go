@@ -298,3 +298,30 @@ func TestEventReadTools(t *testing.T) {
 		}
 	}
 }
+
+func TestAppSyncReadTools(t *testing.T) {
+	for _, tc := range []struct {
+		method, name, path string
+		args               map[string]any
+	}{
+		{"ListAppSyncs", "list_app_syncs", "/api/v2/apps/my-app/syncs", map[string]any{"appId": "my-app", "limit": 20, "cursor": "11111111-1111-1111-1111-111111111111"}},
+		{"GetAppSync", "get_app_sync", "/api/v2/apps/my-app/syncs/11111111-1111-1111-1111-111111111111", map[string]any{"appId": "my-app", "syncId": "11111111-1111-1111-1111-111111111111"}},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			endpoint := endpointByMethod(t, tc.method)
+			tool := Tool(endpoint)
+			require.Equal(t, tc.name, tool.Name)
+			require.True(t, tool.Annotations.ReadOnlyHint)
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, *tool.Annotations.DestructiveHint)
+			req, err := Request(t.Context(), endpoint, tc.args, Options{})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodGet, req.Method)
+			require.Equal(t, tc.path, req.URL.Path)
+			if tc.method == "ListAppSyncs" {
+				require.Equal(t, "20", req.URL.Query().Get("limit"))
+				require.Equal(t, "11111111-1111-1111-1111-111111111111", req.URL.Query().Get("cursor"))
+			}
+		})
+	}
+}

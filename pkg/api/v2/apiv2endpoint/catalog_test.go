@@ -81,3 +81,23 @@ func TestEventReadCatalog(t *testing.T) {
 		require.Equal(t, []string{"payload"}, FieldEnum(endpoint.Input.Fields().ByName("include")))
 	}
 }
+
+func TestAppSyncReadCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, command, tool, path, permission string }{
+		{"ListAppSyncs", "list-app-syncs", "list_app_syncs", "/apps/{app_id}/syncs", "apps:read:list_syncs"},
+		{"GetAppSync", "get-app-sync", "get_app_sync", "/apps/{app_id}/syncs/{sync_id}", "apps:read:get_sync"},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			endpoint := byMethod[tc.method]
+			require.Equal(t, tc.command, endpoint.CommandName)
+			require.Equal(t, tc.tool, endpoint.ToolName)
+			require.Equal(t, http.MethodGet, endpoint.HTTPMethod)
+			require.Equal(t, tc.path, endpoint.Path)
+			require.Equal(t, tc.permission, endpoint.AuthzPermission)
+		})
+	}
+}

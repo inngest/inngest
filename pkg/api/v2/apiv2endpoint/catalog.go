@@ -21,8 +21,9 @@ var hiddenMethods = map[string]struct{}{
 }
 
 var commandNames = map[string]string{
-	"ListRuns":   "get-function-runs",
-	"ListEvents": "list-events",
+	"ListRuns":     "get-function-runs",
+	"ListEvents":   "list-events",
+	"ListAppSyncs": "list-app-syncs",
 }
 
 var toolNames = map[string]string{

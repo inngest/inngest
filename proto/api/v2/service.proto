@@ -1793,6 +1793,46 @@ service V2 {
     };
   }
 
+  rpc ListAppSyncs(ListAppSyncsRequest) returns (ListAppSyncsResponse) {
+    option (google.api.http) = { get: "/apps/{app_id}/syncs" };
+    option (authz) = {
+      require_authz: true
+      permission: "apps:read:list_syncs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List app syncs"
+      tags: "Apps"
+      tags: "Beta"
+      description: "Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetAppSync(GetAppSyncRequest) returns (GetAppSyncResponse) {
+    option (google.api.http) = { get: "/apps/{app_id}/syncs/{sync_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "apps:read:get_sync"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app sync"
+      tags: "Apps"
+      tags: "Beta"
+      description: "Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetFunctionTrace(GetFunctionTraceRequest) returns (GetFunctionTraceResponse) {
     option (google.api.http) = {
       get: "/runs/{run_id}/trace"
@@ -3695,6 +3735,121 @@ message SyncAppData {
 message SyncAppError {
   string code = 1;
   string message = 2;
+}
+
+message ListAppSyncsRequest {
+  string app_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+    }
+  ];
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response: the UUID of the last returned sync"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of syncs to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListAppSyncsResponse {
+  repeated Sync data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message GetAppSyncRequest {
+  string app_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+    }
+  ];
+  string sync_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sync UUID"
+    }
+  ];
+}
+
+message GetAppSyncResponse {
+  Sync data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Sync {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sync UUID, matching the ID returned by SyncApp"
+    }
+  ];
+  string app_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+    }
+  ];
+  string status = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
+    }
+  ];
+  optional string url = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "URL for the Inngest endpoint in the app"
+    }
+  ];
+  optional string sdk_language = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK language reported by this sync"
+    }
+  ];
+  optional string sdk_version = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "SDK version reported by this sync"
+    }
+  ];
+  optional string framework = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Framework reported by this sync"
+    }
+  ];
+  optional string app_version = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App version reported by this sync"
+    }
+  ];
+  optional SyncAppError error = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Error, including a code and message"
+    }
+  ];
+  repeated string added_functions = 10 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Functions this sync created. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
+    }
+  ];
+  repeated string modified_functions = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Existing functions this sync re-registered. A sync re-registers every function, so unchanged functions count too. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
+    }
+  ];
+  repeated string removed_functions = 12 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Functions this sync archived. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
+    }
+  ];
+  google.protobuf.Timestamp created_at = 13 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "When the sync was created"
+    }
+  ];
 }
 
 message QueryInsightsRequest {
