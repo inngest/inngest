@@ -323,9 +323,6 @@ message InboxWake {
   bool      timed_out    = 3;
   bool      closed       = 4;
   bool      has_pending  = 5;
-  // Set by RecordInboxWait when another path already ended the read. Nothing was
-  // recorded and the run is already continued.
-  bool      ended        = 6;
 }
 
 message SaveInboxMessageRequest {
