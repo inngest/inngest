@@ -100,10 +100,11 @@ func celExprsToSQL(ctx context.Context, exprs []string, convert func(root *expr.
 		if tree.HasMacros {
 			return nil, fmt.Errorf("insights: macros are not supported in CEL expression %q", celExpr)
 		}
-		// expr's tree can't represent a ! over && / || faithfully (see
-		// celNegatesLogic), so such an expression gets no SQL prefilter at
-		// all and is left entirely to the caller's Go post-filter.
-		if celNegatesLogic(celExpr) {
+		// expr's tree can't represent a ! over && / || or a list/map literal
+		// faithfully (see celNegatesLogic, celHasCompositeLiteral), so such
+		// an expression gets no SQL prefilter at all and is left entirely to
+		// the caller's Go post-filter.
+		if celNegatesLogic(celExpr) || celHasCompositeLiteral(celExpr) {
 			continue
 		}
 
@@ -160,6 +161,40 @@ func celNegatesLogic(celExpr string) bool {
 		return false
 	}
 	return walk(parsed.Expr(), false)
+}
+
+// celHasCompositeLiteral reports whether celExpr has a list or map literal
+// anywhere. expr reports `a == [1, 2]` (or `== {...}`) w/ a nil Literal, the
+// same as `a == null`, so a predicate against one would otherwise convert
+// to the null check and drop rows that actually match. An expression that
+// fails to parse here reports true (no SQL prefilter), like
+// celNegatesLogic.
+func celHasCompositeLiteral(celExpr string) bool {
+	parsed, errs := celparser.Parse(common.NewTextSource(celExpr))
+	if errs != nil && len(errs.GetErrors()) > 0 {
+		return true
+	}
+	var walk func(e celast.Expr) bool
+	walk = func(e celast.Expr) bool {
+		switch e.Kind() {
+		case celast.ListKind, celast.MapKind, celast.StructKind:
+			return true
+		case celast.CallKind:
+			call := e.AsCall()
+			if call.IsMemberFunction() && walk(call.Target()) {
+				return true
+			}
+			for _, arg := range call.Args() {
+				if walk(arg) {
+					return true
+				}
+			}
+		case celast.SelectKind:
+			return walk(e.AsSelect().Operand())
+		}
+		return false
+	}
+	return walk(parsed.Expr())
 }
 
 // celNodeToSQL converts n into one SQL expression, following expr.Node's

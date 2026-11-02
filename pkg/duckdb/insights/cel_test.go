@@ -418,6 +418,12 @@ func TestCELFiltersNeverNarrow(t *testing.T) {
 		`"x" in event.data.list`,
 		`event.data.a < "x"`,
 		`event.data.a == 1u`,
+		// expr reports a list/map literal as a nil Literal, like null.
+		`event.data.list == [1, 2]`,
+		`event.data.list != [1, 2]`,
+		`event.data.list == []`,
+		`event.data.m == {"a": 1}`,
+		`event.name == "x" && event.data.list == [1, 2]`,
 		// event.Event.Map() always has these, whatever's stored.
 		`event.data == null`,
 		`event.data != null`,
