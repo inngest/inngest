@@ -244,16 +244,6 @@ func (e *executor) handleGeneratorSubscribeWait(ctx context.Context, runCtx exec
 		return err
 	}
 
-	// The path that ended the read has woken the run and drawn the row. Only
-	// the timer queued above is left to remove.
-	if wake != nil && wake.Ended {
-		if drain {
-			return nil
-		}
-
-		return e.dequeueInboxTimer(ctx, *md, gen.ID)
-	}
-
 	e.emitInboxWaitSpan(ctx, runCtx, gen, group, wake == nil)
 
 	if err := runCtx.ReleaseCapacityLease(); err != nil {

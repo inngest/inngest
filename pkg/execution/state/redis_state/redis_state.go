@@ -1233,9 +1233,6 @@ func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wai
 	if err != nil {
 		return nil, fmt.Errorf("error reading inbox wait status: %w", err)
 	}
-	if found == 4 {
-		return &statev2.InboxWake{Wait: wait, Ended: true}, nil
-	}
 	if found == 3 && len(out) >= 2 {
 		hasPending, err := out[1].AsInt64()
 		if err != nil {
