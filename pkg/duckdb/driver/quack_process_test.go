@@ -282,3 +282,68 @@ func TestQuackAbandonedAppendIsReplacedBeforeNextAppend(t *testing.T) {
 		})
 	}
 }
+
+// TestQuackAbandonedStatementsAreCapped pins Options.MaxAbandonedStatements:
+// once that many abandoned statements are still running server-side, a gated
+// (OpenShared) connection refuses to handshake a new session w/
+// ErrTooManyAbandoned, until the server is done w/ them. Sessions that don't
+// need a new handshake, the primary connection, and ungated pooled
+// connections (dual-write's) are unaffected. The constant-folded levenshtein
+// ignores its interrupt (~2s here), like
+// TestQuackAbandonedStatementDoesNotBlockNextStatement's.
+func TestQuackAbandonedStatementsAreCapped(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &addr, withMaxAbandoned(1))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	gated, err := p.openGatedQuackConn(t.Context())
+	require.NoError(t, err)
+	otherGated, err := p.openGatedQuackConn(t.Context())
+	require.NoError(t, err)
+	ungated, err := p.openQuackConn(t.Context())
+	require.NoError(t, err)
+
+	const stuckSQL = "SELECT levenshtein(repeat('a', 40000), repeat('b', 40000)) AS d;"
+	abandon := func(execer sqlExecer) {
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+		_, _, _, err := execer.Query(ctx, stuckSQL)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
+
+	abandon(gated)
+	require.EqualValues(t, 1, p.abandoned.Load(), "an abandoned statement is counted before Query returns")
+
+	start := time.Now()
+	_, _, _, err = gated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.ErrorIs(t, err, ErrTooManyAbandoned)
+	require.Less(t, time.Since(start), time.Second, "a capped connection must fail fast, not queue")
+	_, err = p.openGatedQuackConn(t.Context())
+	require.ErrorIs(t, err, ErrTooManyAbandoned)
+
+	for name, execer := range map[string]sqlExecer{"healthy gated": otherGated, "primary": p, "ungated": ungated} {
+		_, _, rows, err := execer.Query(t.Context(), "SELECT 1 AS ok;")
+		require.NoError(t, err, name)
+		require.Len(t, rows, 1, name)
+	}
+	abandon(ungated)
+	_, _, _, err = ungated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.NoError(t, err, "an ungated connection re-handshakes past the cap")
+	require.EqualValues(t, 2, p.abandoned.Load())
+
+	// Both levenshteins ignore their interrupt, so they're only uncounted
+	// once the server finishes them.
+	require.Eventually(t, func() bool { return p.abandoned.Load() == 0 }, 30*time.Second, 50*time.Millisecond)
+	_, _, rows, err := gated.Query(t.Context(), "SELECT 1 AS ok;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	p.mu.Lock()
+	disabled := p.disabled
+	p.mu.Unlock()
+	require.False(t, disabled)
+}

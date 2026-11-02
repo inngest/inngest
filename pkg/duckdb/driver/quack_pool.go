@@ -34,6 +34,14 @@ type pooledQuackConn struct {
 	p    *process
 	sess *quack.Session
 	gen  uint64
+	// gated makes a handshake for a first session or to replace an abandoned
+	// one fail w/ ErrTooManyAbandoned while p.abandoned is at its cap (see
+	// Options.MaxAbandonedStatements). That's where pile-up happens: an
+	// abandoned statement keeps running server-side while its connection
+	// moves on to a fresh session. A re-handshake only because the
+	// subprocess restarted isn't gated (the restart killed everything
+	// abandoned on it, and their cancels then fail fast).
+	gated bool
 }
 
 func (c *pooledQuackConn) Exec(ctx context.Context, sqlText string) (cols []string, rows []result.Row, err error) {
@@ -89,7 +97,10 @@ func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) e
 		return 0, err
 	}
 	if c.sess == nil || c.gen != ep.gen || c.sess.Abandoned() {
-		sess, err := quack.NewSession(ctx, ep.listenURL, ep.token)
+		if c.gated && (c.sess == nil || c.sess.Abandoned()) && c.p.tooManyAbandoned() {
+			return ep.gen, ErrTooManyAbandoned
+		}
+		sess, err := quack.NewSession(ctx, ep.listenURL, ep.token, quack.WithAbandonedCounter(&c.p.abandoned))
 		if err != nil {
 			c.sess = nil
 			return ep.gen, err
@@ -127,10 +138,21 @@ func (c *pooledQuackConn) shouldRecover(ctx context.Context, err error) bool {
 	switch {
 	case errors.Is(err, result.ErrStatementFailed),
 		errors.Is(err, ErrDisabled),
-		errors.Is(err, errQuackUnavailable):
+		errors.Is(err, errQuackUnavailable),
+		errors.Is(err, ErrTooManyAbandoned):
 		return false
 	}
 	// Same reasoning as runWithRestartLocked: a quack request aborted by the
 	// caller's own ctx leaves nothing behind that a restart would fix.
 	return ctx.Err() == nil
+}
+
+// tooManyAbandoned reports whether p.abandoned is at its cap (see
+// Options.MaxAbandonedStatements).
+func (p *process) tooManyAbandoned() bool {
+	limit := p.maxAbandoned
+	if limit <= 0 {
+		limit = DefaultMaxAbandonedStatements
+	}
+	return p.abandoned.Load() >= int64(limit)
 }

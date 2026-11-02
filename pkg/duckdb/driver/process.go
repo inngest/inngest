@@ -89,6 +89,13 @@ type process struct {
 	// spill at the end of every spawn's bootstrap -- see
 	// Options.ResourceLimits and bootstrapResourceLimitsLocked.
 	resourceLimits *ResourceLimits
+	// abandoned counts statements, on any of this process's quack sessions,
+	// that were abandoned mid-flight and that the server may still be
+	// running (see quack.WithAbandonedCounter). maxAbandoned caps it for
+	// gated pooled connections (see pooledQuackConn.gated); <= 0 is
+	// DefaultMaxAbandonedStatements.
+	abandoned    atomic.Int64
+	maxAbandoned int
 
 	procCtx    context.Context
 	procCancel context.CancelFunc
@@ -414,7 +421,7 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: quack_serve response missing listen_url (columns: %v)", rows[0].Names())
 	}
 
-	quackSess, err := quack.NewSession(ctx, listenURL, token)
+	quackSess, err := quack.NewSession(ctx, listenURL, token, quack.WithAbandonedCounter(&p.abandoned))
 	if err != nil {
 		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
 	}
@@ -459,7 +466,19 @@ func (p *process) bootstrapExecLocked(ctx context.Context, phase string, stmts [
 // any caller — dual-write's own writes included — one of these rather than
 // the primary connection.
 func (p *process) openQuackConn(ctx context.Context) (sqlExecer, error) {
-	c := &pooledQuackConn{p: p}
+	return p.openPooledQuackConn(ctx, false)
+}
+
+// openGatedQuackConn is openQuackConn for a pooled connection whose
+// handshakes are gated on p's abandoned statements (see
+// pooledQuackConn.gated), so it fails fast w/ ErrTooManyAbandoned rather
+// than opening a session while too much abandoned work is still running.
+func (p *process) openGatedQuackConn(ctx context.Context) (sqlExecer, error) {
+	return p.openPooledQuackConn(ctx, true)
+}
+
+func (p *process) openPooledQuackConn(ctx context.Context, gated bool) (sqlExecer, error) {
+	c := &pooledQuackConn{p: p, gated: gated}
 	// Handshake eagerly so a bad listener fails Connect, not the first
 	// statement.
 	if _, err := c.currentSession(ctx); err != nil {
@@ -995,7 +1014,7 @@ func (p *process) replaceAbandonedQuackSessionLocked(ctx context.Context) error 
 	if ep == nil {
 		return errQuackUnavailable
 	}
-	sess, err := quack.NewSession(ctx, ep.listenURL, ep.token)
+	sess, err := quack.NewSession(ctx, ep.listenURL, ep.token, quack.WithAbandonedCounter(&p.abandoned))
 	if err != nil {
 		return fmt.Errorf("duckdb: replacing abandoned quack session: %w", err)
 	}
@@ -1319,7 +1338,28 @@ type Options struct {
 	// DefaultResourceLimits is a conservative starting point for a handle
 	// that also runs Insights.
 	ResourceLimits *ResourceLimits
+
+	// MaxAbandonedStatements caps how many statements abandoned mid-flight
+	// (a cancelled ctx, e.g. an Insights timeout) the server may still be
+	// running before an OpenShared connection refuses to open another quack
+	// session, failing w/ ErrTooManyAbandoned instead. Each abandoned
+	// statement keeps running until DuckDB finishes or honors its interrupt
+	// (some never do), while its caller moves on to a fresh session, so
+	// repeated cancels would otherwise pile up background work. Only
+	// OpenShared connections are gated: the primary connection and
+	// Connector.Connect's own pool (dual-write's writes) always reconnect.
+	// Leave at the zero value for DefaultMaxAbandonedStatements.
+	MaxAbandonedStatements int
 }
+
+// DefaultMaxAbandonedStatements is Options.MaxAbandonedStatements' default.
+const DefaultMaxAbandonedStatements = 4
+
+// ErrTooManyAbandoned is returned by a statement on an OpenShared connection
+// that needs a new quack session while Options.MaxAbandonedStatements
+// abandoned statements are still running server-side. It's transient: retry
+// once they finish.
+var ErrTooManyAbandoned = errors.New("duckdb: too many cancelled statements are still running")
 
 // Connector implements database/sql/driver.Connector over one supervised
 // duckdb subprocess. It also implements io.Closer: database/sql calls
@@ -1348,6 +1388,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			withQuackServeToken(c.opts.QuackServeToken),
 			withRestrictExternalAccess(c.opts.RestrictExternalAccess),
 			withResourceLimits(c.opts.ResourceLimits),
+			withMaxAbandoned(c.opts.MaxAbandonedStatements),
 		)
 		if err != nil {
 			return nil, err
@@ -1440,7 +1481,8 @@ func OpenConnector(ctx context.Context, opts Options) (*Connector, *sql.DB, erro
 // it never shares the primary connection (and its mutex) w/ the other
 // handle; without a quack listener it can only share the primary connection.
 // Closing it only closes its own connections: the subprocess stays up until
-// the *sql.DB OpenConnector returned is closed.
+// the *sql.DB OpenConnector returned is closed. Its quack sessions are gated
+// on Options.MaxAbandonedStatements.
 func (c *Connector) OpenShared(maxConns int) *sql.DB {
 	db := sql.OpenDB(sharedConnector{c})
 	db.SetMaxOpenConns(maxConns)
@@ -1455,7 +1497,7 @@ func (s sharedConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	if s.c.opts.QuackAddr == nil {
 		return s.c.Connect(ctx)
 	}
-	sess, err := s.c.proc.openQuackConn(ctx)
+	sess, err := s.c.proc.openGatedQuackConn(ctx)
 	if err != nil {
 		return nil, err
 	}

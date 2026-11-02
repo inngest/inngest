@@ -46,12 +46,20 @@ func newHTTPClient() *http.Client {
 	return &http.Client{}
 }
 
-// cancelRequestTimeout bounds each of the CancelRequest and
-// DisconnectMessage watchForCancel fires once a caller's ctx ends
-// mid-statement, each under a fresh, short-lived context detached from that
-// (already-done) ctx, since the requests need to go out regardless of why
-// the caller gave up.
+// cancelRequestTimeout bounds the DisconnectMessage watchForCancel sends
+// once a caller's ctx ends mid-statement, under a fresh, short-lived context
+// detached from that (already-done) ctx, since it needs to go out regardless
+// of why the caller gave up.
 const cancelRequestTimeout = 5 * time.Second
+
+// abandonedStatementTimeout bounds the CancelRequest watchForCancel sends
+// before that DisconnectMessage. The server only answers it once the
+// statement is done (verified against v2.0.0: ~1ms for an interruptible
+// statement, but ~8.7s for a constant-folded levenshtein that ignores the
+// interrupt), so it's how long an abandoned statement is tracked (see
+// WithAbandonedCounter). It's a backstop for a statement that never
+// finishes, not an expected wait.
+const abandonedStatementTimeout = 2 * time.Minute
 
 // Session implements sqlExecer (see conn.go) over DuckDB's quack wire
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
@@ -64,14 +72,32 @@ type Session struct {
 	// abandoned is set once a statement's ctx ends mid-flight -- see
 	// watchForCancel.
 	abandoned atomic.Bool
+	// abandonedCounter, if set, counts this session's abandoned statements
+	// the server may still be running -- see WithAbandonedCounter.
+	abandonedCounter *atomic.Int64
+}
+
+// Option configures a Session.
+type Option func(*Session)
+
+// WithAbandonedCounter has a session add 1 to n for each statement it
+// abandons (see watchForCancel), from when it's abandoned until the server
+// is done with it (or abandonedStatementTimeout passes), so an owner sharing
+// n across sessions can tell how much abandoned work is still running
+// server-side.
+func WithAbandonedCounter(n *atomic.Int64) Option {
+	return func(s *Session) { s.abandonedCounter = n }
 }
 
 // NewSession performs the ConnectionRequest handshake against listenURL
 // (as reported by `CALL quack_serve(...)`) and returns a session ready for exec.
-func NewSession(ctx context.Context, listenURL, token string) (*Session, error) {
+func NewSession(ctx context.Context, listenURL, token string, opts ...Option) (*Session, error) {
 	s := &Session{
 		httpClient: newHTTPClient(),
 		endpoint:   listenURL + "/quack",
+	}
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	req := connectionRequest{
@@ -259,8 +285,9 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 //   - Some statements don't react to Interrupt() (or the CancelRequest
 //     itself blocks server-side) at all. `SELECT len(string_split(repeat('a,',
 //     300000000), ','))` keeps running for ~50s after its cancel, which
-//     never gets a response. The next PREPARE on that connection queues
-//     behind it, and the late interrupt then fails it w/ "Interrupted!".
+//     only gets a response once it finishes. The next PREPARE on that
+//     connection queues behind it, and the late interrupt then fails it w/
+//     "Interrupted!".
 //
 // A fresh connection doesn't queue behind the abandoned statement (other
 // connections stay responsive while it runs) and a late interrupt can't
@@ -271,34 +298,48 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 // context.AfterFunc makes "was ctx done before stop" deterministic: once
 // ctx.Err() is non-nil, stop always reports the func as started, so a
 // statement Query gave up on is never silently left running on a session
-// still marked reusable.
+// still marked reusable. The same goes for abandonedCounter: whichever of
+// the func and stop sees the abandonment first counts it, before Query
+// returns, and the func (which always runs to completion once started)
+// uncounts it.
 func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop func()) {
-	stopAfter := context.AfterFunc(ctx, func() {
+	var counted atomic.Bool
+	abandon := func() {
 		s.abandoned.Store(true)
+		if s.abandonedCounter != nil && counted.CompareAndSwap(false, true) {
+			s.abandonedCounter.Add(1)
+		}
+	}
+	stopAfter := context.AfterFunc(ctx, func() {
+		abandon()
 		s.cancelAndDisconnect(context.WithoutCancel(ctx), queryID)
+		if s.abandonedCounter != nil {
+			s.abandonedCounter.Add(-1)
+		}
 	})
 	return func() {
 		if !stopAfter() {
-			s.abandoned.Store(true)
+			abandon()
 		}
 	}
 }
 
-// cancelAndDisconnect sends a CancelRequest for queryID, then a
-// DisconnectMessage for s's connection, each under its own
-// cancelRequestTimeout. Results are logged, not returned: Query's caller
-// already gets ctx's own error back regardless of whether the server managed
-// to actually interrupt anything.
+// cancelAndDisconnect sends a CancelRequest for queryID and waits (up to
+// abandonedStatementTimeout) for the server to answer it, which it does once
+// the statement is done, then sends a DisconnectMessage for s's connection
+// under cancelRequestTimeout. Results are logged, not returned: Query's
+// caller already gets ctx's own error back regardless of whether the server
+// managed to actually interrupt anything.
 func (s *Session) cancelAndDisconnect(ctx context.Context, queryID hugeint) {
 	l := logger.StdlibLogger(ctx).With(
 		"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
 
-	cancelCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
+	cancelCtx, cancel := context.WithTimeout(context.Background(), abandonedStatementTimeout)
 	hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
 	cancel()
 	switch {
 	case err != nil:
-		l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)
+		l.Warn("duckdb: quack: failed to send cancel request for an abandoned query (or it's still running)", "error", err)
 	case hdr.Type == msgErrorResponse:
 		resp, _ := decodeErrorResponseBody(r)
 		l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", resp.Error())

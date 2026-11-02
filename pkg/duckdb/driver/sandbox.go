@@ -129,6 +129,12 @@ func DefaultResourceLimits() *ResourceLimits {
 	}
 }
 
+// withMaxAbandoned sets maxAbandoned on a process being constructed -- see
+// Options.MaxAbandonedStatements.
+func withMaxAbandoned(n int) processOption {
+	return func(p *process) { p.maxAbandoned = n }
+}
+
 // withResourceLimits sets resourceLimits on a process being constructed --
 // see Options.ResourceLimits.
 func withResourceLimits(limits *ResourceLimits) processOption {

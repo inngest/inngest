@@ -36,6 +36,8 @@ func limitError(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, driver.ErrResultTooLarge):
 		return fmt.Errorf("query result exceeds the %d MiB limit; select fewer columns or rows: %w", maxResultBytes>>20, err)
+	case errors.Is(err, driver.ErrTooManyAbandoned):
+		return fmt.Errorf("too many cancelled queries are still finishing; try again shortly: %w", err)
 	case hitExecuteTimeout(ctx):
 		return fmt.Errorf("query exceeded the %s time limit: %w", executeTimeout, err)
 	}

@@ -111,3 +111,51 @@ func TestExecuteCallerCancellationIsNotATimeLimit(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.NotContains(t, err.Error(), "time limit")
 }
+
+// TestExecuteTooManyAbandonedQueries: once
+// driver.Options.MaxAbandonedStatements timed-out queries are still running
+// server-side, Execute over an OpenShared handle fails fast w/ a user-facing
+// message instead of piling up more. The constant-folded levenshtein ignores
+// its interrupt (see driver.TestQuackAbandonedStatementsAreCapped).
+func TestExecuteTooManyAbandonedQueries(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	addr := driver.EphemeralQuackAddr
+	connector, primary, err := driver.OpenConnector(t.Context(), driver.Options{
+		BinaryPath:             binPath,
+		DBFile:                 ":memory:",
+		QuackAddr:              &addr,
+		MaxAbandonedStatements: 1,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = primary.Close() })
+	db := connector.OpenShared(4)
+	t.Cleanup(func() { _ = db.Close() })
+
+	insights.SetExecuteTimeout(t, 200*time.Millisecond)
+	insights.DisableRenderedSQLGuard(t)
+
+	_, err = insights.Execute(context.Background(), db, &insights.TranspileResult{
+		SQL: "SELECT levenshtein(repeat('a', 40000), repeat('b', 40000)) AS d;",
+	})
+	require.ErrorContains(t, err, "time limit")
+
+	start := time.Now()
+	_, err = insights.Execute(context.Background(), db, &insights.TranspileResult{SQL: "SELECT 1 AS one;"})
+	var eerr *insights.ExecutionError
+	require.ErrorAs(t, err, &eerr)
+	require.ErrorIs(t, err, driver.ErrTooManyAbandoned)
+	require.ErrorContains(t, err, "too many cancelled queries are still finishing; try again shortly")
+	require.Less(t, time.Since(start), time.Second)
+
+	// The primary handle (dual-write's) isn't gated.
+	var one int
+	require.NoError(t, primary.QueryRowContext(context.Background(), "SELECT 1;").Scan(&one))
+
+	require.Eventually(t, func() bool {
+		_, err := insights.Execute(context.Background(), db, &insights.TranspileResult{SQL: "SELECT 1 AS one;"})
+		return err == nil
+	}, 30*time.Second, 100*time.Millisecond)
+}
