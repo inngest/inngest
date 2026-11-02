@@ -61,6 +61,7 @@ func TestOpcodeToGQL(t *testing.T) {
 		{"StepPlanned", enums.OpcodeStepPlanned, models.StepOpRun},
 		{"Sleep", enums.OpcodeSleep, models.StepOpSleep},
 		{"WaitForEvent", enums.OpcodeWaitForEvent, models.StepOpWaitForEvent},
+		{"WaitForSignal", enums.OpcodeWaitForSignal, models.StepOpWaitForSignal},
 		{"Subscribe", enums.OpcodeSubscribe, models.StepOpSubscribe},
 		{"SubscribeWait", enums.OpcodeSubscribeWait, models.StepOpInboxRead},
 	}

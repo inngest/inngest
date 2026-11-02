@@ -37,8 +37,8 @@ const (
 	// OpcodeSubscribeRead reports, as a lazy op, a read of an inbox that was
 	// answered from state: which messages it took.
 	OpcodeSubscribeRead
-	// OpcodeSubscribeClose closes an inbox or a view of one: it deletes the
-	// pauses of the handle's sources and ends the reads waiting under it.
+	// OpcodeSubscribeClose closes an inbox: it deletes the pauses of the
+	// inbox's sources and ends the read waiting on it.
 	OpcodeSubscribeClose
 )
 

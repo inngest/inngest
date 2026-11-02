@@ -882,7 +882,8 @@ func (v v2) DeleteInboxWait(ctx context.Context, id state.ID, inbox string, wait
 	return err
 }
 
-// LoadInboxWaits returns the waits recorded for a run and the reads whose handle was closed.
+// LoadInboxWaits returns the waits recorded for a run, and the inboxes that
+// were closed.
 func (v v2) LoadInboxWaits(ctx context.Context, id state.ID) (state.InboxWaitSet, error) {
 	return util.WithRetry(
 		ctx,

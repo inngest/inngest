@@ -111,7 +111,6 @@ export interface BarMarker {
 
   /** Position on the timeline as a percentage of its width (0-100) */
   startPercent: number;
-
 }
 
 /**
