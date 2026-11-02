@@ -660,6 +660,11 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, e
 	return result, nil
 }
 
+// Name returns the batch store name set by WithStoreName.
+func (b *redisBatchManager) Name() string {
+	return b.storeName
+}
+
 // Close gracefully shuts down the batch manager, flushing any pending buffers.
 func (b *redisBatchManager) Close() error {
 	if b.buffer != nil {
