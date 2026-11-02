@@ -50,16 +50,89 @@ func TestSizeLimitedFunctions(t *testing.T) {
 		"SELECT printf('%*s', 1500000000, 'x') AS s":                  "PRINTF doesn't support a width",
 		"SELECT range(300000000) AS r":                                "RANGE output size is limited",
 		"SELECT range(0, 10001) AS r":                                 "RANGE output size is limited",
-		"SELECT range(length(run_id)) AS r FROM runs":                 "RANGE requires number literal arguments",
+		"SELECT range(length(run_id)) AS r FROM runs":                 "RANGE requires integer literal arguments",
 		"SELECT generate_series(0, 10000) AS r":                       "GENERATE_SERIES output size is limited",
 		"SELECT generate_series(-300000000, 0) AS r":                  "GENERATE_SERIES output size is limited",
-		"SELECT generate_series(1, 2, 0.0000001) AS r":                "GENERATE_SERIES output size is limited",
-		"SELECT generate_series(1, length(run_id)) AS r FROM runs":    "GENERATE_SERIES requires number literal arguments",
+		"SELECT generate_series(1, 2, 0.0000001) AS r":                "GENERATE_SERIES requires integer literal arguments",
+		"SELECT generate_series(1, length(run_id)) AS r FROM runs":    "GENERATE_SERIES requires integer literal arguments",
 	}
 	for q, want := range rejects {
 		t.Run(q, func(t *testing.T) {
 			_, _, _, err := validate(mustParse(t, q))
 			require.ErrorContains(t, err, want)
 		})
+	}
+}
+
+// TestSizeLimitedComposition pins checkSizeComposition's rules: no guarded
+// call inside a list comprehension or a CTE/subquery, and guarded calls add
+// up across the statement.
+func TestSizeLimitedComposition(t *testing.T) {
+	accepts := []string{
+		"SELECT [x * 2 for x in [1, 2, 3]] AS r",
+		"SELECT [x || 'a' for x in string_split(run_id, '-')] AS r FROM runs",
+		"SELECT [run_id for x in [1, 2, 3]] AS r FROM runs",
+		"SELECT [x.a for x in [{'a': 1}]] AS r",
+		"SELECT range(5000) AS a, range(5000) AS b",
+		"SELECT repeat('-', 20) AS a FROM runs UNION ALL SELECT repeat('=', 20) AS a FROM runs",
+		"SELECT unnest(range(1000)) AS r",
+		"SELECT * FROM unnest(range(1000))",
+		"SELECT range(10) AS r FROM runs WHERE run_id IN (SELECT run_id FROM runs)",
+		"SELECT range(9223372036854770000, 9223372036854775000) AS r",
+		"SELECT range(010) AS r",
+		"WITH c AS (SELECT run_id FROM runs) SELECT lpad(run_id, 30, '0') AS r FROM c",
+	}
+	for _, q := range accepts {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.NoError(t, err)
+		})
+	}
+
+	const inComprehension = "can't be used inside a list comprehension"
+	const inSubquery = "can't be used inside a CTE or subquery"
+	const total = "output size is limited to 10000, counting every size-limited call"
+	rejects := map[string]string{
+		// The original repro.
+		"SELECT len(flatten([range(10000) for x in range(10000)])) AS n":             "RANGE " + inComprehension,
+		"SELECT [x for x in range(10)] AS r":                                         "RANGE " + inComprehension,
+		"SELECT [range(10) for x in [1, 2]] AS r":                                    "RANGE " + inComprehension,
+		"SELECT [x for x in [1, 2] if x < len(repeat('a', 3))] AS r":                 "REPEAT " + inComprehension,
+		"SELECT [lpad(x, 5, '0') for x in string_split(run_id, '-')] AS r FROM runs": "LPAD " + inComprehension,
+		"SELECT [[y for y in range(10)] for x in [1, 2]] AS r":                       "RANGE " + inComprehension,
+		"SELECT [runs.run_id for runs in range(100)] AS r FROM runs":                 "RANGE " + inComprehension,
+		// Float rounding near BIGINT's range used to compute this 100-element
+		// series as 0 elements.
+		"SELECT [range(10000) for x in range(9223372036854770000, 9223372036854770100)] AS r": "RANGE " + inComprehension,
+		// A guarded value copied by name.
+		"WITH t AS (SELECT range(10000) AS r) SELECT [x for x in t.r] AS c FROM t":                                 "RANGE " + inSubquery,
+		"WITH c AS (SELECT range(10000) AS r) SELECT [r for y in string_split(run_id, '-')] AS x FROM c, runs":     "RANGE " + inSubquery,
+		"WITH c AS (SELECT range(1000) AS r) SELECT list_value(r, r, r, r, r, r, r, r, r, r, r) AS x FROM c, runs": "RANGE " + inSubquery,
+		"SELECT [#1 for y in string_split(run_id, '-')] AS x FROM (SELECT range(10000) AS r) s, runs":              "RANGE " + inSubquery,
+		"SELECT x FROM (SELECT repeat('a', 3) AS x) s":                                                             "REPEAT " + inSubquery,
+		"SELECT run_id FROM runs WHERE run_id IN (SELECT repeat('a', 3))":                                          "REPEAT " + inSubquery,
+		"SELECT (SELECT range(3)) AS r": "RANGE " + inSubquery,
+		// Sibling calls add up.
+		"SELECT list_value(range(5000), range(5000), range(1)) AS r":                    "RANGE " + total,
+		"SELECT rpad(run_id, 10000, ' ') AS a, lpad(run_id, 1, ' ') AS b FROM runs":     "LPAD " + total,
+		"SELECT range(6000) AS a FROM runs UNION ALL SELECT range(6000) AS a FROM runs": "RANGE " + total,
+		"SELECT format('{:>5000}', 1) AS a, printf('%5001s', 'x') AS b":                 "PRINTF " + total,
+		"SELECT range(10000) AS r FROM runs WHERE len(range(1)) > 0":                    "RANGE " + total,
+		"SELECT range(9223372036854770000, 9223372036854780001) AS r":                   "RANGE output size is limited to 10000",
+	}
+	for q, want := range rejects {
+		t.Run(q, func(t *testing.T) {
+			_, _, _, err := validate(mustParse(t, q))
+			require.ErrorContains(t, err, want)
+		})
+	}
+}
+
+// TestSizeChecksAreAllowedFunctions pins that every sizeChecks entry is an
+// allowed function, so withSizeLimit's lookup by name can't silently miss.
+func TestSizeChecksAreAllowedFunctions(t *testing.T) {
+	for name := range sizeChecks {
+		_, ok := allowedFunctions[name]
+		require.True(t, ok, name)
 	}
 }

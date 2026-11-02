@@ -800,13 +800,13 @@ func init() {
 			description: "Formats a string using the fmt syntax.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#formatformat-",
 			signature:   "format(format, ...)",
-			returnType:  withArity(1, -1, withSizeLimit(formatSizeLimit(false), fixedType(ColumnTypeString))),
+			returnType:  withArity(1, -1, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"generate_series": {
 			description: "Creates a list of values between start and stop - the stop parameter is inclusive.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/list#generate_seriesstart-stop-step",
 			signature:   "generate_series(start[, stop][, step])",
-			returnType:  withArity(1, 3, withSizeLimit(seriesSizeLimit(true), fixedType(ColumnTypeJSON))),
+			returnType:  withArity(1, 3, withSizeLimit(fixedType(ColumnTypeJSON))),
 		},
 		"greatest": {
 			description: "Returns the largest value. For strings lexicographical ordering is used. Note that lowercase characters are considered \"larger\" than uppercase characters and collations are not supported.",
@@ -1148,7 +1148,7 @@ func init() {
 			description: "Pads the string with the character on the left until it has count characters. Truncates the string on the right if it has more than count characters.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#lpadstring-count-character",
 			signature:   "lpad(string, count, character)",
-			returnType:  withArity(3, 3, withSizeLimit(padSizeLimit, fixedType(ColumnTypeString))),
+			returnType:  withArity(3, 3, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"ltrim": {
 			description: "Removes any occurrences of any of the characters from the left side of the string. characters defaults to space.",
@@ -1298,7 +1298,7 @@ func init() {
 			description: "Formats a string using printf syntax.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#printfformat-",
 			signature:   "printf(format, ...)",
-			returnType:  withArity(1, -1, withSizeLimit(formatSizeLimit(true), fixedType(ColumnTypeString))),
+			returnType:  withArity(1, -1, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"product": {
 			description: "Calculates the product of all tuples in arg.",
@@ -1334,7 +1334,7 @@ func init() {
 			description: "Creates a list of values between start and stop - the stop parameter is exclusive.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/list#rangestart-stop-step",
 			signature:   "range(start[, stop][, step])",
-			returnType:  withArity(1, 3, withSizeLimit(seriesSizeLimit(false), fixedType(ColumnTypeJSON))),
+			returnType:  withArity(1, 3, withSizeLimit(fixedType(ColumnTypeJSON))),
 		},
 		"rank": {
 			description: "The rank of the current row with gaps.",
@@ -1382,7 +1382,7 @@ func init() {
 			description: "Repeats the string count number of times.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#repeatstring-count",
 			signature:   "repeat(string, count)",
-			returnType:  withArity(2, 2, withSizeLimit(repeatSizeLimit, fixedType(ColumnTypeString))),
+			returnType:  withArity(2, 2, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"replace": {
 			description: "Replaces any occurrences of the source with target in string.",
@@ -1418,7 +1418,7 @@ func init() {
 			description: "Pads the string with the character on the right until it has count characters. Truncates the string on the right if it has more than count characters.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#rpadstring-count-character",
 			signature:   "rpad(string, count, character)",
-			returnType:  withArity(3, 3, withSizeLimit(padSizeLimit, fixedType(ColumnTypeString))),
+			returnType:  withArity(3, 3, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"rtrim": {
 			description: "Removes any occurrences of any of the characters from the right side of the string. characters defaults to space.",

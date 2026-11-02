@@ -3,6 +3,7 @@ package insights
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -31,6 +32,10 @@ import (
 //
 // This is a deliberate exception to checkFunction's "only reject what
 // DuckDB would reject" rule: these calls would run, just not safely.
+//
+// It also bounds how these calls compose (nested in a list comprehension,
+// copying row data per element, adding up across the statement), which the
+// per-call checks can't see. See checkSizeComposition.
 const maxSizeArgument = 10_000
 
 // sizeLimitDiagnostic is the DiagnosticError a size guard rejects a call
@@ -43,13 +48,33 @@ func sizeLimitDiagnostic(name, problem string) Diagnostic {
 	}
 }
 
-// withSizeLimit wraps next with check, which returns a non-empty problem
-// (for sizeLimitDiagnostic) when args ask for too much output. It goes
-// inside withArity, so check can assume a valid argument count.
-func withSizeLimit(check func(args []parser.Expr) string, next functionTypeResolver) functionTypeResolver {
+// sizeCheck returns the output size (characters or elements, see
+// maxSizeArgument) a call to one size-guarded function asks for, or a
+// non-empty problem (for sizeLimitDiagnostic) when args ask for too much or
+// can't be bounded statically. It can assume a valid argument count.
+type sizeCheck func(args []parser.Expr) (size float64, problem string)
+
+// sizeChecks is every size-guarded function, keyed by its allowedFunctions
+// name. withSizeLimit looks a call up here, and so does
+// checkSizeComposition.
+var sizeChecks = map[string]sizeCheck{
+	"repeat":          repeatSizeLimit,
+	"lpad":            padSizeLimit,
+	"rpad":            padSizeLimit,
+	"format":          formatSizeLimit(false),
+	"printf":          formatSizeLimit(true),
+	"range":           seriesSizeLimit(false),
+	"generate_series": seriesSizeLimit(true),
+}
+
+// withSizeLimit wraps next with name's sizeChecks entry. It goes inside
+// withArity, so the check can assume a valid argument count.
+func withSizeLimit(next functionTypeResolver) functionTypeResolver {
 	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
-		if problem := check(args); problem != "" {
-			return ColumnTypeUnknown, nil, []Diagnostic{sizeLimitDiagnostic(name, problem)}
+		if check, ok := sizeChecks[name]; ok {
+			if _, problem := check(args); problem != "" {
+				return ColumnTypeUnknown, nil, []Diagnostic{sizeLimitDiagnostic(name, problem)}
+			}
 		}
 		return next(name, args, scope)
 	}
@@ -98,93 +123,143 @@ var (
 // repeatSizeLimit: repeat(string, count) produces len(string) * count
 // characters, so both must be literals. A column (or a nested repeat) as
 // the string would multiply by an unbounded length.
-func repeatSizeLimit(args []parser.Expr) string {
+func repeatSizeLimit(args []parser.Expr) (float64, string) {
 	s, ok := stringLiteral(args[0])
 	if !ok {
-		return fmt.Sprintf("requires a string literal as its string argument (its output is len(string) * count, limited to %d)", maxSizeArgument)
+		return 0, fmt.Sprintf("requires a string literal as its string argument (its output is len(string) * count, limited to %d)", maxSizeArgument)
 	}
 	count, ok := numberLiteral(args[1])
 	if !ok {
-		return errSizeNotLiteral
+		return 0, errSizeNotLiteral
 	}
-	if float64(len(s))*count > maxSizeArgument {
-		return errSizeTooLarge
+	size := max(0, float64(len(s))*count)
+	if size > maxSizeArgument {
+		return 0, errSizeTooLarge
 	}
-	return ""
+	return size, ""
 }
 
 // padSizeLimit: lpad/rpad(string, count, character) always produce exactly
 // count characters (truncating a longer string), so only count matters.
-func padSizeLimit(args []parser.Expr) string {
+func padSizeLimit(args []parser.Expr) (float64, string) {
 	count, ok := numberLiteral(args[1])
 	if !ok {
-		return errSizeNotLiteral
+		return 0, errSizeNotLiteral
 	}
 	if count > maxSizeArgument {
-		return errSizeTooLarge
+		return 0, errSizeTooLarge
 	}
-	return ""
+	return max(0, count), ""
 }
 
 // seriesSizeLimit is range/generate_series(start[, stop][, step]):
-// every argument must be a number literal and the element count at most
+// every argument must be an integer literal and the element count at most
 // maxSizeArgument. inclusive is generate_series' inclusive stop.
 // Timestamp series are rejected too (their bounds aren't number
-// literals), since a small interval over a long span is just as unbounded.
-func seriesSizeLimit(inclusive bool) func(args []parser.Expr) string {
-	return func(args []parser.Expr) string {
-		vals := make([]float64, len(args))
+// literals), since a small interval over a long span is just as unbounded,
+// and so are decimal bounds, which DuckDB rejects anyway.
+//
+// The count is computed exactly (big.Int), never in float64: bounds near
+// BIGINT's range are farther apart than a float64 ulp, so float math could
+// round a real 500-element series down to 0, and checkSizeComposition
+// treats a 0-length comprehension source as never evaluating its body.
+func seriesSizeLimit(inclusive bool) sizeCheck {
+	return func(args []parser.Expr) (float64, string) {
+		vals := make([]*big.Int, len(args))
 		for i, a := range args {
-			v, ok := numberLiteral(a)
+			v, ok := integerLiteral(a)
 			if !ok {
-				return fmt.Sprintf("requires number literal arguments (at most %d elements)", maxSizeArgument)
+				return 0, fmt.Sprintf("requires integer literal arguments (at most %d elements)", maxSizeArgument)
 			}
 			vals[i] = v
 		}
-		start, stop, step := 0.0, vals[0], 1.0
+		start, stop, step := big.NewInt(0), vals[0], big.NewInt(1)
 		if len(vals) >= 2 {
 			start, stop = vals[0], vals[1]
 		}
 		if len(vals) == 3 {
 			step = vals[2]
 		}
-		if step == 0 {
-			return "" // DuckDB rejects this itself
+		if step.Sign() == 0 {
+			return 0, "" // DuckDB rejects this itself
 		}
-		n := math.Ceil((stop - start) / step)
-		if inclusive {
-			n = math.Floor((stop-start)/step) + 1
+		// Normalize to an ascending span w/ a positive step.
+		span := new(big.Int).Sub(stop, start)
+		absStep := new(big.Int).Abs(step)
+		if step.Sign() < 0 {
+			span.Neg(span)
 		}
-		if n > maxSizeArgument {
-			return errSizeTooLarge
+		n := new(big.Int)
+		switch {
+		case inclusive && span.Sign() >= 0:
+			n.Quo(span, absStep).Add(n, big.NewInt(1)) // floor(span/step) + 1
+		case !inclusive && span.Sign() > 0:
+			n.Add(span, absStep).Sub(n, big.NewInt(1)).Quo(n, absStep) // ceil(span/step)
 		}
-		return ""
+		if n.Cmp(big.NewInt(maxSizeArgument)) > 0 {
+			return 0, errSizeTooLarge
+		}
+		return float64(n.Int64()), ""
 	}
+}
+
+// integerLiteral returns e's exact value if it's a (possibly signed)
+// integer literal (decimal, or 0x/0b/0o, w/ optional "_" separators).
+func integerLiteral(e parser.Expr) (*big.Int, bool) {
+	neg := false
+	if u, ok := e.(*parser.UnaryExpr); ok && !u.Postfix && (u.Op == "-" || u.Op == "+") {
+		neg = u.Op == "-"
+		e = u.X
+	}
+	lit, ok := e.(*parser.Literal)
+	if !ok || lit.Kind != parser.LitNumber {
+		return nil, false
+	}
+	text := strings.ReplaceAll(lit.Text, "_", "")
+	base := 10 // DuckDB reads "010" as 10, not octal
+	if len(text) > 1 && text[0] == '0' && strings.ContainsAny(text[1:2], "xXbBoO") {
+		base = 0
+	}
+	v, ok := new(big.Int).SetString(text, base)
+	if !ok {
+		return nil, false
+	}
+	if neg {
+		v.Neg(v)
+	}
+	return v, true
 }
 
 // formatSizeLimit is format/printf(format, ...): the format string must be
 // a literal, every width/precision in it at most maxSizeArgument, and none
 // may come from an argument ("{:>{}}", "%*s"). printf selects printf-style
 // specs ("%-10.3f"), otherwise fmt-style ("{:>10}").
-func formatSizeLimit(printf bool) func(args []parser.Expr) string {
-	return func(args []parser.Expr) string {
+//
+// Its size (for checkSizeComposition) is the sum of its widths/precisions,
+// the part of the output the format asks for on its own (the rest is the
+// format's own text and the arguments, bounded by the query text and data).
+func formatSizeLimit(printf bool) sizeCheck {
+	return func(args []parser.Expr) (float64, string) {
 		f, ok := stringLiteral(args[0])
 		if !ok {
-			return fmt.Sprintf("requires a string literal format (widths are limited to %d)", maxSizeArgument)
+			return 0, fmt.Sprintf("requires a string literal format (widths are limited to %d)", maxSizeArgument)
 		}
 		specs, dynamic := fmtSpecs(f)
 		if printf {
 			specs, dynamic = printfSpecs(f)
 		}
 		if dynamic {
-			return fmt.Sprintf("doesn't support a width or precision taken from an argument (widths are limited to %d)", maxSizeArgument)
+			return 0, fmt.Sprintf("doesn't support a width or precision taken from an argument (widths are limited to %d)", maxSizeArgument)
 		}
+		size := 0.0
 		for _, spec := range specs {
-			if maxDigitRun(spec) > maxSizeArgument {
-				return fmt.Sprintf("widths and precisions are limited to %d", maxSizeArgument)
+			width := maxDigitRun(spec)
+			if width > maxSizeArgument {
+				return 0, fmt.Sprintf("widths and precisions are limited to %d", maxSizeArgument)
 			}
+			size += width
 		}
-		return ""
+		return size, ""
 	}
 }
 
@@ -253,4 +328,148 @@ func maxDigitRun(s string) float64 {
 		cur = 0
 	}
 	return best
+}
+
+// checkSizeComposition bounds what the per-call guards (sizeChecks) can't see
+// on their own: how many copies of a guarded call's output get produced at
+// once. Measured against the pinned duckdb w/ memory_limit=2GiB, threads=4
+// (driver.DefaultResourceLimits):
+//
+//   - A list comprehension evaluates its body/filter once per source element,
+//     outside memory_limit: len([range(10000) for x in range(10000)]) -> ~7GB
+//     RSS (~18GB w/ flatten), and per row (a whole 2048-row vector at once)
+//     [range(10000) || [i] for x in range(100)] -> >21GB.
+//   - Row data gets copied the same way: [s for x in range(10000)] over a ~1KB
+//     string column -> >14GB, and a CTE column holding a range(10000) can be
+//     copied by name the same way.
+//   - Sibling calls add up: list_value() of 10 per-row range(10000)s -> ~4.2GB
+//     (1 -> ~470MB, 3 -> ~1.5GB).
+//
+// A single guarded call evaluated per row streams in vectors, so it stays
+// bounded however many rows there are (sum(len(range(10000) || [i])) over 1M
+// rows -> ~470MB), and aggregating its output (list, string_agg) is tracked
+// by memory_limit (it fails w/ an Out of Memory Error instead).
+//
+// Rather than track sizes through the expression tree (which has to get
+// every way of naming or copying a value right), the rule is deliberately
+// blunt and fail-closed:
+//
+//  1. A guarded call can't appear anywhere inside a list comprehension
+//     (source, body, or filter), so nothing evaluates it, or a list it
+//     produced, once per element.
+//  2. A guarded call can only appear in the statement's own top-level SELECT
+//     (or a UNION/INTERSECT/EXCEPT operand of it), never in a CTE, a FROM
+//     subquery, or an expression subquery. So its output can't be referenced
+//     (and copied) by name: every copy is its own call site in the query text.
+//  3. The sizes of every guarded call in the statement add up to at most
+//     maxSizeArgument, so sibling calls (and repeating a call in the query
+//     text) can't add up past what one call may ask for.
+//
+// This rejects some harmless shapes ([repeat('-', 3) for x in tags], two
+// rpad(col, 10000, ' ') columns, a repeat() in a CTE), which is the trade-off
+// for not having to reason about where a guarded value flows.
+func checkSizeComposition(stmt *parser.SelectStatement) error {
+	c := &sizeComposition{}
+	c.walkTopLevel(stmt)
+	return c.err
+}
+
+// sizeComposition walks a statement for checkSizeComposition.
+type sizeComposition struct {
+	// total is the statement's guarded output so far (rule 3).
+	total float64
+	err   error
+}
+
+// walkTopLevel walks stmt as a top-level SELECT: its own expressions may have
+// guarded calls (rule 2), and so may its set-op operands.
+func (c *sizeComposition) walkTopLevel(stmt *parser.SelectStatement) {
+	if stmt.SetOp != parser.SetOpNone {
+		if stmt.With != nil {
+			c.walkNested(stmt.With)
+		}
+		c.walkTopLevel(stmt.SetLeft)
+		c.walkTopLevel(stmt.SetRight)
+		// ORDER BY/LIMIT etc. on the set-op node itself.
+		for _, n := range stmt.Children() {
+			if c.err != nil {
+				return
+			}
+			if n != parser.Node(stmt.SetLeft) && n != parser.Node(stmt.SetRight) && n != parser.Node(stmt.With) {
+				parser.Walk(c, n)
+			}
+		}
+		return
+	}
+	for _, n := range stmt.Children() {
+		if c.err != nil {
+			return
+		}
+		parser.Walk(c, n)
+	}
+}
+
+// walkNested rejects any guarded call under n (rule 2).
+func (c *sizeComposition) walkNested(n parser.Node) {
+	if c.err == nil {
+		c.err = rejectSizeLimitedCalls(n, "can't be used inside a CTE or subquery, only in the query's top-level SELECT")
+	}
+}
+
+func (c *sizeComposition) Visit(n parser.Node) parser.Visitor {
+	if c.err != nil {
+		return nil
+	}
+	switch x := n.(type) {
+	case *parser.SelectStatement, *parser.WithClause, *parser.TableSubqueryRef, *parser.SubqueryExpr:
+		c.walkNested(x)
+		return nil
+	case *parser.ListComprehensionExpr:
+		c.err = rejectSizeLimitedCalls(x, "can't be used inside a list comprehension")
+		return nil
+	case *parser.FunctionExpr:
+		name := strings.ToLower(strings.Join(x.Name, "."))
+		if check, ok := sizeChecks[name]; ok {
+			size, problem := check(x.Args)
+			if problem != "" {
+				return nil // validate already rejected it
+			}
+			c.total += size
+			if c.total > maxSizeArgument {
+				c.err = sizeCompositionError(x, fmt.Sprintf("%s output size is limited to %d, counting every size-limited call in the query together", strings.ToUpper(name), maxSizeArgument))
+				return nil
+			}
+		}
+	}
+	return c
+}
+
+// rejectSizeLimitedCalls returns an error naming the first guarded call
+// under n, if any.
+func rejectSizeLimitedCalls(n parser.Node, problem string) error {
+	var err error
+	parser.Walk(visitFunc(func(n parser.Node) bool {
+		if f, ok := n.(*parser.FunctionExpr); ok {
+			name := strings.ToLower(strings.Join(f.Name, "."))
+			if _, ok := sizeChecks[name]; ok {
+				err = sizeCompositionError(f, fmt.Sprintf("%s %s (output size is limited to %d)", strings.ToUpper(name), problem, maxSizeArgument))
+			}
+		}
+		return err == nil
+	}), n)
+	return err
+}
+
+// visitFunc is a parser.Visitor that keeps descending while it returns true.
+type visitFunc func(parser.Node) bool
+
+func (f visitFunc) Visit(n parser.Node) parser.Visitor {
+	if f(n) {
+		return f
+	}
+	return nil
+}
+
+func sizeCompositionError(n parser.Node, msg string) error {
+	return &ValidationError{Pos: n.Pos(), End: n.End(), Message: msg}
 }
