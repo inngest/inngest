@@ -51,3 +51,27 @@ func TestComprehensionFanOut(t *testing.T) {
 		})
 	}
 }
+
+// TestComprehensionFanOutCaseInsensitive checks the fan-out rules on their
+// own (not via validate): variables and table names match regardless of
+// case, like DuckDB identifiers.
+func TestComprehensionFanOutCaseInsensitive(t *testing.T) {
+	const own = "a list comprehension can only reference its own variables"
+	cases := map[string]string{
+		"SELECT [X FOR x IN event_ids] AS e FROM runs":                   "",
+		"SELECT [upper(x) FOR X IN event_ids IF x != ''] AS e FROM runs": "",
+		"SELECT [X->>'key' FOR x IN sessions] AS k FROM runs":            "",
+		"SELECT [Runs.run_id FOR runs IN event_ids] AS r FROM runs":      own + `, not "Runs.run_id"`,
+		"SELECT [r.run_id FOR R IN event_ids] AS e FROM runs AS r":       own + `, not "r.run_id"`,
+	}
+	for q, want := range cases {
+		t.Run(q, func(t *testing.T) {
+			err := checkComprehensionFanOut(mustParse(t, q))
+			if want == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, want)
+		})
+	}
+}

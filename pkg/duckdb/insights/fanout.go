@@ -3,6 +3,7 @@ package insights
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
@@ -31,7 +32,8 @@ import (
 //     subquery, or any expression shape not listed in fanOutAllowed fails
 //     closed. A qualified x.field off a variable counts only when x isn't
 //     also a table/alias/CTE name in the statement, since DuckDB resolves
-//     t.col against the FROM tables first.
+//     t.col against the FROM tables first. Names compare case-insensitively,
+//     like DuckDB's own identifiers.
 //
 // The source can still be any (already validated) expression: evaluating it
 // is one linear pass over the row. So [x.key for x in sessions] and
@@ -98,11 +100,13 @@ func (f *fanOut) checkComprehension(l *parser.ListComprehensionExpr) error {
 // shapes and references to vars (rule 2).
 func (f *fanOut) checkBody(vars []string, e parser.Expr) error {
 	var err error
-	isVar := func(name string) bool { return slices.Contains(vars, name) }
+	isVar := func(name string) bool {
+		return slices.ContainsFunc(vars, func(v string) bool { return strings.EqualFold(v, name) })
+	}
 	parser.Walk(visitFunc(func(n parser.Node) bool {
 		switch x := n.(type) {
 		case *parser.Ident:
-			if !isVar(x.Parts[0]) || (len(x.Parts) > 1 && f.tables[x.Parts[0]]) {
+			if !isVar(x.Parts[0]) || (len(x.Parts) > 1 && f.tables[strings.ToLower(x.Parts[0])]) {
 				err = fanOutError(x, fmt.Sprintf("a list comprehension can only reference its own variables, not %q (it would be copied once per element)", identName(x)))
 			}
 		case *parser.LambdaExpr:
@@ -145,7 +149,7 @@ func statementTableNames(stmt *parser.SelectStatement) map[string]bool {
 	names := map[string]bool{}
 	add := func(s string) {
 		if s != "" {
-			names[s] = true
+			names[strings.ToLower(s)] = true
 		}
 	}
 	parser.Walk(visitFunc(func(n parser.Node) bool {
