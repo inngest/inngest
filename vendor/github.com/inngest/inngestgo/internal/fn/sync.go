@@ -8,6 +8,10 @@ import (
 
 func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 	config := fn.Config()
+	checkpointConfig := config.Checkpoint
+	if checkpointConfig != nil && checkpointConfig.Disable {
+		checkpointConfig = nil
+	}
 
 	return &SyncConfig{
 		Name:        fn.Name(),
@@ -20,7 +24,7 @@ func GetFnSyncConfig(fn ServableFunction) *SyncConfig {
 		RateLimit:   config.RateLimit,
 		Throttle:    config.Throttle,
 		Debounce:    config.Debounce,
-		Checkpoint:  config.Checkpoint,
+		Checkpoint:  checkpointConfig,
 		Timeouts:    config.Timeouts,
 		Cancel:      config.Cancel,
 		Retries:     config.Retries,
