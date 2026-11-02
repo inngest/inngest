@@ -2,10 +2,13 @@ import { Kind, type DocumentNode, type SelectionSetNode } from 'graphql';
 import { formatDocument } from 'urql';
 import { describe, expect, it } from 'vitest';
 
-import { GetRunTraceDocument, GetRunTraceTicksDocument } from './graphql';
+import { GetRunTraceDocument } from './graphql';
 
-/** Cloud rejects any query that costs more than this. */
-const CLOUD_COMPLEXITY_LIMIT = 300;
+/**
+ * Cloud rejects any query that costs more than this. It is `ComplexityLimit` in
+ * the monorepo's pkg/config/appconfig/appconfig.go.
+ */
+const CLOUD_COMPLEXITY_LIMIT = 600;
 
 /**
  * Costs a query the way Cloud does: one point per field, whatever it holds,
@@ -53,15 +56,11 @@ function complexity(document: DocumentNode) {
   return cost;
 }
 
-describe('run trace queries', () => {
-  // The trace query goes five levels deep and has little room left: each field
-  // added to its TraceDetails fragment costs five times over. Anything that
-  // needs more fields, such as span ticks, belongs in its own query.
-  it('stay under the complexity limit Cloud enforces', () => {
+describe('run trace query', () => {
+  // The trace query goes five levels deep, and each field added to its
+  // TraceDetails fragment costs five times over.
+  it('stays under the complexity limit Cloud enforces', () => {
     expect(complexity(GetRunTraceDocument)).toBeLessThanOrEqual(
-      CLOUD_COMPLEXITY_LIMIT,
-    );
-    expect(complexity(GetRunTraceTicksDocument)).toBeLessThanOrEqual(
       CLOUD_COMPLEXITY_LIMIT,
     );
   });
