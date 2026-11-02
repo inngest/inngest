@@ -606,9 +606,9 @@ export type Query = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsV2Connection;
-  sessionKeys: Array<SessionKey>;
-  sessionRuns: Array<SessionRun>;
-  sessions: Array<SessionGroup>;
+  sessionKeys: SessionKeysConnection;
+  sessionRuns: SessionRunsConnection;
+  sessions: SessionGroupsConnection;
   stream: Array<StreamItem>;
   workerConnection: Maybe<ConnectV1WorkerConnection>;
   workerConnections: ConnectV1WorkerConnectionsConnection;
@@ -676,16 +676,22 @@ export type QueryRunsArgs = {
 };
 
 export type QuerySessionKeysArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   search: InputMaybe<Scalars['String']>;
 };
 
 export type QuerySessionRunsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   sessionId: Scalars['String'];
   sessionKey: Scalars['String'];
   timeRange: InputMaybe<TimeRangeInput>;
 };
 
 export type QuerySessionsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
   sessionIdSearch: InputMaybe<Scalars['String']>;
   sessionKey: Scalars['String'];
   timeRange: InputMaybe<TimeRangeInput>;
@@ -977,10 +983,22 @@ export type SessionGroup = {
   sessionKey: Scalars['String'];
 };
 
+export type SessionGroupsConnection = {
+  __typename?: 'SessionGroupsConnection';
+  nodes: Array<SessionGroup>;
+  pageInfo: PageInfo;
+};
+
 export type SessionKey = {
   __typename?: 'SessionKey';
   createdAt: Scalars['Time'];
   sessionKey: Scalars['String'];
+};
+
+export type SessionKeysConnection = {
+  __typename?: 'SessionKeysConnection';
+  nodes: Array<SessionKey>;
+  pageInfo: PageInfo;
 };
 
 export type SessionRun = {
@@ -992,6 +1010,13 @@ export type SessionRun = {
   queuedAt: Scalars['Time'];
   startedAt: Maybe<Scalars['Time']>;
   status: Scalars['String'];
+};
+
+export type SessionRunsConnection = {
+  __typename?: 'SessionRunsConnection';
+  nodes: Array<SessionRun>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
 };
 
 export type SingletonConfiguration = {

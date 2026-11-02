@@ -64,6 +64,8 @@ var registry = map[string]registryEntry{
 	KeySessionKeys: {build: buildSessionKeysSQL},
 	KeySessions:    {build: buildSessionsSQL},
 	KeySessionRuns: {build: buildSessionRunsSQL},
+
+	KeySessionRunsCount: {build: buildSessionRunsCountSQL},
 }
 
 const (
@@ -142,10 +144,23 @@ func validateScope(scope Scope) error {
 		return fmt.Errorf("dashboard query: accountID and envID are required")
 	}
 	if !scope.From.IsZero() && !scope.To.IsZero() && !scope.From.Before(scope.To) {
-		return fmt.Errorf("dashboard query: invalid time range: from (%s) must be before to (%s)",
+		return invalidArgumentf("invalid time range: from (%s) must be before until (%s)",
 			scope.From.Format(time.RFC3339), scope.To.Format(time.RFC3339))
 	}
 	return nil
+}
+
+// InvalidArgumentError is a caller error (bad cursor, inverted time range,
+// missing session key, ...) as opposed to a query/database failure, so an
+// API layer can return a 400 w/ Message instead of a 500.
+type InvalidArgumentError struct {
+	Message string
+}
+
+func (e *InvalidArgumentError) Error() string { return e.Message }
+
+func invalidArgumentf(format string, args ...any) error {
+	return &InvalidArgumentError{Message: fmt.Sprintf(format, args...)}
 }
 
 func resolveLimit(requested int) int {

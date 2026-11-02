@@ -413,6 +413,20 @@ func TestListSessionRuns_Pagination(t *testing.T) {
 	require.False(t, second.HasMore)
 	require.Len(t, second.Runs, 1)
 	require.Equal(t, "r0", second.Runs[0].RunID)
+
+	// The count is the session's total, regardless of page/cursor.
+	count, err := dashboards.CountSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "u1", From: now.Add(-time.Hour), Until: now.Add(time.Hour), Limit: 2,
+		Cursor: first.Runs[len(first.Runs)-1].Cursor,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+
+	count, err = dashboards.CountSessionRuns(t.Context(), db, accountID, envID, dashboards.SessionRunsOpts{
+		Key: "user", ID: "missing", From: now.Add(-time.Hour), Until: now.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
 }
 
 func TestListSessions_EnvIsolation(t *testing.T) {
@@ -494,4 +508,27 @@ func TestListSessionRuns_LatestRowTiebreak(t *testing.T) {
 		got[r.RunID] = r.Status
 	}
 	require.Equal(t, want, got)
+}
+
+func TestResolveSessionTimeRange(t *testing.T) {
+	now := time.Now().UTC()
+
+	from, until, err := dashboards.ResolveSessionTimeRange(time.Time{}, time.Time{})
+	require.NoError(t, err)
+	require.WithinDuration(t, now, until, time.Minute)
+	require.Equal(t, 7*24*time.Hour, until.Sub(from))
+
+	from, until, err = dashboards.ResolveSessionTimeRange(now.Add(-time.Hour), time.Time{})
+	require.NoError(t, err)
+	require.Equal(t, now.Add(-time.Hour), from)
+	require.WithinDuration(t, now, until, time.Minute)
+
+	from, until, err = dashboards.ResolveSessionTimeRange(time.Time{}, now)
+	require.NoError(t, err)
+	require.Equal(t, now.Add(-7*24*time.Hour), from)
+	require.Equal(t, now, until)
+
+	_, _, err = dashboards.ResolveSessionTimeRange(now, now)
+	var iae *dashboards.InvalidArgumentError
+	require.ErrorAs(t, err, &iae)
 }

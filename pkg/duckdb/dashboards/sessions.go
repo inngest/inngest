@@ -38,6 +38,8 @@ const (
 	KeySessionKeys = "session_keys"
 	KeySessions    = "sessions"
 	KeySessionRuns = "session_runs"
+
+	KeySessionRunsCount = "session_runs_count"
 )
 
 // defaultSessionWindow matches PR #4530's ("sessions oss") own default
@@ -129,10 +131,8 @@ func buildSessionKeysSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (created_at < ? OR (created_at = ? AND key < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query := fmt.Sprintf(`
@@ -170,10 +170,8 @@ func buildSessionsSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		having = "\nHAVING (last_active_at < ? OR (last_active_at = ? AND session_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -214,10 +212,8 @@ func buildSessionRunsSQL(scope Scope) (string, []any, error) {
 		if err != nil {
 			return "", nil, err
 		}
-		if cur != nil {
-			where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
-			args = append(args, cur.at, cur.at, cur.id)
-		}
+		where += "\n  AND (queued_at < ? OR (queued_at = ? AND run_id < ?))"
+		args = append(args, cur.at, cur.at, cur.id)
 	}
 
 	query += fmt.Sprintf(`
@@ -232,6 +228,26 @@ LIMIT ?;`, where)
 	return query, args, nil
 }
 
+// buildSessionRunsCountSQL counts every run carrying one (key, id)
+// session pair in the time range, ignoring Cursor/Limit so it's the
+// session's total rather than what's left after the current page. This
+// is the same set buildSessionsSQL's run_count aggregates for that id.
+func buildSessionRunsCountSQL(scope Scope) (string, []any, error) {
+	if scope.SessionKey == "" || scope.SessionID == "" {
+		return "", nil, fmt.Errorf("session key and session id are required")
+	}
+
+	var args []any
+	query := latestRunsCTE(scope, &args)
+	query += `
+SELECT COUNT(*) AS total_count
+FROM latest, UNNEST(sessions) AS s(session)
+WHERE session.key = ? AND session.id = ? AND queued_at BETWEEN ? AND ?;`
+	args = append(args, scope.SessionKey, scope.SessionID, scope.From, scope.To)
+
+	return query, args, nil
+}
+
 type sessionCursor struct {
 	at time.Time
 	id string
@@ -242,19 +258,20 @@ type sessionCursor struct {
 // with the row/group identifier as the final tiebreak. Reuses
 // cqrs.TracePageCursor (the same codec pkg/cqrs/duckdbquery's own runs/
 // events pagination already uses) rather than a bespoke cursor type per
-// entry. Returns nil, nil for the first page (no cursor, or nothing under
-// this field).
+// entry. Returns nil, nil for the first page (no cursor). A cursor that
+// decodes but isn't keyed on field (e.g. a sessions cursor sent to session
+// runs) is an *InvalidArgumentError, not a silent restart at page 1.
 func decodeSessionCursor(cursorStr, field string) (*sessionCursor, error) {
 	if cursorStr == "" {
 		return nil, nil
 	}
 	cur := &cqrs.TracePageCursor{}
 	if err := cur.Decode(cursorStr); err != nil {
-		return nil, fmt.Errorf("dashboard: decoding cursor: %w", err)
+		return nil, invalidArgumentf("invalid cursor")
 	}
 	tc := cur.Find(field)
 	if tc == nil || cur.ID == "" {
-		return nil, nil
+		return nil, invalidArgumentf("invalid cursor: not a cursor for this listing")
 	}
 	return &sessionCursor{at: time.UnixMilli(tc.Value), id: cur.ID}, nil
 }
@@ -271,18 +288,22 @@ func encodeSessionCursor(id, field string, at time.Time) (string, error) {
 	return c.Encode()
 }
 
-// resolveSessionTimeRange applies defaultSessionWindow when the caller
-// specifies no range at all, matching the reference's own
-// sessions.resolveTimeRange default; an explicit range is validated
-// (from < to) but otherwise passed through unbounded by any retention
-// window -- OSS has no billing-tier history limit to enforce.
-func resolveSessionTimeRange(from, until time.Time) (time.Time, time.Time, error) {
-	if from.IsZero() && until.IsZero() {
-		to := time.Now().UTC()
-		return to.Add(-defaultSessionWindow), to, nil
+// ResolveSessionTimeRange is the one time-range defaulting rule every
+// Sessions caller (REST and GQL) shares: a zero until means now, a zero
+// from means defaultSessionWindow before until (so no range at all is the
+// last 7 days, matching the reference's own sessions.resolveTimeRange
+// default). The resolved range must satisfy from < until, else it's an
+// *InvalidArgumentError. It's otherwise unbounded by any retention window
+// -- OSS has no billing-tier history limit to enforce.
+func ResolveSessionTimeRange(from, until time.Time) (time.Time, time.Time, error) {
+	if until.IsZero() {
+		until = time.Now().UTC()
+	}
+	if from.IsZero() {
+		from = until.Add(-defaultSessionWindow)
 	}
 	if !from.Before(until) {
-		return time.Time{}, time.Time{}, fmt.Errorf(
+		return time.Time{}, time.Time{}, invalidArgumentf(
 			"invalid time range: from (%s) must be before until (%s)",
 			from.Format(time.RFC3339), until.Format(time.RFC3339),
 		)
@@ -376,8 +397,8 @@ func (g SessionGroup) FailureRate() float64 {
 	return float64(g.FailedRunCount) / float64(g.RunCount)
 }
 
-// SessionsOpts are ListSessions' caller-provided parameters. From/Until
-// zero means "use the default window" (see resolveSessionTimeRange).
+// SessionsOpts are ListSessions' caller-provided parameters. A zero
+// From/Until is defaulted by ResolveSessionTimeRange.
 type SessionsOpts struct {
 	Key      string
 	IDSearch string
@@ -397,9 +418,9 @@ type SessionsResult struct {
 // under one session key, most-recently-active first.
 func ListSessions(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionsOpts) (*SessionsResult, error) {
 	if opts.Key == "" {
-		return nil, fmt.Errorf("dashboard: session key is required")
+		return nil, invalidArgumentf("session key is required")
 	}
-	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard: %w", err)
 	}
@@ -493,9 +514,9 @@ type SessionRunsResult struct {
 // session pair, most-recently-queued first.
 func ListSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionRunsOpts) (*SessionRunsResult, error) {
 	if opts.Key == "" || opts.ID == "" {
-		return nil, fmt.Errorf("dashboard: session key and session id are required")
+		return nil, invalidArgumentf("session key and session id are required")
 	}
-	from, until, err := resolveSessionTimeRange(opts.From, opts.Until)
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
 	if err != nil {
 		return nil, fmt.Errorf("dashboard: %w", err)
 	}
@@ -527,6 +548,36 @@ func ListSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID
 		runs = runs[:limit]
 	}
 	return &SessionRunsResult{Runs: runs, HasMore: hasMore}, nil
+}
+
+// CountSessionRuns returns the total number of runs ListSessionRuns
+// would page through for opts, ignoring opts.Cursor/opts.Limit.
+func CountSessionRuns(ctx context.Context, db *sql.DB, accountID, envID uuid.UUID, opts SessionRunsOpts) (int, error) {
+	if opts.Key == "" || opts.ID == "" {
+		return 0, fmt.Errorf("dashboard: session key and session id are required")
+	}
+	from, until, err := ResolveSessionTimeRange(opts.From, opts.Until)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+
+	scope := Scope{
+		AccountID: accountID, EnvID: envID,
+		From: from, To: until,
+		SessionKey: opts.Key, SessionID: opts.ID,
+	}
+	result, err := Get(ctx, db, scope, KeySessionRunsCount)
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: counting session runs: %w", err)
+	}
+	if len(result.Rows) != 1 {
+		return 0, fmt.Errorf("dashboard: counting session runs: expected 1 row, got %d", len(result.Rows))
+	}
+	count, err := asInt64(col(result.Rows[0], columnIndex(result.Columns), "total_count"), "total_count")
+	if err != nil {
+		return 0, fmt.Errorf("dashboard: %w", err)
+	}
+	return int(count), nil
 }
 
 func parseSessionRunRow(row []any, idx map[string]int) (SessionRun, error) {
