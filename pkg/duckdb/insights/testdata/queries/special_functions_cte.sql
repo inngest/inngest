@@ -1,0 +1,1 @@
+WITH c AS (SELECT COALESCE(ended_at, started_at) AS t, NULLIF(status, 'Queued') AS s, EXTRACT(year FROM queued_at) AS y, TRIM(app_id) AS a, SUBSTRING(run_id, 1, 8) AS r, POSITION('a' IN function_id) AS p FROM runs) SELECT t, s, y, a, r, p FROM c WHERE y > 2020 AND p > 0

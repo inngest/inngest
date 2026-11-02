@@ -1,6 +1,8 @@
 package insights
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
@@ -35,7 +37,7 @@ func remapTablesWithCTEs(stmt *parser.SelectStatement, accountID, envID uuid.UUI
 		}
 		for _, cte := range stmt.With.CTEs {
 			args = append(args, remapTablesWithCTEs(cte.Select, accountID, envID, merged)...)
-			merged[cte.Name] = true
+			merged[strings.ToLower(cte.Name)] = true
 		}
 		ctes = merged
 	}
@@ -125,10 +127,10 @@ func remapRef(ref parser.TableRef, accountID, envID uuid.UUID, args []any, ctes 
 // physical logical table (validate should have already rejected this
 // before Transpile ever calls remapTables).
 func remapBaseTable(r *parser.BaseTableRef, accountID, envID uuid.UUID, ctes map[string]bool) (ref parser.TableRef, callArgs []any, ok bool) {
-	if ctes[r.Name[0]] {
+	if ctes[strings.ToLower(r.Name[0])] {
 		return r, nil, false
 	}
-	tbl, known := logicalTables[r.Name[0]]
+	tbl, known := lookupLogicalTable(r.Name[0])
 	if !known {
 		return r, nil, false
 	}

@@ -26,18 +26,5 @@ func SetExecuteTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { executeTimeout = orig })
 }
 
-// OccupyExecuteSlots takes every Execute concurrency slot until t ends, as
-// if that many queries were already running.
-func OccupyExecuteSlots(t *testing.T) {
-	for range cap(executeSlots) {
-		executeSlots <- struct{}{}
-	}
-	t.Cleanup(func() {
-		for range cap(executeSlots) {
-			<-executeSlots
-		}
-	})
-}
-
 // MaxResultBytes is Execute's result size limit.
 func MaxResultBytes() int64 { return maxResultBytes }

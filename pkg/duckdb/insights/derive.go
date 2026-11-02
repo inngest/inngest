@@ -1,6 +1,11 @@
 package insights
 
-import "github.com/inngest/inngest/pkg/duckdb/parser"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/inngest/inngest/pkg/duckdb/parser"
+)
 
 // deriveTable validates stmt (a CTE body or a FROM-clause subquery) with
 // its own scope — built from its own FROM clause plus ctes, per standard
@@ -84,27 +89,22 @@ func leftmostOperand(stmt *parser.SelectStatement) *parser.SelectStatement {
 // expands using resolveStarColumns (columnhints.go), the same resolution
 // buildColumnHints itself uses. Any other item needs either an explicit
 // alias or to already be a bare/qualified column reference (whose own
-// name is used) — a computed expression with no alias is rejected rather
+// name is used) -- a computed expression with no alias is rejected rather
 // than guessing a name.
 //
-// A duplicate output name (e.g. a join's "*" expanding two same-named
-// columns from different tables) collapses to one entry, keyed by that
-// name — an accepted imprecision, since a derived table only needs "is
-// this a known column of it," not an exact positional count.
+// explicitCols renames columns positionally first, then a duplicate name
+// (e.g. a join's "*" expanding two same-named columns) is renamed the way
+// DuckDB names a derived table's columns (dedupeColumnNames), so the
+// derived table keeps one entry per real output column and "SELECT *"
+// over it stays positionally aligned.
 func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explicitCols []string) ([]string, map[string]knownColumn, error) {
-	var order []string
-	cols := map[string]knownColumn{}
-	add := func(name string, kc knownColumn) {
-		if _, exists := cols[name]; !exists {
-			order = append(order, name)
-		}
-		cols[name] = kc
-	}
-
+	var names []string
+	var kcs []knownColumn
 	for _, item := range stmt.Columns {
 		if star, ok := item.Expr.(*parser.StarExpr); ok {
 			for _, sc := range resolveStarColumns(star, scope) {
-				add(sc.name, sc.col)
+				names = append(names, sc.name)
+				kcs = append(kcs, sc.col)
 			}
 			continue
 		}
@@ -113,22 +113,43 @@ func inferOutputColumns(stmt *parser.SelectStatement, scope *tableScope, explici
 		if err != nil {
 			return nil, nil, err
 		}
-		add(name, knownColumn{
+		names = append(names, name)
+		kcs = append(kcs, knownColumn{
 			colType:   inferType(item.Expr, scope),
 			pathHints: rootHint(resolveItemHint(item.Expr, scope)),
 		})
 	}
 
 	for i, override := range explicitCols {
-		if i >= len(order) || override == order[i] {
-			continue
+		if i < len(names) {
+			names[i] = override
 		}
-		cols[override] = cols[order[i]]
-		delete(cols, order[i])
-		order[i] = override
 	}
+	names = dedupeColumnNames(names)
 
-	return order, cols, nil
+	cols := make(map[string]knownColumn, len(names))
+	for i, name := range names {
+		cols[strings.ToLower(name)] = kcs[i]
+	}
+	return names, cols, nil
+}
+
+// dedupeColumnNames renames each name already taken (case-insensitively)
+// by an earlier one to name_1, name_2, ..., the first suffix not yet taken,
+// matching DuckDB's derived-table naming (checked empirically):
+// (x, x, x, x_1) -> (x, x_1, x_2, x_1_1), and (x, X) -> (x, X_1).
+func dedupeColumnNames(names []string) []string {
+	out := make([]string, len(names))
+	taken := make(map[string]bool, len(names))
+	for i, name := range names {
+		candidate := name
+		for n := 1; taken[strings.ToLower(candidate)]; n++ {
+			candidate = fmt.Sprintf("%s_%d", name, n)
+		}
+		taken[strings.ToLower(candidate)] = true
+		out[i] = candidate
+	}
+	return out
 }
 
 // outputColumnName names one non-star SelectItem: its alias if given, else

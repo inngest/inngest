@@ -1,0 +1,3 @@
+{
+  "error": "insights: a list comprehension can only reference its own variables, not \"run_id\" (it would be copied once per element) (at 1:9)"
+}

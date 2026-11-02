@@ -74,7 +74,7 @@ func insertRunRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, s
 // step attempt (name executor.step, attributes carrying the "_inngest."
 // prefixed step.userland.id/step.attempt keys insights_step_attempts reads
 // its own step_id/step_attempt columns from -- see the macro in
-// pkg/db/duckdb/migrations/000004_insights_views.sql and
+// pkg/db/duckdb/migrations/000002_insights_views.sql and
 // pkg/tracing/meta's AttrKeyPrefix/StepUserlandID), satisfying every NOT
 // NULL column on that table.
 func insertStepSpan(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, spanID, stepID string, attempt int, startTime time.Time) {
