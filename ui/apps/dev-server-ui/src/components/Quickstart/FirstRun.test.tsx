@@ -54,6 +54,8 @@ vi.mock('@inngest/components/CodeBlock', () => {
 const fn = { id: 'fn-1', slug: 'app-hello', name: 'Hello', appName: 'App' };
 const invokeButton = () =>
   screen.getByRole<HTMLButtonElement>('button', { name: 'Invoke function' });
+const retryButton = () =>
+  screen.getByRole<HTMLButtonElement>('button', { name: 'Try again' });
 const copyPrompt = () =>
   act(async () =>
     fireEvent.click(
@@ -136,7 +138,7 @@ it('invokes once with the existing mutation and keeps acceptance distinct from c
     finish!({ invokeFunction: true });
   });
   view.rerender(<FirstRun />);
-  expect(invokeButton().disabled).toBe(true);
+  expect(retryButton().disabled).toBe(false);
   expect(fixtures.navigate).not.toHaveBeenCalled();
 });
 it('retains the payload on a rejected invocation so it can be corrected and retried', async () => {
@@ -319,14 +321,15 @@ it.each([
     replace: true,
   });
 });
-it('uses only button loading while an accepted invocation has no identified run', () => {
+it('offers retry and Runs while an accepted invocation has no identified run', () => {
   fixtures.context.attempt = {
     functionID: fn.id,
     startedAt: '2026-10-23T12:00:00Z',
   };
   render(<FirstRun />);
   expect(fixtures.navigate).not.toHaveBeenCalled();
-  expect(invokeButton().disabled).toBe(true);
+  expect(retryButton().disabled).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Invoke function' })).toBeNull();
   expect(screen.queryByText(/Waiting for a run/)).toBeNull();
   expect(screen.queryByText(/Run status:/)).toBeNull();
 });
@@ -414,8 +417,8 @@ it.each(['', fn.id])(
     expect(attempt.functionID).toBe(fn.id);
     fixtures.context.attempt = attempt;
     view.rerender(<FirstRun />);
-    expect(invokeButton().disabled).toBe(true);
-    fireEvent.click(invokeButton());
+    expect(retryButton().disabled).toBe(false);
+    fireEvent.click(retryButton());
     expect(fixtures.invoke).toHaveBeenCalledTimes(1);
   },
 );
@@ -450,19 +453,15 @@ it('preserves explicit retry recovery after checking Runs and returning with no 
     screen.getByRole('link', { name: 'View all runs' }).getAttribute('href'),
   ).toBe('/runs?showAllRuns=true');
   expect(fixtures.setAttempt).not.toHaveBeenCalledWith(null);
-  expect(invokeButton().disabled).toBe(true);
+  expect(retryButton().disabled).toBe(false);
   // Following View all runs unmounts FirstRun; the provider retains the attempt
   // (and restores it from session storage on reload), but local errors are lost.
   view.unmount();
   const returnedView = render(<FirstRun />);
   expect(screen.queryByRole('alert')).toBeNull();
-  expect(invokeButton().disabled).toBe(true);
+  expect(retryButton().disabled).toBe(false);
   expect(fixtures.invoke).toHaveBeenCalledTimes(1);
-  fireEvent.click(
-    screen.getByRole('button', {
-      name: 'I checked Runs — allow another invocation',
-    }),
-  );
+  fireEvent.click(retryButton());
   expect(fixtures.setAttempt).toHaveBeenLastCalledWith(null);
   expect(fixtures.invoke).toHaveBeenCalledTimes(1);
   fixtures.context.attempt = null;

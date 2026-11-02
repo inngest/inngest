@@ -16,7 +16,7 @@ export function RunsOnboarding({
   showAllRuns?: boolean;
   children: ReactNode;
 }) {
-  const { ready, isDevServer, completion, functions, server, info } =
+  const { ready, isDevServer, completion, functions, server, info, attempt } =
     useQuickstart();
   const track = useQuickstartTracking(server);
   const showFirstRun =
@@ -42,12 +42,14 @@ export function RunsOnboarding({
   return (
     <main className="mx-auto w-full max-w-[648px] px-6 py-12 space-y-6">
       <FirstRun />
-      <p className="text-muted text-sm">
-        Need the setup guide or agent prompt?{' '}
-        <Link href="/?quickstart=true" target="_self">
-          Open Quickstart
-        </Link>
-      </p>
+      {!(attempt?.functionID && attempt.mode !== 'agent') && (
+        <p className="text-muted text-sm">
+          Need the setup guide or agent prompt?{' '}
+          <Link href="/?quickstart=true" target="_self">
+            Open Quickstart
+          </Link>
+        </p>
+      )}
     </main>
   );
 }

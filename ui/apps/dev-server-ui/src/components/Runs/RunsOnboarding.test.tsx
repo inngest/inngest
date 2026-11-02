@@ -103,3 +103,13 @@ it.each([
     expect(!!screen.queryByText('Existing function invocation')).toBe(!list);
   },
 );
+
+it('keeps recovery focused on the invocation actions without an extra Quickstart link', () => {
+  fixtures.state.attempt = {
+    functionID: 'fn-1',
+    startedAt: '2026-10-23T12:00:00Z',
+  };
+  render(<RunsOnboarding>{content}</RunsOnboarding>);
+  expect(screen.getByText('Existing function invocation')).toBeTruthy();
+  expect(screen.queryByRole('link', { name: 'Open Quickstart' })).toBeNull();
+});

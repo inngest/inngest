@@ -236,34 +236,29 @@ export function FirstRun({
       {functions.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           <Button
-            label="Invoke function"
-            aria-label="Invoke function"
-            loading={invocation.isLoading || pending}
+            label={pending ? 'Try again' : 'Invoke function'}
+            aria-label={pending ? 'Try again' : 'Invoke function'}
+            loading={invocation.isLoading}
             disabled={
-              (!!completion && !showSetupGuide) ||
-              !!functionError ||
-              !details ||
-              pending ||
-              invocation.isLoading
+              invocation.isLoading ||
+              (!pending &&
+                ((!!completion && !showSetupGuide) ||
+                  !!functionError ||
+                  !details))
             }
-            onClick={submit}
+            onClick={
+              pending
+                ? () => {
+                    setAttempt(null);
+                    setError('');
+                  }
+                : submit
+            }
           />
           <Link href="/runs?showAllRuns=true" target="_self">
             View all runs
           </Link>
         </div>
-      )}
-      {pending && (
-        <Button
-          kind="secondary"
-          appearance="outlined"
-          label="I checked Runs — allow another invocation"
-          disabled={invocation.isLoading}
-          onClick={() => {
-            setAttempt(null);
-            setError('');
-          }}
-        />
       )}
     </section>
   );
