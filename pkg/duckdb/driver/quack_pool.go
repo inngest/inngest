@@ -119,6 +119,27 @@ func (c *pooledQuackConn) attempt(ctx context.Context, fn func(*quack.Session) e
 	return c.gen, fn(c.sess)
 }
 
+// Close disconnects c's session, if any, so closing a pooled connection
+// (database/sql's idle eviction, *sql.DB.Close of an OpenShared handle, ...)
+// doesn't leave its server-side connection behind (the server only drops it
+// on a DisconnectMessage, or w/ the subprocess). Best effort: a failure is
+// logged, not returned, since the connection is going away regardless.
+func (c *pooledQuackConn) Close() error {
+	if c.sess == nil {
+		return nil
+	}
+	sess := c.sess
+	c.sess = nil
+	if ep := c.p.quackEP.Load(); ep == nil || ep.gen != c.gen {
+		return nil // its listener is gone along w/ the subprocess
+	}
+	if err := sess.Close(context.Background()); err != nil {
+		logger.StdlibLogger(context.Background()).Debug("duckdb: failed to disconnect a closed pooled quack connection",
+			"transport", "quack", "connection_id", sess.ConnectionID(), "error", err)
+	}
+	return nil
+}
+
 // currentSession returns a session against the live listener,
 // re-handshaking if needed (including when the last statement on it, from
 // an appender or otherwise, was abandoned), for callers (the quack

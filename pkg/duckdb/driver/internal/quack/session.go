@@ -352,6 +352,34 @@ func (s *Session) cancelAndDisconnect(ctx context.Context, queryID hugeint) {
 	}
 }
 
+// closeTimeout bounds Close's DisconnectMessage. The server answers it
+// promptly even mid-statement, so this only matters for an unreachable one.
+const closeTimeout = 2 * time.Second
+
+// Close sends a DisconnectMessage for s's connection (best effort, under
+// closeTimeout), so the server drops its connection entry instead of keeping
+// it until the subprocess exits. It's a no-op for an abandoned session,
+// whose watchForCancel already disconnects it once its statement is done.
+// HTTP sockets aren't s's own to close: every session shares
+// http.DefaultTransport's keep-alive pool (see newHTTPClient), which caps
+// idle sockets per host itself. s must not be used afterwards.
+func (s *Session) Close(ctx context.Context) error {
+	if s.Abandoned() {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+	defer cancel()
+	hdr, r, err := s.send(ctx, encodeDisconnectMessage(s.connectionID))
+	if err != nil {
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s): %w", s.connectionID, err)
+	}
+	if hdr.Type == msgErrorResponse {
+		resp, _ := decodeErrorResponseBody(r)
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s) rejected: %s", s.connectionID, resp.Error())
+	}
+	return nil
+}
+
 // Abandoned reports whether a statement on s was given up on mid-flight
 // (its ctx ended before the server answered). An abandoned session must not
 // run another statement: see watchForCancel. Owners discard it and
