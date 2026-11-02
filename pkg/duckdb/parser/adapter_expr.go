@@ -412,7 +412,7 @@ func (a *adapter) adaptPrefixExpression(n *peg.Node) Expr {
 		if choice(body(prefixes[i])).Name == "QualifiedOperator" {
 			rejectQualifiedOperator()
 		}
-		result =&UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
+		result = &UnaryExpr{baseExpr: a.at(prefixes[i]), Op: literalText(prefixes[i]), X: result}
 	}
 	return result
 }
@@ -647,7 +647,10 @@ func (a *adapter) adaptStarExpression(n *peg.Node) Expr {
 	}
 	if ex, ok := present(seq.Children[2]); ok {
 		// ExcludeList <- ExcludeOrExcept ExcludeNames
-		s.Exclude = a.adaptExcludeNames(body(ex).Children[1])
+		s.ExcludeParts = a.adaptExcludeNames(body(ex).Children[1])
+		for _, p := range s.ExcludeParts {
+			s.Exclude = append(s.Exclude, p[len(p)-1])
+		}
 	}
 	// Not modeled on StarExpr; silently dropping them would change which
 	// columns (or column names) the query returns.
@@ -660,21 +663,36 @@ func (a *adapter) adaptStarExpression(n *peg.Node) Expr {
 	return s
 }
 
-func (a *adapter) adaptExcludeNames(n *peg.Node) []string {
+func (a *adapter) adaptExcludeNames(n *peg.Node) [][]string {
 	// ExcludeNames <- ExcludeNameList / ExcludeNameSingle
 	alt := choice(body(n))
 	if alt.Name == "ExcludeNameSingle" {
-		return []string{a.rawText(body(alt))}
+		return [][]string{a.adaptExcludeName(body(alt))}
 	}
 	// ExcludeNameList <- Parens(List(ExcludeName)) — alt's own body is a
 	// single ExprCall (Parens(...)), so body(alt) only unwraps to the
 	// "Parens" KindRule node itself; a second body() reaches its Seq.
 	listSeq := body(body(body(alt)).Children[1])
-	names := []string{a.rawText(listSeq.Children[0])}
+	names := [][]string{a.adaptExcludeName(listSeq.Children[0])}
 	for _, tail := range listSeq.Children[1].Children {
-		names = append(names, a.rawText(body(tail).Children[1]))
+		names = append(names, a.adaptExcludeName(body(tail).Children[1]))
 	}
 	return names
+}
+
+func (a *adapter) adaptExcludeName(n *peg.Node) []string {
+	// ExcludeName <- ExcludeDottedName / ExcludeColumnName
+	alt := choice(body(n))
+	if alt.Name == "ExcludeColumnName" {
+		return []string{literalText(body(alt))} // <- ColIdOrString
+	}
+	// ExcludeDottedName <- DottedIdentifier ; DottedIdentifier <- Identifier DotColLabel* ; DotColLabel <- '.' ColLabel
+	seq := body(body(alt))
+	parts := []string{literalText(seq.Children[0])}
+	for _, d := range repeatChildren(seq.Children[1]) {
+		parts = append(parts, literalText(body(d).Children[1]))
+	}
+	return parts
 }
 
 func (a *adapter) adaptCastExpressionCall(n *peg.Node) Expr {

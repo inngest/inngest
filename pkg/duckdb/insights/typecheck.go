@@ -97,7 +97,7 @@ func identType(id *parser.Ident, scope *tableScope) ColumnType {
 		if !ok {
 			return ColumnTypeUnknown
 		}
-		col, ok := tbl.columns[id.Parts[1]]
+		col, ok := tbl.column(id.Parts[1])
 		if !ok {
 			return ColumnTypeUnknown
 		}
@@ -148,12 +148,25 @@ func binaryExprType(b *parser.BinaryExpr, scope *tableScope) ColumnType {
 	case "=", "==", "<>", "!=", "<", ">", "<=", ">=", "AND", "OR":
 		return ColumnTypeBoolean
 	case "||":
+		// List concatenation when an operand is statically a list
+		// ([1] || [2] is INTEGER[]); anything else, JSON included, is
+		// string concatenation ('{}'::JSON || '{}'::JSON is VARCHAR).
+		if isListExpr(b.Left) || isListExpr(b.Right) {
+			return ColumnTypeJSON
+		}
 		return ColumnTypeString
 	case "->>":
 		return ColumnTypeString
 	case "->":
 		return ColumnTypeJSON
+	case "COLLATE":
+		return inferType(b.Left, scope)
 	case "+", "-", "*", "/", "%", "^", "//":
+		// DATE - DATE is a day count (BIGINT), unlike TIMESTAMP -
+		// TIMESTAMP (an INTERVAL) or DATE - n (a DATE).
+		if b.Op == "-" && isDateExpr(b.Left) && isDateExpr(b.Right) {
+			return ColumnTypeNumber
+		}
 		if inferType(b.Left, scope) == ColumnTypeDatetime || inferType(b.Right, scope) == ColumnTypeDatetime {
 			return ColumnTypeDatetime
 		}
@@ -193,4 +206,105 @@ func functionReturnType(name string, args []parser.Expr, scope *tableScope) (Col
 		return ColumnTypeUnknown, nil, nil
 	}
 	return info.returnType(name, args, scope)
+}
+
+// isListExpr reports whether e is statically known to be a LIST (not just
+// something in the JSON bucket, which also holds JSON/STRUCT/MAP values):
+// a list literal, a cast to a T[] type, or a list-building function.
+func isListExpr(e parser.Expr) bool {
+	switch x := e.(type) {
+	case *parser.ListExpr:
+		return !x.Paren
+	case *parser.ListComprehensionExpr:
+		return true
+	case *parser.CastExpr:
+		return strings.HasSuffix(strings.TrimSpace(x.Type), "]")
+	case *parser.FunctionExpr:
+		switch strings.ToLower(strings.Join(x.Name, ".")) {
+		case "list", "array_agg", "list_value":
+			return true
+		}
+	}
+	return false
+}
+
+// isDateExpr reports whether e is statically a DATE (rather than some
+// other DATETIME-bucket type): a cast or typed literal to DATE, or
+// current_date()/today().
+func isDateExpr(e parser.Expr) bool {
+	switch x := e.(type) {
+	case *parser.CastExpr:
+		return strings.EqualFold(strings.TrimSpace(x.Type), "DATE")
+	case *parser.TypeLiteral:
+		return strings.EqualFold(strings.TrimSpace(x.Type), "DATE")
+	case *parser.FunctionExpr:
+		switch strings.ToLower(strings.Join(x.Name, ".")) {
+		case "current_date", "today":
+			return true
+		}
+	}
+	return false
+}
+
+// listWhenArgCount wraps next for an aggregate whose extra trailing "n"
+// argument turns its result into a LIST of the top n values (max(x, n),
+// min(x, n), arg_max(arg, val, n), arg_min(arg, val, n)): with at least
+// n args the result is a LIST of args[0]'s own values, so args[0]'s
+// pathHints describe its elements ([*]) rather than its root.
+func listWhenArgCount(n int, next functionTypeResolver) functionTypeResolver {
+	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+		if len(args) >= n {
+			return ColumnTypeJSON, wrapArrayElementPathHints(exprPathHints(args[0], scope)), nil
+		}
+		return next(name, args, scope)
+	}
+}
+
+// listWhenListArg wraps next for a function that returns a LIST of
+// results when args[i] is itself a list literal (quantile_cont(x, [0.25,
+// 0.75]), json_extract_string(j, ['$.a', '$.b'])). elementHints carries
+// args[0]'s pathHints onto the elements, for a function whose elements
+// are args[0]'s own values (quantile_disc).
+func listWhenListArg(i int, elementHints bool, next functionTypeResolver) functionTypeResolver {
+	return func(name string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+		if len(args) > i && isListExpr(args[i]) {
+			if elementHints {
+				return ColumnTypeJSON, wrapArrayElementPathHints(exprPathHints(args[0], scope)), nil
+			}
+			return ColumnTypeJSON, nil, nil
+		}
+		return next(name, args, scope)
+	}
+}
+
+// numberOrArgDatetime is avg's/approx_quantile's returnType: a DATETIME
+// argument (TIMESTAMP, INTERVAL, ...) averages to the same type, anything
+// else to a number.
+func numberOrArgDatetime(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	if inferType(args[0], scope) == ColumnTypeDatetime {
+		return ColumnTypeDatetime, nil, nil
+	}
+	return ColumnTypeNumber, nil, nil
+}
+
+// epochMsReturnType: epoch_ms(timestamp) is the epoch in milliseconds
+// (BIGINT), but epoch_ms(integer) converts milliseconds to a TIMESTAMP.
+func epochMsReturnType(_ string, args []parser.Expr, scope *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	switch inferType(args[0], scope) {
+	case ColumnTypeNumber:
+		return ColumnTypeDatetime, nil, nil
+	case ColumnTypeDatetime:
+		return ColumnTypeNumber, nil, nil
+	default:
+		return ColumnTypeUnknown, nil, nil
+	}
+}
+
+// timezoneReturnType: timezone(ts) extracts the UTC offset in seconds
+// (BIGINT), timezone(tz, ts) converts ts to a TIMESTAMP in tz.
+func timezoneReturnType(_ string, args []parser.Expr, _ *tableScope) (ColumnType, []PathHint, []Diagnostic) {
+	if len(args) == 1 {
+		return ColumnTypeNumber, nil, nil
+	}
+	return ColumnTypeDatetime, nil, nil
 }

@@ -597,10 +597,24 @@ func (sw *sqlWriter) starExpr(s *StarExpr) {
 	}
 	sw.str("*")
 	if len(s.Exclude) > 0 {
+		// ExcludeParts, when set, must agree with Exclude: callers validate
+		// Exclude, so printing names it doesn't hold would exclude columns
+		// nobody checked.
+		if s.ExcludeParts != nil && len(s.ExcludeParts) != len(s.Exclude) {
+			panic("duckdb/parser: Write: StarExpr.ExcludeParts doesn't match Exclude")
+		}
 		sw.str(" EXCLUDE (")
 		for i, e := range s.Exclude {
 			sw.sep(i, ", ")
-			writeIdentPart(sw, e)
+			if s.ExcludeParts == nil {
+				writeIdentPart(sw, e)
+				continue
+			}
+			p := s.ExcludeParts[i]
+			if len(p) == 0 || p[len(p)-1] != e {
+				panic("duckdb/parser: Write: StarExpr.ExcludeParts doesn't match Exclude")
+			}
+			writeDottedName(sw, p)
 		}
 		sw.str(")")
 	}

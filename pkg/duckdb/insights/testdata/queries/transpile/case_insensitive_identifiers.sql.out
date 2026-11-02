@@ -1,0 +1,29 @@
+{
+  "sql": "WITH X AS (SELECT Run_ID AS Foo, App_ID FROM inngest.insights_runs(?, ?) AS RUNS) SELECT x.FOO, app_id, (SELECT count(*) FROM inngest.insights_events(?, ?) AS e WHERE e.ID = X.Foo) AS n FROM x LIMIT 1000",
+  "args": [
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000",
+    "00000000-0000-4000-a000-000000000000",
+    "00000000-0000-4000-b000-000000000000"
+  ],
+  "primaryTable": "runs",
+  "tables": [
+    "runs",
+    "events"
+  ],
+  "limited": true,
+  "columnHints": [
+    3,
+    1,
+    0
+  ],
+  "diagnostics": [
+    {
+      "start": "1:52",
+      "end": "1:138",
+      "severity": 0,
+      "code": "default-limit-applied",
+      "message": "No LIMIT was specified; results were capped at 1000 rows."
+    }
+  ]
+}

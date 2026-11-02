@@ -38,3 +38,23 @@ func TestExtractQueryInfoSetOpModifierSubquery(t *testing.T) {
 	info := extractQueryInfo(stmt)
 	require.Equal(t, []string{"runs", "events"}, info.Tables)
 }
+
+func TestExtractQueryInfoCaseInsensitive(t *testing.T) {
+	stmt := mustParse(t, `WITH X AS (SELECT run_id FROM RUNS) SELECT * FROM x JOIN "Events" ON x.run_id = "Events".id`)
+	info := extractQueryInfo(stmt)
+	require.Equal(t, "runs", info.PrimaryTable)
+	require.Equal(t, []string{"runs", "events"}, info.Tables)
+}
+
+// A CTE only hides a same-named real table within its own WITH's scope.
+func TestExtractQueryInfoScopesCTENamesLexically(t *testing.T) {
+	stmt := mustParse(t, "SELECT * FROM (WITH runs AS (SELECT 1 AS x) SELECT * FROM runs) a, runs")
+	require.Equal(t, []string{"runs"}, extractQueryInfo(stmt).Tables)
+
+	stmt = mustParse(t, "SELECT (SELECT count(*) FROM (WITH events AS (SELECT 1 AS x) SELECT * FROM events) e) AS n FROM events")
+	require.Equal(t, []string{"events"}, extractQueryInfo(stmt).Tables)
+
+	// A CTE body doesn't see its own name.
+	stmt = mustParse(t, "WITH runs AS (SELECT run_id FROM runs) SELECT * FROM runs")
+	require.Equal(t, []string{"runs"}, extractQueryInfo(stmt).Tables)
+}

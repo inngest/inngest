@@ -136,3 +136,51 @@ func TestInferTypeListComprehension(t *testing.T) {
 	// other composite type (ListExpr/StructExpr/MapExpr).
 	require.Equal(t, ColumnTypeJSON, typeOfFirstColumn(t, "SELECT [e FOR e IN event_ids] FROM runs"))
 }
+
+// Each case checked against a real duckdb with SELECT typeof(...).
+func TestInferTypeMatchesDuckDB(t *testing.T) {
+	cases := map[string]ColumnType{
+		// max(x, n)/min(x, n)/arg_max(arg, val, n) return a LIST.
+		"SELECT max(run_id, 3) FROM runs":                              ColumnTypeJSON,
+		"SELECT min(queued_at, 3) FROM runs":                           ColumnTypeJSON,
+		"SELECT arg_max(run_id, queued_at, 3) FROM runs":               ColumnTypeJSON,
+		"SELECT arg_min(run_id, queued_at, 3) FROM runs":               ColumnTypeJSON,
+		"SELECT max(run_id) FROM runs":                                 ColumnTypeString,
+		"SELECT arg_max(run_id, queued_at) FROM runs":                  ColumnTypeString,
+		"SELECT date_sub('day', queued_at, ended_at) FROM runs":        ColumnTypeNumber,
+		"SELECT timezone(queued_at) FROM runs":                         ColumnTypeNumber,
+		"SELECT timezone('UTC', queued_at) FROM runs":                  ColumnTypeDatetime,
+		"SELECT avg(queued_at) FROM runs":                              ColumnTypeDatetime,
+		"SELECT avg(step_index) FROM metadata":                         ColumnTypeNumber,
+		"SELECT approx_quantile(queued_at, 0.5) FROM runs":             ColumnTypeDatetime,
+		"SELECT approx_quantile(step_index, [0.5]) FROM metadata":      ColumnTypeJSON,
+		"SELECT epoch_ms(1700000000000) FROM runs":                     ColumnTypeDatetime,
+		"SELECT epoch_ms(queued_at) FROM runs":                         ColumnTypeNumber,
+		"SELECT quantile_cont(step_index, [0.25, 0.75]) FROM metadata": ColumnTypeJSON,
+		"SELECT quantile_cont(step_index, 0.5) FROM metadata":          ColumnTypeNumber,
+		"SELECT quantile_disc(run_id, [0.5]) FROM runs":                ColumnTypeJSON,
+		"SELECT json_extract_string(inputs, ['$.a', '$.b']) FROM runs": ColumnTypeJSON,
+		"SELECT json_extract_string(inputs, '$.a') FROM runs":          ColumnTypeString,
+		"SELECT [1] || [2] FROM runs":                                  ColumnTypeJSON,
+		"SELECT inputs || inputs FROM runs":                            ColumnTypeString,
+		"SELECT run_id || 'x' FROM runs":                               ColumnTypeString,
+		"SELECT queued_at::DATE - DATE '2024-01-01' FROM runs":         ColumnTypeNumber,
+		"SELECT queued_at::DATE - 1 FROM runs":                         ColumnTypeDatetime,
+		"SELECT ended_at - queued_at FROM runs":                        ColumnTypeDatetime,
+		"SELECT status COLLATE nocase FROM runs":                       ColumnTypeString,
+		"SELECT run_id::INT8 FROM runs":                                ColumnTypeNumber,
+		"SELECT CAST(NULL AS STRUCT (a INT)) FROM runs":                ColumnTypeJSON,
+		"SELECT CAST(NULL AS MAP (VARCHAR, INT)) FROM runs":            ColumnTypeJSON,
+		"SELECT CAST(1 AS DECIMAL (10, 2)) FROM runs":                  ColumnTypeNumber,
+		"SELECT CAST(NULL AS INTEGER []) FROM runs":                    ColumnTypeJSON,
+		"SELECT CAST(run_id AS CHARACTER VARYING) FROM runs":           ColumnTypeString,
+		"SELECT CAST(run_id AS CHAR VARYING (10)) FROM runs":           ColumnTypeString,
+		"SELECT run_id::GUID FROM runs":                                ColumnTypeString,
+		"SELECT CAST(1 AS INT64) FROM runs":                            ColumnTypeNumber,
+	}
+	for q, want := range cases {
+		t.Run(q, func(t *testing.T) {
+			require.Equal(t, want, typeOfFirstColumn(t, q))
+		})
+	}
+}
