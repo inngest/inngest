@@ -94,6 +94,9 @@ func TestTicksBecomeDimmedChildSpans(t *testing.T) {
 		require.NotNil(t, message)
 		require.Equal(t, arrived.UnixMilli(), message.Attributes.StartedAt.UnixMilli(), "arrived")
 		require.Equal(t, read.UnixMilli(), message.Attributes.EndedAt.UnixMilli(), "read")
+		require.Equal(t, arrived.UnixMilli(), message.GetQueuedAtTime().UnixMilli(), "the trace API queues it when it arrived")
+		require.Equal(t, arrived.UnixMilli(), message.StartTime.UnixMilli())
+		require.Equal(t, read.UnixMilli(), message.EndTime.UnixMilli())
 
 		// The arrival is also a tick on the row of the inbox, which the trace
 		// draws as a circle on its bar; a read's tick has the arrival time too.

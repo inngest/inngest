@@ -844,6 +844,9 @@ func rollupTicks(ticks []*cqrs.OtelSpan, resolve func(string) (string, bool), sp
 		attrs.DynamicStatus = &completed
 		attrs.StartedAt = &start
 		attrs.EndedAt = &end
+		attrs.QueuedAt = &start
+		tick.StartTime = start
+		tick.EndTime = end
 		if parent.Attributes != nil {
 			attrs.StepSpanPath = parent.Attributes.StepSpanPath
 			attrs.StepOrigin = parent.Attributes.StepOrigin
