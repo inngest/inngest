@@ -260,6 +260,24 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 	return q.RefillDelay() + q.ExpectedDelay()
 }
 
+// StartLatency is the time from the item being due to now, including any wait
+// for user-defined capacity. Unlike Latency it ignores refill and peek stamps,
+// so it is computed identically for every queue backend.
+func (q QueueItem) StartLatency(now time.Time) time.Duration {
+	dueMS := q.WallTimeMS
+	if dueMS == 0 {
+		dueMS = q.AtMS
+	}
+	// An item enqueued after its due time (e.g. a requeue) is due when enqueued.
+	if q.EnqueuedAt > dueMS {
+		dueMS = q.EnqueuedAt
+	}
+	if dueMS == 0 || now.UnixMilli() < dueMS {
+		return 0
+	}
+	return now.Sub(time.UnixMilli(dueMS))
+}
+
 // Latency represents the processing delay excluding sojourn latency.
 func (q QueueItem) Latency(now time.Time) time.Duration {
 	if q.RefilledAt == 0 {
