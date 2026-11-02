@@ -94,9 +94,6 @@ type AppSyncRecord struct {
 	Framework   string
 	AppVersion  string
 	Error       *SyncError
-	Added       []string
-	Modified    []string
-	Removed     []string
 	CreatedAt   time.Time
 }
 

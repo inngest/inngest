@@ -95,18 +95,15 @@ func (s *Service) GetAppSync(ctx context.Context, req *apiv2.GetAppSyncRequest) 
 
 func toSync(app App, sync AppSyncRecord) *apiv2.Sync {
 	result := &apiv2.Sync{
-		Id:                sync.ID.String(),
-		AppId:             appPublicID(app),
-		Status:            sync.Status,
-		Url:               nonEmptyString(sync.URL),
-		SdkLanguage:       nonEmptyString(sync.SDKLanguage),
-		SdkVersion:        nonEmptyString(sync.SDKVersion),
-		Framework:         nonEmptyString(sync.Framework),
-		AppVersion:        nonEmptyString(sync.AppVersion),
-		AddedFunctions:    sync.Added,
-		ModifiedFunctions: sync.Modified,
-		RemovedFunctions:  sync.Removed,
-		CreatedAt:         timestamppb.New(sync.CreatedAt),
+		Id:          sync.ID.String(),
+		AppId:       appPublicID(app),
+		Status:      sync.Status,
+		Url:         nonEmptyString(sync.URL),
+		SdkLanguage: nonEmptyString(sync.SDKLanguage),
+		SdkVersion:  nonEmptyString(sync.SDKVersion),
+		Framework:   nonEmptyString(sync.Framework),
+		AppVersion:  nonEmptyString(sync.AppVersion),
+		CreatedAt:   timestamppb.New(sync.CreatedAt),
 	}
 	if sync.Error != nil {
 		result.Error = &apiv2.SyncAppError{Code: sync.Error.Code, Message: sync.Error.Message}

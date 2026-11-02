@@ -6561,22 +6561,19 @@ func (x *GetAppSyncResponse) GetMetadata() *ResponseMetadata {
 }
 
 type Sync struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	AppId             string                 `protobuf:"bytes,2,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
-	Status            string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
-	Url               *string                `protobuf:"bytes,4,opt,name=url,proto3,oneof" json:"url,omitempty"`
-	SdkLanguage       *string                `protobuf:"bytes,5,opt,name=sdk_language,json=sdkLanguage,proto3,oneof" json:"sdk_language,omitempty"`
-	SdkVersion        *string                `protobuf:"bytes,6,opt,name=sdk_version,json=sdkVersion,proto3,oneof" json:"sdk_version,omitempty"`
-	Framework         *string                `protobuf:"bytes,7,opt,name=framework,proto3,oneof" json:"framework,omitempty"`
-	AppVersion        *string                `protobuf:"bytes,8,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
-	Error             *SyncAppError          `protobuf:"bytes,9,opt,name=error,proto3,oneof" json:"error,omitempty"`
-	AddedFunctions    []string               `protobuf:"bytes,10,rep,name=added_functions,json=addedFunctions,proto3" json:"added_functions,omitempty"`
-	ModifiedFunctions []string               `protobuf:"bytes,11,rep,name=modified_functions,json=modifiedFunctions,proto3" json:"modified_functions,omitempty"`
-	RemovedFunctions  []string               `protobuf:"bytes,12,rep,name=removed_functions,json=removedFunctions,proto3" json:"removed_functions,omitempty"`
-	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AppId         string                 `protobuf:"bytes,2,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Url           *string                `protobuf:"bytes,4,opt,name=url,proto3,oneof" json:"url,omitempty"`
+	SdkLanguage   *string                `protobuf:"bytes,5,opt,name=sdk_language,json=sdkLanguage,proto3,oneof" json:"sdk_language,omitempty"`
+	SdkVersion    *string                `protobuf:"bytes,6,opt,name=sdk_version,json=sdkVersion,proto3,oneof" json:"sdk_version,omitempty"`
+	Framework     *string                `protobuf:"bytes,7,opt,name=framework,proto3,oneof" json:"framework,omitempty"`
+	AppVersion    *string                `protobuf:"bytes,8,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	Error         *SyncAppError          `protobuf:"bytes,9,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Sync) Reset() {
@@ -6668,27 +6665,6 @@ func (x *Sync) GetAppVersion() string {
 func (x *Sync) GetError() *SyncAppError {
 	if x != nil {
 		return x.Error
-	}
-	return nil
-}
-
-func (x *Sync) GetAddedFunctions() []string {
-	if x != nil {
-		return x.AddedFunctions
-	}
-	return nil
-}
-
-func (x *Sync) GetModifiedFunctions() []string {
-	if x != nil {
-		return x.ModifiedFunctions
-	}
-	return nil
-}
-
-func (x *Sync) GetRemovedFunctions() []string {
-	if x != nil {
-		return x.RemovedFunctions
 	}
 	return nil
 }
@@ -11051,7 +11027,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\async_id\x18\x02 \x01(\tB\x0e\x92A\v2\tSync UUIDR\x06syncId\"l\n" +
 	"\x12GetAppSyncResponse\x12 \n" +
 	"\x04data\x18\x01 \x01(\v2\f.api.v2.SyncR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc3\x12\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xb7\t\n" +
 	"\x04Sync\x12C\n" +
 	"\x02id\x18\x01 \x01(\tB3\x92A02.Sync UUID, matching the ID returned by SyncAppR\x02id\x123\n" +
 	"\x06app_id\x18\x02 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12\xe8\x02\n" +
@@ -11063,11 +11039,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tframework\x18\a \x01(\tB$\x92A!2\x1fFramework reported by this syncH\x03R\tframework\x88\x01\x01\x12L\n" +
 	"\vapp_version\x18\b \x01(\tB&\x92A#2!App version reported by this syncH\x04R\n" +
 	"appVersion\x88\x01\x01\x12Y\n" +
-	"\x05error\x18\t \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x05R\x05error\x88\x01\x01\x12\xbb\x03\n" +
-	"\x0fadded_functions\x18\n" +
-	" \x03(\tB\x91\x03\x92A\x8d\x032\x8a\x03Functions this sync created, best-effort based on function created time; archived functions re-added later appear as modified. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x0eaddedFunctions\x12\xb4\x03\n" +
-	"\x12modified_functions\x18\v \x03(\tB\x84\x03\x92A\x80\x032\xfd\x02Existing functions this sync re-registered. A sync re-registers every function, so unchanged functions count too. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x11modifiedFunctions\x12\xde\x02\n" +
-	"\x11removed_functions\x18\f \x03(\tB\xb0\x02\x92A\xac\x022\xa9\x02Functions this sync archived. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x10removedFunctions\x12Y\n" +
+	"\x05error\x18\t \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x05R\x05error\x88\x01\x01\x12Y\n" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x1e\x92A\x1b2\x19When the sync was createdR\tcreatedAtB\x06\n" +
 	"\x04_urlB\x0f\n" +
@@ -11076,7 +11048,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"_frameworkB\x0e\n" +
 	"\f_app_versionB\b\n" +
-	"\x06_error\"t\n" +
+	"\x06_errorJ\x04\b\n" +
+	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rR\x0fadded_functionsR\x12modified_functionsR\x11removed_functions\"t\n" +
 	"\x14QueryInsightsRequest\x12\\\n" +
 	"\x05query\x18\x01 \x01(\tBF\x92AC2AThe insights query to execute, written in modified ClickHouse SQLR\x05query\"|\n" +
 	"\x15QueryInsightsResponse\x12-\n" +

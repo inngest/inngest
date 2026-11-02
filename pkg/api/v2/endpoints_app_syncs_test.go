@@ -64,9 +64,6 @@ func TestHTTPGateway_ListAppSyncs(t *testing.T) {
 		require.Len(t, body.Data, 1)
 		require.Equal(t, id.String(), body.Data[0]["id"])
 		require.Equal(t, "my app", body.Data[0]["appId"])
-		for _, key := range []string{"addedFunctions", "modifiedFunctions", "removedFunctions"} {
-			require.Equal(t, []any{}, body.Data[0][key])
-		}
 		for _, key := range []string{"url", "sdkLanguage", "sdkVersion", "framework", "appVersion", "error"} {
 			require.NotContains(t, body.Data[0], key)
 		}
@@ -131,9 +128,6 @@ func TestHTTPGateway_GetAppSync(t *testing.T) {
 				record.Framework = "nextjs"
 				record.AppVersion = "APP_METHOD_literal"
 				record.Error = &SyncError{Code: "sync_failed", Message: "FUNCTION_RUN_STATUS_literal"}
-				record.Added = []string{"my-app-new"}
-				record.Modified = []string{"my-app-existing"}
-				record.Removed = []string{"my-app-old"}
 			}
 			return record, nil
 		}}
@@ -145,9 +139,9 @@ func TestHTTPGateway_GetAppSync(t *testing.T) {
 		var body map[string]json.RawMessage
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 		if full {
-			require.JSONEq(t, `{"id":"11111111-1111-1111-1111-111111111111","appId":"my-app","status":"error","url":"https://example.com/api/inngest","sdkLanguage":"typescript","sdkVersion":"3.22.0","framework":"nextjs","appVersion":"APP_METHOD_literal","error":{"code":"sync_failed","message":"FUNCTION_RUN_STATUS_literal"},"addedFunctions":["my-app-new"],"modifiedFunctions":["my-app-existing"],"removedFunctions":["my-app-old"],"createdAt":"2026-11-02T12:00:00Z"}`, string(body["data"]))
+			require.JSONEq(t, `{"id":"11111111-1111-1111-1111-111111111111","appId":"my-app","status":"error","url":"https://example.com/api/inngest","sdkLanguage":"typescript","sdkVersion":"3.22.0","framework":"nextjs","appVersion":"APP_METHOD_literal","error":{"code":"sync_failed","message":"FUNCTION_RUN_STATUS_literal"},"createdAt":"2026-11-02T12:00:00Z"}`, string(body["data"]))
 		} else {
-			require.JSONEq(t, `{"id":"11111111-1111-1111-1111-111111111111","appId":"my-app","status":"duplicate","addedFunctions":[],"modifiedFunctions":[],"removedFunctions":[],"createdAt":"2026-11-02T12:00:00Z"}`, string(body["data"]))
+			require.JSONEq(t, `{"id":"11111111-1111-1111-1111-111111111111","appId":"my-app","status":"duplicate","createdAt":"2026-11-02T12:00:00Z"}`, string(body["data"]))
 		}
 		require.Contains(t, string(body["metadata"]), `"fetchedAt"`)
 	}

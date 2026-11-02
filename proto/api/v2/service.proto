@@ -3781,6 +3781,9 @@ message GetAppSyncResponse {
 }
 
 message Sync {
+  reserved 10, 11, 12;
+  reserved "added_functions", "modified_functions", "removed_functions";
+
   string id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Sync UUID, matching the ID returned by SyncApp"
@@ -3828,21 +3831,6 @@ message Sync {
   optional SyncAppError error = 9 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Error, including a code and message"
-    }
-  ];
-  repeated string added_functions = 10 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Functions this sync created, best-effort based on function created time; archived functions re-added later appear as modified. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
-    }
-  ];
-  repeated string modified_functions = 11 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Existing functions this sync re-registered. A sync re-registers every function, so unchanged functions count too. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
-    }
-  ];
-  repeated string removed_functions = 12 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Functions this sync archived. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
     }
   ];
   google.protobuf.Timestamp created_at = 13 [
