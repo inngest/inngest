@@ -165,3 +165,31 @@ func TestOpenInboxRowIsEndedWithItsRun(t *testing.T) {
 		require.Equal(t, testStart.Add(time.Minute).UnixMilli(), row.Attributes.EndedAt.UnixMilli())
 	})
 }
+
+// A run that is still going stays going when one of its steps has completed:
+// the root takes the status of a completed child, but that is a guess, so its
+// open inbox and waiting read are not ended by it.
+func TestCompletedChildDoesNotEndAnOpenInboxOrWaitingRead(t *testing.T) {
+	done := map[string]any{meta.Attrs.DynamicStatus.Key(): enums.StepStatusCompleted.String()}
+	open := map[string]any{
+		meta.Attrs.StepOp.Key():        enums.OpcodeSubscribe.String(),
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusRunning.String(),
+	}
+	waiting := map[string]any{
+		meta.Attrs.StepOp.Key():        enums.OpcodeSubscribeWait.String(),
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusWaiting.String(),
+	}
+
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		root := buildRoot(t, enc, []testSpanRow{
+			runRow(),
+			stepRow("done", done),
+			stepRow("inbox", open),
+			stepRow("read", waiting),
+		})
+
+		require.Equal(t, enums.StepStatusRunning, childNamed(root, "inbox").Status)
+		require.Nil(t, childNamed(root, "inbox").Attributes.EndedAt)
+		require.Equal(t, enums.StepStatusWaiting, childNamed(root, "read").Status)
+	})
+}

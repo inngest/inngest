@@ -636,6 +636,10 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 	}
 
+	// inferredStatus holds the spans whose status was taken from a child, as
+	// opposed to the one they report themselves.
+	inferredStatus := map[*cqrs.OtelSpan]bool{}
+
 	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
@@ -680,6 +684,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			// still running
 			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
 				parent.Status = span.Status
+				inferredStatus[parent] = true
 			}
 
 			item, _ := spanMap.Get(span.SpanID)
@@ -745,7 +750,9 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	}
 
 	rollupTicks(ticks, resolveDynamic, spanMap)
-	endWaitingReads(root)
+	if !inferredStatus[root] {
+		endWaitingReads(root)
+	}
 
 	// Fold order doesn't matter: the builder rounds the summed cost to
 	// extractors.RoundCost's granularity, absorbing float addition's order
