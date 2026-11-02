@@ -28,7 +28,7 @@ func stepRunOp(id string, data string) *state.GeneratorOpcode {
 // stream, so every order of the three is possible. Whichever order happens, the
 // run must end up with exactly one job that continues it, so the steps after
 // the Promise.all run once.
-func TestSubscribeParallelAllLateStepAlwaysWakes(t *testing.T) {
+func TestSubscribeParallelAllLateStepWakesOnce(t *testing.T) {
 	points := map[string]string{
 		"M": "SaveInboxMessage",
 		"R": "RecordInboxWait",

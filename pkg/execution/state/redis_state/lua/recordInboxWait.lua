@@ -13,12 +13,19 @@ the record, so at least one of the two always sees the other.
 A read of an inbox that was closed is not recorded: it leaves the pending set
 and is ended.
 
+A read that the response put in the pending set (it carries a coalesce key) and
+that is no longer in it was ended by another path, which took it out and owns
+the run's continuation. The SDK reports a pending read again in the response of
+a sibling step, so this can be that report arriving late. It is not recorded and
+wakes nothing: a second wake would run every step after the read twice.
+
 Output:
   { 0 }                           recorded; nothing for it to read
   { 1, messageStepID, pending }   recorded and satisfied; pending is 1 when
                                   pending steps remain, else 0
   { 2, pending }                  not recorded; its inbox was closed
   { 3, pending }                  a batch read, recorded and answered with a cut
+  { 4 }                           not recorded; another path already ended it
 
 ]]
 
@@ -42,6 +49,10 @@ if redis.call("HEXISTS", keyWaits, inbox .. ":closed") == 1 then
 	redis.call("SREM", keyStepsPending, waitID)
 
 	return { 2, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+end
+
+if cjson.decode(record)["pck"] ~= nil and redis.call("SISMEMBER", keyStepsPending, waitID) == 0 then
+	return { 4 }
 end
 
 redis.call("HSET", keyWaits, inbox, record)

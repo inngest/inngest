@@ -96,7 +96,8 @@ type RunService interface {
 	SaveInboxMessage(ctx context.Context, id ID, msg InboxMessage) (*InboxWake, error)
 	// RecordInboxWait records the wait of an inbox, then scans the steps saved
 	// after the wait's Seen step. If one is a message of the inbox, the wait is
-	// satisfied and returned; otherwise nil.
+	// satisfied and returned; otherwise nil. A report of a read that another path
+	// already ended returns an InboxWake with Ended set, and records nothing.
 	RecordInboxWait(ctx context.Context, id ID, wait InboxWait) (*InboxWake, error)
 	// TimeoutInboxWait times an inbox's wait out: if the inbox's wait is still
 	// the wait waitID, it saves data under the wait's id, takes the wait out of
