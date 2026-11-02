@@ -61,6 +61,8 @@ export function FirstRun({
     attempt?.startedAt === invokedAt;
   const pending =
     currentAttempt && !!attempt?.functionID && attempt.mode !== 'agent';
+  const canRetry =
+    pending && (!!error || runs.isError || attempt?.startedAt !== invokedAt);
   const runID = showSetupGuide
     ? currentAttempt
       ? attempt?.runID || run?.id
@@ -236,18 +238,19 @@ export function FirstRun({
       {functions.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           <Button
-            label={pending ? 'Try again' : 'Invoke function'}
-            aria-label={pending ? 'Try again' : 'Invoke function'}
-            loading={invocation.isLoading}
+            label={canRetry ? 'Try again' : 'Invoke function'}
+            aria-label={canRetry ? 'Try again' : 'Invoke function'}
+            loading={invocation.isLoading || (pending && !canRetry)}
             disabled={
               invocation.isLoading ||
-              (!pending &&
+              (pending && !canRetry) ||
+              (!canRetry &&
                 ((!!completion && !showSetupGuide) ||
                   !!functionError ||
                   !details))
             }
             onClick={
-              pending
+              canRetry
                 ? () => {
                     setAttempt(null);
                     setError('');

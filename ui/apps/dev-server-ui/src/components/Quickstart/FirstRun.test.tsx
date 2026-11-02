@@ -138,7 +138,8 @@ it('invokes once with the existing mutation and keeps acceptance distinct from c
     finish!({ invokeFunction: true });
   });
   view.rerender(<FirstRun />);
-  expect(retryButton().disabled).toBe(false);
+  expect(invokeButton().disabled).toBe(true);
+  expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   expect(fixtures.navigate).not.toHaveBeenCalled();
 });
 it('retains the payload on a rejected invocation so it can be corrected and retried', async () => {
@@ -321,7 +322,7 @@ it.each([
     replace: true,
   });
 });
-it('offers retry and Runs while an accepted invocation has no identified run', () => {
+it('offers retry and Runs for a restored invocation with no identified run', () => {
   fixtures.context.attempt = {
     functionID: fn.id,
     startedAt: '2026-10-23T12:00:00Z',
@@ -417,8 +418,9 @@ it.each(['', fn.id])(
     expect(attempt.functionID).toBe(fn.id);
     fixtures.context.attempt = attempt;
     view.rerender(<FirstRun />);
-    expect(retryButton().disabled).toBe(false);
-    fireEvent.click(retryButton());
+    expect(invokeButton().disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    fireEvent.click(invokeButton());
     expect(fixtures.invoke).toHaveBeenCalledTimes(1);
   },
 );
