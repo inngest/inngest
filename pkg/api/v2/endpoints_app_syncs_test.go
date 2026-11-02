@@ -165,10 +165,11 @@ func TestHTTPGateway_AppSyncErrors(t *testing.T) {
 		{name: "limit too high", suffix: "?limit=101", status: 400, message: "Limit cannot exceed 100"},
 		{name: "negative limit", suffix: "?limit=-1", status: 400, message: "Limit must be at least 1"},
 		{name: "bad cursor", suffix: "?cursor=bad", status: 400, message: "Cursor is invalid"},
+		{name: "unresolved cursor", suffix: "?cursor=" + id, status: 400, message: "Cursor is invalid", syncErr: fmt.Errorf("lookup: %w", ErrInvalidCursor)},
 		{name: "list unknown app", status: 404, message: "App not found", appErr: fmt.Errorf("lookup: %w", ErrAppNotFound)},
 		{name: "get unknown app", suffix: "/" + id, status: 404, message: "App not found", appErr: ErrAppNotFound},
 		{name: "unknown sync", suffix: "/" + id, status: 404, message: "Sync not found", syncErr: fmt.Errorf("lookup: %w", ErrAppSyncNotFound)},
-		{name: "garbage sync", suffix: "/bad", status: 404, message: "Sync not found"},
+		{name: "garbage sync", suffix: "/bad", status: 400, message: "Sync ID must be a valid UUID"},
 		{name: "list app failure", status: 500, message: "Unable to fetch app", appErr: errors.New("private database detail")},
 		{name: "get app failure", suffix: "/" + id, status: 500, message: "Unable to fetch app", appErr: errors.New("private database detail")},
 		{name: "list sync failure", status: 500, message: "Unable to fetch app syncs", syncErr: errors.New("private database detail")},
@@ -204,7 +205,9 @@ func TestHTTPGateway_AppSyncErrors(t *testing.T) {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v2/apps/my-app/syncs"+tc.suffix, nil))
 			require.Equal(t, tc.status, rec.Code, rec.Body.String())
-			if tc.message != "" {
+			if tc.status == http.StatusBadRequest {
+				require.JSONEq(t, fmt.Sprintf(`{"errors":[{"code":"invalid_field_format","message":%q}]}`, tc.message), rec.Body.String())
+			} else if tc.message != "" {
 				require.Contains(t, rec.Body.String(), tc.message)
 			}
 			require.NotContains(t, rec.Body.String(), "private database detail")

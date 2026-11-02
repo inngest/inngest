@@ -11035,11 +11035,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06_error\"<\n" +
 	"\fSyncAppError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xaa\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb4\x02\n" +
 	"\x13ListAppSyncsRequest\x123\n" +
 	"\x06app_id\x18\x01 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12n\n" +
-	"\x06cursor\x18\x02 \x01(\tBQ\x92AN2LPagination cursor from previous response: the UUID of the last returned syncH\x00R\x06cursor\x88\x01\x01\x12Y\n" +
-	"\x05limit\x18\x03 \x01(\x05B>\x92A;25Number of syncs to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\x06cursor\x18\x02 \x01(\tBQ\x92AN2LPagination cursor from previous response: the UUID of the last returned syncH\x00R\x06cursor\x88\x01\x01\x12c\n" +
+	"\x05limit\x18\x03 \x01(\x05BH\x92AE2?Number of syncs to return per page: 1-100; 0 or omitted uses 20:\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limit\"\x90\x01\n" +
 	"\x14ListAppSyncsResponse\x12 \n" +
@@ -11051,7 +11051,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\async_id\x18\x02 \x01(\tB\x0e\x92A\v2\tSync UUIDR\x06syncId\"l\n" +
 	"\x12GetAppSyncResponse\x12 \n" +
 	"\x04data\x18\x01 \x01(\v2\f.api.v2.SyncR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xe1\x11\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xc3\x12\n" +
 	"\x04Sync\x12C\n" +
 	"\x02id\x18\x01 \x01(\tB3\x92A02.Sync UUID, matching the ID returned by SyncAppR\x02id\x123\n" +
 	"\x06app_id\x18\x02 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12\xe8\x02\n" +
@@ -11063,9 +11063,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tframework\x18\a \x01(\tB$\x92A!2\x1fFramework reported by this syncH\x03R\tframework\x88\x01\x01\x12L\n" +
 	"\vapp_version\x18\b \x01(\tB&\x92A#2!App version reported by this syncH\x04R\n" +
 	"appVersion\x88\x01\x01\x12Y\n" +
-	"\x05error\x18\t \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x05R\x05error\x88\x01\x01\x12\xd9\x02\n" +
+	"\x05error\x18\t \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x05R\x05error\x88\x01\x01\x12\xbb\x03\n" +
 	"\x0fadded_functions\x18\n" +
-	" \x03(\tB\xaf\x02\x92A\xab\x022\xa8\x02Functions this sync created. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x0eaddedFunctions\x12\xb4\x03\n" +
+	" \x03(\tB\x91\x03\x92A\x8d\x032\x8a\x03Functions this sync created, best-effort based on function created time; archived functions re-added later appear as modified. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x0eaddedFunctions\x12\xb4\x03\n" +
 	"\x12modified_functions\x18\v \x03(\tB\x84\x03\x92A\x80\x032\xfd\x02Existing functions this sync re-registered. A sync re-registers every function, so unchanged functions count too. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x11modifiedFunctions\x12\xde\x02\n" +
 	"\x11removed_functions\x18\f \x03(\tB\xb0\x02\x92A\xac\x022\xa9\x02Functions this sync archived. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists.R\x10removedFunctions\x12Y\n" +
 	"\n" +
@@ -11502,7 +11502,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xa8\xeb\x01\n" +
+	"\x04INFO\x10\x032\xde\xeb\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12004,17 +12004,17 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xc6\x03\n" +
-	"\fListAppSyncs\x12\x1b.api.v2.ListAppSyncsRequest\x1a\x1c.api.v2.ListAppSyncsResponse\"\xfa\x02\x92A\xbe\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xe1\x03\n" +
+	"\fListAppSyncs\x12\x1b.api.v2.ListAppSyncsRequest\x1a\x1c.api.v2.ListAppSyncsResponse\"\x95\x03\x92A\xd9\x02\n" +
 	"\x04Apps\n" +
-	"\x04Beta\x12\x0eList app syncs\x1a\x8d\x02Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x04Beta\x12\x0eList app syncs\x1a\xa8\x02Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x18\b\x01\x12\x14apps:read:list_syncs\x82\xd3\xe4\x93\x02\x16\x12\x14/apps/{app_id}/syncs\x12\xba\x03\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x18\b\x01\x12\x14apps:read:list_syncs\x82\xd3\xe4\x93\x02\x16\x12\x14/apps/{app_id}/syncs\x12\xd5\x03\n" +
 	"\n" +
-	"GetAppSync\x12\x19.api.v2.GetAppSyncRequest\x1a\x1a.api.v2.GetAppSyncResponse\"\xf4\x02\x92A\xb0\x02\n" +
+	"GetAppSync\x12\x19.api.v2.GetAppSyncRequest\x1a\x1a.api.v2.GetAppSyncResponse\"\x8f\x03\x92A\xcb\x02\n" +
 	"\x04Apps\n" +
-	"\x04Beta\x12\fGet app sync\x1a\x81\x02Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x04Beta\x12\fGet app sync\x1a\x9c\x02Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12apps:read:get_sync\x82\xd3\xe4\x93\x02 \x12\x1e/apps/{app_id}/syncs/{sync_id}\x12\xf6\x01\n" +

@@ -1803,7 +1803,7 @@ service V2 {
       summary: "List app syncs"
       tags: "Apps"
       tags: "Beta"
-      description: "Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state."
+      description: "Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -1823,7 +1823,7 @@ service V2 {
       summary: "Get app sync"
       tags: "Apps"
       tags: "Beta"
-      description: "Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list returns an empty list and get returns 404. Use GetApp latestSync for the dev server's current state."
+      description: "Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -3750,7 +3750,7 @@ message ListAppSyncsRequest {
   ];
   optional int32 limit = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Number of syncs to return per page (min: 1, max: 100)"
+      description: "Number of syncs to return per page: 1-100; 0 or omitted uses 20"
       default: "20"
     }
   ];
@@ -3832,7 +3832,7 @@ message Sync {
   ];
   repeated string added_functions = 10 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Functions this sync created. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
+      description: "Functions this sync created, best-effort based on function created time; archived functions re-added later appear as modified. Function IDs use the same public form as GET /v2/apps/{app_id}/functions. Duplicate syncs change nothing, so all three function lists are empty. A function is listed only under the most recent sync that registered or removed it, so older syncs can show partial lists."
     }
   ];
   repeated string modified_functions = 11 [

@@ -35,6 +35,9 @@ func (s *Service) ListAppSyncs(ctx context.Context, req *apiv2.ListAppSyncsReque
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch app")
 	}
 	result, err := s.appSyncs.ListAppSyncs(ctx, app, ListAppSyncsOpts{Cursor: cursor, Limit: limit})
+	if errors.Is(err, ErrInvalidCursor) {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Cursor is invalid")
+	}
 	if err != nil {
 		logger.From(ctx).Error("unable to fetch app syncs", "error", err)
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch app syncs")
@@ -66,7 +69,7 @@ func (s *Service) GetAppSync(ctx context.Context, req *apiv2.GetAppSyncRequest) 
 	}
 	id, err := uuid.Parse(req.GetSyncId())
 	if err != nil {
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Sync not found")
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Sync ID must be a valid UUID")
 	}
 	app, err := s.apps.GetApp(ctx, decodePathParam(req.GetAppId()))
 	if errors.Is(err, ErrAppNotFound) {

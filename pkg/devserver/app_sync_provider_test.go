@@ -24,6 +24,8 @@ func TestAppSyncProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, result.Syncs)
 	require.False(t, result.HasMore)
+	_, err = provider.ListAppSyncs(t.Context(), app, apiv2.ListAppSyncsOpts{Limit: 20, Cursor: uuid.New()})
+	require.ErrorIs(t, err, apiv2.ErrInvalidCursor)
 	_, err = provider.GetAppSync(t.Context(), app, uuid.New())
 	require.ErrorIs(t, err, apiv2.ErrAppSyncNotFound)
 }
@@ -39,6 +41,7 @@ func TestAppSyncHistoryHTTP(t *testing.T) {
 		message string
 	}{
 		{"/v2/apps/my-app/syncs", 200, ""},
+		{"/v2/apps/my-app/syncs?cursor=" + id, 400, "Cursor is invalid"},
 		{"/v2/apps/my-app/syncs/" + id, 404, "Sync not found"},
 		{"/v2/apps/missing/syncs", 404, "App not found"},
 		{"/v2/apps/missing/syncs/" + id, 404, "App not found"},
@@ -52,6 +55,8 @@ func TestAppSyncHistoryHTTP(t *testing.T) {
 				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 				require.JSONEq(t, `[]`, string(body["data"]))
 				require.JSONEq(t, `{"limit":20,"hasMore":false}`, string(body["page"]))
+			} else if tc.status == http.StatusBadRequest {
+				require.JSONEq(t, `{"errors":[{"code":"invalid_field_format","message":"Cursor is invalid"}]}`, rec.Body.String())
 			} else {
 				require.Contains(t, rec.Body.String(), tc.message)
 			}
