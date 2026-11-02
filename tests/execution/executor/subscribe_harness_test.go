@@ -192,6 +192,14 @@ func (s crashingState) TimeoutInboxWait(ctx context.Context, id statev2.ID, inbo
 func (s crashingState) RecordInboxWait(ctx context.Context, id statev2.ID, wait statev2.InboxWait) (*statev2.InboxWake, error) {
 	s.crash.await("before:RecordInboxWait")
 
+	// An armed retry commits the record and loses the response, so the adapter
+	// sends the same call again and the executor sees only the second answer.
+	if errors.Is(s.crash.fire("retry:RecordInboxWait"), errCrash) {
+		if _, err := s.RunService.RecordInboxWait(ctx, id, wait); err != nil {
+			return nil, err
+		}
+	}
+
 	wake, err := s.RunService.RecordInboxWait(ctx, id, wait)
 	if err != nil {
 		return wake, err
