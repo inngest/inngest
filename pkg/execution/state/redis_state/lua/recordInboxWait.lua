@@ -52,6 +52,13 @@ if redis.call("HEXISTS", keyWaits, inbox .. ":closed") == 1 then
 end
 
 if cjson.decode(record)["pck"] ~= nil and redis.call("SISMEMBER", keyStepsPending, waitID) == 0 then
+	-- A batch read's answer is saved under its own id. If it is there, this
+	-- call is the same one sent again after its response was lost, and nobody
+	-- has queued the wake yet: answer it as satisfied.
+	if batch ~= nil and redis.call("HEXISTS", keyStep, waitID) == 1 then
+		return { 3, redis.call("SCARD", keyStepsPending) > 0 and 1 or 0 }
+	end
+
 	return { 4 }
 end
 
