@@ -14,6 +14,7 @@ import (
 
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngestgo/internal/logger"
+	"github.com/inngest/inngestgo/internal/signingkey"
 )
 
 var (
@@ -188,15 +189,5 @@ func hashEventKey(key string) string {
 }
 
 func hashedSigningKey(key []byte) ([]byte, error) {
-	prefix := keyRegexp.Find(key)
-	key = normalizeKey(key)
-
-	dst := make([]byte, hex.DecodedLen(len(key)))
-	if _, err := hex.Decode(dst, key); err != nil {
-		return nil, err
-	}
-
-	sum := sha256.Sum256(dst)
-	enc := hex.EncodeToString(sum[:])
-	return append(prefix, []byte(enc)...), nil
+	return signingkey.Hash(key)
 }
