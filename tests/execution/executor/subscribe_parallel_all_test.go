@@ -59,7 +59,7 @@ func TestSubscribeParallelAllLateStepAlwaysWakes(t *testing.T) {
 			require.NoError(t, <-delivered)
 
 			require.Contains(t, h.steps(), "work")
-			require.Equal(t, 1, h.discoveries(before), "one job continues the run")
+			require.Equal(t, 1, h.discoveries(before), "one job continues the run: %v", h.newJobs(before))
 		})
 	}
 }
