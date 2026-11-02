@@ -20,6 +20,7 @@ const (
 	SpanNameExecution        = "executor.execution"
 	SpanNameStepFailed       = "executor.failed"
 	SpanNameDefer            = "executor.defer"
+	SpanNameTick             = "executor.tick"
 	SpanNameDynamicExtension = "EXTEND"
 	SpanNameUserland         = "userland"
 	SpanNameMetadata         = "metadata"

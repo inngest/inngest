@@ -39,6 +39,7 @@ import { cn } from '../utils/classNames';
 import type {
   BarHeight,
   BarIcon,
+  BarMarker,
   BarPattern,
   BarSegment,
   BarStyle,
@@ -690,6 +691,54 @@ function WarningIcon({ warnings }: { warnings: StepWarning[] }) {
   );
 }
 
+/**
+ * The theme's text colour at 45%: lighter than a bar in dark mode and darker in
+ * light mode, and still visible between the stripes of a wait bar.
+ */
+const MARKER_COLOR = 'rgb(var(--color-foreground-base) / 0.45)';
+
+/**
+ * Small tonal dots on a bar, one per marker, centred vertically at the moment
+ * the marker names. They are drawn beside the bar, so a collapsed or expanded
+ * row shows them alike, and they are decorative. A marker outside the visible
+ * window is not drawn.
+ */
+function BarMarkers({
+  markers,
+  viewStartOffset,
+  viewEndOffset,
+}: {
+  markers: BarMarker[];
+  viewStartOffset: number;
+  viewEndOffset: number;
+}) {
+  const viewWidth = viewEndOffset - viewStartOffset;
+
+  if (viewWidth <= 0) return null;
+
+  return (
+    <>
+      {markers.map((marker) => {
+        if (marker.startPercent < viewStartOffset || marker.startPercent > viewEndOffset) {
+          return null;
+        }
+
+        const left = ((marker.startPercent - viewStartOffset) / viewWidth) * 100;
+
+        return (
+          <span
+            key={marker.id}
+            data-testid="bar-marker"
+            aria-hidden="true"
+            className="absolute top-1/2 z-10 h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: `${left}%`, backgroundColor: MARKER_COLOR }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
 
 /**
@@ -879,6 +928,7 @@ export function TimelineBar({
   sandbox,
   groupKind,
   dimmed,
+  markers,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -1103,6 +1153,14 @@ export function TimelineBar({
               </>
             )}
           </div>
+
+          {markers && markers.length > 0 && (
+            <BarMarkers
+              markers={markers}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+            />
+          )}
         </div>
       </div>
 

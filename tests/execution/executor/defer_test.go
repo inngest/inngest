@@ -1133,7 +1133,7 @@ func TestDeferSessionTombstones(t *testing.T) {
 					"input":   map[string]any{},
 					"meta": map[string]any{
 						// nil marshals to JSON null: the per-key tombstone.
-						"sessions":           map[string]any{"cut": nil, "keep": "manual-id"},
+						"sessions":            map[string]any{"cut": nil, "keep": "manual-id"},
 						"propagated_sessions": map[string]any{"cut": "inherited-cut", "survive": "prop-id"},
 					},
 				},
@@ -1194,7 +1194,7 @@ func TestDeferSessionTombstones(t *testing.T) {
 					"input":   map[string]any{},
 					"meta": map[string]any{
 						// nil marshals to JSON null: the whole-field clear-all.
-						"sessions":           nil,
+						"sessions":            nil,
 						"propagated_sessions": map[string]any{"org": "o_9", "tenant": "acme"},
 					},
 				},

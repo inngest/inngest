@@ -42,7 +42,21 @@ export type Trace = {
   debugRunID?: string | null;
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
+  /** Small events on this span's row, such as messages arriving at an inbox */
+  ticks?: SpanTick[] | null;
   response?: ResponseInfo;
+};
+
+/** One small event on a span's row. It is drawn as a marker on the bar. */
+export type SpanTick = {
+  /** What ticked, such as a message's id */
+  id: string;
+  /** What it came through */
+  sources: string[];
+  /** When it happened */
+  at: string;
+  /** When something took it, if anything has */
+  readAt?: string | null;
 };
 
 export type ResponseInfo = {

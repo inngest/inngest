@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1120,6 +1121,298 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	}
 }
 
+// SaveInboxMessage saves a message step of an inbox and returns the inbox's
+// recorded wait if the message satisfies it.
+func (m shardedMgr) SaveInboxMessage(ctx context.Context, i state.Identifier, msg statev2.InboxMessage) (*statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SaveInboxMessage"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{msg.StepID, string(msg.Value), msg.Inbox, strconv.Itoa(msg.MaxSteps), strconv.Itoa(msg.MaxStateSize)}
+
+	out, err := retriableScripts["saveInboxMessage"].Exec(
+		redis_telemetry.WithScriptName(ctx, "saveInboxMessage"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error saving inbox message: %w", err)
+	}
+
+	status, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox message status: %w", err)
+	}
+	switch status {
+	case -1:
+		return nil, state.ErrDuplicateResponse
+	case -3:
+		return nil, statev2.ErrInboxStepsFull
+	case -4:
+		return nil, statev2.ErrInboxStateFull
+	case -5:
+		return nil, state.ErrRunNotFound
+	case -6:
+		return nil, statev2.ErrInboxClosed
+	}
+
+	if len(out) < 3 {
+		return nil, nil
+	}
+
+	wake, err := inboxWakeFrom(out[1], out[2], msg.StepID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wake, nil
+}
+
+func inboxWakeFrom(record rueidis.RedisMessage, pending rueidis.RedisMessage, messageStep string) (statev2.InboxWake, error) {
+	raw, err := record.ToString()
+	if err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error reading inbox wait: %w", err)
+	}
+
+	wake := statev2.InboxWake{MessageStep: messageStep}
+	if err := json.Unmarshal([]byte(raw), &wake.Wait); err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error decoding inbox wait: %w", err)
+	}
+
+	hasPending, err := pending.AsInt64()
+	if err != nil {
+		return statev2.InboxWake{}, fmt.Errorf("error reading inbox pending: %w", err)
+	}
+	wake.HasPending = hasPending == 1
+
+	return wake, nil
+}
+
+// RecordInboxWait records a wait and returns it if a message already saved
+// after its last seen step satisfies it.
+func (m shardedMgr) RecordInboxWait(ctx context.Context, i state.Identifier, wait statev2.InboxWait) (*statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RecordInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	record, err := json.Marshal(wait)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding inbox wait: %w", err)
+	}
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+	}
+	args := []string{wait.ID, string(record), wait.Inbox, wait.Seen}
+
+	out, err := retriableScripts["recordInboxWait"].Exec(
+		redis_telemetry.WithScriptName(ctx, "recordInboxWait"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error recording inbox wait: %w", err)
+	}
+
+	found, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait status: %w", err)
+	}
+	if found == 4 {
+		return &statev2.InboxWake{Wait: wait, Ended: true}, nil
+	}
+	if found == 3 && len(out) >= 2 {
+		hasPending, err := out[1].AsInt64()
+		if err != nil {
+			return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+		}
+
+		return &statev2.InboxWake{Wait: wait, HasPending: hasPending == 1}, nil
+	}
+	if found == 2 && len(out) >= 2 {
+		hasPending, err := out[1].AsInt64()
+		if err != nil {
+			return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+		}
+
+		return &statev2.InboxWake{Wait: wait, Closed: true, HasPending: hasPending == 1}, nil
+	}
+	if found != 1 || len(out) < 3 {
+		return nil, nil
+	}
+
+	messageStep, err := out[1].ToString()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait message: %w", err)
+	}
+	hasPending, err := out[2].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox wait pending: %w", err)
+	}
+
+	return &statev2.InboxWake{Wait: wait, MessageStep: messageStep, HasPending: hasPending == 1}, nil
+}
+
+// TimeoutInboxWait saves data under an inbox's recorded wait and returns the
+// wait, or returns nil if the inbox's wait is no longer that one.
+func (m shardedMgr) TimeoutInboxWait(ctx context.Context, i state.Identifier, inbox string, waitID string, data []byte) (*statev2.InboxWake, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "TimeoutInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{inbox, waitID, string(data)}
+
+	out, err := retriableScripts["timeoutInboxWait"].Exec(
+		redis_telemetry.WithScriptName(ctx, "timeoutInboxWait"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, fmt.Errorf("error timing out inbox wait: %w", err)
+	}
+
+	found, err := out[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error reading inbox timeout status: %w", err)
+	}
+	if found != 1 || len(out) < 3 {
+		return nil, nil
+	}
+
+	wake, err := inboxWakeFrom(out[1], out[2], "")
+	if err != nil {
+		return nil, err
+	}
+	wake.TimedOut = true
+
+	return &wake, nil
+}
+
+// CloseInbox saves the result of a close op and ends the inbox's wait.
+func (m shardedMgr) CloseInbox(ctx context.Context, i state.Identifier, closing statev2.InboxClose) (*statev2.InboxWake, bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "CloseInbox"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	keys := []string{
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
+	}
+	args := []string{closing.StepID, closing.Inbox}
+
+	out, err := retriableScripts["closeInbox"].Exec(
+		redis_telemetry.WithScriptName(ctx, "closeInbox"),
+		r,
+		keys,
+		args,
+	).ToArray()
+	if err != nil || len(out) == 0 {
+		return nil, false, fmt.Errorf("error closing inbox: %w", err)
+	}
+
+	pending, err := out[0].AsInt64()
+	if err != nil {
+		return nil, false, fmt.Errorf("error reading inbox close pending: %w", err)
+	}
+
+	if len(out) < 2 {
+		return nil, pending == 1, nil
+	}
+
+	wake, err := inboxWakeFrom(out[1], out[0], "")
+	if err != nil {
+		return nil, false, err
+	}
+	wake.Closed = true
+
+	return &wake, pending == 1, nil
+}
+
+// DeleteInboxWait removes the inbox's wait if it is the wait waitID.
+func (m shardedMgr) DeleteInboxWait(ctx context.Context, i state.Identifier, inbox string, waitID string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "DeleteInboxWait"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	return retriableScripts["deleteInboxWait"].Exec(
+		redis_telemetry.WithScriptName(ctx, "deleteInboxWait"),
+		r,
+		[]string{fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID)},
+		[]string{inbox, waitID},
+	).Error()
+}
+
+// LoadInboxWaits returns the waits recorded for a run, and the inboxes that
+// were closed, each sorted by inbox.
+func (m shardedMgr) LoadInboxWaits(ctx context.Context, i state.Identifier) (statev2.InboxWaitSet, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "LoadInboxWaits"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
+
+	recorded, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Hgetall().Key(fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID)).Build()
+	}).AsStrMap()
+	if err != nil {
+		return statev2.InboxWaitSet{}, fmt.Errorf("error loading inbox waits: %w", err)
+	}
+
+	set := statev2.InboxWaitSet{}
+	for field, record := range recorded {
+		if inbox, closed := strings.CutSuffix(field, inboxClosedSuffix); closed {
+			set.Closed = append(set.Closed, inbox)
+
+			continue
+		}
+
+		var wait statev2.InboxWait
+		if err := json.Unmarshal([]byte(record), &wait); err != nil {
+			return statev2.InboxWaitSet{}, fmt.Errorf("error decoding inbox wait %s: %w", field, err)
+		}
+
+		set.Waits = append(set.Waits, wait)
+	}
+
+	sort.Slice(set.Waits, func(a, b int) bool { return set.Waits[a].Inbox < set.Waits[b].Inbox })
+	sort.Strings(set.Closed)
+
+	return set, nil
+}
+
+// inboxClosedSuffix ends the field that records an inbox as closed in the hash
+// of a run's inbox waits. The inbox's own wait is the field named by the inbox.
+// The closeInbox script writes it.
+const inboxClosedSuffix = ":closed"
+
 func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending []string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePending"), redis_telemetry.ScopeFnRunState)
 
@@ -1200,6 +1493,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersControlMeta(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.InboxWaits(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
 
 	result := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {

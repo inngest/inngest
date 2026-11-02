@@ -264,6 +264,107 @@ func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 	return opts, nil
 }
 
+// SubscribeSource is one source of an inbox: an event name and an optional
+// expression, written like a function trigger.
+type SubscribeSource struct {
+	Event string  `json:"event"`
+	If    *string `json:"if,omitempty"`
+}
+
+// SubscribeOpts are the options of an OpcodeSubscribe op, which opens an inbox.
+type SubscribeOpts struct {
+	Sources []SubscribeSource `json:"sources"`
+}
+
+// SubscribeWaitOpts are the options of an OpcodeSubscribeWait op, a read of an
+// inbox that has nothing unread.
+type SubscribeWaitOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+	// Seen is the last step id of the stack the SDK had loaded.
+	Seen string `json:"seen"`
+	// Timeout is how long the read waits for a message before it gets a null:
+	// a duration or a timestamp, like the timeout of waitForEvent. Empty means
+	// the read waits for as long as the run lives.
+	Timeout string `json:"timeout,omitempty"`
+	// Batch is set when the read is a batch read (`drain()` or `nextBatch()`):
+	// the executor answers it with a cut at the last message saved after
+	// Seen, and the answer is the read's result.
+	Batch *SubscribeBatchOpts `json:"batch,omitempty"`
+}
+
+// SubscribeBatchOpts are what a batch read adds to a SubscribeWaitOpts.
+type SubscribeBatchOpts struct {
+	// Drain is whether the read never waits: it is answered at once, with no
+	// messages if there are none.
+	Drain bool `json:"drain,omitempty"`
+	// Unread is whether the SDK already holds unread messages from the state it
+	// loaded, so the read is answered at once even if nothing was saved since.
+	Unread bool `json:"unread,omitempty"`
+	// Max is how many messages the answer may cover, oldest first. Missing
+	// means all of them.
+	Max *int `json:"max,omitempty"`
+}
+
+// SubscribeReadOpts are the options of an OpcodeSubscribeRead op, which reports
+// the messages a read of an inbox took.
+type SubscribeReadOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+	// Messages are the step ids of the messages the read took.
+	Messages []string `json:"messages"`
+	// Draw is whether the read has no row of its own yet: the read was answered
+	// from state, so no step drew it. A batch read is a step with a row already.
+	Draw bool `json:"draw,omitempty"`
+	// Row is the step whose row the messages go under, when the read is a step
+	// whose op has an id of its own (a batch read). Empty means the read's own
+	// id.
+	Row string `json:"row,omitempty"`
+}
+
+func (g GeneratorOpcode) SubscribeReadOpts() (*SubscribeReadOpts, error) {
+	opts := &SubscribeReadOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+// SubscribeCloseOpts are the options of an OpcodeSubscribeClose op, which closes
+// an inbox.
+type SubscribeCloseOpts struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+}
+
+func (g GeneratorOpcode) SubscribeCloseOpts() (*SubscribeCloseOpts, error) {
+	opts := &SubscribeCloseOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+func (g GeneratorOpcode) SubscribeOpts() (*SubscribeOpts, error) {
+	opts := &SubscribeOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+func (g GeneratorOpcode) SubscribeWaitOpts() (*SubscribeWaitOpts, error) {
+	opts := &SubscribeWaitOpts{}
+	if err := unmarshalOpts(g.Opts, opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	if opts, ok := g.Opts.(*WaitForEventOpts); ok && opts != nil {
 		return opts, nil

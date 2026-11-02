@@ -246,6 +246,11 @@ type Pause struct {
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
+	// Subscribe is set on the pause of an inbox's source. Such a pause is not
+	// consumed by a matching event: the event is saved as a message of the
+	// inbox and the pause stays until the inbox closes or the run ends.
+	Subscribe *PauseSubscribe `json:"sub,omitempty"`
+
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
 
@@ -264,6 +269,17 @@ type Pause struct {
 	// timeframes are based on this timestamp (previously only available as the
 	// sort score in pause indexes).
 	CreatedAt time.Time `json:"ca"`
+}
+
+// PauseSubscribe marks a pause as the source of an inbox.
+type PauseSubscribe struct {
+	// Inbox is the id of the op that opened the inbox.
+	Inbox string `json:"inbox"`
+
+	// Untimed marks the timer of a read that has no timeout. The timer exists
+	// only so the run always holds a queue item while it waits, and does nothing
+	// when it fires.
+	Untimed bool `json:"untimed,omitempty"`
 }
 
 // CreatedAfter reports whether this pause was created after the given

@@ -575,6 +575,8 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
   WAIT_FOR_SIGNAL
+  SUBSCRIBE # open an inbox
+  INBOX_READ # a read of an inbox that waited
 }
 
 union StepInfo =
@@ -658,7 +660,15 @@ type RunTraceSpan {
   skipExistingRunID: String
   customConcurrencyKeys: [RunTraceConcurrencyKey!]!
   metadata: [SpanMetadata!]!
+  ticks: [SpanTick!]! # small events on this row, such as messages arriving at an inbox; never rows
   response: RunTraceSpanResponseInfo # Response status and headers
+}
+
+type SpanTick {
+  id: String! # what ticked, such as a message's step ID
+  sources: [String!]! # the pauses of the sources it came through
+  at: Time! # when it arrived
+  readAt: Time # when a read took it
 }
 
 type RunTraceConcurrencyKey {

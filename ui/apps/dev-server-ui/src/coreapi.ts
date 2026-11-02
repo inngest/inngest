@@ -410,6 +410,12 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     stepType
     groupKind
     origin
+    ticks {
+      id
+      sources
+      at
+      readAt
+    }
     stepInfo {
       __typename
       ... on InvokeStepInfo {

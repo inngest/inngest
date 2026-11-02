@@ -876,6 +876,7 @@ export type RunTraceSpan = {
   stepInfo: Maybe<StepInfo>;
   stepOp: Maybe<StepOp>;
   stepType: Scalars['String'];
+  ticks: Array<SpanTick>;
   traceID: Scalars['String'];
   userlandSpan: Maybe<UserlandSpan>;
 };
@@ -1020,6 +1021,14 @@ export type SpanMetadata = {
   values: Scalars['SpanMetadataValues'];
 };
 
+export type SpanTick = {
+  __typename?: 'SpanTick';
+  at: Scalars['Time'];
+  id: Scalars['String'];
+  readAt: Maybe<Scalars['Time']>;
+  sources: Array<Scalars['String']>;
+};
+
 export type StepError = {
   __typename?: 'StepError';
   cause: Maybe<Scalars['Unknown']>;
@@ -1065,9 +1074,11 @@ export type StepInfo =
 
 export enum StepOp {
   AiGateway = 'AI_GATEWAY',
+  InboxRead = 'INBOX_READ',
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',
+  Subscribe = 'SUBSCRIBE',
   WaitForEvent = 'WAIT_FOR_EVENT',
   WaitForSignal = 'WAIT_FOR_SIGNAL',
 }
@@ -1542,6 +1553,13 @@ export type TraceDetailsFragment = {
     values: any;
     updatedAt: any;
   }>;
+  ticks: Array<{
+    __typename?: 'SpanTick';
+    id: string;
+    sources: Array<string>;
+    at: any;
+    readAt: any | null;
+  }>;
   stepInfo:
     | {
         __typename: 'InvokeStepInfo';
@@ -1778,6 +1796,13 @@ export type GetRunQuery = {
                       values: any;
                       updatedAt: any;
                     }>;
+                    ticks: Array<{
+                      __typename?: 'SpanTick';
+                      id: string;
+                      sources: Array<string>;
+                      at: any;
+                      readAt: any | null;
+                    }>;
                     stepInfo:
                       | {
                           __typename: 'InvokeStepInfo';
@@ -1828,6 +1853,13 @@ export type GetRunQuery = {
                     isUser: boolean;
                     values: any;
                     updatedAt: any;
+                  }>;
+                  ticks: Array<{
+                    __typename?: 'SpanTick';
+                    id: string;
+                    sources: Array<string>;
+                    at: any;
+                    readAt: any | null;
                   }>;
                   stepInfo:
                     | {
@@ -1880,6 +1912,13 @@ export type GetRunQuery = {
                   values: any;
                   updatedAt: any;
                 }>;
+                ticks: Array<{
+                  __typename?: 'SpanTick';
+                  id: string;
+                  sources: Array<string>;
+                  at: any;
+                  readAt: any | null;
+                }>;
                 stepInfo:
                   | {
                       __typename: 'InvokeStepInfo';
@@ -1930,6 +1969,13 @@ export type GetRunQuery = {
                 isUser: boolean;
                 values: any;
                 updatedAt: any;
+              }>;
+              ticks: Array<{
+                __typename?: 'SpanTick';
+                id: string;
+                sources: Array<string>;
+                at: any;
+                readAt: any | null;
               }>;
               stepInfo:
                 | {
@@ -1982,6 +2028,13 @@ export type GetRunQuery = {
               values: any;
               updatedAt: any;
             }>;
+            ticks: Array<{
+              __typename?: 'SpanTick';
+              id: string;
+              sources: Array<string>;
+              at: any;
+              readAt: any | null;
+            }>;
             stepInfo:
               | {
                   __typename: 'InvokeStepInfo';
@@ -2032,6 +2085,13 @@ export type GetRunQuery = {
             isUser: boolean;
             values: any;
             updatedAt: any;
+          }>;
+          ticks: Array<{
+            __typename?: 'SpanTick';
+            id: string;
+            sources: Array<string>;
+            at: any;
+            readAt: any | null;
           }>;
           stepInfo:
             | {
@@ -2084,6 +2144,13 @@ export type GetRunQuery = {
           values: any;
           updatedAt: any;
         }>;
+        ticks: Array<{
+          __typename?: 'SpanTick';
+          id: string;
+          sources: Array<string>;
+          at: any;
+          readAt: any | null;
+        }>;
         stepInfo:
           | {
               __typename: 'InvokeStepInfo';
@@ -2134,6 +2201,13 @@ export type GetRunQuery = {
         isUser: boolean;
         values: any;
         updatedAt: any;
+      }>;
+      ticks: Array<{
+        __typename?: 'SpanTick';
+        id: string;
+        sources: Array<string>;
+        at: any;
+        readAt: any | null;
       }>;
       stepInfo:
         | {
@@ -2347,6 +2421,13 @@ export type GetRunTraceQuery = {
               values: any;
               updatedAt: any;
             }>;
+            ticks: Array<{
+              __typename?: 'SpanTick';
+              id: string;
+              sources: Array<string>;
+              at: any;
+              readAt: any | null;
+            }>;
             stepInfo:
               | {
                   __typename: 'InvokeStepInfo';
@@ -2397,6 +2478,13 @@ export type GetRunTraceQuery = {
             isUser: boolean;
             values: any;
             updatedAt: any;
+          }>;
+          ticks: Array<{
+            __typename?: 'SpanTick';
+            id: string;
+            sources: Array<string>;
+            at: any;
+            readAt: any | null;
           }>;
           stepInfo:
             | {
@@ -2449,6 +2537,13 @@ export type GetRunTraceQuery = {
           values: any;
           updatedAt: any;
         }>;
+        ticks: Array<{
+          __typename?: 'SpanTick';
+          id: string;
+          sources: Array<string>;
+          at: any;
+          readAt: any | null;
+        }>;
         stepInfo:
           | {
               __typename: 'InvokeStepInfo';
@@ -2500,6 +2595,13 @@ export type GetRunTraceQuery = {
         values: any;
         updatedAt: any;
       }>;
+      ticks: Array<{
+        __typename?: 'SpanTick';
+        id: string;
+        sources: Array<string>;
+        at: any;
+        readAt: any | null;
+      }>;
       stepInfo:
         | {
             __typename: 'InvokeStepInfo';
@@ -2550,6 +2652,13 @@ export type GetRunTraceQuery = {
       isUser: boolean;
       values: any;
       updatedAt: any;
+    }>;
+    ticks: Array<{
+      __typename?: 'SpanTick';
+      id: string;
+      sources: Array<string>;
+      at: any;
+      readAt: any | null;
     }>;
     stepInfo:
       | {

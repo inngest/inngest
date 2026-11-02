@@ -67,12 +67,20 @@ const traceDetailsFragment = graphql(`
       statusCode
       headers
     }
+    ticks {
+      id
+      sources
+      at
+      readAt
+    }
   }
 `);
 
-// Cloud caps query complexity at 300 and each level costs ~58, so this stops
-// at 5 levels. Deeper spans (extra machines, command retries, failed attempts
-// in CI traces) aren't shown until span children are loaded lazily.
+// Cloud caps query complexity at 600 (`ComplexityLimit` in the monorepo's
+// pkg/config/appconfig/appconfig.go). Each level costs ~65, so these 5 levels
+// cost ~324 of it. Deeper spans (extra machines, command retries, failed
+// attempts in CI traces) aren't shown until span children are loaded lazily.
+// The budget is checked in src/gql/runTraceComplexity.test.ts.
 const query = graphql(`
   query GetRunTrace($envID: ID!, $runID: String!, $preview: Boolean) {
     workspace(id: $envID) {
