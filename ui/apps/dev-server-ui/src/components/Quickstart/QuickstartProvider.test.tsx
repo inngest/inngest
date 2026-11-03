@@ -156,7 +156,7 @@ it('restores an in-flight attempt without invoking again or completing on failur
   saveAttempt();
   setRuns({ ...run, status: 'FAILED' });
   render(<TestApp />);
-  expect(state.attempt).toEqual(attempt);
+  expect(state.attempt).toEqual({ ...attempt, runID: run.id });
   expect(state.completion).toBeNull();
   expect(state.run?.status).toBe('FAILED');
   expect(fixtures.track).not.toHaveBeenCalled();
@@ -169,6 +169,53 @@ it('restores an in-flight attempt without invoking again or completing on failur
     expect.anything(),
   );
 });
+it.each(['manual', 'agent'] as const)(
+  'keeps the matched %s run through handoff, another run, and reload until completion',
+  (mode) => {
+    saveAttempt(mode === 'agent' ? { mode, functionID: '' } : {});
+    const running = { ...run, status: 'RUNNING', endedAt: null };
+    setRuns(running);
+    const view = render(<TestApp />);
+    const pinnedAttempt = {
+      ...attempt,
+      ...(mode === 'agent' ? { mode } : {}),
+      runID: run.id,
+    };
+    expect(state.attempt).toEqual(pinnedAttempt);
+    expect(
+      JSON.parse(sessionStorage.getItem(`${storageKey(server)}:attempt`)!),
+    ).toEqual(pinnedAttempt);
+
+    fixtures.pathname = '/runs';
+    const other = { ...running, id: 'run-2', queuedAt: '2026-10-23T12:00:03Z' };
+    setRuns(other, running);
+    view.rerender(<TestApp />);
+    expect(state.run?.id).toBe(run.id);
+    expect(state.completion).toBeNull();
+    view.unmount();
+    const restored = render(<TestApp />);
+    expect(state.run?.id).toBe(run.id);
+    expect(state.attempt).toEqual(pinnedAttempt);
+
+    setRuns(other, run);
+    restored.rerender(<TestApp />);
+    expect(state.completion?.runID).toBe(run.id);
+    expect(JSON.parse(localStorage.getItem(storageKey(server))!).runID).toBe(
+      run.id,
+    );
+    expect(state.attempt).toBeNull();
+    expect(sessionStorage.getItem(`${storageKey(server)}:attempt`)).toBeNull();
+    expect(fixtures.track).toHaveBeenCalledExactlyOnceWith(
+      'cli/onboarding.action',
+      {
+        flow: 'quickstart',
+        version: 1,
+        action: 'first_run_completed',
+        path: mode,
+      },
+    );
+  },
+);
 it('excludes disconnected apps and durable endpoints from historical inference', () => {
   fixtures.apps.data.apps.push(
     {
@@ -281,7 +328,7 @@ it.each(['FAILED', 'CANCELLED', 'SKIPPED'])(
     saveAttempt();
     setRuns({ ...run, status });
     const view = render(<TestApp />);
-    expect(state.attempt).toEqual(attempt);
+    expect(state.attempt).toEqual({ ...attempt, runID: run.id });
     expect(state.run?.id).toBe(run.id);
     fixtures.pathname = '/runs';
     view.rerender(<TestApp />);
@@ -303,7 +350,7 @@ it.each(['QUEUED', 'RUNNING'])(
     fixtures.pathname = '/runs';
     setRuns({ ...run, status });
     render(<TestApp />);
-    expect(state.attempt).toEqual(attempt);
+    expect(state.attempt).toEqual({ ...attempt, runID: run.id });
     expect(state.completion).toBeNull();
   },
 );

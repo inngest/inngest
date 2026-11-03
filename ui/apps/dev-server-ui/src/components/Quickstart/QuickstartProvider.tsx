@@ -106,6 +106,13 @@ function useQuickstartState() {
 
   useEffect(() => {
     if (!server || !run) return;
+    if (attempt && !attempt.runID) {
+      setAttempt({
+        ...attempt,
+        functionID: run.function.id,
+        runID: run.id,
+      });
+    }
     if (!completion && run.status === 'COMPLETED') {
       const value: Completion = {
         version: 1,
