@@ -16,6 +16,7 @@ export const clientFeatureFlags = [
   'overdue-invoice-banner',
   'polling-disabled',
   'supabase-integration',
+  'webhook-failure-rows',
 ] as const;
 
 export type ClientFeatureFlagKey = (typeof clientFeatureFlags)[number];
