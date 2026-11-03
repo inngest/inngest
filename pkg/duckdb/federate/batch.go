@@ -64,6 +64,18 @@ func (b *Batch) Validate() error {
 	return nil
 }
 
+// validateFor is Validate, plus a check that b has one column per column of
+// schema, the reader's schema its rows are encoded against.
+func (b *Batch) validateFor(schema []Column) error {
+	if err := b.Validate(); err != nil {
+		return err
+	}
+	if len(b.Columns) != len(schema) {
+		return fmt.Errorf("federate: batch has %d columns for a %d-column reader schema", len(b.Columns), len(schema))
+	}
+	return nil
+}
+
 // BatchReader streams Batches that share one schema. Next returns io.EOF
 // once the stream is exhausted. Close releases the underlying stream and is
 // safe to call more than once.
