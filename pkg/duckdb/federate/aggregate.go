@@ -173,11 +173,12 @@ func (e *Executor) aggregatePushed(ctx context.Context, as AggregateStreamer, q 
 
 // aggregateRows aggregates the federated source (lake ∪ the delta's rows)
 // in DuckDB: the delta streams rows, pre-filtered by whichever predicates it
-// can push.
+// can push. It reads the source uncollapsed, so like the pushed path it
+// assumes a flat lake (RunsCollapsed).
 func (e *Executor) aggregateRows(ctx context.Context, q AggregateQuery) (*Rows, error) {
 	return e.Query(ctx, Query{
 		AccountID: q.AccountID, EnvID: q.EnvID, From: q.From, To: q.To,
-		Lake: q.Lake, Watermark: q.Watermark, Tables: []Table{q.Table},
+		Lake: q.Lake, Watermark: q.Watermark, Tables: []Table{q.Table}, RunsCollapsed: true,
 		Predicates: map[Table][]Predicate{q.Table: q.Predicates}, RowCap: q.RowCap,
 		Render: func(sources map[Table]Source) (*parser.SelectStatement, []any, error) {
 			src := sources[q.Table]

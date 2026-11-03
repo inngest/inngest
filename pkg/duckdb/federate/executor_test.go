@@ -150,7 +150,7 @@ func (f *fixture) query(t *testing.T, tables []Table, preds map[Table][]Predicat
 	rows, err := f.exec.Query(context.Background(), Query{
 		AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 		Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(), Tables: tables, Predicates: preds,
-		RowCap: 1000, Select: sel(sqlText), Args: args,
+		RowCap: 1000, RunsCollapsed: true, Select: sel(sqlText), Args: args,
 	})
 	require.NoError(t, err)
 	defer rows.Close()
@@ -204,21 +204,16 @@ func TestExecutorRunsUnion(t *testing.T) {
 		q := f.base
 		done := q.Add(time.Minute)
 
-		// A: queued in the lake, finished in the delta (straddles the watermark).
-		f.lakeRun(t, f.account, "run-A", "Queued", q, nil)
-		f.deltaRun("run-A", "Completed", q, &done, `{"ok":true}`)
-		// B: in flight, only in the lake.
-		f.lakeRun(t, f.account, "run-B", "Running", q, nil)
-		// C: started in the lake, still running in the delta (latest non-final wins).
-		f.lakeRun(t, f.account, "run-C", "Queued", q, nil)
-		f.deltaRun("run-C", "Running", q, nil, "")
-		// D: finished entirely in the lake.
+		// A flat lake: each finished run's final row, at or below W.
 		f.lakeRun(t, f.account, "run-D", "Failed", q, &done)
 		// Another tenant's run, and a run outside the time bound: never visible.
-		f.lakeRun(t, uuid.New(), "run-other", "Running", q, nil)
-		f.lakeRun(t, f.account, "run-old", "Running", f.from.Add(-time.Hour), nil)
-		// E: still open, only in the delta, bucketed at or below W: the runs
-		// delta isn't cut at the watermark.
+		f.lakeRun(t, uuid.New(), "run-other", "Completed", q, &done)
+		f.lakeRun(t, f.account, "run-old", "Completed", f.from.Add(-time.Hour), &done)
+		// The delta: each other run's latest row.
+		f.deltaRun("run-A", "Completed", q, &done, `{"ok":true}`)
+		f.deltaRun("run-C", "Running", q, nil, "")
+		// E: still open, bucketed at or below W: the runs delta isn't cut at
+		// the watermark.
 		f.deltaRun("run-E", "Running", q, nil, "")
 		f.streamer.rows[TableRuns][len(f.streamer.rows[TableRuns])-1]["bucket_at"] = f.lakeBucketAt()
 		// Another tenant's delta run: the delta side re-applies the tenant.
@@ -228,7 +223,6 @@ func TestExecutorRunsUnion(t *testing.T) {
 		got := f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
 		require.Equal(t, map[string]string{
 			"run-A": "Completed",
-			"run-B": "Running",
 			"run-C": "Running",
 			"run-D": "Failed",
 			"run-E": "Running",
@@ -236,10 +230,34 @@ func TestExecutorRunsUnion(t *testing.T) {
 	})
 }
 
+// TestExecutorRejectsRunsWithoutRunsCollapsed checks a runs query needs a
+// flat lake: over runs straddling W, forwarded run predicates and a top-n's
+// lake cut would return wrong rows.
+func TestExecutorRejectsRunsWithoutRunsCollapsed(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		query := func(tables ...Table) error {
+			rows, err := f.exec.Query(context.Background(), Query{
+				AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
+				Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(), Tables: tables,
+				RowCap: 1000, Select: sel(`SELECT 1 AS a, 1 AS b`),
+			})
+			if err == nil {
+				_ = rows.Close()
+			}
+			return err
+		}
+		require.ErrorIs(t, query(TableRuns), ErrRunsNotCollapsed)
+		require.ErrorIs(t, query(TableSpans, TableRuns), ErrRunsNotCollapsed)
+		require.Empty(t, f.streamer.reqs, "a rejected query streams no delta")
+		require.NoError(t, query(TableSpans, TableEvents))
+	})
+}
+
 // TestExecutorRunsCollapsedSkipsRawRuns checks RunsCollapsed reads runs as
 // the plain union: a lake and delta that are one row per run, disjoint (as
 // cloud's are), come back as is, and the delta is asked for just the
-// columns the query reads, none for raw_runs' collapse.
+// columns the query and the delta side's bounds read, none for raw_runs'
+// collapse.
 func TestExecutorRunsCollapsedSkipsRawRuns(t *testing.T) {
 	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
@@ -269,7 +287,7 @@ func TestExecutorRunsCollapsedSkipsRawRuns(t *testing.T) {
 		for _, c := range f.streamer.reqs[0].Columns {
 			cols = append(cols, c.Name)
 		}
-		require.ElementsMatch(t, []string{"run_id", "status"}, cols)
+		require.ElementsMatch(t, []string{"run_id", "status", "account_id", "env_id", "queued_at"}, cols)
 	})
 }
 
@@ -367,14 +385,14 @@ func TestExecutorRejectsOverCap(t *testing.T) {
 		}
 		_, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
-			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 2,
+			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 2, RunsCollapsed: true,
 			Select: sel(`SELECT run_id FROM runs`),
 		})
 		require.True(t, errors.Is(err, ErrRowCapExceeded), "got %v", err)
 
 		rows, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
-			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 10,
+			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 10, RunsCollapsed: true,
 			Select: sel(`SELECT run_id FROM runs`),
 		})
 		require.NoError(t, err, "the connection is usable after a failed query")
@@ -418,18 +436,16 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
 		require.Len(t, f.streamer.reqs, 1)
-		got := names(f.streamer.reqs[0].Columns)
-		for _, c := range []string{"account_id", "env_id", "run_id", "queued_at", "started_at", "ended_at", "status"} {
-			require.Contains(t, got, c, "raw_runs' collapse and the query read %s", c)
-		}
-		require.NotContains(t, got, "attributes")
-		require.NotContains(t, got, "output")
+		// Runs aren't collapsed (RunsCollapsed): the query's columns and the
+		// delta side's bounds (no watermark for runs).
+		require.ElementsMatch(t, []string{"run_id", "status", "account_id", "env_id", "queued_at"}, names(f.streamer.reqs[0].Columns))
 
-		// A count reads no column of the plain union, so one streams.
+		// A count reads no column of the plain union, so only the delta
+		// side's bounds stream.
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableSpans}, nil, `SELECT count(*)::VARCHAR, '' FROM spans`)
 		require.Len(t, f.streamer.reqs, 1)
-		require.Len(t, f.streamer.reqs[0].Columns, 1)
+		require.ElementsMatch(t, bounds, names(f.streamer.reqs[0].Columns))
 	})
 }
 
@@ -441,7 +457,7 @@ func TestExecutorReportsTheQueryError(t *testing.T) {
 		_, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.base,
-			Tables: []Table{TableRuns}, RowCap: 100,
+			Tables: []Table{TableRuns}, RowCap: 100, RunsCollapsed: true,
 			Render: func(src map[Table]Source) (*parser.SelectStatement, []any, error) {
 				s := src[TableRuns]
 				return withCTEs(sel("SELECT no_such_column FROM "+s.Name), s.Prelude...), nil, nil

@@ -3,7 +3,9 @@ package federate
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +24,10 @@ type Executor struct {
 	DB    *sql.DB
 	Delta DeltaStreamer
 }
+
+// ErrRunsNotCollapsed is returned for a query reading runs w/o
+// Query.RunsCollapsed: a delta needs a flat lake.
+var ErrRunsNotCollapsed = errors.New("federate: reading runs w/ a delta needs a flat lake (Query.RunsCollapsed)")
 
 // Query is one federated query.
 type Query struct {
@@ -53,8 +59,10 @@ type Query struct {
 	// run, disjoint (IE the lake holds exported finals at or below W and
 	// the delta each run's latest row above it, or still open), so nothing
 	// collapses them: the runs view is the plain union rather than
-	// raw_runs, and a top-n cuts no lake side of its own. Leave it unset
-	// where a run's rows can straddle the two.
+	// raw_runs, and a top-n cuts no lake side of its own. A query reading
+	// runs must set it: over a lake whose runs straddle W, forwarded run
+	// predicates and a top-n's lake cut return wrong rows, so Query
+	// rejects that (ErrRunsNotCollapsed) rather than answer wrong.
 	RunsCollapsed bool
 	// TopN pushes the query's ORDER BY ... LIMIT into a table's source,
 	// when the query meets TopN's conditions.
@@ -107,6 +115,9 @@ func (r *Rows) Close() error {
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	if q.Select == nil && q.Render == nil {
 		return nil, fmt.Errorf("federate: query has no Select or Render")
+	}
+	if slices.Contains(q.Tables, TableRuns) && !q.RunsCollapsed {
+		return nil, ErrRunsNotCollapsed
 	}
 
 	conn, err := e.DB.Conn(ctx)

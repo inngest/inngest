@@ -132,7 +132,7 @@ func TestExecutorAggregate(t *testing.T) {
 				check, err := f.exec.Query(context.Background(), Query{
 					AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 					Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
-					Tables: []Table{TableRuns}, RowCap: 1000, Select: sel(tt.check),
+					Tables: []Table{TableRuns}, RowCap: 1000, RunsCollapsed: true, Select: sel(tt.check),
 				})
 				require.NoError(t, err)
 				require.Equal(t, got, scanStrings(t, check), "Aggregate and a GROUP BY over the runs view disagree")
