@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/federate"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
@@ -129,13 +130,9 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 
 	ctx = driver.WithMaxResultBytes(ctx, maxResultBytes)
 
-	cat := tr.cat
-	if cat.tables == nil {
-		cat = productCatalog // a hand-built result (tests)
-	}
 	// Only this mode's table macros pass: product queries can't reach the
 	// raw (cross-tenant) ones.
-	if err := checkRenderedSQL(ctx, db, tr.SQL, cat); err != nil {
+	if err := checkRenderedSQL(ctx, db, tr.SQL, tr.catalog()); err != nil {
 		return nil, &ExecutionError{Err: limitError(ctx, err), Start: tr.Start, End: tr.End}
 	}
 
@@ -144,7 +141,59 @@ func Execute(ctx context.Context, db *sql.DB, tr *TranspileResult) (*Result, err
 		return nil, &ExecutionError{Err: limitError(ctx, fmt.Errorf("executing query: %w", err)), Start: tr.Start, End: tr.End}
 	}
 	defer rows.Close()
+	return readResult(rows, tr)
+}
 
+// ExecuteFederated is Execute over a federated read: exec streams each
+// table's delta and runs tr over the lake ∪ delta sources (see
+// TranspileResult.Federated), under Execute's same bounds and rendered-SQL
+// check. q carries the tenant, time range, lake and watermark; its Tables,
+// Predicates and Render are tr's.
+func ExecuteFederated(ctx context.Context, exec *federate.Executor, tr *TranspileResult, q federate.Query) (*Result, error) {
+	ctx, cancel := context.WithTimeoutCause(ctx, executeTimeout, errExecuteTimeout)
+	defer cancel()
+
+	ctx = driver.WithMaxResultBytes(ctx, maxResultBytes)
+
+	tables, preds, render := tr.Federated()
+	// The full render can't pass checkRenderedSQL (its preludes stream the
+	// deltas and read the lake tables directly), so check everything else:
+	// the same SQL with each source left a bare name.
+	bare := map[federate.Table]federate.Source{}
+	for _, t := range tables {
+		bare[t] = federate.Source{Name: federate.SourceName(t)}
+	}
+	checked, _, err := render(bare)
+	if err != nil {
+		return nil, &ExecutionError{Err: err, Start: tr.Start, End: tr.End}
+	}
+	checkedSQL, err := renderSQL(checked)
+	if err != nil {
+		return nil, &ExecutionError{Err: err, Start: tr.Start, End: tr.End}
+	}
+	if err := checkRenderedSQL(ctx, exec.DB, checkedSQL, tr.catalog()); err != nil {
+		return nil, &ExecutionError{Err: limitError(ctx, err), Start: tr.Start, End: tr.End}
+	}
+
+	q.Tables, q.Predicates, q.Render = tables, preds, render
+	rows, err := exec.Query(ctx, q)
+	if err != nil {
+		return nil, &ExecutionError{Err: limitError(ctx, fmt.Errorf("executing query: %w", err)), Start: tr.Start, End: tr.End}
+	}
+	defer rows.Close()
+	return readResult(rows.Rows, tr)
+}
+
+// catalog is the transpile mode's catalog.
+func (r *TranspileResult) catalog() catalog {
+	if r.cat.tables == nil {
+		return productCatalog // a hand-built result (tests)
+	}
+	return r.cat
+}
+
+// readResult decodes rows into a Result, w/ tr's column hints.
+func readResult(rows *sql.Rows, tr *TranspileResult) (*Result, error) {
 	columns, err := resultColumns(rows, tr.ColumnPathHints)
 	if err != nil {
 		return nil, &ExecutionError{Err: err, Start: tr.Start, End: tr.End}
