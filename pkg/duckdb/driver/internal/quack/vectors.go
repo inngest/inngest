@@ -60,6 +60,9 @@ func EncodeVectors(vectors []Vector) (blob []byte, chunkCount uint64, err error)
 		if v.Nulls != nil && len(v.Nulls) != n {
 			return nil, 0, fmt.Errorf("duckdb: quack vectors: column %d has %d null flags, want %d", i, len(v.Nulls), n)
 		}
+		if err := v.checkEnds(); err != nil {
+			return nil, 0, fmt.Errorf("duckdb: quack vectors: column %d: %w", i, err)
+		}
 	}
 	for start := 0; start < n; start += StandardVectorSize {
 		end := min(start+StandardVectorSize, n)
@@ -94,6 +97,22 @@ func encodeVectorChunk(vectors []Vector, start, end int) ([]byte, error) {
 	}
 	w.endObject()
 	return w.bytes(), nil
+}
+
+// checkEnds checks a VARCHAR/JSON vector's Ends are ordered and within
+// Bytes, so a malformed batch errors instead of panicking the encoder.
+func (v Vector) checkEnds() error {
+	if v.Kind != ColumnVarchar && v.Kind != ColumnJSON {
+		return nil
+	}
+	prev := 0
+	for i, e := range v.Ends {
+		if e < prev || e > len(v.Bytes) {
+			return fmt.Errorf("row %d ends at %d, want %d..%d", i, e, prev, len(v.Bytes))
+		}
+		prev = e
+	}
+	return nil
 }
 
 func (v Vector) null(i int) bool { return v.Nulls != nil && v.Nulls[i] }

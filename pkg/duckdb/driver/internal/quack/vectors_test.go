@@ -85,6 +85,24 @@ func TestEncodeVectorsRejectsRaggedColumns(t *testing.T) {
 	require.ErrorContains(t, err, "column 1 has 1 rows, want 2")
 }
 
+func TestEncodeVectorsRejectsBadEnds(t *testing.T) {
+	tests := []struct {
+		name string
+		ends []int
+		want string
+	}{
+		{"negative", []int{-1, 2}, "row 0 ends at -1, want 0..3"},
+		{"decreasing", []int{2, 1}, "row 1 ends at 1, want 2..3"},
+		{"past the bytes", []int{1, 4}, "row 1 ends at 4, want 1..3"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := EncodeVectors([]Vector{{Kind: ColumnVarchar, Bytes: []byte("abc"), Ends: tt.ends}})
+			require.ErrorContains(t, err, "column 0: "+tt.want)
+		})
+	}
+}
+
 func randString(r *rand.Rand) string {
 	const chars = `abcdefghijklmnopqrstuvwxyz0123456789 "\{}é漢`
 	rs := []rune(chars)
