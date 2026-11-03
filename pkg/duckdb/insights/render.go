@@ -159,7 +159,8 @@ var federatedSources = map[bool]map[string]federatedSource{
 // federate.Query.Render: each logical table's reserved CTE calls its own
 // macro (its one projection, joins and collapse) with the executor's lake ∪
 // delta source in place of the lake table. A logical table with no federated
-// source is an error, never a silent read of the lake alone.
+// source is an error, never a silent read of the lake alone. Run it through
+// ExecuteFederated, which applies Execute's limits and rendered-SQL check.
 func (r *TranspileResult) Federated() ([]federate.Table, map[federate.Table][]federate.Predicate, func(map[federate.Table]federate.Source) (*parser.SelectStatement, []any, error)) {
 	var tables []federate.Table
 	seen := map[federate.Table]bool{}
