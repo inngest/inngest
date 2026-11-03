@@ -45,6 +45,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
   tags: { name: "Builds"       description: "Build images for sandboxes and compute" }
+  tags: { name: "Deploys"      description: "Deploy apps to compute" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
