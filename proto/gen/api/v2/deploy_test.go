@@ -9,12 +9,96 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type deployRouteServer struct {
 	UnimplementedV2Server
 	created   *CreateDeployRequest
 	committed *CommitDeployRequest
+}
+
+func TestDeployConfigJSON(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		invalid bool
+		check   func(*testing.T, *DeployConfig)
+	}{
+		{
+			name: "serve endpoint stays omitted",
+			body: `{"config":{"serve":{}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.NotNil(t, config.GetServe())
+				require.Nil(t, config.Description)
+				require.Nil(t, config.GetServe().Port)
+				require.Nil(t, config.GetServe().Path)
+			},
+		},
+		{
+			name: "empty description retains presence",
+			body: `{"config":{"description":"","serve":{}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.NotNil(t, config.Description)
+				require.Empty(t, config.GetDescription())
+			},
+		},
+		{
+			name: "serve settings stay omitted",
+			body: `{"config":{"serve":{"port":8080,"path":"/api/inngest"}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.EqualValues(t, 8080, config.GetServe().GetPort())
+				require.Equal(t, "/api/inngest", config.GetServe().GetPath())
+				require.Nil(t, config.ServeConfig)
+			},
+		},
+		{
+			name: "partial serve settings stay omitted",
+			body: `{"config":{"serve":{"port":8080,"path":"/api/inngest"},"serve_config":{"multiplex":10,"idle":"15s"}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.EqualValues(t, 10, config.ServeConfig.GetMultiplex())
+				require.Equal(t, "15s", config.ServeConfig.GetIdle())
+				require.Nil(t, config.ServeConfig.MaxRequests)
+				require.Nil(t, config.ServeConfig.Lifetime)
+			},
+		},
+		{
+			name: "connect replicas stay omitted",
+			body: `{"config":{"connect":{}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.NotNil(t, config.GetConnect())
+				require.Nil(t, config.GetConnect().Replicas)
+			},
+		},
+		{
+			name: "explicit zero replicas retain presence",
+			body: `{"config":{"connect":{"replicas":0}}}`,
+			check: func(t *testing.T, config *DeployConfig) {
+				require.NotNil(t, config.GetConnect().Replicas)
+				require.Zero(t, config.GetConnect().GetReplicas())
+			},
+		},
+		{
+			name:    "serve and connect are mutually exclusive",
+			body:    `{"config":{"connect":{},"serve":{"port":8080,"path":"/api/inngest"}}}`,
+			invalid: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var request CreateDeployRequest
+			err := protojson.Unmarshal([]byte(tc.body), &request)
+			if tc.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			encoded, err := protojson.Marshal(&request)
+			require.NoError(t, err)
+			var decoded CreateDeployRequest
+			require.NoError(t, protojson.Unmarshal(encoded, &decoded))
+			tc.check(t, decoded.Config)
+		})
+	}
 }
 
 func (s *deployRouteServer) CreateDeploy(_ context.Context, req *CreateDeployRequest) (*CreateDeployResponse, error) {

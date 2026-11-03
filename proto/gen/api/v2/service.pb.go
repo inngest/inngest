@@ -11097,7 +11097,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xd9\xed\x01\n" +
+	"\x04INFO\x10\x032\xa9\xf0\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -11436,10 +11436,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x1aCancel an unfinished buildb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:cancel\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/builds/{build_id}/cancel\x12\xb0\x03\n" +
-	"\fCreateDeploy\x12\x1b.api.v2.CreateDeployRequest\x1a\x1c.api.v2.CreateDeployResponse\"\xe4\x02\x92A\xab\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:cancel\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/builds/{build_id}/cancel\x12\x80\x06\n" +
+	"\fCreateDeploy\x12\x1b.api.v2.CreateDeployRequest\x1a\x1c.api.v2.CreateDeployResponse\"\xb4\x05\x92A\xfb\x04\n" +
 	"\aDeploys\n" +
-	"\x04Beta\x12\x0fCreate a deploy\x1a\xf6\x01Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact and launch it with its saved ENTRYPOINT and CMD. Requires image-build access.b\x10\n" +
+	"\x04Beta\x12\x0fCreate a deploy\x1a\xc6\x04Provide config from the selected apps entry in inngest.toml with exactly one of serve or connect. Memory defaults to 2048 MiB, CPU to 1 vCPU, and connect replicas to 1. Serve path defaults to /api/inngest and an omitted port is discovered from the image's exposed ports at launch. Omitted serve_config settings use node defaults. Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact. Runtime ENV, ENTRYPOINT, and CMD come from the image. Requires image-build access.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x17\b\x01\x12\x13images:write:create\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/deploys/{name}\x12\xd9\x01\n" +

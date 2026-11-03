@@ -28,7 +28,50 @@ message CreateDeployRequest {
   // use lowercase SHA256 of the uploaded archive bytes.  commit fails when the
   // uploaded bytes have a different hash.
   string upload_sha256 = 5;
+  // config is required and contains the workload settings from the selected apps entry.
+  DeployConfig config = 6;
 }
+
+message DeployConfig {
+  optional string description = 1;
+  DeploySpec spec = 2;
+  // exactly one mode is required to select the app's workload type.
+  oneof mode {
+    DeployConnectConfig connect = 3;
+    DeployServeConfig serve = 4;
+  }
+  // omitted settings use node defaults so the server can change them.
+  // serve_config is valid only with serve.
+  DeployServeRuntimeConfig serve_config = 5;
+}
+
+message DeploySpec {
+  // memory is in MiB.  omission uses 2048 MiB.
+  optional uint32 memory = 1;
+  // cpu is in vCPUs.  omission uses 1 vCPU.
+  optional uint32 cpu = 2;
+}
+
+message DeployConnectConfig {
+  // omission uses one replica.  an explicit zero is invalid.
+  optional uint32 replicas = 1;
+}
+
+message DeployServeConfig {
+  // omission selects a port from the image's exposed ports at launch.
+  optional uint32 port = 1;
+  // omission uses /api/inngest inside the workload.
+  optional string path = 2;
+}
+
+message DeployServeRuntimeConfig {
+  optional uint32 multiplex = 1;
+  optional uint32 max_requests = 2;
+  // durations use Go syntax such as 15s and 15m.
+  optional string idle = 3;
+  optional string lifetime = 4;
+}
+
 message CreateDeployResponse {
   Deploy data = 1;
   // send the archive in a PUT request body with every header in

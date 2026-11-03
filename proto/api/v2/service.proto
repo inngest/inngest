@@ -1259,7 +1259,7 @@ service V2 {
     option (authz) = { require_authz: true permission: "images:write:create" };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a deploy"
-      description: "Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact and launch it with its saved ENTRYPOINT and CMD. Requires image-build access."
+      description: "Provide config from the selected apps entry in inngest.toml with exactly one of serve or connect. Memory defaults to 2048 MiB, CPU to 1 vCPU, and connect replicas to 1. Serve path defaults to /api/inngest and an omitted port is discovered from the image's exposed ports at launch. Omitted serve_config settings use node defaults. Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact. Runtime ENV, ENTRYPOINT, and CMD come from the image. Requires image-build access."
       tags: "Deploys" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
