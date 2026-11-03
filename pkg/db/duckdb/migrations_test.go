@@ -1,7 +1,6 @@
 package duckdb
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -109,6 +108,20 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	require.NoError(t, Migrate(t.Context(), db, ModeRawLake)) // second call must be a no-op, not an error
 }
 
+// TestMigrateRejectsAnotherMode checks re-migrating a catalog in another
+// mode errors rather than silently keeping the first mode's macros.
+func TestMigrateRejectsAnotherMode(t *testing.T) {
+	binPath := driver.RequireDuckDBBinary(t)
+
+	db, err := driver.Open(t.Context(), testDuckLakeOptions(t, binPath))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, Migrate(t.Context(), db, ModeFlatLake))
+	require.NoError(t, Migrate(t.Context(), db, ModeFlatLake))
+	require.ErrorContains(t, Migrate(t.Context(), db, ModeRawLake), "migrated in mode flat_lake, not raw_lake")
+}
+
 // TestMigrateModeRawRunsCollapse checks raw_runs collapses a run's rows to
 // its latest in every mode but ModeFlatLake, whose runs are already one row per
 // run, and that insights_runs (which reads through raw_runs) follows.
@@ -124,7 +137,9 @@ func TestMigrateModeRawRunsCollapse(t *testing.T) {
 		{ModeFlatLake, 2},
 	}
 	for _, tc := range cases {
-		t.Run(fmt.Sprintf("mode %d", tc.mode), func(t *testing.T) {
+		t.Run(tc.mode.String(), func(t *testing.T) {
+			// Every mode migrates concurrently, so each must keep its own env.
+			t.Parallel()
 			opts := testDuckLakeOptions(t, binPath)
 			if tc.mode == ModeMemory {
 				opts = driver.Options{BinaryPath: binPath, DBFile: ":memory:"}
