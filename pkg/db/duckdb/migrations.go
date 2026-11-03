@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"sync"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/pressly/goose/v3"
@@ -35,6 +37,18 @@ const (
 	ModeFlatLake
 )
 
+func (m Mode) String() string {
+	switch m {
+	case ModeMemory:
+		return "memory"
+	case ModeRawLake:
+		return "raw_lake"
+	case ModeFlatLake:
+		return "flat_lake"
+	}
+	return fmt.Sprintf("Mode(%d)", int(m))
+}
+
 // modeEnv is the env vars each Mode sets while migrating.
 //
 // DUCKDB_DUCKLAKE_ONLY replaces each DuckLake-only statement. Every
@@ -56,6 +70,15 @@ var modeEnv = map[Mode]map[string]string{
 	ModeRawLake:  {},
 	ModeFlatLake: {"DUCKDB_RUNS_COLLAPSE": ""},
 }
+
+// migrateMu serializes Migrate: a mode travels as process env vars, so two
+// concurrent Migrates in different modes would see each other's.
+var migrateMu sync.Mutex
+
+// migrationModeTable records the Mode a catalog was migrated in. Each
+// migration only ever runs once, so re-migrating a catalog in another mode
+// would silently keep the first mode's macros; Migrate errors instead.
+const migrationModeTable = "duckdb_migration_mode"
 
 // Migrate applies every staging-table migration to db. It's safe to call
 // more than once (idempotent) and is run once at subprocess startup before
@@ -82,10 +105,16 @@ func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
 	if !ok {
 		return fmt.Errorf("duckdb: unknown migration mode %d", mode)
 	}
+	migrateMu.Lock()
+	defer migrateMu.Unlock()
+
 	if mode == ModeMemory {
 		if _, err := db.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+driver.DuckLakeAlias+";"); err != nil {
 			return fmt.Errorf("duckdb: creating in-memory schema %q: %w", driver.DuckLakeAlias, err)
 		}
+	}
+	if err := checkMode(ctx, db, mode); err != nil {
+		return err
 	}
 	for k, v := range env {
 		if err := os.Setenv(k, v); err != nil {
@@ -113,6 +142,28 @@ func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
 
 	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("duckdb: running migrations: %w", err)
+	}
+	return nil
+}
+
+// checkMode records mode as db's migration mode, or errors if db was already
+// migrated in another one.
+func checkMode(ctx context.Context, db *sql.DB, mode Mode) error {
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS "+migrationModeTable+" (mode VARCHAR NOT NULL);"); err != nil {
+		return fmt.Errorf("duckdb: creating %s: %w", migrationModeTable, err)
+	}
+	var got string
+	err := db.QueryRowContext(ctx, "SELECT mode FROM "+migrationModeTable+" LIMIT 1;").Scan(&got)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		if _, err := db.ExecContext(ctx, "INSERT INTO "+migrationModeTable+" VALUES (?);", mode.String()); err != nil {
+			return fmt.Errorf("duckdb: recording migration mode: %w", err)
+		}
+		return nil
+	case err != nil:
+		return fmt.Errorf("duckdb: reading migration mode: %w", err)
+	case got != mode.String():
+		return fmt.Errorf("duckdb: catalog was migrated in mode %s, not %s", got, mode)
 	}
 	return nil
 }
