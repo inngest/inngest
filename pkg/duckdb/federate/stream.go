@@ -154,6 +154,11 @@ func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, string, 
 		if err != nil {
 			return nil, err // io.EOF ends the stream
 		}
+		// A ragged batch would panic encoding its rows, on the stream's own
+		// goroutine.
+		if err := b.validateFor(schema); err != nil {
+			return nil, fmt.Errorf("federate: %s delta: %w", t, err)
+		}
 		total += b.Len()
 		if rowCap > 0 && total > rowCap {
 			return nil, fmt.Errorf("%w: %s delta has more than %d rows", ErrRowCapExceeded, t, rowCap)

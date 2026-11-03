@@ -68,10 +68,27 @@ type sourceSpec struct {
 // sourceTimeColumn is the column bounding a physical table's run-time range.
 var sourceTimeColumn = map[Table]string{TableRuns: "queued_at", TableSpans: "run_queued_at", TableEvents: "received_at"}
 
+// deltaBoundColumns are the columns sourceCTE's delta-side bounds read, so
+// the delta must carry them whatever the query reads.
+func deltaBoundColumns(t Table, allTenants bool) []string {
+	cols := []string{sourceTimeColumn[t]}
+	if !allTenants {
+		cols = append(cols, "account_id", "env_id")
+	}
+	if t != TableRuns {
+		cols = append(cols, "bucket_at")
+	}
+	return cols
+}
+
 // sourceCTE renders t's physical source CTE (lake ∪ delta, every physical
 // column, in declared order) and its bound args. The lake side is cut at
 // the watermark, as the delta is, so rows the lake holds past W (a newer
-// export) aren't read twice. The delta's columns are
+// export) aren't read twice. The delta side re-applies the tenant and time
+// bounds (and, for spans and events, the watermark) rather than trusting
+// the streamer to, so a streamer bug can't leak another tenant's rows or
+// read a row twice. Runs skip the watermark there: a run still open can sit
+// in the delta whatever its bucket. The delta's columns are
 // cast to their lake types (JSON text to VARIANT, STRUCT lists), so the
 // union is the physical table's own shape and any macro over the table
 // reads it unchanged.
@@ -91,11 +108,19 @@ func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
 		delta[i] = deltaSelect(c)
 	}
 	timeCol := quoteIdent(sourceTimeColumn[t])
-	filter := fmt.Sprintf("%s >= ? AND %s < ? AND bucket_at <= ?", timeCol, timeCol)
-	args := []any{spec.From, spec.To, spec.Watermark}
+	bounds := fmt.Sprintf("%s >= ? AND %s < ?", timeCol, timeCol)
+	boundArgs := []any{spec.From, spec.To}
 	if !spec.AllTenants {
-		filter = "account_id = ?::UUID AND env_id = ?::UUID AND " + filter
-		args = append([]any{spec.AccountID.String(), spec.EnvID.String()}, args...)
+		bounds = "account_id = ?::UUID AND env_id = ?::UUID AND " + bounds
+		boundArgs = append([]any{spec.AccountID.String(), spec.EnvID.String()}, boundArgs...)
+	}
+	filter := bounds + " AND bucket_at <= ?"
+	args := append(append([]any{}, boundArgs...), spec.Watermark)
+	deltaFilter := bounds
+	args = append(args, boundArgs...)
+	if t != TableRuns {
+		deltaFilter += " AND bucket_at > ?"
+		args = append(args, spec.Watermark)
 	}
 	if spec.Delta == "" {
 		return CTEDef{SQL: fmt.Sprintf("%s AS (\n  SELECT %s\n  FROM %s\n)",
@@ -106,9 +131,9 @@ func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
   FROM %s WHERE %s
   UNION ALL
   SELECT %s
-  FROM %s
+  FROM %s WHERE %s
 )`, quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name), filter,
-		strings.Join(delta, ", "), quoteIdent(spec.Delta))
+		strings.Join(delta, ", "), quoteIdent(spec.Delta), deltaFilter)
 	return CTEDef{SQL: sql, Args: args}, nil
 }
 

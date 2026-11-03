@@ -60,7 +60,8 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int) (driver.QuackStrea
 // the delta needs exactly the columns the plan reads from the lake table
 // (projected, or named in a filter pushed into the scan). The macros' own
 // reads (raw_runs' collapse, for one) are included because they're part of
-// the planned query.
+// the planned query, and so are the delta side's own bounds
+// (deltaBoundColumns), which the lake-only plan doesn't have.
 //
 // A table maps to nil when the plan has no scan of its lake table: stream
 // every column. That covers a table the query never reads, too: a missing
@@ -93,6 +94,9 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 		if !found || len(names) == 0 {
 			out[t] = nil
 			continue
+		}
+		for _, c := range deltaBoundColumns(t, q.AllTenants) {
+			names[c] = true
 		}
 		cols := []Column{}
 		for _, c := range DeltaColumns(t) {

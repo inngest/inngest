@@ -106,6 +106,10 @@ func (f *fixture) watermark() time.Time { return f.base }
 // so the lake side of every federated read includes them.
 func (f *fixture) lakeBucketAt() time.Time { return f.base.Add(-time.Minute) }
 
+// deltaBucketAt is when the fixture's delta rows reached the buffer: after
+// W, so the delta side keeps them.
+func (f *fixture) deltaBucketAt() time.Time { return f.base.Add(time.Minute) }
+
 func (f *fixture) lakeRun(t *testing.T, account uuid.UUID, runID, status string, queuedAt time.Time, ended *time.Time) {
 	t.Helper()
 	_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.runs
@@ -128,6 +132,7 @@ func (f *fixture) deltaRun(runID, status string, queuedAt time.Time, ended *time
 		"account_id": f.account, "env_id": f.env, "run_id": runID, "app_id": f.app, "app_name": "app",
 		"function_id": f.fn, "function_slug": "fn", "queued_at": queuedAt, "started_at": startedAt(status, queuedAt), "ended_at": end,
 		"status": status, "attributes": `{}`, "inputs": `[]`, "output": out, "event_ids": []string{"evt-1"},
+		"bucket_at": f.deltaBucketAt(),
 	})
 }
 
@@ -170,6 +175,13 @@ func TestExecutorRunsUnion(t *testing.T) {
 		// Another tenant's run, and a run outside the time bound: never visible.
 		f.lakeRun(t, uuid.New(), "run-other", "Running", q, nil)
 		f.lakeRun(t, f.account, "run-old", "Running", f.from.Add(-time.Hour), nil)
+		// E: still open, only in the delta, bucketed at or below W: the runs
+		// delta isn't cut at the watermark.
+		f.deltaRun("run-E", "Running", q, nil, "")
+		f.streamer.rows[TableRuns][len(f.streamer.rows[TableRuns])-1]["bucket_at"] = f.lakeBucketAt()
+		// Another tenant's delta run: the delta side re-applies the tenant.
+		f.deltaRun("run-other-delta", "Running", q, nil, "")
+		f.streamer.rows[TableRuns][len(f.streamer.rows[TableRuns])-1]["account_id"] = uuid.New()
 
 		got := f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
 		require.Equal(t, map[string]string{
@@ -177,6 +189,7 @@ func TestExecutorRunsUnion(t *testing.T) {
 			"run-B": "Running",
 			"run-C": "Running",
 			"run-D": "Failed",
+			"run-E": "Running",
 		}, got)
 	})
 }
@@ -221,12 +234,22 @@ func TestExecutorSpansUnionLakeAndDelta(t *testing.T) {
 		insertLakeSpan("span-1", `{"v":"lake"}`)
 		insertLakeSpan("span-2", `{"v":"lake"}`)
 		// Spans aren't collapsed: each row is its own emission.
-		f.streamer.rows[TableSpans] = []map[string]any{{
-			"account_id": f.account, "env_id": f.env, "run_id": "run-A", "run_queued_at": q, "app_id": f.app,
-			"app_name": "app", "function_id": f.fn, "function_slug": "fn", "name": "executor.step",
-			"start_time": q, "end_time": q, "trace_id": "trace-1", "span_id": "span-3", "parent_span_id": "",
-			"attributes": `{"v":"delta"}`,
-		}}
+		deltaSpan := func(spanID string, account uuid.UUID, queuedAt, bucketAt time.Time) map[string]any {
+			return map[string]any{
+				"account_id": account, "env_id": f.env, "run_id": "run-A", "run_queued_at": queuedAt, "app_id": f.app,
+				"app_name": "app", "function_id": f.fn, "function_slug": "fn", "name": "executor.step",
+				"start_time": q, "end_time": q, "trace_id": "trace-1", "span_id": spanID, "parent_span_id": "",
+				"attributes": `{"v":"delta"}`, "bucket_at": bucketAt,
+			}
+		}
+		// The delta side re-applies the tenant, time and watermark bounds, so
+		// a streamer returning too much can't leak or double-count rows.
+		f.streamer.rows[TableSpans] = []map[string]any{
+			deltaSpan("span-3", f.account, q, f.deltaBucketAt()),
+			deltaSpan("span-other-tenant", uuid.New(), q, f.deltaBucketAt()),
+			deltaSpan("span-old", f.account, f.from.Add(-time.Hour), f.deltaBucketAt()),
+			deltaSpan("span-1", f.account, q, f.lakeBucketAt()), // already in the lake
+		}
 
 		got := f.query(t, []Table{TableSpans}, nil, `SELECT span_id, attributes.v::VARCHAR FROM spans`)
 		require.Equal(t, map[string]string{"span-1": "lake", "span-2": "lake", "span-3": "delta"}, got)
@@ -249,7 +272,7 @@ func TestExecutorEventsUnionLakeAndDelta(t *testing.T) {
 		f.streamer.rows[TableEvents] = []map[string]any{{
 			"account_id": f.account, "env_id": f.env, "internal_id": "internal-e2", "received_at": q,
 			"source": "api", "event_id": "e2", "event_name": "app/x", "event_data": `{"src":"delta"}`,
-			"event_v": "1", "event_ts": q, "event_meta": `{}`,
+			"event_v": "1", "event_ts": q, "event_meta": `{}`, "bucket_at": f.deltaBucketAt(),
 		}}
 
 		got := f.query(t, []Table{TableEvents}, nil, `SELECT event_id, event_data.src::VARCHAR FROM events`)
@@ -293,22 +316,25 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 			return out
 		}
 
+		// The delta side's own bounds read the tenant, time and watermark
+		// columns.
+		bounds := []string{"account_id", "env_id", "run_queued_at", "bucket_at"}
 		f.query(t, []Table{TableSpans}, nil, `SELECT span_id, span_id FROM spans`)
 		require.Len(t, f.streamer.reqs, 1)
-		require.Equal(t, []string{"span_id"}, names(f.streamer.reqs[0].Columns))
+		require.ElementsMatch(t, append([]string{"span_id"}, bounds...), names(f.streamer.reqs[0].Columns))
 
 		// A filter's column is read too, even when the filter is pushed into
 		// the scan rather than projected.
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableSpans}, nil, `SELECT span_id, span_id FROM spans WHERE name = 'executor.step'`)
 		require.Len(t, f.streamer.reqs, 1)
-		require.ElementsMatch(t, []string{"span_id", "name"}, names(f.streamer.reqs[0].Columns))
+		require.ElementsMatch(t, append([]string{"span_id", "name"}, bounds...), names(f.streamer.reqs[0].Columns))
 
 		// Every scan of the table counts: a self-join reads the union.
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableSpans}, nil, `SELECT a.span_id, b.name FROM spans a JOIN spans b ON a.parent_span_id = b.span_id`)
 		require.Len(t, f.streamer.reqs, 1)
-		require.ElementsMatch(t, []string{"span_id", "parent_span_id", "name"}, names(f.streamer.reqs[0].Columns))
+		require.ElementsMatch(t, append([]string{"span_id", "parent_span_id", "name"}, bounds...), names(f.streamer.reqs[0].Columns))
 
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
@@ -345,4 +371,47 @@ func TestExecutorReportsTheQueryError(t *testing.T) {
 		require.ErrorContains(t, err, `"no_such_column" not found`)
 		require.NotErrorIs(t, err, context.Canceled)
 	})
+}
+
+// raggedStreamer returns a delta batch whose columns don't line up with the
+// requested schema.
+type raggedStreamer struct{ drop bool }
+
+func (r raggedStreamer) Stream(_ context.Context, req DeltaRequest) (BatchReader, error) {
+	cols := make([][]any, len(req.Columns))
+	for i := range cols {
+		cols[i] = []any{nil, nil}
+	}
+	if r.drop {
+		cols = cols[:len(cols)-1] // a column short of the schema
+	} else {
+		cols[0] = cols[0][:1] // one value short in the first column
+	}
+	return NewSliceReader(req.Columns, &Batch{Schema: req.Columns[:len(cols)], Columns: cols}), nil
+}
+
+// TestExecutorRejectsMalformedDeltaBatches checks a batch that doesn't
+// match its schema fails the query instead of panicking the stream.
+func TestExecutorRejectsMalformedDeltaBatches(t *testing.T) {
+	tests := []struct {
+		name string
+		drop bool
+		want string
+	}{
+		{name: "ragged column", want: "has 2 values, want 1"},
+		{name: "missing column", drop: true, want: "-column reader schema"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withFixture(t, func(t *testing.T, f *fixture) {
+				f.exec.Delta = raggedStreamer{drop: tt.drop}
+				_, err := f.exec.Query(context.Background(), Query{
+					AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
+					Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
+					Tables: []Table{TableSpans}, RowCap: 100, SQL: `SELECT span_id FROM spans`,
+				})
+				require.ErrorContains(t, err, tt.want)
+			})
+		})
+	}
 }
