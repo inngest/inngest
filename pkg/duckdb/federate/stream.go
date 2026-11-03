@@ -126,7 +126,7 @@ func deltaCTEName(t Table) string { return "__delta_" + string(t) }
 // CTE definition that reads it, each column typed and named as its lake
 // column. Exceeding rowCap fails the query with ErrRowCapExceeded.
 func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.CTE, error) {
-	st, scan, err := deltaScan(t, r, rowCap)
+	st, scan, err := deltaScan(t, r, &deltaCount{table: t, kind: deltaRows, rowCap: rowCap})
 	if err != nil {
 		return driver.QuackStream{}, nil, err
 	}
@@ -134,8 +134,9 @@ func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parse
 }
 
 // deltaScan turns a delta reader into a quack stream and the SELECT that
-// reads it, each column typed and named as its lake column.
-func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.SelectStatement, error) {
+// reads it, each column typed and named as its lake column. count, if set,
+// caps and records the stream's rows.
+func deltaScan(t Table, r BatchReader, count *deltaCount) (driver.QuackStream, *parser.SelectStatement, error) {
 	schema := r.Schema()
 	if len(schema) == 0 {
 		return driver.QuackStream{}, nil, fmt.Errorf("federate: delta for %s has no columns", t)
@@ -145,7 +146,6 @@ func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.
 		return driver.QuackStream{}, nil, err
 	}
 
-	count := &deltaCount{table: t, kind: deltaRows, rowCap: rowCap}
 	next := func(ctx context.Context) ([][]any, error) {
 		b, err := r.Next(ctx)
 		if errors.Is(err, io.EOF) {
@@ -160,7 +160,7 @@ func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.
 			return nil, fmt.Errorf("federate: %s delta: %w", t, err)
 		}
 		if err := count.add(ctx, b.Len()); err != nil {
-			return nil, fmt.Errorf("%w: %s delta has more than %d rows", err, t, rowCap)
+			return nil, fmt.Errorf("%w: %s delta has more than %d rows", err, t, count.rowCap)
 		}
 		rows := make([][]any, b.Len())
 		for i := range rows {

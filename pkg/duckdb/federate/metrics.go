@@ -22,7 +22,8 @@ const (
 )
 
 // deltaCount counts one delta stream's rows against its cap and records the
-// total once the stream ends.
+// total once the stream ends. A nil deltaCount counts nothing (a lake
+// export's stream isn't a federated read's delta).
 type deltaCount struct {
 	table    Table
 	kind     deltaKind
@@ -33,6 +34,9 @@ type deltaCount struct {
 
 // add counts n more rows, failing with ErrRowCapExceeded past the cap.
 func (c *deltaCount) add(ctx context.Context, n int) error {
+	if c == nil {
+		return nil
+	}
 	c.total += n
 	if c.rowCap > 0 && c.total > c.rowCap {
 		recordRowCapExceeded(ctx, c.table, c.kind)
@@ -54,7 +58,7 @@ func recordRowCapExceeded(ctx context.Context, t Table, kind deltaKind) {
 
 // done records the stream's total; later calls do nothing.
 func (c *deltaCount) done(ctx context.Context) {
-	if c.recorded {
+	if c == nil || c.recorded {
 		return
 	}
 	c.recorded = true
