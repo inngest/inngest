@@ -59,7 +59,8 @@ var errStatementEnded = errors.New("duckdb: quack stream: statement ended before
 // stream's batches are POSTed as Next produces them, then closed against
 // their batch count. A failing stream cancels the query and its error is
 // returned; a failing query stops every stream. A stream the statement
-// never opens (e.g. the planner pruned its scan) is simply not sent.
+// never opens (e.g. the planner pruned its scan) is simply not sent, and
+// its source is cancelled once the statement ends.
 func (s *Session) QueryWithStreams(ctx context.Context, sqlText string, streams []SendStream) (cols []string, types []string, rows []result.Row, err error) {
 	// Whichever side fails first cancels the other with its error as the
 	// cause, and that error is the one returned: the other side's failure
@@ -76,12 +77,22 @@ func (s *Session) QueryWithStreams(ctx context.Context, sqlText string, streams 
 		cols, types, rows, queryErr = s.Query(ctx, sqlText)
 		if queryErr != nil {
 			cancel(queryErr) // unblock any stream still waiting on its source
+		} else {
+			// Every stream the statement opened is complete, so whatever's
+			// still feeding is one it never opened: stop its source.
+			cancel(errStatementEnded)
 		}
 	}()
 
 	feedErrs := make(chan error, len(streams))
 	for _, st := range streams {
-		go func() { feedErrs <- s.feedStream(ctx, st, done) }()
+		go func() {
+			err := s.feedStream(ctx, st, done)
+			if err != nil && context.Cause(ctx) == errStatementEnded {
+				err = nil
+			}
+			feedErrs <- err
+		}()
 	}
 	var feedErr error
 	for range streams {
@@ -150,9 +161,9 @@ func (st SendStream) nextBatch(ctx context.Context) ([]byte, uint64, error) {
 
 // sendWhenActive POSTs payload(), retrying while the server reports the
 // stream isn't open yet (the statement hasn't reached BIND), until the
-// statement itself ends.
+// statement itself ends. There's no deadline of its own: a statement that
+// never opens the stream still ends (or ctx does), however slow its bind.
 func (s *Session) sendWhenActive(ctx context.Context, done <-chan struct{}, payload func() []byte) error {
-	deadline := time.Now().Add(sendDataStreamReadyTimeout)
 	backoff := sendDataStreamReadyMinBackoff
 	for {
 		err := s.sendDataRequest(ctx, payload())
@@ -163,9 +174,6 @@ func (s *Session) sendWhenActive(ctx context.Context, done <-chan struct{}, payl
 		case <-done:
 			return errStatementEnded
 		default:
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("duckdb: quack stream never became active: %w", err)
 		}
 		select {
 		case <-ctx.Done():
