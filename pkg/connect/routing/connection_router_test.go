@@ -134,3 +134,35 @@ func TestRouterInvalidationObservesReplacementImmediately(t *testing.T) {
 	require.Equal(t, replacement.connIds[0], route.ConnectionID)
 	require.Equal(t, 2, counted.connectionReads)
 }
+
+func TestRouterInvalidationDoesNotStarveRunningRead(t *testing.T) {
+	router := NewRouter(nil)
+	key := connectionSnapshotKey{uuid.New(), uuid.New()}
+	manager := &snapshotTestState{load: func(ctx context.Context, _, _ uuid.UUID) ([]*connectpb.ConnMetadata, error) {
+		select {
+		case <-time.After(10 * time.Millisecond):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		return snapshotTestConnections("connection"), nil
+	}}
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		ticker := time.NewTicker(time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				router.InvalidateConnections(key.envID, key.appID)
+			}
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	snapshot, _, err := router.snapshots.get(ctx, manager, key)
+	require.NoError(t, err)
+	require.Len(t, snapshot.connections, 1)
+}

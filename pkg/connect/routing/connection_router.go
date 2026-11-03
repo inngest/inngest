@@ -31,7 +31,9 @@ func (r *Router) GetRoute(ctx context.Context, rnd *util.FrandRNG, tracer trace.
 }
 
 // InvalidateConnections removes the app snapshot after failed forwarding so
-// the next attempt can select a replacement connection.
+// the next attempt can select a replacement connection.  it does not cancel a
+// read that is in progress.  if it did, many failed forwards for one app could
+// stop every route for that app until each request times out.
 func (r *Router) InvalidateConnections(envID, appID uuid.UUID) {
-	r.snapshots.invalidate(connectionSnapshotKey{envID: envID, appID: appID}, nil)
+	r.snapshots.drop(connectionSnapshotKey{envID: envID, appID: appID})
 }

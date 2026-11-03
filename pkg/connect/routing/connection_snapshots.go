@@ -197,6 +197,19 @@ func (c *connectionSnapshotCache) invalidate(key connectionSnapshotKey, observed
 	c.pruneState(current)
 }
 
+// drop removes the stored app connection list.  a read from redis that is
+// still running continues, so frequent forward failures cannot stop new routes.
+func (c *connectionSnapshotCache) drop(key connectionSnapshotKey) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	current := c.states[key]
+	if current == nil {
+		return
+	}
+	c.removeSnapshot(current)
+	c.pruneState(current)
+}
+
 func (c *connectionSnapshotCache) refresh(ctx context.Context, manager state.StateManager, key connectionSnapshotKey, observed *connectionSnapshot) (*connectionSnapshot, bool, error) {
 	c.invalidate(key, observed)
 	return c.get(ctx, manager, key)
