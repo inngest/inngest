@@ -28,20 +28,25 @@ type Pushdown map[federate.Table][]federate.Predicate
 // can't change the result. A second scan would need the OR of both scans'
 // filters (or none), so it pushes nothing for that table.
 //
-// Only top-level AND conjuncts of these shapes are pushed, all comparing a
-// column of that table against non-NULL literals of the column's own type
-// (string, integer, boolean):
+// Each top-level AND conjunct of these shapes is pushed, all comparing a
+// column of that table (or one text key of a JSON column, col->>'key')
+// against non-NULL literals of the column's own type (string, integer,
+// boolean):
 //
-//	col = | <> | != | < | <= | > | >= lit   (either side)
+//	col = | <> | != | < | <= | > | >= lit   (either side; = and <> on a key)
 //	col IN (lit, ...)
 //	col BETWEEN lit AND lit
+//	col LIKE 'pattern'
 //
-// Each is null-rejecting (NULL never satisfies it), which is what keeps
-// pushing it correct when the table sits on either side of an outer join:
-// a row it drops early would have been dropped after the join too. OR, NOT,
-// functions, casts, JSON paths, NULL tests, datetime columns (the query's
-// time bound is extracted separately) and anything ambiguous are not
-// pushed.
+// and so is an AND, OR or NOT of those (NOT IN, NOT BETWEEN, NOT LIKE
+// included) whose every part is on the same table (pushdownExpr).
+//
+// Each leaf is null-rejecting (NULL never satisfies it), and so is the whole
+// conjunct, which is what keeps pushing it correct when the table sits on
+// either side of an outer join: a row it drops early would have been
+// dropped after the join too. Functions, casts, NULL tests, datetime columns
+// (the query's time bound is extracted separately) and anything ambiguous
+// are not pushed.
 func extractPushdown(stmt *parser.SelectStatement, tables map[string]logicalTable) Pushdown {
 	w := &pushdownWalk{tables: tables, counts: map[string]int{}, shadowed: map[string]bool{}}
 	w.walk(stmt)
