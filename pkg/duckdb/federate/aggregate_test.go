@@ -123,6 +123,12 @@ func TestExecutorAggregate(t *testing.T) {
 				q := tt.agg
 				q.AccountID, q.EnvID, q.From, q.To = f.account, f.env, f.from, f.to
 				q.Lake, q.Watermark, q.Table, q.RowCap = LakeSource{Catalog: "inngest"}, f.watermark(), TableRuns, 1000
+				// Over a raw runs lake, each side would count a run once per
+				// row.
+				_, err := f.exec.Aggregate(context.Background(), q)
+				require.ErrorIs(t, err, ErrRunsNotCollapsed)
+
+				q.RunsCollapsed = true
 				rows, err := f.exec.Aggregate(context.Background(), q)
 				require.NoError(t, err)
 				got := scanStrings(t, rows)
