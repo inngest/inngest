@@ -81,13 +81,15 @@ func (w *pushdownWalk) walk(n parser.Node) {
 	}
 	switch x := n.(type) {
 	case *parser.CTE:
-		if _, ok := w.tables[x.Name]; ok {
-			w.shadowed[x.Name] = true
+		name := strings.ToLower(x.Name)
+		if _, ok := w.tables[name]; ok {
+			w.shadowed[name] = true
 		}
 	case *parser.BaseTableRef:
 		if len(x.Name) == 1 {
-			if _, ok := w.tables[x.Name[0]]; ok {
-				w.counts[x.Name[0]]++
+			name := strings.ToLower(x.Name[0])
+			if _, ok := w.tables[name]; ok {
+				w.counts[name]++
 			}
 		}
 	case *parser.SelectStatement:
@@ -100,7 +102,8 @@ func (w *pushdownWalk) walk(n parser.Node) {
 
 // pushdownEntry is one FROM item of a SELECT. table is "" when the item
 // isn't a logical table (a CTE reference, subquery or table function),
-// whose columns are unknown here.
+// whose columns are unknown here. alias and table are lowercased, since
+// DuckDB resolves names case-insensitively.
 type pushdownEntry struct {
 	alias string
 	table string
@@ -123,13 +126,14 @@ func (w *pushdownWalk) collect(s *parser.SelectStatement) {
 func appendPushdownEntries(tables map[string]logicalTable, entries []pushdownEntry, ref parser.TableRef) []pushdownEntry {
 	switch r := ref.(type) {
 	case *parser.BaseTableRef:
-		e := pushdownEntry{alias: r.Alias}
+		e := pushdownEntry{alias: strings.ToLower(r.Alias)}
 		if len(r.Name) == 1 {
+			name := strings.ToLower(r.Name[0])
 			if e.alias == "" {
-				e.alias = r.Name[0]
+				e.alias = name
 			}
-			if tbl, ok := tables[r.Name[0]]; ok {
-				e.table, e.cols = r.Name[0], tbl.columns
+			if tbl, ok := tables[name]; ok {
+				e.table, e.cols = name, tbl.columns
 			}
 		}
 		return append(entries, e)
@@ -137,7 +141,7 @@ func appendPushdownEntries(tables map[string]logicalTable, entries []pushdownEnt
 		entries = appendPushdownEntries(tables, entries, r.Left)
 		return appendPushdownEntries(tables, entries, r.Right)
 	case *parser.TableSubqueryRef:
-		return append(entries, pushdownEntry{alias: r.Alias})
+		return append(entries, pushdownEntry{alias: strings.ToLower(r.Alias)})
 	default:
 		// Table functions, parenthesized refs, PIVOT, ...: an entry with
 		// unknown columns, so unqualified names stay ambiguous.
@@ -333,7 +337,7 @@ func resolvePushdownColumn(e parser.Expr, entries []pushdownEntry) (table, col s
 	}
 	switch len(id.Parts) {
 	case 1:
-		col = id.Parts[0]
+		col = strings.ToLower(id.Parts[0])
 		for _, en := range entries {
 			if en.table == "" {
 				return "", "", knownColumn{}, false
@@ -347,7 +351,7 @@ func resolvePushdownColumn(e parser.Expr, entries []pushdownEntry) (table, col s
 		}
 		return table, col, kc, table != ""
 	case 2:
-		alias, col := id.Parts[0], id.Parts[1]
+		alias, col := strings.ToLower(id.Parts[0]), strings.ToLower(id.Parts[1])
 		for _, en := range entries {
 			if en.alias != alias {
 				continue

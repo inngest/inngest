@@ -139,6 +139,26 @@ func TestExtractPushdown(t *testing.T) {
 			sql:  `WITH runs AS (SELECT id AS run_id FROM events WHERE name = 'n') SELECT run_id FROM runs WHERE run_id = 'x'`,
 			want: Pushdown{"events": {eq("name", "n")}},
 		},
+		{
+			name: "names match case-insensitively",
+			sql:  `SELECT R.Run_ID FROM Runs AS r WHERE r.STATUS = 'Failed' AND App_ID = 'a'`,
+			want: Pushdown{"runs": {eq("status", "Failed"), eq("app_id", "a")}},
+		},
+		{
+			name: "a second scan in another case still counts",
+			sql:  `SELECT run_id FROM runs WHERE status = 'Failed' UNION ALL SELECT run_id FROM RUNS`,
+			want: Pushdown{},
+		},
+		{
+			name: "a subquery scan in another case still counts",
+			sql:  `SELECT run_id FROM runs r WHERE status = 'Failed' AND r.run_id IN (SELECT run_id FROM "Runs")`,
+			want: Pushdown{},
+		},
+		{
+			name: "a CTE shadowing a logical table name in another case blocks that table",
+			sql:  `WITH RUNS AS (SELECT id AS run_id FROM events WHERE name = 'n') SELECT run_id FROM runs WHERE run_id = 'x'`,
+			want: Pushdown{"events": {eq("name", "n")}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
