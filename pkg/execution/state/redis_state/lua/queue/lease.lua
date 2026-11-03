@@ -45,8 +45,10 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 end
 
 -- A buffered/peeked snapshot superseded by requeue must not dispatch old data.
--- Legacy callers without a generation retain their existing lease behavior.
-if generation ~= nil and generation > 0 and item.genID ~= generation then
+-- Explicit zero is a real snapshot generation on pre-rollout items and must
+-- also be fenced when repair/requeue advances it. Omitted generations retain
+-- the legacy caller behavior.
+if generation ~= nil and (item.genID or 0) ~= generation then
 	return -1
 end
 

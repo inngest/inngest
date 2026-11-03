@@ -31,6 +31,19 @@ func DequeueCapacityLeased() DequeueOptionFn {
 type RequeueOptions struct {
 	// CapacityLeased has the same meaning as DequeueOptions.CapacityLeased.
 	CapacityLeased bool
+
+	// ExpiredCapacityLeasePartition restricts requeue to an expired refill
+	// reservation while holding this partition lease. Ineligible or stale
+	// snapshots are left unchanged. Only direct Redis shards support it.
+	ExpiredCapacityLeasePartition *ulid.ULID
+}
+
+// RequeueIfExpiredCapacityLease conditionally repairs a ready item without
+// overwriting a newer generation, capacity reservation, or live item lease.
+// It also requires key queues to remain enabled for the item. A failed item
+// condition is a no-op; lost partition ownership returns ErrPartitionLeaseMismatch.
+func RequeueIfExpiredCapacityLease(partitionLeaseID ulid.ULID) RequeueOptionFn {
+	return func(o *RequeueOptions) { o.ExpiredCapacityLeasePartition = &partitionLeaseID }
 }
 
 // RequeueCapacityLeased marks the requeued item as holding a capacity lease
