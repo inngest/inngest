@@ -521,6 +521,13 @@ func TestTruthyLogicalCoercion(t *testing.T) {
 			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"b": "yes"}}},
 			expected: "yes",
 		},
+		{
+			// a negative int is non-zero, so truthy, as in JS
+			name:     "OR int(-5) (truthy) || string → returns int -5",
+			expr:     `int(-5) || event.data.b`,
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"b": "yes"}}},
+			expected: int64(-5),
+		},
 		// Boolean operands delegate to native CEL
 		{
 			name:     "OR bool false || bool true → true",
