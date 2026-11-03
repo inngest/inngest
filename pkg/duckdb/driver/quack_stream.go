@@ -2,8 +2,10 @@ package driver
 
 import (
 	"context"
+	"errors"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 )
 
 // QuackStream feeds one relation of a query directly from Go, over quack's
@@ -46,6 +48,16 @@ func NewQuackStreamID() (string, error) { return quack.NewStreamID() }
 // a query, e.g. scan_data_from_quack_client('id', NULL::STRUCT(c0 VARCHAR), ordered := true).
 func QuackStreamScan(id string, columns []QuackColumnKind) (string, error) {
 	return quack.StreamScanSQL(id, columns)
+}
+
+// errQuackStreamsTransport is returned for a stream query on a connection
+// that isn't quack.
+var errQuackStreamsTransport = errors.New("duckdb: quack streams require a quack-transport connection (Options.QuackAddr)")
+
+// streamQuerier is a transport that can run a statement reading quack
+// streams.
+type streamQuerier interface {
+	QueryWithStreams(ctx context.Context, sqlText string, streams []quack.SendStream) (cols []string, types []string, rows []result.Row, err error)
 }
 
 type quackStreamsKey struct{}

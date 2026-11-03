@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func openQuackForStreams(t *testing.T) *sql.DB {
+func openQuackForStreams(t *testing.T, conns int) *sql.DB {
 	t.Helper()
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
@@ -23,7 +23,7 @@ func openQuackForStreams(t *testing.T) *sql.DB {
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath, DBFile: ":memory:",
 		DuckLake:  &DuckLakeOptions{CatalogPath: filepath.Join(dir, "catalog.ducklake"), DataPath: filepath.Join(dir, "data")},
-		QuackAddr: &addr,
+		QuackAddr: &addr, QuackConns: conns,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -61,7 +61,21 @@ func rowsOf(start, n int) [][]any {
 }
 
 func TestQuackStreamsFeedAQuery(t *testing.T) {
-	db := openQuackForStreams(t)
+	for _, conns := range []int{1, 2} {
+		t.Run(fmt.Sprintf("%d quack conns", conns), func(t *testing.T) {
+			testQuackStreamsFeedAQuery(t, openQuackForStreams(t, conns))
+		})
+	}
+}
+
+func testQuackStreamsFeedAQuery(t *testing.T, db *sql.DB) {
+	// Pin one conn, so the pooled (second) conn is the one used when there
+	// is one.
+	if db.Stats().MaxOpenConnections != 1 {
+		first, err := db.Conn(t.Context())
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = first.Close() })
+	}
 	cols := []QuackColumnKind{QuackColumnVarchar, QuackColumnBigint}
 
 	t.Run("one stream, many batches over the vector size", func(t *testing.T) {
@@ -106,6 +120,15 @@ func TestQuackStreamsFeedAQuery(t *testing.T) {
 		var n int64
 		err := db.QueryRowContext(WithQuackStreams(t.Context(), st), "SELECT count(*) FROM "+scan).Scan(&n)
 		require.ErrorIs(t, err, boom)
+	})
+
+	t.Run("a stream the statement never opens doesn't hold the query", func(t *testing.T) {
+		st, _ := testStream(t, cols, time.Hour, rowsOf(0, 1))
+		start := time.Now()
+		var n int64
+		require.NoError(t, db.QueryRowContext(WithQuackStreams(t.Context(), st), "SELECT 1").Scan(&n))
+		require.EqualValues(t, 1, n)
+		require.Less(t, time.Since(start), 10*time.Second)
 	})
 
 	t.Run("a failing query stops a blocked source", func(t *testing.T) {
