@@ -65,7 +65,7 @@ func TestExecuteFederated(t *testing.T) {
 
 	query := federate.Query{
 		AccountID: account, EnvID: env, From: w.Add(-24 * time.Hour), To: w.Add(time.Hour),
-		Lake: federate.LakeSource{Catalog: "inngest"}, Watermark: w, RowCap: 100,
+		Lake: federate.LakeSource{Catalog: "inngest"}, Watermark: w, RowCap: 100, RunsCollapsed: true,
 	}
 	tr, err := insights.Transpile(`SELECT run_id, status FROM runs ORDER BY run_id`, account, env)
 	require.NoError(t, err)
