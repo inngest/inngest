@@ -390,6 +390,14 @@ type CancelRequest struct {
 	// when a user wants to cancel a "false stuck" function run (i.e. it isn't
 	// in the state store but the history store thinks it's running)
 	ForceLifecycleHook bool
+
+	// RequireCleanupVerification is for bounded recovery under an external
+	// hold. Refuse missing ownership/state and retain metadata on cleanup
+	// failures rather than treating a cancellation receipt as proof of cleanup.
+	RequireCleanupVerification bool
+	// KnownQueueItemIDs supplements the run index with independently inventoried
+	// jobs. Each item's run and tenant are checked before it is removed.
+	KnownQueueItemIDs []string
 }
 
 type ResumeRequest struct {
@@ -525,6 +533,8 @@ type FinalizeResponse struct {
 // when finalizing.  Where possible, if already loaded in memory these fields
 // should be supplied.
 type FinalizeOptional struct {
+	RequireCleanupVerification bool
+	KnownQueueItemIDs          []string
 	// FnSlug is the slug of the function, used in the finish event.
 	//
 	// If not present, this will be loaded via the function loader.

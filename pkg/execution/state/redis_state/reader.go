@@ -27,20 +27,20 @@ func (q *queue) RunJobs(ctx context.Context, scope osqueue.Scope, runID ulid.ULI
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
 
-	cmd := q.RedisClient.unshardedRc.B().Zscan().Key(q.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
+	if offset < 0 {
+		return nil, fmt.Errorf("run jobs offset must not be negative")
+	}
+	// This API exposes a rank offset, not a Redis scan cursor. A ZSCAN can
+	// return an empty batch with a nonzero cursor, falsely suggesting cleanup
+	// is complete. A bounded rank range has deterministic pagination.
+	cmd := q.RedisClient.unshardedRc.B().Zrange().Key(q.RedisClient.kg.RunIndex(runID)).Min(fmt.Sprint(offset)).Max(fmt.Sprint(offset + limit - 1)).Build()
+	members, err := q.RedisClient.unshardedRc.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error reading index: %w", err)
 	}
 
-	if len(jobIDs.Elements) == 0 {
+	if len(members) == 0 {
 		return []osqueue.JobResponse{}, nil
-	}
-
-	// ZSCAN returns interleaved [member, score] pairs;  extract only the members.
-	members := make([]string, 0, len(jobIDs.Elements)/2)
-	for i := 0; i < len(jobIDs.Elements); i += 2 {
-		members = append(members, jobIDs.Elements[i])
 	}
 
 	// Get all job items.
