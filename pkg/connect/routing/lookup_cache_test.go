@@ -14,6 +14,7 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestGetRouteReusesLookupsAndRefreshesBetweenCalls(t *testing.T) {
@@ -185,10 +186,10 @@ func TestGetRouteRefreshesLookupsAfterDrainingRetry(t *testing.T) {
 	counted.getConnections = func(ctx context.Context, env, app uuid.UUID) ([]*connectpb.ConnMetadata, error) {
 		conns, err := mgr.GetConnectionsByAppID(ctx, env, app)
 		if counted.connectionReads == 1 {
-			conn := *conns[0]
+			conn := proto.Clone(conns[0]).(*connectpb.ConnMetadata)
 			conn.Id = ulid.Make().String()
 			conn.Status = connectpb.ConnectionStatus_DRAINING
-			conns = append(conns, &conn)
+			conns = append(conns, conn)
 		}
 		return conns, err
 	}

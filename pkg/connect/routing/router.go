@@ -186,7 +186,11 @@ func getSuitableConnectionWithSnapshots(ctx context.Context, rnd *util.FrandRNG,
 	}
 	invalidate := func() { snapshots.invalidate(key, snapshot) }
 	selected, err := selectSuitableConnection(ctx, rnd, stateMgr, envID, appID, fnSlug, log, snapshot.connections, cached, invalidate)
-	if !cached || !(errors.Is(err, errRefreshConnectionSnapshot) || errors.Is(err, ErrNoHealthyConnection) || errors.Is(err, ErrOnlyDrainingConnections) || errors.Is(err, ErrAllWorkersAtCapacity)) {
+	needsRefresh := errors.Is(err, errRefreshConnectionSnapshot) ||
+		errors.Is(err, ErrNoHealthyConnection) ||
+		errors.Is(err, ErrOnlyDrainingConnections) ||
+		errors.Is(err, ErrAllWorkersAtCapacity)
+	if !cached || !needsRefresh {
 		return selected, err
 	}
 
