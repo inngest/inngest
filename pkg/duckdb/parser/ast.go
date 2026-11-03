@@ -593,9 +593,24 @@ type BaseTableRef struct {
 	baseTableRefNode
 	Name  []string
 	Alias string
+	// At is the ref's time travel, `AT (VERSION => 3)`. Write prints it,
+	// but ParseString still rejects it (it's never valid in a user query).
+	At *AtClause
 }
 
-func (b *BaseTableRef) Children() []Node { return nil }
+// AtClause is a table ref's `AT (Unit => Expr)`.
+type AtClause struct {
+	// Unit is VERSION or TIMESTAMP.
+	Unit string
+	Expr Expr
+}
+
+func (b *BaseTableRef) Children() []Node {
+	if b.At != nil {
+		return []Node{b.At.Expr}
+	}
+	return nil
+}
 func (b *BaseTableRef) String() string {
 	return fmt.Sprintf("BaseTableRef(%s,alias=%s)", strings.Join(b.Name, "."), b.Alias)
 }
