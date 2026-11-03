@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/inngest/inngest/pkg/duckdb/schema"
 
 	"github.com/google/uuid"
@@ -55,22 +55,16 @@ type Query struct {
 	Predicates map[Table][]Predicate
 	// RowCap bounds each table's delta.
 	RowCap int
-	// SQL reads the logical tables by name (runs, spans). It may not start
-	// with its own WITH clause; wrap it in a subquery instead. Ignored when
-	// Render is set.
-	SQL  string
-	Args []any
-	// Render, if set, composes the final query from each table's federated
-	// physical source (e.g. the Insights transpiler, passing them to its
-	// table macros), instead of wrapping SQL in the default views.
-	Render func(sources map[Table]Source) (string, []any, error)
-}
-
-// CTEDef is one CTE definition ("name AS (...)") and the args its '?'
-// placeholders bind to.
-type CTEDef struct {
-	SQL  string
-	Args []any
+	// Select reads the logical tables by name (runs, spans), which the
+	// executor defines as CTEs ahead of its own WITH clause's; Args bind its
+	// '?' placeholders. Ignored when Render is set.
+	Select *parser.SelectStatement
+	Args   []any
+	// Render, if set, composes the final query and its args from each
+	// table's federated physical source (e.g. the Insights transpiler,
+	// passing them to its table macros), instead of reading Select over the
+	// default views.
+	Render func(sources map[Table]Source) (*parser.SelectStatement, []any, error)
 }
 
 // Source is one federated physical table, for Query.Render.
@@ -82,7 +76,7 @@ type Source struct {
 	// them first in the query's top-level WITH, each once: they include the
 	// delta's stream scan, which may be read only once and so must not be
 	// nested in a CTE DuckDB could inline at several references.
-	Prelude []CTEDef
+	Prelude []*parser.CTE
 }
 
 // Rows is a query result. Close releases the result and returns the
@@ -104,10 +98,11 @@ func (r *Rows) Close() error {
 	return err
 }
 
-// Query runs q.SQL over the logical views, streaming in the deltas q needs.
+// Query runs q.Select over the logical views (or q.Render's query),
+// streaming in the deltas q needs.
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
-	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(q.SQL)), "WITH") {
-		return nil, fmt.Errorf("federate: query SQL must not start with WITH; wrap it in a subquery")
+	if q.Select == nil && q.Render == nil {
+		return nil, fmt.Errorf("federate: query has no Select or Render")
 	}
 
 	conn, err := e.DB.Conn(ctx)
@@ -147,7 +142,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	deltaRel := map[Table]string{}
 	deltaCols := map[Table]map[string]bool{}
 	var streams []driver.QuackStream
-	preludes := map[Table]string{}
+	preludes := map[Table]*parser.CTE{}
 	for _, t := range needed {
 		cols := used[t]
 		if cols == nil {
@@ -197,7 +192,11 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 		deltaRel[t] = deltaCTEName(t)
 	}
 
-	sqlText, args, err := assemble(q, needed, deltaRel, preludes, deltaCols)
+	stmt, args, err := assemble(q, needed, deltaRel, preludes, deltaCols)
+	if err != nil {
+		return fail(err)
+	}
+	sqlText, err := render(stmt)
 	if err != nil {
 		return fail(err)
 	}
@@ -210,49 +209,43 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	return &Rows{Rows: rows, conn: conn}, nil
 }
 
-// assemble renders the final query over the federated sources: each table's
+// assemble builds the final query over the federated sources: each table's
 // source CTE (lake ∪ the relation in deltaRel, with any streamed delta's own
-// CTE first), then either q.Render's query or the plain views and q.SQL.
-func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[Table]string, deltaCols map[Table]map[string]bool) (string, []any, error) {
+// CTE first), then either q.Render's query or the plain views and q.Select.
+func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[Table]*parser.CTE, deltaCols map[Table]map[string]bool) (*parser.SelectStatement, []any, error) {
 	sources := make(map[Table]Source, len(needed))
-	var preludeSQL []string
-	var args []any
+	var ctes []*parser.CTE
 	for _, t := range needed {
 		src, err := sourceCTE(t, sourceSpec{
 			AccountID: q.AccountID, EnvID: q.EnvID, AllTenants: q.AllTenants, From: q.From, To: q.To,
 			Lake: q.Lake, Watermark: q.Watermark, Delta: deltaRel[t], DeltaColumns: deltaCols[t],
 		})
 		if err != nil {
-			return "", nil, err
+			return nil, nil, err
 		}
-		var prelude []CTEDef
+		var prelude []*parser.CTE
 		if def, ok := preludes[t]; ok {
-			prelude = append(prelude, CTEDef{SQL: def})
+			prelude = append(prelude, def)
 		}
 		prelude = append(prelude, src)
 		sources[t] = Source{Name: SourceName(t), Prelude: prelude}
-		for _, d := range prelude {
-			preludeSQL = append(preludeSQL, d.SQL)
-			args = append(args, d.Args...)
-		}
+		ctes = append(ctes, prelude...)
 	}
 	if q.Render != nil {
-		sqlText, rargs, err := q.Render(sources)
+		stmt, args, err := q.Render(sources)
 		if err != nil {
-			return "", nil, fmt.Errorf("federate: render: %w", err)
+			return nil, nil, fmt.Errorf("federate: render: %w", err)
 		}
-		return sqlText, rargs, nil
+		return stmt, args, nil
 	}
-	views := append([]string{}, preludeSQL...)
 	for _, t := range needed {
 		v, err := rawView(t, q.Lake)
 		if err != nil {
-			return "", nil, err
+			return nil, nil, err
 		}
-		views = append(views, v)
+		ctes = append(ctes, v)
 	}
-	sqlText := "WITH " + strings.Join(views, ",\n") + "\nSELECT * FROM (\n" + q.SQL + "\n)"
-	return sqlText, append(args, q.Args...), nil
+	return withCTEs(q.Select, ctes...), q.Args, nil
 }
 
 // deltaTables returns the delta tables the logical tables need, in a stable

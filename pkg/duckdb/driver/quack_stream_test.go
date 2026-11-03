@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/duckdbtest"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +50,7 @@ func testStream(t *testing.T, cols []QuackColumnKind, delay time.Duration, batch
 		}
 		i++
 		return batches[i-1], nil
-	}}, scan
+	}}, parser.String(scan)
 }
 
 func rowsOf(start, n int) [][]any {

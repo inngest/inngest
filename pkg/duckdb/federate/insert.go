@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
 // InsertStream appends r's rows to t's physical lake table in catalog: one
@@ -34,15 +34,21 @@ func InsertStream(ctx context.Context, conn *sql.Conn, catalog string, t Table, 
 	if err != nil {
 		return 0, err
 	}
-	cols := make([]string, len(phys.Columns))
-	sel := make([]string, len(phys.Columns))
+	sel := make([]*parser.SelectItem, len(phys.Columns))
 	for i, c := range phys.Columns {
-		cols[i] = quoteIdent(c.Name)
 		sel[i] = deltaSelect(c)
 	}
-	target := LakeSource{Catalog: catalog}.table(phys.Name)
-	sqlText := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM (%s) AS %s",
-		target, strings.Join(cols, ", "), strings.Join(sel, ", "), scan, quoteIdent(deltaCTEName(t)))
+	selectSQL, err := render(&parser.SelectStatement{
+		Columns: sel,
+		From:    from(&parser.TableSubqueryRef{Select: scan, Alias: deltaCTEName(t)}),
+	})
+	if err != nil {
+		return 0, err
+	}
+	// The parser's AST is SELECT-only, so the INSERT is just a prefix: BY
+	// NAME matches the SELECT's columns to the table's.
+	target := tableRef(catalog, phys.Name)
+	sqlText := "INSERT INTO " + parser.String(target) + " BY NAME " + selectSQL
 
 	rows, err := conn.QueryContext(driver.WithQuackStreams(ctx, st), sqlText)
 	if err != nil {

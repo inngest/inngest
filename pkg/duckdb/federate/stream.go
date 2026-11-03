@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
@@ -64,29 +64,25 @@ func toWire(cols []Column, row []any) ([]any, error) {
 	return out, nil
 }
 
-func quoteIdent(name string) string {
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-}
-
-// deltaScanSQL returns the wire kinds of cols, the SELECT reading a quack
+// deltaScanSelect returns the wire kinds of cols, the SELECT reading a quack
 // stream of them (each column cast to its DuckDB type and named), and the
 // stream's fresh id.
-func deltaScanSQL(cols []Column) ([]driver.QuackColumnKind, string, string, error) {
+func deltaScanSelect(cols []Column) ([]driver.QuackColumnKind, *parser.SelectStatement, string, error) {
 	kinds := make([]driver.QuackColumnKind, len(cols))
-	sel := make([]string, len(cols))
+	sel := make([]*parser.SelectItem, len(cols))
 	for i, c := range cols {
 		kinds[i] = quackKind(c.Type)
-		sel[i] = fmt.Sprintf("CAST(c%d AS %s) AS %s", i, c.Type.DuckDBType(), quoteIdent(c.Name))
+		sel[i] = item(cast(colRef(fmt.Sprintf("c%d", i)), c.Type.DuckDBType()), c.Name)
 	}
 	id, err := driver.NewQuackStreamID()
 	if err != nil {
-		return nil, "", "", err
+		return nil, nil, "", err
 	}
 	scan, err := driver.QuackStreamScan(id, kinds)
 	if err != nil {
-		return nil, "", "", err
+		return nil, nil, "", err
 	}
-	return kinds, fmt.Sprintf("SELECT %s FROM %s", strings.Join(sel, ", "), scan), id, nil
+	return kinds, &parser.SelectStatement{Columns: sel, From: from(scan)}, id, nil
 }
 
 // AppendListLiteral appends vals as the DuckDB list literal a VARCHAR →
@@ -128,24 +124,24 @@ func deltaCTEName(t Table) string { return "__delta_" + string(t) }
 // deltaStream turns a delta reader into a quack stream and the MATERIALIZED
 // CTE definition that reads it, each column typed and named as its lake
 // column. Exceeding rowCap fails the query with ErrRowCapExceeded.
-func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, string, error) {
+func deltaStream(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.CTE, error) {
 	st, scan, err := deltaScan(t, r, rowCap)
 	if err != nil {
-		return driver.QuackStream{}, "", err
+		return driver.QuackStream{}, nil, err
 	}
-	return st, fmt.Sprintf("%s AS MATERIALIZED (%s)", quoteIdent(deltaCTEName(t)), scan), nil
+	return st, materializedCTE(deltaCTEName(t), scan), nil
 }
 
 // deltaScan turns a delta reader into a quack stream and the SELECT that
 // reads it, each column typed and named as its lake column.
-func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, string, error) {
+func deltaScan(t Table, r BatchReader, rowCap int) (driver.QuackStream, *parser.SelectStatement, error) {
 	schema := r.Schema()
 	if len(schema) == 0 {
-		return driver.QuackStream{}, "", fmt.Errorf("federate: delta for %s has no columns", t)
+		return driver.QuackStream{}, nil, fmt.Errorf("federate: delta for %s has no columns", t)
 	}
-	kinds, def, id, err := deltaScanSQL(schema)
+	kinds, def, id, err := deltaScanSelect(schema)
 	if err != nil {
-		return driver.QuackStream{}, "", err
+		return driver.QuackStream{}, nil, err
 	}
 
 	var total int
