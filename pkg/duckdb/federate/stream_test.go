@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -47,8 +46,10 @@ func streamDelta(t *testing.T, conn *sql.Conn, r BatchReader, rowCap int, query 
 	t.Helper()
 	st, def, err := deltaStream("t", r, rowCap)
 	require.NoError(t, err)
-	def = strings.Replace(def, quoteIdent(deltaCTEName("t")), "delta", 1)
-	return conn.QueryContext(driver.WithQuackStreams(context.Background(), st), "WITH "+def+" "+query)
+	def.Name = "delta"
+	sqlText, err := render(withCTEs(sel(query), def))
+	require.NoError(t, err)
+	return conn.QueryContext(driver.WithQuackStreams(context.Background(), st), sqlText)
 }
 
 func TestDeltaStreamCarriesEveryType(t *testing.T) {

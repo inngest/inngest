@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/stretchr/testify/require"
 )
 
@@ -89,6 +89,15 @@ func newFixture(t *testing.T) *fixture {
 // withFixture runs fn with a fresh fixture.
 func withFixture(t *testing.T, fn func(t *testing.T, f *fixture)) { fn(t, newFixture(t)) }
 
+// sel parses a test query.
+func sel(sqlText string) *parser.SelectStatement {
+	stmt, err := parser.ParseString(sqlText)
+	if err != nil {
+		panic(err)
+	}
+	return stmt
+}
+
 // startedAt is when a run row says the run started: never for a queued row,
 // as the listener writes them.
 func startedAt(status string, queuedAt time.Time) any {
@@ -141,7 +150,7 @@ func (f *fixture) query(t *testing.T, tables []Table, preds map[Table][]Predicat
 	rows, err := f.exec.Query(context.Background(), Query{
 		AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 		Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(), Tables: tables, Predicates: preds,
-		RowCap: 1000, SQL: sqlText, Args: args,
+		RowCap: 1000, Select: sel(sqlText), Args: args,
 	})
 	require.NoError(t, err)
 	defer rows.Close()
@@ -155,6 +164,39 @@ func (f *fixture) query(t *testing.T, tables []Table, preds map[Table][]Predicat
 	}
 	require.NoError(t, rows.Err())
 	return got
+}
+
+// TestExecutorQueryShapes checks the executor's CTEs compose w/ any query:
+// one reading no table, one w/ its own WITH, and a pushed predicate whose
+// value needs quoting.
+func TestExecutorQueryShapes(t *testing.T) {
+	withFixture(t, func(t *testing.T, f *fixture) {
+		done := f.base.Add(time.Minute)
+		f.lakeRun(t, f.account, "run-D", "Failed", f.base, &done)
+		f.deltaRun("run-A", "it's done", f.base, &done, "")
+
+		tests := []struct {
+			name   string
+			tables []Table
+			preds  map[Table][]Predicate
+			sql    string
+			want   map[string]string
+		}{
+			{"no table", nil, nil, `SELECT 'a', 'b'`, map[string]string{"a": "b"}},
+			{"its own WITH", []Table{TableRuns}, nil,
+				`WITH r AS (SELECT run_id, status FROM runs) SELECT run_id, status FROM r`,
+				map[string]string{"run-A": "it's done", "run-D": "Failed"}},
+			{"a quoted predicate value", []Table{TableRuns},
+				map[Table][]Predicate{TableRuns: {{Column: "status", Op: OpEq, Value: "it's done"}}},
+				`SELECT run_id, status FROM runs WHERE status = 'it''s done'`,
+				map[string]string{"run-A": "it's done"}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				require.Equal(t, tt.want, f.query(t, tt.tables, tt.preds, tt.sql))
+			})
+		}
+	})
 }
 
 func TestExecutorRunsUnion(t *testing.T) {
@@ -289,14 +331,14 @@ func TestExecutorRejectsOverCap(t *testing.T) {
 		_, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 2,
-			SQL: `SELECT run_id FROM runs`,
+			Select: sel(`SELECT run_id FROM runs`),
 		})
 		require.True(t, errors.Is(err, ErrRowCapExceeded), "got %v", err)
 
 		rows, err := f.exec.Query(context.Background(), Query{
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 			Lake: LakeSource{Catalog: "inngest"}, Tables: []Table{TableRuns}, RowCap: 10,
-			SQL: `SELECT run_id FROM runs`,
+			Select: sel(`SELECT run_id FROM runs`),
 		})
 		require.NoError(t, err, "the connection is usable after a failed query")
 		require.NoError(t, rows.Close())
@@ -357,15 +399,9 @@ func TestExecutorReportsTheQueryError(t *testing.T) {
 			AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 			Lake: LakeSource{Catalog: "inngest"}, Watermark: f.base,
 			Tables: []Table{TableRuns}, RowCap: 100,
-			Render: func(src map[Table]Source) (string, []any, error) {
+			Render: func(src map[Table]Source) (*parser.SelectStatement, []any, error) {
 				s := src[TableRuns]
-				var defs []string
-				var args []any
-				for _, d := range s.Prelude {
-					defs = append(defs, d.SQL)
-					args = append(args, d.Args...)
-				}
-				return "WITH " + strings.Join(defs, ", ") + " SELECT no_such_column FROM " + s.Name, args, nil
+				return withCTEs(sel("SELECT no_such_column FROM "+s.Name), s.Prelude...), nil, nil
 			},
 		})
 		require.ErrorContains(t, err, `"no_such_column" not found`)
@@ -408,7 +444,7 @@ func TestExecutorRejectsMalformedDeltaBatches(t *testing.T) {
 				_, err := f.exec.Query(context.Background(), Query{
 					AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 					Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
-					Tables: []Table{TableSpans}, RowCap: 100, SQL: `SELECT span_id FROM spans`,
+					Tables: []Table{TableSpans}, RowCap: 100, Select: sel(`SELECT span_id FROM spans`),
 				})
 				require.ErrorContains(t, err, tt.want)
 			})

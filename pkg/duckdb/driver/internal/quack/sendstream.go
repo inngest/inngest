@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 )
 
 // SendStream is one SEND_DATA stream a query reads, through the table
-// function StreamScanSQL returns, while QueryWithStreams feeds it.
+// function driver.QuackStreamScan returns, while QueryWithStreams feeds it.
 type SendStream struct {
 	ID      string
 	Columns []ColumnKind
@@ -29,30 +28,16 @@ type SendStream struct {
 // NewStreamID returns a fresh, unguessable stream id.
 func NewStreamID() (string, error) { return generateStreamID() }
 
-// StreamScanSQL returns the table-function call that reads stream id inside
-// a statement, its rows typed by columns (fields c0, c1, ...).
-func StreamScanSQL(id string, columns []ColumnKind) (string, error) {
-	if len(columns) == 0 {
-		return "", fmt.Errorf("duckdb: quack stream: no columns")
-	}
-	fields := make([]string, len(columns))
-	for i, k := range columns {
-		typeName, err := sendDataColumnType(k)
-		if err != nil {
-			return "", err
-		}
-		fields[i] = fmt.Sprintf("c%d %s", i, typeName)
-	}
-	return fmt.Sprintf("scan_data_from_quack_client(%s, NULL::STRUCT(%s), ordered := true)",
-		stringLiteral(id), strings.Join(fields, ", ")), nil
-}
+// StreamColumnType is the DuckDB type a stream column of kind k is read
+// as, in the STRUCT that types a stream scan's rows.
+func StreamColumnType(k ColumnKind) (string, error) { return sendDataColumnType(k) }
 
 // errStatementEnded reports that the statement finished before a stream it
 // was meant to read ever opened.
 var errStatementEnded = errors.New("duckdb: quack stream: statement ended before the stream opened")
 
 // QueryWithStreams runs sqlText (a query reading every stream through
-// StreamScanSQL) while feeding each stream concurrently from its Next.
+// driver.QuackStreamScan) while feeding each stream concurrently from its Next.
 //
 // The server opens a statement's streams at BIND and blocks execution until
 // they're complete, so the query runs on its own goroutine while each
