@@ -915,6 +915,51 @@ func (p *process) Query(ctx context.Context, sqlText string) (cols []string, typ
 	return cols, types, rows, nil
 }
 
+// QueryWithStreams is Query for a statement reading quack streams (see
+// WithQuackStreams), fed on p's current quack session. A stream's source
+// can't be replayed, so a transport failure restarts the subprocess as
+// usual but isn't retried.
+func (p *process) QueryWithStreams(ctx context.Context, sqlText string, streams []quack.SendStream) (cols []string, types []string, rows []result.Row, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.disabled {
+		return nil, nil, nil, ErrDisabled
+	}
+
+	query := onceOnly(func(sess *quack.Session) error {
+		var e error
+		cols, types, rows, e = sess.QueryWithStreams(ctx, sqlText, streams)
+		return e
+	})
+	runErr := p.runWithRestartLocked(ctx, func() error {
+		sess, ok := p.sess.(*quack.Session)
+		if !ok {
+			return errQuackStreamsTransport
+		}
+		return query(sess)
+	})
+	if runErr != nil {
+		return nil, nil, nil, runErr
+	}
+	return cols, types, rows, nil
+}
+
+// onceOnly wraps fn so a retry returns fn's first error instead of running
+// it again, for statements whose inputs (quack streams) are consumed.
+func onceOnly(fn func(*quack.Session) error) func(*quack.Session) error {
+	var ran bool
+	var first error
+	return func(sess *quack.Session) error {
+		if ran {
+			return first
+		}
+		ran = true
+		first = fn(sess)
+		return first
+	}
+}
+
 // runWithRestartLocked assumes mu is already held (see exec/query above). It
 // runs fn once and classifies whatever it returns into the three cases that
 // need different handling:
