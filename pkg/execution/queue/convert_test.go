@@ -1175,6 +1175,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"NormalizeFromBacklogID",
 			"SingletonMigrationKey",
 			"IdempotencyPeriod",
+			"CallerLease",
 		},
 	})
 }
