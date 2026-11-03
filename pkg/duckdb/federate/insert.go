@@ -30,7 +30,7 @@ func InsertStream(ctx context.Context, conn *sql.Conn, catalog string, t Table, 
 	}
 	// Read straight from the stream: a MATERIALIZED CTE (as queries use)
 	// would buffer the whole partition first.
-	st, scan, err := deltaScan(t, r, 0)
+	st, scan, err := deltaScan(t, r, nil)
 	if err != nil {
 		return 0, err
 	}
