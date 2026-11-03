@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,11 @@ func SkipFlushing(index Index, pauses []*state.Pause) bool {
 	if index.EventName == consts.FnFinishedName {
 		// If the index is for the FnFinishedName, treat this as an invoke and never
 		// flush this block for fast O(1) lookups.
+		return true
+	}
+	if strings.HasPrefix(index.EventName, consts.SubscriptionParkName) {
+		// The markers of a parked subscription are read through a tiny per-run
+		// index and are short-lived: never flush these indexes.
 		return true
 	}
 
