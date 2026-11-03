@@ -2,10 +2,10 @@ package federate
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
@@ -36,10 +36,10 @@ type LakeSource struct {
 	Snapshot *int64
 }
 
-func (s LakeSource) table(name string) string {
-	ref := quoteIdent(s.Catalog) + "." + quoteIdent(name)
+func (s LakeSource) table(name string) *parser.BaseTableRef {
+	ref := tableRef(s.Catalog, name)
 	if s.Snapshot != nil {
-		ref += fmt.Sprintf(" AT (VERSION => %d)", *s.Snapshot)
+		ref.At = &parser.AtClause{Unit: "VERSION", Expr: numLit(*s.Snapshot)}
 	}
 	return ref
 }
@@ -81,8 +81,8 @@ func deltaBoundColumns(t Table, allTenants bool) []string {
 	return cols
 }
 
-// sourceCTE renders t's physical source CTE (lake ∪ delta, every physical
-// column, in declared order) and its bound args. The lake side is cut at
+// sourceCTE builds t's physical source CTE (lake ∪ delta, every physical
+// column, in declared order). The lake side is cut at
 // the watermark, as the delta is, so rows the lake holds past W (a newer
 // export) aren't read twice. The delta side re-applies the tenant and time
 // bounds (and, for spans and events, the watermark) rather than trusting
@@ -92,68 +92,62 @@ func deltaBoundColumns(t Table, allTenants bool) []string {
 // cast to their lake types (JSON text to VARIANT, STRUCT lists), so the
 // union is the physical table's own shape and any macro over the table
 // reads it unchanged.
-func sourceCTE(t Table, spec sourceSpec) (CTEDef, error) {
+func sourceCTE(t Table, spec sourceSpec) (*parser.CTE, error) {
 	phys, ok := Physical[t]
 	if !ok {
-		return CTEDef{}, fmt.Errorf("federate: no physical table for %q", t)
+		return nil, fmt.Errorf("federate: no physical table for %q", t)
 	}
-	lake := make([]string, len(phys.Columns))
-	delta := make([]string, len(phys.Columns))
+	lake := make([]*parser.SelectItem, len(phys.Columns))
+	delta := make([]*parser.SelectItem, len(phys.Columns))
 	for i, c := range phys.Columns {
-		lake[i] = quoteIdent(c.Name)
+		lake[i] = item(colRef(c.Name), "")
 		if spec.DeltaColumns != nil && !spec.DeltaColumns[c.Name] {
-			delta[i] = fmt.Sprintf("CAST(NULL AS %s) AS %s", c.PhysicalType(), quoteIdent(c.Name))
+			delta[i] = item(cast(&parser.Literal{Kind: parser.LitNull}, c.PhysicalType()), c.Name)
 			continue
 		}
 		delta[i] = deltaSelect(c)
 	}
-	timeCol := quoteIdent(sourceTimeColumn[t])
-	bounds := fmt.Sprintf("%s >= ? AND %s < ?", timeCol, timeCol)
-	boundArgs := []any{spec.From, spec.To}
-	if !spec.AllTenants {
-		bounds = "account_id = ?::UUID AND env_id = ?::UUID AND " + bounds
-		boundArgs = append([]any{spec.AccountID.String(), spec.EnvID.String()}, boundArgs...)
-	}
-	filter := bounds + " AND bucket_at <= ?"
-	args := append(append([]any{}, boundArgs...), spec.Watermark)
-	deltaFilter := bounds
-	args = append(args, boundArgs...)
-	if t != TableRuns {
-		deltaFilter += " AND bucket_at > ?"
-		args = append(args, spec.Watermark)
-	}
+	lakeSide := &parser.SelectStatement{Columns: lake, From: from(spec.Lake.table(phys.Name))}
 	if spec.Delta == "" {
-		return CTEDef{SQL: fmt.Sprintf("%s AS (\n  SELECT %s\n  FROM %s\n)",
-			quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name))}, nil
+		return cte(SourceName(t), lakeSide), nil
 	}
-	sql := fmt.Sprintf(`%s AS (
-  SELECT %s
-  FROM %s WHERE %s
-  UNION ALL
-  SELECT %s
-  FROM %s WHERE %s
-)`, quoteIdent(SourceName(t)), strings.Join(lake, ", "), spec.Lake.table(phys.Name), filter,
-		strings.Join(delta, ", "), quoteIdent(spec.Delta), deltaFilter)
-	return CTEDef{SQL: sql, Args: args}, nil
+
+	timeCol := colRef(sourceTimeColumn[t])
+	bounds := []parser.Expr{binary(">=", timeCol, timeLit(spec.From)), binary("<", timeCol, timeLit(spec.To))}
+	if !spec.AllTenants {
+		bounds = append([]parser.Expr{
+			binary("=", colRef("account_id"), uuidLit(spec.AccountID.String())),
+			binary("=", colRef("env_id"), uuidLit(spec.EnvID.String())),
+		}, bounds...)
+	}
+	lakeSide.Where = and(append(bounds, binary("<=", colRef("bucket_at"), timeLit(spec.Watermark)))...)
+	deltaWhere := and(bounds...)
+	if t != TableRuns {
+		deltaWhere = and(deltaWhere, binary(">", colRef("bucket_at"), timeLit(spec.Watermark)))
+	}
+	deltaSide := &parser.SelectStatement{Columns: delta, From: from(tableRef(spec.Delta)), Where: deltaWhere}
+	return cte(SourceName(t), unionAll(lakeSide, deltaSide, false)), nil
 }
 
-func deltaSelect(c schema.Column) string {
+func deltaSelect(c schema.Column) *parser.SelectItem {
 	if c.PhysicalType() == c.Type.DuckDBType() {
-		return quoteIdent(c.Name)
+		return item(colRef(c.Name), "")
 	}
-	return fmt.Sprintf("CAST(%s AS %s) AS %s", quoteIdent(c.Name), c.PhysicalType(), quoteIdent(c.Name))
+	return item(cast(colRef(c.Name), c.PhysicalType()), c.Name)
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
 // inngest.raw_runs over their federated source; spans and events are the
 // source itself (each row is its own emission / event).
-func rawView(t Table, lake LakeSource) (string, error) {
+func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
 	switch t {
 	case TableRuns:
-		return fmt.Sprintf("%s AS (SELECT * FROM %s.raw_runs(p_runs := '%s'))",
-			quoteIdent(string(t)), quoteIdent(lake.Catalog), SourceName(t)), nil
+		return cte(string(t), selectStar(&parser.TableFunctionRef{
+			Name: []string{lake.Catalog, "raw_runs"},
+			Args: []parser.Expr{&parser.NamedArg{Name: "p_runs", Value: strLit(SourceName(t))}},
+		})), nil
 	case TableSpans, TableEvents:
-		return fmt.Sprintf("%s AS (SELECT * FROM %s)", quoteIdent(string(t)), quoteIdent(SourceName(t))), nil
+		return cte(string(t), selectStar(tableRef(SourceName(t)))), nil
 	}
-	return "", fmt.Errorf("federate: no view for table %q", t)
+	return nil, fmt.Errorf("federate: no view for table %q", t)
 }

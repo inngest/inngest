@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
 // EncodedDeltaStreamer is an optional DeltaStreamer extension: it streams a
@@ -29,16 +30,16 @@ type EncodedReader interface {
 }
 
 // encodedDeltaStream is deltaStream for an EncodedReader.
-func encodedDeltaStream(t Table, r EncodedReader, rowCap int) (driver.QuackStream, string, error) {
+func encodedDeltaStream(t Table, r EncodedReader, rowCap int) (driver.QuackStream, *parser.CTE, error) {
 	cols := r.Schema()
 	if len(cols) == 0 {
-		return driver.QuackStream{}, "", fmt.Errorf("federate: delta for %s has no columns", t)
+		return driver.QuackStream{}, nil, fmt.Errorf("federate: delta for %s has no columns", t)
 	}
-	kinds, scan, id, err := deltaScanSQL(cols)
+	kinds, scan, id, err := deltaScanSelect(cols)
 	if err != nil {
-		return driver.QuackStream{}, "", err
+		return driver.QuackStream{}, nil, err
 	}
-	def := fmt.Sprintf("%s AS MATERIALIZED (%s)", quoteIdent(deltaCTEName(t)), scan)
+	def := materializedCTE(deltaCTEName(t), scan)
 	var total int
 	next := func(ctx context.Context) ([]byte, uint64, error) {
 		blob, chunks, rows, err := r.NextEncoded(ctx)
@@ -71,7 +72,11 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 	if len(needed) == 0 {
 		return nil, nil
 	}
-	sqlText, args, err := assemble(q, needed, map[Table]string{}, nil, nil)
+	stmt, args, err := assemble(q, needed, map[Table]string{}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	sqlText, err := render(stmt)
 	if err != nil {
 		return nil, err
 	}

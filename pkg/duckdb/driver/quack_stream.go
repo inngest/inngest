@@ -3,9 +3,11 @@ package driver
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
 // QuackStream feeds one relation of a query directly from Go, over quack's
@@ -44,10 +46,36 @@ func EncodeQuackVectors(vectors []QuackVector) (blob []byte, chunks uint64, err 
 // NewQuackStreamID returns a fresh stream id.
 func NewQuackStreamID() (string, error) { return quack.NewStreamID() }
 
-// QuackStreamScan returns the table-function call that reads stream id in
-// a query, e.g. scan_data_from_quack_client('id', NULL::STRUCT(c0 VARCHAR), ordered := true).
-func QuackStreamScan(id string, columns []QuackColumnKind) (string, error) {
-	return quack.StreamScanSQL(id, columns)
+// QuackStreamScan returns the table function that reads stream id in a
+// query, e.g. scan_data_from_quack_client('id', NULL::STRUCT(c0 VARCHAR), ordered := true):
+// its rows are typed by columns, in fields c0, c1, ...
+func QuackStreamScan(id string, columns []QuackColumnKind) (*parser.TableFunctionRef, error) {
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("duckdb: quack stream: no columns")
+	}
+	fields := make([]*parser.TypeField, len(columns))
+	for i, k := range columns {
+		name, err := quack.StreamColumnType(k)
+		if err != nil {
+			return nil, err
+		}
+		typ, err := parser.ParseType(name)
+		if err != nil {
+			return nil, err
+		}
+		fields[i] = &parser.TypeField{Name: fmt.Sprintf("c%d", i), Type: typ}
+	}
+	return &parser.TableFunctionRef{
+		Name: []string{"scan_data_from_quack_client"},
+		Args: []parser.Expr{
+			&parser.Literal{Kind: parser.LitString, Text: id},
+			&parser.CastExpr{
+				X:    &parser.Literal{Kind: parser.LitNull},
+				Type: &parser.TypeName{Name: []string{"STRUCT"}, Keyword: true, Fields: fields},
+			},
+			&parser.NamedArg{Name: "ordered", Value: &parser.Literal{Kind: parser.LitTrue}},
+		},
+	}, nil
 }
 
 // errQuackStreamsTransport is returned for a stream query on a connection
