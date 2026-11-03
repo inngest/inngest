@@ -148,6 +148,10 @@ const (
 	V2ResumeFunctionProcedure = "/api.v2.V2/ResumeFunction"
 	// V2GetFunctionsProcedure is the fully-qualified name of the V2's GetFunctions RPC.
 	V2GetFunctionsProcedure = "/api.v2.V2/GetFunctions"
+	// V2ListEventsProcedure is the fully-qualified name of the V2's ListEvents RPC.
+	V2ListEventsProcedure = "/api.v2.V2/ListEvents"
+	// V2GetEventProcedure is the fully-qualified name of the V2's GetEvent RPC.
+	V2GetEventProcedure = "/api.v2.V2/GetEvent"
 	// V2SendEventProcedure is the fully-qualified name of the V2's SendEvent RPC.
 	V2SendEventProcedure = "/api.v2.V2/SendEvent"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
@@ -232,6 +236,8 @@ type V2Client interface {
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
+	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
+	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
@@ -580,6 +586,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunctions")),
 			connect.WithClientOptions(opts...),
 		),
+		listEvents: connect.NewClient[v2.ListEventsRequest, v2.ListEventsResponse](
+			httpClient,
+			baseURL+V2ListEventsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListEvents")),
+			connect.WithClientOptions(opts...),
+		),
+		getEvent: connect.NewClient[v2.GetEventRequest, v2.GetEventResponse](
+			httpClient,
+			baseURL+V2GetEventProcedure,
+			connect.WithSchema(v2Methods.ByName("GetEvent")),
+			connect.WithClientOptions(opts...),
+		),
 		sendEvent: connect.NewClient[v2.SendEventRequest, v2.SendEventResponse](
 			httpClient,
 			baseURL+V2SendEventProcedure,
@@ -705,6 +723,8 @@ type v2Client struct {
 	pauseFunction              *connect.Client[v2.PauseFunctionRequest, v2.PauseFunctionResponse]
 	resumeFunction             *connect.Client[v2.ResumeFunctionRequest, v2.ResumeFunctionResponse]
 	getFunctions               *connect.Client[v2.GetFunctionsRequest, v2.GetFunctionsResponse]
+	listEvents                 *connect.Client[v2.ListEventsRequest, v2.ListEventsResponse]
+	getEvent                   *connect.Client[v2.GetEventRequest, v2.GetEventResponse]
 	sendEvent                  *connect.Client[v2.SendEventRequest, v2.SendEventResponse]
 	invokeFunction             *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
 	listInsightsTables         *connect.Client[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse]
@@ -988,6 +1008,16 @@ func (c *v2Client) GetFunctions(ctx context.Context, req *connect.Request[v2.Get
 	return c.getFunctions.CallUnary(ctx, req)
 }
 
+// ListEvents calls api.v2.V2.ListEvents.
+func (c *v2Client) ListEvents(ctx context.Context, req *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error) {
+	return c.listEvents.CallUnary(ctx, req)
+}
+
+// GetEvent calls api.v2.V2.GetEvent.
+func (c *v2Client) GetEvent(ctx context.Context, req *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error) {
+	return c.getEvent.CallUnary(ctx, req)
+}
+
 // SendEvent calls api.v2.V2.SendEvent.
 func (c *v2Client) SendEvent(ctx context.Context, req *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error) {
 	return c.sendEvent.CallUnary(ctx, req)
@@ -1102,6 +1132,8 @@ type V2Handler interface {
 	PauseFunction(context.Context, *connect.Request[v2.PauseFunctionRequest]) (*connect.Response[v2.PauseFunctionResponse], error)
 	ResumeFunction(context.Context, *connect.Request[v2.ResumeFunctionRequest]) (*connect.Response[v2.ResumeFunctionResponse], error)
 	GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error)
+	ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error)
+	GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error)
 	SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
@@ -1446,6 +1478,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunctions")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListEventsHandler := connect.NewUnaryHandler(
+		V2ListEventsProcedure,
+		svc.ListEvents,
+		connect.WithSchema(v2Methods.ByName("ListEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetEventHandler := connect.NewUnaryHandler(
+		V2GetEventProcedure,
+		svc.GetEvent,
+		connect.WithSchema(v2Methods.ByName("GetEvent")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2SendEventHandler := connect.NewUnaryHandler(
 		V2SendEventProcedure,
 		svc.SendEvent,
@@ -1622,6 +1666,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ResumeFunctionHandler.ServeHTTP(w, r)
 		case V2GetFunctionsProcedure:
 			v2GetFunctionsHandler.ServeHTTP(w, r)
+		case V2ListEventsProcedure:
+			v2ListEventsHandler.ServeHTTP(w, r)
+		case V2GetEventProcedure:
+			v2GetEventHandler.ServeHTTP(w, r)
 		case V2SendEventProcedure:
 			v2SendEventHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
@@ -1867,6 +1915,14 @@ func (UnimplementedV2Handler) ResumeFunction(context.Context, *connect.Request[v
 
 func (UnimplementedV2Handler) GetFunctions(context.Context, *connect.Request[v2.GetFunctionsRequest]) (*connect.Response[v2.GetFunctionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctions is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListEvents(context.Context, *connect.Request[v2.ListEventsRequest]) (*connect.Response[v2.ListEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListEvents is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetEvent(context.Context, *connect.Request[v2.GetEventRequest]) (*connect.Response[v2.GetEventResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetEvent is not implemented"))
 }
 
 func (UnimplementedV2Handler) SendEvent(context.Context, *connect.Request[v2.SendEventRequest]) (*connect.Response[v2.SendEventResponse], error) {

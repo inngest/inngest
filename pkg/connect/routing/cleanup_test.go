@@ -30,7 +30,7 @@ func TestCleanupPreservesRefreshedConnection(t *testing.T) {
 	require.NoError(t, err)
 	route, err := getSuitableConnection(ctx, rnd, wrapped, s.envId, s.appId, s.fnSlug, logger.VoidLogger())
 	require.NoError(t, err)
-	require.Equal(t, s.connIds[0].String(), route.Id)
+	require.Equal(t, s.connIds[0].String(), route.conn.Id)
 }
 
 type heartbeatAfterSnapshot struct {

@@ -489,3 +489,31 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestStartLatency(t *testing.T) {
+	now := time.UnixMilli(1_000_000)
+	ms := func(v int64) int64 { return now.UnixMilli() - v }
+
+	tests := []struct {
+		name     string
+		item     QueueItem
+		expected time.Duration
+	}{
+		{name: "unset", item: QueueItem{}, expected: 0},
+		{name: "wall time", item: QueueItem{WallTimeMS: ms(500), AtMS: ms(100)}, expected: 500 * time.Millisecond},
+		{name: "falls back to at", item: QueueItem{AtMS: ms(300)}, expected: 300 * time.Millisecond},
+		{name: "enqueued after due", item: QueueItem{WallTimeMS: ms(900), EnqueuedAt: ms(200)}, expected: 200 * time.Millisecond},
+		{name: "not yet due", item: QueueItem{WallTimeMS: now.UnixMilli() + 50}, expected: 0},
+		{
+			// Concurrency waits are included regardless of refill or peek stamps.
+			name:     "ignores refill and peek",
+			item:     QueueItem{WallTimeMS: ms(5000), EnqueuedAt: ms(5000), RefilledAt: ms(10), EarliestPeekTime: ms(4000)},
+			expected: 5 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.item.StartLatency(now))
+		})
+	}
+}

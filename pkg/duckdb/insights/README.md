@@ -39,7 +39,7 @@ mandatory rather than trusting a `WHERE` clause the caller wrote.
 ## Scope
 
 Six logical tables, each backed by a parameterized DuckDB table macro
-(`pkg/db/duckdb/migrations/000004_insights_views.sql`) rather than the
+(`pkg/db/duckdb/migrations/000002_insights_views.sql`) rather than the
 underlying physical table directly:
 
 | Logical table | What it is |

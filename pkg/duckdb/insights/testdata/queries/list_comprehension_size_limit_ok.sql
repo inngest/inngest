@@ -1,0 +1,1 @@
+SELECT [x || '-' for x in string_split(run_id, '-')] AS parts, repeat('-', 20) AS bar FROM runs

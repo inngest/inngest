@@ -11,6 +11,7 @@ import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
 import {
   displayPlanName,
+  executionUsageDescription,
   isHobbyFreePlan,
   isHobbyPlan,
 } from '@/components/Billing/Plans/utils';
@@ -111,9 +112,7 @@ export const Route = createFileRoute('/_authed/billing/')({
       executions = {
         isVisible: !!executionLimit,
         title: 'Executions',
-        description: isCurrentHobbyPlan
-          ? 'The maximum number of executions per month'
-          : 'Additional usage billed at the start of the next billing cycle.',
+        description: executionUsageDescription(currentPlan, executionLimit),
         current: executionUsage,
         limit: executionLimit,
         overageAllowed:

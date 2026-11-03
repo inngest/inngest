@@ -77,7 +77,7 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 			}
 			return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, err.Error())
 		}
-		resp, err = toQueryInsightsResponse(nil, sc.Result, &apiv2.InsightsQueryInfo{Tables: sc.Tables})
+		resp, err = s.toQueryInsightsResponse(nil, sc.Result, &apiv2.InsightsQueryInfo{Tables: sc.Tables})
 		if err != nil {
 			insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusInternalError, "", 0)
 			return nil, err
@@ -114,7 +114,7 @@ func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsReq
 	}
 	// Built before recording metrics: converting a row can still fail (e.g.
 	// a NaN json.Marshal can't encode), which isn't a successful query.
-	resp, err = toQueryInsightsResponse(tr.Diagnostics, result, info)
+	resp, err = s.toQueryInsightsResponse(tr.Diagnostics, result, info)
 	if err != nil {
 		insights.RecordQueryMetrics(ctx, insightsMetricsPkgName, start, insights.QueryStatusInternalError, tr.PrimaryTable, 0)
 		return nil, err
@@ -163,7 +163,7 @@ func (s *Service) ListInsightsEventSchemas(ctx context.Context, req *apiv2.ListI
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }
 
-func toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights.Result, info *apiv2.InsightsQueryInfo) (*apiv2.QueryInsightsResponse, error) {
+func (s *Service) toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights.Result, info *apiv2.InsightsQueryInfo) (*apiv2.QueryInsightsResponse, error) {
 	columns := make([]*apiv2.InsightsOutputColumn, len(result.Columns))
 	for i, c := range result.Columns {
 		columns[i] = &apiv2.InsightsOutputColumn{
@@ -180,7 +180,8 @@ func toQueryInsightsResponse(diagnostics []insights.Diagnostic, result *insights
 	for i, row := range result.Rows {
 		r, err := toInsightsRow(row)
 		if err != nil {
-			return nil, err
+			return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError,
+				fmt.Sprintf("Unable to encode Insights row %d: %s", i, err))
 		}
 		rows[i] = r
 	}
@@ -231,16 +232,15 @@ func toInsightsRow(row []any) (*apiv2.InsightsRow, error) {
 }
 
 // driverValueToProtoValue converts one decoded DuckDB cell (execute.go's
-// Result.Rows -- "the driver's own native decoded Go value, raw, not
-// pre-stringified") into a structpb.Value via a JSON round trip. The
-// driver can return types structpb.NewValue doesn't accept directly (e.g.
-// time.Time), but every one of them already has the JSON encoding this
-// package's GQL twin relies on (gql_scalars.MarshalUnknown, which also
-// just calls json.Marshal) -- round-tripping through JSON reuses that
-// same encoding instead of hand-rolling a second conversion per driver
-// type.
+// Result.Rows) into a structpb.Value via a JSON round trip of
+// insights.JSONSafeValue's encoding -- the same encoding the GQL resolver
+// returns, so both agree on non-finite floats ("NaN", "Infinity",
+// "-Infinity") and integers past 2^53 (decimal strings). The driver can
+// return types structpb.NewValue doesn't accept directly (e.g. time.Time),
+// but every one of them already has a JSON encoding, so round-tripping
+// reuses that instead of hand-rolling a second conversion per driver type.
 func driverValueToProtoValue(v any) (*structpb.Value, error) {
-	raw, err := json.Marshal(v)
+	raw, err := json.Marshal(insights.JSONSafeValue(v))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling value: %w", err)
 	}

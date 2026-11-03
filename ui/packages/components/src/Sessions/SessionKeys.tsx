@@ -38,6 +38,10 @@ type SessionKeysProps = {
   onRefresh: () => void;
   onSelectSessionKey: (sessionKey: string) => void;
   getSessionKeyHref: (sessionKey: string) => string;
+  // Optional "Load more" paging: shown when hasMore and onLoadMore are set.
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 export function SessionKeys({
@@ -50,6 +54,9 @@ export function SessionKeys({
   onRefresh,
   onSelectSessionKey,
   getSessionKeyHref,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
 }: SessionKeysProps) {
   const trimmedSearch = search.trim();
 
@@ -80,29 +87,43 @@ export function SessionKeys({
         {error ? (
           <ErrorCard error={error} reset={onRefresh} />
         ) : (
-          <Table
-            columns={columns}
-            data={sessionKeys}
-            isLoading={isLoading}
-            blankState={
-              <TableBlankState
-                icon={<SessionsIcon />}
-                actions={
-                  <Button
-                    label="Go to docs"
-                    href={DOCS_URL}
-                    target="_blank"
-                    icon={<RiExternalLinkLine />}
-                    iconSide="left"
-                  />
-                }
-                title={search ? `No session key found for "${search}"` : 'No sessions found'}
-                description="Session keys appear here after events are sent with session meta."
-              />
-            }
-            onRowClick={(row) => onSelectSessionKey(row.original.sessionKey)}
-            getRowHref={(row) => getSessionKeyHref(row.original.sessionKey)}
-          />
+          <>
+            <Table
+              columns={columns}
+              data={sessionKeys}
+              isLoading={isLoading}
+              blankState={
+                <TableBlankState
+                  icon={<SessionsIcon />}
+                  actions={
+                    <Button
+                      label="Go to docs"
+                      href={DOCS_URL}
+                      target="_blank"
+                      icon={<RiExternalLinkLine />}
+                      iconSide="left"
+                    />
+                  }
+                  title={search ? `No session key found for "${search}"` : 'No sessions found'}
+                  description="Session keys appear here after events are sent with session meta."
+                />
+              }
+              onRowClick={(row) => onSelectSessionKey(row.original.sessionKey)}
+              getRowHref={(row) => getSessionKeyHref(row.original.sessionKey)}
+            />
+            {hasMore && onLoadMore && (
+              <div className="flex flex-col items-center py-2">
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  label="Load more"
+                  onClick={onLoadMore}
+                  loading={isLoadingMore}
+                  disabled={isLoadingMore}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

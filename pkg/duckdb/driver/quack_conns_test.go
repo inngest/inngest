@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -114,5 +115,56 @@ func TestQuackConnsUseUTC(t *testing.T) {
 	}
 	for _, c := range conns {
 		require.NoError(t, c.Close())
+	}
+}
+
+// TestQuackPooledConnsDisconnectOnClose pins that closing a pooled quack
+// connection, whether database/sql evicts it (SetMaxIdleConns) or an
+// OpenShared handle is closed, disconnects its server-side quack
+// connection, counted by quack_active_connections() on the primary.
+func TestQuackPooledConnsDisconnectOnClose(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+
+	addr := EphemeralQuackAddr
+	connector, primary, err := OpenConnector(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:", QuackAddr: &addr})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = primary.Close() })
+
+	active := func() int {
+		var n int
+		require.NoError(t, primary.QueryRowContext(t.Context(), "SELECT count(*) FROM quack_active_connections();").Scan(&n))
+		return n
+	}
+	base := active()
+
+	for name, evict := range map[string]bool{"evicted": true, "db closed": false} {
+		t.Run(name, func(t *testing.T) {
+			shared := connector.OpenShared(3)
+			defer shared.Close()
+			if evict {
+				shared.SetMaxIdleConns(0)
+			} else {
+				shared.SetMaxIdleConns(3)
+			}
+			var conns []*sql.Conn
+			for range 3 {
+				c, err := shared.Conn(t.Context())
+				require.NoError(t, err)
+				var one int
+				require.NoError(t, c.QueryRowContext(t.Context(), "SELECT 1;").Scan(&one))
+				conns = append(conns, c)
+			}
+			require.Equal(t, base+3, active())
+
+			for _, c := range conns {
+				require.NoError(t, c.Close())
+			}
+			if !evict {
+				require.Equal(t, base+3, active(), "idle conns stay open until the handle is closed")
+				require.NoError(t, shared.Close())
+			}
+			require.Equal(t, base, active())
+		})
 	}
 }

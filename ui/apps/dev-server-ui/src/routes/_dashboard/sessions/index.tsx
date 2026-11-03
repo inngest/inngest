@@ -13,8 +13,16 @@ export const Route = createFileRoute('/_dashboard/sessions/')({
 function SessionsPage() {
   const navigate = Route.useNavigate();
   const [search, setSearch] = useState('');
-  const { data, error, isPending, isFetching, refetch } =
-    useSessionKeys(search);
+  const {
+    data,
+    error,
+    isPending,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useSessionKeys(search);
 
   function navigateToSessionKey(sessionKey: string) {
     navigate({ to: pathCreator.sessions({ sessionKey }) });
@@ -26,12 +34,15 @@ function SessionsPage() {
       <ClientOnly>
         <SessionKeys
           sessionKeys={data ?? []}
-          isLoading={isPending || isFetching}
+          isLoading={isPending || (isFetching && !isFetchingNextPage)}
           search={search}
           error={error}
           onSearchChange={setSearch}
           onSubmitSearch={navigateToSessionKey}
           onRefresh={() => refetch()}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          onLoadMore={() => fetchNextPage()}
           onSelectSessionKey={navigateToSessionKey}
           getSessionKeyHref={(sessionKey) =>
             pathCreator.sessions({ sessionKey })

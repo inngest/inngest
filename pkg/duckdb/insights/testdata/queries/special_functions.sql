@@ -1,0 +1,1 @@
+SELECT COALESCE(ended_at, started_at) AS t, NULLIF(status, 'Queued') AS s, EXTRACT(year FROM queued_at) AS y, TRIM(LEADING 'x' FROM app_id) AS a, SUBSTRING(run_id FROM 1 FOR 8) AS r, POSITION('a' IN function_id) AS p FROM runs

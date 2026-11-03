@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -119,6 +120,73 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 		// flush completed and notified the pending append
 	}
 	require.ErrorIs(t, pending.err, scheduleErr)
+}
+
+func TestBufferedOverfullSnapshot(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		maxCount     int
+		bufferEvents int
+		batchSizes   []int
+	}{
+		{name: "exact byte boundary", maxCount: 50, bufferEvents: 2, batchSizes: []int{4, 4}},
+		{name: "event larger than buffer budget", maxCount: 50, bufferEvents: 0, batchSizes: []int{3, 3, 2}},
+		{name: "count bound still applies", maxCount: 3, bufferEvents: 2, batchSizes: []int{3, 3, 2}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			ctx := t.Context()
+			fn := inngest.Function{ID: uuid.New(), EventBatch: &inngest.EventBatchConfig{MaxSize: tc.maxCount, Timeout: "60s"}}
+			var evt event.Event
+			require.NoError(t, json.Unmarshal([]byte(`{"name":"test/bytes","data":{"value":"`+strings.Repeat("<", 100)+`"}}`), &evt))
+			item := BatchItem{FunctionID: fn.ID, Event: evt}
+			encoded, err := json.Marshal(item)
+			require.NoError(t, err)
+			require.Greater(t, len(encoded), item.Event.Size())
+			q := &fakeProducer{}
+			bm := NewRedisBatchManager(redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey), q,
+				WithRedisBatchSizeLimit(3*len(encoded)), WithBufferMaxByteSize(max(1, tc.bufferEvents*len(encoded))))
+			buffer := bm.(*redisBatchManager).buffer
+			// Arrange the snapshot concurrent appenders can leave before flush
+			// obtains the lock. No timing race is needed to reproduce the overflow.
+			buf := buffer.getOrCreateBuffer(bufferKey{FunctionID: fn.ID}, fn)
+			var expected []ulid.ULID
+			for range 8 {
+				item.EventID = ulid.Make()
+				expected = append(expected, item.EventID)
+				encoded, err := json.Marshal(item)
+				require.NoError(t, err)
+				buf.items = append(buf.items, pendingItem{item: item, fn: fn, encoded: encoded, pending: &pendingResult{done: make(chan struct{})}})
+				buf.byteSize += len(encoded)
+			}
+			buffer.totalPendingItems.Store(int64(len(buf.items)))
+			buffer.totalPendingBytes.Store(int64(buf.byteSize))
+			// Two-event chunks cross the three-event byte threshold at four;
+			// one-event chunks reach it at three. This distinguishes accepting
+			// an exact buffer boundary from splitting prematurely.
+			require.NoError(t, bm.Close())
+			batches := map[ulid.ULID]bool{}
+			for _, job := range q.items {
+				batches[job.item.Payload.(ScheduleBatchPayload).BatchID] = true
+			}
+			var actual []ulid.ULID
+			var batchSizes []int
+			for id := range batches {
+				stored, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, id)
+				require.NoError(t, err)
+				batchSizes = append(batchSizes, len(stored))
+				for _, stored := range stored {
+					actual = append(actual, stored.EventID)
+					require.Equal(t, evt.Data, stored.Event.Data)
+				}
+			}
+			require.ElementsMatch(t, tc.batchSizes, batchSizes)
+			require.ElementsMatch(t, expected, actual, "every event must remain in a scheduled batch exactly once")
+		})
+	}
 }
 
 func TestBulkAppend(t *testing.T) {
@@ -1107,7 +1175,8 @@ func TestBufferedByteSize(t *testing.T) {
 
 	t.Run("byte size flush triggers before count limit", func(t *testing.T) {
 		// Low byte-size limit (500B), high count limit (1000), long timer (5s).
-		// Events with large Data should trigger a byte-size flush well before count or timer.
+		// Raw input fits under the limit, but JSON escaping and BatchItem metadata
+		// make each encoded item exceed it. Flush on the bytes actually sent.
 		buffered := NewRedisBatchManager(bc, nil,
 			WithBufferSettings(5*time.Second, 1000),
 			WithBufferMaxByteSize(500),
@@ -1123,7 +1192,6 @@ func TestBufferedByteSize(t *testing.T) {
 			},
 		}
 
-		// Each event is ~200+ bytes of JSON, so 3 should exceed 500B.
 		var wg sync.WaitGroup
 		results := make([]*BatchAppendResult, 3)
 		errs := make([]error, 3)
@@ -1133,21 +1201,20 @@ func TestBufferedByteSize(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
+				var evt event.Event
+				require.NoError(t, json.Unmarshal([]byte(`{"name":"test/bytesize","data":{"payload":"`+strings.Repeat("<", 100)+`"}}`), &evt))
 				bi := BatchItem{
 					AccountID:   uuid.New(),
 					WorkspaceID: uuid.New(),
 					AppID:       uuid.New(),
 					FunctionID:  fnId,
 					EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
-					Event: event.Event{
-						Name: "test/bytesize",
-						Data: map[string]any{
-							"payload": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
-								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							"idx": idx,
-						},
-					},
+					Event:       evt,
 				}
+				encoded, err := json.Marshal(bi)
+				require.NoError(t, err)
+				require.Less(t, 3*evt.Size(), 500, "the old accounting would not flush these events")
+				require.Greater(t, len(encoded), 500)
 				results[idx], errs[idx] = buffered.Append(context.Background(), bi, fn)
 			}(i)
 		}
@@ -1169,12 +1236,6 @@ func TestBufferedByteSize(t *testing.T) {
 	t.Run("byte size resets after flush", func(t *testing.T) {
 		// Verify that two consecutive batches each flush at the byte-size threshold independently.
 		// Appends are concurrent within each batch since Append blocks until flush.
-		buffered := NewRedisBatchManager(bc, nil,
-			WithBufferSettings(5*time.Second, 1000),
-			WithBufferMaxByteSize(500),
-		)
-		defer buffered.Close()
-
 		fnId := uuid.New()
 		fn := inngest.Function{
 			ID: fnId,
@@ -1201,7 +1262,15 @@ func TestBufferedByteSize(t *testing.T) {
 			}
 		}
 
-		// First batch: 3 concurrent items should exceed 500B and flush
+		encoded, err := json.Marshal(makeLargeItem())
+		require.NoError(t, err)
+		buffered := NewRedisBatchManager(bc, nil,
+			WithBufferSettings(5*time.Second, 1000),
+			WithBufferMaxByteSize(3*len(encoded)),
+		)
+		defer buffered.Close()
+
+		// First batch: exactly 3 encoded items reach the threshold and flush.
 		var wg1 sync.WaitGroup
 		for i := 0; i < 3; i++ {
 			wg1.Add(1)

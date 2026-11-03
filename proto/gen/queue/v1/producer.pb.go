@@ -359,8 +359,11 @@ type EnqueueOptions struct {
 	NormalizeFromBacklogId string                 `protobuf:"bytes,3,opt,name=normalize_from_backlog_id,json=normalizeFromBacklogId,proto3" json:"normalize_from_backlog_id,omitempty"`
 	IdempotencyPeriod      *durationpb.Duration   `protobuf:"bytes,4,opt,name=idempotency_period,json=idempotencyPeriod,proto3,oneof" json:"idempotency_period,omitempty"`
 	SingletonMigrationKey  string                 `protobuf:"bytes,5,opt,name=singleton_migration_key,json=singletonMigrationKey,proto3" json:"singleton_migration_key,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Lease the item for the enqueuing caller in the enqueue commit (see
+	// CallerLease). Queues that do not support it ignore it.
+	CallerLease   *CallerLease `protobuf:"bytes,6,opt,name=caller_lease,json=callerLease,proto3" json:"caller_lease,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EnqueueOptions) Reset() {
@@ -428,6 +431,81 @@ func (x *EnqueueOptions) GetSingletonMigrationKey() string {
 	return ""
 }
 
+func (x *EnqueueOptions) GetCallerLease() *CallerLease {
+	if x != nil {
+		return x.CallerLease
+	}
+	return nil
+}
+
+// CallerLease asks the queue to write the item already leased for the caller
+// when it lands on one of shards, so the caller can run it without a separate
+// lease. lease_id is the caller-chosen lease (a ULID whose time is the lease
+// expiry), unique per enqueue call; a retry of the same call carries the same
+// lease_id and gets the same lease back.
+type CallerLease struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Shards  []string               `protobuf:"bytes,1,rep,name=shards,proto3" json:"shards,omitempty"`
+	LeaseId string                 `protobuf:"bytes,2,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
+	// at_limit: the caller takes over its run's concurrency slot for this item
+	// (it holds the previous item's capacity lease), so the queue may lease it
+	// while the function or key is at its limit, oldest run first.
+	AtLimit       bool `protobuf:"varint,3,opt,name=at_limit,json=atLimit,proto3" json:"at_limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CallerLease) Reset() {
+	*x = CallerLease{}
+	mi := &file_queue_v1_producer_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CallerLease) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CallerLease) ProtoMessage() {}
+
+func (x *CallerLease) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_producer_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CallerLease.ProtoReflect.Descriptor instead.
+func (*CallerLease) Descriptor() ([]byte, []int) {
+	return file_queue_v1_producer_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CallerLease) GetShards() []string {
+	if x != nil {
+		return x.Shards
+	}
+	return nil
+}
+
+func (x *CallerLease) GetLeaseId() string {
+	if x != nil {
+		return x.LeaseId
+	}
+	return ""
+}
+
+func (x *CallerLease) GetAtLimit() bool {
+	if x != nil {
+		return x.AtLimit
+	}
+	return false
+}
+
 var File_queue_v1_producer_proto protoreflect.FileDescriptor
 
 const file_queue_v1_producer_proto_rawDesc = "" +
@@ -456,14 +534,19 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
 	"\x05scope\x18\x04 \x01(\v2\x0f.queue.v1.ScopeR\x05scope\"\x18\n" +
-	"\x16RequeueByJobIDResponse\"\xcc\x02\n" +
+	"\x16RequeueByJobIDResponse\"\x86\x03\n" +
 	"\x0eEnqueueOptions\x12,\n" +
 	"\x12passthrough_job_id\x18\x01 \x01(\bR\x10passthroughJobId\x123\n" +
 	"\x16force_queue_shard_name\x18\x02 \x01(\tR\x13forceQueueShardName\x129\n" +
 	"\x19normalize_from_backlog_id\x18\x03 \x01(\tR\x16normalizeFromBacklogId\x12M\n" +
 	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01\x126\n" +
-	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKeyB\x15\n" +
-	"\x13_idempotency_period2\xec\x01\n" +
+	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKey\x128\n" +
+	"\fcaller_lease\x18\x06 \x01(\v2\x15.queue.v1.CallerLeaseR\vcallerLeaseB\x15\n" +
+	"\x13_idempotency_period\"[\n" +
+	"\vCallerLease\x12\x16\n" +
+	"\x06shards\x18\x01 \x03(\tR\x06shards\x12\x19\n" +
+	"\blease_id\x18\x02 \x01(\tR\aleaseId\x12\x19\n" +
+	"\bat_limit\x18\x03 \x01(\bR\aatLimit2\xec\x01\n" +
 	"\x0fProducerService\x12@\n" +
 	"\aEnqueue\x12\x18.queue.v1.EnqueueRequest\x1a\x19.queue.v1.EnqueueResponse\"\x00\x12@\n" +
 	"\aRequeue\x12\x18.queue.v1.RequeueRequest\x1a\x19.queue.v1.RequeueResponse\"\x00\x12U\n" +
@@ -481,7 +564,7 @@ func file_queue_v1_producer_proto_rawDescGZIP() []byte {
 	return file_queue_v1_producer_proto_rawDescData
 }
 
-var file_queue_v1_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_queue_v1_producer_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_queue_v1_producer_proto_goTypes = []any{
 	(*EnqueueRequest)(nil),         // 0: queue.v1.EnqueueRequest
 	(*EnqueueResponse)(nil),        // 1: queue.v1.EnqueueResponse
@@ -490,33 +573,35 @@ var file_queue_v1_producer_proto_goTypes = []any{
 	(*RequeueByJobIDRequest)(nil),  // 4: queue.v1.RequeueByJobIDRequest
 	(*RequeueByJobIDResponse)(nil), // 5: queue.v1.RequeueByJobIDResponse
 	(*EnqueueOptions)(nil),         // 6: queue.v1.EnqueueOptions
-	(*Item)(nil),                   // 7: queue.v1.Item
-	(*timestamppb.Timestamp)(nil),  // 8: google.protobuf.Timestamp
-	(*QueueItem)(nil),              // 9: queue.v1.QueueItem
-	(*Scope)(nil),                  // 10: queue.v1.Scope
-	(*durationpb.Duration)(nil),    // 11: google.protobuf.Duration
+	(*CallerLease)(nil),            // 7: queue.v1.CallerLease
+	(*Item)(nil),                   // 8: queue.v1.Item
+	(*timestamppb.Timestamp)(nil),  // 9: google.protobuf.Timestamp
+	(*QueueItem)(nil),              // 10: queue.v1.QueueItem
+	(*Scope)(nil),                  // 11: queue.v1.Scope
+	(*durationpb.Duration)(nil),    // 12: google.protobuf.Duration
 }
 var file_queue_v1_producer_proto_depIdxs = []int32{
-	7,  // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
-	8,  // 1: queue.v1.EnqueueRequest.at:type_name -> google.protobuf.Timestamp
+	8,  // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
+	9,  // 1: queue.v1.EnqueueRequest.at:type_name -> google.protobuf.Timestamp
 	6,  // 2: queue.v1.EnqueueRequest.opts:type_name -> queue.v1.EnqueueOptions
-	9,  // 3: queue.v1.EnqueueResponse.item:type_name -> queue.v1.QueueItem
-	9,  // 4: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
-	8,  // 5: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
-	8,  // 6: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
-	10, // 7: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
-	11, // 8: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
-	0,  // 9: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
-	2,  // 10: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
-	4,  // 11: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
-	1,  // 12: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
-	3,  // 13: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
-	5,  // 14: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	10, // 3: queue.v1.EnqueueResponse.item:type_name -> queue.v1.QueueItem
+	10, // 4: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
+	9,  // 5: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
+	9,  // 6: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
+	11, // 7: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
+	12, // 8: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
+	7,  // 9: queue.v1.EnqueueOptions.caller_lease:type_name -> queue.v1.CallerLease
+	0,  // 10: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
+	2,  // 11: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
+	4,  // 12: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
+	1,  // 13: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
+	3,  // 14: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
+	5,  // 15: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
+	13, // [13:16] is the sub-list for method output_type
+	10, // [10:13] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_producer_proto_init() }
@@ -532,7 +617,7 @@ func file_queue_v1_producer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queue_v1_producer_proto_rawDesc), len(file_queue_v1_producer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

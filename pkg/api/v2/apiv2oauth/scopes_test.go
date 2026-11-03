@@ -26,6 +26,7 @@ func TestScopesForEndpoints(t *testing.T) {
 
 func TestCLIScopesExcludeNonDelegatableKeys(t *testing.T) {
 	scopes := CLIScopes()
+	require.Contains(t, scopes, "events:read:*")
 
 	require.Contains(t, scopes, "apps:read:*")
 	require.Contains(t, scopes, "apps:write:*")

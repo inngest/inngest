@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -222,6 +224,180 @@ func TestBatchSizeLimit(t *testing.T) {
 	require.NotEmpty(t, res.BatchID)
 	require.NotEmpty(t, res.BatchPointerKey)
 	require.Equal(t, enums.BatchMaxSize, res.Status)
+}
+
+func TestBatchSizeLimitWithUnevenEvents(t *testing.T) {
+	// REDIS_ADDR also exercises the real quicklist representation.
+	address := os.Getenv("REDIS_ADDR")
+	if address == "" {
+		address = miniredis.RunT(t).Addr()
+	}
+	for _, buffered := range []bool{false, true} {
+		t.Run(fmt.Sprintf("buffered=%t", buffered), func(t *testing.T) {
+			ctx := context.Background()
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{address}, DisableCache: true})
+			require.NoError(t, err)
+			defer rc.Close()
+			bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+			const sizeLimit = 1024 * 1024
+			opts := []RedisBatchManagerOpt{WithRedisBatchSizeLimit(sizeLimit), WithoutBuffer()}
+			if buffered {
+				opts = append(opts, WithBufferSettings(time.Millisecond, 50))
+			}
+			q := &fakeProducer{}
+			bm := NewRedisBatchManager(bc, q, opts...)
+			defer bm.Close()
+			fn := inngest.Function{ID: uuid.New(), EventBatch: &inngest.EventBatchConfig{MaxSize: 1000, Timeout: "60s"}}
+			kg := bc.KeyGenerator()
+			keys := []string{kg.BatchPointer(ctx, fn.ID)}
+			defer func() {
+				require.NoError(t, rc.Do(ctx, rc.B().Del().Key(keys...).Build()).Error())
+			}()
+			batches := map[ulid.ULID]bool{}
+			var expected []ulid.ULID
+			largestItem := 0
+			// Small nodes at the head bias the default five-node sample. Later
+			// large events must still trigger the byte limit, well before MaxSize.
+			for i := range 96 {
+				payloadSize := 4000
+				if i >= 64 {
+					payloadSize = 100000
+				}
+				item := BatchItem{FunctionID: fn.ID, EventID: ulid.Make(), Event: event.Event{Data: map[string]any{"value": strings.Repeat("x", payloadSize)}}}
+				expected = append(expected, item.EventID)
+				keys = append(keys, fmt.Sprintf("%s:batch_idem:%s", kg.QueuePrefix(ctx, fn.ID), item.EventID))
+				encoded, err := json.Marshal(item)
+				require.NoError(t, err)
+				largestItem = max(largestItem, len(encoded))
+				res, err := bm.Append(ctx, item, fn)
+				require.NoError(t, err)
+				id := ulid.MustParse(res.BatchID)
+				if !batches[id] {
+					keys = append(keys, kg.Batch(ctx, fn.ID, id), kg.BatchMetadata(ctx, fn.ID, id))
+				}
+				batches[id] = true
+			}
+			var actual []ulid.ULID
+			for id := range batches {
+				items, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, id)
+				require.NoError(t, err)
+				bytes := 0
+				for _, item := range items {
+					encoded, err := json.Marshal(item)
+					require.NoError(t, err)
+					bytes += len(encoded)
+					actual = append(actual, item.EventID)
+				}
+				// The check is after append, so one item can cross the limit.
+				require.LessOrEqual(t, bytes, sizeLimit+largestItem)
+			}
+			require.ElementsMatch(t, expected, actual)
+		})
+	}
+}
+
+func TestBatchByteTallyWithLegacyWriters(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bulk   bool
+		legacy bool
+		mixed  bool
+	}{
+		{name: "single fresh"},
+		{name: "bulk fresh", bulk: true},
+		{name: "single legacy", legacy: true},
+		{name: "bulk legacy", bulk: true, legacy: true},
+		{name: "single mixed", mixed: true},
+		{name: "bulk mixed", bulk: true, mixed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			defer rc.Close()
+			ctx := t.Context()
+			bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+			fn := inngest.Function{ID: uuid.New(), EventBatch: &inngest.EventBatchConfig{MaxSize: 100, Timeout: "60s"}}
+			var items []BatchItem
+			var encoded []string
+			limit := 0
+			for _, bytes := range []int{100, 2000, 300, 4000, 200, 50} {
+				item := BatchItem{FunctionID: fn.ID, EventID: ulid.Make(), Event: event.Event{Data: map[string]any{"value": strings.Repeat("x", bytes)}}}
+				data, err := json.Marshal(item)
+				require.NoError(t, err)
+				items = append(items, item)
+				encoded = append(encoded, string(data))
+				limit += len(data)
+			}
+			if tc.legacy || tc.mixed {
+				// Legacy batches must rotate at the allocator-size boundary, not
+				// the smaller serialized-byte boundary used by new batches.
+				controlKey := "legacy-size-control"
+				_, err = r.RPush(controlKey, encoded...)
+				require.NoError(t, err)
+				memoryBytes, err := rc.Do(ctx, rc.B().Arbitrary("MEMORY", "USAGE").Keys(controlKey).Build()).AsInt64()
+				require.NoError(t, err)
+				require.Greater(t, memoryBytes, int64(limit))
+				limit = int(memoryBytes)
+				r.Del(controlKey)
+			}
+			bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchSizeLimit(limit))
+			appendItem := func(item BatchItem) enums.Batch {
+				if tc.bulk {
+					res, err := bm.BulkAppend(ctx, []BatchItem{item, item}, fn)
+					require.NoError(t, err)
+					status, err := enums.BatchString(res.Status)
+					require.NoError(t, err)
+					return status
+				}
+				res, err := bm.Append(ctx, item, fn)
+				require.NoError(t, err)
+				return res.Status
+			}
+			id := ulid.Make()
+			key := bc.KeyGenerator().Batch(ctx, fn.ID, id)
+			pointer := bc.KeyGenerator().BatchPointer(ctx, fn.ID)
+			require.NoError(t, r.Set(pointer, id.String()))
+			r.HSet(bc.KeyGenerator().BatchMetadata(ctx, fn.ID, id), "status", enums.BatchStatusPending.String())
+			if tc.legacy {
+				_, err = r.RPush(key, encoded[0], encoded[1])
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, enums.BatchNew, appendItem(items[0]))
+				require.Equal(t, enums.BatchAppend, appendItem(items[1]))
+			}
+			require.Equal(t, enums.BatchAppend, appendItem(items[2]))
+			require.Equal(t, enums.BatchItemExists, appendItem(items[2]))
+			if tc.legacy || tc.mixed {
+				// An old writer does not update the tally; this batch must stay
+				// on legacy sizing rather than promote an estimate to a tally.
+				_, err = r.RPush(key, encoded[3])
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, enums.BatchAppend, appendItem(items[3]))
+			}
+			require.Equal(t, enums.BatchAppend, appendItem(items[4]))
+			require.Equal(t, enums.BatchMaxSize, appendItem(items[5]), "rotate at the serialized-byte boundary for new batches and the memory boundary for legacy/mixed batches")
+			stored, err := bm.RetrieveItems(ctx, uuid.Nil, fn.ID, id)
+			require.NoError(t, err)
+			require.Len(t, stored, len(items))
+			for i, item := range items {
+				require.Equal(t, item.EventID, stored[i].EventID)
+				require.Equal(t, item.Event.Data, stored[i].Event.Data)
+			}
+			next, err := r.Get(pointer)
+			require.NoError(t, err)
+			require.NotEqual(t, id.String(), next)
+			// The tally shares metadata's lifetime; deletion must not affect the
+			// next batch or leave accounting that carries into it.
+			require.NoError(t, bm.DeleteKeys(ctx, fn.ID, id))
+			require.False(t, r.Exists(key))
+			require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(ctx, fn.ID, id)))
+			fresh := items[0]
+			fresh.EventID = ulid.Make()
+			require.Equal(t, enums.BatchNew, appendItem(fresh))
+		})
+	}
 }
 
 func TestBatchAppendIdempotence(t *testing.T) {
@@ -735,14 +911,14 @@ func TestBulkAppendPayloadAccountingAcrossOverflow(t *testing.T) {
 
 	ctx := context.Background()
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
 	fnID := uuid.New()
 	fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 2, Timeout: "60s"}}
 	accountID := uuid.New()
 	items := []BatchItem{
 		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "one"}},
-		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "two"}},
-		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "three"}},
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "two", Data: map[string]any{"value": strings.Repeat("x", 200)}}},
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "three", Data: map[string]any{"value": strings.Repeat("x", 2000)}}},
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "four", Data: map[string]any{"value": strings.Repeat("x", 300)}}},
 	}
 	encodedBytes := make([]int, len(items))
 	for i, item := range items {
@@ -751,11 +927,22 @@ func TestBulkAppendPayloadAccountingAcrossOverflow(t *testing.T) {
 		encodedBytes[i] = len(encoded)
 	}
 
-	result, err := bm.BulkAppend(ctx, items, fn)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithRedisBatchSizeLimit(encodedBytes[2]+encodedBytes[3]))
+	result, err := bm.BulkAppend(ctx, items[:3], fn)
 	require.NoError(t, err)
 	require.Equal(t, "overflow", result.Status)
 	require.Equal(t, 3, result.Committed)
 	require.Equal(t, int64(encodedBytes[0]+encodedBytes[1]+encodedBytes[2]), result.CommittedBytes)
+	overflowID := result.NextBatchID
+	result, err = bm.BulkAppend(ctx, items[3:], fn)
+	require.NoError(t, err)
+	require.Equal(t, overflowID, result.BatchID)
+	require.Equal(t, "maxsize", result.Status, "overflow must carry only its own serialized bytes into the next append")
+	stored, err := bm.RetrieveItems(ctx, uuid.Nil, fnID, ulid.MustParse(overflowID))
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	require.Equal(t, items[2].EventID, stored[0].EventID)
+	require.Equal(t, items[3].EventID, stored[1].EventID)
 }
 
 func TestDeleteKeysRecordsResidency(t *testing.T) {

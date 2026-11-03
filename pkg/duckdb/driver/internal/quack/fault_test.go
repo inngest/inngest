@@ -21,17 +21,18 @@ import (
 // fakeQuackServer is an httptest quack endpoint whose prepare/fetch/send-data
 // responses each test scripts, so transport faults and interleavings a
 // cooperative real server never produces can be injected deterministically.
-// It answers the handshake and CancelRequests itself, recording every
-// cancelled query ID.
+// It answers the handshake, CancelRequests, and DisconnectMessages itself,
+// recording every cancelled query ID and disconnected connection ID.
 type fakeQuackServer struct {
 	t   *testing.T
 	srv *httptest.Server
 
 	nextConn atomic.Int64
 
-	mu        sync.Mutex
-	cancelled []hugeint
-	prepared  []hugeint
+	mu           sync.Mutex
+	cancelled    []hugeint
+	prepared     []hugeint
+	disconnected []string
 
 	onPrepare  func(w http.ResponseWriter, r *http.Request, sql string, queryID hugeint)
 	onFetch    func(w http.ResponseWriter, r *http.Request, batchIndex uint64)
@@ -90,6 +91,12 @@ func (f *fakeQuackServer) handle(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		_, _ = w.Write(encodeMessage(msgSuccessResponse, "", func(*writer) {}))
 
+	case msgDisconnectMessage:
+		f.mu.Lock()
+		f.disconnected = append(f.disconnected, hdr.ConnectionID)
+		f.mu.Unlock()
+		_, _ = w.Write(encodeMessage(msgSuccessResponse, "", func(*writer) {}))
+
 	default:
 		http.Error(w, "unexpected message type", http.StatusBadRequest)
 	}
@@ -106,6 +113,12 @@ func (f *fakeQuackServer) cancelledIDs() []hugeint {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]hugeint(nil), f.cancelled...)
+}
+
+func (f *fakeQuackServer) disconnectedIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.disconnected...)
 }
 
 func (f *fakeQuackServer) lastPrepared() hugeint {
@@ -301,8 +314,9 @@ func TestQuackFaultMultiBatchFetchHappyPath(t *testing.T) {
 
 // TestQuackFaultCancelDuringPrepare: a caller's ctx ending while the server
 // is still running the statement must send a CancelRequest for exactly that
-// statement's query ID, return promptly with the ctx error, and leave no
-// watcher goroutine or connection behind.
+// statement's query ID, then disconnect, return promptly with the ctx error
+// and the session marked Abandoned, and leave no watcher goroutine or
+// connection behind.
 func TestQuackFaultCancelDuringPrepare(t *testing.T) {
 	ignore := goleak.IgnoreCurrent()
 	f := newFakeQuackServer(t)
@@ -323,14 +337,20 @@ func TestQuackFaultCancelDuringPrepare(t *testing.T) {
 		ids := f.cancelledIDs()
 		return len(ids) == 1 && ids[0] == want
 	}, 5*time.Second, 10*time.Millisecond, "exactly the abandoned query must be cancelled")
+	require.True(t, s.Abandoned())
+	require.Eventually(t, func() bool {
+		ids := f.disconnectedIDs()
+		return len(ids) == 1 && ids[0] == s.connectionID
+	}, 5*time.Second, 10*time.Millisecond, "the abandoned connection must be disconnected")
 
 	f.srv.Close()
 	verifyNoQuackLeaks(t, ignore)
 }
 
-// TestQuackFaultCancelBetweenFetchesThenReuse: cancellation mid-fetch-loop
-// cancels the right query, and the same session is healthy afterwards.
-func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
+// TestQuackFaultCancelBetweenFetches: cancellation mid-fetch-loop cancels
+// the right query and abandons the session, while a session whose statements
+// all finished is never abandoned (even once their ctx ends afterwards).
+func TestQuackFaultCancelBetweenFetches(t *testing.T) {
 	f := newFakeQuackServer(t)
 	var blockFetch atomic.Bool
 	blockFetch.Store(true)
@@ -361,10 +381,17 @@ func TestQuackFaultCancelBetweenFetchesThenReuse(t *testing.T) {
 		return len(ids) == 1 && ids[0] == want
 	}, 5*time.Second, 10*time.Millisecond)
 
-	_, _, rows, err := s.Query(t.Context(), "SELECT 1")
-	require.NoError(t, err, "the session must be reusable after a cancelled statement")
+	require.True(t, s.Abandoned(), "a session w/ a cancelled statement must not be reused")
+
+	fresh := f.session(t)
+	doneCtx, doneCancel := context.WithCancel(t.Context())
+	_, _, rows, err := fresh.Query(doneCtx, "SELECT 1")
+	doneCancel()
+	require.NoError(t, err)
 	require.Len(t, rows, 1)
+	require.False(t, fresh.Abandoned())
 	require.Len(t, f.cancelledIDs(), 1, "a completed statement must not send a cancel")
+	require.Len(t, f.disconnectedIDs(), 1)
 }
 
 // TestQuackFaultConcurrentSessionsGetTheirOwnResults runs interleaved,

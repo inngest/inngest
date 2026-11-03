@@ -71,33 +71,41 @@ func TestHandleInvokeFinishLookup(t *testing.T) {
 	storeErr := errors.New("store unavailable")
 	type testCase struct {
 		name         string
-		lookupErr    error
-		fallbackErr  error
+		byIDErr      error
+		indexErr     error
 		change       func(*state.Pause, *event.InternalEvent)
+		nilPause     bool
 		wantErr      error
 		wantMismatch bool
-		wantFallback bool
+		wantByID     bool
+		wantIndex    bool
 		wantDelete   bool
 	}
 	tests := []testCase{
-		{name: "healthy index"},
-		{name: "missing index", lookupErr: state.ErrInvokePauseNotFound, wantFallback: true},
-		{name: "expired beyond grace", lookupErr: state.ErrInvokePauseNotFound, wantFallback: true, wantDelete: true,
+		{name: "direct lookup skips index", wantByID: true},
+		{name: "missing index is not consulted", indexErr: state.ErrInvokePauseNotFound, wantByID: true},
+		{name: "index store error is not consulted", indexErr: storeErr, wantByID: true},
+		{name: "legacy random ID", byIDErr: state.ErrPauseNotFound, wantByID: true, wantIndex: true,
+			change: func(p *state.Pause, _ *event.InternalEvent) { p.ID = uuid.New() }},
+		{name: "expired beyond grace", wantByID: true, wantDelete: true,
 			change: func(p *state.Pause, _ *event.InternalEvent) {
 				p.Expires = state.Time(time.Now().Add(-2 * consts.PauseExpiredDeletionGracePeriod))
 			}},
-		{name: "index store error", lookupErr: storeErr, wantErr: storeErr},
-		{name: "indexed pause absent", lookupErr: state.ErrPauseNotFound, wantErr: state.ErrPauseNotFound},
-		{name: "pause absent", lookupErr: state.ErrInvokePauseNotFound, fallbackErr: state.ErrPauseNotFound, wantErr: state.ErrInvokePauseNotFound, wantFallback: true},
-		{name: "fallback store error", lookupErr: state.ErrInvokePauseNotFound, fallbackErr: storeErr, wantErr: storeErr, wantFallback: true},
+		{name: "direct store error", byIDErr: storeErr, wantErr: storeErr, wantByID: true},
+		{name: "index store error", byIDErr: state.ErrPauseNotFound, indexErr: storeErr, wantErr: storeErr, wantByID: true, wantIndex: true},
+		{name: "pause absent", byIDErr: state.ErrPauseNotFound, indexErr: state.ErrInvokePauseNotFound, wantErr: state.ErrInvokePauseNotFound, wantByID: true, wantIndex: true},
+		{name: "indexed pause absent", byIDErr: state.ErrPauseNotFound, indexErr: state.ErrPauseNotFound, wantErr: state.ErrInvokePauseNotFound, wantByID: true, wantIndex: true},
+		{name: "nil direct pause", nilPause: true, wantMismatch: true, wantByID: true},
+		{name: "nil indexed pause", byIDErr: state.ErrPauseNotFound, nilPause: true, wantMismatch: true, wantByID: true, wantIndex: true},
 		{name: "no correlation", wantErr: ErrNoCorrelationID, change: func(_ *state.Pause, evt *event.InternalEvent) { delete(evt.Event.Data, consts.InvokeCorrelationId) }},
+		{name: "non-finished event", wantErr: ErrNoCorrelationID, change: func(_ *state.Pause, evt *event.InternalEvent) { evt.Event.Name = "other/event" }},
+		{name: "wrong direct pause ID", wantMismatch: true, wantByID: true, change: func(p *state.Pause, _ *event.InternalEvent) { p.ID = uuid.New() }},
 	}
 	for _, malformed := range []string{"not-a-correlation", "invalid.step", ulid.Make().String() + ".", ulid.Make().String()} {
-		tests = append(tests, testCase{name: "malformed " + malformed, lookupErr: state.ErrInvokePauseNotFound, wantErr: state.ErrInvokePauseNotFound,
+		tests = append(tests, testCase{name: "malformed " + malformed, wantErr: state.ErrInvokePauseNotFound,
 			change: func(_ *state.Pause, evt *event.InternalEvent) { evt.Event.Data[consts.InvokeCorrelationId] = malformed }})
 	}
 	for name, change := range map[string]func(*state.Pause, *event.InternalEvent){
-		"pause ID":        func(p *state.Pause, _ *event.InternalEvent) { p.ID = uuid.New() },
 		"account":         func(p *state.Pause, _ *event.InternalEvent) { p.Identifier.AccountID = uuid.New() },
 		"workspace":       func(p *state.Pause, _ *event.InternalEvent) { p.WorkspaceID = uuid.New() },
 		"run":             func(p *state.Pause, _ *event.InternalEvent) { p.Identifier.RunID = ulid.Make() },
@@ -109,7 +117,10 @@ func TestHandleInvokeFinishLookup(t *testing.T) {
 		"event":           func(p *state.Pause, _ *event.InternalEvent) { p.Event = new("another/event") },
 		"nil event":       func(p *state.Pause, _ *event.InternalEvent) { p.Event = nil },
 	} {
-		tests = append(tests, testCase{name: "mismatch " + name, lookupErr: state.ErrInvokePauseNotFound, change: change, wantMismatch: true, wantFallback: true})
+		tests = append(tests,
+			testCase{name: "direct mismatch " + name, change: change, wantMismatch: true, wantByID: true},
+			testCase{name: "indexed mismatch " + name, byIDErr: state.ErrPauseNotFound, change: change, wantMismatch: true, wantByID: true, wantIndex: true},
+		)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,14 +130,21 @@ func TestHandleInvokeFinishLookup(t *testing.T) {
 			if tt.change != nil {
 				tt.change(&p, &evt)
 			}
-			called := false
+			returnedPause := &p
+			if tt.nilPause {
+				returnedPause = nil
+			}
+			byIDCalls, indexCalls := 0, 0
 			pm := &invokeLookupManager{
-				lookup: func() (*state.Pause, error) { return &p, tt.lookupErr },
+				lookup: func() (*state.Pause, error) {
+					indexCalls++
+					return returnedPause, tt.indexErr
+				},
 				byID: func(index pauses.Index, id uuid.UUID) (*state.Pause, error) {
-					called = true
+					byIDCalls++
 					require.Equal(t, pauses.Index{WorkspaceID: evt.WorkspaceID, EventName: event.FnFinishedName}, index)
 					require.Equal(t, expectedID, id)
-					return &p, tt.fallbackErr
+					return returnedPause, tt.byIDErr
 				},
 			}
 			e := &executor{pm: pm, log: logger.From(context.Background())}
@@ -139,21 +157,29 @@ func TestHandleInvokeFinishLookup(t *testing.T) {
 			default:
 				require.NoError(t, err)
 			}
-			require.Equal(t, tt.wantFallback, called)
+			require.Equal(t, tt.wantByID, byIDCalls == 1)
+			require.Equal(t, tt.wantIndex, indexCalls == 1)
 			require.Equal(t, tt.wantDelete, pm.deletes == 1)
 		})
 	}
 }
 
-func TestHandleInvokeFinishMissingIndexResumes(t *testing.T) {
+func TestHandleInvokeFinishResumes(t *testing.T) {
 	for _, tt := range []struct {
-		name        string
-		response    string
-		mode        enums.ParallelMode
-		coalesceKey string
+		name         string
+		response     string
+		mode         enums.ParallelMode
+		coalesceKey  string
+		missingIndex bool
+		legacyID     bool
 	}{
 		{name: "result", response: "result"},
 		{name: "error", response: "error"},
+		{name: "legacy random ID", response: "result", legacyID: true},
+		{name: "missing index result", response: "result", missingIndex: true},
+		{name: "missing index error", response: "error", missingIndex: true},
+		{name: "missing index coalesced", response: "result", mode: enums.ParallelModeWait, coalesceKey: "parallel-group", missingIndex: true},
+		{name: "missing index race", response: "result", mode: enums.ParallelModeRace, coalesceKey: "parallel-group", missingIndex: true},
 		{name: "coalesced", response: "result", mode: enums.ParallelModeWait, coalesceKey: "parallel-group"},
 		{name: "race", response: "result", mode: enums.ParallelModeRace, coalesceKey: "parallel-group"},
 	} {
@@ -174,6 +200,9 @@ func TestHandleInvokeFinishMissingIndexResumes(t *testing.T) {
 			rs := redis_state.MustRunServiceV2(mgr)
 			pm := pauses.NewPauseStoreManager(unsharded)
 			p, evt := invokePauseFixture()
+			if tt.legacyID {
+				p.ID = uuid.New()
+			}
 			p.ParallelMode = tt.mode
 			p.ParallelCoalesceKey = tt.coalesceKey
 			md := sv2.Metadata{
@@ -186,11 +215,13 @@ func TestHandleInvokeFinishMissingIndexResumes(t *testing.T) {
 			require.NoError(t, err)
 			indexKey := fmt.Sprintf("{%s}:invoke:%s", redis_state.StateDefaultKey, p.WorkspaceID)
 			require.Equal(t, p.ID.String(), r.HGet(indexKey, *p.InvokeCorrelationID))
-			r.HDel(indexKey, *p.InvokeCorrelationID)
-			_, err = pm.PauseByInvokeCorrelationID(ctx, p.WorkspaceID, *p.InvokeCorrelationID)
-			require.ErrorIs(t, err, state.ErrInvokePauseNotFound)
-			_, err = pauseStore.SavePause(ctx, p)
-			require.ErrorIs(t, err, state.ErrPauseAlreadyExists)
+			if tt.missingIndex {
+				r.HDel(indexKey, *p.InvokeCorrelationID)
+				_, err = pm.PauseByInvokeCorrelationID(ctx, p.WorkspaceID, *p.InvokeCorrelationID)
+				require.ErrorIs(t, err, state.ErrInvokePauseNotFound)
+				_, err = pauseStore.SavePause(ctx, p)
+				require.ErrorIs(t, err, state.ErrPauseAlreadyExists)
+			}
 			delete(evt.Event.Data, "result")
 			evt.Event.Data[response] = map[string]any{"message": "child response"}
 			q := &dedupeQueue{}

@@ -440,9 +440,19 @@ type SessionGroup struct {
 	Functions      []*SessionFunction `json:"functions"`
 }
 
+type SessionGroupsConnection struct {
+	Nodes    []*SessionGroup `json:"nodes"`
+	PageInfo *PageInfo       `json:"pageInfo"`
+}
+
 type SessionKey struct {
 	SessionKey string    `json:"sessionKey"`
 	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type SessionKeysConnection struct {
+	Nodes    []*SessionKey `json:"nodes"`
+	PageInfo *PageInfo     `json:"pageInfo"`
 }
 
 type SessionRun struct {

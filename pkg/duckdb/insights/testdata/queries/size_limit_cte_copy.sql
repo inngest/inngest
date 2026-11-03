@@ -1,0 +1,1 @@
+WITH t AS (SELECT range(10000) AS r) SELECT [x for x in t.r] AS c FROM t
