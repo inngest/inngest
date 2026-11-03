@@ -435,7 +435,7 @@ func (v *exprValidator) Visit(n parser.Node) parser.Visitor {
 			return nil
 		}
 	case *parser.Parameter:
-		// remapTables binds every macro call's (account_id, env_id) to
+		// Render binds every macro call's (account_id, env_id) to
 		// anonymous "?" placeholders, positionally. A user's own "?" would
 		// shift those bindings, and "$1"/"$name" could read them back, so
 		// user-written parameters are rejected outright (nothing could
