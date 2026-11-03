@@ -99,7 +99,7 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 	out := map[Table][]Column{}
 	for _, t := range needed {
 		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t))
-		if !found || len(names) == 0 {
+		if !found {
 			out[t] = nil
 			continue
 		}
@@ -111,11 +111,6 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 			if names[c.Name] {
 				cols = append(cols, c)
 			}
-		}
-		if len(cols) == 0 {
-			// The scan reads rows but no columns (count(*) over a plain
-			// union): stream one, so the delta still has its rows.
-			cols = DeltaColumns(t)[:1]
 		}
 		out[t] = cols
 	}
