@@ -40,6 +40,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -76,9 +77,10 @@ type Options struct {
 
 // Server is an Iceberg REST catalog backed by a catalog.Catalog.
 type Server struct {
-	cat  Catalog
-	opts Options
-	mux  *http.ServeMux
+	cat    Catalog
+	opts   Options
+	mux    *http.ServeMux
+	tables tableCache
 }
 
 // New returns a Server. The caller owns cat (and its *sql.DB).
@@ -247,9 +249,11 @@ type createTableRequest struct {
 }
 
 type loadTableResponse struct {
-	MetadataLocation string             `json:"metadata-location,omitempty"`
-	Metadata         table.Metadata     `json:"metadata"`
-	Config           iceberg.Properties `json:"config,omitempty"`
+	MetadataLocation string `json:"metadata-location,omitempty"`
+	// Metadata is a table.Metadata, or its cached encoding
+	// (json.RawMessage) on the load path.
+	Metadata any                `json:"metadata"`
+	Config   iceberg.Properties `json:"config,omitempty"`
 }
 
 type commitTableRequest struct {
@@ -259,8 +263,8 @@ type commitTableRequest struct {
 }
 
 type commitTableResponse struct {
-	MetadataLocation string         `json:"metadata-location"`
-	Metadata         table.Metadata `json:"metadata"`
+	MetadataLocation string          `json:"metadata-location"`
+	Metadata         json.RawMessage `json:"metadata"`
 }
 
 type renameTableRequest struct {
@@ -515,14 +519,20 @@ func (s *Server) defaultLocation(ctx context.Context, ns table.Identifier, name 
 func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 	// `snapshots=refs` and X-Iceberg-Access-Delegation are ignored, we
 	// always return all snapshots and never vend creds.
-	tbl, err := s.cat.LoadTable(r.Context(), pathTable(r))
+	ident := pathTable(r)
+	tbl, err := s.cat.LoadTable(r.Context(), ident)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	body, err := s.tables.body(ident, tbl.MetadataLocation(), tbl.Metadata())
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, loadTableResponse{
 		MetadataLocation: tbl.MetadataLocation(),
-		Metadata:         tbl.Metadata(),
+		Metadata:         body,
 		Config:           iceberg.Properties{},
 	})
 }
@@ -547,17 +557,18 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed requirements: "+err.Error())
 		return
 	}
-	checked, err := s.checkCommitLocations(raw.Updates)
-	if err != nil {
-		writeCatalogError(w, err)
-		return
-	}
-	updates, err := fixCreateUpdates(req.Requirements, checked)
+	updates, err := fixCreateUpdates(req.Requirements, raw.Updates)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
 		return
 	}
+	// Decoded twice: checkCommit applies its copy to a throwaway builder.
+	var checkUpdates table.Updates
 	if err := json.Unmarshal(updates, &req.Updates); err != nil {
+		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
+		return
+	}
+	if err := json.Unmarshal(updates, &checkUpdates); err != nil {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
 		return
 	}
@@ -568,12 +579,25 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	// concurrent commit between here and there still loses (and that path
 	// does wrap ErrCommitFailed). The requirement-failed-inside-CommitTable
 	// window is caught by isRequirementFailure below.
+	//
+	// The base is the cached version when there is one: duckdb loads the
+	// table right before writing, so it's almost always current, and a
+	// stale one can't let a bad commit through (CommitTable re-validates
+	// against what's actually stored). A requirement failure against it is
+	// re-checked against a fresh load so a stale cache never fakes a 409.
 	var current table.Metadata
-	if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
-		current = tbl.Metadata()
-	} else if !errors.Is(err, catalog.ErrNoSuchTable) {
-		writeCatalogError(w, err)
-		return
+	cached, fromCache := s.tables.get(ident)
+	if fromCache {
+		current = cached.md
+	}
+	if !fromCache || !requirementsHold(req.Requirements, current) {
+		current = nil
+		if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
+			current = tbl.Metadata()
+		} else if !errors.Is(err, catalog.ErrNoSuchTable) {
+			writeCatalogError(w, err)
+			return
+		}
 	}
 	for _, req := range req.Requirements {
 		if err := req.Validate(current); err != nil {
@@ -585,30 +609,65 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, fmt.Errorf("%w: %s", catalog.ErrNoSuchTable, strings.Join(ident, ".")))
 		return
 	}
+	if err := s.checkCommit(current, checkUpdates); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 
 	md, loc, err := s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
 	if err != nil {
+		s.tables.drop(ident)
 		writeCatalogError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, commitTableResponse{MetadataLocation: loc, Metadata: md})
-}
-
-func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
-	ident := pathTable(r)
-	var err error
-	if r.URL.Query().Get("purgeRequested") == "true" {
-		if p, ok := s.cat.(catalog.PurgeableTable); ok {
-			err = p.PurgeTable(r.Context(), ident)
-		} else {
-			err = s.cat.DropTable(r.Context(), ident)
-		}
-	} else {
-		err = s.cat.DropTable(r.Context(), ident)
-	}
+	body, err := s.tables.put(ident, loc, md)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
+	}
+	writeJSON(w, http.StatusOK, commitTableResponse{MetadataLocation: loc, Metadata: body})
+}
+
+func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ident := pathTable(r)
+	defer s.tables.drop(ident)
+	if r.URL.Query().Get("purgeRequested") != "true" {
+		if err := s.cat.DropTable(ctx, ident); err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// NOTE: purge doesn't use iceberg-go's PurgeTable, which deletes every
+	// file the table's manifests reference wherever it is (and manifests are
+	// written by the client, so we can't vouch for their contents). This
+	// only ever deletes the table's own directory, after checking it's
+	// strictly inside the warehouse.
+	tbl, err := s.cat.LoadTable(ctx, ident)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	loc, err := s.purgeLocation(tbl.Metadata())
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	if err := s.cat.DropTable(ctx, ident); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	if loc != "" {
+		if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
+		}
+	} else if s.opts.Logger != nil {
+		// TODO(maintenance): purge remote warehouses (list + delete under
+		// the table prefix).
+		s.opts.Logger.Warn("dropped iceberg table w/o purging files (remote warehouse)", "table", strings.Join(ident, "."))
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -626,6 +685,7 @@ func (s *Server) renameTable(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	defer s.tables.drop(from, to)
 	if _, err := s.cat.RenameTable(r.Context(), from, to); err != nil {
 		writeCatalogError(w, err)
 		return
@@ -785,4 +845,14 @@ type statusRecorder struct {
 func (s *statusRecorder) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
+}
+
+// requirementsHold reports whether every requirement validates against md.
+func requirementsHold(reqs []table.Requirement, md table.Metadata) bool {
+	for _, r := range reqs {
+		if r.Validate(md) != nil {
+			return false
+		}
+	}
+	return true
 }
