@@ -191,7 +191,7 @@ func TestCommitValidation(t *testing.T) {
 		{"case variant duplicate", []string{`{"action":"set-properties","ACTION":"set-location","location":"/tmp/evil","updates":{}}`}},
 		{"set-location outside", []string{`{"action":"set-location","location":"/tmp/evil"}`}},
 		{"manifest-list outside", []string{snapshot(2, "/tmp/evil/snap-2.avro")}},
-		{"manifest-list in another table", []string{snapshot(2, filepath.Dir(loc) + "/other/snap-2.avro")}},
+		{"manifest-list in another table", []string{snapshot(2, filepath.Dir(loc)+"/other/snap-2.avro")}},
 		{"statistics outside", []string{stats("/tmp/evil/1.stats")}},
 		{"partition statistics outside", []string{partStats("/tmp/evil/1.pstats")}},
 		{"write.data.path outside", []string{`{"action":"set-properties","updates":{"write.data.path":"/tmp/evil"}}`}},
