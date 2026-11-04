@@ -1280,7 +1280,8 @@ func checkPauseByID(t *testing.T, m state.Manager, pm state.PauseManager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: pauseID(t),
+		ID:          pauseID(t),
+		WorkspaceID: s.Identifier().WorkspaceID,
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,

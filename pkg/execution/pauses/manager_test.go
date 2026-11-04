@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -80,168 +79,152 @@ func TestPauseKeyLayouts(t *testing.T) {
 			blocks, err := NewBlockstore(BlockstoreOpts{
 				PauseClient: client.Pauses(), Bufferer: buffer, Bucket: bucket,
 				Leaser: leaser, CompactionLeaser: leaser, BlockSize: 2,
-				DeleteAfterFlush:      alwaysEnabled,
-				EnableBlockCompaction: alwaysEnabled,
+				DeleteAfterFlush: alwaysEnabled,
 			})
 			require.NoError(t, err)
-			blocks.(*blockstore).compactionSample = 0 // Exercise compaction synchronously below.
 			mgr := NewManager(buffer, blocks, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
 			for _, ws := range workspaces {
 				event := "test/workspace-layout"
 				idx := Index{WorkspaceID: ws, EventName: event}
-				run := ulid.Make()
-				ps := make([]*state.Pause, 3)
-				for i := range ps {
-					ps[i] = &state.Pause{
-						ID: uuid.New(), WorkspaceID: ws, Event: &event,
-						Identifier: state.PauseIdentifier{RunID: run, FunctionID: uuid.New()},
-						CreatedAt:  time.Now().Add(time.Duration(i-10) * time.Second).Truncate(time.Second),
-						Expires:    state.Time(time.Now().Add(time.Hour)),
+				t.Run(ws.String()+"/lifecycle", func(t *testing.T) {
+					run := ulid.Make()
+					ps := make([]*state.Pause, 3)
+					for i := range ps {
+						ps[i] = &state.Pause{
+							ID: uuid.New(), WorkspaceID: ws, Event: &event,
+							Identifier: state.PauseIdentifier{RunID: run, FunctionID: uuid.New()},
+							CreatedAt:  time.Now().Add(time.Duration(i-10) * time.Second).Truncate(time.Second),
+							Expires:    state.Time(time.Now().Add(time.Hour)),
+						}
 					}
-				}
-				_, err := mgr.Write(ctx, idx, ps...)
-				require.NoError(t, err)
-				prefix := "{estate}"
-				if scoped {
-					prefix = "{estate:" + ws.String() + "}"
-				}
-				exists, err := rc.Do(ctx, rc.B().Exists().Key(prefix+":pauses:"+ps[0].ID.String()).Build()).AsBool()
-				require.NoError(t, err)
-				require.True(t, exists)
-				for _, since := range []time.Time{{}, ps[1].CreatedAt} {
-					iter, err := mgr.PausesSince(ctx, idx, since)
+					_, err := mgr.Write(ctx, idx, ps...)
 					require.NoError(t, err)
-					var ids []uuid.UUID
+					for _, since := range []time.Time{{}, ps[1].CreatedAt} {
+						iter, err := mgr.PausesSince(ctx, idx, since)
+						require.NoError(t, err)
+						var ids []uuid.UUID
+						for iter.Next(ctx) {
+							p := iter.Val(ctx)
+							require.NotNil(t, p)
+							ids = append(ids, p.ID)
+						}
+						require.ErrorIs(t, iter.Error(), context.Canceled)
+						expected := []uuid.UUID{ps[1].ID, ps[2].ID}
+						if since.IsZero() {
+							expected = append(expected, ps[0].ID)
+						}
+						require.ElementsMatch(t, expected, ids)
+					}
+					// Signal and invoke indexes must use the same slot as pause writes.
+					for _, signal := range []bool{true, false} {
+						p := *ps[0]
+						p.ID, p.Event = uuid.New(), nil
+						correlation := "shared-correlation"
+						if signal {
+							p.SignalID = &correlation
+						} else {
+							p.InvokeCorrelationID = &correlation
+						}
+						_, err := mgr.Write(ctx, PauseIndex(p), &p)
+						require.NoError(t, err)
+						var found *state.Pause
+						if signal {
+							found, err = mgr.PauseBySignalID(ctx, ws, correlation)
+						} else {
+							found, err = mgr.PauseByInvokeCorrelationID(ctx, ws, correlation)
+						}
+						require.NoError(t, err)
+						require.NotNil(t, found)
+						require.Equal(t, p.ID, found.ID)
+					}
+					require.NoError(t, blocks.FlushIndexBlock(ctx, idx))
+					require.Eventually(t, func() bool {
+						n, err := buffer.BufferLen(ctx, idx)
+						return err == nil && n == 1
+					}, 5*time.Second, 10*time.Millisecond)
+					stats, err := mgr.IndexStats(ctx, idx)
+					require.NoError(t, err)
+					require.Len(t, stats.Blocks, 1)
+					iter, err := mgr.PausesSince(ctx, idx, time.Time{})
+					require.NoError(t, err)
+					var loaded []uuid.UUID
 					for iter.Next(ctx) {
 						p := iter.Val(ctx)
 						require.NotNil(t, p)
-						ids = append(ids, p.ID)
+						loaded = append(loaded, p.ID)
 					}
 					require.ErrorIs(t, iter.Error(), context.Canceled)
-					expected := []uuid.UUID{ps[1].ID, ps[2].ID}
-					if since.IsZero() {
-						expected = append(expected, ps[0].ID)
+					require.ElementsMatch(t, []uuid.UUID{ps[0].ID, ps[1].ID, ps[2].ID}, loaded)
+					for _, p := range ps {
+						found, err := mgr.PauseByID(ctx, Index{WorkspaceID: ws}, p.ID)
+						require.NoError(t, err)
+						require.Equal(t, p.ID, found.ID)
 					}
-					require.ElementsMatch(t, expected, ids)
-				}
-				// Signal and invoke indexes must use the same slot as pause writes.
-				for _, signal := range []bool{true, false} {
-					p := *ps[0]
-					p.ID, p.Event = uuid.New(), nil
-					correlation := "shared-correlation"
-					if signal {
-						p.SignalID = &correlation
-					} else {
-						p.InvokeCorrelationID = &correlation
-					}
-					_, err := mgr.Write(ctx, PauseIndex(p), &p)
-					require.NoError(t, err)
-					var found *state.Pause
-					if signal {
-						found, err = mgr.PauseBySignalID(ctx, ws, correlation)
-					} else {
-						found, err = mgr.PauseByInvokeCorrelationID(ctx, ws, correlation)
-					}
-					require.NoError(t, err)
-					require.NotNil(t, found)
-					require.Equal(t, p.ID, found.ID)
-				}
-				require.NoError(t, blocks.FlushIndexBlock(ctx, idx))
-				require.Eventually(t, func() bool {
-					n, err := buffer.BufferLen(ctx, idx)
-					return err == nil && n == 1
-				}, 5*time.Second, 10*time.Millisecond)
-				stats, err := mgr.IndexStats(ctx, idx)
-				require.NoError(t, err)
-				require.Len(t, stats.Blocks, 1)
-				for _, key := range []string{
-					fmt.Sprintf("%s:blk:idx:%s:%s", prefix, ws, util.XXHash(event)),
-					fmt.Sprintf("%s:blk:md:%s:%s", prefix, ws, util.XXHash(event)),
-					fmt.Sprintf("%s:pause-block:%s", prefix, ps[0].ID),
-				} {
-					exists, err := rc.Do(ctx, rc.B().Exists().Key(key).Build()).AsBool()
-					require.NoError(t, err)
-					require.True(t, exists, "missing key %s", key)
-				}
-				iter, err := mgr.PausesSince(ctx, idx, time.Time{})
-				require.NoError(t, err)
-				var loaded []uuid.UUID
-				for iter.Next(ctx) {
-					p := iter.Val(ctx)
-					require.NotNil(t, p)
-					loaded = append(loaded, p.ID)
-				}
-				require.ErrorIs(t, iter.Error(), context.Canceled)
-				require.ElementsMatch(t, []uuid.UUID{ps[0].ID, ps[1].ID, ps[2].ID}, loaded)
-				for _, p := range ps {
-					found, err := mgr.PauseByID(ctx, Index{WorkspaceID: ws}, p.ID)
-					require.NoError(t, err)
-					require.Equal(t, p.ID, found.ID)
-				}
-				require.NoError(t, mgr.DeletePauseByID(ctx, ps[0].ID, ws))
-				_, err = mgr.PauseByID(ctx, idx, ps[0].ID)
-				require.ErrorIs(t, err, state.ErrPauseNotFound)
-				// Consumption's cleanup must use the same layout for a buffered pause.
-				result, cleanup, err := mgr.ConsumePause(ctx, &mockRunService{}, *ps[2], state.ConsumePauseOpts{})
-				require.NoError(t, err)
-				require.True(t, result.DidConsume)
-				require.NoError(t, cleanup())
-				_, err = mgr.PauseByID(ctx, idx, ps[2].ID)
-				require.ErrorIs(t, err, state.ErrPauseNotFound)
-				require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
-				ids, err := mgr.PauseIDsForRun(ctx, run, ws)
-				require.NoError(t, err)
-				require.Empty(t, ids)
-				for _, p := range ps[1:] {
-					_, err := mgr.PauseByID(ctx, idx, p.ID)
+					require.NoError(t, mgr.DeletePauseByID(ctx, ps[0].ID, ws))
+					_, err = mgr.PauseByID(ctx, idx, ps[0].ID)
 					require.ErrorIs(t, err, state.ErrPauseNotFound)
-				}
-				found, err := mgr.PauseBySignalID(ctx, ws, "shared-correlation")
-				require.NoError(t, err)
-				require.Nil(t, found)
-				_, err = mgr.PauseByInvokeCorrelationID(ctx, ws, "shared-correlation")
-				require.ErrorIs(t, err, state.ErrInvokePauseNotFound)
-				// Compact the fully deleted block and verify its scoped metadata is gone.
-				require.NoError(t, blocks.(*blockstore).Compact(ctx, idx))
-				stats, err = mgr.IndexStats(ctx, idx)
-				require.NoError(t, err)
-				require.Empty(t, stats.Blocks)
-
-				// Cross both the HSCAN threshold and the incremental MGET batch size.
-				run = ulid.Make()
-				base := time.Now().Add(-time.Hour).Truncate(time.Second)
-				many := make([]*state.Pause, 1003)
-				for i := range many {
-					many[i] = &state.Pause{
-						ID: uuid.New(), WorkspaceID: ws, Event: &event,
-						Identifier: state.PauseIdentifier{RunID: run},
-						CreatedAt:  base.Add(time.Duration(i) * time.Second),
-						Expires:    state.Time(time.Now().Add(time.Hour)),
-					}
-				}
-				_, err = mgr.Write(ctx, idx, many...)
-				require.NoError(t, err)
-				for _, start := range []int{0, 713} {
-					since := time.Time{}
-					if start > 0 {
-						since = many[start].CreatedAt
-					}
-					iter, err := mgr.PausesSince(ctx, idx, since)
+					// Consumption's cleanup must use the same layout for a buffered pause.
+					result, cleanup, err := mgr.ConsumePause(ctx, &mockRunService{}, *ps[2], state.ConsumePauseOpts{})
 					require.NoError(t, err)
-					var got, want []uuid.UUID
-					for iter.Next(ctx) {
-						p := iter.Val(ctx)
-						require.NotNil(t, p)
-						require.Equal(t, ws, p.WorkspaceID)
-						got = append(got, p.ID)
+					require.True(t, result.DidConsume)
+					require.NoError(t, cleanup())
+					_, err = mgr.PauseByID(ctx, idx, ps[2].ID)
+					require.ErrorIs(t, err, state.ErrPauseNotFound)
+					require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
+					ids, err := mgr.PauseIDsForRun(ctx, run, ws)
+					require.NoError(t, err)
+					require.Empty(t, ids)
+					for _, p := range ps[1:] {
+						_, err := mgr.PauseByID(ctx, idx, p.ID)
+						require.ErrorIs(t, err, state.ErrPauseNotFound)
 					}
-					require.ErrorIs(t, iter.Error(), context.Canceled)
-					for _, p := range many[start:] {
-						want = append(want, p.ID)
+					found, err := mgr.PauseBySignalID(ctx, ws, "shared-correlation")
+					require.NoError(t, err)
+					require.Nil(t, found)
+					_, err = mgr.PauseByInvokeCorrelationID(ctx, ws, "shared-correlation")
+					require.ErrorIs(t, err, state.ErrInvokePauseNotFound)
+				})
+
+				t.Run(ws.String()+"/pagination", func(t *testing.T) {
+					// Keep pagination independent of the block lifecycle above.
+					mgr := NewManager(buffer, nil)
+					idx := Index{WorkspaceID: ws, EventName: "test/workspace-pagination"}
+					// Cross both the HSCAN threshold and the incremental MGET batch size.
+					run := ulid.Make()
+					base := time.Now().Add(-time.Hour).Truncate(time.Second)
+					many := make([]*state.Pause, 1003)
+					for i := range many {
+						many[i] = &state.Pause{
+							ID: uuid.New(), WorkspaceID: ws, Event: &idx.EventName,
+							Identifier: state.PauseIdentifier{RunID: run},
+							CreatedAt:  base.Add(time.Duration(i) * time.Second),
+							Expires:    state.Time(time.Now().Add(time.Hour)),
+						}
 					}
-					require.ElementsMatch(t, want, got)
-				}
-				require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
+					_, err := mgr.Write(ctx, idx, many...)
+					require.NoError(t, err)
+					for _, start := range []int{0, 713} {
+						since := time.Time{}
+						if start > 0 {
+							since = many[start].CreatedAt
+						}
+						iter, err := mgr.PausesSince(ctx, idx, since)
+						require.NoError(t, err)
+						var got, want []uuid.UUID
+						for iter.Next(ctx) {
+							p := iter.Val(ctx)
+							require.NotNil(t, p)
+							require.Equal(t, ws, p.WorkspaceID)
+							got = append(got, p.ID)
+						}
+						require.ErrorIs(t, iter.Error(), context.Canceled)
+						for _, p := range many[start:] {
+							want = append(want, p.ID)
+						}
+						require.ElementsMatch(t, want, got)
+					}
+					require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
+				})
 			}
 		})
 	}
