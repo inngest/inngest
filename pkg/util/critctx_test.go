@@ -119,15 +119,15 @@ func TestCrit(t *testing.T) {
 
 	t.Run("It should return context deadline error if execution exceeds expected duration", func(t *testing.T) {
 		ctx := context.Background()
-		var called bool
+		done := make(chan struct{})
+		defer func() { <-done }()
 
 		err := Crit(ctx, "long", func(ctx context.Context) error {
+			defer close(done)
 			<-time.After(1 * time.Second)
-			called = true
 			return nil
 		}, WithTimeout(100*time.Millisecond))
 
-		require.False(t, called)
 		require.Equal(t, ErrCritContextDeadlineExceeded, err)
 	})
 }
