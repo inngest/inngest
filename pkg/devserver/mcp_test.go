@@ -59,6 +59,7 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	require.Contains(t, names, "resume_function")
 	require.Contains(t, names, "list_events")
 	require.Contains(t, names, "get_event")
+	require.NotContains(t, names, "submit_feedback")
 	for method := range unsupportedDevServerMCPMethods {
 		// The dev server keeps its older send_event tool for eventIdSeed support.
 		if method == "SendEvent" {
