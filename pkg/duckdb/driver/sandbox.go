@@ -23,7 +23,7 @@ func (p *process) bootstrapSandboxLocked(ctx context.Context) error {
 	if !p.restrictExternalAccess {
 		return nil
 	}
-	stmts, err := sandboxStmts(p.duckLake)
+	stmts, err := sandboxStmts(p.iceberg)
 	if err != nil {
 		return err
 	}
@@ -31,9 +31,9 @@ func (p *process) bootstrapSandboxLocked(ctx context.Context) error {
 }
 
 // sandboxStmts builds the statements that turn off DuckDB's external access
-// for the rest of the subprocess's life, keeping only what the DuckLake
-// catalog itself needs reachable. Every setting involved is GLOBAL in DuckDB
-// (there is no per-connection scope), so this applies to every connection —
+// for the rest of the subprocess's life, keeping only what the Iceberg lake
+// itself needs reachable. Every setting involved is GLOBAL in DuckDB (there
+// is no per-connection scope), so this applies to every connection —
 // dual-write's included — not just Insights'. Verified against the real
 // binary:
 //
@@ -44,47 +44,31 @@ func (p *process) bootstrapSandboxLocked(ctx context.Context) error {
 //     running, and refuses any further change to allowed_directories/
 //     allowed_paths once it is off. So no later statement can widen it.
 //   - The database file's own temp directory is added to allowed_directories
-//     automatically, and an already-attached DuckDB/SQLite/Postgres catalog
-//     keeps working. DuckLake's DATA_PATH needs listing since DuckLake opens
-//     Parquet files under it on demand, and (since DuckDB v2.0.0) so does a
-//     quack catalog's endpoint, because the quack client's HTTP requests go
-//     through the same external access check.
-//   - NOTE: the sandbox does NOT isolate a quack catalog. Its endpoint has to
-//     be allowed and its secret stays registered, so SQL in this process can
-//     still ATTACH 'quack:<QuackCatalogAddr>' or quack_query() it w/ the
-//     catalog's credentials (the pre-v2.0.0 quack client skipped the
-//     external access check entirely, so this was already the case). Don't
-//     rely on it as the only barrier for untrusted SQL w/ a quack catalog.
-//   - lock_configuration is deliberately NOT set: DuckLake changes settings
-//     internally, so locking the configuration makes every DuckLake
-//     statement fail ("Failed to query most recent snapshot").
-func sandboxStmts(duckLake *DuckLakeOptions) ([]string, error) {
+//     automatically. The Iceberg REST calls go through the same check
+//     ("Cannot access http://127.0.0.1:.../v1/... - file system operations
+//     are disabled by configuration"), so the catalog URI is allowed as a
+//     directory prefix, and so is the warehouse's DataPath since data and
+//     metadata files are read/written on demand.
+//   - NOTE: the catalog's secret stays registered, so SQL in this process
+//     can still reach the catalog's REST API w/ its token (IE through the
+//     iceberg extension's own functions). The catalog only serves this
+//     warehouse, so that's no more than the lake attach can already do.
+//   - lock_configuration is deliberately NOT set: the iceberg extension
+//     changes settings internally.
+func sandboxStmts(iceberg *IcebergOptions) ([]string, error) {
 	var dirs []string
-	if duckLake != nil && duckLake.DataPath != "" {
-		abs, err := filepath.Abs(duckLake.DataPath)
-		if err != nil {
-			return nil, fmt.Errorf("duckdb: resolving DuckLake data path %q: %w", duckLake.DataPath, err)
-		}
-		dirs = append(dirs, strings.TrimSuffix(abs, string(filepath.Separator))+string(filepath.Separator))
-	}
-
-	var paths []string
-	if duckLake != nil && duckLake.QuackCatalogAddr != "" {
-		// The quack client picks http for loopback binds and https otherwise,
-		// so allow both.
-		for _, scheme := range []string{"http", "https"} {
-			paths = append(paths, scheme+"://"+duckLake.QuackCatalogAddr+"/quack")
+	if iceberg != nil {
+		dirs = append(dirs, strings.TrimSuffix(iceberg.URI, "/")+"/")
+		if iceberg.DataPath != "" {
+			abs, err := filepath.Abs(iceberg.DataPath)
+			if err != nil {
+				return nil, fmt.Errorf("duckdb: resolving Iceberg data path %q: %w", iceberg.DataPath, err)
+			}
+			dirs = append(dirs, strings.TrimSuffix(abs, string(filepath.Separator))+string(filepath.Separator))
 		}
 	}
 
 	var stmts []string
-	if len(paths) > 0 {
-		lit, err := encodeLiteral(paths)
-		if err != nil {
-			return nil, fmt.Errorf("duckdb: encoding allowed paths: %w", err)
-		}
-		stmts = append(stmts, fmt.Sprintf("SET allowed_paths=%s;", lit))
-	}
 	if len(dirs) > 0 {
 		lit, err := encodeLiteral(dirs)
 		if err != nil {

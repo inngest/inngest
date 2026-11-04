@@ -50,8 +50,8 @@ const (
 const defaultSessionWindow = 7 * 24 * time.Hour
 
 // latestRunOrder picks each run's latest lifecycle row, matching the
-// inngest.insights_runs macro's own QUALIFY (pkg/db/duckdb/migrations/
-// 000002_insights_views.sql): timestamps are ms precision so rows can tie
+// inngest_local.insights_runs macro's own QUALIFY (pkg/db/duckdb/migrations/
+// pkg/db/duckdb/views.sql): timestamps are ms precision so rows can tie
 // (a Queued and a Running row in the same ms), and the tiebreaks prefer the
 // furthest-along row (ended, then terminal > in-progress > queued status)
 // instead of whichever row happened to be inserted first.
@@ -90,7 +90,7 @@ func latestRunsCTE(scope Scope, args *[]any) string {
   FROM %s.runs
   WHERE account_id = ? AND env_id = ? AND queued_at BETWEEN ? AND ?
   QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id ORDER BY %s) = 1
-)`, driver.DuckLakeAlias, latestRunOrder)
+)`, driver.LakeAlias, latestRunOrder)
 }
 
 // escapeLikeSearch escapes a caller-supplied search string for embedding
@@ -140,7 +140,7 @@ SELECT session.key AS key, MIN(queued_at) AS created_at
 FROM %s.runs, UNNEST(sessions) AS s(session)%s
 GROUP BY session.key%s
 ORDER BY created_at DESC, key DESC
-LIMIT ?;`, driver.DuckLakeAlias, where, having)
+LIMIT ?;`, driver.LakeAlias, where, having)
 	args = append(args, resolveLimit(scope.Limit)+1)
 
 	return query, args, nil

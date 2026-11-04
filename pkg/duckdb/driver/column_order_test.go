@@ -26,7 +26,7 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	const query = "SELECT 1 AS zebra, 2 AS apple, 3 AS mango;"
 	want := []string{"zebra", "apple", "mango"}
 
-	jsonlinesProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, nil)
+	jsonlinesProc, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = jsonlinesProc.close(t.Context()) })
 	_, isJSONLines := jsonlinesProc.sess.(*jsonlines.Session)
@@ -37,7 +37,7 @@ func TestQuackAndJSONLinesReportTheSameColumnOrder(t *testing.T) {
 	require.Equal(t, want, jsonlinesCols)
 
 	quackAddr := EphemeralQuackAddr
-	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
+	quackProc, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 	_, isQuack := quackProc.sess.(*quack.Session)
@@ -67,7 +67,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	wantCols := []string{"n", "s", "ts"}
 	wantTypes := []string{"BIGINT", "VARCHAR", "TIMESTAMP WITH TIME ZONE"}
 
-	jsonlinesProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, nil)
+	jsonlinesProc, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = jsonlinesProc.close(t.Context()) })
 
@@ -78,7 +78,7 @@ func TestQuackAndJSONLinesReportTheSameColumnTypes(t *testing.T) {
 	require.Empty(t, jsonlinesRows, "query matches zero rows")
 
 	quackAddr := EphemeralQuackAddr
-	quackProc, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
+	quackProc, err := startProcessWithLake(t.Context(), binPath, ":memory:", nil, &quackAddr)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = quackProc.close(t.Context()) })
 

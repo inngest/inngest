@@ -58,10 +58,11 @@ const restartHealthTimeout = 10 * time.Second
 type process struct {
 	binaryPath string
 	dbFile     string
-	// duckLake is nil unless the caller opted into DuckLake (Options.DuckLake).
-	// When set, every freshly spawned subprocess is re-bootstrapped from it —
-	// see bootstrapDuckLakeLocked for why that has to happen per spawn.
-	duckLake  *DuckLakeOptions
+	// iceberg is nil unless the caller opted into an Iceberg lake
+	// (Options.Iceberg). When set, every freshly spawned subprocess is
+	// re-bootstrapped from it — see bootstrapIcebergLocked for why that has
+	// to happen per spawn.
+	iceberg   *IcebergOptions
 	quackAddr *string
 	// stateDir, when non-empty, isolates the subprocess's DuckDB extension
 	// cache and home directory under <stateDir>/duckdb — see
@@ -138,11 +139,11 @@ type process struct {
 // bounds the health check; the subprocess's own OS lifetime is governed by
 // the process-owned procCtx (see the process doc comment), not this ctx.
 func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, error) {
-	return startProcessWithDuckLake(ctx, binaryPath, dbFile, nil, nil)
+	return startProcessWithLake(ctx, binaryPath, dbFile, nil, nil)
 }
 
 // processOption configures optional per-spawn behavior beyond
-// startProcessWithDuckLake's required parameters — currently just state-dir
+// startProcessWithLake's required parameters — currently just state-dir
 // isolation (withStateDir). Added as a variadic functional option so the
 // many existing call sites (every test spawning a process directly) don't
 // need updating for a knob only Connector.Connect uses.
@@ -172,14 +173,14 @@ func withQuackServeToken(token string) processOption {
 	return func(p *process) { p.quackServeToken = token }
 }
 
-// startProcessWithDuckLake is startProcess with the opt-in DuckLake bootstrap.
-// duckLake may be nil, which is exactly the pre-DuckLake behaviour.
-func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, duckLake *DuckLakeOptions, quackAddr *string, opts ...processOption) (*process, error) {
+// startProcessWithLake is startProcess with the opt-in Iceberg lake
+// bootstrap. iceberg may be nil, which attaches no lake at all.
+func startProcessWithLake(ctx context.Context, binaryPath, dbFile string, iceberg *IcebergOptions, quackAddr *string, opts ...processOption) (*process, error) {
 	procCtx, procCancel := context.WithCancel(context.Background())
 	p := &process{
 		binaryPath: binaryPath,
 		dbFile:     dbFile,
-		duckLake:   duckLake,
+		iceberg:    iceberg,
 		quackAddr:  quackAddr,
 		procCtx:    procCtx,
 		procCancel: procCancel,
@@ -189,8 +190,8 @@ func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, du
 		opt(p)
 	}
 	p.redactor.add(p.quackServeToken)
-	if duckLake != nil {
-		p.redactor.add(duckLake.PostgresCatalogURI, duckLake.QuackCatalogToken)
+	if iceberg != nil {
+		p.redactor.add(iceberg.Token)
 	}
 
 	p.mu.Lock()
@@ -298,10 +299,10 @@ func (p *process) healthCheck(ctx context.Context) error {
 
 // initSessionLocked assumes mu is already held. It runs everything a *freshly
 // spawned* subprocess needs before it can be handed to a caller: prove it can
-// round-trip a query, then re-establish any DuckLake attachment.
+// round-trip a query, then re-establish any lake attachment.
 //
 // Both are per-spawn concerns, which is why they are paired here and why both
-// spawn paths (startProcessWithDuckLake and restartLocked) go through this one
+// spawn paths (startProcessWithLake and restartLocked) go through this one
 // function — a crash-triggered restart that only health-checked would come
 // back looking perfectly healthy with no lake catalog attached at all.
 //
@@ -326,7 +327,7 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 		return err
 	}
 
-	if err := p.bootstrapDuckLakeLocked(ctx); err != nil {
+	if err := p.bootstrapIcebergLocked(ctx); err != nil {
 		return err
 	}
 
@@ -579,9 +580,9 @@ func (p *process) bootstrapTimeZoneLocked(ctx context.Context) error {
 // state from the ambient HOME by default, which would otherwise be shared
 // (and potentially polluted) across every instance running on a machine.
 // Pointing both at <stateDir>/duckdb isolates that state the same way
-// Options.DBFile/DuckLakeOptions already isolate the catalog and lake data.
+// Options.DBFile/IcebergOptions already isolate the catalog and lake data.
 //
-// This must run before bootstrapDuckLakeLocked/startQuackLocked's INSTALL
+// This must run before bootstrapIcebergLocked/startQuackLocked's INSTALL
 // statements below, on every spawn (initial start and crash-triggered
 // restart alike, since a fresh subprocess starts with none of this set), so
 // those installs land in the isolated directory rather than DuckDB's
@@ -619,213 +620,94 @@ func (p *process) bootstrapStateDirLocked(ctx context.Context) error {
 	return p.bootstrapExecLocked(ctx, "state dir", stmts)
 }
 
-// bootstrapDuckLakeLocked assumes mu is already held. It is a no-op unless the
-// caller opted into DuckLake, so every existing caller is unaffected.
+// bootstrapIcebergLocked assumes mu is already held. It is a no-op unless
+// the caller opted into an Iceberg lake.
 //
 // A duckdb subprocess starts with a completely fresh, unattached session every
 // single time it spawns: extensions it loaded are gone, and so is the ATTACHed
-// lake catalog. Nothing about the DuckLake state is carried in the main
-// database file, so this must run after *every* spawn — initial start and
+// lake catalog. Nothing about the lake attach is carried in the main database
+// file, so this must run after *every* spawn — initial start and
 // crash-triggered restart alike — or a restarted subprocess would pass its
-// health check and then fail every lake.* statement with a Catalog Error.
-//
-// The statements are the verified DuckLake sequence:
-//
-//	INSTALL ducklake;                            -- no-op once cached
-//	LOAD ducklake;
-//	ATTACH IF NOT EXISTS 'ducklake:<catalog>' AS lake (DATA_PATH '<data>/', DATA_INLINING_ROW_LIMIT 1000);
-//
-// None of the three produce any output on the merged stdout+stderr stream when
-// they succeed (verified against duckdb v1.5.5 over this exact transport), so
-// they neither add phantom rows to session.exec's result nor emit anything that
-// reportDiagnostics could misclassify as an error. Failures do print the usual
-// "<Kind> Error: " diagnostics, which session.exec turns into
-// result.ErrStatementFailed — surfaced here as a real error, never swallowed.
-//
-// IF NOT EXISTS makes the ATTACH idempotent so a re-bootstrap of a session
-// that already has the catalog is harmless rather than a hard Binder Error.
-func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
-	if p.duckLake == nil {
+// health check and then fail every inngest.* statement with a Catalog Error.
+func (p *process) bootstrapIcebergLocked(ctx context.Context) error {
+	if p.iceberg == nil {
 		return nil
 	}
-	opts := *p.duckLake
-
-	stmts, err := duckLakeBootstrapStmts(opts, p.localExtensionPaths)
+	stmts, err := icebergBootstrapStmts(*p.iceberg, p.localExtensionPaths)
 	if err != nil {
 		return err
 	}
-
-	// DuckLake requires the data directory to exist before ATTACH runs.
-	// MkdirAll is idempotent, so re-running it on every respawn is free.
-	if err := os.MkdirAll(opts.DataPath, 0o755); err != nil {
-		return fmt.Errorf("duckdb: creating DuckLake data path %q: %w", opts.DataPath, err)
-	}
-
-	return p.bootstrapExecLocked(ctx, "DuckLake", stmts)
+	return p.bootstrapExecLocked(ctx, "Iceberg", stmts)
 }
 
-// duckLakeBootstrapStmts builds the SQL statement sequence
-// bootstrapDuckLakeLocked runs to attach a DuckLake catalog, and validates
-// opts up front. It is a pure function (no I/O, no subprocess) precisely so
-// this validation and statement construction — including the postgres-catalog
-// forced inlining override below — can be unit tested without a live duckdb
-// subprocess or a real Postgres server.
+// icebergBootstrapStmts builds the statements bootstrapIcebergLocked runs to
+// attach an Iceberg REST catalog as LakeAlias, and validates opts up front.
+// It is a pure function (no I/O, no subprocess) so it can be unit tested
+// w/o a live duckdb subprocess or catalog.
 //
-// Exactly one of CatalogPath (a local DuckLake catalog file),
-// PostgresCatalogURI (an external Postgres database holding the catalog
-// metadata), or SQLiteCatalogPath (a local SQLite catalog file) is required;
-// DataPath is always required, since Parquet data files stay on local disk
-// in every mode.
+// An Iceberg catalog has no default schema, so `inngest.<table>` only
+// resolves w/ ATTACH's DEFAULT_SCHEMA, which in turn fails unless that
+// namespace already exists. So this attaches once w/o it, creates
+// LakeNamespace if missing, and re-attaches w/ it.
 //
-// localExtensionPaths overrides how the ducklake/postgres extensions are
-// loaded — see installOrLoadStmts and Options.LocalExtensionPaths. Nil
-// behaves exactly like the ordinary name-based INSTALL/LOAD.
-func duckLakeBootstrapStmts(opts DuckLakeOptions, localExtensionPaths map[string]string) ([]string, error) {
-	usingPostgres := opts.PostgresCatalogURI != ""
-	usingSQLite := opts.SQLiteCatalogPath != ""
-	usingQuack := opts.QuackCatalogAddr != ""
-	catalogSourcesSet := 0
-	for _, set := range []bool{opts.CatalogPath != "", usingPostgres, usingSQLite, usingQuack} {
-		if set {
-			catalogSourcesSet++
-		}
+// Verified against the pinned v2.0.0 CLI (see
+// pkg/duckdb/icebergcatalog/smoke_test.go): `ENDPOINT` still works but
+// warns that it's deprecated in favor of `URI`, httpfs is needed for the
+// REST calls, and a TOKEN secret sends `Authorization: Bearer <token>`.
+func icebergBootstrapStmts(opts IcebergOptions, localExtensionPaths map[string]string) ([]string, error) {
+	if opts.URI == "" {
+		return nil, fmt.Errorf("duckdb: Iceberg enabled but URI is empty")
 	}
-	if catalogSourcesSet > 1 {
-		return nil, fmt.Errorf("duckdb: DuckLake enabled with more than one of CatalogPath/PostgresCatalogURI/SQLiteCatalogPath/QuackCatalogAddr set; exactly one catalog source is required")
-	}
-	if catalogSourcesSet == 0 {
-		return nil, fmt.Errorf("duckdb: DuckLake enabled but CatalogPath is empty")
-	}
-	if opts.DataPath == "" {
-		return nil, fmt.Errorf("duckdb: DuckLake enabled but DataPath is empty")
-	}
-	if usingQuack && opts.QuackCatalogToken == "" {
-		return nil, fmt.Errorf("duckdb: DuckLake enabled with QuackCatalogAddr but QuackCatalogToken is empty")
-	}
-
-	// DATA_PATH is interpreted as a directory only when it ends in a
-	// separator; the paths themselves are quoted through the same escaping the
-	// literal encoder uses, since this transport has no parameter binding.
-	catalogTarget := "ducklake:" + opts.CatalogPath
-	switch {
-	case usingPostgres:
-		catalogTarget = "ducklake:postgres:" + opts.PostgresCatalogURI
-	case usingSQLite:
-		catalogTarget = "ducklake:sqlite:" + opts.SQLiteCatalogPath
-	case usingQuack:
-		catalogTarget = "ducklake:quack:" + opts.QuackCatalogAddr
-	}
-	catalogLiteral, err := encodeLiteral(catalogTarget)
-	if err != nil {
-		return nil, fmt.Errorf("duckdb: encoding DuckLake catalog target: %w", err)
-	}
-	dataLiteral, err := encodeLiteral(strings.TrimSuffix(opts.DataPath, "/") + "/")
-	if err != nil {
-		return nil, fmt.Errorf("duckdb: encoding DuckLake data path: %w", err)
-	}
-
-	rowLimit := opts.DataInliningRowLimit
-	switch {
-	case rowLimit == 0:
-		rowLimit = DefaultDataInliningRowLimit
-	case rowLimit < 0:
-		// A negative value means "explicitly disable inlining" — distinct
-		// from the zero value, which means "unset, use the default". See
-		// DataInliningRowLimit's doc comment.
-		rowLimit = 0
+	if opts.Warehouse == "" {
+		return nil, fmt.Errorf("duckdb: Iceberg enabled but Warehouse is empty")
 	}
 
 	var stmts []string
-	switch {
-	case usingPostgres:
-		// DuckLake's postgres catalog backend depends on the postgres
-		// extension to talk to the metadata database; install/load it before
-		// ducklake so the ATTACH below can actually reach it.
-		postgresStmts, err := installOrLoadStmts("postgres", localExtensionPaths)
+	for _, ext := range []string{"httpfs", "iceberg"} {
+		s, err := installOrLoadStmts(ext, localExtensionPaths)
 		if err != nil {
 			return nil, err
 		}
-		stmts = append(stmts, postgresStmts...)
-	case usingSQLite:
-		// Same reasoning, against the sqlite extension instead.
-		sqliteStmts, err := installOrLoadStmts("sqlite", localExtensionPaths)
-		if err != nil {
-			return nil, err
-		}
-		stmts = append(stmts, sqliteStmts...)
-	case usingQuack:
-		// httpfs is a prerequisite for the same reason startQuackLocked
-		// loads it before quack_serve on a self-built binary: a real crypto
-		// engine for the ATTACH itself, confirmed by a real "Extension
-		// Autoloading Error: ... required extension 'httpfs" failure
-		// attaching against a self-built duckdb without it. Only relevant
-		// via LocalExtensionPaths (a self-built binary); an ordinary
-		// published DuckDB build already has a real crypto engine
-		// registered without it, exactly as startQuackLocked's own comment
-		// on this describes.
-		if httpfsPath, ok := localExtensionPaths["httpfs"]; ok && httpfsPath != "" {
-			httpfsStmts, err := installOrLoadStmts("httpfs", localExtensionPaths)
-			if err != nil {
-				return nil, err
-			}
-			stmts = append(stmts, httpfsStmts...)
-		}
-		// Same reasoning as postgres/sqlite above, against the quack
-		// extension instead — this process needs it loaded to act as a
-		// quack *client* attaching to QuackCatalogAddr's listener, the same
-		// requirement any other quack client has (this driver's own
-		// data-plane QuackAppender included).
-		quackStmts, err := installOrLoadStmts("quack", localExtensionPaths)
-		if err != nil {
-			return nil, err
-		}
-		stmts = append(stmts, quackStmts...)
+		stmts = append(stmts, s...)
 	}
-	ducklakeStmts, err := installOrLoadStmts("ducklake", localExtensionPaths)
+
+	uriLit, err := encodeLiteral(strings.TrimSuffix(opts.URI, "/"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("duckdb: encoding Iceberg URI: %w", err)
 	}
-	stmts = append(stmts, ducklakeStmts...)
-
-	if usingQuack {
-		// Authenticates this process as a quack client of QuackCatalogAddr's
-		// listener before the ATTACH below needs to reach it — SCOPE alone
-		// (no explicit SECRET name on the ATTACH itself) is enough for quack
-		// to resolve which secret to use, confirmed against a real
-		// quack_serve listener. CREATE OR REPLACE so a crash-triggered
-		// subprocess restart re-bootstrapping this same sequence doesn't
-		// fail on an "already exists" error.
-		scopeLiteral, err := encodeLiteral("quack:" + opts.QuackCatalogAddr)
-		if err != nil {
-			return nil, fmt.Errorf("duckdb: encoding DuckLake quack catalog scope: %w", err)
-		}
-		tokenLiteral, err := encodeLiteral(opts.QuackCatalogToken)
-		if err != nil {
-			return nil, fmt.Errorf("duckdb: encoding DuckLake quack catalog token: %w", err)
-		}
-		stmts = append(stmts, fmt.Sprintf(
-			"CREATE OR REPLACE SECRET ducklake_quack_catalog (TYPE quack, TOKEN %s, SCOPE %s);",
-			tokenLiteral, scopeLiteral,
-		))
+	whLit, err := encodeLiteral(opts.Warehouse)
+	if err != nil {
+		return nil, fmt.Errorf("duckdb: encoding Iceberg warehouse: %w", err)
+	}
+	nsLit, err := encodeLiteral(LakeNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("duckdb: encoding Iceberg namespace: %w", err)
 	}
 
-	attachOpts := fmt.Sprintf("DATA_PATH %s, DATA_INLINING_ROW_LIMIT %d", dataLiteral, rowLimit)
-	if opts.MetadataSchema != "" {
-		schemaLiteral, err := encodeLiteral(opts.MetadataSchema)
+	attachOpts := "TYPE iceberg, URI " + uriLit
+	if opts.Token != "" {
+		tokenLit, err := encodeLiteral(opts.Token)
 		if err != nil {
-			return nil, fmt.Errorf("duckdb: encoding DuckLake metadata schema: %w", err)
+			return nil, fmt.Errorf("duckdb: encoding Iceberg token: %w", err)
 		}
-		attachOpts += ", METADATA_SCHEMA " + schemaLiteral
+		// CREATE OR REPLACE so a crash-triggered restart re-running this
+		// doesn't fail on "already exists".
+		stmts = append(stmts, fmt.Sprintf("CREATE OR REPLACE SECRET %s (TYPE iceberg, TOKEN %s);", icebergSecretName, tokenLit))
+		attachOpts += ", SECRET " + icebergSecretName
+	} else {
+		attachOpts += ", AUTHORIZATION_TYPE 'none'"
 	}
-	stmts = append(stmts,
-		// DATA_INLINING_ROW_LIMIT keeps small writes (dual-write's batched
-		// flushes, cmd/duckdbseed's batched inserts) stored directly in the
-		// catalog instead of each becoming its own tiny Parquet file — see
-		// DuckLakeOptions.DataInliningRowLimit's doc comment.
-		fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (%s);", catalogLiteral, DuckLakeAlias, attachOpts),
-	)
-	return stmts, nil
+
+	return append(stmts,
+		fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (%s);", whLit, LakeAlias, attachOpts),
+		fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s.%s;", LakeAlias, LakeNamespace),
+		fmt.Sprintf("DETACH %s;", LakeAlias),
+		fmt.Sprintf("ATTACH %s AS %s (%s, DEFAULT_SCHEMA %s);", whLit, LakeAlias, attachOpts, nsLit),
+	), nil
 }
+
+// icebergSecretName is the duckdb secret holding the catalog's bearer token.
+const icebergSecretName = "inngest_iceberg"
 
 // installOrLoadStmts returns the statements that make extName available in
 // the current session: ordinarily the name-based "INSTALL x; LOAD x;" pair,
@@ -850,7 +732,7 @@ func installOrLoadStmts(extName string, localExtensionPaths map[string]string) (
 
 // restartLocked assumes mu is already held. It closes the current
 // subprocess, spawns a fresh one, and re-initializes it (health check plus any
-// DuckLake bootstrap) before declaring the restart successful — a
+// lake bootstrap) before declaring the restart successful — a
 // respawned-but-unresponsive, or respawned-but-unattached, process is treated
 // the same as a failed restart.
 func (p *process) restartLocked(ctx context.Context) error {
@@ -1162,120 +1044,37 @@ func (p *process) close(ctx context.Context) error {
 // process to claim it.
 const EphemeralQuackAddr = "127.0.0.1:0"
 
-// DuckLakeAlias is the catalog name the DuckLake bootstrap attaches under, so
-// callers address DuckLake-backed tables as inngest.<table>. It is fixed for this
-// POC; making it configurable is future work.
-const DuckLakeAlias = "inngest"
+// LakeAlias is the catalog name the lake attaches under, so callers address
+// lake tables as inngest.<table>. W/o a lake (the in-memory mode) it's a
+// plain schema of the same name, so the same names work either way.
+const LakeAlias = "inngest"
 
-// DuckLakeOptions opts a process into DuckLake. pkg/devserver's
-// setupDualWrite sets it for a persisted (--persist) dual-write catalog.
-//
-// CatalogPath/DataPath (or PostgresCatalogURI/DataPath, or
-// SQLiteCatalogPath/DataPath) are required when this struct is used.
-// Presence of the struct itself is the enable switch (Options.DuckLake ==
-// nil means "disabled, behave exactly as before"), so there is no separate
-// boolean to keep in sync.
-type DuckLakeOptions struct {
-	// CatalogPath is the path to the DuckLake metadata catalog file, attached
-	// as 'ducklake:<CatalogPath>'. It is created by DuckDB on first attach and
-	// is distinct from Options.DBFile: the main database can be ":memory:"
-	// while the lake still persists to disk.
-	//
-	// Mutually exclusive with PostgresCatalogURI and SQLiteCatalogPath —
-	// exactly one catalog source is required.
-	CatalogPath string
-	// PostgresCatalogURI, when set, attaches the DuckLake catalog against a
-	// Postgres database instead of a local catalog file: 'ducklake:postgres:
-	// <PostgresCatalogURI>'. Parquet data still lands under DataPath on local
-	// disk in this mode — only the catalog metadata moves to Postgres.
-	//
-	// Mutually exclusive with CatalogPath and SQLiteCatalogPath — exactly one
-	// catalog source is required. Inlining is on by default like every other
-	// catalog (ducklake#1175, which corrupted inlined JSON rows on a postgres
-	// catalog, is fixed as of the DuckDB v2.0.0 pin).
-	PostgresCatalogURI string
-	// SQLiteCatalogPath, when set, attaches the DuckLake catalog against a
-	// SQLite database file instead of a local DuckDB catalog file:
-	// 'ducklake:sqlite:<SQLiteCatalogPath>'. Like CatalogPath, it is created
-	// on first attach; unlike PostgresCatalogURI, it needs no external
-	// server, since the catalog file itself is the whole "server". Parquet
-	// data still lands under DataPath on local disk in this mode — only the
-	// catalog metadata moves to a SQLite file instead of a DuckDB one.
-	//
-	// Mutually exclusive with CatalogPath, PostgresCatalogURI, and
-	// QuackCatalogAddr — exactly one catalog source is required. DuckLake's
-	// SQLite metadata manager never had an equivalent of ducklake#1175 (JSON
-	// isn't in its TypeIsNativelySupported/SupportsInlining exclusion list —
-	// only FLOAT/DOUBLE/TIMESTAMP_TZ/STRUCT/MAP/LIST/VARIANT are).
-	SQLiteCatalogPath string
-	// QuackCatalogAddr, when set, attaches the DuckLake catalog against a
-	// remote DuckDB instance over the quack wire protocol instead of a local
-	// catalog file, Postgres, or SQLite: 'ducklake:quack:<QuackCatalogAddr>'
-	// (host:port, no "quack:" prefix — that's added here, matching
-	// Options.QuackAddr's own convention). DuckLake ships this as a first-
-	// class metadata backend (QuackMetadataManager, registered as "quack"/
-	// "quack_scanner") — including an optional server-side commit fast path
-	// (FlushChangesServerSide) when the remote instance also has the
-	// ducklake extension loaded, though that's not required for correctness:
-	// confirmed working (falling back to an ordinary client-driven commit)
-	// against a remote instance with only the quack extension loaded.
-	//
-	// The remote instance is expected to already be listening (e.g. another
-	// Options.QuackAddr-configured Open call, possibly this same process's
-	// own — nothing prevents a self-referential attach) with
-	// QuackCatalogToken as its quack_serve auth token; this driver does not
-	// spawn or manage that process. A DuckLake attach needs to authenticate
-	// as a client to it (CREATE SECRET ... SCOPE 'quack:<QuackCatalogAddr>'
-	// before ATTACH), which is exactly the same relationship any other quack
-	// client (including this driver's own data-plane QuackAppender) has to
-	// a quack listener — this just happens to be DuckLake attaching to one
-	// as its metadata store instead of this driver's Go client attaching to
-	// one for data.
-	//
-	// Mutually exclusive with CatalogPath, PostgresCatalogURI, and
-	// SQLiteCatalogPath — exactly one catalog source is required. Like
-	// SQLiteCatalogPath, does not force DataInliningRowLimit off: the remote
-	// instance is an ordinary DuckDB database with no restricted type
-	// support to work around.
-	QuackCatalogAddr string
-	// QuackCatalogToken is the auth token QuackCatalogAddr's listener was
-	// started with (its quack_serve token) — required whenever
-	// QuackCatalogAddr is set, since the CREATE SECRET this driver issues
-	// before ATTACH has nothing to authenticate with otherwise.
-	QuackCatalogToken string
-	// MetadataSchema, when non-empty, adds a METADATA_SCHEMA clause to the
-	// ATTACH statement, scoping the catalog's tables to that schema instead
-	// of DuckLake's own default. Only meaningful alongside
-	// PostgresCatalogURI: unlike a file catalog (already isolated per
-	// CatalogPath) or a SQLite one (already isolated per SQLiteCatalogPath),
-	// every attach against the same Postgres database otherwise shares one
-	// namespace, so repeated/parallel runs against a long-lived Postgres
-	// instance (tests, benchmarks) need a distinct schema each to avoid
-	// colliding on each other's tables and DATA_PATH. Leave empty to use
-	// DuckLake's own default schema.
-	MetadataSchema string
-	// DataPath is the directory DuckLake writes its Parquet data files into.
-	// It is created (os.MkdirAll) before ATTACH runs, because DuckLake
-	// requires it to exist. A trailing separator is added if absent, since
-	// DuckLake only treats DATA_PATH as a directory when it ends in one.
+// LakeNamespace is the Iceberg namespace the lake tables live in, attached
+// as LakeAlias's default schema (so inngest.<table> is
+// inngest.<LakeNamespace>.<table>).
+const LakeNamespace = "main"
+
+// IcebergOptions opts a process into an Iceberg lake: an Iceberg REST
+// catalog attached as LakeAlias. Locally that's pkg/duckdb/icebergcatalog
+// (an embedded catalog on 127.0.0.1), but any REST catalog w/ a static
+// token works the same. Presence of the struct is the enable switch
+// (Options.Iceberg == nil means no lake).
+type IcebergOptions struct {
+	// URI is the REST catalog base URL, e.g. `http://127.0.0.1:41234` (no
+	// `/v1`).
+	URI string
+	// Warehouse is the ATTACH target, which duckdb sends as
+	// `GET /v1/config?warehouse=<Warehouse>`. The embedded catalog ignores
+	// it, a multi-warehouse catalog (Lakekeeper) uses it to pick one.
+	Warehouse string
+	// Token is a static bearer token. Empty attaches w/
+	// AUTHORIZATION_TYPE 'none'.
+	Token string
+	// DataPath is the warehouse's local directory when it's on local disk,
+	// which the sandbox has to allow (see sandboxStmts). Empty for a
+	// remote warehouse.
 	DataPath string
-	// DataInliningRowLimit sets DuckLake's DATA_INLINING_ROW_LIMIT: writes
-	// at or below this many rows stay stored directly in the catalog
-	// instead of each becoming its own Parquet file — verified empirically
-	// (ducklake_test.go's TestDuckLakeInlinesSmallInsertsUpToRowLimit):
-	// without any limit, five separate 200-row inserts produce five Parquet
-	// files; with it set high enough, the same rows stay fully inlined.
-	// Leave at the zero value to use DefaultDataInliningRowLimit. Set to a
-	// negative value to disable inlining entirely (DATA_INLINING_ROW_LIMIT
-	// 0) — the zero value itself can't mean that, since it already means
-	// "unset" for every caller that doesn't set this field at all.
-	DataInliningRowLimit int
 }
-
-// DefaultDataInliningRowLimit is the DATA_INLINING_ROW_LIMIT
-// bootstrapDuckLakeLocked uses when DuckLakeOptions.DataInliningRowLimit is
-// left at its zero value.
-const DefaultDataInliningRowLimit = 1000
 
 // Options configures Open.
 type Options struct {
@@ -1294,13 +1093,12 @@ type Options struct {
 	StateDir string
 	// DBFile is the path to the .duckdb catalog file, or ":memory:".
 	DBFile string
-	// DuckLake, when non-nil, installs and loads the ducklake extension and
-	// attaches a DuckLake catalog as DuckLakeAlias after every successful
+	// Iceberg, when non-nil, installs and loads the iceberg extension and
+	// attaches an Iceberg REST catalog as LakeAlias after every successful
 	// health check of a freshly spawned subprocess — including the respawn
 	// after a crash, since a new subprocess starts with an unattached session.
-	// Leave nil (the zero value) to disable DuckLake entirely; that path is
-	// byte-for-byte the previous behaviour.
-	DuckLake *DuckLakeOptions
+	// Leave nil (the zero value) for no lake.
+	Iceberg *IcebergOptions
 
 	// QuackAddr, when non-nil, starts a quack listener on the given address
 	// after every successful health check of a freshly spawned subprocess.
@@ -1317,10 +1115,8 @@ type Options struct {
 	// every quack session this driver opens against its own listener
 	// (openQuackConn, currentQuackSession) already has it in memory. A fixed
 	// token is only needed when some other process must independently know
-	// it in advance to attach as a client — e.g. a second Open call's
-	// DuckLakeOptions.QuackCatalogAddr/QuackCatalogToken, attaching a
-	// DuckLake catalog against this listener as its remote metadata store.
-	// Leave empty for the ordinary random-token behavior.
+	// it in advance to attach as a client (IE another process ATTACHing
+	// 'quack:<addr>'). Leave empty for the ordinary random-token behavior.
 	QuackServeToken string
 
 	// QuackConns, when greater than 1, allows Open's *sql.DB to hand out up
@@ -1341,8 +1137,8 @@ type Options struct {
 	// commit (e.g. one with an upstream fix not yet published to the
 	// extension repository under any resolvable name/version).
 	AllowUnsignedExtensions bool
-	// LocalExtensionPaths maps an extension name (e.g. "ducklake",
-	// "postgres", "quack") to a local .duckdb_extension file to LOAD
+	// LocalExtensionPaths maps an extension name (e.g. "iceberg",
+	// "httpfs", "quack") to a local .duckdb_extension file to LOAD
 	// directly, instead of the ordinary INSTALL/LOAD-by-name pair that
 	// resolves against DuckDB's extension repository — see
 	// installOrLoadStmts. Useful only alongside a BinaryPath pointing at a
@@ -1352,9 +1148,8 @@ type Options struct {
 	// resolution used everywhere in production.
 	//
 	// For an extension statically linked into that binary (no separate
-	// file — DuckLake's own build does this for "ducklake" itself), set
-	// its value to just the extension's bare name (e.g. "ducklake":
-	// "ducklake") rather than a path: LOAD accepts a quoted bare name
+	// file), set its value to just the extension's bare name (e.g.
+	// "iceberg": "iceberg") rather than a path: LOAD accepts a quoted bare name
 	// identically to the unquoted form, so this still resolves via the
 	// already-linked-in extension. It only matters here because it skips
 	// the plain INSTALL/LOAD pair's INSTALL statement, which always hits
@@ -1372,7 +1167,8 @@ type Options struct {
 
 	// RestrictExternalAccess, when true, turns off DuckDB's external access
 	// (enable_external_access=false) once every spawn's bootstrap is done,
-	// leaving only DuckLake's DataPath reachable (see sandboxStmts). Set it
+	// leaving only the Iceberg catalog URI and warehouse DataPath reachable
+	// (see sandboxStmts). Set it
 	// whenever the *sql.DB also runs user-supplied SQL (Insights), as
 	// defense in depth: a query that slips past the caller's own validation
 	// still can't read files (read_text, read_csv, glob), environment
@@ -1434,7 +1230,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			}
 			binPath = resolved
 		}
-		p, err := startProcessWithDuckLake(ctx, binPath, c.opts.DBFile, c.opts.DuckLake, c.opts.QuackAddr,
+		p, err := startProcessWithLake(ctx, binPath, c.opts.DBFile, c.opts.Iceberg, c.opts.QuackAddr,
 			withStateDir(c.opts.StateDir),
 			withAllowUnsignedExtensions(c.opts.AllowUnsignedExtensions),
 			withLocalExtensionPaths(c.opts.LocalExtensionPaths),

@@ -75,7 +75,7 @@ func (e *redactedError) Is(target error) bool { return errors.Is(e.cause, target
 
 // stmtSummary returns the leading keywords of a bootstrap statement (e.g.
 // "INSTALL quack", "CALL quack_serve", "ATTACH IF NOT EXISTS",
-// "CREATE OR REPLACE SECRET ducklake_quack_catalog") without any of its
+// "CREATE OR REPLACE SECRET inngest_iceberg") without any of its
 // literals, so a failure can say which step failed without formatting a
 // token or connection string into the error.
 func stmtSummary(stmt string) string {
