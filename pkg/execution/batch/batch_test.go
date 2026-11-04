@@ -390,7 +390,8 @@ func TestBatchByteTallyWithLegacyWriters(t *testing.T) {
 			require.NotEqual(t, id.String(), next)
 			// The tally shares metadata's lifetime; deletion must not affect the
 			// next batch or leave accounting that carries into it.
-			require.NoError(t, bm.DeleteKeys(ctx, fn.ID, id))
+			_, err = bm.DeleteKeys(ctx, uuid.Nil, fn.ID, id)
+			require.NoError(t, err)
 			require.False(t, r.Exists(key))
 			require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(ctx, fn.ID, id)))
 			fresh := items[0]
@@ -573,7 +574,7 @@ func TestBatchCleanup(t *testing.T) {
 	// Per-event idempotence key exists instead of a single sorted set
 	require.Equal(t, 4, len(r.Keys()))
 
-	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
+	_, err = bm.DeleteKeys(context.Background(), uuid.Nil, fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
@@ -964,12 +965,17 @@ func TestDeleteKeysRecordsResidency(t *testing.T) {
 	require.NoError(t, err)
 	r.HSet(metadataKey, "status", enums.BatchStatusPending.String())
 
-	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	existed, err := bm.DeleteKeys(ctx, uuid.Nil, functionID, batchID)
+	require.NoError(t, err)
+	require.True(t, existed)
 	require.Len(t, recorder.deletes, 1)
 	require.InDelta(t, (2 * time.Minute).Milliseconds(), recorder.deletes[0].residencyDuration.Milliseconds(), 2_000)
 
-	// Idempotent retries do not record removal or residency a second time.
-	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	// Idempotent retries report the batch gone and do not record removal or
+	// residency a second time.
+	existed, err = bm.DeleteKeys(ctx, uuid.Nil, functionID, batchID)
+	require.NoError(t, err)
+	require.False(t, existed)
 	require.Len(t, recorder.deletes, 1)
 }
 
@@ -1018,7 +1024,7 @@ func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
 	require.Equal(t, 4, len(r.Keys()))
 
 	// DeleteKeys removes batch list and metadata but not the per-event idem key (it has its own TTL).
-	err = bm.DeleteKeys(context.Background(), fnId, ulid.MustParse(res.BatchID))
+	_, err = bm.DeleteKeys(context.Background(), uuid.Nil, fnId, ulid.MustParse(res.BatchID))
 	require.NoError(t, err)
 	require.False(t, r.Exists(bc.KeyGenerator().Batch(context.Background(), fnId, ulid.MustParse(res.BatchID))))
 	require.False(t, r.Exists(bc.KeyGenerator().BatchMetadata(context.Background(), fnId, ulid.MustParse(res.BatchID))))
