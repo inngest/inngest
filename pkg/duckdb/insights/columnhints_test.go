@@ -18,6 +18,11 @@ func TestBuildColumnHintsBareColumn(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT run_id FROM runs"))
 }
 
+func TestBuildColumnHintsCollate(t *testing.T) {
+	require.Equal(t, []ColumnHint{HintRunID, HintRunID, HintAppID, HintRunID},
+		hintsFor(t, `SELECT run_id COLLATE nocase, run_id COLLATE nocase COLLATE "nocase.noaccent" AS r, runs.app_id COLLATE nocase, defer_parent_run_ids[1] COLLATE nocase FROM runs`))
+}
+
 func TestBuildColumnHintsQualifiedColumn(t *testing.T) {
 	require.Equal(t, []ColumnHint{HintAppID}, hintsFor(t, "SELECT runs.app_id FROM runs"))
 }
@@ -588,4 +593,99 @@ func TestBuildColumnHintsEventIDsExplicitHintUnnest(t *testing.T) {
 func TestBuildColumnHintsEventIDsExplicitHintSingleIndex(t *testing.T) {
 	hints := hintsFor(t, "SELECT event_ids[1] FROM runs")
 	require.Equal(t, []ColumnHint{HintEventID}, hints)
+}
+
+// A qualified EXCLUDE entry only drops that table's own copy of the column.
+func TestBuildColumnHintsStarExcludeQualified(t *testing.T) {
+	require.Equal(t,
+		[]ColumnHint{HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintRunID, HintNone, HintAppID, HintFunctionID, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone, HintNone},
+		hintsFor(t, "SELECT * EXCLUDE (m.run_id) FROM metadata m JOIN extended_trace_spans e ON m.run_id = e.run_id"),
+	)
+}
+
+// DuckDB projects a USING/NATURAL join's merged columns once, at the left
+// copy's position (checked against a real duckdb's DESCRIBE), so the
+// right side's hints must shift left accordingly.
+func TestBuildColumnHintsStarOverUsingAndNaturalJoins(t *testing.T) {
+	n := HintNone
+	// metadata (9 columns) + extended_trace_spans minus run_id/span_id.
+	using := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n, n, HintAppID, HintFunctionID, n, n, n, n, n, n, n, n}
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata JOIN extended_trace_spans USING (run_id, span_id)"))
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata LEFT JOIN extended_trace_spans USING (span_id, run_id)"))
+	require.Equal(t, using, hintsFor(t, "SELECT * FROM metadata FULL OUTER JOIN extended_trace_spans USING (run_id, span_id)"))
+
+	// NATURAL merges every shared column: run_id, run_queued_at, span_id,
+	// inngest, metadata.
+	natural := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n, HintAppID, HintFunctionID, n, n, n, n, n, n}
+	require.Equal(t, natural, hintsFor(t, "SELECT * FROM metadata NATURAL JOIN extended_trace_spans"))
+	require.Equal(t, natural, hintsFor(t, "SELECT * FROM metadata m NATURAL FULL JOIN extended_trace_spans e"))
+
+	// Excluding the left copy moves the merged column to the right copy's
+	// position instead of dropping it.
+	require.Equal(t,
+		[]ColumnHint{n, n, n, n, n, n, n, n, HintRunID, n, HintAppID, HintFunctionID, n, n, n, n, n, n, n, n, n},
+		hintsFor(t, "SELECT * EXCLUDE (m.run_id) FROM metadata m JOIN extended_trace_spans e USING (run_id)"))
+
+	// "t.*" is never merged.
+	require.Len(t, hintsFor(t, "SELECT e.* FROM metadata m JOIN extended_trace_spans e USING (run_id)"), 13)
+}
+
+func TestBuildColumnHintsStarOverSemiAntiJoin(t *testing.T) {
+	n := HintNone
+	metadata := []ColumnHint{HintRunID, n, n, n, n, n, n, n, n}
+	require.Equal(t, metadata, hintsFor(t, "SELECT * FROM metadata m SEMI JOIN extended_trace_spans e ON m.run_id = e.run_id"))
+	require.Equal(t, metadata, hintsFor(t, "SELECT * FROM metadata m ANTI JOIN extended_trace_spans e USING (run_id)"))
+	// POSITIONAL/CROSS/ON joins project both sides in full.
+	require.Len(t, hintsFor(t, "SELECT * FROM metadata POSITIONAL JOIN extended_trace_spans"), 22)
+}
+
+// max(x, n) & co return a LIST of x's own values, so x's hint describes
+// each element ([*]), not the result's root.
+func TestBuildColumnHintsTopNAggregatesAreLists(t *testing.T) {
+	for _, q := range []string{
+		"SELECT max(run_id, 3) FROM runs",
+		"SELECT min(run_id, 3) FROM runs",
+		"SELECT arg_max(run_id, queued_at, 3) FROM runs",
+		"SELECT arg_min(run_id, queued_at, 3) FROM runs",
+		"SELECT quantile_disc(run_id, [0.5]) FROM runs",
+	} {
+		require.Equal(t, [][]PathHint{{{Path: []PathSegment{wc}, Hint: HintRunID}}}, pathHintsFor(t, q), q)
+	}
+	require.Equal(t, [][]PathHint{{{Hint: HintRunID}}}, pathHintsFor(t, "SELECT max(run_id) FROM runs"))
+}
+
+// A later join only sees a SEMI/ANTI join's left side, so its "*" is just
+// runs + metadata with run_id merged once.
+func TestBuildColumnHintsStarAfterSemiJoin(t *testing.T) {
+	got := hintsFor(t, "SELECT * FROM runs r SEMI JOIN extended_trace_spans e ON r.run_id = e.run_id JOIN metadata m USING (run_id)")
+	want := hintsFor(t, "SELECT * FROM runs r JOIN metadata m USING (run_id)")
+	require.Equal(t, want, got)
+}
+
+// A merged USING column resolves the way DuckDB projects it (checked
+// against a real duckdb): the left copy for INNER/LEFT, the right copy for
+// RIGHT, and COALESCE(left, right) for FULL, which only keeps a hint both
+// sides agree on. A bare reference and "*" agree.
+func TestBuildColumnHintsMergedUsingColumn(t *testing.T) {
+	const events = "(SELECT id AS run_id FROM events) e USING (run_id)"
+	for typ, want := range map[string]ColumnHint{
+		"JOIN":             HintRunID,
+		"LEFT JOIN":        HintRunID,
+		"RIGHT JOIN":       HintEventID,
+		"RIGHT OUTER JOIN": HintEventID,
+		"FULL JOIN":        HintNone,
+	} {
+		bare := hintsFor(t, "SELECT run_id FROM runs r "+typ+" "+events)
+		require.Equal(t, []ColumnHint{want}, bare, typ)
+		star := hintsFor(t, "SELECT * FROM runs r "+typ+" "+events)
+		require.Equal(t, want, star[0], typ)
+	}
+
+	// NATURAL joins merge the same way.
+	require.Equal(t, []ColumnHint{HintEventID}, hintsFor(t, "SELECT run_id FROM runs r NATURAL RIGHT JOIN (SELECT id AS run_id FROM events) e"))
+	// FULL keeps a hint both sides agree on.
+	require.Equal(t, []ColumnHint{HintRunID}, hintsFor(t, "SELECT run_id FROM metadata m FULL JOIN extended_trace_spans e USING (run_id)"))
+	// A multi-way merge folds left to right.
+	require.Equal(t, []ColumnHint{HintEventID}, hintsFor(t, "SELECT run_id FROM runs a JOIN runs b USING (run_id) RIGHT JOIN "+events))
+	require.Equal(t, []ColumnHint{HintNone}, hintsFor(t, "SELECT run_id FROM runs a RIGHT JOIN "+events+" FULL JOIN runs b USING (run_id)"))
 }

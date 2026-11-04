@@ -41,7 +41,7 @@ func newPegParser() (*peg.Parser, *KeywordSets, error) {
 		return nil, nil, fmt.Errorf("duckdb/parser: %w", err)
 	}
 	ks := NewKeywordSets(kl.Reserved, kl.Unreserved, kl.ColumnName, kl.FuncName, kl.TypeName)
-	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens, MaxDepth: maxRuleDepth}, ks, nil
+	return &peg.Parser{Grammar: g, Primitives: Primitives(ks), SkipTrivia: SkipSQLTrivia, SymbolTokens: tokens, MaxDepth: maxRuleDepth, MaxEntries: maxParseEntries}, ks, nil
 }
 
 // isNonIdentKeyword reports whether s, spelled bare, would lex as a keyword
@@ -59,10 +59,38 @@ func isNonIdentKeyword(s string) bool {
 	return false
 }
 
-// MaxSQLBytes is the longest input ParseString accepts. Parse cost (time,
-// and memo/slab memory preallocated in proportion to input length) grows
-// with input size — a 64KiB query already takes a few hundred MB of
-// allocations — so larger input is rejected up front rather than parsed.
+// IsKeyword reports whether s (case-insensitively) is any keyword in the
+// vendored grammar's lists, unreserved ones included. DuckDB quotes every
+// such name when it prints a type (`STRUCT("type" INTEGER)`).
+func IsKeyword(s string) bool {
+	if _, err := loadPegParser(); err != nil {
+		return false
+	}
+	return keywordSets.isAnyKeyword([]byte(strings.ToUpper(s)))
+}
+
+// isFuncNameIdent reports whether s, spelled bare, lexes as a FunctionName
+// (an identifier, or a keyword the function-name category allows).
+func isFuncNameIdent(s string) bool {
+	if _, err := loadPegParser(); err != nil {
+		return false
+	}
+	return keywordSets.allowedAsIdentifier([]byte(strings.ToUpper(s)), CategoryFuncName)
+}
+
+// isEmptyQuotedIdent reports whether src has an empty `""` identifier at
+// pos, which the identifier primitives refuse to match (see
+// scanQuotedIdentifier), so a parse that fails there gets DuckDB's own
+// error message instead of a generic one.
+func isEmptyQuotedIdent(src string, pos int) bool {
+	return pos >= 0 && strings.HasPrefix(src[min(pos, len(src)):], `""`) && !strings.HasPrefix(src[min(pos, len(src)):], `"""`)
+}
+
+// MaxSQLBytes is the longest input ParseString accepts, rejected up front
+// rather than parsed. Memory is bounded separately by maxParseEntries,
+// which a dense input can reach before this (see there for which shapes
+// fit); this mainly bounds the work of scanning trivia (whitespace,
+// comments) that creates no entries.
 const MaxSQLBytes = 64 << 10
 
 // maxRuleDepth caps nested grammar-rule invocations (peg.Parser.MaxDepth).
@@ -71,6 +99,16 @@ const MaxSQLBytes = 64 << 10
 // far beyond any realistic query — while keeping the stack in the low tens
 // of MB instead of overflowing it, which Go can't recover from.
 const maxRuleDepth = 4096
+
+// maxParseEntries caps the packrat memo entries plus CST nodes one parse
+// may create (peg.Parser.MaxEntries), at ~150-190 bytes allocated each
+// (~190MB at the cap). An IN list of IDs or numbers takes 4-14 per input
+// byte, so one up to MaxSQLBytes fits; a list of small numbers (`1, 2,
+// ...`, ~22 per byte) fits up to ~45KB, and a wide SELECT list or long AND
+// chain (~20-23 per byte) up to ~45-50KB. A dense worst case (`SELECT a, a,
+// ...`, ~72 per byte) is cut off around 14KB instead of allocating ~770MB
+// at MaxSQLBytes.
+const maxParseEntries = 1 << 20
 
 // errPrefix starts every non-ParseError error ParseString returns.
 const errPrefix = "duckdb/parser: "
@@ -101,34 +139,81 @@ func ParseString(sql string) (stmt *SelectStatement, err error) {
 
 	// Registered before sess.Parse, not just before adapting, so a panic
 	// from the peg engine or a primitive is also returned as an error.
-	// The adapter's own panics already carry the package prefix; only
-	// foreign ones (runtime errors, the peg engine) need it added.
-	defer func() {
-		if r := recover(); r != nil {
-			msg := fmt.Sprint(r)
-			if !strings.HasPrefix(msg, errPrefix) {
-				msg = errPrefix + msg
-			}
-			stmt, err = nil, errors.New(msg)
-		}
-	}()
+	defer recoverParse(&err)
 
 	cst, parseErr := sess.Parse(trimmed, "SelectStatement")
 	if parseErr != nil {
-		pos := Position{}
-		msg := parseErr.Error()
-		var perr *peg.ParseError
-		if errors.As(parseErr, &perr) {
-			pos = positionAt(trimmed, perr.Pos)
-			msg = perr.Message
-		}
-		if errors.Is(parseErr, peg.ErrTooDeep) {
-			msg = "query is nested too deeply"
-		}
-		return nil, &ParseError{Pos: pos, Message: msg}
+		return nil, convertParseError(trimmed, parseErr)
 	}
 
 	a := newAdapter(trimmed)
 	// SelectStatement <- SelectStatementInternal
 	return a.adaptSelectStatementInternal(body(cst)), nil
+}
+
+// ParseType parses a standalone DuckDB type name (`INTEGER`,
+// `STRUCT(a INTEGER)[]`, `DECIMAL(18,3)`) with the same grammar rule a
+// cast's type uses. Surrounding whitespace is tolerated; anything else
+// after the type is a parse error.
+func ParseType(s string) (t *TypeName, err error) {
+	if len(s) > MaxSQLBytes {
+		return nil, &ParseError{Pos: positionAt(s, 0), Message: fmt.Sprintf("type is %d bytes, exceeding the %d-byte limit", len(s), MaxSQLBytes)}
+	}
+	p, loadErr := loadPegParser()
+	if loadErr != nil {
+		return nil, loadErr
+	}
+	trimmed := strings.TrimSpace(s)
+	// insights calls this once per result column, so reuse a Session's
+	// buffers like ParseString does. Safe for the same reason: cst is fully
+	// adapted (no *peg.Node references kept) before Release runs.
+	sess := p.AcquireSession()
+	defer sess.Release()
+	defer recoverParse(&err)
+	cst, parseErr := sess.Parse(trimmed, "Type")
+	if parseErr != nil {
+		return nil, convertParseError(trimmed, parseErr)
+	}
+	return newAdapter(trimmed).adaptType(cst), nil
+}
+
+// recoverParse turns a panic during parsing or adapting into *err. An
+// unsupported construct panics with a *ParseError (see
+// adapter.unsupported), returned as-is. The adapter's other panics already
+// carry the package prefix; only foreign ones (runtime errors, the peg
+// engine) need it added.
+func recoverParse(err *error) {
+	r := recover()
+	if r == nil {
+		return
+	}
+	if perr, ok := r.(*ParseError); ok {
+		*err = perr
+		return
+	}
+	msg := fmt.Sprint(r)
+	if !strings.HasPrefix(msg, errPrefix) {
+		msg = errPrefix + msg
+	}
+	*err = errors.New(msg)
+}
+
+// convertParseError turns a peg parse failure over src into a positioned
+// *ParseError.
+func convertParseError(src string, parseErr error) error {
+	pos := Position{}
+	msg := parseErr.Error()
+	var perr *peg.ParseError
+	if errors.As(parseErr, &perr) {
+		pos = positionAt(src, perr.Pos)
+		msg = perr.Message
+	}
+	if errors.Is(parseErr, peg.ErrTooDeep) {
+		msg = "query is nested too deeply"
+	} else if errors.Is(parseErr, peg.ErrTooLarge) {
+		msg = "query is too large or complex to parse"
+	} else if perr != nil && isEmptyQuotedIdent(src, perr.Pos) {
+		msg = "zero-length delimited identifier"
+	}
+	return &ParseError{Pos: pos, Message: msg}
 }

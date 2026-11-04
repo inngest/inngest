@@ -85,9 +85,6 @@ type CheckpointAPIOpts struct {
 	RunJWTSecret []byte
 	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
 	BackoffFunc backoff.BackoffFunc
-	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
-	// The default is to always enforce the limits.
-	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation checkpoint.AllowAsyncDispatchValidation
 	// RouteAsyncCheckpoint can handle an authenticated async checkpoint after
@@ -127,7 +124,6 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		},
 		MetricsProvider:              o.CheckpointOpts.CheckpointMetrics,
 		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
-		EnforceStepSizeLimits:        o.CheckpointOpts.EnforceStepSizeLimits,
 		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
 		SyncLifecycleListeners:       o.SyncLifecycleListeners,
 	})

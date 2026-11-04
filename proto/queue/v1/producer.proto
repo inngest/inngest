@@ -50,4 +50,21 @@ message EnqueueOptions {
   string normalize_from_backlog_id = 3;
   optional google.protobuf.Duration idempotency_period = 4;
   string singleton_migration_key = 5;
+  // Lease the item for the enqueuing caller in the enqueue commit (see
+  // CallerLease). Queues that do not support it ignore it.
+  CallerLease caller_lease = 6;
+}
+
+// CallerLease asks the queue to write the item already leased for the caller
+// when it lands on one of shards, so the caller can run it without a separate
+// lease. lease_id is the caller-chosen lease (a ULID whose time is the lease
+// expiry), unique per enqueue call; a retry of the same call carries the same
+// lease_id and gets the same lease back.
+message CallerLease {
+  repeated string shards = 1;
+  string lease_id = 2;
+  // at_limit: the caller takes over its run's concurrency slot for this item
+  // (it holds the previous item's capacity lease), so the queue may lease it
+  // while the function or key is at its limit, oldest run first.
+  bool at_limit = 3;
 }

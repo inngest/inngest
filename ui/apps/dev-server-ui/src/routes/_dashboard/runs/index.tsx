@@ -1,4 +1,9 @@
 import SendEventButton from '@/components/Event/SendEventButton';
+import { LinkedRunDetails } from '@/components/Runs/LinkedRunDetails';
+import {
+  RunsOnboarding,
+  isRunsListRequested,
+} from '@/components/Runs/RunsOnboarding';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import { useInfoQuery } from '@/store/devApi';
@@ -30,7 +35,7 @@ import {
 import { toMaybeDate } from '@inngest/components/utils/date';
 import { parseCelSearchError } from '@inngest/components/utils/searchErrorParser';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useSearch } from '@tanstack/react-router';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // Dev mode polls aggressively so iterations feel instant; serve (single-node
@@ -74,10 +79,12 @@ function RunsComponent() {
     isFunctionTimeField,
   );
   const [excludeDeferred] = useBooleanSearchParam('excludeDeferred');
+  const showAllRuns = useSearch({ strict: false, select: isRunsListRequested });
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
+  const [runID] = useSearchParam('runID');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
 
@@ -231,41 +238,50 @@ function RunsComponent() {
           </div>
         }
       />
-      <RunsPage
-        apps={appsRes.data?.apps || []}
-        data={runs ?? []}
-        defaultVisibleColumns={[
-          'status',
-          'id',
-          'trigger',
-          'function',
-          'queuedAt',
-          'endedAt',
-        ]}
-        features={{
-          history: Number.MAX_SAFE_INTEGER,
-          isDeferred: true,
-        }}
-        hasMore={hasNextPage ?? false}
-        isLoadingInitial={isFetching && runs === undefined}
-        isLoadingMore={isFetching && runs !== undefined}
-        onScrollToTop={onScrollToTop}
-        onRefresh={onRefresh}
-        getTrigger={getTrigger}
-        pollInterval={pollInterval}
-        scope="env"
-        totalCount={totalCount}
-        searchError={searchError}
-        searchLimit={duckdbInsightsEnabled ? undefined : 1000}
-        infiniteScrollTrigger={(containerRef) => (
-          <InfiniteScrollTrigger
-            onIntersect={fetchNextPage}
-            hasMore={hasNextPage ?? false}
-            isLoading={isFetching}
-            root={containerRef}
-          />
-        )}
-      />
+      <RunsOnboarding runID={runID || undefined} showAllRuns={showAllRuns}>
+        <LinkedRunDetails
+          runID={runID || undefined}
+          runs={runs}
+          getTrigger={getTrigger}
+          pollInterval={autoRefresh ? pollInterval : 0}
+        />
+        <RunsPage
+          initialExpandedRunID={runID || undefined}
+          apps={appsRes.data?.apps || []}
+          data={runs ?? []}
+          defaultVisibleColumns={[
+            'status',
+            'id',
+            'trigger',
+            'function',
+            'queuedAt',
+            'endedAt',
+          ]}
+          features={{
+            history: Number.MAX_SAFE_INTEGER,
+            isDeferred: true,
+          }}
+          hasMore={hasNextPage ?? false}
+          isLoadingInitial={isFetching && runs === undefined}
+          isLoadingMore={isFetching && runs !== undefined}
+          onScrollToTop={onScrollToTop}
+          onRefresh={onRefresh}
+          getTrigger={getTrigger}
+          pollInterval={pollInterval}
+          scope="env"
+          totalCount={totalCount}
+          searchError={searchError}
+          searchLimit={duckdbInsightsEnabled ? undefined : 1000}
+          infiniteScrollTrigger={(containerRef) => (
+            <InfiniteScrollTrigger
+              onIntersect={fetchNextPage}
+              hasMore={hasNextPage ?? false}
+              isLoading={isFetching}
+              root={containerRef}
+            />
+          )}
+        />
+      </RunsOnboarding>
     </>
   );
 }

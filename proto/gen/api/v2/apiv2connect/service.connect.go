@@ -88,6 +88,16 @@ const (
 	V2ListBuildsProcedure = "/api.v2.V2/ListBuilds"
 	// V2CancelBuildProcedure is the fully-qualified name of the V2's CancelBuild RPC.
 	V2CancelBuildProcedure = "/api.v2.V2/CancelBuild"
+	// V2CreateDeployProcedure is the fully-qualified name of the V2's CreateDeploy RPC.
+	V2CreateDeployProcedure = "/api.v2.V2/CreateDeploy"
+	// V2CommitDeployProcedure is the fully-qualified name of the V2's CommitDeploy RPC.
+	V2CommitDeployProcedure = "/api.v2.V2/CommitDeploy"
+	// V2GetDeployProcedure is the fully-qualified name of the V2's GetDeploy RPC.
+	V2GetDeployProcedure = "/api.v2.V2/GetDeploy"
+	// V2ListDeploysProcedure is the fully-qualified name of the V2's ListDeploys RPC.
+	V2ListDeploysProcedure = "/api.v2.V2/ListDeploys"
+	// V2CancelDeployProcedure is the fully-qualified name of the V2's CancelDeploy RPC.
+	V2CancelDeployProcedure = "/api.v2.V2/CancelDeploy"
 	// V2CreateSandboxProcedure is the fully-qualified name of the V2's CreateSandbox RPC.
 	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
 	// V2ListSandboxesProcedure is the fully-qualified name of the V2's ListSandboxes RPC.
@@ -212,6 +222,11 @@ type V2Client interface {
 	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
 	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	CreateDeploy(context.Context, *connect.Request[v2.CreateDeployRequest]) (*connect.Response[v2.CreateDeployResponse], error)
+	CommitDeploy(context.Context, *connect.Request[v2.CommitDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	GetDeploy(context.Context, *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	ListDeploys(context.Context, *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error)
+	CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -422,6 +437,36 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2CancelBuildProcedure,
 			connect.WithSchema(v2Methods.ByName("CancelBuild")),
+			connect.WithClientOptions(opts...),
+		),
+		createDeploy: connect.NewClient[v2.CreateDeployRequest, v2.CreateDeployResponse](
+			httpClient,
+			baseURL+V2CreateDeployProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateDeploy")),
+			connect.WithClientOptions(opts...),
+		),
+		commitDeploy: connect.NewClient[v2.CommitDeployRequest, v2.DeployResponse](
+			httpClient,
+			baseURL+V2CommitDeployProcedure,
+			connect.WithSchema(v2Methods.ByName("CommitDeploy")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeploy: connect.NewClient[v2.GetDeployRequest, v2.DeployResponse](
+			httpClient,
+			baseURL+V2GetDeployProcedure,
+			connect.WithSchema(v2Methods.ByName("GetDeploy")),
+			connect.WithClientOptions(opts...),
+		),
+		listDeploys: connect.NewClient[v2.ListDeploysRequest, v2.ListDeploysResponse](
+			httpClient,
+			baseURL+V2ListDeploysProcedure,
+			connect.WithSchema(v2Methods.ByName("ListDeploys")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelDeploy: connect.NewClient[v2.CancelDeployRequest, v2.DeployResponse](
+			httpClient,
+			baseURL+V2CancelDeployProcedure,
+			connect.WithSchema(v2Methods.ByName("CancelDeploy")),
 			connect.WithClientOptions(opts...),
 		),
 		createSandbox: connect.NewClient[v2.CreateSandboxRequest, v2.CreateSandboxResponse](
@@ -713,6 +758,11 @@ type v2Client struct {
 	getBuild                   *connect.Client[v2.GetBuildRequest, v2.BuildResponse]
 	listBuilds                 *connect.Client[v2.ListBuildsRequest, v2.ListBuildsResponse]
 	cancelBuild                *connect.Client[v2.CancelBuildRequest, v2.BuildResponse]
+	createDeploy               *connect.Client[v2.CreateDeployRequest, v2.CreateDeployResponse]
+	commitDeploy               *connect.Client[v2.CommitDeployRequest, v2.DeployResponse]
+	getDeploy                  *connect.Client[v2.GetDeployRequest, v2.DeployResponse]
+	listDeploys                *connect.Client[v2.ListDeploysRequest, v2.ListDeploysResponse]
+	cancelDeploy               *connect.Client[v2.CancelDeployRequest, v2.DeployResponse]
 	createSandbox              *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
 	listSandboxes              *connect.Client[v2.ListSandboxesRequest, v2.ListSandboxesResponse]
 	getSandbox                 *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
@@ -886,6 +936,31 @@ func (c *v2Client) ListBuilds(ctx context.Context, req *connect.Request[v2.ListB
 // CancelBuild calls api.v2.V2.CancelBuild.
 func (c *v2Client) CancelBuild(ctx context.Context, req *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
 	return c.cancelBuild.CallUnary(ctx, req)
+}
+
+// CreateDeploy calls api.v2.V2.CreateDeploy.
+func (c *v2Client) CreateDeploy(ctx context.Context, req *connect.Request[v2.CreateDeployRequest]) (*connect.Response[v2.CreateDeployResponse], error) {
+	return c.createDeploy.CallUnary(ctx, req)
+}
+
+// CommitDeploy calls api.v2.V2.CommitDeploy.
+func (c *v2Client) CommitDeploy(ctx context.Context, req *connect.Request[v2.CommitDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return c.commitDeploy.CallUnary(ctx, req)
+}
+
+// GetDeploy calls api.v2.V2.GetDeploy.
+func (c *v2Client) GetDeploy(ctx context.Context, req *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return c.getDeploy.CallUnary(ctx, req)
+}
+
+// ListDeploys calls api.v2.V2.ListDeploys.
+func (c *v2Client) ListDeploys(ctx context.Context, req *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error) {
+	return c.listDeploys.CallUnary(ctx, req)
+}
+
+// CancelDeploy calls api.v2.V2.CancelDeploy.
+func (c *v2Client) CancelDeploy(ctx context.Context, req *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return c.cancelDeploy.CallUnary(ctx, req)
 }
 
 // CreateSandbox calls api.v2.V2.CreateSandbox.
@@ -1134,6 +1209,11 @@ type V2Handler interface {
 	GetBuild(context.Context, *connect.Request[v2.GetBuildRequest]) (*connect.Response[v2.BuildResponse], error)
 	ListBuilds(context.Context, *connect.Request[v2.ListBuildsRequest]) (*connect.Response[v2.ListBuildsResponse], error)
 	CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error)
+	CreateDeploy(context.Context, *connect.Request[v2.CreateDeployRequest]) (*connect.Response[v2.CreateDeployResponse], error)
+	CommitDeploy(context.Context, *connect.Request[v2.CommitDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	GetDeploy(context.Context, *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error)
+	ListDeploys(context.Context, *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error)
+	CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	ListSandboxes(context.Context, *connect.Request[v2.ListSandboxesRequest]) (*connect.Response[v2.ListSandboxesResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
@@ -1340,6 +1420,36 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2CancelBuildProcedure,
 		svc.CancelBuild,
 		connect.WithSchema(v2Methods.ByName("CancelBuild")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CreateDeployHandler := connect.NewUnaryHandler(
+		V2CreateDeployProcedure,
+		svc.CreateDeploy,
+		connect.WithSchema(v2Methods.ByName("CreateDeploy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CommitDeployHandler := connect.NewUnaryHandler(
+		V2CommitDeployProcedure,
+		svc.CommitDeploy,
+		connect.WithSchema(v2Methods.ByName("CommitDeploy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetDeployHandler := connect.NewUnaryHandler(
+		V2GetDeployProcedure,
+		svc.GetDeploy,
+		connect.WithSchema(v2Methods.ByName("GetDeploy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListDeploysHandler := connect.NewUnaryHandler(
+		V2ListDeploysProcedure,
+		svc.ListDeploys,
+		connect.WithSchema(v2Methods.ByName("ListDeploys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2CancelDeployHandler := connect.NewUnaryHandler(
+		V2CancelDeployProcedure,
+		svc.CancelDeploy,
+		connect.WithSchema(v2Methods.ByName("CancelDeploy")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2CreateSandboxHandler := connect.NewUnaryHandler(
@@ -1654,6 +1764,16 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListBuildsHandler.ServeHTTP(w, r)
 		case V2CancelBuildProcedure:
 			v2CancelBuildHandler.ServeHTTP(w, r)
+		case V2CreateDeployProcedure:
+			v2CreateDeployHandler.ServeHTTP(w, r)
+		case V2CommitDeployProcedure:
+			v2CommitDeployHandler.ServeHTTP(w, r)
+		case V2GetDeployProcedure:
+			v2GetDeployHandler.ServeHTTP(w, r)
+		case V2ListDeploysProcedure:
+			v2ListDeploysHandler.ServeHTTP(w, r)
+		case V2CancelDeployProcedure:
+			v2CancelDeployHandler.ServeHTTP(w, r)
 		case V2CreateSandboxProcedure:
 			v2CreateSandboxHandler.ServeHTTP(w, r)
 		case V2ListSandboxesProcedure:
@@ -1851,6 +1971,26 @@ func (UnimplementedV2Handler) ListBuilds(context.Context, *connect.Request[v2.Li
 
 func (UnimplementedV2Handler) CancelBuild(context.Context, *connect.Request[v2.CancelBuildRequest]) (*connect.Response[v2.BuildResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelBuild is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateDeploy(context.Context, *connect.Request[v2.CreateDeployRequest]) (*connect.Response[v2.CreateDeployResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateDeploy is not implemented"))
+}
+
+func (UnimplementedV2Handler) CommitDeploy(context.Context, *connect.Request[v2.CommitDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CommitDeploy is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetDeploy(context.Context, *connect.Request[v2.GetDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetDeploy is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListDeploys(context.Context, *connect.Request[v2.ListDeploysRequest]) (*connect.Response[v2.ListDeploysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListDeploys is not implemented"))
+}
+
+func (UnimplementedV2Handler) CancelDeploy(context.Context, *connect.Request[v2.CancelDeployRequest]) (*connect.Response[v2.DeployResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CancelDeploy is not implemented"))
 }
 
 func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {

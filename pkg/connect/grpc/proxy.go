@@ -57,6 +57,7 @@ type grpcConnector struct {
 	tracer trace.ConditionalTracer
 
 	stateManager state.StateManager
+	router       *routing.Router
 	rnd          *util.FrandRNG
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
@@ -101,6 +102,7 @@ func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GR
 	for _, option := range options {
 		option(connector)
 	}
+	connector.router = routing.NewRouter(connector.stateManager)
 
 	// Create default gateway manager if not provided via options
 	if connector.gatewayGRPCManager == nil {
@@ -399,7 +401,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}()
 
 		// Determine the most suitable connection
-		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
+		route, err := i.router.GetRoute(ctx, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "failed to route message")
@@ -466,6 +468,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			if err == nil {
 				break
 			}
+			i.router.InvalidateConnections(opts.EnvID, opts.AppID)
 
 			// A Forward stuck on a dead connection can fail after the worker already
 			// received the request and replied. Re-routing would run it twice, so
@@ -503,7 +506,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			l.Warn("forward to gateway failed, re-routing", "attempt", forwardAttempt+1, "err", err)
 
-			route, err = routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
+			route, err = i.router.GetRoute(ctx, i.rnd, i.tracer, l, opts.Data)
 			if err != nil {
 				l.Warn("re-route failed", "attempt", forwardAttempt+1, "err", err)
 				break

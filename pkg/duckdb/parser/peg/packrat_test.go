@@ -151,6 +151,55 @@ Parens(D) <- '(' D ')'
 	require.NotErrorIs(t, err, ErrTooDeep)
 }
 
+func TestParseEnforcesMaxEntries(t *testing.T) {
+	g, err := ParseGrammar(`
+Items <- Item (',' Item)*
+Item <- 'x'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g, MaxEntries: 50}
+	items := func(n int) string {
+		return "x" + strings.Repeat(",x", n-1)
+	}
+
+	_, err = p.Parse(items(5), "Items")
+	require.NoError(t, err)
+
+	_, err = p.Parse(items(500), "Items")
+	require.ErrorIs(t, err, ErrTooLarge)
+	require.NotErrorIs(t, err, ErrTooDeep)
+
+	// A pooled session that hit the limit starts the next parse clean.
+	s := p.AcquireSession()
+	defer s.Release()
+	_, err = s.Parse(items(500), "Items")
+	require.ErrorIs(t, err, ErrTooLarge)
+	_, err = s.Parse(items(5), "Items")
+	require.NoError(t, err)
+}
+
+func TestSessionReleaseDropsOversizedBuffers(t *testing.T) {
+	g, err := ParseGrammar(`
+Items <- Item (',' Item)*
+Item <- 'x'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g}
+
+	s := p.AcquireSession()
+	_, err = s.Parse("x"+strings.Repeat(",x", maxRetainedEntries), "Items")
+	require.NoError(t, err)
+	require.NotNil(t, s.e)
+	s.Release()
+	require.Nil(t, s.e, "a session that grew past maxRetainedEntries keeps its buffers")
+
+	s = &Session{parser: p}
+	_, err = s.Parse("x,x", "Items")
+	require.NoError(t, err)
+	s.Release()
+	require.NotNil(t, s.e, "a small session drops its buffers")
+}
+
 func TestParseMemoizesRepeatedRuleAtSamePosition(t *testing.T) {
 	// Several alternatives all try Shared at the same starting position
 	// before falling through to Word — not exponential (this engine
@@ -200,5 +249,61 @@ Op <- '<' / '<=' / '!'
 	require.NoError(t, err)
 	// ...but never splits one that is: "!=" isn't '!' followed by "=b".
 	_, err = p.Parse("a !=b", "Cmp")
+	require.Error(t, err)
+}
+
+func TestArenaKeepsHandedOutValuesAcrossChunks(t *testing.T) {
+	a := newArena[int](1)
+	var ptrs []*int
+	var slices [][]int
+	for i := range 3 * maxArenaChunk {
+		ptrs = append(ptrs, a.alloc(i))
+		if i%1000 == 0 {
+			slices = append(slices, a.allocSlice(i, i+1, i+2))
+		}
+	}
+	for i, p := range ptrs {
+		require.Equal(t, i, *p)
+	}
+	for _, s := range slices {
+		require.Equal(t, []int{s[0], s[0] + 1, s[0] + 2}, s)
+		require.Equal(t, 3, cap(s))
+	}
+	require.Equal(t, len(ptrs)+3*len(slices), a.len())
+
+	// A reset arena reuses its chunks instead of allocating new ones.
+	size := a.size()
+	a.reset()
+	require.Zero(t, a.len())
+	for i := range 3 * maxArenaChunk {
+		a.alloc(i)
+	}
+	require.Equal(t, size, a.size())
+
+	// A slice bigger than a chunk gets a chunk of its own.
+	big := a.allocSlice(make([]int, 2*maxArenaChunk)...)
+	require.Len(t, big, 2*maxArenaChunk)
+}
+
+func TestMarkLeafRules(t *testing.T) {
+	g, err := ParseGrammar(`
+Op <- '+' / '-'
+Sign <- Op?
+Expr <- Term (Op Term)*
+Term <- 'x' / '(' Expr ')'
+Wrap <- Parens('x')
+Parens(X) <- '(' X ')'
+`)
+	require.NoError(t, err)
+	p := &Parser{Grammar: g}
+	d := p.getDispatch()
+	for name, want := range map[string]bool{"Op": true, "Sign": true, "Expr": false, "Term": false, "Wrap": false, "Parens": false} {
+		require.Equal(t, want, d[name].leaf, name)
+	}
+
+	// Leaf failures aren't memoized, but still fail the same way.
+	_, err = p.Parse("x+(x-x)", "Expr")
+	require.NoError(t, err)
+	_, err = p.Parse("x+(x-", "Expr")
 	require.Error(t, err)
 }

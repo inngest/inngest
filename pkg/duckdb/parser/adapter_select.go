@@ -92,7 +92,8 @@ func (a *adapter) adaptSelectAtom(n *peg.Node) *SelectStatement {
 	case "UnpivotStatement":
 		return a.adaptUnpivotStatement(stAlt)
 	default: // DescribeStatement / TableStatement
-		panic("duckdb/parser: DESCRIBE/TABLE as a standalone statement is not supported")
+		a.unsupported(stAlt, "DESCRIBE/TABLE as a standalone statement")
+		return nil
 	}
 }
 
@@ -123,8 +124,8 @@ func (a *adapter) adaptSimpleSelect(n *peg.Node) *SelectStatement {
 	if q, ok := present(seq.Children[5]); ok {
 		stmt.Qualify = a.adaptExpression(body(q).Children[1]) // QualifyClause <- 'QUALIFY' Expression
 	}
-	if _, ok := present(seq.Children[6]); ok {
-		panic("duckdb/parser: TABLESAMPLE is not yet supported")
+	if ts, ok := present(seq.Children[6]); ok {
+		a.unsupported(ts, "TABLESAMPLE")
 	}
 	return stmt
 }
@@ -205,18 +206,18 @@ func (a *adapter) adaptFromClause(n *peg.Node) *FromClause {
 func (a *adapter) adaptBaseTableRef(n *peg.Node) *BaseTableRef {
 	// BaseTableRef <- TableAliasColon? BaseTableName TableAlias? AtClause? SampleClause?
 	seq := body(n)
-	if _, ok := present(seq.Children[0]); ok {
-		panic("duckdb/parser: the `alias:` table-alias-colon form is not yet supported (see Task 10)")
+	if ac, ok := present(seq.Children[0]); ok {
+		a.unsupported(ac, "The `alias:` table-alias-colon form")
 	}
 	ref := &BaseTableRef{baseTableRefNode: baseTableRefNode{a.at(n)}, Name: a.adaptBaseTableName(seq.Children[1])}
 	if alias, ok := present(seq.Children[2]); ok {
 		ref.Alias = a.adaptTableAlias(alias)
 	}
-	if _, ok := present(seq.Children[3]); ok {
-		panic("duckdb/parser: AT (time travel) is not yet supported (see Task 10)")
+	if at, ok := present(seq.Children[3]); ok {
+		a.unsupported(at, "AT (time travel)")
 	}
-	if _, ok := present(seq.Children[4]); ok {
-		panic("duckdb/parser: TABLESAMPLE is not yet supported (see Task 10)")
+	if ts, ok := present(seq.Children[4]); ok {
+		a.unsupported(ts, "TABLESAMPLE")
 	}
 	return ref
 }
@@ -252,15 +253,15 @@ func (a *adapter) adaptTableAlias(n *peg.Node) string {
 	if alt.Name == "TableAliasAs" {
 		// 'AS' IdentifierOrStringLiteral ColumnAliases?
 		seq := body(alt)
-		if _, ok := present(seq.Children[2]); ok {
-			panic("duckdb/parser: column aliases on a table alias are not yet supported (see Task 10)")
+		if ca, ok := present(seq.Children[2]); ok {
+			a.unsupported(ca, "Column aliases on a table alias")
 		}
 		return literalText(seq.Children[1])
 	}
 	// TableAliasWithoutAs <- Identifier ColumnAliases?
 	seq := body(alt)
-	if _, ok := present(seq.Children[1]); ok {
-		panic("duckdb/parser: column aliases on a table alias are not yet supported (see Task 10)")
+	if ca, ok := present(seq.Children[1]); ok {
+		a.unsupported(ca, "Column aliases on a table alias")
 	}
 	return literalText(seq.Children[0])
 }

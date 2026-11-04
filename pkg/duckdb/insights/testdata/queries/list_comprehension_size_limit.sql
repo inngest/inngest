@@ -1,0 +1,1 @@
+SELECT len(flatten([range(10000) for x in range(10000)])) AS n

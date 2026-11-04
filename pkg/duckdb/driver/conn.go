@@ -51,7 +51,15 @@ func (c *conn) Prepare(query string) (driver.Stmt, error) {
 	return nil, errors.New("duckdb: prepared statements not supported; use ExecContext/QueryContext")
 }
 
-func (c *conn) Close() error { return nil }
+// Close releases c's own session if it has one (a pooledQuackConn). The
+// primary connection's *process is shared by every conn Connector.Connect
+// hands out and outlives them, so it's only closed by Connector.Close.
+func (c *conn) Close() error {
+	if closer, ok := c.sess.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
 
 func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errors.New("duckdb: transactions not supported in this POC")
