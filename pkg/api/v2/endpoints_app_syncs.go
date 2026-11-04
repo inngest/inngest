@@ -26,6 +26,9 @@ func (s *Service) ListAppSyncs(ctx context.Context, req *apiv2.ListAppSyncsReque
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
+	if req.GetCursor() != "" && cursor == uuid.Nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Cursor is invalid")
+	}
 	app, err := s.apps.GetApp(ctx, decodePathParam(req.GetAppId()))
 	if errors.Is(err, ErrAppNotFound) {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "App not found")
