@@ -35,6 +35,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
     }
   }
   tags: { name: "Account"      description: "Manage your account" }
+  tags: { name: "Feedback"     description: "Submit product feedback" }
   tags: { name: "Environments" description: "Create and manage environments" }
   tags: { name: "Keys"         description: "Manage event and signing keys" }
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }

@@ -12042,12 +12042,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bFeedback\x12\x17Submit product feedback\x1a\xaf\x02Sends user-requested product feedback to Inngest support. Cloud only. Submit only feedback the user has asked to share; do not include credentials, secrets, or run payloads. Creates a support ticket, so retries may create duplicates. Requires feedback:write:create. No environment selection is required.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15feedback:write:create\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/feedbackB\xb3\a\x92A\xfc\x06\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x19\b\x01\x12\x15feedback:write:create\x82\xd3\xe4\x93\x02\x0e:\x01*\"\t/feedbackB\xd8\a\x92A\xa1\a\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
 	"BearerAuth\x12H\b\x02\x123Bearer token authentication. Format: `Bearer {key}`\x1a\rAuthorization \x02j\x1e\n" +
-	"\aAccount\x12\x13Manage your accountj.\n" +
+	"\aAccount\x12\x13Manage your accountj#\n" +
+	"\bFeedback\x12\x17Submit product feedbackj.\n" +
 	"\fEnvironments\x12\x1eCreate and manage environmentsj%\n" +
 	"\x04Keys\x12\x1dManage event and signing keysj.\n" +
 	"\bWebhooks\x12\"Create and manage inbound webhooksj\x17\n" +
