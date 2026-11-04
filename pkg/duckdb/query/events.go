@@ -44,7 +44,7 @@ func (m *Manager) GetEventsByExpressions(ctx context.Context, cel []string) ([]*
 		return nil, fmt.Errorf("duckdbquery: rendering CEL filter: %w", err)
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s.events", eventColumns, driver.DuckLakeAlias)
+	query := fmt.Sprintf("SELECT %s FROM %s.events", eventColumns, driver.LakeAlias)
 	if where != "" {
 		query += " WHERE " + where
 	}
@@ -79,7 +79,7 @@ func (m *Manager) GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) (
 
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s.events WHERE internal_id IN (%s);",
-		eventColumns, driver.DuckLakeAlias, strings.Join(placeholders, ", "),
+		eventColumns, driver.LakeAlias, strings.Join(placeholders, ", "),
 	)
 	return m.queryEvents(ctx, query, args...)
 }
@@ -91,7 +91,7 @@ func (m *Manager) GetEvents(ctx context.Context, accountID, workspaceID uuid.UUI
 
 	query := fmt.Sprintf(
 		`SELECT %s FROM %s.events WHERE account_id = ? AND env_id = ? AND received_at <= ? AND received_at >= ?`,
-		eventColumns, driver.DuckLakeAlias,
+		eventColumns, driver.LakeAlias,
 	)
 	args := []any{accountID.String(), workspaceID.String(), opts.Newest, opts.Oldest}
 
@@ -168,7 +168,7 @@ func (m *Manager) GetEventsCount(ctx context.Context, accountID, workspaceID uui
 
 	query := fmt.Sprintf(
 		`FROM %s.events WHERE account_id = ? AND env_id = ? AND received_at <= ? AND received_at >= ?`,
-		driver.DuckLakeAlias,
+		driver.LakeAlias,
 	)
 	args := []any{accountID.String(), workspaceID.String(), opts.Newest, opts.Oldest}
 

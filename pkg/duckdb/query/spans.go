@@ -34,7 +34,7 @@ const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_ti
 // created_at via QUALIFY, then the outer query GROUPs BY every span column
 // and aggregates metadata into one LIST(STRUCT(...)) column per span. The
 // ordering (values text breaks created_at ties) matches
-// inngest.run_metadata_rollup's so both pick the same row.
+// inngest_local.run_metadata_rollup's so both pick the same row.
 func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	query := fmt.Sprintf(
 		`WITH latest_metadata AS (
@@ -56,7 +56,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		 FROM latest_metadata
 		 GROUP BY %s
 		 ORDER BY start_time ASC;`,
-		spanColumnsPrefixed, driver.DuckLakeAlias, driver.DuckLakeAlias,
+		spanColumnsPrefixed, driver.LakeAlias, driver.LakeAlias,
 		spanColumns, spanColumns,
 	)
 	rows, err := m.db.QueryContext(ctx, query, runID.String())
@@ -179,7 +179,7 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 
 	query := fmt.Sprintf(
 		"SELECT output, input FROM %s.run_trace_spans WHERE run_id = ? AND span_id IN (%s);",
-		driver.DuckLakeAlias, strings.Join(placeholders, ", "),
+		driver.LakeAlias, strings.Join(placeholders, ", "),
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {

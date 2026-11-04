@@ -30,7 +30,7 @@ func RequireBinary(t testing.TB) string {
 
 // FreeLocalAddr resolves an ephemeral local port, closing the listener
 // immediately. Only for callers that must know a port in advance (e.g. a
-// DuckLake quack catalog address another process attaches to); anything
+// quack listener address another process attaches to); anything
 // that can read the bound port back should bind port 0 instead.
 func FreeLocalAddr(t testing.TB) string {
 	t.Helper()

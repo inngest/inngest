@@ -19,7 +19,7 @@ import (
 // so ATTACH 'quack:...' AS rpc; MERGE INTO rpc.t USING <local data> ...
 // fails with "Database type "quack" does not support MERGE INTO or ON
 // CONFLICT" — confirmed against this exact build). It doesn't need to be:
-// this client talks directly to the server process that owns the DuckLake
+// this client talks directly to the server process that owns the lake
 // table, so the MERGE's target is that server's own ordinary local table,
 // not a cross-process "remote" catalog attachment — scan_data_from_quack_client
 // is just an ordinary table-valued source for it, the same as it already is

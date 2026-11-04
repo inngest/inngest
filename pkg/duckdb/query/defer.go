@@ -69,7 +69,7 @@ WHERE name = ? AND run_id IN (%s) AND %s IS NOT NULL
 WINDOW w AS (PARTITION BY run_id, %s ORDER BY start_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
 QUALIFY ROW_NUMBER() OVER (PARTITION BY run_id, %s ORDER BY start_time DESC) = 1;`,
 		hashedIDExpr, userlandIDExpr, fnSlugExpr, statusExpr, eventIDExpr,
-		driver.DuckLakeAlias, strings.Join(placeholders, ", "), hashedIDExpr,
+		driver.LakeAlias, strings.Join(placeholders, ", "), hashedIDExpr,
 		hashedIDExpr, hashedIDExpr,
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
@@ -170,7 +170,7 @@ func (m *Manager) resolveDeferChildRunIDs(ctx context.Context, eventIDs map[ulid
 	}
 	query := fmt.Sprintf(
 		"SELECT run_id, event_ids FROM %s.runs WHERE list_has_any(event_ids, ?);",
-		driver.DuckLakeAlias,
+		driver.LakeAlias,
 	)
 	rows, err := m.db.QueryContext(ctx, query, ids)
 	if err != nil {
@@ -235,7 +235,7 @@ func (m *Manager) GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (m
 
 	query := fmt.Sprintf(
 		"SELECT run_id, attributes FROM %s.run_trace_spans WHERE name = ? AND run_id IN (%s);",
-		driver.DuckLakeAlias, strings.Join(placeholders, ", "),
+		driver.LakeAlias, strings.Join(placeholders, ", "),
 	)
 	rows, err := m.db.QueryContext(ctx, query, args...)
 	if err != nil {
