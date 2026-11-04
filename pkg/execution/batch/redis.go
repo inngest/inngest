@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"time"
+
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -410,8 +411,9 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 	return nil
 }
 
-// DeleteKeys drops keys related to the provided batchID.
-func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) (err error) {
+// DeleteKeys drops keys related to the provided batchID and reports whether
+// the batch's event list existed.
+func (b *redisBatchManager) DeleteKeys(ctx context.Context, _ uuid.UUID, functionId uuid.UUID, batchID ulid.ULID) (_ bool, err error) {
 	defer func(start time.Time) { b.recordCall(ctx, "delete_keys", start, err) }(time.Now())
 
 	keys := []string{
@@ -426,7 +428,7 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		[]string{},
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
+		return false, fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}
 	if batchExisted > 0 && b.metricRecorder != nil {
 		createdAt := time.UnixMilli(int64(batchID.Time()))
@@ -437,7 +439,7 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		b.metricRecorder.RecordDelete(ctx, residencyDuration)
 	}
 
-	return nil
+	return batchExisted > 0, nil
 }
 
 // DeleteBatch deletes the current batch for a function and batch key.
@@ -466,7 +468,7 @@ func (b *redisBatchManager) DeleteBatch(ctx context.Context, functionID uuid.UUI
 	}
 
 	// Delete the batch keys
-	if err := b.DeleteKeys(ctx, functionID, batchID); err != nil {
+	if _, err := b.DeleteKeys(ctx, consts.DevServerAccountID, functionID, batchID); err != nil {
 		return nil, fmt.Errorf("batch store %s: failed to delete batch keys: %w", b.storeName, err)
 	}
 

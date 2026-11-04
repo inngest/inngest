@@ -26,7 +26,8 @@ type WriteToNextFunc func(ctx context.Context, accountID uuid.UUID) bool
 // - Reads (RetrieveItems, StartExecution) check the primary first and fall
 // back to the other cluster only when the batch is not there, so batches drain
 // from whichever cluster created them.
-// - DeleteKeys always runs on both clusters.
+// - DeleteKeys runs on the primary, and on the other cluster only when the
+// primary did not hold the batch.
 // - The debug APIs (GetBatchInfo, DeleteBatch, RunBatch) act on both clusters
 // and return one result per cluster, current first.
 //
@@ -135,12 +136,25 @@ func (m *migratingBatchManager) ScheduleExecution(ctx context.Context, opts Sche
 	return primary.ScheduleExecution(ctx, opts)
 }
 
-// DeleteKeys deletes from both clusters. Batch IDs are unique ULIDs, so
-// deleting from the cluster that doesn't hold the batch is a no-op.
-func (m *migratingBatchManager) DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error {
-	errNext := m.next.DeleteKeys(ctx, functionID, batchID)
-	errCurrent := m.current.DeleteKeys(ctx, functionID, batchID)
-	return errors.Join(errNext, errCurrent)
+// DeleteKeys deletes from the account's primary cluster, and from the other
+// cluster only when the primary did not hold the batch. Batch IDs are unique
+// ULIDs, so a batch found in the primary cannot also exist in the other
+// cluster. A primary error is returned without falling back: whether the batch
+// was there is unknown, so the caller retries.
+func (m *migratingBatchManager) DeleteKeys(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) (bool, error) {
+	primary, fallback := m.writeManager(ctx, accountID)
+	existed, err := primary.DeleteKeys(ctx, accountID, functionID, batchID)
+	if err != nil || existed {
+		return existed, err
+	}
+	logger.StdlibLogger(ctx).Debug("batch empty in primary cluster, falling back for DeleteKeys",
+		"account_id", accountID,
+		"function_id", functionID,
+		"batch_id", batchID,
+		"primary", primary.Name(),
+	)
+	recordFallback(ctx, "delete_keys")
+	return fallback.DeleteKeys(ctx, accountID, functionID, batchID)
 }
 
 // GetBatchInfo returns the current batch in each cluster, current first. Both
