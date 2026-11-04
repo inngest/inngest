@@ -144,7 +144,7 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 	FROM %s.runs
 	WHERE run_id IN (SELECT run_id FROM sampled_run_ids)
 	QUALIFY row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
-	;`, driver.DuckLakeAlias, driver.DuckLakeAlias)
+	;`, driver.LakeAlias, driver.LakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("duckdbseed: sampling runs: %w", err)
@@ -221,7 +221,7 @@ func sampleTraces(ctx context.Context, db *sql.DB, limit int) ([]TraceTemplate, 
 	       s.trace_id, s.span_id, s.parent_span_id,
 	       s.name, s.attributes, s.output, s.input, s.start_time, s.end_time
 	FROM %s.run_trace_spans s
-	JOIN run_timing rt ON rt.run_id = s.run_id;`, driver.DuckLakeAlias, driver.DuckLakeAlias, driver.DuckLakeAlias)
+	JOIN run_timing rt ON rt.run_id = s.run_id;`, driver.LakeAlias, driver.LakeAlias, driver.LakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("duckdbseed: sampling spans: %w", err)
@@ -343,7 +343,7 @@ func sampleEventProfiles(ctx context.Context, db *sql.DB, limit int) ([][]EventT
 	)
 	SELECT re.run_id, re.queued_at, e.event_name, e.event_data, e.received_at
 	FROM run_events re
-	JOIN %s.events e ON e.internal_id = re.event_internal_id;`, driver.DuckLakeAlias, driver.DuckLakeAlias, driver.DuckLakeAlias)
+	JOIN %s.events e ON e.internal_id = re.event_internal_id;`, driver.LakeAlias, driver.LakeAlias, driver.LakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("duckdbseed: sampling events: %w", err)
@@ -415,7 +415,7 @@ func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfi
 	)
 	SELECT m.run_id, rt.queued_at, m.span_id, m.scope, m.step_id, m.step_index, m.step_attempt, m.kind, m.is_user, m.values, m.created_at
 	FROM %s.run_metadata m
-	JOIN run_timing rt ON rt.run_id = m.run_id;`, driver.DuckLakeAlias, driver.DuckLakeAlias, driver.DuckLakeAlias)
+	JOIN run_timing rt ON rt.run_id = m.run_id;`, driver.LakeAlias, driver.LakeAlias, driver.LakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("duckdbseed: sampling metadata: %w", err)
