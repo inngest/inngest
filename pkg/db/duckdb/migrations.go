@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/pressly/goose/v3"
@@ -17,22 +19,31 @@ import (
 //go:embed migrations/*.sql
 var MigrationsFS embed.FS
 
+// viewsSQL is the views and table macros createViews (re)creates on every
+// Migrate, see views.sql.
+//
+//go:embed views.sql
+var viewsSQL string
+
+var viewsTmpl = template.Must(template.New("views.sql").Parse(viewsSQL))
+
 // Mode is what kind of catalog Migrate runs against. Goose's ENVSUB can
 // only substitute a variable or fall back to a default, never branch on a
-// value, so each mode is the set of env vars (modeEnv) its "-- +goose ENVSUB
-// ON" blocks substitute: an unset var keeps a statement's in-file default.
+// value, so each mode is the set of env vars (modeEnv) the migrations' "--
+// +goose ENVSUB ON" blocks substitute: an unset var keeps a statement's
+// in-file default. The views (views.sql) branch on the mode directly.
 type Mode int
 
 const (
 	// ModeMemory is a bare in-memory catalog (devserver w/o --persist): no
-	// DuckLake ATTACH, so Migrate creates the "inngest" schema itself and the
-	// DuckLake-only SET SORTED/PARTITIONED BY statements are no-ops.
+	// lake ATTACH, so Migrate creates the "inngest" schema itself and the
+	// tables skip their Iceberg-only partitioning/sort/format-version clause.
 	ModeMemory Mode = iota
-	// ModeRawLake is a DuckLake catalog whose tables hold every emission
+	// ModeRawLake is an Iceberg lake whose tables hold every emission
 	// (devserver --persist): the migrations run unchanged.
 	ModeRawLake
-	// ModeFlatLake is a DuckLake catalog whose runs are already one row per
-	// run (IE exported from final rows only): as ModeRawLake, but raw_runs
+	// ModeFlatLake is an Iceberg lake whose runs are already one row per run
+	// (IE exported from final rows only): as ModeRawLake, but raw_runs
 	// doesn't collapse.
 	ModeFlatLake
 )
@@ -51,24 +62,15 @@ func (m Mode) String() string {
 
 // modeEnv is the env vars each Mode sets while migrating.
 //
-// DUCKDB_DUCKLAKE_ONLY replaces each DuckLake-only statement. Every
-// occurrence uses the no-colon "${VAR-default}" form, which (unlike
+// DUCKDB_ICEBERG_ONLY replaces each table's Iceberg-only clause
+// (PARTITIONED BY/SORTED BY/WITH), which a plain duckdb table rejects.
+// Every occurrence uses the no-colon "${VAR-default}" form, which (unlike
 // "${VAR:-default}") only falls back to the default when the var is
-// completely unset, so an explicitly-set value always wins. It can't be a
-// literal empty string: over the quack transport (see
-// pkg/duckdb/driver/internal/quack/session.go -- production's
-// setupDualWrite always enables it, alongside the plain jsonlines transport
-// tests here use directly), DuckDB's prepare/fetch protocol rejects a
-// statement that resolves to nothing with "Query did not return any
-// columns", even though the same empty statement is silently accepted over
-// jsonlines. "SELECT 1" is a real, valid statement on both transports.
-//
-// DUCKDB_RUNS_COLLAPSE replaces raw_runs' QUALIFY, so empty drops it (the
-// statement is still the rest of the macro, never empty).
+// completely unset, so an explicitly empty value wins.
 var modeEnv = map[Mode]map[string]string{
-	ModeMemory:   {"DUCKDB_DUCKLAKE_ONLY": "SELECT 1"},
+	ModeMemory:   {"DUCKDB_ICEBERG_ONLY": ""},
 	ModeRawLake:  {},
-	ModeFlatLake: {"DUCKDB_RUNS_COLLAPSE": ""},
+	ModeFlatLake: {},
 }
 
 // migrateMu serializes Migrate: a mode travels as process env vars, so two
@@ -77,10 +79,11 @@ var migrateMu sync.Mutex
 
 // migrationModeTable records the Mode a catalog was migrated in. Each
 // migration only ever runs once, so re-migrating a catalog in another mode
-// would silently keep the first mode's macros; Migrate errors instead.
+// would silently keep the first mode's tables; Migrate errors instead.
 const migrationModeTable = "duckdb_migration_mode"
 
-// Migrate applies every staging-table migration to db. It's safe to call
+// Migrate applies every staging-table migration to db, then (re)creates the
+// views and table macros over them (see createViews). It's safe to call
 // more than once (idempotent) and is run once at subprocess startup before
 // dual-write is enabled.
 //
@@ -97,9 +100,9 @@ const migrationModeTable = "duckdb_migration_mode"
 // discovered incompatibility in this driver's row-column ordering.
 //
 // mode says what db is (see Mode). ModeMemory's db was opened with
-// Options.DBFile ":memory:" and Options.DuckLake nil, so there is no DuckLake
-// ATTACH to create the "inngest" catalog schema and Migrate creates it
-// directly; the others' db was opened with Options.DuckLake set.
+// Options.DBFile ":memory:" and Options.Iceberg nil, so there is no lake
+// ATTACH to create the "inngest" catalog and Migrate creates a schema of
+// that name directly; the others' db was opened with Options.Iceberg set.
 func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
 	env, ok := modeEnv[mode]
 	if !ok {
@@ -109,8 +112,8 @@ func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
 	defer migrateMu.Unlock()
 
 	if mode == ModeMemory {
-		if _, err := db.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+driver.DuckLakeAlias+";"); err != nil {
-			return fmt.Errorf("duckdb: creating in-memory schema %q: %w", driver.DuckLakeAlias, err)
+		if _, err := db.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+driver.LakeAlias+";"); err != nil {
+			return fmt.Errorf("duckdb: creating in-memory schema %q: %w", driver.LakeAlias, err)
 		}
 	}
 	if err := checkMode(ctx, db, mode); err != nil {
@@ -143,7 +146,46 @@ func Migrate(ctx context.Context, db *sql.DB, mode Mode) error {
 	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("duckdb: running migrations: %w", err)
 	}
+	return createViews(ctx, db, mode)
+}
+
+// createViews (re)creates the views and table macros in views.sql. They
+// can't live in an Iceberg lake, so they're in a schema of duckdb's own
+// database (schema.MacroSchema) and get re-created every Migrate instead of
+// being a migration, so a definition change (or a mode change) never needs
+// one.
+func createViews(ctx context.Context, db *sql.DB, mode Mode) error {
+	var b strings.Builder
+	if err := viewsTmpl.Execute(&b, struct{ CollapseRuns bool }{mode != ModeFlatLake}); err != nil {
+		return fmt.Errorf("duckdb: rendering views: %w", err)
+	}
+	for _, stmt := range splitStatements(b.String()) {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("duckdb: creating views: %w", err)
+		}
+	}
 	return nil
+}
+
+// splitStatements splits views.sql into statements: comment lines are
+// dropped and a statement ends at a line ending in `;`.
+func splitStatements(sqlText string) []string {
+	var (
+		stmts []string
+		cur   []string
+	)
+	for _, line := range strings.Split(sqlText, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+		cur = append(cur, line)
+		if strings.HasSuffix(trimmed, ";") {
+			stmts = append(stmts, strings.Join(cur, "\n"))
+			cur = nil
+		}
+	}
+	return stmts
 }
 
 // checkMode records mode as db's migration mode, or errors if db was already

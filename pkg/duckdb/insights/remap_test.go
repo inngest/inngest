@@ -77,8 +77,8 @@ func TestRemapTables(t *testing.T) {
 
 func TestRender(t *testing.T) {
 	acct, env := testAccountID.String(), testEnvID.String()
-	runsMacro := "__inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?))"
-	eventsMacro := "__inngest_events AS NOT MATERIALIZED (SELECT * FROM inngest.insights_events(?, ?))"
+	runsMacro := "__inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest_local.insights_runs(?, ?))"
+	eventsMacro := "__inngest_events AS NOT MATERIALIZED (SELECT * FROM inngest_local.insights_events(?, ?))"
 
 	tests := []struct {
 		name     string

@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/inngest/inngest/pkg/duckdb/federate"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
+	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
 // TableCTE is the body of one logical table's reserved CTE.
@@ -35,7 +35,7 @@ type TableSource func(table string) (TableCTE, error)
 
 // MacroSource is the plain (non-federated) source: each table's CTE is an
 // inlined alias for its tenant-scoped table macro, e.g.
-// __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)),
+// __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest_local.insights_runs(?, ?)),
 // which plans exactly like calling the macro at each reference.
 func MacroSource(accountID, envID uuid.UUID) TableSource {
 	return func(table string) (TableCTE, error) {
@@ -80,7 +80,7 @@ func macroSelect(view string, args ...parser.Expr) *parser.SelectStatement {
 	return &parser.SelectStatement{
 		Columns: []*parser.SelectItem{{Expr: &parser.StarExpr{}}},
 		From: &parser.FromClause{Refs: []parser.TableRef{
-			&parser.TableFunctionRef{Name: []string{driver.DuckLakeAlias, view}, Args: args},
+			&parser.TableFunctionRef{Name: []string{schema.MacroSchema, view}, Args: args},
 		}},
 	}
 }
