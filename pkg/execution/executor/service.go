@@ -839,8 +839,10 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 
 	var from time.Time
 	if c.StartedAfter != nil {
-		from = *c.StartedAfter
+		from = c.StartedAfter.Add(-time.Duration(consts.PriorityFactorMax) * time.Second)
 	}
+	// Queue scores include priority; filter the original run times below.
+	until := c.StartedBefore.Add(-time.Duration(consts.PriorityFactorMin) * time.Second)
 
 	scope := queue.Scope{
 		AccountID:  c.AccountID,
@@ -856,7 +858,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		AccountID:  c.AccountID,
 		EnvID:      c.WorkspaceID,
 		FunctionID: c.FunctionID,
-	}, c.FunctionID.String(), from, c.StartedBefore)
+	}, c.FunctionID.String(), from, until)
 	if errors.Is(err, rueidis.Nil) {
 		return nil
 	}

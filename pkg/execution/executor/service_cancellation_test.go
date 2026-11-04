@@ -10,6 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/cancellation"
@@ -49,14 +50,19 @@ func TestEagerBulkCancellationQueuedTime(t *testing.T) {
 		runAt, score time.Time
 		lower        *time.Time
 		eager, lazy  bool
+		priority     int64
 	}{
-		{"older_run_sleep_wakes_inside_range", from.Add(-time.Hour), from.Add(time.Second), &from, false, false},
-		{"queued_start_at_from", from, from, &from, true, true},
-		{"queued_start_at_until", until, until, &from, true, true},
-		{"sleeping_item_after_until", from.Add(time.Second), until.Add(time.Hour), &from, false, true},
-		{"no_lower_bound_older_run", from.Add(-time.Hour), from.Add(time.Second), nil, true, true},
-		{"no_lower_bound_at_until", until, until, nil, true, true},
-		{"no_lower_bound_after_until", until.Add(time.Millisecond), until.Add(time.Millisecond), nil, false, false},
+		{"older_run_sleep_wakes_inside_range", from.Add(-time.Hour), from.Add(time.Second), &from, false, false, 0},
+		{"queued_start_at_from", from, from, &from, true, true, 0},
+		{"queued_start_at_until", until, until, &from, true, true, 0},
+		{"sleeping_item_after_scan_window", from.Add(time.Second), until.Add(24 * time.Hour), &from, false, true, 0},
+		{"no_lower_bound_older_run", from.Add(-time.Hour), from.Add(time.Second), nil, true, true, 0},
+		{"no_lower_bound_at_until", until, until, nil, true, true, 0},
+		{"no_lower_bound_after_until", until.Add(time.Millisecond), until.Add(time.Millisecond), nil, false, false, 0},
+		{"highest_priority_at_from", from, from, &from, true, true, consts.PriorityFactorMax},
+		{"lowest_priority_at_until", until, until, &from, true, true, consts.PriorityFactorMin},
+		{"priority_does_not_include_older_run", from.Add(-time.Millisecond), from.Add(-time.Millisecond), &from, false, false, consts.PriorityFactorMin},
+		{"priority_does_not_include_newer_run", until.Add(time.Millisecond), until.Add(time.Millisecond), &from, false, false, consts.PriorityFactorMax},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mr := miniredis.RunT(t)
@@ -80,9 +86,10 @@ func TestEagerBulkCancellationQueuedTime(t *testing.T) {
 				kind = queue.KindSleep
 			}
 			err = producer.Enqueue(ctx, queue.Item{
-				JobID:       &jobID,
-				Kind:        kind,
-				WorkspaceID: env,
+				JobID:          &jobID,
+				Kind:           kind,
+				WorkspaceID:    env,
+				PriorityFactor: &tc.priority,
 				Identifier: state.Identifier{
 					AccountID:   account,
 					WorkspaceID: env,
