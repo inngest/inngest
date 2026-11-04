@@ -19,7 +19,7 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 
 	// inngest://serve names an Inngest-hosted app rather than a network
 	// address, so it keeps its scheme.
-	if forceHTTPS && !(parsed.Scheme == "inngest" && parsed.Host == "serve") {
+	if forceHTTPS && (parsed.Scheme != "inngest" || parsed.Host != "serve") {
 		isWebSocket := strings.HasPrefix(parsed.Scheme, "ws")
 		parsed.Scheme = "https"
 		if isWebSocket {
