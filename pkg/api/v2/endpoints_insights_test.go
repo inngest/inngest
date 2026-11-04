@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
@@ -27,14 +28,10 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 	})
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)

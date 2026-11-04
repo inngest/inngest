@@ -3,8 +3,10 @@ package insights
 import (
 	"database/sql"
 	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
+	"github.com/inngest/inngest/pkg/duckdb/schema"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
@@ -23,14 +25,10 @@ func newSchemaTestDuckDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 	})
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)
@@ -44,7 +42,7 @@ func newSchemaTestDuckDB(t *testing.T) *sql.DB {
 
 // TestLogicalTablesMatchLiveMacroSchema proves every logicalTable's
 // columnOrder/columns registry (tables.go) exactly matches what its real
-// DuckDB macro (pkg/db/duckdb/migrations/000002_insights_views.sql) actually
+// DuckDB macro (pkg/db/duckdb/views.sql) actually
 // projects -- catching a class of drift TestLogicalTablesColumnOrderMatchesColumns
 // can't: that test only checks tables.go against itself, so a column added
 // (or left, or removed) consistently in both columnOrder and columns but
@@ -61,7 +59,7 @@ func TestLogicalTablesMatchLiveMacroSchema(t *testing.T) {
 	for name, tbl := range logicalTables {
 		t.Run(name, func(t *testing.T) {
 			rows, err := db.QueryContext(t.Context(),
-				"SELECT * FROM inngest."+tbl.view+"(?, ?) LIMIT 0;", accountID.String(), envID.String())
+				"SELECT * FROM "+schema.MacroSchema+"."+tbl.view+"(?, ?) LIMIT 0;", accountID.String(), envID.String())
 			require.NoError(t, err)
 			defer rows.Close()
 
