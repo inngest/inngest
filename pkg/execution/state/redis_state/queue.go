@@ -129,6 +129,10 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
+	return q.enqueueItem(ctx, i, at, opts, "")
+}
+
+func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts, originalSleepID string) (osqueue.QueueItem, error) {
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
@@ -213,6 +217,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
 	}
 
+	alternateSleepID := originalSleepID
+	if alternateSleepID == "" && i.Data.Kind == osqueue.KindSleep && !isSystemPartition && opts.NormalizeFromBacklogID == "" {
+		alternateSleepID = osqueue.MigrationSleepID(i)
+	}
+	if alternateSleepID == i.ID {
+		alternateSleepID = ""
+	}
+
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -242,6 +254,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		// Singletons
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 		kg.SingletonKey(singleton),
+		kg.Idempotency(alternateSleepID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
@@ -273,6 +286,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 		opts.NormalizeFromBacklogID,
 		opts.SingletonMigrationKey != "",
+		alternateSleepID,
+		originalSleepID != "",
 	})
 	if err != nil {
 		return i, err
@@ -295,6 +310,11 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	).AsInt64()
 	if err != nil {
 		return i, fmt.Errorf("error enqueueing item: %w", err)
+	}
+	if status == 3 {
+		i.ID = alternateSleepID
+		i.Data.JobID = &i.ID
+		status = 1
 	}
 	switch status {
 	case 0:
