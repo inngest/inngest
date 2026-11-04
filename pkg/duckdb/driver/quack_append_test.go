@@ -3,7 +3,6 @@ package driver
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -26,28 +25,24 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".append_t "+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE main.append_t "+
 		"(id UUID, name VARCHAR, attrs JSON, ts TIMESTAMPTZ);")
 	require.NoError(t, err)
 
 	id := uuid.New()
 	ts := time.UnixMilli(1_700_000_000_000).UTC()
 
-	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "append_t",
+	appender, err := NewQuackAppender(t.Context(), db, "", "main", "append_t",
 		[]QuackColumnKind{QuackColumnUUID, QuackColumnVarchar, QuackColumnJSON, QuackColumnTimestampTZ})
 	require.NoError(t, err)
 
@@ -56,7 +51,7 @@ func TestQuackAppenderWritesRowsIntoRealTable(t *testing.T) {
 	require.NoError(t, appender.Close(t.Context()))
 
 	rows, err := db.QueryContext(t.Context(),
-		"SELECT id, name, attrs, ts FROM "+DuckLakeAlias+".append_t ORDER BY name NULLS LAST;")
+		"SELECT id, name, attrs, ts FROM main.append_t ORDER BY name NULLS LAST;")
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -86,24 +81,20 @@ func TestQuackAppenderBoolAndBigint(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".append_bi (name VARCHAR, ok BOOLEAN, n BIGINT);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".append_bi (name VARCHAR, ok BOOLEAN, n BIGINT);")
 	require.NoError(t, err)
 
-	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "append_bi",
+	appender, err := NewQuackAppender(t.Context(), db, LakeAlias, "main", "append_bi",
 		[]QuackColumnKind{QuackColumnVarchar, QuackColumnBool, QuackColumnBigint})
 	require.NoError(t, err)
 	require.NoError(t, appender.AppendRow("a", true, int64(9223372036854775807)))
@@ -112,7 +103,7 @@ func TestQuackAppenderBoolAndBigint(t *testing.T) {
 	require.NoError(t, appender.AppendRow("d", true, 42))
 	require.NoError(t, appender.Close(t.Context()))
 
-	rows, err := db.QueryContext(t.Context(), "SELECT name, ok, n FROM "+DuckLakeAlias+".append_bi ORDER BY name;")
+	rows, err := db.QueryContext(t.Context(), "SELECT name, ok, n FROM "+LakeAlias+".append_bi ORDER BY name;")
 	require.NoError(t, err)
 	defer rows.Close()
 	var got [][3]any
@@ -144,7 +135,7 @@ func TestQuackAppenderBoolAndBigint(t *testing.T) {
 // inngest.run_trace_spans rows, one flush): a single oversized chunk failed
 // downstream expression evaluation with "Vector::SetSize out of range —
 // trying to set size to N for vector with capacity 2048" inside
-// CastVarcharToJSON, specifically on the JSON-aliased column this test also
+// CastVarcharToJSON, specifically on the JSON column this test also
 // exercises. rowsToQuackChunks splits a large buffer into
 // quack.StandardVectorSize-capped chunks within the one batch instead — this
 // test flushes more than 2*quack.StandardVectorSize rows in a single Flush
@@ -154,25 +145,21 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".many_rows_t "+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE main.many_rows_t "+
 		"(id VARCHAR, attrs JSON);")
 	require.NoError(t, err)
 
-	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "many_rows_t",
+	appender, err := NewQuackAppender(t.Context(), db, "", "main", "many_rows_t",
 		[]QuackColumnKind{QuackColumnVarchar, QuackColumnJSON})
 	require.NoError(t, err)
 
@@ -182,13 +169,13 @@ func TestQuackAppenderFlushesMoreThanOneVectorWorthOfRows(t *testing.T) {
 	}
 	require.NoError(t, appender.Close(t.Context()))
 
-	row := db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+DuckLakeAlias+".many_rows_t;")
+	row := db.QueryRowContext(t.Context(), "SELECT count(*) FROM main.many_rows_t;")
 	var gotCount int
 	require.NoError(t, row.Scan(&gotCount))
 	require.Equal(t, wantRows, gotCount)
 
 	rows, err := db.QueryContext(t.Context(),
-		"SELECT attrs FROM "+DuckLakeAlias+".many_rows_t WHERE id = 'row-"+fmt.Sprint(wantRows-1)+"';")
+		"SELECT attrs FROM main.many_rows_t WHERE id = 'row-"+fmt.Sprint(wantRows-1)+"';")
 	require.NoError(t, err)
 	defer rows.Close()
 	require.True(t, rows.Next())
@@ -221,24 +208,20 @@ func TestQuackAppenderWritesVarcharArrayLiteralIntoRealArrayColumn(t *testing.T)
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
-		QuackAddr: &addr,
+		Iceberg:    testIceberg(t),
+		QuackAddr:  &addr,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".array_t (id VARCHAR, tags VARCHAR[]);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+LakeAlias+".array_t (id VARCHAR, tags VARCHAR[]);")
 	require.NoError(t, err)
 
-	appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "array_t",
+	appender, err := NewQuackAppender(t.Context(), db, LakeAlias, "main", "array_t",
 		[]QuackColumnKind{QuackColumnVarchar, QuackColumnVarchar})
 	require.NoError(t, err)
 
@@ -247,7 +230,7 @@ func TestQuackAppenderWritesVarcharArrayLiteralIntoRealArrayColumn(t *testing.T)
 	require.NoError(t, appender.AppendRow("null-list", nil))
 	require.NoError(t, appender.Close(t.Context()))
 
-	rows, err := db.QueryContext(t.Context(), "SELECT id, tags FROM "+DuckLakeAlias+".array_t ORDER BY id;")
+	rows, err := db.QueryContext(t.Context(), "SELECT id, tags FROM "+LakeAlias+".array_t ORDER BY id;")
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -282,24 +265,21 @@ func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	const workers = 4
 	const rowsPerWorker = 25
 	connector, db, err := OpenConnector(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    testIceberg(t),
 		QuackAddr:  &addr,
 		QuackConns: workers,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".concurrent_t (id VARCHAR);")
+	// A plain duckdb table, see TestQuackAppenderConcurrentPooledUseDoesNotSuperseded.
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE main.concurrent_t (id VARCHAR);")
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -312,7 +292,7 @@ func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 			require.NoError(t, err)
 			defer conn.Close()
 
-			appender, err := NewQuackAppenderFromConn(t.Context(), conn, DuckLakeAlias, "main", "concurrent_t", []QuackColumnKind{QuackColumnVarchar})
+			appender, err := NewQuackAppenderFromConn(t.Context(), conn, "", "main", "concurrent_t", []QuackColumnKind{QuackColumnVarchar})
 			require.NoError(t, err)
 			for i := range rowsPerWorker {
 				require.NoError(t, appender.AppendRow(fmt.Sprintf("worker-%d-row-%d-%s", worker, i, uuid.New())))
@@ -323,8 +303,8 @@ func TestQuackAppenderFromConnWritesConcurrentlyWithoutLoss(t *testing.T) {
 	wg.Wait()
 
 	var count, distinct int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+DuckLakeAlias+".concurrent_t;").Scan(&count))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT id) FROM "+DuckLakeAlias+".concurrent_t;").Scan(&distinct))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM main.concurrent_t;").Scan(&count))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT id) FROM main.concurrent_t;").Scan(&distinct))
 	require.Equal(t, workers*rowsPerWorker, count)
 	require.Equal(t, workers*rowsPerWorker, distinct, "no row should have been lost or duplicated across concurrent appenders")
 }
@@ -348,7 +328,6 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
 
-	dir := t.TempDir()
 	addr := EphemeralQuackAddr
 	// More workers than QuackConns forces genuine connection reuse (the pool
 	// cannot open more than QuackConns connections at once), and several
@@ -363,17 +342,17 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    testIceberg(t),
 		QuackAddr:  &addr,
 		QuackConns: quackConns,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE "+DuckLakeAlias+".concurrent_pooled_t (id VARCHAR);")
+	// A plain duckdb table, not the lake: this is about the pooled quack
+	// connections, and concurrent appends to one Iceberg table 409 on all
+	// but one commit (optimistic concurrency, see QuackMergeAppender).
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE main.concurrent_pooled_t (id VARCHAR);")
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -383,7 +362,7 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 		go func(worker int) {
 			defer wg.Done()
 			for a := range appendersPerWorker {
-				appender, err := NewQuackAppender(t.Context(), db, DuckLakeAlias, "main", "concurrent_pooled_t", []QuackColumnKind{QuackColumnVarchar})
+				appender, err := NewQuackAppender(t.Context(), db, "", "main", "concurrent_pooled_t", []QuackColumnKind{QuackColumnVarchar})
 				if err != nil {
 					errs[worker] = err
 					return
@@ -408,8 +387,8 @@ func TestQuackAppenderConcurrentPooledUseDoesNotSuperseded(t *testing.T) {
 
 	const wantRows = workers * appendersPerWorker * rowsPerAppender
 	var count, distinct int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+DuckLakeAlias+".concurrent_pooled_t;").Scan(&count))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT id) FROM "+DuckLakeAlias+".concurrent_pooled_t;").Scan(&distinct))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM main.concurrent_pooled_t;").Scan(&count))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT id) FROM main.concurrent_pooled_t;").Scan(&distinct))
 	require.Equal(t, wantRows, count)
 	require.Equal(t, wantRows, distinct, "no row should have been lost or duplicated across concurrent pooled appenders")
 }

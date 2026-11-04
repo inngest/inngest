@@ -330,7 +330,7 @@ func TestGenerateAndInsertPropagatesGenerationErrors(t *testing.T) {
 // instead of leaving the generator blocked on work.
 func TestGenerateAndInsertReturnsWriteErrors(t *testing.T) {
 	connector, db := newTestDB(t, 1)
-	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.DuckLakeAlias+".run_trace_spans;")
+	_, err := db.ExecContext(t.Context(), "DROP TABLE "+driver.LakeAlias+".run_trace_spans;")
 	require.NoError(t, err)
 	genCfg := GenerateConfig{RunCount: 50, Window: time.Hour, Now: time.Now().UTC()}
 
