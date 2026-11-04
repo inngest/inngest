@@ -176,3 +176,26 @@ it('updates table visibility immediately while keeping the multi-select open', a
   fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
 });
+
+it('keeps the whole select disabled until it becomes available', async () => {
+  const onChange = vi.fn();
+  const content = (disabled: boolean) => (
+    <Select label="Function" disabled={disabled} onChange={onChange} isLabelVisible={false}>
+      <Select.Button>Select function</Select.Button>
+      <Select.Options>
+        <Select.Option option={options[0]}>First option</Select.Option>
+      </Select.Options>
+    </Select>
+  );
+  const view = render(content(true));
+  const button = screen.getByRole('button', { name: 'Function Select function' });
+  expect(button.hasAttribute('disabled')).toBe(true);
+  fireEvent.click(button);
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  view.rerender(content(false));
+  expect(button.hasAttribute('disabled')).toBe(false);
+  await open('Function Select function');
+  fireEvent.click(screen.getByRole('option', { name: 'First option' }));
+  expect(onChange).toHaveBeenCalledExactlyOnceWith(options[0]);
+});

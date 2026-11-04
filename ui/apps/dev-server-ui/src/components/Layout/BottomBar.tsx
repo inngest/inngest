@@ -3,12 +3,18 @@ import { Fragment } from 'react';
 import { useInfoQuery } from '@/store/devApi';
 
 const links = [
-  { label: 'Support', href: 'https://support.inngest.com' },
+  { label: 'Support', href: 'https://support.inngest.com', external: true },
   {
     label: 'Docs',
     href: 'https://www.inngest.com/docs?ref=dev-server-bottom-bar',
+    external: true,
   },
-  { label: 'Changelog', href: 'https://www.inngest.com/changelog' },
+  { label: 'MCP', href: '/mcp/setup', external: false },
+  {
+    label: 'Changelog',
+    href: 'https://www.inngest.com/changelog',
+    external: true,
+  },
 ];
 
 export default function BottomBar() {
@@ -22,8 +28,8 @@ export default function BottomBar() {
             {i > 0 && <span className="text-disabled">|</span>}
             <a
               href={item.href}
-              target="_blank"
-              rel="noreferrer"
+              target={item.external ? '_blank' : undefined}
+              rel={item.external ? 'noreferrer' : undefined}
               className="hover:text-basis"
             >
               {item.label}
@@ -33,7 +39,11 @@ export default function BottomBar() {
       </div>
       {/* Version is best-effort — skip the label entirely when the server
           doesn't report one. */}
-      {info?.version && <div>Dev Server v{info.version}</div>}
+      {info?.version && (
+        <div className="hidden shrink-0 sm:block">
+          Dev Server v{info.version}
+        </div>
+      )}
     </footer>
   );
 }

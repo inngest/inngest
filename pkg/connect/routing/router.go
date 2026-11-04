@@ -40,6 +40,10 @@ type RouteResult struct {
 }
 
 func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
+	return getRoute(ctx, stateMgr, rnd, tracer, log, data, nil)
+}
+
+func getRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData, snapshots *connectionSnapshotCache) (*RouteResult, error) {
 	appID, err := uuid.Parse(data.AppId)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse app ID: %w", err)
@@ -71,7 +75,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	ctx, span := tracer.NewUserSpan(ctx, "RouteExecutorRequest", accountID, envID, fnID)
 	defer span.End()
 
-	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
+	routeTo, err := getSuitableConnectionWithSnapshots(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log, snapshots)
 
 	// Retry when all connections are draining — during gateway rollouts
 	// there's a brief window where the replacement isn't READY yet.
@@ -88,7 +92,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 				return nil, ErrNoHealthyConnection
 			case <-time.After(1 * time.Second):
 			}
-			routeTo, err = getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
+			routeTo, err = getSuitableConnectionWithSnapshots(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log, snapshots)
 			if !errors.Is(err, ErrOnlyDrainingConnections) {
 				log.Info("found connection after draining retry",
 					"attempt", i+1,
@@ -126,29 +130,22 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 		}
 	}
 
-	gatewayId, err := ulid.Parse(routeTo.GatewayId)
+	gatewayId, err := ulid.Parse(routeTo.conn.GatewayId)
 	if err != nil {
-		return nil, fmt.Errorf("invalid gatewayId %q: %w", routeTo.GatewayId, err)
+		return nil, fmt.Errorf("invalid gatewayId %q: %w", routeTo.conn.GatewayId, err)
 	}
 
-	connId, err := ulid.Parse(routeTo.Id)
+	connId, err := ulid.Parse(routeTo.conn.Id)
 	if err != nil {
-		return nil, fmt.Errorf("invalid connectionID %q: %w", routeTo.Id, err)
+		return nil, fmt.Errorf("invalid connectionID %q: %w", routeTo.conn.Id, err)
 	}
 
-	groupHash := routeTo.SyncedWorkerGroups[data.AppId]
-
-	group, err := stateMgr.GetWorkerGroupByHash(ctx, envID, groupHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
-	}
-
-	if routeTo.InstanceId == "" {
-		return nil, fmt.Errorf("failed to get instance ID for connection: %q: %w", routeTo.Id, state.ErrNoInstanceIDFound)
+	if routeTo.conn.InstanceId == "" {
+		return nil, fmt.Errorf("failed to get instance ID for connection: %q: %w", routeTo.conn.Id, state.ErrNoInstanceIDFound)
 	}
 
 	// Set app name: This is important to help the SDK find the respective function to invoke
-	data.AppName = group.AppName
+	data.AppName = routeTo.group.AppName
 
 	span.SetAttributes(
 		attribute.String("route_to_gateway_id", gatewayId.String()),
@@ -158,7 +155,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	return &RouteResult{
 		GatewayID:    gatewayId,
 		ConnectionID: connId,
-		InstanceID:   routeTo.InstanceId,
+		InstanceID:   routeTo.conn.InstanceId,
 	}, nil
 }
 
@@ -167,10 +164,51 @@ type connWithGroup struct {
 	group *state.WorkerGroup
 }
 
-func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log logger.Logger) (*connectpb.ConnMetadata, error) {
-	conns, err := stateMgr.GetConnectionsByAppID(ctx, envID, appID)
+func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log logger.Logger) (*connWithGroup, error) {
+	return getSuitableConnectionWithSnapshots(ctx, rnd, stateMgr, envID, appID, fnSlug, log, nil)
+}
+
+var errRefreshConnectionSnapshot = errors.New("connection snapshot needs refresh")
+
+func getSuitableConnectionWithSnapshots(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log logger.Logger, snapshots *connectionSnapshotCache) (*connWithGroup, error) {
+	if snapshots == nil {
+		conns, err := stateMgr.GetConnectionsByAppID(ctx, envID, appID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get connections by app ID: %w", err)
+		}
+		return selectSuitableConnection(ctx, rnd, stateMgr, envID, appID, fnSlug, log, conns, false, nil)
+	}
+
+	key := connectionSnapshotKey{envID: envID, appID: appID}
+	snapshot, cached, err := snapshots.get(ctx, stateMgr, key)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
+	}
+	invalidate := func() { snapshots.invalidate(key, snapshot) }
+	selected, err := selectSuitableConnection(ctx, rnd, stateMgr, envID, appID, fnSlug, log, snapshot.connections, cached, invalidate)
+	needsRefresh := errors.Is(err, errRefreshConnectionSnapshot) ||
+		errors.Is(err, ErrNoHealthyConnection) ||
+		errors.Is(err, ErrOnlyDrainingConnections) ||
+		errors.Is(err, ErrAllWorkersAtCapacity)
+	if !cached || !needsRefresh {
+		return selected, err
+	}
+
+	// a cached record can outlive a reconnect or a heartbeat update.  refresh
+	// before cleanup or before reporting that no worker can take the request.
+	snapshot, _, err = snapshots.refresh(ctx, stateMgr, key, snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("could not refresh connections by app ID: %w", err)
+	}
+	return selectSuitableConnection(ctx, rnd, stateMgr, envID, appID, fnSlug, log, snapshot.connections, false, invalidate)
+}
+
+func selectSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID, appID uuid.UUID, fnSlug string, log logger.Logger, conns []*connectpb.ConnMetadata, cached bool, invalidate func()) (*connWithGroup, error) {
+	stateMgr = &routingLookups{
+		StateManager: stateMgr,
+		groups:       make(map[workerGroupKey]*state.WorkerGroup),
+		gateways:     make(map[ulid.ULID]*state.Gateway),
+		onCleanup:    invalidate,
 	}
 
 	if len(conns) == 0 {
@@ -184,6 +222,9 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	hasDrainingConnections := false
 	for _, conn := range conns {
 		res := isHealthy(ctx, stateMgr, envID, appID, fnSlug, conn, log)
+		if cached && (res.shouldDeleteUnhealthyGateway || res.shouldDeleteUnhealthyConnection) {
+			return nil, errRefreshConnectionSnapshot
+		}
 		// avoid duplicate calls to check capacity for same instance
 		if _, ok := capacityCache[conn.InstanceId]; !ok {
 			capacityRes := checkCapacity(ctx, stateMgr, envID, conn, log)
@@ -232,7 +273,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	}
 
 	if len(candidates) == 1 {
-		return candidates[0].conn, nil
+		return &candidates[0], nil
 	}
 
 	return pickConnection(candidates, rnd)
@@ -309,7 +350,7 @@ func sortByGroupCreatedAt(candidates []connWithGroup) {
 	})
 }
 
-func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connectpb.ConnMetadata, error) {
+func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connWithGroup, error) {
 	// Sort by group CreatedAt (oldest first) so getVersionTimeDistribution can
 	// read the oldest/newest versions from the ends. All candidates remain
 	// eligible; the weighted sampler distributes uniformly among connections
@@ -328,9 +369,7 @@ func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connectpb.
 	if !ok {
 		return nil, util.ErrWeightedSampleRead
 	}
-	chosen := candidates[idx]
-
-	return chosen.conn, nil
+	return &candidates[idx], nil
 }
 
 type isHealthyRes struct {

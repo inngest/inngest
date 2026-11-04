@@ -46,6 +46,11 @@ const (
 	V2_GetBuild_FullMethodName                   = "/api.v2.V2/GetBuild"
 	V2_ListBuilds_FullMethodName                 = "/api.v2.V2/ListBuilds"
 	V2_CancelBuild_FullMethodName                = "/api.v2.V2/CancelBuild"
+	V2_CreateDeploy_FullMethodName               = "/api.v2.V2/CreateDeploy"
+	V2_CommitDeploy_FullMethodName               = "/api.v2.V2/CommitDeploy"
+	V2_GetDeploy_FullMethodName                  = "/api.v2.V2/GetDeploy"
+	V2_ListDeploys_FullMethodName                = "/api.v2.V2/ListDeploys"
+	V2_CancelDeploy_FullMethodName               = "/api.v2.V2/CancelDeploy"
 	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
 	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
 	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
@@ -124,6 +129,11 @@ type V2Client interface {
 	GetBuild(ctx context.Context, in *GetBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
 	ListBuilds(ctx context.Context, in *ListBuildsRequest, opts ...grpc.CallOption) (*ListBuildsResponse, error)
 	CancelBuild(ctx context.Context, in *CancelBuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
+	CreateDeploy(ctx context.Context, in *CreateDeployRequest, opts ...grpc.CallOption) (*CreateDeployResponse, error)
+	CommitDeploy(ctx context.Context, in *CommitDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
+	GetDeploy(ctx context.Context, in *GetDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
+	ListDeploys(ctx context.Context, in *ListDeploysRequest, opts ...grpc.CallOption) (*ListDeploysResponse, error)
+	CancelDeploy(ctx context.Context, in *CancelDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
@@ -431,6 +441,56 @@ func (c *v2Client) CancelBuild(ctx context.Context, in *CancelBuildRequest, opts
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BuildResponse)
 	err := c.cc.Invoke(ctx, V2_CancelBuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CreateDeploy(ctx context.Context, in *CreateDeployRequest, opts ...grpc.CallOption) (*CreateDeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateDeployResponse)
+	err := c.cc.Invoke(ctx, V2_CreateDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CommitDeploy(ctx context.Context, in *CommitDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_CommitDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetDeploy(ctx context.Context, in *GetDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_GetDeploy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListDeploys(ctx context.Context, in *ListDeploysRequest, opts ...grpc.CallOption) (*ListDeploysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDeploysResponse)
+	err := c.cc.Invoke(ctx, V2_ListDeploys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) CancelDeploy(ctx context.Context, in *CancelDeployRequest, opts ...grpc.CallOption) (*DeployResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeployResponse)
+	err := c.cc.Invoke(ctx, V2_CancelDeploy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -927,6 +987,11 @@ type V2Server interface {
 	GetBuild(context.Context, *GetBuildRequest) (*BuildResponse, error)
 	ListBuilds(context.Context, *ListBuildsRequest) (*ListBuildsResponse, error)
 	CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error)
+	CreateDeploy(context.Context, *CreateDeployRequest) (*CreateDeployResponse, error)
+	CommitDeploy(context.Context, *CommitDeployRequest) (*DeployResponse, error)
+	GetDeploy(context.Context, *GetDeployRequest) (*DeployResponse, error)
+	ListDeploys(context.Context, *ListDeploysRequest) (*ListDeploysResponse, error)
+	CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error)
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
@@ -1057,6 +1122,21 @@ func (UnimplementedV2Server) ListBuilds(context.Context, *ListBuildsRequest) (*L
 }
 func (UnimplementedV2Server) CancelBuild(context.Context, *CancelBuildRequest) (*BuildResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelBuild not implemented")
+}
+func (UnimplementedV2Server) CreateDeploy(context.Context, *CreateDeployRequest) (*CreateDeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDeploy not implemented")
+}
+func (UnimplementedV2Server) CommitDeploy(context.Context, *CommitDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitDeploy not implemented")
+}
+func (UnimplementedV2Server) GetDeploy(context.Context, *GetDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDeploy not implemented")
+}
+func (UnimplementedV2Server) ListDeploys(context.Context, *ListDeploysRequest) (*ListDeploysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDeploys not implemented")
+}
+func (UnimplementedV2Server) CancelDeploy(context.Context, *CancelDeployRequest) (*DeployResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelDeploy not implemented")
 }
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
@@ -1672,6 +1752,96 @@ func _V2_CancelBuild_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).CancelBuild(ctx, req.(*CancelBuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CreateDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateDeploy(ctx, req.(*CreateDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CommitDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CommitDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CommitDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CommitDeploy(ctx, req.(*CommitDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetDeploy(ctx, req.(*GetDeployRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListDeploys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDeploysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListDeploys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListDeploys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListDeploys(ctx, req.(*ListDeploysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_CancelDeploy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelDeployRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CancelDeploy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CancelDeploy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CancelDeploy(ctx, req.(*CancelDeployRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2539,6 +2709,26 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelBuild",
 			Handler:    _V2_CancelBuild_Handler,
+		},
+		{
+			MethodName: "CreateDeploy",
+			Handler:    _V2_CreateDeploy_Handler,
+		},
+		{
+			MethodName: "CommitDeploy",
+			Handler:    _V2_CommitDeploy_Handler,
+		},
+		{
+			MethodName: "GetDeploy",
+			Handler:    _V2_GetDeploy_Handler,
+		},
+		{
+			MethodName: "ListDeploys",
+			Handler:    _V2_ListDeploys_Handler,
+		},
+		{
+			MethodName: "CancelDeploy",
+			Handler:    _V2_CancelDeploy_Handler,
 		},
 		{
 			MethodName: "CreateSandbox",
