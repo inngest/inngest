@@ -20,6 +20,7 @@ import {
   RiRefreshLine,
   RiTrophyLine,
 } from '@remixicon/react';
+import { toast } from 'sonner';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -264,12 +265,17 @@ export function ExperimentDetailPage({
   const onOpenInsights = useCallback(() => {
     const sql = insightsQuery.data;
     if (!sql) return;
+    const href = insightsUrl(environment.slug, sql);
+    if (!href) {
+      toast.error('This query is too large to open in Insights.');
+      return;
+    }
     trackOpenedInInsights({
       feature: 'experiments',
       variantCount: detail.data?.variants.length ?? 0,
       selectedVariantCount: selectedVariants.length,
     });
-    window.open(insightsUrl(environment.slug, sql), '_blank');
+    window.open(href, '_blank');
   }, [
     insightsQuery.data,
     environment.slug,
