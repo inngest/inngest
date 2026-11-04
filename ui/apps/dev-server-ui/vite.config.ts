@@ -1,12 +1,11 @@
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
-import path from 'path';
+import path, { resolve } from 'path';
 
 import tsConfigPaths from 'vite-tsconfig-paths';
 
 import { Connect, defineConfig, type PreviewServer } from 'vite';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import http from 'http';
 
 //
@@ -77,7 +76,14 @@ export default defineConfig({
     dedupe: ['next-themes', '@tanstack/react-query', 'react', 'react-dom'],
   },
   ssr: {
-    noExternal: ['@reduxjs/toolkit', '@rtk-query/graphql-request-base-query'],
+    noExternal: [
+      '@reduxjs/toolkit',
+      '@rtk-query/graphql-request-base-query',
+      // Shared editors use these ESM dependencies with extensionless imports.
+      // Bundle them so they resolve during SSR and prerendering.
+      '@headlessui/tailwindcss',
+      'react-use',
+    ],
   },
   plugins: [
     tsConfigPaths({

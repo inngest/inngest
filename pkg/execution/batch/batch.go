@@ -40,6 +40,7 @@ func HashBatchKey(batchKey string) string {
 //
 //	#4 needs to happen in one transaction in order to make sure there will not be any race conditions.
 type BatchManager interface {
+	Name() string
 	// Append appends items to a batch.  This may buffer in-memory for functions with
 	// the same ID prior to appending.
 	//

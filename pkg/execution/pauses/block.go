@@ -570,13 +570,21 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause, 
 	return nil
 }
 
+var deleteBlockLocator = rueidis.NewLuaScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
 // DeleteByID deletes a pause from a block by marking it as deleted in the block's delete tracking set.
 // This method must be called before the pause is deleted from the buffer, otherwise the block index
 // lookup will fail and we won't know which block contains the pause.
 func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspaceID uuid.UUID) error {
 	blockIndexKey := b.pc.KeyGenerator().PauseBlockIndex(ctx, pauseID)
 
-	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Getdel().Key(blockIndexKey).Build()).ToString()
+	// Keep the locator until the deletion marker is written so failures can retry.
+	blockIDStr, err := b.pc.Client().Do(ctx, b.pc.Client().B().Get().Key(blockIndexKey).Build()).ToString()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			// Temporary during rollout:
@@ -625,6 +633,11 @@ func (b blockstore) DeleteByID(ctx context.Context, pauseID uuid.UUID, workspace
 
 	if err := b.pc.Client().Do(ctx, b.pc.Client().B().Sadd().Key(blockDeleteKey(index, blockID)).Member(pauseID.String()).Build()).Error(); err != nil {
 		return err
+	}
+
+	// Do not remove a locator or tombstone installed since our read.
+	if err := deleteBlockLocator.Exec(ctx, b.pc.Client(), []string{blockIndexKey}, []string{blockIDStr}).Error(); err != nil {
+		return fmt.Errorf("error removing block index for pause %s: %w", pauseID, err)
 	}
 
 	b.maybeCompact(ctx, index, []ulid.ULID{blockID}, b.compactionSample)

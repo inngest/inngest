@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
+	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
 // Quack message types, mirroring duckdb_quack::MessageType for protocol
 // version 3. APPEND_REQUEST from the older v1.5-variegata protocol is gone,
 // replaced by SEND_DATA_REQUEST/RESPONSE (see senddata.go).
-// DISCONNECT_MESSAGE(11), ACKNOWLEDGEMENT(15), and HEARTBEAT_REQUEST(16)
-// exist server-side but aren't implemented here. CANCEL_REQUEST(12) is (see
-// encodeCancelRequest).
+// ACKNOWLEDGEMENT(15) and HEARTBEAT_REQUEST(16) exist server-side but aren't
+// implemented here. CANCEL_REQUEST(12) and DISCONNECT_MESSAGE(11) are (see
+// encodeCancelRequest and encodeDisconnectMessage).
 const (
 	msgConnectionRequest  byte = 1
 	msgConnectionResponse byte = 2
@@ -29,6 +30,7 @@ const (
 	msgFetchResponse      byte = 8
 	msgSendDataRequest    byte = 9
 	msgSuccessResponse    byte = 10
+	msgDisconnectMessage  byte = 11
 	msgCancelRequest      byte = 12
 	msgSendDataResponse   byte = 14
 	msgErrorResponse      byte = 100
@@ -322,11 +324,20 @@ func encodePrepareRequest(connectionID, sql string, queryID hugeint) []byte {
 // connection", but this client always sends the real value so a cancel
 // that arrives after a next query has been installed gets rejected. That
 // check alone isn't race-free on the server (see watchForCancel), which is
-// why Query waits for the cancel's response before returning.
+// why a cancelled session is abandoned rather than reused.
 func encodeCancelRequest(connectionID string, queryID hugeint) []byte {
 	return encodeMessage(msgCancelRequest, connectionID, func(w *writer) {
 		w.writeHugeint(1, queryID)
 	})
+}
+
+// encodeDisconnectMessage builds a DisconnectMessage, which has an empty
+// body. The server answers w/ a SuccessResponse and drops connectionID
+// (later requests on it fail w/ "Invalid connection id"). Verified against
+// the real extension: it returns promptly even while a statement is running
+// on the connection, but doesn't interrupt that statement.
+func encodeDisconnectMessage(connectionID string) []byte {
+	return encodeMessage(msgDisconnectMessage, connectionID, func(*writer) {})
 }
 
 // decodePrepareResponseBody reads a PrepareResponse body and returns
@@ -778,7 +789,9 @@ func decodeLogicalType(r *reader) (logicalType, error) {
 // typeName renders lt as the same type-name string DuckDB's own DESCRIBE
 // would print, so a quack-sourced schema feeds DuckDBToColumnType
 // (pkg/duckdb/insights/columntype.go) identically to a DESCRIBE-sourced one.
-// An unrecognized id renders as "UNKNOWN(<id>)" rather than guessing.
+// That includes quoting a STRUCT/UNION field name or ENUM value the way
+// DuckDB does, so the result parses back (parser.ParseType) as the same
+// type. An unrecognized id renders as "UNKNOWN(<id>)" rather than guessing.
 func (lt logicalType) typeName() string {
 	switch lt.id {
 	case logicalTypeSQLNull:
@@ -837,7 +850,7 @@ func (lt logicalType) typeName() string {
 	case logicalTypeEnum:
 		values := make([]string, len(lt.enumValues))
 		for i, v := range lt.enumValues {
-			values[i] = "'" + v + "'"
+			values[i] = "'" + strings.ReplaceAll(v, "'", "''") + "'"
 		}
 		return "ENUM(" + strings.Join(values, ", ") + ")"
 	case logicalTypeList:
@@ -848,7 +861,7 @@ func (lt logicalType) typeName() string {
 	case logicalTypeStruct:
 		parts := make([]string, len(lt.structFields))
 		for i, f := range lt.structFields {
-			parts[i] = f.name + " " + f.typ.typeName()
+			parts[i] = quoteIdent(f.name) + " " + f.typ.typeName()
 		}
 		return "STRUCT(" + strings.Join(parts, ", ") + ")"
 	case logicalTypeMap:
@@ -859,7 +872,7 @@ func (lt logicalType) typeName() string {
 	case logicalTypeUnion:
 		parts := make([]string, 0, len(lt.structFields))
 		for _, f := range lt.structFields[1:] { // structFields[0] is the hidden tag field
-			parts = append(parts, f.name+" "+f.typ.typeName())
+			parts = append(parts, quoteIdent(f.name)+" "+f.typ.typeName())
 		}
 		return "UNION(" + strings.Join(parts, ", ") + ")"
 	case logicalTypeArray:
@@ -872,6 +885,26 @@ func (lt logicalType) typeName() string {
 	default:
 		return fmt.Sprintf("UNKNOWN(%d)", lt.id)
 	}
+}
+
+// quoteIdent quotes s unless it's a lowercase identifier that isn't a
+// keyword, matching DuckDB's own KeywordHelper::WriteOptionallyQuoted.
+func quoteIdent(s string) string {
+	if isLowerIdent(s) && !parser.IsKeyword(s) {
+		return s
+	}
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+}
+
+func isLowerIdent(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '_' || c >= 'a' && c <= 'z' || i > 0 && c >= '0' && c <= '9' {
+			continue
+		}
+		return false
+	}
+	return s != ""
 }
 
 // decodeStructFieldTypes reads a STRUCT LogicalType's field200 value: a

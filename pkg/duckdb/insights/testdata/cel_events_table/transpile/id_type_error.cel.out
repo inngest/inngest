@@ -1,5 +1,8 @@
 INPUT
 event.id == 123
 
-EVENTS ERROR
-expects "event.id" to be a string: 123
+EVENTS SQL
+
+
+EVENTS ARGS
+[]

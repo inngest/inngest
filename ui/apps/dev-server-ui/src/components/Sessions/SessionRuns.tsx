@@ -145,6 +145,10 @@ export function SessionRuns({
     data: runs = [],
     isPending,
     isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    totalCount,
     error,
     refetch,
   } = useSessionRuns({ sessionKey, sessionId, startTime, endTime });
@@ -210,7 +214,19 @@ export function SessionRuns({
             onStatusesChange={onStatusFilterChange}
           />
         </div>
-        <TotalCount totalCount={isPending ? undefined : filteredRuns.length} />
+        <TotalCount
+          // The status filter is client-side, so w/ a filter we can only
+          // count matches in the loaded pages (a lower bound until every
+          // page is loaded). Unfiltered, the backend's total is exact.
+          totalCount={
+            isPending
+              ? undefined
+              : filteredStatus.length === 0
+              ? totalCount ?? runs.length
+              : filteredRuns.length
+          }
+          partial={filteredStatus.length > 0 && Boolean(hasNextPage)}
+        />
       </div>
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
         {error ? (
@@ -246,7 +262,17 @@ export function SessionRuns({
                 />
               )}
             />
-            <div className="flex flex-col items-center pt-2">
+            <div className="flex flex-col items-center gap-2 pt-2">
+              {hasNextPage && (
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  label="Load more"
+                  onClick={() => fetchNextPage()}
+                  loading={isFetchingNextPage}
+                  disabled={isFetchingNextPage}
+                />
+              )}
               <Button
                 kind="secondary"
                 appearance="outlined"
@@ -265,13 +291,27 @@ export function SessionRuns({
   );
 }
 
-function TotalCount({ totalCount }: { totalCount: number | undefined }) {
+function TotalCount({
+  totalCount,
+  partial,
+}: {
+  totalCount: number | undefined;
+  partial: boolean;
+}) {
   if (totalCount === undefined) return null;
 
   const formatted = new Intl.NumberFormat().format(totalCount);
   return (
-    <span className="text-muted text-xs font-semibold">
-      {formatted} {totalCount === 1 ? 'run' : 'runs'}
+    <span
+      className="text-muted text-xs font-semibold"
+      title={
+        partial
+          ? 'Matching runs in the loaded pages, load more to count the rest'
+          : undefined
+      }
+    >
+      {formatted}
+      {partial ? '+' : ''} {totalCount === 1 && !partial ? 'run' : 'runs'}
     </span>
   );
 }

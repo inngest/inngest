@@ -21,6 +21,13 @@ var (
 		60_000, 300_000, 600_000,
 	}
 
+	queueItemStartLatencyBoundaries = []float64{
+		1, 2, 5, 10, 20, 50, 100, 200, 500,
+		1000, 2000, 5000, 10_000, 30_000,
+		60_000, 300_000, 600_000, 1_800_000, // < 1h
+		3_600_000, 10_800_000, // < 3h
+	}
+
 	cancellationReadDurationBoundaries = []float64{
 		5, 10, 50, 100, 200, 500, // < 1s
 		1000, 2000, 5000, 30_000, // < 1m
@@ -139,6 +146,20 @@ func HistogramFastPathExecutionLatency(ctx context.Context, value int64, opts Hi
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  fastPathExecutionLatencyBoundaries,
+	})
+}
+
+// HistogramQueueItemStartLatency records due-to-start time for every queue item,
+// including time spent waiting for concurrency, throttle or backlog capacity.
+// It is measured the same way for every queue backend.
+func HistogramQueueItemStartLatency(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_start_latency",
+		Description: "Time from a queue item being due to it starting, including capacity and backlog waits",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  queueItemStartLatencyBoundaries,
 	})
 }
 

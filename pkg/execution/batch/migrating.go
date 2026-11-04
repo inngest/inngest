@@ -94,6 +94,7 @@ func (m *migratingBatchManager) StartExecution(ctx context.Context, accountID, f
 		"account_id", accountID,
 		"function_id", functionID,
 		"batch_id", batchID,
+		"primary", primary.Name(),
 	)
 	recordFallback(ctx, "start_execution")
 	return fallback.StartExecution(ctx, accountID, functionID, batchID, batchPointer)
@@ -112,6 +113,7 @@ func (m *migratingBatchManager) RetrieveItems(ctx context.Context, accountID, fu
 		"account_id", accountID,
 		"function_id", functionID,
 		"batch_id", batchID,
+		"primary", primary.Name(),
 	)
 	recordFallback(ctx, "retrieve_items")
 	return fallback.RetrieveItems(ctx, accountID, functionID, batchID)
@@ -164,6 +166,10 @@ func (m *migratingBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts)
 	resCurrent, errCurrent := m.current.RunBatch(ctx, opts)
 	resNext, errNext := m.next.RunBatch(ctx, opts)
 	return append(resCurrent, resNext...), errors.Join(errCurrent, errNext)
+}
+
+func (m *migratingBatchManager) Name() string {
+	return "migrating"
 }
 
 func (m *migratingBatchManager) Close() error {

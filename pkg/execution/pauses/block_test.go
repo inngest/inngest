@@ -1966,6 +1966,26 @@ func TestBlockstoreDeleteByID(t *testing.T) {
 
 	// Delete existing blocks through a manager with reading and flushing disabled.
 	mgr := NewManager(redisAdapter{rsm: pauseStore}, store)
+	blockIDs, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blockIDs, 1)
+	deleteKey := blockDeleteKey(index, blockIDs[0])
+	// A wrong-type key lets the locator read succeed but fails the deletion marker write.
+	require.NoError(t, r.Set(deleteKey, "not a set"))
+	require.ErrorContains(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID), "WRONGTYPE")
+	r.Del(deleteKey)
+	require.NoError(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID))
+	require.NoError(t, mgr.DeletePauseByID(ctx, pauses[0].ID, workspaceID))
+
+	reader := NewManager(redisAdapter{rsm: pauseStore}, store,
+		WithBlockStoreEnabled(func(context.Context, uuid.UUID) bool { return true }))
+	var remaining []uuid.UUID
+	require.NoError(t, reader.LoadEvaluablesSince(ctx, workspaceID, eventName, time.Time{}, func(_ context.Context, e expr.Evaluable) error {
+		remaining = append(remaining, e.GetID())
+		return nil
+	}))
+	require.ElementsMatch(t, []uuid.UUID{pauses[1].ID, pauses[2].ID}, remaining)
+
 	for _, pause := range pauses {
 		err = mgr.DeletePauseByID(ctx, pause.ID, workspaceID)
 		require.NoError(t, err)

@@ -1,0 +1,3 @@
+{
+  "error": "insights: a list comprehension can't be nested inside another list comprehension (at 1:9)"
+}

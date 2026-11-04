@@ -1,0 +1,3 @@
+{
+  "error": "insights: column \"bogus\" does not exist on left side of join (at 1:20)"
+}

@@ -2,6 +2,7 @@
 package parser
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,19 +61,26 @@ func TestParseStringRecoversPanicAsError(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseStringPrefixesRecoveredPanicsOnce(t *testing.T) {
-	// Adapter panics already carry the package prefix; the recover in
-	// ParseString must not add a second one.
-	for _, sql := range []string{
-		"DESCRIBE t",
-		"SELECT * REPLACE (a + 1 AS a) FROM t",
-		"SELECT * RENAME (a AS b) FROM t",
-		"SELECT * FROM t TABLESAMPLE 10%",
+func TestParseStringReportsUnsupportedConstructsAsParseErrors(t *testing.T) {
+	// An unsupported construct comes back as a positioned *ParseError, not
+	// a recovered panic message.
+	for _, c := range []struct {
+		sql, msg string
+		col      int
+	}{
+		{"DESCRIBE t", "DESCRIBE/TABLE as a standalone statement is not supported", 1},
+		{"SELECT * REPLACE (a + 1 AS a) FROM t", "* REPLACE (...) is not supported", 10},
+		{"SELECT * RENAME (a AS b) FROM t", "* RENAME (...) is not supported", 10},
+		{"SELECT * FROM t TABLESAMPLE 10%", "TABLESAMPLE is not supported", 17},
+		{"SELECT a OPERATOR(+) b FROM t", "OPERATOR(...) is not supported", 10},
+		{"SELECT TRY(a) FROM t", "TRY(...) is not supported", 8},
 	} {
-		_, err := ParseString(sql)
-		require.Error(t, err, sql)
-		require.True(t, strings.HasPrefix(err.Error(), "duckdb/parser: "), err.Error())
-		require.Equal(t, 1, strings.Count(err.Error(), "duckdb/parser:"), err.Error())
+		_, err := ParseString(c.sql)
+		var perr *ParseError
+		require.ErrorAs(t, err, &perr, c.sql)
+		require.Equal(t, c.msg, perr.Message, c.sql)
+		require.Equal(t, 1, perr.Pos.Line, c.sql)
+		require.Equal(t, c.col, perr.Pos.Column, c.sql)
 	}
 }
 
@@ -86,6 +94,35 @@ func TestParseStringRejectsOversizedInput(t *testing.T) {
 	var perr *ParseError
 	require.ErrorAs(t, err, &perr)
 	require.Contains(t, perr.Message, "exceeding the 65536-byte limit")
+}
+
+func TestParseStringRejectsOversizedParse(t *testing.T) {
+	// A dense input well under MaxSQLBytes still exceeds the memo/node
+	// budget, and fails cleanly instead of allocating without bound.
+	sql := "SELECT a" + strings.Repeat(", a", 20<<10)
+	require.Less(t, len(sql), MaxSQLBytes)
+	_, err := ParseString(sql)
+	var perr *ParseError
+	require.ErrorAs(t, err, &perr)
+	require.Equal(t, "query is too large or complex to parse", perr.Message)
+
+	// So is an IN list just under MaxSQLBytes.
+	var in strings.Builder
+	in.WriteString("SELECT * FROM t WHERE x IN (100000")
+	for i := 100001; in.Len() < MaxSQLBytes-16; i++ {
+		fmt.Fprintf(&in, ", %d", i)
+	}
+	in.WriteString(")")
+	_, err = ParseString(in.String())
+	require.NoError(t, err)
+
+	// A realistic large query is well within it.
+	_, err = ParseString("SELECT a" + strings.Repeat(", coalesce(t.b, 'x') + 1 AS c", 200) + " FROM t")
+	require.NoError(t, err)
+
+	// The pooled session that hit the limit is reusable afterwards.
+	_, err = ParseString("SELECT a FROM t")
+	require.NoError(t, err)
 }
 
 func TestParseStringRejectsDeepNesting(t *testing.T) {
