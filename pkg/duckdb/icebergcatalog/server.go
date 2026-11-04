@@ -106,6 +106,27 @@ var endpoints = []string{
 	"POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/metrics",
 }
 
+// handle registers h behind validation of the `{ns}`/`{table}` path params,
+// so no handler ever sees a name that could escape the warehouse once it's
+// joined into a location.
+func (s *Server) handle(pattern string, h http.HandlerFunc) {
+	s.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+		if ns := r.PathValue("ns"); ns != "" {
+			if err := validateNames(strings.Split(ns, namespaceSeparator)); err != nil {
+				writeCatalogError(w, err)
+				return
+			}
+		}
+		if t := r.PathValue("table"); t != "" {
+			if err := validateName(t); err != nil {
+				writeCatalogError(w, err)
+				return
+			}
+		}
+		h(w, r)
+	})
+}
+
 func (s *Server) routes() {
 	// NOTE: we don't use a {prefix} segment. Config returns no `prefix`
 	// override so clients build `/v1/namespaces/...` directly. Go's mux can't
@@ -115,18 +136,18 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /v1/namespaces", s.listNamespaces)
 	s.mux.HandleFunc("POST /v1/namespaces", s.createNamespace)
-	s.mux.HandleFunc("GET /v1/namespaces/{ns}", s.getNamespace)
-	s.mux.HandleFunc("HEAD /v1/namespaces/{ns}", s.headNamespace)
-	s.mux.HandleFunc("DELETE /v1/namespaces/{ns}", s.dropNamespace)
-	s.mux.HandleFunc("POST /v1/namespaces/{ns}/properties", s.updateNamespaceProperties)
+	s.handle("GET /v1/namespaces/{ns}", s.getNamespace)
+	s.handle("HEAD /v1/namespaces/{ns}", s.headNamespace)
+	s.handle("DELETE /v1/namespaces/{ns}", s.dropNamespace)
+	s.handle("POST /v1/namespaces/{ns}/properties", s.updateNamespaceProperties)
 
-	s.mux.HandleFunc("GET /v1/namespaces/{ns}/tables", s.listTables)
-	s.mux.HandleFunc("POST /v1/namespaces/{ns}/tables", s.createTable)
-	s.mux.HandleFunc("GET /v1/namespaces/{ns}/tables/{table}", s.loadTable)
-	s.mux.HandleFunc("HEAD /v1/namespaces/{ns}/tables/{table}", s.headTable)
-	s.mux.HandleFunc("POST /v1/namespaces/{ns}/tables/{table}", s.commitTable)
-	s.mux.HandleFunc("DELETE /v1/namespaces/{ns}/tables/{table}", s.dropTable)
-	s.mux.HandleFunc("POST /v1/namespaces/{ns}/tables/{table}/metrics", s.reportMetrics)
+	s.handle("GET /v1/namespaces/{ns}/tables", s.listTables)
+	s.handle("POST /v1/namespaces/{ns}/tables", s.createTable)
+	s.handle("GET /v1/namespaces/{ns}/tables/{table}", s.loadTable)
+	s.handle("HEAD /v1/namespaces/{ns}/tables/{table}", s.headTable)
+	s.handle("POST /v1/namespaces/{ns}/tables/{table}", s.commitTable)
+	s.handle("DELETE /v1/namespaces/{ns}/tables/{table}", s.dropTable)
+	s.handle("POST /v1/namespaces/{ns}/tables/{table}/metrics", s.reportMetrics)
 	s.mux.HandleFunc("POST /v1/tables/rename", s.renameTable)
 
 	s.mux.HandleFunc("POST /v1/transactions/commit", func(w http.ResponseWriter, r *http.Request) {
@@ -287,12 +308,16 @@ func (s *Server) createNamespace(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	if len(req.Namespace) == 0 {
-		writeError(w, http.StatusBadRequest, "BadRequestException", "namespace is required")
+	if err := validateNames(req.Namespace); err != nil {
+		writeCatalogError(w, err)
 		return
 	}
 	if req.Properties == nil {
 		req.Properties = iceberg.Properties{}
+	}
+	if err := s.checkLocationProps(req.Properties); err != nil {
+		writeCatalogError(w, err)
+		return
 	}
 	if err := s.cat.CreateNamespace(r.Context(), req.Namespace, req.Properties); err != nil {
 		writeCatalogError(w, err)
@@ -332,6 +357,10 @@ func (s *Server) updateNamespaceProperties(w http.ResponseWriter, r *http.Reques
 	if !readJSON(w, r, &req) {
 		return
 	}
+	if err := s.checkLocationProps(req.Updates); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 	sum, err := s.cat.UpdateNamespaceProperties(r.Context(), pathNamespace(r), req.Removals, req.Updates)
 	if err != nil {
 		writeCatalogError(w, err)
@@ -362,6 +391,22 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "name and schema are required")
 		return
 	}
+	if err := validateName(req.Name); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	if req.Location != "" {
+		loc, err := s.checkLocation(req.Location)
+		if err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		req.Location = loc
+	}
+	if err := s.checkLocationProps(req.Properties); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 	ident := append(append(table.Identifier{}, ns...), req.Name)
 
 	if req.StageCreate {
@@ -373,6 +418,9 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// NOTE: w/o an explicit location, iceberg-go's CreateTable derives one
+	// from the namespace `location` property (validated on write) or the
+	// warehouse, same as defaultLocation.
 	opts := []catalog.CreateTableOpt{}
 	if req.Location != "" {
 		opts = append(opts, catalog.WithLocation(req.Location))
@@ -447,13 +495,21 @@ func (s *Server) defaultLocation(ctx context.Context, ns table.Identifier, name 
 	if err != nil {
 		return "", err
 	}
-	if loc := props.Get("location", ""); loc != "" {
-		return url.JoinPath(loc, name)
-	}
-	if s.opts.Warehouse == "" {
+	var loc string
+	switch {
+	case props.Get("location", "") != "":
+		loc, err = url.JoinPath(props.Get("location", ""), name)
+	case s.opts.Warehouse == "":
 		return "", errors.New("no warehouse configured and no location given")
+	default:
+		loc, err = url.JoinPath(s.opts.Warehouse, strings.Join(ns, ".")+".db", name)
 	}
-	return url.JoinPath(s.opts.Warehouse, strings.Join(ns, ".")+".db", name)
+	if err != nil {
+		return "", err
+	}
+	// Names and the namespace location are validated on the way in, this
+	// just makes sure nothing slipped through (IE a pre-existing property).
+	return s.checkLocation(loc)
 }
 
 func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
@@ -491,7 +547,12 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed requirements: "+err.Error())
 		return
 	}
-	updates, err := fixCreateUpdates(req.Requirements, raw.Updates)
+	checked, err := s.checkCommitLocations(raw.Updates)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	updates, err := fixCreateUpdates(req.Requirements, checked)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
 		return
@@ -559,6 +620,12 @@ func (s *Server) renameTable(w http.ResponseWriter, r *http.Request) {
 	}
 	from := append(append(table.Identifier{}, req.Source.Namespace...), req.Source.Name)
 	to := append(append(table.Identifier{}, req.Destination.Namespace...), req.Destination.Name)
+	for _, id := range []table.Identifier{from, to} {
+		if err := validateNames(id); err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+	}
 	if _, err := s.cat.RenameTable(r.Context(), from, to); err != nil {
 		writeCatalogError(w, err)
 		return
@@ -691,7 +758,8 @@ func classify(err error) (int, string) {
 		return http.StatusConflict, "NamespaceNotEmptyException"
 	case errors.Is(err, table.ErrCommitFailed), isRequirementFailure(err):
 		return http.StatusConflict, "CommitFailedException"
-	case errors.Is(err, catalog.ErrInvalidIdentifier),
+	case errors.Is(err, errBadRequest),
+		errors.Is(err, catalog.ErrInvalidIdentifier),
 		errors.Is(err, table.ErrInvalidRequirement),
 		errors.Is(err, table.ErrInvalidMetadata):
 		return http.StatusBadRequest, "BadRequestException"
