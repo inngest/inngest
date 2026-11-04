@@ -3,14 +3,17 @@ package devserver
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/inngest/inngest/pkg/duckdb/tracing"
@@ -100,10 +103,12 @@ func duckDBConnLimit(ctx context.Context, env string, def int) int {
 // persist mirrors devserver's --persist flag (StartOpts.Persist), the same
 // knob that already gates SQLite/Redis persistence -- ANDed by the caller
 // with the EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE feature flag, so an
-// on-disk DuckLake catalog additionally requires that flag even when
-// --persist is set (see devserver.go's start()). false skips DuckLake
-// entirely and opens a plain in-memory duckdb catalog instead (no on-disk
-// catalog/data files), matching how --persist=false already means
+// on-disk Iceberg lake additionally requires that flag even when --persist
+// is set (see devserver.go's start()). true starts an embedded Iceberg REST
+// catalog (pkg/duckdb/icebergcatalog) on 127.0.0.1 and attaches it as the
+// lake; it's closed w/ the listener. false skips the lake entirely and
+// opens a plain in-memory duckdb catalog instead (no on-disk catalog/data
+// files), matching how --persist=false already means
 // "in-memory databases" for the rest of the dev server. It also changes the
 // default (stateDir == "") location of the duckdb binary cache and extension
 // directory (see driver.Options.StateDir): rather than the usual
@@ -111,10 +116,10 @@ func duckDBConnLimit(ctx context.Context, env string, def int) int {
 // under StateDir is worth keeping around once the in-memory catalog is gone
 // anyway. An explicit stateDir is still honored even when persist is false.
 //
-// postgresURI, when non-empty and persist is true, moves the DuckLake catalog
-// to that Postgres database instead of a local catalog file — see
-// duckLakeOptionsFor. It is ignored when persist is false, matching
-// devserver.go's own gating (opts.Persist && enableDuckDBPersistence).
+// postgresURI, when non-empty and persist is true, keeps the Iceberg
+// catalog's table pointers in that Postgres database instead of a local
+// sqlite file — see icebergConfigFor. It is ignored when persist is false,
+// matching devserver.go's own gating (opts.Persist && enableDuckDBPersistence).
 func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stateDir, postgresURI string) (listener execution.SyncLifecycleListener, db, readDB *sql.DB) {
 	l := logger.StdlibLogger(ctx)
 
@@ -156,28 +161,42 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	// share the first instance's port instead of failing to bind.
 	quackAddr := driver.EphemeralQuackAddr
 
-	// persist=false skips DuckLake entirely: a plain in-memory catalog with
+	// persist=false skips the lake entirely: a plain in-memory catalog with
 	// no on-disk main/catalog/data files, matching --persist=false's existing
 	// meaning for SQLite/Redis ("use in-memory databases").
 	dbFile := ":memory:"
-	var duckLake *driver.DuckLakeOptions
+	var (
+		lake    *driver.IcebergOptions
+		catalog *icebergcatalog.Embedded
+	)
 	if persist {
 		dbFile = filepath.Join(duckdbDir, "main.duckdb")
-		duckLake = duckLakeOptionsFor(duckdbDir, postgresURI)
+		catalog, err = icebergcatalog.Open(ctx, icebergConfigFor(duckdbDir, postgresURI))
+		if err != nil {
+			l.Warn("failed to start the embedded iceberg catalog; dual-write disabled", "error", err)
+			return nil, nil, nil
+		}
+		lake = &driver.IcebergOptions{URI: catalog.URL, Warehouse: icebergcatalog.CatalogName, Token: catalog.Token, DataPath: catalog.Warehouse}
+	}
+	closeCatalog := func() {
+		if catalog != nil {
+			_ = catalog.Close()
+		}
 	}
 
 	connector, db, err := driver.OpenConnector(ctx, driver.Options{
 		BinaryPath: binaryPath,
 		StateDir:   resolvedStateDir,
 		DBFile:     dbFile,
-		DuckLake:   duckLake,
+		Iceberg:    lake,
 		QuackAddr:  &quackAddr,
 		QuackConns: duckDBConnLimit(ctx, duckDBWriteConnsEnv, dualWriteQuackConns),
 		// Insights runs user-written SQL on this same handle, so sandbox the
-		// subprocess (no file/env access beyond the lake's own data) as
-		// defense in depth behind insights' validator. Left off for a
-		// Postgres catalog, which hasn't been verified under the sandbox.
-		RestrictExternalAccess: duckLake == nil || duckLake.PostgresCatalogURI == "",
+		// subprocess (no file/env access beyond the catalog and warehouse)
+		// as defense in depth behind insights' validator. The catalog's
+		// own backing db (sqlite or postgres) is in this process, not
+		// duckdb, so it doesn't matter which one it is.
+		RestrictExternalAccess: true,
 		// Also bound memory/threads/temp spill, so a heavy Insights query
 		// can't take the whole machine (these are per-process, so they're
 		// shared w/ dual-write's own writes).
@@ -185,6 +204,7 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)
+		closeCatalog()
 		return nil, nil, nil
 	}
 
@@ -195,41 +215,67 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 	if err := duckdb.Migrate(ctx, db, mode); err != nil {
 		l.Warn("failed to migrate duckdb staging schema; dual-write disabled", "error", err)
 		_ = db.Close()
+		closeCatalog()
 		return nil, nil, nil
 	}
 
-	return tracing.NewListener(db), db, connector.OpenShared(duckDBConnLimit(ctx, duckDBReadConnsEnv, duckDBReadConns))
+	readDB = connector.OpenShared(duckDBConnLimit(ctx, duckDBReadConnsEnv, duckDBReadConns))
+	if catalog == nil {
+		return tracing.NewListener(db), db, readDB
+	}
+	listener = tracing.NewListener(db, tracing.WithBatchInterval(lakeFlushInterval))
+	return lakeListener{SyncLifecycleListener: listener, catalog: catalog}, db, readDB
 }
 
-// duckLakeOptionsFor builds the DuckLakeOptions for a persisted (--persist)
-// dual-write catalog rooted at duckdbDir. postgresURI, when non-empty, moves
-// the catalog metadata to that Postgres database instead of the local
-// catalog.duckdb file -- devserver.go passes opts.PostgresURI here so that a
-// dev server already configured against an external Postgres (its own
-// --postgres-uri flag) can reuse the same database as the DuckLake catalog
-// rather than also maintaining a separate local catalog file. Parquet data
-// stays under duckdbDir/data in either case: only the catalog moves.
+// lakeFlushInterval is how often the persisted lake's batchers flush. Each
+// flush is an Iceberg commit (a snapshot per statement, plus a metadata.json
+// and manifest list), and there's no inlining like DuckLake had, so the
+// in-memory mode's 200ms would make a pile of tiny files + snapshots.
+//
+// TODO(maintenance): nothing expires snapshots, removes orphan files or
+// compacts the lake yet, so it still grows w/o bound.
+const lakeFlushInterval = 3 * time.Second
+
+// lakeListener is the dual-write listener for a persisted lake: Close stops
+// the listener (closing duckdb) and then the embedded catalog duckdb was
+// attached to.
+type lakeListener struct {
+	execution.SyncLifecycleListener
+	catalog *icebergcatalog.Embedded
+}
+
+func (l lakeListener) Close(ctx context.Context) error {
+	var err error
+	if c, ok := l.SyncLifecycleListener.(tracing.Closer); ok {
+		err = c.Close(ctx)
+	}
+	return errors.Join(err, l.catalog.Close())
+}
+
+// icebergConfigFor builds the embedded catalog config for a persisted
+// (--persist) lake rooted at duckdbDir: data + metadata files under
+// duckdbDir/warehouse, and the catalog's table pointers in
+// duckdbDir/catalog.sqlite, or in postgresURI's database when set (so a dev
+// server already configured w/ --postgres-uri doesn't also keep a local
+// catalog file).
 //
 // This applies to `inngest start` too (which always persists), so a
-// self-hosted `inngest start --duckdb --postgres-uri ...` with
-// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true creates DuckLake's catalog
-// tables in the production Postgres database, in DuckLake's default schema
-// alongside Inngest's own tables. That's accepted for this experimental
-// POC; a dedicated catalog URI or schema (DuckLakeOptions.MetadataSchema)
-// would be needed before this is production-ready.
+// self-hosted `inngest start --duckdb --postgres-uri ...` w/
+// EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true creates iceberg-go's catalog
+// tables (`iceberg_tables`, `iceberg_namespace_properties`) in the production
+// Postgres database, in its default schema alongside Inngest's own tables.
+// That's accepted for this experimental POC.
 //
-// Kept as a pure function (no I/O) so this branching is unit-testable without
-// spawning a duckdb subprocess.
-func duckLakeOptionsFor(duckdbDir, postgresURI string) *driver.DuckLakeOptions {
-	opts := &driver.DuckLakeOptions{
-		DataPath: filepath.Join(duckdbDir, "data"),
-	}
+// Kept as a pure function (no I/O) so this branching is unit-testable
+// without starting anything.
+func icebergConfigFor(duckdbDir, postgresURI string) icebergcatalog.Config {
+	cfg := icebergcatalog.Config{Warehouse: filepath.Join(duckdbDir, "warehouse")}
 	if postgresURI != "" {
-		opts.PostgresCatalogURI = postgresURI
+		cfg.PostgresURI = postgresURI
 	} else {
-		opts.CatalogPath = filepath.Join(duckdbDir, "catalog.duckdb")
+		cfg.SQLitePath = filepath.Join(duckdbDir, "catalog.sqlite")
 	}
-	return opts
+	return cfg
 }
 
 // stopDualWrite stops the background batcher goroutines started by
@@ -256,7 +302,7 @@ func stopDualWrite(ctx context.Context, l execution.SyncLifecycleListener) {
 // is also set, instead of silently dual-writing against an in-memory catalog
 // in that case. --persist without --duckdb, or --duckdb without --persist
 // (the in-memory dual-write catalog, which stays available regardless of
-// this flag -- only the on-disk DuckLake catalog, data that outlives the
+// this flag -- only the on-disk lake, data that outlives the
 // process, is gated, since that's the behavior with real operational
 // impact: disk usage, accumulating state), are both still fine. Silently
 // honoring --persist for everything else but not for dual-write was a
@@ -264,7 +310,7 @@ func stopDualWrite(ctx context.Context, l execution.SyncLifecycleListener) {
 // startup, not by noticing dual-write data vanished after a restart.
 func validateDuckDBPersistenceFlags(persist, enableDuckDB, enableDuckDBPersistence bool) error {
 	if persist && enableDuckDB && !enableDuckDBPersistence {
-		return fmt.Errorf("--persist with --duckdb also requires the EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true feature flag to write an on-disk DuckLake catalog; unset --persist, drop --duckdb, or set that env var")
+		return fmt.Errorf("--persist with --duckdb also requires the EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE=true feature flag to write an on-disk Iceberg lake; unset --persist, drop --duckdb, or set that env var")
 	}
 	return nil
 }
