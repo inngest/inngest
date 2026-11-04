@@ -115,22 +115,22 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	require.Greater(t, wantMetadata, 0, "testTemplates' MetadataProfiles should produce some metadata across 3 runs")
 
 	var runCount int
-	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;")
+	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;")
 	require.NoError(t, row.Scan(&runCount))
 	require.Equal(t, 3, runCount)
 
 	var spanCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".run_trace_spans;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_trace_spans;")
 	require.NoError(t, row.Scan(&spanCount))
 	require.Equal(t, wantSpans, spanCount)
 
 	var eventCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".events;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".events;")
 	require.NoError(t, row.Scan(&eventCount))
 	require.Equal(t, wantEvents, eventCount)
 
 	var metadataCount int
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".run_metadata;")
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".run_metadata;")
 	require.NoError(t, row.Scan(&metadataCount))
 	require.Equal(t, wantMetadata, metadataCount)
 }
@@ -201,7 +201,7 @@ func TestInsertGeneratedRunsBatchesAcrossMultipleRunsPerFlush(t *testing.T) {
 	require.Equal(t, wantEvents, summary.Events)
 
 	var runCount int
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
 	require.Equal(t, 5, runCount)
 }
 
@@ -242,8 +242,8 @@ func TestInsertGeneratedRunsProgressBatchIndicesAreDistinctUnderConcurrency(t *t
 
 	require.Equal(t, 40, summary.Runs)
 	var runCount, distinctRunIDs int
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(DISTINCT run_id) FROM "+driver.DuckLakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
 	require.Equal(t, 40, runCount)
 	require.Equal(t, 40, distinctRunIDs, "no run should have been written more than once")
 }
@@ -360,8 +360,8 @@ func TestGenerateAndInsertWithParallelism(t *testing.T) {
 	require.Equal(t, 40, summary.Runs)
 
 	var runCount, distinctRunIDs int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.DuckLakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
 	require.Equal(t, 40, runCount)
 	require.Equal(t, 40, distinctRunIDs)
 }

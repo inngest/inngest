@@ -50,8 +50,8 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = db.ExecContext(ctx,
-		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-		 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '1', ?);`,
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+		 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '1', ?, '{}'::JSON);`,
 		accountID.String(), envID.String(), eventInternalID, receivedAt, eventInternalID, "app/one", `{"k":"v"}`, receivedAt,
 	)
 	require.NoError(t, err)

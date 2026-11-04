@@ -27,6 +27,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog"
 )
 
 // runConfig parameterizes run — the seeding pipeline main wires up from
@@ -141,12 +142,11 @@ func run(ctx context.Context, cfg runConfig) (Summary, error) {
 	}
 
 	cfg.logf("opening source %s", cfg.SourceDir)
-	sourceConnector, sourceDB, err := openDuckDB(ctx, cfg.SourceDir, cfg.Parallelism)
+	sourceConnector, sourceDB, closeSource, err := openDuckDB(ctx, cfg.SourceDir, cfg.Parallelism)
 	if err != nil {
 		return Summary{}, fmt.Errorf("duckdbseed: opening source %q: %w", cfg.SourceDir, err)
 	}
-	defer sourceConnector.Close()
-	defer sourceDB.Close()
+	defer closeSource()
 
 	cfg.logf("sampling up to %d distinct run(s) from source", cfg.SampleLimit)
 	sampleStart := time.Now()
@@ -181,13 +181,12 @@ func run(ctx context.Context, cfg runConfig) (Summary, error) {
 		cfg.logf("target is the same directory as source; reusing connection")
 	} else {
 		cfg.logf("opening target %s", cfg.TargetDir)
-		var targetDB *sql.DB
-		targetConnector, targetDB, err = openDuckDB(ctx, cfg.TargetDir, cfg.Parallelism)
+		var closeTarget func()
+		targetConnector, _, closeTarget, err = openDuckDB(ctx, cfg.TargetDir, cfg.Parallelism)
 		if err != nil {
 			return Summary{}, fmt.Errorf("duckdbseed: opening target %q: %w", cfg.TargetDir, err)
 		}
-		defer targetConnector.Close()
-		defer targetDB.Close()
+		defer closeTarget()
 	}
 
 	cfg.logf("generating and inserting %d run(s) (seed=%d, window=%s, batch size %d, parallelism %d)",
@@ -238,49 +237,59 @@ func progressLogger(logf func(format string, args ...any)) func(batchIndex, tota
 	}
 }
 
-// openDuckDB opens dir's DuckDB catalog (creating it on first use) with
-// DuckLake attached under driver.DuckLakeAlias, quack always enabled (this
-// tool's Appender-based writes require it — see insert.go), and the schema
-// migrated (driver.Migrate — the real dual-write migrations, not a local
-// copy), mirroring pkg/devserver/duckdb.go's setupDualWrite layout
-// (<dir>/main.duckdb, <dir>/catalog.duckdb, <dir>/data/) so this tool reads
-// and writes the same catalog `inngest dev --duckdb` does.
+// openDuckDB opens dir's DuckDB database (creating it on first use) w/ an
+// embedded Iceberg catalog attached under driver.LakeAlias, quack always
+// enabled (this tool's Appender-based writes require it — see insert.go),
+// and the schema migrated (duckdb.Migrate — the real dual-write migrations,
+// not a local copy), mirroring pkg/devserver/duckdb.go's setupDualWrite
+// layout (<dir>/main.duckdb, <dir>/catalog.sqlite, <dir>/warehouse/) so this
+// tool reads and writes the same lake `inngest dev --duckdb` does. The
+// returned close func closes the db, the connector and then the catalog.
 //
 // parallelism sizes Options.QuackConns for parallelism writer sets of one
 // connection per table (see drainAndInsert), each genuinely independent and
 // opened directly against the returned *driver.Connector, on top of the one
 // *sql.DB uses for ordinary querying (sampling, schema checks).
-func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Connector, *sql.DB, error) {
+func openDuckDB(ctx context.Context, dir string, parallelism int) (*driver.Connector, *sql.DB, func(), error) {
 	binPath, err := lookDuckDBBinary()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, nil, fmt.Errorf("creating %q: %w", dir, err)
+		return nil, nil, nil, fmt.Errorf("creating %q: %w", dir, err)
+	}
+
+	catalog, err := icebergcatalog.Open(ctx, icebergcatalog.Config{
+		SQLitePath: filepath.Join(dir, "catalog.sqlite"),
+		Warehouse:  filepath.Join(dir, "warehouse"),
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("starting iceberg catalog: %w", err)
 	}
 
 	addr := driver.EphemeralQuackAddr
-
 	connector, db, err := driver.OpenConnector(ctx, driver.Options{
 		BinaryPath: binPath,
 		DBFile:     filepath.Join(dir, "main.duckdb"),
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    &driver.IcebergOptions{URI: catalog.URL, Warehouse: icebergcatalog.CatalogName, Token: catalog.Token, DataPath: catalog.Warehouse},
 		QuackAddr:  &addr,
 		QuackConns: parallelism*len(seedTables) + 1,
 	})
 	if err != nil {
-		return nil, nil, err
+		_ = catalog.Close()
+		return nil, nil, nil, err
+	}
+	closeAll := func() {
+		_ = db.Close()
+		_ = connector.Close()
+		_ = catalog.Close()
 	}
 
 	if err := duckdb.Migrate(ctx, db, duckdb.ModeRawLake); err != nil {
-		_ = db.Close()
-		_ = connector.Close()
-		return nil, nil, err
+		closeAll()
+		return nil, nil, nil, err
 	}
-	return connector, db, nil
+	return connector, db, closeAll, nil
 }
 
 func lookDuckDBBinary() (string, error) {

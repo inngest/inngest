@@ -35,7 +35,7 @@ func TestRunSeedsAFreshTargetWhenSourceAndTargetAreTheSameEmptyDir(t *testing.T)
 
 	db := openTestDB(t, dir)
 	var runCount int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
 	require.Equal(t, 4, runCount)
 }
 
@@ -47,17 +47,16 @@ func TestRunSamplesFromSourceWithoutModifyingIt(t *testing.T) {
 
 	// Seeded via its own connector, explicitly closed before run() opens
 	// sourceDir itself — unlike the earlier cgo/embedded-driver version of
-	// this tool, two real subprocesses can't both hold the same DuckLake
-	// catalog open at once.
-	seedConnector, seedDB, err := openDuckDB(t.Context(), sourceDir, 1)
+	// this tool, two real subprocesses can't both hold the same main.duckdb
+	// open at once.
+	_, seedDB, closeSeed, err := openDuckDB(t.Context(), sourceDir, 1)
 	require.NoError(t, err)
 	_, err = seedDB.ExecContext(t.Context(),
 		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, app_name, function_id, function_slug, status, attributes, inputs)
 		 VALUES ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 'run-1', now(), now(), '33333333-3333-3333-3333-333333333333', 'my-app', '44444444-4444-4444-4444-444444444444', 'my-app-my-function', 'Completed', '{}', '{}');`,
 	)
 	require.NoError(t, err)
-	require.NoError(t, seedDB.Close())
-	require.NoError(t, seedConnector.Close())
+	closeSeed()
 
 	summary, err := run(t.Context(), runConfig{
 		SourceDir:   sourceDir,
@@ -73,12 +72,12 @@ func TestRunSamplesFromSourceWithoutModifyingIt(t *testing.T) {
 
 	sourceDB := openTestDB(t, sourceDir)
 	var sourceRunCount int
-	require.NoError(t, sourceDB.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&sourceRunCount))
+	require.NoError(t, sourceDB.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&sourceRunCount))
 	require.Equal(t, 1, sourceRunCount, "seeding the target must not add rows to the source")
 
 	targetDB := openTestDB(t, targetDir)
 	var targetRunCount int
-	require.NoError(t, targetDB.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&targetRunCount))
+	require.NoError(t, targetDB.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&targetRunCount))
 	require.Equal(t, 2, targetRunCount)
 }
 
@@ -192,21 +191,18 @@ func TestRunWithParallelismWritesAllRowsExactlyOnce(t *testing.T) {
 
 	db := openTestDB(t, dir)
 	var runCount int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.DuckLakeAlias+".runs;").Scan(&runCount))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) FROM "+driver.LakeAlias+".runs;").Scan(&runCount))
 	require.Equal(t, 40, runCount)
 
 	var distinctRunIDs int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.DuckLakeAlias+".runs;").Scan(&distinctRunIDs))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(DISTINCT run_id) FROM "+driver.LakeAlias+".runs;").Scan(&distinctRunIDs))
 	require.Equal(t, 40, distinctRunIDs, "no run should have been written more than once")
 }
 
 func openTestDB(t *testing.T, dir string) *sql.DB {
 	t.Helper()
-	connector, db, err := openDuckDB(t.Context(), dir, 1)
+	_, db, closeDB, err := openDuckDB(t.Context(), dir, 1)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = db.Close()
-		_ = connector.Close()
-	})
+	t.Cleanup(closeDB)
 	return db
 }
