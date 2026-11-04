@@ -68,7 +68,9 @@ func (s *Service) CreateCancellation(ctx context.Context, req *apiv2.CreateCance
 		if utf8.RuneCountInString(*opts.If) > 1024 {
 			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "if cannot exceed 1024 characters")
 		}
-		if err := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If); err != nil {
+		policy := expressions.DefaultRestrictiveValidationPolicy()
+		policy.RequireBoolean = true
+		if err := expressions.Validate(ctx, policy, *opts.If); err != nil {
 			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, fmt.Sprintf("Invalid expression: %s", err))
 		}
 	}

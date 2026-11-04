@@ -37,10 +37,21 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 		archived, noCreator, noFunctions, limited bool
 		status                                    int
 		code                                      string
+		expression                                string
 	}{
 		{
 			name:   "created",
 			status: 201,
+		},
+		{
+			name:       "dynamic boolean filter",
+			status:     201,
+			expression: "event.data.cancel",
+		},
+		{
+			name:       "constant boolean filter",
+			status:     201,
+			expression: "false",
 		},
 		{
 			name:    "path IDs override body IDs",
@@ -103,6 +114,10 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			expression := tc.expression
+			if expression == "" {
+				expression = "event.data.keep == false"
+			}
 			from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 			until := from.Add(time.Hour)
 			createdAt := until.Add(time.Hour)
@@ -136,7 +151,7 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 					require.Equal(t, CreateCancellationOpts{
 						From:  from,
 						Until: until,
-						If:    new(`event.data.keep == false`),
+						If:    &expression,
 						Name:  new("cleanup"),
 					}, input)
 					return &cqrs.Cancellation{
@@ -153,7 +168,7 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 			requestBody := map[string]any{
 				"from":  "2026-01-01T00:00:00Z",
 				"until": "2026-01-01T01:00:00Z",
-				"if":    "event.data.keep == false",
+				"if":    expression,
 				"name":  "cleanup",
 			}
 			if tc.bodyIDs {
@@ -184,7 +199,7 @@ func TestHTTPGateway_CreateCancellation(t *testing.T) {
 				AppId:      "app",
 				FunctionId: "fn",
 				Name:       new("cleanup"),
-				If:         new(`event.data.keep == false`),
+				If:         &expression,
 				From:       timestamppb.New(from),
 				Until:      timestamppb.New(until),
 				CreatedAt:  timestamppb.New(createdAt),
@@ -249,6 +264,24 @@ func TestHTTPGateway_CreateCancellationValidation(t *testing.T) {
 			field:   "if",
 			value:   "[1, 2].exists(x, x == 1)",
 			message: "Invalid expression",
+		},
+		{
+			name:    "numeric expression",
+			field:   "if",
+			value:   "123",
+			message: "expression must return a boolean",
+		},
+		{
+			name:    "string expression",
+			field:   "if",
+			value:   `'true'`,
+			message: "expression must return a boolean",
+		},
+		{
+			name:    "list expression",
+			field:   "if",
+			value:   "[true]",
+			message: "expression must return a boolean",
 		},
 		{
 			name:    "empty expression",
