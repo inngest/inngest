@@ -144,7 +144,6 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"StartSandboxProcess":        {},
 	"StreamSandboxLogs":          {},
 	"StreamSandboxProcessOutput": {},
-	"SubmitFeedback":             {},
 	"SyncApp":                    {},
 	"WaitSandboxProcess":         {},
 	"WriteSandboxFile":           {},
