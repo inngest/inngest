@@ -1,0 +1,31 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_datetime.yaml'
+
+# timestamps: examples using the timestamp and timestamptz types
+extract(YEAR::enum, '2016-12-31T13:30:15'::ts) = 2016::i64
+extract(ISO_YEAR::enum, '2016-01-01T13:30:15'::ts) = 2015::i64
+extract(QUARTER::enum, '2016-12-31T13:30:15'::ts) = 4::i64
+extract(MONTH::enum, '2016-12-31T13:30:15'::ts) = 12::i64
+extract(ISO_WEEK::enum, '2016-12-31T13:30:15'::ts) = 52::i64
+extract(DAY::enum, '2016-12-31T13:30:15'::ts) = 31::i64
+extract(SUNDAY_DAY_OF_WEEK::enum, '2016-12-25T13:30:15'::ts) = 7::i64
+extract(MONDAY_DAY_OF_WEEK::enum, '2016-12-25T13:30:15'::ts) = 0::i64
+extract(DAY_OF_YEAR::enum, '2016-12-25T13:30:15'::ts) = 360::i64
+extract(HOUR::enum, '2016-12-31T13:30:15'::ts) = 13::i64
+extract(MINUTE::enum, '2016-12-31T13:30:15'::ts) = 30::i64
+extract(SECOND::enum, '2016-12-31T13:30:15'::ts) = 15::i64
+extract(MILLISECOND::enum, '2016-12-31T13:30:15'::ts) = 15000::i64
+extract(MICROSECOND::enum, '2016-12-31T13:30:15.220000'::ts) = 15220000::i64
+extract(UNIX_TIME::enum, '2016-12-31T13:30:15'::ts) = 1483191015::i64
+
+# date: examples using the date type
+extract(YEAR::enum, '2020-12-31'::date) = 2020::i64
+extract(MONTH::enum, '2020-12-31'::date) = 12::i64
+extract(DAY::enum, '2020-12-31'::date) = 31::i64
+
+# time: examples using the time type
+extract(HOUR::enum, '01:02:03'::time) = 1::i64
+extract(MINUTE::enum, '01:02:03'::time) = 2::i64
+extract(SECOND::enum, '01:02:03'::time) = 3::i64
+extract(MILLISECOND::enum, '01:02:03.155'::time) = 3155::i64
+extract(MICROSECOND::enum, '01:02:03.45'::time) = 3450000::i64

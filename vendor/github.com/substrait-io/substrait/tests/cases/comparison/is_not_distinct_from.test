@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+is_not_distinct_from(1::i16, 1::i16) = true::bool
+is_not_distinct_from(2::i16, 1::i16) = false::bool
+is_not_distinct_from(1.75::dec<38, 2>, 1.75::dec<38, 2>) = true::bool
+is_not_distinct_from(1.75::dec<38, 2>, 1.1::dec<38, 2>) = false::bool
+
+# null_input: Examples with null as input
+is_not_distinct_from(null::i16?, 1::i16) = false::bool
+is_not_distinct_from(null::i16?, null::i16?) = true::bool
+is_not_distinct_from(10::dec<38, 0>, null::dec?<38, 0>) = false::bool
+is_not_distinct_from(null::dec?<38, 0>, null::dec?<38, 0>) = true::bool

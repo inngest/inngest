@@ -1,0 +1,23 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+gte(1::i8, 2::i8) = false::bool
+gte(2::i8, 2::i8) = true::bool
+gte(200::i16, 199::i16) = true::bool
+gte(2000000000::i32, 1000000000::i32) = true::bool
+gte(-922337203685775808::i64, -922337203685775807::i64) = false::bool
+gte(7.25::fp32, 2.50::fp32) = true::bool
+gte(7.25::fp32, 7.25::fp32) = true::bool
+gte(7.25::dec<38, 2>, 7.25::dec<38, 2>) = true::bool
+gte(7.25::dec<38, 2>, 7.27::dec<38, 2>) = false::bool
+gte(inf::fp64, 1.5e+308::fp64) = true::bool
+gte(inf::fp64, inf::fp64) = true::bool
+gte(-inf::fp64, -1.5e+308::fp64) = false::bool
+
+# null_input: Examples with null as input
+gte(null::dec?<38, 2>, 7.25::dec<38, 2>) = null::bool?
+gte(null::dec?<38, 2>, null::dec?<38, 2>) = null::bool?
+gte(null::i16?, 1::i16) = null::bool?
+gte(2::i16, null::i16?) = null::bool?
+gte(null::i16?, null::i16?) = null::bool?

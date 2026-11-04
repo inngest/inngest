@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"modernc.org/libc"
+	"modernc.org/libc/sys/types"
 	sqlite3 "modernc.org/sqlite/lib"
 	"modernc.org/sqlite/vtab"
 )
@@ -28,21 +29,30 @@ var (
 		mu  sync.RWMutex
 		m   map[uintptr]*goModule
 		ids idGen
-		// name2id keeps stable IDs per module name to avoid unbounded growth
-		// across connections.
-		name2id map[string]uintptr
+		// name2id keeps stable IDs per registering driver and module name, to
+		// avoid unbounded growth across connections. The driver is part of the
+		// key because two Drivers may each register a different implementation
+		// under the same name; keying by name alone gives both the same pAux,
+		// so whichever registration reaches a connection last silently
+		// replaces the other for every connection in the process.
+		//
+		// The keys keep a *Driver, and through it its modules and their
+		// implementations, reachable for the life of the process once a
+		// connection has been opened on it. Entries are never reclaimed.
+		name2id map[moduleKey]uintptr
 	}{
 		m:       make(map[uintptr]*goModule),
-		name2id: make(map[string]uintptr),
+		name2id: make(map[moduleKey]uintptr),
 	}
 
-	// nativeModules holds sqlite3_module instances for registered modules. We
-	// keep them in Go memory so their addresses remain stable for the C layer.
+	// nativeModules holds sqlite3_module instances for registered modules,
+	// allocated via libc so that transpiled C code can access them without
+	// tripping Go's checkptr instrumentation.
 	nativeModules = struct {
 		mu sync.RWMutex
-		m  map[string]*sqlite3.Sqlite3_module
+		m  map[string]uintptr
 	}{
-		m: make(map[string]*sqlite3.Sqlite3_module),
+		m: make(map[string]uintptr),
 	}
 
 	// vtabTables maps sqlite3_vtab* (pVtab) to the corresponding Go Table.
@@ -63,10 +73,29 @@ var (
 	}
 )
 
-// goModule wraps a vtab.Module implementation with its name.
-type goModule struct {
+// vtab.RegisterModule reaches *Driver through a runtime type assertion on
+// this interface. Asserting it here turns a signature change into a build
+// failure instead of a silent fall-through to the package-level driver.
+var _ vtab.ModuleRegisterer = (*Driver)(nil)
+
+// moduleKey identifies a module registration: the Driver it was registered on
+// and the name it was registered under.
+type moduleKey struct {
+	d    *Driver
 	name string
-	impl vtab.Module
+}
+
+// goModule wraps a vtab.Module implementation with its name.
+//
+// volatile mirrors the opt-in from [vtab.VolatileArgsOpter]: when true, the
+// engine passes argument string/[]byte bodies to Cursor.Filter and Updater
+// Insert/Update as zero-copy views into SQLite-owned memory. The flag is
+// captured once, when the module is registered on a connection, and shared
+// by every table created from this module.
+type goModule struct {
+	name     string
+	impl     vtab.Module
+	volatile bool
 }
 
 // goTable wraps a vtab.Table implementation and remembers its module.
@@ -86,8 +115,42 @@ type cIndexConstraint = sqlite3.Tsqlite3_index_constraint
 type cIndexOrderBy = sqlite3.Tsqlite3_index_orderby
 type cConstraintUsage = sqlite3.Tsqlite3_index_constraint_usage
 
-// registerModule is installed as the hook for vtab.RegisterModule.
+// registerModule is installed as the hook for vtab.RegisterModule. It targets
+// the package-level driver, which is what a nil *sql.DB resolves to.
 func registerModule(name string, m vtab.Module) error {
+	return defaultDriver().RegisterModule(name, m)
+}
+
+// RegisterModule registers a virtual table module on d alone, so it reaches
+// only the connections d opens. It is the per-driver counterpart of
+// [modernc.org/sqlite/vtab.RegisterModule], which reaches it by way of the
+// *sql.DB passed as that function's first argument.
+//
+// Connections d opens also receive every module registered through the
+// package-level path, and where both paths registered the same name the
+// package-level implementation wins.
+//
+// That collision is worth spelling out, because this method reports no error
+// for it. Registering a name the package-level driver already holds - or
+// acquires later - returns nil, and every connection d opens then resolves
+// that name to the package-level implementation rather than to m. Pick names
+// that cannot collide, or register through the package-level path instead.
+//
+// Registration applies to new connections only; see
+// [modernc.org/sqlite/vtab.RegisterModule] for the full contract.
+func (d *Driver) RegisterModule(name string, m vtab.Module) (err error) {
+	if dmesgs {
+		defer func() {
+			dmesg("d %p, name %q, m %T: err %v", d, name, m, err)
+		}()
+	}
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.modules == nil {
+		d.modules = map[string]vtab.Module{}
+	}
 	if _, exists := d.modules[name]; exists {
 		return fmt.Errorf("sqlite: module %q already registered", name)
 	}
@@ -95,37 +158,81 @@ func registerModule(name string, m vtab.Module) error {
 	return nil
 }
 
-// registerModules installs all globally registered vtab modules on this
-// connection by calling sqlite3_create_module_v2 for each one.
-func (c *conn) registerModules() error {
+// registerModules installs the vtab modules visible to d on this connection by
+// calling sqlite3_create_module_v2 for each one.
+//
+// The set is the union of the modules registered on the package-level driver
+// and those registered on d itself. The package-level set is included
+// unconditionally because that is what every connection has received since
+// module support was added, whichever Driver opened it; d's own set is what
+// [Driver.RegisterModule] adds on top.
+//
+// A name held by both resolves to the package-level implementation. Before
+// per-Driver registration existed the two sets could still both be populated,
+// through a vtab.RegisterModule call whose *sql.DB argument was discarded, and
+// there the winner was whichever registration ran first, the second being
+// refused as already registered. No order-independent rule reproduces that, so
+// this one is a choice rather than a continuation: it keeps the process-wide
+// implementation authoritative, which is the safer half to preserve when the
+// two disagree.
+func (c *conn) registerModules(d *Driver) error {
+	global := defaultDriver()
+	for name, mod := range global.modules {
+		if err := c.registerSingleModule(global, name, mod); err != nil {
+			return err
+		}
+	}
+	if d == global {
+		return nil
+	}
 	for name, mod := range d.modules {
-		if err := c.registerSingleModule(name, mod); err != nil {
+		if _, done := global.modules[name]; done {
+			continue
+		}
+		if err := c.registerSingleModule(d, name, mod); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *conn) registerSingleModule(name string, m vtab.Module) error {
-	// Allocate or reuse a stable ID for this module name and remember the Go implementation.
+func (c *conn) registerSingleModule(owner *Driver, name string, m vtab.Module) error {
+	// Allocate or reuse a stable ID for this registration and remember the Go
+	// implementation.
+	key := moduleKey{owner, name}
 	vtabModules.mu.Lock()
-	modID, ok := vtabModules.name2id[name]
+	modID, ok := vtabModules.name2id[key]
 	if !ok {
 		modID = vtabModules.ids.next()
-		vtabModules.name2id[name] = modID
+		vtabModules.name2id[key] = modID
 	}
-	vtabModules.m[modID] = &goModule{name: name, impl: m}
+	gm := &goModule{name: name, impl: m}
+	if v, ok := m.(vtab.VolatileArgsOpter); ok {
+		gm.volatile = v.VolatileArgs()
+	}
+	vtabModules.m[modID] = gm
 	vtabModules.mu.Unlock()
 
 	nativeModules.mu.Lock()
 	defer nativeModules.mu.Unlock()
-	var mod *sqlite3.Sqlite3_module
+	var modPtr uintptr
 	if existing, exists := nativeModules.m[name]; exists {
-		mod = existing
+		modPtr = existing
 	} else {
-		// Build a sqlite3_module descriptor with trampolines.
-		mod = &sqlite3.Sqlite3_module{}
-		mod.FiVersion = 1
+		// Allocate with the C allocator so the transpiled SQLite code can
+		// access the struct without tripping Go's checkptr.
+		modPtr = libc.Xcalloc(c.tls, 1, types.Size_t(unsafe.Sizeof(sqlite3.Sqlite3_module{})))
+		if modPtr == 0 {
+			if !ok {
+				vtabModules.mu.Lock()
+				delete(vtabModules.name2id, key)
+				delete(vtabModules.m, modID)
+				vtabModules.mu.Unlock()
+			}
+			return fmt.Errorf("sqlite: failed to allocate module %q", name)
+		}
+		mod := (*sqlite3.Sqlite3_module)(unsafe.Pointer(modPtr))
+		mod.FiVersion = 2
 		mod.FxCreate = cFuncPointer(vtabCreateTrampoline)
 		mod.FxConnect = cFuncPointer(vtabConnectTrampoline)
 		mod.FxBestIndex = cFuncPointer(vtabBestIndexTrampoline)
@@ -149,7 +256,7 @@ func (c *conn) registerSingleModule(name string, m vtab.Module) error {
 		mod.FxRelease = cFuncPointer(vtabReleaseTrampoline)
 		mod.FxRollbackTo = cFuncPointer(vtabRollbackToTrampoline)
 
-		nativeModules.m[name] = mod
+		nativeModules.m[name] = modPtr
 	}
 
 	// Prepare C string for module name.
@@ -160,7 +267,7 @@ func (c *conn) registerSingleModule(name string, m vtab.Module) error {
 	defer libc.Xfree(c.tls, zName)
 
 	// Register the module with this connection.
-	if rc := sqlite3.Xsqlite3_create_module_v2(c.tls, c.db, zName, uintptr(unsafe.Pointer(mod)), modID, 0); rc != sqlite3.SQLITE_OK {
+	if rc := sqlite3.Xsqlite3_create_module_v2(c.tls, c.db, zName, modPtr, modID, 0); rc != sqlite3.SQLITE_OK {
 		return fmt.Errorf("create_module %q: %w", name, c.errstr(rc))
 	}
 	return nil
@@ -529,8 +636,11 @@ func vtabFilterTrampoline(tls *libc.TLS, pCursor uintptr, idxNum int32, idxStr u
 	if idxStr != 0 {
 		idxStrGo = libc.GoString(idxStr)
 	}
-	vals := functionArgs(tls, argc, argv)
-	if err := gc.impl.Filter(int(idxNum), idxStrGo, vals); err != nil {
+	volatile := gc.table != nil && gc.table.mod != nil && gc.table.mod.volatile
+	sp := functionArgs(tls, argc, argv, volatile)
+	defer releaseUDFArgs(sp)
+	err := gc.impl.Filter(int(idxNum), idxStrGo, *sp)
+	if err != nil {
 		// Set zErrMsg on the associated vtab for better diagnostics.
 		if pCursor != 0 {
 			cur := (*sqlite3.Sqlite3_vtab_cursor)(unsafe.Pointer(pCursor))
@@ -739,18 +849,22 @@ func vtabUpdateTrampoline(tls *libc.TLS, pVtab uintptr, argc int32, argv uintptr
 	}
 
 	// INSERT or UPDATE: argc == N+2. argv[0]=oldRowid (NULL for insert),
-	// argv[1..N]=column values, argv[N+1]=newRowid (or desired rowid for insert, may be NULL).
+	// argv[1]=newRowid (or desired rowid for insert, may be NULL),
+	// argv[2..N+1]=column values.
 	if argc < 3 {
 		return sqlite3.SQLITE_MISUSE
 	}
 	nCols := argc - 2
-	// Extract column values
-	colsPtr := argv + uintptr(1)*sqliteValPtrSize
-	cols := functionArgs(tls, nCols, colsPtr)
+	// Extract column values starting from argv[2]
+	colsPtr := argv + uintptr(2)*sqliteValPtrSize
+	volatile := gt.mod != nil && gt.mod.volatile
+	sp := functionArgs(tls, nCols, colsPtr, volatile)
+	defer releaseUDFArgs(sp)
+	cols := *sp
 
 	// Determine old/new rowid
 	oldPtr := *(*uintptr)(unsafe.Pointer(argv + uintptr(0)*sqliteValPtrSize))
-	newPtr := *(*uintptr)(unsafe.Pointer(argv + uintptr(argc-1)*sqliteValPtrSize))
+	newPtr := *(*uintptr)(unsafe.Pointer(argv + uintptr(1)*sqliteValPtrSize))
 
 	oldIsNull := sqlite3.Xsqlite3_value_type(tls, oldPtr) == sqlite3.SQLITE_NULL
 	newIsNull := sqlite3.Xsqlite3_value_type(tls, newPtr) == sqlite3.SQLITE_NULL

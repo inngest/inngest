@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+ends_with('abcd'::str, 'd'::str) = true::bool
+ends_with('abcd'::str, 'a'::str) = false::bool
+ends_with('abcd'::str, 'CD'::str) = false::bool
+
+# case_insenstivity: multi byte character comparison with case insensitivity
+ends_with('abcd'::str, 'CD'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool
+
+# multi_byte_characters: multi byte character comparison
+ends_with('😊a😊b😊😊'::str, 'b😊😊'::str) = true::bool
+
+# multi_byte_characters case insensitivity: multi byte character comparison with case insensitivity
+ends_with('😊a😊b😊😊'::str, 'B😊😊'::str) [case_sensitivity:CASE_INSENSITIVE] = true::bool

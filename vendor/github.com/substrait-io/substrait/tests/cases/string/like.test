@@ -1,0 +1,12 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+like('abcdefg'::str, 'abcdefg'::str) = true::bool
+like('abcdefg'::str, 'abc'::str) = false::bool
+
+# wildcard: Examples using wildcards
+like('abcdefg'::str, 'abc%'::str) = true::bool
+like('abcdefg'::str, '%efg'::str) = true::bool
+like('abcdefg'::str, '_bcdefg'::str) = true::bool
+like('abcdefg'::str, 'abc_efg'::str) = true::bool

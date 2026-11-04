@@ -1,0 +1,24 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+multiply(25::i8, 5::i8) = 125::i8
+multiply(2::i16, -100::i16) = -200::i16
+multiply(300::i32, 200::i32) = 60000::i32
+multiply(80000::i64, -5000::i64) = -400000000::i64
+
+# overflow: Examples demonstrating overflow behavior
+multiply(13::i8, 10::i8) [overflow:ERROR] = <!ERROR>
+multiply(11::i16, 3000::i16) [overflow:ERROR] = <!ERROR>
+multiply(3::i32, 1000000000::i32) [overflow:ERROR] = <!ERROR>
+multiply(1000000000000000000::i64, 10::i64) [overflow:ERROR] = <!ERROR>
+multiply(13::i8, 10::i8) [overflow:SATURATE] = 127::i8
+multiply(-13::i8, -10::i8) [overflow:SATURATE] = -128::i8
+multiply(13::i8, 10::i8) [overflow:SILENT] = <!UNDEFINED>
+
+# floating_exception: Examples demonstrating exceptional floating point cases
+multiply(1.5e+100::fp64, 1.5e+208::fp64) = inf::fp64
+multiply(1.5e+100::fp64, -1.5e+208::fp64) = -inf::fp64
+
+# types: Examples demonstrating behavior of different data types
+multiply(4.5::fp64, 2.5000007152557373046875::fp64) = 11.250003218650818::fp64

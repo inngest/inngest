@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+shift_right(2::i32, 1::i32) = 1::i32
+shift_right(1024::i32, 8::i32) = 4::i32
+shift_right(301989888::i64, 3::i32) = 37748736::i64
+shift_right(301989888::i64, 16::i32) = 4608::i64
+shift_right(-3::i32, 1::i32) = -2::i32
+shift_right(-3::i32, 2::i32) = -1::i32
+shift_right(-3::i64, 1::i32) = -2::i64
+shift_right(-3::i64, 2::i32) = -1::i64
+shift_right(null::i64?, 2::i32) = null::i64?
+shift_right(127::i64, null::i32?) = null::i64?

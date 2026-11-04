@@ -18,10 +18,6 @@ import (
 // so that the endpoint owner can easily resubscribe to the topic if the
 // Unsubscribe request was unintended.
 //
-// Amazon SQS queue subscriptions require authentication for deletion. Only the
-// owner of the subscription, or the owner of the topic can unsubscribe using the
-// required Amazon Web Services signature.
-//
 // This action is throttled at 100 transactions per second (TPS).
 func (c *Client) Unsubscribe(ctx context.Context, params *UnsubscribeInput, optFns ...func(*Options)) (*UnsubscribeOutput, error) {
 	if params == nil {
@@ -99,6 +95,9 @@ func (c *Client) addOperationUnsubscribeMiddlewares(stack *middleware.Stack, opt
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -115,6 +114,9 @@ func (c *Client) addOperationUnsubscribeMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpUnsubscribeValidationMiddleware(stack); err != nil {
@@ -136,6 +138,15 @@ func (c *Client) addOperationUnsubscribeMiddlewares(stack *middleware.Stack, opt
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

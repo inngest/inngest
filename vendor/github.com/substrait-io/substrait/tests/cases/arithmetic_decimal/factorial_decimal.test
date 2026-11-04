@@ -1,0 +1,17 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+factorial(0::dec<1, 0>) = 1::dec<38, 0>
+factorial(1::dec<1, 0>) = 1::dec<38, 0>
+factorial(20::dec<2, 0>) = 2432902008176640000::dec<38, 0>
+
+# overflow: Examples demonstrating overflow behavior
+factorial(34::dec<2, 0>) = <!ERROR>
+
+# negative_value: Examples demonstrating behavior on negative value
+factorial(-1::dec<1, 0>) = <!ERROR>
+
+# null_values: test with null values
+factorial(null::dec?<38, 0>) = null::dec?<38, 0>
+factorial(null::dec?<1, 0>) = null::dec?<38, 0>
