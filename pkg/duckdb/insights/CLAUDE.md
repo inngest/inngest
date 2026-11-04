@@ -17,7 +17,7 @@ Feature-status snapshot: `FINDINGS/duckdb-insights.md`.
 This package never touches the database except in `execute.go` — parsing,
 validation, and rewriting are pure functions over
 `pkg/duckdb/parser`'s AST. It has no dependency on `cqrs`/`pkg/db/duckdb`
-beyond `duckdb.DuckLakeAlias` (a string constant) and `duckdb.Open`/
+beyond `driver.LakeAlias`/`schema.MacroSchema` (string constants) and `duckdb.Open`/
 `Migrate` in its own integration tests.
 
 ## Where things live
@@ -46,7 +46,7 @@ testdata/queries/transpile/*.out  their expected Transpile() output (goldie)
 ```
 
 Physical schema this package reads from: six `CREATE MACRO ... AS TABLE`
-statements in `pkg/db/duckdb/migrations/000002_insights_views.sql`.
+statements in `pkg/db/duckdb/views.sql`.
 
 ## Architecture, in one pass
 

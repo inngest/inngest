@@ -1,5 +1,5 @@
 {
-  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)), c AS (SELECT COALESCE(ended_at, started_at) AS t, \"nullif\"(status, 'Queued') AS s, date_part('YEAR', queued_at) AS y, \"trim\"(app_id) AS a, \"substring\"(run_id, 1, 8) AS r, \"position\"(function_id, 'a') AS p FROM __inngest_runs AS runs) SELECT t, s, y, a, r, p FROM c WHERE y \u003e 2020 AND p \u003e 0 LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest_local.insights_runs(?, ?)), c AS (SELECT COALESCE(ended_at, started_at) AS t, \"nullif\"(status, 'Queued') AS s, date_part('YEAR', queued_at) AS y, \"trim\"(app_id) AS a, \"substring\"(run_id, 1, 8) AS r, \"position\"(function_id, 'a') AS p FROM __inngest_runs AS runs) SELECT t, s, y, a, r, p FROM c WHERE y \u003e 2020 AND p \u003e 0 LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

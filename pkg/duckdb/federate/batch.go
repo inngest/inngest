@@ -94,7 +94,7 @@ const (
 	TableSpans  Table = "spans"
 	TableEvents Table = "events"
 	// TableMetadata is the raw metadata emissions, which readers roll up
-	// (inngest.run_metadata_rollup) over lake and delta together.
+	// (inngest_local.run_metadata_rollup) over lake and delta together.
 	TableMetadata Table = "metadata"
 )
 

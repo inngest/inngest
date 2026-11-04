@@ -3,14 +3,15 @@ package query
 import (
 	"database/sql"
 	"os/exec"
-	"path/filepath"
 	"testing"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 )
 
-// newTestDuckDB opens a real duckdb subprocess with DuckLake attached and
+// newTestDuckDB opens a real duckdb subprocess with an Iceberg lake attached and
 // the dual-write schema migrated, mirroring
 // pkg/duckdb/tracing/helpers_test.go's newTestDuckDB.
 func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
@@ -19,14 +20,10 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 	})
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)

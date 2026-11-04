@@ -3,7 +3,6 @@ package tracing
 import (
 	"encoding/json"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 	"github.com/inngest/inngest/pkg/duckdb/insights"
 	"github.com/inngest/inngest/pkg/duckdb/query"
 	"github.com/oklog/ulid/v2"
@@ -19,7 +19,7 @@ import (
 
 // TestJSONRoundTripsByteForByte checks a JSON payload w/ unsorted keys, odd
 // whitespace, 1.10 and an int past INT64_MAX comes back exactly as written
-// through the dual-write inserter (and materializeRuns) -> DuckLake
+// through the dual-write inserter (and materializeRuns) -> the Iceberg lake
 // -> the UI/GQL read path and Insights, the way ClickHouse's String columns
 // return it.
 func TestJSONRoundTripsByteForByte(t *testing.T) {
@@ -27,11 +27,7 @@ func TestJSONRoundTripsByteForByte(t *testing.T) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
-	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", DuckLake: &driver.DuckLakeOptions{
-		CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-		DataPath:    filepath.Join(dir, "data"),
-	}})
+	db, err := driver.Open(t.Context(), driver.Options{BinaryPath: binPath, DBFile: ":memory:", Iceberg: icebergtest.Start(t)})
 	require.NoError(t, err)
 	defer db.Close()
 	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake))

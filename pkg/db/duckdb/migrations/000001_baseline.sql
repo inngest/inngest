@@ -1,14 +1,27 @@
 -- +goose Up
+-- The lake tables. On an Iceberg lake each one is format-version 3,
+-- partitioned by account + month of its run/receive time, and
+-- declares a sort order duckdb sorts each write by. DUCKDB_ICEBERG_ONLY is
+-- set empty for the in-memory mode, whose plain duckdb tables take none of
+-- that. Other Iceberg writers (IE the cloud exporter) have to sort
+-- explicitly if they don't honor the table's sort order.
+--
+-- NOTE: Iceberg stores a column default as a literal, so duckdb freezes
+-- bucket_at's current_timestamp default at CREATE TABLE time on a lake. It
+-- only stays as a convenience for the in-memory mode and test fixtures:
+-- real writers (pkg/duckdb/tracing's inserter, the exporter) set bucket_at
+-- explicitly.
+--
 -- JSON payloads (attributes, inputs/input, output, error, values, event_data,
--- event_meta) are stored as JSON text in plain VARCHAR columns: duckdb's
--- shredded VARIANT is a net loss here (no UINT64 shredding
--- (duckdb/duckdb#28166), integers > INT64_MAX fail parquet writes
+-- event_meta) are stored as JSON text in plain VARCHAR columns: Iceberg
+-- rejects duckdb's JSON type (and duckdb doesn't keep the alias on a string
+-- column), and duckdb's shredded VARIANT is a net loss here (no UINT64
+-- shredding (duckdb/duckdb#28166), integers > INT64_MAX fail parquet writes
 -- (duckdb/duckdb#28168), a parquet column per distinct key, slow writes and
--- whole-value reads). They're VARCHAR rather than JSON so an Iceberg lake
--- (which rejects duckdb's JSON type, and duckdb doesn't keep the alias on a
--- string column) can share the same column types. Everything above the
--- tables reads them as JSON: the raw_*/insights_* macros cast them back
--- (free, JSON is an alias of VARCHAR).
+-- whole-value reads). The in-memory mode uses the same type so both modes
+-- share one DDL. Everything above the tables reads them as JSON: the
+-- views.sql macros cast them back (free, JSON is an alias of VARCHAR).
+-- +goose ENVSUB ON
 CREATE TABLE IF NOT EXISTS inngest.runs (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -58,13 +71,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   -- for bucket_at > W, so any W both stores cover gives the same result.
   -- A run row's is its source span's.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-);
--- +goose ENVSUB ON
--- Partitioned by time only: a partition per account would mean a file per active
--- account per export. account_id leads the sort order instead, so row-group
--- statistics still prune by tenant.
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET SORTED BY (year(queued_at), month(queued_at), account_id, env_id, run_id, queued_at)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET PARTITIONED BY (year(queued_at), month(queued_at))};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(queued_at)) SORTED BY (account_id, env_id, run_id, queued_at) WITH ('format-version' = '3')};
 -- +goose ENVSUB OFF
 
 -- inngest.run_metadata holds one row per metadata emission (executor
@@ -80,7 +87,8 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.runs SET PARTITIONED BY (year(queued_
 -- its kind. kind is stored without its userland/inngest prefix (is_user
 -- tells them apart). A reader wanting "the current metadata for this span"
 -- takes the latest row per (run_id, span_id, is_user, kind) (see
--- inngest.run_metadata_rollup) rather than replaying an op history.
+-- inngest_local.run_metadata_rollup) rather than replaying an op history.
+-- +goose ENVSUB ON
 CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   account_id     UUID NOT NULL,
   env_id         UUID NOT NULL,
@@ -108,10 +116,7 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   -- When the row became visible in the buffer, as on inngest.runs: the
   -- federation split (lake bucket_at <= W, buffer bucket_at > W).
   bucket_at      TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-);
--- +goose ENVSUB ON
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET PARTITIONED BY (year(run_queued_at), month(run_queued_at))};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) SORTED BY (account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind) WITH ('format-version' = '3')};
 -- +goose ENVSUB OFF
 
 
@@ -121,6 +126,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET PARTITIONED BY (year
 -- is_deferred) — this table only ever holds flat, non-dynamic spans, so
 -- those values live in `attributes` like any other span attribute instead
 -- of getting a dedicated column.
+-- +goose ENVSUB ON
 CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -149,17 +155,12 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
   -- for bucket_at > W, so any W both stores cover gives the same result.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-);
--- +goose ENVSUB ON
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, start_time, end_time)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (year(run_queued_at), month(run_queued_at))};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(run_queued_at)) SORTED BY (account_id, env_id, run_id, start_time, end_time) WITH ('format-version' = '3')};
 -- +goose ENVSUB OFF
 
 -- CREATE TRIGGER inngest_runs_mv AFTER INSERT ON inngest.run_trace_spans is
--- commented out for now: DuckLake's own table type does not support triggers
--- ("Not implemented Error: Triggers are not supported for this table type"
--- against a real DuckLake-attached table — see
--- pkg/duckdb/tracing/helpers_test.go's newTestDuckDB doc comment). Its
+-- commented out for now: lake tables don't support triggers ("Not
+-- implemented Error: Triggers are not supported for this table type"). Its
 -- logic is instead run as an explicit secondary query on every span batch
 -- insertion in the duckdb dual-write path — see
 -- pkg/duckdb/tracing/batch.go's materializeRuns.
@@ -196,6 +197,7 @@ ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET PARTITIONED BY (y
 -- ;
 
 
+-- +goose ENVSUB ON
 CREATE TABLE IF NOT EXISTS inngest.events (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -205,69 +207,19 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   source_id VARCHAR NULL,
 	event_id VARCHAR NOT NULL,
 	event_name VARCHAR NOT NULL,
-  event_data VARCHAR NOT NULL DEFAULT '{}',
+  event_data VARCHAR NOT NULL,
   event_v VARCHAR NOT NULL,
   event_ts TIMESTAMPTZ NOT NULL,
-  event_meta VARCHAR NOT NULL DEFAULT '{}',
+  event_meta VARCHAR NOT NULL,
   -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
   -- LogAppendTime for exported rows, the insert time for rows written here
   -- directly. Federated reads take the lake for bucket_at <= W and the buffer
   -- for bucket_at > W, so any W both stores cover gives the same result.
   bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
-);
--- +goose ENVSUB ON
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET SORTED BY (year(received_at), month(received_at), account_id, env_id, internal_id, received_at)};
-${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(received_at), month(received_at))};
+) ${DUCKDB_ICEBERG_ONLY-PARTITIONED BY (account_id, month(received_at)) SORTED BY (account_id, env_id, internal_id, received_at) WITH ('format-version' = '3')};
 -- +goose ENVSUB OFF
-
--- raw_runs is the one collapse of inngest.runs (one row per run), unscoped:
--- insights_runs projects over it, and Insights' internal raw mode and the
--- federated executor read it directly. A run's rows collapse by lifecycle
--- stage before recency (final, i.e. ended_at set, beats started beats
--- queued), so a row that arrives out of order can't regress it. Rows
--- that tie (ms timestamps) pick terminal > in-progress > queued status, then
--- status itself, so the pick never depends on insert order. It
--- partitions by account_id/env_id first, so tenant (and run) filters still
--- push below the window into the scan. raw_run_trace_spans is
--- inngest.run_trace_spans as is: spans need no collapse, each row is its own
--- emission.
---
--- The lake stores JSON payloads as JSON text in VARCHAR columns (see the top
--- of this file). Every macro returns them as JSON (dot access, ->>, JSON
--- results for Insights), but ::JSON is a validating parse per row, so it's
--- only applied to a whole value a macro returns or embeds, in its final
--- projection (after any QUALIFY): the macros' own filters and key
--- extractions (->>, which parses either way) read the text directly.
---
--- A lake whose runs are already one row per run (duckdb.ModeFlatLake: it only
--- holds exported final rows, and a federated read's delta is each run's
--- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
--- the window over every run row is most of an Insights query's cost there.
--- The QUALIFY is one line because goose's substitution can't take a default
--- spanning lines.
--- +goose ENVSUB ON
-CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
-SELECT * REPLACE (attributes::JSON AS attributes, inputs::JSON AS inputs, output::JSON AS output, error::JSON AS error) FROM query_table(p_runs)
-${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC, CASE WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2 WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1 ELSE 0 END DESC, status DESC) = 1};
--- +goose ENVSUB OFF
-
-CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
-SELECT * REPLACE (attributes::JSON AS attributes, output::JSON AS output, error::JSON AS error, input::JSON AS input) FROM query_table(p_spans);
-
--- raw_events is inngest.events as is: an event is never re-written.
-CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE
-SELECT * REPLACE (event_data::JSON AS event_data, event_meta::JSON AS event_meta) FROM query_table(p_events);
-
--- raw_run_metadata is inngest.run_metadata as is: one row per emission
--- (inngest.run_metadata_rollup collapses them).
-CREATE MACRO inngest.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
-SELECT * REPLACE ("values"::JSON AS "values") FROM query_table(p_metadata);
 
 -- +goose Down
-DROP MACRO IF EXISTS inngest.raw_run_metadata;
-DROP MACRO IF EXISTS inngest.raw_events;
-DROP MACRO IF EXISTS inngest.raw_run_trace_spans;
-DROP MACRO IF EXISTS inngest.raw_runs;
 DROP TABLE IF EXISTS inngest.runs;
 DROP TABLE IF EXISTS inngest.run_metadata;
 DROP TABLE IF EXISTS inngest.run_trace_spans;

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/inngest/inngest/pkg/duckdb/driver"
+	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
 // guardRenderedSQL gates checkRenderedSQL; only tests turn it off, to prove
@@ -119,9 +119,9 @@ func checkRenderedNode(n any, ctes, macros map[string]bool) error {
 		// are then checked like any other expression.
 		if v["type"] == "TABLE_FUNCTION" {
 			fn, _ := v["function"].(map[string]any)
-			name, schema := strings.ToLower(str(fn["function_name"])), str(fn["schema"])
-			macro := schema == driver.DuckLakeAlias && macros[name]
-			unnest := schema == "" && name == "unnest"
+			name, fnSchema := strings.ToLower(str(fn["function_name"])), str(fn["schema"])
+			macro := fnSchema == schema.MacroSchema && macros[name]
+			unnest := fnSchema == "" && name == "unnest"
 			if str(fn["catalog"]) != "" || !macro && !unnest {
 				return fmt.Errorf("rendered query reads from table function %q, which is not allowed", str(fn["function_name"]))
 			}

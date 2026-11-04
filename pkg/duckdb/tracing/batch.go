@@ -82,7 +82,7 @@ func (b *batcher[T]) stop() { close(b.stopc) }
 // only cover work *after* the lock is acquired, not the lock acquisition
 // itself. quack.Session's HTTP client has no timeout of its own by design
 // (see newQuackHTTPClient's doc comment) specifically so a caller can opt
-// into a longer-running call like DuckLake compaction; a batch flush is not
+// into a longer-running call like lake compaction; a batch flush is not
 // that caller, so it gets its own short leash instead. A statement that
 // merely times out here surfaces as an ordinary dropped-batch warning
 // (see flush below) rather than a subprocess restart — see

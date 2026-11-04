@@ -12,11 +12,12 @@ import (
 )
 
 // InsertStream appends r's rows to t's physical lake table in catalog: one
-// INSERT ... SELECT reading r over quack's SEND_DATA stream, so DuckLake
-// writes the files itself (its partitioning and sort order, file
-// statistics) and commits them as one snapshot. Each column is cast to its
-// lake type the way the federated views cast the delta (JSON to the lake's
-// VARCHAR text, list text to STRUCT lists). r must carry DeltaColumns(t).
+// INSERT ... SELECT reading r over quack's SEND_DATA stream, so duckdb's
+// Iceberg writer writes the files itself (the table's partitioning and
+// sort order, file statistics) and commits them as one snapshot. Each
+// column is cast to its lake type the way the federated views cast the
+// delta (JSON to the lake's VARCHAR text, list text to STRUCT lists). r
+// must carry DeltaColumns(t).
 // conn must be a quack-transport connection. It returns the rows inserted.
 func InsertStream(ctx context.Context, conn *sql.Conn, catalog string, t Table, r BatchReader) (int64, error) {
 	defer r.Close()

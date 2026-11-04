@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/inngest/inngest/pkg/duckdb/schema"
 )
 
 // ExecutionDiagnostic is e.Diagnostic() w/ its message made user facing
@@ -27,12 +29,12 @@ var (
 )
 
 // UserFacingExecutionMessage rewrites DuckDB error text about the SQL
-// Execute actually ran (remapTables' `inngest.insights_runs('<account>',
+// Execute actually ran (remapTables' `inngest_local.insights_runs('<account>',
 // '<env>') AS runs`, ...) back to what the user wrote:
 //
 //   - every macro reference, w/ its scoping arguments (whole, or truncated
 //     by DuckDB's "..."), becomes its logical table name, e.g.
-//     `inngest.insights_runs('...', '...')` -> `runs`.
+//     `inngest_local.insights_runs('...', '...')` -> `runs`.
 //   - DuckDB's "LINE N: ..." excerpt and its caret are dropped: they quote
 //     the rewritten SQL and point at a column within it, not within the
 //     user's query (see ExecutionError's doc comment), and can start
@@ -56,7 +58,7 @@ func buildMacroRefRe() {
 	// insights_steps (the \b already prevents that, this is just belt and
 	// braces).
 	slices.SortFunc(views, func(a, b string) int { return len(b) - len(a) })
-	// An optional `inngest.` schema, the macro name, then optionally its
+	// An optional macro schema, the macro name, then optionally its
 	// argument list: either complete, or cut off by DuckDB's "...".
-	macroRefRe = regexp.MustCompile(`(?:\binngest\.)?\b(` + strings.Join(views, "|") + `)\b(?:\s*\((?:[^()]*\)|[^()]*?\.\.\.))?`)
+	macroRefRe = regexp.MustCompile(`(?:\b` + regexp.QuoteMeta(schema.MacroSchema) + `\.)?\b(` + strings.Join(views, "|") + `)\b(?:\s*\((?:[^()]*\)|[^()]*?\.\.\.))?`)
 }
