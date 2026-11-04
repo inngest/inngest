@@ -2,13 +2,11 @@ import type { Metric } from './mergeMetricRows';
 import { mergeMetricRows } from './mergeMetricRows';
 
 /**
- * Converts the separate Running and concurrency-limit results from the backend
- * into chart data with one row per timestamp. Running is a gauge whose numeric
- * values are plotted as a line, so short gaps remain absent and gaps of at
+ * Combines the dense Running and concurrency-limit results from the backend.
+ * Short runs of null Running values remain chart gaps, while runs lasting at
  * least three minutes are represented as inferred zeroes. Concurrency Limit is
- * instead a marker that changes the chart background; its numeric value is
- * converted to a boolean at the matching timestamp, and missing markers are
- * not inferred because absence means the limit was not hit.
+ * a marker that changes the chart background; its observed numeric value is
+ * converted to a boolean, while null remains absent.
  */
 export function mergeStepsRunningMetrics(
   running: Metric[],
