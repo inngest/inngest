@@ -73,3 +73,20 @@ func TestEvent_SetInvokeSpanRef_ReturnsFalseWhenNoMetadata(t *testing.T) {
 	nilData := Event{Name: "user/thing.happened"}
 	require.False(t, nilData.SetInvokeSpanRef(&meta.SpanReference{}))
 }
+
+func TestInngestMetadataDropsLegacyInvokeTraceCarrier(t *testing.T) {
+	var md InngestMetadata
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"tc": {"ctx": {"traceparent": "00-00112233445566778899aabbccddeeff-0011223344556677-01"}},
+		"isr": {"tp": "00-ffeeddccbbaa99887766554433221100-7766554433221100-01"}
+	}`), &md))
+
+	encoded, err := json.Marshal(md)
+	require.NoError(t, err)
+
+	var wire map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &wire))
+	require.NotContains(t, wire, "tc")
+	require.Contains(t, wire, "isr")
+	require.Equal(t, "00-ffeeddccbbaa99887766554433221100-7766554433221100-01", md.InvokeSpanRef.TraceParent)
+}
