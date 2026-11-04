@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
@@ -45,11 +46,20 @@ func newHTTPClient() *http.Client {
 	return &http.Client{}
 }
 
-// cancelRequestTimeout bounds the CancelRequest query.watchForCancel
-// fires once a caller's ctx ends mid-statement — a fresh, short-lived
-// context detached from that (already-done) ctx, since the request needs to
-// go out regardless of why the caller gave up.
+// cancelRequestTimeout bounds the DisconnectMessage watchForCancel sends
+// once a caller's ctx ends mid-statement, under a fresh, short-lived context
+// detached from that (already-done) ctx, since it needs to go out regardless
+// of why the caller gave up.
 const cancelRequestTimeout = 5 * time.Second
+
+// abandonedStatementTimeout bounds the CancelRequest watchForCancel sends
+// before that DisconnectMessage. The server only answers it once the
+// statement is done (verified against v2.0.0: ~1ms for an interruptible
+// statement, but ~8.7s for a constant-folded levenshtein that ignores the
+// interrupt), so it's how long an abandoned statement is tracked (see
+// WithAbandonedCounter). It's a backstop for a statement that never
+// finishes, not an expected wait.
+const abandonedStatementTimeout = 2 * time.Minute
 
 // Session implements sqlExecer (see conn.go) over DuckDB's quack wire
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
@@ -59,14 +69,35 @@ type Session struct {
 	httpClient   *http.Client
 	endpoint     string
 	connectionID string
+	// abandoned is set once a statement's ctx ends mid-flight -- see
+	// watchForCancel.
+	abandoned atomic.Bool
+	// abandonedCounter, if set, counts this session's abandoned statements
+	// the server may still be running -- see WithAbandonedCounter.
+	abandonedCounter *atomic.Int64
+}
+
+// Option configures a Session.
+type Option func(*Session)
+
+// WithAbandonedCounter has a session add 1 to n for each statement it
+// abandons (see watchForCancel), from when it's abandoned until the server
+// is done with it (or abandonedStatementTimeout passes), so an owner sharing
+// n across sessions can tell how much abandoned work is still running
+// server-side.
+func WithAbandonedCounter(n *atomic.Int64) Option {
+	return func(s *Session) { s.abandonedCounter = n }
 }
 
 // NewSession performs the ConnectionRequest handshake against listenURL
 // (as reported by `CALL quack_serve(...)`) and returns a session ready for exec.
-func NewSession(ctx context.Context, listenURL, token string) (*Session, error) {
+func NewSession(ctx context.Context, listenURL, token string, opts ...Option) (*Session, error) {
 	s := &Session{
 		httpClient: newHTTPClient(),
 		endpoint:   listenURL + "/quack",
+	}
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	req := connectionRequest{
@@ -130,13 +161,15 @@ func (s *Session) Exec(ctx context.Context, sqlText string) (cols []string, rows
 // quack never needs a separate DESCRIBE statement to get types.
 //
 // A caller whose ctx ends mid-statement doesn't just stop waiting: a
-// watchForCancel goroutine (started immediately below) fires a real
+// watchForCancel func (armed immediately below) fires a real
 // CancelRequest for this statement's queryID, which the server turns into
 // an actual DuckDB Connection::Interrupt() — see encodeCancelRequest's
 // doc comment for the wire format and quack_server.cpp's CANCEL_REQUEST
 // handler (verified against the real extension: this is what actually
 // stops the abandoned statement from continuing to burn CPU server-side,
-// which simply not waiting for the response never did on its own).
+// which simply not waiting for the response never did on its own). It also
+// marks the session Abandoned, so its owner never runs another statement
+// on it.
 func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, types []string, rows []result.Row, err error) {
 	queryID := randomHugeint()
 	stopCancelWatch := s.watchForCancel(ctx, queryID)
@@ -233,64 +266,125 @@ func (s *Session) Query(ctx context.Context, sqlText string) (cols []string, typ
 	return cols, types, rows, nil
 }
 
-// watchForCancel starts a goroutine that sends a CancelRequest for queryID
-// as soon as ctx ends, and returns a stop func the caller must defer
-// immediately (before ctx can end) to retire that goroutine once query()'s
-// own request(s) are done — success or any other error. Without stop, the
-// goroutine would leak for the life of ctx (which, for a long-lived
-// context, is far longer than this one statement).
+// watchForCancel arranges for the session to abandon queryID's statement as
+// soon as ctx ends, and returns a stop func the caller must defer
+// immediately (before ctx can end) to retire that arrangement once query()'s
+// own request(s) are done, success or any other error.
 //
-// Once a cancel is in flight, stop waits for its response, so query()
-// can't return (and its caller can't start the next statement on this
-// connection) until the server is done with it. The server's query_uuid
-// check doesn't make a late cancel safe on its own: quack_server.cpp reads
-// the active query_uuid under the statement lock, releases it, and only
-// then calls Connection::Interrupt(), which interrupts whatever is running
-// on the connection by then. W/o the wait, the follow-up statement's
-// PREPARE reaches the server ~0.5ms before the cancel's response does, and
-// ~1.5% of the time the Interrupt() lands mid-statement and fails it w/
-// "INTERRUPT Error" (TestQuackCancelledQueryDoesNotRestartSubprocess on
-// v2.0.0). An Interrupt() that lands between statements is harmless,
-// since DuckDB clears the flag when the next query starts.
+// Abandoning marks the session Abandoned, so its owner discards it rather
+// than running another statement on this server connection, and then (in
+// the background, never blocking Query's return) sends a CancelRequest for
+// queryID followed by a DisconnectMessage for the connection. Reusing the
+// connection after a cancel isn't safe either way:
 //
-// The cancel request itself runs under cancelRequestTimeout, detached
-// from ctx (already done by the time this fires), which also bounds how
-// long stop can wait. Its result is logged, not returned: query()'s caller
-// already gets ctx's own error back regardless of whether the server
-// managed to actually interrupt anything.
+//   - The server's query_uuid check doesn't make a late cancel safe:
+//     quack_server.cpp reads the active query_uuid under the statement lock,
+//     releases it, and only then calls Connection::Interrupt(), which
+//     interrupts whatever is running on the connection by then. So a cancel
+//     racing the next statement's PREPARE can fail it w/ "INTERRUPT Error".
+//   - Some statements don't react to Interrupt() (or the CancelRequest
+//     itself blocks server-side) at all. `SELECT len(string_split(repeat('a,',
+//     300000000), ','))` keeps running for ~50s after its cancel, which
+//     only gets a response once it finishes. The next PREPARE on that
+//     connection queues behind it, and the late interrupt then fails it w/
+//     "Interrupted!".
+//
+// A fresh connection doesn't queue behind the abandoned statement (other
+// connections stay responsive while it runs) and a late interrupt can't
+// reach it. DisconnectMessage returns promptly even mid-statement, but it
+// doesn't stop the statement either, it just frees the server's connection
+// entry so abandoned connections don't pile up.
+//
+// context.AfterFunc makes "was ctx done before stop" deterministic: once
+// ctx.Err() is non-nil, stop always reports the func as started, so a
+// statement Query gave up on is never silently left running on a session
+// still marked reusable. The same goes for abandonedCounter: whichever of
+// the func and stop sees the abandonment first counts it, before Query
+// returns, and the func (which always runs to completion once started)
+// uncounts it.
 func (s *Session) watchForCancel(ctx context.Context, queryID hugeint) (stop func()) {
-	done := make(chan struct{})
-	finished := make(chan struct{})
-	go func() {
-		defer close(finished)
-		select {
-		case <-ctx.Done():
-			select {
-			case <-done:
-				// query() already finished on its own, nothing to cancel
-				return
-			default:
-			}
-			cancelCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
-			defer cancel()
-			hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
-			l := logger.StdlibLogger(context.WithoutCancel(ctx)).With(
-				"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
-			switch {
-			case err != nil:
-				l.Warn("duckdb: quack: failed to send cancel request for an abandoned query", "error", err)
-			case hdr.Type == msgErrorResponse:
-				resp, _ := decodeErrorResponseBody(r)
-				l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", resp.Error())
-			}
-		case <-done:
+	var counted atomic.Bool
+	abandon := func() {
+		s.abandoned.Store(true)
+		if s.abandonedCounter != nil && counted.CompareAndSwap(false, true) {
+			s.abandonedCounter.Add(1)
 		}
-	}()
+	}
+	stopAfter := context.AfterFunc(ctx, func() {
+		abandon()
+		s.cancelAndDisconnect(context.WithoutCancel(ctx), queryID)
+		if s.abandonedCounter != nil {
+			s.abandonedCounter.Add(-1)
+		}
+	})
 	return func() {
-		close(done)
-		<-finished
+		if !stopAfter() {
+			abandon()
+		}
 	}
 }
+
+// cancelAndDisconnect sends a CancelRequest for queryID and waits (up to
+// abandonedStatementTimeout) for the server to answer it, which it does once
+// the statement is done, then sends a DisconnectMessage for s's connection
+// under cancelRequestTimeout. Results are logged, not returned: Query's
+// caller already gets ctx's own error back regardless of whether the server
+// managed to actually interrupt anything.
+func (s *Session) cancelAndDisconnect(ctx context.Context, queryID hugeint) {
+	l := logger.StdlibLogger(ctx).With(
+		"transport", "quack", "phase", "cancel", "connection_id", s.connectionID, "query_id", queryID.String())
+
+	cancelCtx, cancel := context.WithTimeout(context.Background(), abandonedStatementTimeout)
+	hdr, r, err := s.send(cancelCtx, encodeCancelRequest(s.connectionID, queryID))
+	cancel()
+	switch {
+	case err != nil:
+		l.Warn("duckdb: quack: failed to send cancel request for an abandoned query (or it's still running)", "error", err)
+	case hdr.Type == msgErrorResponse:
+		resp, _ := decodeErrorResponseBody(r)
+		l.Debug("duckdb: quack: cancel request rejected (statement likely already finished)", "message", resp.Error())
+	}
+
+	disconnectCtx, cancel := context.WithTimeout(context.Background(), cancelRequestTimeout)
+	defer cancel()
+	if _, _, err := s.send(disconnectCtx, encodeDisconnectMessage(s.connectionID)); err != nil {
+		l.Warn("duckdb: quack: failed to disconnect an abandoned connection", "error", err)
+	}
+}
+
+// closeTimeout bounds Close's DisconnectMessage. The server answers it
+// promptly even mid-statement, so this only matters for an unreachable one.
+const closeTimeout = 2 * time.Second
+
+// Close sends a DisconnectMessage for s's connection (best effort, under
+// closeTimeout), so the server drops its connection entry instead of keeping
+// it until the subprocess exits. It's a no-op for an abandoned session,
+// whose watchForCancel already disconnects it once its statement is done.
+// HTTP sockets aren't s's own to close: every session shares
+// http.DefaultTransport's keep-alive pool (see newHTTPClient), which caps
+// idle sockets per host itself. s must not be used afterwards.
+func (s *Session) Close(ctx context.Context) error {
+	if s.Abandoned() {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+	defer cancel()
+	hdr, r, err := s.send(ctx, encodeDisconnectMessage(s.connectionID))
+	if err != nil {
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s): %w", s.connectionID, err)
+	}
+	if hdr.Type == msgErrorResponse {
+		resp, _ := decodeErrorResponseBody(r)
+		return fmt.Errorf("duckdb: quack disconnect (connection_id=%s) rejected: %s", s.connectionID, resp.Error())
+	}
+	return nil
+}
+
+// Abandoned reports whether a statement on s was given up on mid-flight
+// (its ctx ended before the server answered). An abandoned session must not
+// run another statement: see watchForCancel. Owners discard it and
+// handshake a new one.
+func (s *Session) Abandoned() bool { return s.abandoned.Load() }
 
 // ErrDatabaseInvalidated marks an ErrorResponse w/ must_invalidate set: the
 // server's database is gone, so unlike result.ErrStatementFailed the

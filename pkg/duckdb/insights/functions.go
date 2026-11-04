@@ -242,7 +242,7 @@ var duckDBBoolLiterals = map[string]bool{
 }
 
 // preservesArgType is the returnType function for "pick one of my
-// arguments" functions (MIN, MAX, GREATEST, LEAST, ANY_VALUE, IFNULL,
+// arguments" functions (MIN, MAX, GREATEST, LEAST, ANY_VALUE, IFNULL, COALESCE, NULLIF,
 // MEDIAN, MODE, QUANTILE_CONT/DISC, FIRST, LAST, ARG_MAX, ARG_MIN,
 // BIT_AND/OR/XOR, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE) -- they
 // report their representative argument's type (always args[0]) rather
@@ -445,19 +445,19 @@ func init() {
 			description: "Computes the approximate quantile using T-Digest.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#approximate-aggregates",
 			signature:   "approx_quantile(x, pos)",
-			returnType:  withArity(2, 2, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, numberOrArgDatetime)),
 		},
 		"arg_max": {
 			description: "Finds the row with the maximum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_maxarg-val",
 			signature:   "arg_max(arg, val)",
-			returnType:  withArity(2, 3, preservesArgTypeAndHint),
+			returnType:  withArity(2, 3, listWhenArgCount(3, preservesArgTypeAndHint)),
 		},
 		"arg_min": {
 			description: "Finds the row with the minimum val. Calculates the non-NULL arg expression at that row.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#arg_minarg-val",
 			signature:   "arg_min(arg, val)",
-			returnType:  withArity(2, 3, preservesArgTypeAndHint),
+			returnType:  withArity(2, 3, listWhenArgCount(3, preservesArgTypeAndHint)),
 		},
 		"array_agg": {
 			description: "Returns a LIST containing all the values of a column.",
@@ -535,7 +535,7 @@ func init() {
 			description: "Calculates the average value for all tuples in x.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#avgarg",
 			signature:   "avg(arg)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(1, 1, numberOrArgDatetime),
 		},
 		"bit_and": {
 			description: "Returns the bitwise AND of all bits in a given expression.",
@@ -608,6 +608,12 @@ func init() {
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#containsstring-search_string",
 			signature:   "contains(string, search_string)",
 			returnType:  withArity(2, 2, fixedType(ColumnTypeBoolean)),
+		},
+		"coalesce": {
+			description: "Returns the first argument that is not NULL.",
+			docsURL:     "https://duckdb.org/docs/current/sql/functions/utility#coalesceexpr-",
+			signature:   "coalesce(expr, ...)",
+			returnType:  withArity(1, -1, preservesArgType),
 		},
 		"corr": {
 			description: "Returns the correlation coefficient for non-NULL pairs in a group.",
@@ -698,7 +704,7 @@ func init() {
 			description: "The number of complete partitions between the timestamps.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/date#date_subpart-startdate-enddate",
 			signature:   "date_sub(part, startdate, enddate)",
-			returnType:  withArity(3, 3, fixedType(ColumnTypeDatetime)),
+			returnType:  withArity(3, 3, fixedType(ColumnTypeNumber)),
 		},
 		"date_trunc": {
 			description: "Truncate to specified precision.",
@@ -758,7 +764,7 @@ func init() {
 			description: "Extract the epoch component in milliseconds from a temporal type.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/timestamp#epoch_mstimestamp",
 			signature:   "epoch_ms(timestamp)",
-			returnType:  withArity(1, 1, fixedType(ColumnTypeNumber)),
+			returnType:  withArity(1, 1, epochMsReturnType),
 		},
 		"exp": {
 			description: "Computes e to the power of x.",
@@ -794,13 +800,13 @@ func init() {
 			description: "Formats a string using the fmt syntax.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#formatformat-",
 			signature:   "format(format, ...)",
-			returnType:  withArity(1, -1, fixedType(ColumnTypeString)),
+			returnType:  withArity(1, -1, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"generate_series": {
 			description: "Creates a list of values between start and stop - the stop parameter is inclusive.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/list#generate_seriesstart-stop-step",
 			signature:   "generate_series(start[, stop][, step])",
-			returnType:  withArity(1, 3, fixedType(ColumnTypeJSON)),
+			returnType:  withArity(1, 3, withSizeLimit(fixedType(ColumnTypeJSON))),
 		},
 		"greatest": {
 			description: "Returns the largest value. For strings lexicographical ordering is used. Note that lowercase characters are considered \"larger\" than uppercase characters and collations are not supported.",
@@ -896,7 +902,7 @@ func init() {
 			description: "Extracts the value at the given path or key as a string.",
 			docsURL:     "https://duckdb.org/docs/current/data/json/json_functions#json-extraction-functions",
 			signature:   "json_extract_string(json, path)",
-			returnType:  withArity(2, 2, fixedType(ColumnTypeString)),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, fixedType(ColumnTypeString))),
 		},
 		"json_group_array": {
 			description: "Aggregates values into a JSON array.",
@@ -1142,7 +1148,7 @@ func init() {
 			description: "Pads the string with the character on the left until it has count characters. Truncates the string on the right if it has more than count characters.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#lpadstring-count-character",
 			signature:   "lpad(string, count, character)",
-			returnType:  withArity(3, 3, fixedType(ColumnTypeString)),
+			returnType:  withArity(3, 3, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"ltrim": {
 			description: "Removes any occurrences of any of the characters from the left side of the string. characters defaults to space.",
@@ -1190,7 +1196,7 @@ func init() {
 			description: "Returns the maximum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#maxarg",
 			signature:   "max(arg)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenArgCount(2, preservesArgTypeAndHint)),
 		},
 		"md5": {
 			description: "Returns the MD5 hash of the string as a VARCHAR.",
@@ -1208,7 +1214,7 @@ func init() {
 			description: "Returns the minimum value present in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#minarg",
 			signature:   "min(arg)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenArgCount(2, preservesArgTypeAndHint)),
 		},
 		"minute": {
 			description: "Extract the minute component from a date or timestamp.",
@@ -1240,6 +1246,12 @@ func init() {
 			signature:   "now()",
 			returnType:  withArity(0, 0, fixedType(ColumnTypeDatetime)),
 		},
+		"nullif": {
+			description: "Returns NULL if a = b, else returns a. Equivalent to CASE WHEN a = b THEN NULL ELSE a END.",
+			docsURL:     "https://duckdb.org/docs/current/sql/functions/utility#nullifa-b",
+			signature:   "nullif(a, b)",
+			returnType:  withArity(2, 2, preservesArgType),
+		},
 		"nth_value": {
 			description: "The nth value of expr in the frame. Can IGNORE or RESPECT NULLS.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/window_functions#nth_valueexpr-nth-order-by-ordering-ignore-nulls",
@@ -1264,6 +1276,12 @@ func init() {
 			signature:   "pi()",
 			returnType:  withArity(0, 0, fixedType(ColumnTypeNumber)),
 		},
+		"position": {
+			description: "Returns location of first occurrence of search_string in string, counting from 1. Returns 0 if no match found. Also spelled position(search_string IN string).",
+			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#positionsearch_string-in-string",
+			signature:   "position(string, search_string)",
+			returnType:  withArity(2, 2, fixedType(ColumnTypeNumber)),
+		},
 		"pow": {
 			description: "Computes x to the power of y.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/numeric#powx-y",
@@ -1280,7 +1298,7 @@ func init() {
 			description: "Formats a string using printf syntax.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#printfformat-",
 			signature:   "printf(format, ...)",
-			returnType:  withArity(1, -1, fixedType(ColumnTypeString)),
+			returnType:  withArity(1, -1, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"product": {
 			description: "Calculates the product of all tuples in arg.",
@@ -1292,13 +1310,13 @@ func init() {
 			description: "Returns the interpolated quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding interpolated quantiles.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_contx-pos",
 			signature:   "quantile_cont(x, pos)",
-			returnType:  withArity(2, 2, preservesArgType),
+			returnType:  withArity(2, 2, listWhenListArg(1, false, preservesArgType)),
 		},
 		"quantile_disc": {
 			description: "Returns the exact quantile number between 0 and 1 . If pos is a LIST of FLOATs, then the result is a LIST of the corresponding exact quantiles.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#quantile_discx-pos",
 			signature:   "quantile_disc(x, pos)",
-			returnType:  withArity(1, 2, preservesArgTypeAndHint),
+			returnType:  withArity(1, 2, listWhenListArg(1, true, preservesArgTypeAndHint)),
 		},
 		"quarter": {
 			description: "Extract the quarter component from a date or timestamp.",
@@ -1316,7 +1334,7 @@ func init() {
 			description: "Creates a list of values between start and stop - the stop parameter is exclusive.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/list#rangestart-stop-step",
 			signature:   "range(start[, stop][, step])",
-			returnType:  withArity(1, 3, fixedType(ColumnTypeJSON)),
+			returnType:  withArity(1, 3, withSizeLimit(fixedType(ColumnTypeJSON))),
 		},
 		"rank": {
 			description: "The rank of the current row with gaps.",
@@ -1364,7 +1382,7 @@ func init() {
 			description: "Repeats the string count number of times.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#repeatstring-count",
 			signature:   "repeat(string, count)",
-			returnType:  withArity(2, 2, fixedType(ColumnTypeString)),
+			returnType:  withArity(2, 2, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"replace": {
 			description: "Replaces any occurrences of the source with target in string.",
@@ -1400,7 +1418,7 @@ func init() {
 			description: "Pads the string with the character on the right until it has count characters. Truncates the string on the right if it has more than count characters.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#rpadstring-count-character",
 			signature:   "rpad(string, count, character)",
-			returnType:  withArity(3, 3, fixedType(ColumnTypeString)),
+			returnType:  withArity(3, 3, withSizeLimit(fixedType(ColumnTypeString))),
 		},
 		"rtrim": {
 			description: "Removes any occurrences of any of the characters from the right side of the string. characters defaults to space.",
@@ -1534,6 +1552,12 @@ func init() {
 			signature:   "substr(string, start[, length])",
 			returnType:  withArity(2, 3, fixedType(ColumnTypeString)),
 		},
+		"substring": {
+			description: "Extracts substring starting from character start up to the end of the string. If optional argument length is set, extracts a substring of length characters instead. Note that a start value of 1 refers to the first character of the string. Also spelled substring(string FROM start FOR length).",
+			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#substringstring-start-length",
+			signature:   "substring(string, start[, length])",
+			returnType:  withArity(2, 3, fixedType(ColumnTypeString)),
+		},
 		"sum": {
 			description: "Calculates the sum value for all tuples in arg.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/aggregates#sumarg",
@@ -1562,7 +1586,7 @@ func init() {
 			description: "Extract the timezone component from a date or timestamp.",
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/datepart#timezonedate",
 			signature:   "timezone(date)",
-			returnType:  withArity(1, 2, fixedType(ColumnTypeDatetime)),
+			returnType:  withArity(1, 2, timezoneReturnType),
 		},
 		"to_json": {
 			description: "Converts a value to JSON.",
@@ -1587,6 +1611,12 @@ func init() {
 			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#translatestring-from-to",
 			signature:   "translate(string, from, to)",
 			returnType:  withArity(3, 3, fixedType(ColumnTypeString)),
+		},
+		"trim": {
+			description: "Removes any occurrences of any of the characters from either side of the string. characters defaults to space. Also spelled trim([BOTH | LEADING | TRAILING] [characters] FROM string).",
+			docsURL:     "https://duckdb.org/docs/current/sql/functions/text#trimstring-characters",
+			signature:   "trim(string[, characters])",
+			returnType:  withArity(1, 2, fixedType(ColumnTypeString)),
 		},
 		"trunc": {
 			description: "Truncates the number.",

@@ -30,6 +30,18 @@ func TestNormalizeAppURL(t *testing.T) {
 			forceHTTPS:  true,
 		},
 		{
+			name:        "force https keeps the inngest scheme of hosted apps",
+			inputURL:    "inngest://serve?fnId=app-hello&stepId=step",
+			expectedURL: "inngest://serve?fnId=app-hello&stepId=step",
+			forceHTTPS:  true,
+		},
+		{
+			name:        "force https rewrites other inngest hosts",
+			inputURL:    "inngest://foo?fnId=app-hello&stepId=step",
+			expectedURL: "https://foo?fnId=app-hello&stepId=step",
+			forceHTTPS:  true,
+		},
+		{
 			name:        "strip deployId query param",
 			inputURL:    "https://api.example.com/api/inngest?deployId=1234",
 			expectedURL: "https://api.example.com/api/inngest",

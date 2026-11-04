@@ -1,6 +1,10 @@
 package insights
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/inngest/inngest/pkg/duckdb/parser"
+)
 
 // ColumnType is the GQL-facing type bucket for one result column — see
 // docs/plans/010-duckdb-insights-query-layer.md's GQL schema section
@@ -23,22 +27,39 @@ const (
 )
 
 // DuckDBToColumnType maps a *sql.ColumnType.DatabaseTypeName() string (as
-// DuckDB's driver reports it) to a ColumnType bucket — see docs/plans/010's
-// GQL schema section's mapping table.
+// DuckDB's driver reports it, `STRUCT(a INTEGER)[]`, `DECIMAL(18,3)`) to a
+// ColumnType bucket -- see docs/plans/010's GQL schema section's mapping
+// table. It parses the string with the same grammar rule a query's own
+// casts use, so it classifies exactly like typeNameColumnType does for
+// those, and a name the parser can't read is ColumnTypeUnknown.
 func DuckDBToColumnType(duckdbType string) ColumnType {
-	t := strings.ToUpper(duckdbType)
+	t, err := parser.ParseType(duckdbType)
+	if err != nil {
+		return ColumnTypeUnknown
+	}
+	return typeNameColumnType(t)
+}
 
-	switch {
-	case t == "VARCHAR", t == "CHAR", t == "BPCHAR", t == "TEXT", t == "UUID":
-		return ColumnTypeString
-	case t == "BOOLEAN":
-		return ColumnTypeBoolean
-	case t == "DATE", t == "TIME", t == "INTERVAL",
-		strings.HasPrefix(t, "TIMESTAMP"):
-		return ColumnTypeDatetime
-	case t == "JSON", t == "VARIANT", strings.HasSuffix(t, "[]"), strings.HasPrefix(t, "STRUCT("), strings.HasPrefix(t, "MAP("):
+// typeNameColumnType buckets a parsed type by its base type name
+// (TypeName.BaseTypeName, which resolves DuckDB's aliases like INT8, TEXT,
+// CHARACTER VARYING and DOUBLE PRECISION). Any list/array dimension makes
+// it JSON regardless of the element type.
+func typeNameColumnType(t *parser.TypeName) ColumnType {
+	if len(t.Arrays) > 0 {
 		return ColumnTypeJSON
-	case isNumberType(t):
+	}
+	switch name := t.BaseTypeName(); {
+	case name == "STRUCT", name == "MAP", name == "UNION", name == "LIST", name == "ARRAY",
+		name == "JSON", name == "VARIANT":
+		return ColumnTypeJSON
+	case name == "VARCHAR", name == "UUID", name == "BLOB", name == "ENUM":
+		return ColumnTypeString
+	case name == "BOOLEAN":
+		return ColumnTypeBoolean
+	// TIME, TIMESTAMP, TIMESTAMP_MS, TIMESTAMP WITH TIME ZONE, TIME_NS, ...
+	case name == "DATE", name == "INTERVAL", strings.HasPrefix(name, "TIME"):
+		return ColumnTypeDatetime
+	case isNumberType(name):
 		return ColumnTypeNumber
 	default:
 		return ColumnTypeUnknown
@@ -67,12 +88,10 @@ func (t ColumnType) String() string {
 }
 
 func isNumberType(t string) bool {
-	switch {
-	case t == "TINYINT", t == "SMALLINT", t == "INTEGER", t == "BIGINT", t == "HUGEINT",
-		t == "UTINYINT", t == "USMALLINT", t == "UINTEGER", t == "UBIGINT", t == "UHUGEINT",
-		t == "FLOAT", t == "DOUBLE":
-		return true
-	case strings.HasPrefix(t, "DECIMAL"):
+	switch t {
+	case "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
+		"UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT",
+		"FLOAT", "DOUBLE", "DECIMAL", "BIGNUM":
 		return true
 	default:
 		return false

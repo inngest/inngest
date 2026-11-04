@@ -226,8 +226,8 @@ func TestFullConnectRouting(t *testing.T) {
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
-		require.Equal(t, setupRes.connIds[0].String(), conn.Id)
-		require.Equal(t, setupRes.gatewayId.String(), conn.GatewayId)
+		require.Equal(t, setupRes.connIds[0].String(), conn.conn.Id)
+		require.Equal(t, setupRes.gatewayId.String(), conn.conn.GatewayId)
 	})
 
 	t.Run("unhealthy connection should be filtered out", func(t *testing.T) {
@@ -245,8 +245,8 @@ func TestFullConnectRouting(t *testing.T) {
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
-		require.Equal(t, setupRes.connIds[3].String(), conn.Id)
-		require.Equal(t, setupRes.gatewayId.String(), conn.GatewayId)
+		require.Equal(t, setupRes.connIds[3].String(), conn.conn.Id)
+		require.Equal(t, setupRes.gatewayId.String(), conn.conn.GatewayId)
 
 		conns, err := stateMan.GetConnectionsByEnvID(context.Background(), setupRes.envId)
 		require.NoError(t, err)
@@ -308,8 +308,8 @@ func TestFullConnectRouting(t *testing.T) {
 
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
-		require.Equal(t, setupNewVersion.connIds[0].String(), conn.Id)
-		require.NotEqual(t, setupOldVersion.connIds[0].String(), conn.Id)
+		require.Equal(t, setupNewVersion.connIds[0].String(), conn.conn.Id)
+		require.NotEqual(t, setupOldVersion.connIds[0].String(), conn.conn.Id)
 	})
 
 	t.Run("connection without functions should be ignored", func(t *testing.T) {
@@ -355,8 +355,8 @@ func TestFullConnectRouting(t *testing.T) {
 		// Try to route message for fn-1 (this does not exist in newer version)
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
-		require.NotEqual(t, setupNewVersion.connIds[0].String(), conn.Id)
-		require.Equal(t, setupOldVersion.connIds[0].String(), conn.Id)
+		require.NotEqual(t, setupNewVersion.connIds[0].String(), conn.conn.Id)
+		require.Equal(t, setupOldVersion.connIds[0].String(), conn.conn.Id)
 	})
 }
 

@@ -26,15 +26,16 @@ func (a *adapter) adaptInnerTableRef(n *peg.Node) TableRef {
 	case "ParensTableRef":
 		return a.adaptParensTableRef(alt)
 	default: // ValuesRef
-		panic("duckdb/parser: VALUES as a table reference is not yet supported (see Task 11)")
+		a.unsupported(alt, "VALUES as a table reference")
+		return nil
 	}
 }
 
 func (a *adapter) adaptTableSubquery(n *peg.Node) TableRef {
 	// TableSubquery <- TableAliasColon? Lateral? SubqueryReference TableAlias?
 	seq := body(n)
-	if _, ok := present(seq.Children[0]); ok {
-		panic("duckdb/parser: the `alias:` table-alias-colon form is not yet supported")
+	if ac, ok := present(seq.Children[0]); ok {
+		a.unsupported(ac, "The `alias:` table-alias-colon form")
 	}
 	_, lateral := present(seq.Children[1])
 	sub := a.adaptParenSelect(body(seq.Children[2])) // SubqueryReference <- Parens(SelectStatementInternal)
@@ -49,7 +50,7 @@ func (a *adapter) adaptTableFunctionRef(n *peg.Node) TableRef {
 	// TableFunction <- TableFunctionLateralOpt / TableFunctionAliasColon
 	alt := choice(body(n))
 	if alt.Name == "TableFunctionAliasColon" {
-		panic("duckdb/parser: the `alias:` table-alias-colon form is not yet supported")
+		a.unsupported(alt, "The `alias:` table-alias-colon form")
 	}
 	// TableFunctionLateralOpt <- Lateral? QualifiedTableFunction TableFunctionArguments WithOrdinality? TableAlias?
 	seq := body(alt)
@@ -102,16 +103,16 @@ func (a *adapter) adaptTableFunctionArgs(n *peg.Node) []Expr {
 func (a *adapter) adaptParensTableRef(n *peg.Node) TableRef {
 	// ParensTableRef <- TableAliasColon? Parens(TableRef) TableAlias? SampleClause?
 	seq := body(n)
-	if _, ok := present(seq.Children[0]); ok {
-		panic("duckdb/parser: the `alias:` table-alias-colon form is not yet supported")
+	if ac, ok := present(seq.Children[0]); ok {
+		a.unsupported(ac, "The `alias:` table-alias-colon form")
 	}
 	inner := a.adaptTableRef(body(seq.Children[1]).Children[1])
 	ref := &ParensTableRef{baseTableRefNode: baseTableRefNode{a.at(n)}, Ref: inner}
 	if alias, ok := present(seq.Children[2]); ok {
 		ref.Alias = a.adaptTableAlias(alias)
 	}
-	if _, ok := present(seq.Children[3]); ok {
-		panic("duckdb/parser: TABLESAMPLE is not yet supported")
+	if ts, ok := present(seq.Children[3]); ok {
+		a.unsupported(ts, "TABLESAMPLE")
 	}
 	return ref
 }
@@ -138,9 +139,11 @@ func (a *adapter) adaptJoinClause(left TableRef, n *peg.Node) TableRef {
 	case "JoinWithoutOnClause":
 		return a.adaptJoinWithoutOnClause(left, alt)
 	case "JoinByClause":
-		panic("duckdb/parser: JOIN BY (TYPE ...) is not supported")
+		a.unsupported(alt, "JOIN BY (TYPE ...)")
+		return nil
 	default: // NearestJoinClause
-		panic("duckdb/parser: NEAREST ... BY (vector-search joins) is not supported")
+		a.unsupported(alt, "NEAREST ... BY (vector-search joins)")
+		return nil
 	}
 }
 

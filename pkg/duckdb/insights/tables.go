@@ -1,5 +1,7 @@
 package insights
 
+import "strings"
+
 // knownColumn is one column of a logicalTable's static schema — the same
 // allowlist validate checks input columns against, the source
 // buildColumnHints traces output items back to, and colType's the declared
@@ -59,6 +61,22 @@ type logicalTable struct {
 	description string
 	columnOrder []string
 	columns     map[string]knownColumn
+}
+
+// column looks name up case-insensitively, matching DuckDB's own
+// identifier resolution -- every columns map is keyed by lowercased name
+// (the static registry's names already are; deriveTable lowercases a
+// derived table's), while columnOrder keeps each name as written.
+func (t logicalTable) column(name string) (knownColumn, bool) {
+	col, ok := t.columns[strings.ToLower(name)]
+	return col, ok
+}
+
+// lookupLogicalTable looks a bare table name up in logicalTables
+// case-insensitively, like DuckDB resolves "FROM RUNS" or "FROM \"Runs\"".
+func lookupLogicalTable(name string) (logicalTable, bool) {
+	tbl, ok := logicalTables[strings.ToLower(name)]
+	return tbl, ok
 }
 
 var logicalTables = map[string]logicalTable{

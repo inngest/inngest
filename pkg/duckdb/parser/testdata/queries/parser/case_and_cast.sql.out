@@ -19,16 +19,18 @@ SelectStatement
 -- SELECT CAST(a AS INTEGER) FROM t
 SelectStatement
   SelectItem()
-    CastExpr(INTEGER,try=false)
+    CastExpr(try=false)
       Ident(a)
+      TypeName(INTEGER)
   FromClause
     BaseTableRef(t,alias=)
 
 -- SELECT a::VARCHAR FROM t
 SelectStatement
   SelectItem()
-    CastExpr(VARCHAR,try=false)
+    CastExpr(try=false)
       Ident(a)
+      TypeName(VARCHAR)
   FromClause
     BaseTableRef(t,alias=)
 
