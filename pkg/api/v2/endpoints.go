@@ -288,3 +288,8 @@ func (s *Service) ListExperiments(ctx context.Context, req *apiv2.ListExperiment
 func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentRequest) (*apiv2.GetExperimentResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
 }
+
+func (s *Service) SubmitFeedback(ctx context.Context, req *apiv2.SubmitFeedbackRequest) (*apiv2.SubmitFeedbackResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
+		"Feedback is only available when targeting Inngest Cloud (use --prod)")
+}
