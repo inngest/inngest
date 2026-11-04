@@ -122,6 +122,8 @@ func LoadManyWithString[T interface{}](
 type Loaders struct {
 	RunTraceLoader        *dataloader.Loader
 	EventLoader           *dataloader.Loader
+	AppLoader             *dataloader.Loader
+	FunctionLoader        *dataloader.Loader
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
 }
@@ -135,9 +137,12 @@ func NewLoaders(params LoaderParams) *Loaders {
 	tr := &traceReader{reader: params.DB, convertRunSpanToGQL: convert}
 	er := &eventReader{loaders: loaders, reader: params.DB}
 	dr := &deferReader{reader: params.DB}
+	afr := &appFunctionReader{reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.EventLoader = dataloader.NewBatchedLoader(er.GetEvents)
+	loaders.AppLoader = dataloader.NewBatchedLoader(afr.GetApps)
+	loaders.FunctionLoader = dataloader.NewBatchedLoader(afr.GetFunctions)
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
 

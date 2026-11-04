@@ -17,11 +17,11 @@ func (r *functionRunV2Resolver) App(
 	ctx context.Context,
 	run *models.FunctionRunV2,
 ) (*cqrs.App, error) {
-	return r.Data.GetAppByID(ctx, run.AppID)
+	return loader.LoadOneWithString[cqrs.App](ctx, loader.FromCtx(ctx).AppLoader, run.AppID.String())
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
-	fun, err := r.Data.GetFunctionByInternalUUID(ctx, fn.FunctionID)
+	fun, err := loader.LoadOneWithString[cqrs.Function](ctx, loader.FromCtx(ctx).FunctionLoader, fn.FunctionID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving function: %w", err)
 	}
