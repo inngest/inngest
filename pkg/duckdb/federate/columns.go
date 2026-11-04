@@ -71,6 +71,15 @@ func encodedDeltaStream(t Table, r EncodedReader, rowCap int, kind deltaKind) (d
 // every column. That covers a table the query never reads, too: a missing
 // scan can't be told apart from one an optimization removed, so it stays
 // conservative.
+//
+// NOTE: an Iceberg scan's plan node doesn't name its table (just
+// `"Function": "ICEBERG_SCAN"`), so unnamed scans are only attributed when
+// one table is federated, to that table. Scans of other lake tables (IE
+// run_metadata under the insights macros) can then only add columns, which
+// is safe. W/ more than one table every column streams.
+//
+// TODO: tell Iceberg scans apart (per-table planning, or upstream naming the
+// table in the plan) so multi-table queries prune too.
 func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Table) (map[Table][]Column, error) {
 	if len(needed) == 0 {
 		return nil, nil
@@ -98,7 +107,7 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 
 	out := map[Table][]Column{}
 	for _, t := range needed {
-		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t))
+		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t), len(needed) == 1)
 		if !found {
 			out[t] = nil
 			continue
@@ -148,8 +157,10 @@ func explainJSON(ctx context.Context, conn *sql.Conn, sqlText string, args []any
 }
 
 // scanColumns returns the columns the plan reads from table: each scan of it
-// contributes its projections, and any of cols named in its filters.
-func scanColumns(plan []planNode, table string, cols []Column) (map[string]bool, bool) {
+// contributes its projections, and any of cols named in its filters. When
+// anonymous is set, scans that don't name a table (Iceberg's) count as
+// table's too.
+func scanColumns(plan []planNode, table string, cols []Column, anonymous bool) (map[string]bool, bool) {
 	names := map[string]bool{}
 	found := false
 	var walk func(n planNode)
@@ -157,7 +168,8 @@ func scanColumns(plan []planNode, table string, cols []Column) (map[string]bool,
 		if strings.Contains(n.Name, "SCAN") {
 			var info map[string]any
 			_ = json.Unmarshal(n.ExtraInfo, &info)
-			if tbl, _ := info["Table"].(string); tableIs(tbl, table) {
+			tbl, named := info["Table"].(string)
+			if tableIs(tbl, table) || (anonymous && !named && info["Function"] == "ICEBERG_SCAN") {
 				found = true
 				for _, p := range stringsOf(info["Projections"]) {
 					names[projectedColumn(p)] = true
