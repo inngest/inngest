@@ -40,6 +40,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -547,17 +548,18 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed requirements: "+err.Error())
 		return
 	}
-	checked, err := s.checkCommitLocations(raw.Updates)
-	if err != nil {
-		writeCatalogError(w, err)
-		return
-	}
-	updates, err := fixCreateUpdates(req.Requirements, checked)
+	updates, err := fixCreateUpdates(req.Requirements, raw.Updates)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
 		return
 	}
+	// Decoded twice: checkCommit applies its copy to a throwaway builder.
+	var checkUpdates table.Updates
 	if err := json.Unmarshal(updates, &req.Updates); err != nil {
+		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
+		return
+	}
+	if err := json.Unmarshal(updates, &checkUpdates); err != nil {
 		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
 		return
 	}
@@ -585,6 +587,10 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, fmt.Errorf("%w: %s", catalog.ErrNoSuchTable, strings.Join(ident, ".")))
 		return
 	}
+	if err := s.checkCommit(current, checkUpdates); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 
 	md, loc, err := s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
 	if err != nil {
@@ -595,20 +601,44 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	ident := pathTable(r)
-	var err error
-	if r.URL.Query().Get("purgeRequested") == "true" {
-		if p, ok := s.cat.(catalog.PurgeableTable); ok {
-			err = p.PurgeTable(r.Context(), ident)
-		} else {
-			err = s.cat.DropTable(r.Context(), ident)
+	if r.URL.Query().Get("purgeRequested") != "true" {
+		if err := s.cat.DropTable(ctx, ident); err != nil {
+			writeCatalogError(w, err)
+			return
 		}
-	} else {
-		err = s.cat.DropTable(r.Context(), ident)
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
+
+	// NOTE: purge doesn't use iceberg-go's PurgeTable, which deletes every
+	// file the table's manifests reference wherever it is (and manifests are
+	// written by the client, so we can't vouch for their contents). This
+	// only ever deletes the table's own directory, after checking it's
+	// strictly inside the warehouse.
+	tbl, err := s.cat.LoadTable(ctx, ident)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
+	}
+	loc, err := s.purgeLocation(tbl.Metadata())
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	if err := s.cat.DropTable(ctx, ident); err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	if loc != "" {
+		if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
+			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
+		}
+	} else if s.opts.Logger != nil {
+		// TODO(maintenance): purge remote warehouses (list + delete under
+		// the table prefix).
+		s.opts.Logger.Warn("dropped iceberg table w/o purging files (remote warehouse)", "table", strings.Join(ident, "."))
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
