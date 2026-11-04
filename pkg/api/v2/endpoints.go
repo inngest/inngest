@@ -291,5 +291,5 @@ func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentReq
 
 func (s *Service) SubmitFeedback(ctx context.Context, req *apiv2.SubmitFeedbackRequest) (*apiv2.SubmitFeedbackResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented,
-		"Feedback is only available when targeting Inngest Cloud (use --prod)")
+		"Submit feedback through Inngest Cloud: inngest api --prod submit-feedback --feedback \"Your feedback\"")
 }

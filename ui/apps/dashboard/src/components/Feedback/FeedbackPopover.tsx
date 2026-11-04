@@ -10,6 +10,8 @@ import { Button } from '@inngest/components/Button';
 import { RiCheckLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
+import { useInngestAPIFetch } from '@/queries/useInngestAPIFetch';
+
 type Props = {
   // Element rendered as the popover trigger (asChild), e.g. a bottom-bar link
   // or a floating icon button. Lets multiple entry points share one dialog.
@@ -26,6 +28,7 @@ export default function FeedbackPopover({
   side = 'top',
   leadingDivider = false,
 }: Props) {
+  const apiFetch = useInngestAPIFetch();
   const { user } = useUser();
   const { organization } = useOrganization();
 
@@ -38,28 +41,24 @@ export default function FeedbackPopover({
   // self-hosted/marketplace mode.
   if (!user || !organization) return null;
 
-  const email = user.primaryEmailAddress?.emailAddress;
-
   // Typing again after a send readies the box for the next submission.
-  function onChangeFeedback(value: string) {
+  const onChangeFeedback = (value: string) => {
     setFeedback(value);
     if (sent) setSent(false);
-  }
+  };
 
-  async function onSubmit(e: React.FormEvent) {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feedback.trim() || !user || !organization || !email) return;
+    if (!feedback.trim() || !user || !organization || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
-      const result = await fetch('/api/feedback', {
+      const result = await apiFetch('/v2/feedback', {
         method: 'POST',
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user: { name: user.fullName ?? email, email, clerkId: user.id },
-          organization: { name: organization.name, clerkId: organization.id },
-          page: window.location.href,
+          operation: window.location.pathname.slice(0, 200),
           feedback,
         }),
       });
@@ -70,14 +69,17 @@ export default function FeedbackPopover({
         setSent(true);
         toast.success('Feedback sent successfully.');
       } else {
-        toast.error('Something went wrong. Please try again.');
+        const body = await result.json();
+        toast.error(body.errors?.[0]?.message ?? 'Could not submit feedback.');
       }
     } catch {
-      toast.error('Something went wrong. Please try again.');
+      toast.error(
+        'Could not confirm feedback submission. Retrying may send it twice.',
+      );
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Fragment>
