@@ -118,6 +118,59 @@ func TestProcessFunctions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid hosted serve step",
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
+					{
+						Name: "lol",
+						Triggers: []inngest.Trigger{
+							{
+								EventTrigger: &inngest.EventTrigger{
+									Event: "my/event",
+								},
+							},
+						},
+						Steps: map[string]sdk.SDKStep{
+							"step": {
+								ID:   "step",
+								Name: "step",
+								Runtime: map[string]any{
+									"url": "inngest://serve?fnId=app-hello&stepId=step",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "unknown hosted step host",
+			r: sdk.RegisterRequest{
+				Functions: []sdk.SDKFunction{
+					{
+						Name: "lol",
+						Triggers: []inngest.Trigger{
+							{
+								EventTrigger: &inngest.EventTrigger{
+									Event: "my/event",
+								},
+							},
+						},
+						Steps: map[string]sdk.SDKStep{
+							"step": {
+								ID:   "step",
+								Name: "step",
+								Runtime: map[string]any{
+									"url": "inngest://foo?fnId=app-hello&stepId=step",
+								},
+							},
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("Non-supported step host: foo"),
+		},
 	}
 
 	for _, test := range tests {
