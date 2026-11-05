@@ -35,6 +35,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
     }
   }
   tags: { name: "Account"      description: "Manage your account" }
+  tags: { name: "Feedback"     description: "Submit product feedback" }
   tags: { name: "Environments" description: "Create and manage environments" }
   tags: { name: "Keys"         description: "Manage event and signing keys" }
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
@@ -2779,6 +2780,20 @@ service V2 {
       }
     };
   }
+
+  rpc SubmitFeedback(SubmitFeedbackRequest) returns (SubmitFeedbackResponse) {
+    option (google.api.http) = { post: "/feedback", body: "*" };
+    option (authz) = {
+      require_authz: true
+      permission: "feedback:write:create"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit product feedback"
+      tags: "Feedback"
+      description: "Sends user-requested product feedback to Inngest support. Cloud only. Submit only feedback the user has asked to share; do not include credentials, secrets, or run payloads. Creates a support ticket, so retries may create duplicates. Requires feedback:write:create. No environment selection is required."
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
 }
 
 message HealthRequest {
@@ -4753,4 +4768,41 @@ message Cancellation {
   google.protobuf.Timestamp until = 6;
   optional string if = 7;
   google.protobuf.Timestamp created_at = 8;
+}
+
+message SubmitFeedbackRequest {
+  string feedback = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Feedback to share with Inngest support, up to 10000 characters. Do not include secrets or sensitive run data."
+    }
+  ];
+  optional string operation = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional API operation, CLI command, or MCP tool this feedback concerns, up to 200 characters."
+    }
+  ];
+  optional string email = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional reply-to email, up to 254 characters. Treated as unverified contact information, not as the submitter identity."
+    }
+  ];
+  optional string name = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional contact name, up to 200 characters. Treated as caller-supplied contact information."
+    }
+  ];
+}
+
+message SubmitFeedbackResponse {
+  FeedbackData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message FeedbackData {
+  bool accepted = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "True only after the support ticket was created."
+    }
+  ];
 }

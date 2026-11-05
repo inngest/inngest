@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	ossv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2operations"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -60,6 +62,7 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	require.Contains(t, names, "resume_function")
 	require.Contains(t, names, "list_events")
 	require.Contains(t, names, "get_event")
+	require.Contains(t, names, "submit_feedback")
 	for method := range unsupportedDevServerMCPMethods {
 		// The dev server keeps its older send_event tool for eventIdSeed support.
 		if method == "SendEvent" {
@@ -320,4 +323,22 @@ func TestMCPEventReadCalls(t *testing.T) {
 		require.Equal(t, true, data["payload"].(map[string]any)["data"].(map[string]any)["ok"])
 	}
 	require.Equal(t, []string{"/api/v2/events", "/api/v2/events/01J00000000000000000000000"}, calls)
+}
+
+func TestMCPFeedbackPointsToCloud(t *testing.T) {
+	handler, err := ossv2.NewHTTPHandler(t.Context(), ossv2.ServiceOptions{}, ossv2.HTTPHandlerOptions{}, apiv2base.NewBase())
+	require.NoError(t, err)
+	srv := httptest.NewServer(NewMCPHandler(nil, nil, 0, handler))
+	defer srv.Close()
+	client := mcp.NewClient(&mcp.Implementation{Name: "feedback-test", Version: "1"}, nil)
+	session, err := client.Connect(t.Context(), &mcp.StreamableClientTransport{Endpoint: srv.URL + "/mcp"}, nil)
+	require.NoError(t, err)
+	defer session.Close()
+	result, err := session.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "submit_feedback", Arguments: map[string]any{"feedback": "More examples"},
+	})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.Contains(t, result.Content[0].(*mcp.TextContent).Text, "Inngest Cloud")
+	require.Contains(t, result.Content[0].(*mcp.TextContent).Text, "inngest api --prod submit-feedback --feedback")
 }

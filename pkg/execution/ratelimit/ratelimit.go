@@ -18,7 +18,8 @@ var (
 )
 
 type rateLimitOptions struct {
-	now time.Time
+	now   time.Time
+	burst int
 
 	idempotencyKey string
 	idempotencyTTL time.Duration
@@ -29,6 +30,13 @@ type RateLimitOptionFn func(o *rateLimitOptions)
 func WithNow(now time.Time) RateLimitOptionFn {
 	return func(o *rateLimitOptions) {
 		o.now = now
+	}
+}
+
+// WithBurst sets the number of extra requests allowed at once above the steady rate.
+func WithBurst(burst int) RateLimitOptionFn {
+	return func(o *rateLimitOptions) {
+		o.burst = max(0, burst)
 	}
 }
 

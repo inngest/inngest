@@ -46,7 +46,7 @@
 //   - Message.BeforeSend: *pb.PubsubMessage
 //   - Message.AfterSend: *string for the pb.PublishResponse.MessageIds entry corresponding to the message.
 //   - Message: *pb.PubsubMessage, *pb.ReceivedMessage
-//   - Error: *google.golang.org/grpc/status.Status
+//   - Error: *google.golang.org/grpc/status.Status (note: does not work with errors.As, because it's not an error)
 package gcppubsub // import "gocloud.dev/pubsub/gcppubsub"
 
 import (
@@ -86,9 +86,9 @@ var sendBatcherOpts = &batcher.Options{
 	MaxHandlers:  2,
 	// The PubSub service limits the size of the request body in a single Publish RPC.
 	// The limit is currently documented as "10MB (total size)" and "10MB (data field)" per message.
-	// We are enforcing 9MiB to give ourselves some headroom for message attributes since those
+	// We are enforcing 8MiB to give ourselves some headroom for message attributes since those
 	// are currently not considered when computing the byte size of a message.
-	MaxBatchByteSize: 9 * 1024 * 1024,
+	MaxBatchByteSize: 8 * 1024 * 1024,
 }
 
 var defaultRecvBatcherOpts = &batcher.Options{
@@ -374,7 +374,7 @@ func (t *topic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 	for _, dm := range dms {
 		psm := &pb.PubsubMessage{Data: dm.Body, Attributes: dm.Metadata}
 		if dm.BeforeSend != nil {
-			asFunc := func(i interface{}) bool {
+			asFunc := func(i any) bool {
 				if p, ok := i.(**pb.PubsubMessage); ok {
 					*p = psm
 					return true
@@ -395,7 +395,7 @@ func (t *topic) SendBatch(ctx context.Context, dms []*driver.Message) error {
 	if len(pr.MessageIds) == len(dms) {
 		for n, dm := range dms {
 			if dm.AfterSend != nil {
-				asFunc := func(i interface{}) bool {
+				asFunc := func(i any) bool {
 					if p, ok := i.(*string); ok {
 						*p = pr.MessageIds[n]
 						return true
@@ -418,7 +418,7 @@ func (t *topic) IsRetryable(error) bool {
 }
 
 // As implements driver.Topic.As.
-func (t *topic) As(i interface{}) bool {
+func (t *topic) As(i any) bool {
 	c, ok := i.(**raw.PublisherClient)
 	if !ok {
 		return false
@@ -428,11 +428,11 @@ func (t *topic) As(i interface{}) bool {
 }
 
 // ErrorAs implements driver.Topic.ErrorAs
-func (*topic) ErrorAs(err error, i interface{}) bool {
+func (*topic) ErrorAs(err error, i any) bool {
 	return errorAs(err, i)
 }
 
-func errorAs(err error, i interface{}) bool {
+func errorAs(err error, i any) bool {
 	s, ok := status.FromError(err)
 	if !ok {
 		return false
@@ -552,7 +552,6 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 
 	ms := make([]*driver.Message, 0, len(resp.ReceivedMessages))
 	for _, rm := range resp.ReceivedMessages {
-		rm := rm
 		rmm := rm.Message
 		m := &driver.Message{
 			LoggableID: rmm.MessageId,
@@ -566,8 +565,8 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 	return ms, nil
 }
 
-func messageAsFunc(pm *pb.PubsubMessage, rm *pb.ReceivedMessage) func(interface{}) bool {
-	return func(i interface{}) bool {
+func messageAsFunc(pm *pb.PubsubMessage, rm *pb.ReceivedMessage) func(any) bool {
+	return func(i any) bool {
 		ip, ok := i.(**pb.PubsubMessage)
 		if ok {
 			*ip = pm
@@ -618,7 +617,7 @@ func (s *subscription) IsRetryable(err error) bool {
 }
 
 // As implements driver.Subscription.As.
-func (s *subscription) As(i interface{}) bool {
+func (s *subscription) As(i any) bool {
 	c, ok := i.(**raw.SubscriberClient)
 	if !ok {
 		return false
@@ -628,7 +627,7 @@ func (s *subscription) As(i interface{}) bool {
 }
 
 // ErrorAs implements driver.Subscription.ErrorAs
-func (*subscription) ErrorAs(err error, i interface{}) bool {
+func (*subscription) ErrorAs(err error, i any) bool {
 	return errorAs(err, i)
 }
 
