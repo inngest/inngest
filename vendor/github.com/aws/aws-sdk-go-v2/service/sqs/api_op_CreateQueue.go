@@ -4,10 +4,9 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates a new standard or FIFO queue. You can pass one or more attributes in
@@ -20,7 +19,7 @@ import (
 //
 //	existing standard queue into a FIFO queue. You must either create a new FIFO
 //	queue for your application or delete your existing standard queue and recreate
-//	it as a FIFO queue. For more information, see [Moving From a Standard Queue to a FIFO Queue]in the Amazon SQS Developer
+//	it as a FIFO queue. For more information, see [Moving From a standard queue to a FIFO queue]in the Amazon SQS Developer
 //	Guide.
 //
 //	- If you don't provide a value for an attribute, the queue is created with
@@ -35,23 +34,29 @@ import (
 // After you create a queue, you must wait at least one second after the queue is
 // created to be able to use the queue.
 //
-// To get the queue URL, use the GetQueueUrl action. GetQueueUrl requires only the QueueName parameter.
-// be aware of existing queue names:
+// To retrieve the URL of a queue, use the [GetQueueUrl]GetQueueUrl action. This action only
+// requires the [QueueName]QueueName parameter.
 //
-//   - If you provide the name of an existing queue along with the exact names and
-//     values of all the queue's attributes, CreateQueue returns the queue URL for
-//     the existing queue.
+// When creating queues, keep the following points in mind:
 //
-//   - If the queue name, attribute names, or attribute values don't match an
-//     existing queue, CreateQueue returns an error.
+//   - If you specify the name of an existing queue and provide the exact same
+//     names and values for all its attributes, the [CreateQueue]CreateQueue action will return
+//     the URL of the existing queue instead of creating a new one.
+//
+//   - If you attempt to create a queue with a name that already exists but with
+//     different attribute names or values, the CreateQueue action will return an
+//     error. This ensures that existing queues are not inadvertently altered.
 //
 // Cross-account permissions don't apply to this action. For more information, see [Grant cross-account permissions to a role and a username]
 // in the Amazon SQS Developer Guide.
 //
 // [limits related to queues]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/limits-queues.html
+// [CreateQueue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html
 // [Grant cross-account permissions to a role and a username]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-customer-managed-policy-examples.html#grant-cross-account-permissions-to-role-and-user-name
+// [QueueName]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html#API_CreateQueue_RequestSyntax
+// [GetQueueUrl]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueUrl.html
 //
-// [Moving From a Standard Queue to a FIFO Queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html#FIFO-queues-moving
+// [Moving From a standard queue to a FIFO queue]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html#FIFO-queues-moving
 func (c *Client) CreateQueue(ctx context.Context, params *CreateQueueInput, optFns ...func(*Options)) (*CreateQueueOutput, error) {
 	if params == nil {
 		params = &CreateQueueInput{}
@@ -93,7 +98,7 @@ type CreateQueueInput struct {
 	//
 	//   - MaximumMessageSize – The limit of how many bytes a message can contain
 	//   before Amazon SQS rejects it. Valid values: An integer from 1,024 bytes (1 KiB)
-	//   to 262,144 bytes (256 KiB). Default: 262,144 (256 KiB).
+	//   to 1,048,576 bytes (1 MiB). Default: 1,048,576 bytes (1 MiB).
 	//
 	//   - MessageRetentionPeriod – The length of time, in seconds, for which Amazon
 	//   SQS retains a message. Valid values: An integer from 60 seconds (1 minute) to
@@ -284,6 +289,20 @@ type CreateQueueInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateQueueInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateQueueRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateQueueInput) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeQueueAttributeMap(s, schemas.CreateQueueRequest_Attributes, v.Attributes)
+	if v.QueueName != nil {
+		s.WriteString(schemas.CreateQueueRequest_QueueName, *v.QueueName)
+	}
+	serializeTagMap(s, schemas.CreateQueueRequest_tags, v.Tags)
+}
+
 // Returns the QueueUrl attribute of the created queue.
 type CreateQueueOutput struct {
 
@@ -296,74 +315,48 @@ type CreateQueueOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateQueueOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateQueueResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateQueueOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.CreateQueueResult_QueueUrl, *v.QueueUrl)
+	}
+}
+func (v *CreateQueueOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.CreateQueueResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.CreateQueueResult_QueueUrl:
+			v.QueueUrl = new(string)
+			return d.ReadString(schemas.CreateQueueResult_QueueUrl, v.QueueUrl)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationCreateQueueMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateQueue, schemas.CreateQueueRequest, schemas.CreateQueueResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpCreateQueue{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateQueue, schemas.CreateQueueRequest, schemas.CreateQueueResult), output: &CreateQueueOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpCreateQueue{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "CreateQueue"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateQueueValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opCreateQueue(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -378,13 +371,8 @@ func (c *Client) addOperationCreateQueueMiddlewares(stack *middleware.Stack, opt
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opCreateQueue(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "CreateQueue",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

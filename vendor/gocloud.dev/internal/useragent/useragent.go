@@ -18,6 +18,7 @@ package useragent // import "gocloud.dev/internal/useragent"
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 
 	"google.golang.org/api/option"
@@ -26,7 +27,7 @@ import (
 
 const (
 	prefix  = "go-cloud"
-	version = "0.40.0"
+	version = "0.47.0"
 )
 
 // ClientOption returns an option.ClientOption that sets a Go CDK User-Agent.
@@ -59,9 +60,7 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// Clone the request to avoid mutating it.
 	newReq := *req
 	newReq.Header = make(http.Header)
-	for k, vv := range req.Header {
-		newReq.Header[k] = vv
-	}
+	maps.Copy(newReq.Header, req.Header)
 	// Append to the User-Agent string to preserve other information.
 	newReq.Header.Set("User-Agent", req.UserAgent()+" "+userAgentString(t.api))
 	return t.base.RoundTrip(&newReq)
@@ -71,6 +70,12 @@ func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error
 // header for all requests.
 func HTTPClient(client *http.Client, api string) *http.Client {
 	c := *client
-	c.Transport = &userAgentTransport{base: c.Transport, api: api}
+	base := c.Transport
+	if base == nil {
+		// A nil Transport means the client uses http.DefaultTransport
+		// implicitly; wrapping it as-is would panic on the first request.
+		base = http.DefaultTransport
+	}
+	c.Transport = &userAgentTransport{base: base, api: api}
 	return &c
 }

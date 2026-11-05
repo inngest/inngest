@@ -791,7 +791,7 @@ func (e *ThrottledException) ErrorCode() string {
 }
 func (e *ThrottledException) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The batch request contains more entries than permissible.
+// The batch request contains more entries than permissible (more than 10).
 type TooManyEntriesInBatchRequestException struct {
 	Message *string
 

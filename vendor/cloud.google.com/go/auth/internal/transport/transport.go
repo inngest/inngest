@@ -24,7 +24,37 @@ import (
 	"time"
 
 	"cloud.google.com/go/auth/credentials"
+	"go.opentelemetry.io/otel/attribute"
 )
+
+// knownKeys provides keys for reading telemetry attributes from Context.
+// It provides an implicit contract with generated client library code
+// using the same keys. The keys in this collection should not be removed
+// or modified. New keys may be added, but they will need to be explicitly
+// used in code referencing this collection in order to appear in telemetry.
+var knownKeys = []string{
+	"gcp.client.service",
+	"gcp.client.version",
+	"gcp.client.repo",
+	"gcp.client.artifact",
+	"gcp.client.language",
+	"url.domain",
+}
+
+// StaticTelemetryAttributes selectively converts known keys from a map of
+// strings to Open Telemetry attributes.
+func StaticTelemetryAttributes(m map[string]string) []attribute.KeyValue {
+	var staticAttrs []attribute.KeyValue
+	if m == nil {
+		return staticAttrs
+	}
+	for _, k := range knownKeys {
+		if v, ok := m[k]; ok {
+			staticAttrs = append(staticAttrs, attribute.String(k, v))
+		}
+	}
+	return staticAttrs
+}
 
 // CloneDetectOptions clones a user set detect option into some new memory that
 // we can internally manipulate before sending onto the detect package.
@@ -37,6 +67,7 @@ func CloneDetectOptions(oldDo *credentials.DetectOptions) *credentials.DetectOpt
 	}
 	newDo := &credentials.DetectOptions{
 		// Simple types
+		TokenBindingType:  oldDo.TokenBindingType,
 		Audience:          oldDo.Audience,
 		Subject:           oldDo.Subject,
 		EarlyTokenRefresh: oldDo.EarlyTokenRefresh,
@@ -46,9 +77,10 @@ func CloneDetectOptions(oldDo *credentials.DetectOptions) *credentials.DetectOpt
 		UseSelfSignedJWT:  oldDo.UseSelfSignedJWT,
 		UniverseDomain:    oldDo.UniverseDomain,
 
-		// These fields are are pointer types that we just want to use exactly
-		// as the user set, copy the ref
+		// These fields are pointer types that we just want to use exactly as
+		// the user set, copy the ref
 		Client:             oldDo.Client,
+		Logger:             oldDo.Logger,
 		AuthHandlerOptions: oldDo.AuthHandlerOptions,
 	}
 
@@ -81,12 +113,14 @@ func ValidateUniverseDomain(clientUniverseDomain, credentialsUniverseDomain stri
 
 // DefaultHTTPClientWithTLS constructs an HTTPClient using the provided tlsConfig, to support mTLS.
 func DefaultHTTPClientWithTLS(tlsConfig *tls.Config) *http.Client {
-	trans := baseTransport()
+	trans := BaseTransport()
 	trans.TLSClientConfig = tlsConfig
 	return &http.Client{Transport: trans}
 }
 
-func baseTransport() *http.Transport {
+// BaseTransport returns a default [http.Transport] which can be used if
+// [http.DefaultTransport] has been overwritten.
+func BaseTransport() *http.Transport {
 	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
