@@ -1390,3 +1390,24 @@ func TestCommandPausesAndResumesFunctions(t *testing.T) {
 		})
 	}
 }
+
+func TestSubmitFeedbackCommand(t *testing.T) {
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+	var gotBody map[string]any
+	var gotPath, gotAgent, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotAgent, gotAuth = r.URL.Path, r.UserAgent(), r.Header.Get("Authorization")
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"accepted":true}}`))
+	}))
+	t.Cleanup(srv.Close)
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	require.NoError(t, cmd.Run(t.Context(), []string{"api", "--api-host", srv.URL, "--api-key", "test-key",
+		"submit-feedback", "--feedback", "More examples please", "--operation", "get_run", "--email", "dev@example.com"}))
+	require.Equal(t, "/api/v2/feedback", gotPath)
+	require.Equal(t, "Bearer test-key", gotAuth)
+	require.True(t, strings.HasPrefix(gotAgent, "inngest-cli/"))
+	require.Equal(t, map[string]any{"feedback": "More examples please", "operation": "get_run", "email": "dev@example.com"}, gotBody)
+}

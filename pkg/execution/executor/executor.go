@@ -6126,7 +6126,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
-		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+		if _, err := e.batcher.DeleteKeys(ctx, payload.AccountID, payload.FunctionID, payload.BatchID); err != nil {
 			return err
 		}
 	}
