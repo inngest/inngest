@@ -75,7 +75,9 @@ type BatchManager interface {
 	StartExecution(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID, batchPointer string) (string, error)
 	ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error
 
-	DeleteKeys(ctx context.Context, functionID uuid.UUID, batchID ulid.ULID) error
+	// DeleteKeys deletes a batch's keys and reports whether the batch's event
+	// list existed.
+	DeleteKeys(ctx context.Context, accountID, functionID uuid.UUID, batchID ulid.ULID) (bool, error)
 	// GetBatchInfo retrieves information about the current batch for a function and batch key,
 	// with one entry per batch store. This is used for debugging and introspection.
 	GetBatchInfo(ctx context.Context, functionID uuid.UUID, batchKey string) ([]BatchInfo, error)

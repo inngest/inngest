@@ -4967,6 +4967,7 @@ enum AppMethod {
   SERVE
   CONNECT
   API
+  INNGEST_SERVE
 }
 
 input AppsFilterV1 {
