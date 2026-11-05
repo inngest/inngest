@@ -1,0 +1,7 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+is_not_false(true::bool) = true::bool
+is_not_false(false::bool) = false::bool
+is_not_false(null::bool?) = true::bool

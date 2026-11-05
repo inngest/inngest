@@ -1,0 +1,22 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+bitwise_or(0::dec<1, 0>, 1::dec<1, 0>) = 1::dec<1, 0>
+bitwise_or(127::dec<3, 0>, 127::dec<3, 0>) = 127::dec<3, 0>
+bitwise_or(-127::dec<3, 0>, -10::dec<2, 0>) = -9::dec<3, 0>
+bitwise_or(31766::dec<5, 0>, 900::dec<3, 0>) = 32662::dec<5, 0>
+bitwise_or(-31766::dec<5, 0>, 900::dec<3, 0>) = -31762::dec<5, 0>
+bitwise_or(2147483647::dec<10, 0>, 123456789::dec<9, 0>) = 2147483647::dec<10, 0>
+bitwise_or(-2147483647::dec<10, 0>, 123456789::dec<9, 0>) = -2024026859::dec<10, 0>
+bitwise_or(9223372036854775807::dec<19, 0>, 127::dec<3, 0>) = 9223372036854775807::dec<19, 0>
+bitwise_or(-9223372036854775807::dec<19, 0>, 127::dec<3, 0>) = -9223372036854775681::dec<19, 0>
+
+# max_values: test with max values
+bitwise_or(99999999999999999999999999999999999999::dec<38, 0>, 99999999999999999999999999999999999999::dec<38, 0>) = 99999999999999999999999999999999999999::dec<38, 0>
+bitwise_or(99999999999999999999999999999999999999::dec<38, 0>, 00000000000000000000000000000000000000::dec<38, 0>) = 99999999999999999999999999999999999999::dec<38, 0>
+bitwise_or(-99999999999999999999999999999999999999::dec<38, 0>, -99999999999999999999999999999999999999::dec<38, 0>) = -99999999999999999999999999999999999999::dec<38, 0>
+
+# null_values: test with null values
+bitwise_or(null::dec?<1, 0>, 127::dec<3, 0>) = null::dec?<3, 0>
+bitwise_or(null::dec?<1, 0>, null::dec?<1, 0>) = null::dec?<1, 0>

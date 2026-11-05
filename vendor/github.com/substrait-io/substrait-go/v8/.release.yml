@@ -1,0 +1,18 @@
+commitFormat: conventional
+branch:
+  main: release
+release: 'github'
+github:
+  repo: "substrait-go"
+  user: "substrait-io"
+# preRelease hooks run after go-semantic-release computes the next version
+# but before the tag is created. RELEASE_VERSION env var contains the
+# computed version (e.g., "8.0.0").
+hooks:
+  preRelease:
+  - ./scripts/check-module-version.sh
+changelog:
+  printAll: true
+  title: "v{{.Version}}"
+  showAuthors: false
+

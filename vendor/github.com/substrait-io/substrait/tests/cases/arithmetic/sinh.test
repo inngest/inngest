@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+sinh(0.0::fp32) = 0.0::fp32
+sinh(1.0::fp64) = 1.1752011936438014::fp64
+sinh(7.0000009::fp64) = 548.3166167588001::fp64
+sinh(-7.0000009::fp64) = -548.3166167588001::fp64
+sinh(null::fp64?) = null::fp64?

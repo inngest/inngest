@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+cos(0.00::fp32) = 1.0::fp32
+cos(1.0::fp64) = 0.5403023058681398::fp64
+cos(7.0000009::fp64) = 0.7539016630550606::fp64
+cos(-7.00000095::fp64) = 0.7539016302056953::fp64
+cos(null::fp64?) = null::fp64?

@@ -1,0 +1,132 @@
+%YAML 1.2
+---
+urn: extension:io.substrait:functions_list
+scalar_functions:
+  - name: "transform"
+    description: >-
+      Transforms each element of a list using the provided function.
+      Also known as "map" in functional programming.
+
+      Returns a new list where each element is the result of applying
+      the transformer to the corresponding element in the input list.
+
+      The transformer receives one parameter (the current element) and must return
+      the transformed value.
+
+      If the input list is null, the result is null.
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+          - name: transformer
+            value: func<any1 -> any2>
+        nullability: MIRROR
+        return: list<any2>
+
+  - name: "filter"
+    description: >-
+      Filters a list of elements based on a predicate function.
+
+      Returns a new list containing only elements for which the predicate
+      function returns true.
+
+      The predicate receives one parameter (the current element) and must return a
+      boolean.
+
+      Elements for which the predicate returns true are included in the
+      result. Elements for which the predicate returns false or null are excluded.
+
+      If the input list is null, the result is null.
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+          - name: predicate
+            value: func<any1 -> boolean?>
+        nullability: MIRROR
+        return: list<any1>
+
+  - name: "cardinality"
+    description: >-
+      Returns the number of elements in the list.
+
+      Null elements are counted. If the input list is null, the result is null.
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+        nullability: MIRROR
+        return: i64
+
+  # TODO: Add comparator overload for custom sorting (see #972)
+  - name: "sort"
+    description: >-
+      Sorts the elements of a list. Elements must be orderable.
+
+      If the input list is null, the result is null.
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+        options:
+          direction:
+            description: >-
+              Sort direction and null placement, matching SortField.SortDirection
+              in the Sort relation.
+            values: [ASC_NULLS_FIRST, ASC_NULLS_LAST, DESC_NULLS_FIRST, DESC_NULLS_LAST]
+        nullability: MIRROR
+        return: list<any1>
+
+  - name: "any_match"
+    description: >-
+      Returns true if the predicate returns true for any element of the list.
+
+      More precisely
+      * If the list is null, or the predicate is null, returns null.
+      * If the list is empty, returns false as no element matches the predicate.
+
+      Otherwise
+      * Returns true if the predicate returns true for at least one element.
+      * Returns false if the predicate returns false for all elements.
+      * Returns null if the predicate does not return true for any element,
+      and returns null for at least one element.
+
+      This behaviour is equivalent to applying the predicate to every element
+      of the list, and then OR-ing all of the results together. This is
+      consistent with the Kleene logic defined in
+      extension:io.substrait:functions_boolean::or
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+          - name: predicate
+            value: func<any1 -> boolean?>
+        nullability: DECLARED_OUTPUT
+        return: boolean?
+
+  - name: "all_match"
+    description: >-
+      Returns true if the predicate returns true for all elements of the list.
+
+      More precisely
+      * If the list is null, or the predicate is null, returns null.
+      * If the list is empty, returns true as no element fails the predicate.
+
+      Otherwise
+      * Returns false if the predicate returns false for at least one element.
+      * Returns true if the predicate returns true for all elements.
+      * Returns null if the predicate does not return false for any element,
+      and returns null for at least one element.
+
+      This behaviour is equivalent to applying the predicate to every element
+      of the list, and then AND-ing all of the results together. This is
+      consistent with the Kleene logic defined in
+      extension:io.substrait:functions_boolean::and
+    impls:
+      - args:
+          - name: input
+            value: list<any1>
+          - name: predicate
+            value: func<any1 -> boolean?>
+        nullability: DECLARED_OUTPUT
+        return: boolean?

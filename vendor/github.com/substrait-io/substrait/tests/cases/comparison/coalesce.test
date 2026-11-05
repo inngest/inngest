@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+coalesce(1::i8, 2::i8) = 1::i8
+coalesce(null::i8?, 2::i8) = 2::i8?
+coalesce(null::i16?, null::i16?) = null::i16?
+coalesce(2000000::i32, null::i32?) = 2000000::i32?
+coalesce(null::i64?, 9223372036854775807::i64) = 9223372036854775807::i64?
+coalesce(null::fp32?, -65.500000::fp32) = -65.500000::fp32?
+coalesce(inf::fp64, -inf::fp64) = inf::fp64
+coalesce(7::dec<38, 0>, 4::dec<38, 0>) = 7::dec<38, 0>
+coalesce(null::dec?<38, 0>, 2::dec<38, 0>) = 2::dec?<38, 0>
+coalesce(null::dec?<38, 0>, null::dec?<38, 0>) = null::dec?<38, 0>
+coalesce(2000000::dec<38, 0>, null::dec?<38, 0>) = 2000000::dec?<38, 0>
+coalesce(null::dec?<38, 0>, 2000000::dec<38, 0>) = 2000000::dec?<38, 0>

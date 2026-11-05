@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+atanh(0.0::fp32) = 0.0::fp32
+atanh(1.0::fp64) = inf::fp64
+atanh(0.009::fp64) = 0.009000243011810481::fp64
+atanh(-0.009::fp64) = -0.009000243011810481::fp64
+atanh(null::fp64?) = null::fp64?
