@@ -58,7 +58,7 @@ type SetQueueAttributesInput struct {
 	//
 	//   - MaximumMessageSize – The limit of how many bytes a message can contain
 	//   before Amazon SQS rejects it. Valid values: An integer from 1,024 bytes (1 KiB)
-	//   up to 262,144 bytes (256 KiB). Default: 262,144 (256 KiB).
+	//   up to 1,048,576 bytes (1 MiB). Default: 1,048,576 bytes (1 MiB).
 	//
 	//   - MessageRetentionPeriod – The length of time, in seconds, for which Amazon
 	//   SQS retains a message. Valid values: An integer representing seconds, from 60 (1
@@ -271,6 +271,9 @@ func (c *Client) addOperationSetQueueAttributesMiddlewares(stack *middleware.Sta
 	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
+	if err = addSpanRetryLoop(stack, options); err != nil {
+		return err
+	}
 	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
@@ -287,6 +290,9 @@ func (c *Client) addOperationSetQueueAttributesMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpSetQueueAttributesValidationMiddleware(stack); err != nil {
@@ -308,6 +314,15 @@ func (c *Client) addOperationSetQueueAttributesMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
