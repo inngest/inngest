@@ -55,7 +55,7 @@ require (
 	github.com/lib/pq v1.12.0
 	github.com/liushuangls/go-anthropic/v2 v2.12.2
 	github.com/lmittmann/tint v1.1.0
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.24
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby/api v1.54.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
@@ -111,7 +111,7 @@ require (
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 	lukechampine.com/frand v1.5.1
-	modernc.org/sqlite v1.46.1
+	modernc.org/sqlite v1.57.0
 )
 
 require (
@@ -291,7 +291,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.68.0 // indirect
+	modernc.org/libc v1.74.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
