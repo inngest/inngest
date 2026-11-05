@@ -75,7 +75,7 @@ end
 -- enqueue, so a racing runtime retry or completion cannot create a second copy.
 local alternateSleepID = ARGV[16]
 if alternateSleepID and alternateSleepID ~= "" and not is_normalize then
-  if ARGV[17] ~= "1" then
+  if ARGV[17] == "0" then
     if redis.call("HEXISTS", queueKey, alternateSleepID) ~= 0 or redis.call("EXISTS", KEYS[21]) ~= 0 then
       return 3
     end
@@ -101,6 +101,9 @@ if alternateSleepID and alternateSleepID ~= "" and not is_normalize then
         return 3
       end
     elseif redis.call("EXISTS", KEYS[21]) ~= 0 then
+      -- Runtime scheduling must retry an ambiguous legacy completion, rather
+      -- than reporting a different run's missing wake-up as scheduled.
+      if ARGV[17] == "2" then return 4 end
       return 3
     end
   end

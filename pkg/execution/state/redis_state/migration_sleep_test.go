@@ -147,3 +147,55 @@ func TestSleepMigrationRacesRuntimeRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(20), count, "one physical sleep per run after racing enqueues")
 }
+
+func TestRunScopedSleepEnqueue(t *testing.T) {
+	for _, tc := range []string{"no legacy", "same run", "other run", "completed", "wrong kind", "invalid ID"} {
+		t.Run(tc, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			_, shard := newQueue(t, rc)
+			legacyID := "legacy-sleep"
+			env, fn := uuid.New(), uuid.New()
+			item := osqueue.QueueItem{ID: legacyID, FunctionID: fn, WorkspaceID: env, Data: osqueue.Item{Kind: osqueue.KindSleep, WorkspaceID: env, Identifier: state.Identifier{AccountID: uuid.New(), WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}}
+			at := time.Now().Add(time.Hour)
+			if tc != "no legacy" && tc != "invalid ID" {
+				old := item
+				if tc == "other run" {
+					old.Data.Identifier.RunID = ulid.Make()
+				}
+				if tc == "wrong kind" {
+					old.Data.Kind = osqueue.KindEdge
+				}
+				old, err = shard.EnqueueItem(t.Context(), old, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+				require.NoError(t, err)
+				if tc == "completed" {
+					require.NoError(t, shard.Dequeue(t.Context(), old))
+				}
+			}
+			item.ID = osqueue.MigrationSleepID(item)
+			if tc == "invalid ID" {
+				item.ID = "wrong"
+			}
+			opts := osqueue.EnqueueOpts{PassthroughJobId: true, LegacySleepID: legacyID}
+			stored, err := shard.EnqueueItem(t.Context(), item, at, opts)
+			switch tc {
+			case "same run":
+				require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+			case "completed", "wrong kind", "invalid ID":
+				require.Error(t, err)
+				require.NotErrorIs(t, err, osqueue.ErrQueueItemExists)
+			default:
+				require.NoError(t, err)
+				require.Equal(t, at.UnixMilli(), stored.AtMS)
+				_, err = shard.EnqueueItem(t.Context(), item, at, opts)
+				require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+				oldRetry := item
+				oldRetry.ID = legacyID
+				_, err = shard.EnqueueItem(t.Context(), oldRetry, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+				require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+			}
+		})
+	}
+}

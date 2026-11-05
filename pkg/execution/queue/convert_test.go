@@ -584,6 +584,7 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 		ForceQueueShardName:    "queue-a",
 		NormalizeFromBacklogID: "backlog-a",
 		SingletonMigrationKey:  "singleton-a",
+		LegacySleepID:          "legacy-sleep",
 		IdempotencyPeriod:      &idempotencyPeriod,
 		CallerLease:            &CallerLease{Shards: []string{"shard-a", "shard-b"}, LeaseID: ulid.Make(), AtLimit: true},
 	}
@@ -1174,6 +1175,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"ForceQueueShardName",
 			"NormalizeFromBacklogID",
 			"SingletonMigrationKey",
+			"LegacySleepID",
 			"IdempotencyPeriod",
 			"CallerLease",
 		},

@@ -503,6 +503,7 @@ func EnqueueOptionsToProto(opts EnqueueOpts) *pb.EnqueueOptions {
 		NormalizeFromBacklogId: opts.NormalizeFromBacklogID,
 		IdempotencyPeriod:      durationPtrToProto(opts.IdempotencyPeriod),
 		SingletonMigrationKey:  opts.SingletonMigrationKey,
+		LegacySleepId:          opts.LegacySleepID,
 		CallerLease:            callerLeaseToProto(opts.CallerLease),
 	}
 }
@@ -537,6 +538,7 @@ func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {
 		NormalizeFromBacklogID: msg.GetNormalizeFromBacklogId(),
 		IdempotencyPeriod:      durationPtrFromProto(msg.GetIdempotencyPeriod()),
 		SingletonMigrationKey:  msg.GetSingletonMigrationKey(),
+		LegacySleepID:          msg.GetLegacySleepId(),
 		CallerLease:            callerLeaseFromProto(msg.GetCallerLease()),
 	}
 }

@@ -131,7 +131,10 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
-	return q.enqueueItem(ctx, i, at, opts, "")
+	if err := osqueue.ValidateSleepJobID(i, opts); err != nil {
+		return i, err
+	}
+	return q.enqueueItem(ctx, i, at, opts, opts.LegacySleepID)
 }
 
 func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts, originalSleepID string) (osqueue.QueueItem, error) {
@@ -227,6 +230,14 @@ func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		alternateSleepID = ""
 	}
 
+	sleepIDMode := 0
+	if originalSleepID != "" {
+		sleepIDMode = 1
+	}
+	if opts.LegacySleepID != "" {
+		sleepIDMode = 2
+	}
+
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -289,7 +300,7 @@ func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		opts.NormalizeFromBacklogID,
 		opts.SingletonMigrationKey != "",
 		alternateSleepID,
-		originalSleepID != "",
+		sleepIDMode,
 	})
 	if err != nil {
 		return i, err
@@ -319,6 +330,8 @@ func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		status = 1
 	}
 	switch status {
+	case 4:
+		return i, fmt.Errorf("cannot confirm ownership of legacy sleep completion %q", alternateSleepID)
 	case 0:
 		return i, nil
 	case 1:

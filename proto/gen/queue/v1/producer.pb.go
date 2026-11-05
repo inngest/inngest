@@ -362,6 +362,7 @@ type EnqueueOptions struct {
 	// Lease the item for the enqueuing caller in the enqueue commit (see
 	// CallerLease). Queues that do not support it ignore it.
 	CallerLease   *CallerLease `protobuf:"bytes,6,opt,name=caller_lease,json=callerLease,proto3" json:"caller_lease,omitempty"`
+	LegacySleepId string       `protobuf:"bytes,7,opt,name=legacy_sleep_id,json=legacySleepId,proto3" json:"legacy_sleep_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -436,6 +437,13 @@ func (x *EnqueueOptions) GetCallerLease() *CallerLease {
 		return x.CallerLease
 	}
 	return nil
+}
+
+func (x *EnqueueOptions) GetLegacySleepId() string {
+	if x != nil {
+		return x.LegacySleepId
+	}
+	return ""
 }
 
 // CallerLease asks the queue to write the item already leased for the caller
@@ -534,14 +542,15 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
 	"\x05scope\x18\x04 \x01(\v2\x0f.queue.v1.ScopeR\x05scope\"\x18\n" +
-	"\x16RequeueByJobIDResponse\"\x86\x03\n" +
+	"\x16RequeueByJobIDResponse\"\xae\x03\n" +
 	"\x0eEnqueueOptions\x12,\n" +
 	"\x12passthrough_job_id\x18\x01 \x01(\bR\x10passthroughJobId\x123\n" +
 	"\x16force_queue_shard_name\x18\x02 \x01(\tR\x13forceQueueShardName\x129\n" +
 	"\x19normalize_from_backlog_id\x18\x03 \x01(\tR\x16normalizeFromBacklogId\x12M\n" +
 	"\x12idempotency_period\x18\x04 \x01(\v2\x19.google.protobuf.DurationH\x00R\x11idempotencyPeriod\x88\x01\x01\x126\n" +
 	"\x17singleton_migration_key\x18\x05 \x01(\tR\x15singletonMigrationKey\x128\n" +
-	"\fcaller_lease\x18\x06 \x01(\v2\x15.queue.v1.CallerLeaseR\vcallerLeaseB\x15\n" +
+	"\fcaller_lease\x18\x06 \x01(\v2\x15.queue.v1.CallerLeaseR\vcallerLease\x12&\n" +
+	"\x0flegacy_sleep_id\x18\a \x01(\tR\rlegacySleepIdB\x15\n" +
 	"\x13_idempotency_period\"[\n" +
 	"\vCallerLease\x12\x16\n" +
 	"\x06shards\x18\x01 \x03(\tR\x06shards\x12\x19\n" +
