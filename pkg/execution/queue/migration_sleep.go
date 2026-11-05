@@ -1,10 +1,18 @@
 package queue
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+	"time"
 )
+
+// SleepMigrationDestination atomically handles legacy and run-scoped sleep IDs.
+// Migration must verify the returned identity before removing the source item.
+type SleepMigrationDestination interface {
+	EnqueueSleepForMigration(context.Context, QueueItem, time.Time, EnqueueOpts) (QueueItem, error)
+}
 
 // MigrationSleepID separates legacy sleep IDs reused by different runs during
 // a shard cutover. Preserve an already migrated ID on subsequent migrations.

@@ -47,8 +47,10 @@ func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
 }
 
 type RedisQueueShard interface {
+	osqueue.SleepMigrationDestination
 	osqueue.QueueShard
 	osqueue.BacklogOperations
+	HasPendingMigrationItems(context.Context, osqueue.Scope, string) (bool, error)
 	Client() *QueueClient
 	ItemsByPartitionSeq2(context.Context, osqueue.Scope, string, time.Time, time.Time, ...osqueue.QueueIterOpt) (iter.Seq2[*osqueue.QueueItem, error], error)
 	SingletonMigrationKey(context.Context, osqueue.QueueItem) (string, error)

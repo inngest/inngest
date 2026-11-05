@@ -9,6 +9,8 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var _ osqueue.SleepMigrationDestination = (*queue)(nil)
+
 // EnqueueSleepForMigration preserves both runs when a legacy sleep ID is reused
 // after shard routing changes. Legacy duplicates and completion markers are
 // checked atomically with the copy, as are ordinary retries of migrated sleeps.
