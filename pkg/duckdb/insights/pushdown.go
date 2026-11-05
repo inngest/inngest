@@ -144,6 +144,12 @@ func appendPushdownEntries(tables map[string]logicalTable, entries []pushdownEnt
 		return append(entries, e)
 	case *parser.JoinRef:
 		entries = appendPushdownEntries(tables, entries, r.Left)
+		if typ := strings.ToUpper(r.Type); strings.Contains(typ, "SEMI") || strings.Contains(typ, "ANTI") {
+			// A SEMI/ANTI join's right side is hidden from the rest of the
+			// SELECT (see tableScope), so a later FROM item can reuse its
+			// alias and WHERE can't see its columns: it gets no entry.
+			return entries
+		}
 		return appendPushdownEntries(tables, entries, r.Right)
 	case *parser.TableSubqueryRef:
 		return append(entries, pushdownEntry{alias: strings.ToLower(r.Alias)})

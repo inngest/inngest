@@ -104,6 +104,17 @@ func TestExtractPushdown(t *testing.T) {
 			want: Pushdown{"metadata": {eq("scope", "step")}},
 		},
 		{
+			name: "join: a SEMI join's hidden right side doesn't capture a later join's reused alias",
+			sql: `SELECT r.run_id FROM runs r SEMI JOIN events e ON r.run_id=e.id
+				JOIN extended_trace_spans e ON r.run_id=e.run_id WHERE e.name='sdk.extended_trace'`,
+			want: Pushdown{"extended_trace_spans": {eq("name", "sdk.extended_trace")}},
+		},
+		{
+			name: "join: an ANTI join's hidden right side doesn't make a bare column ambiguous",
+			sql:  `SELECT r.run_id FROM runs r ANTI JOIN extended_trace_spans s ON r.run_id=s.run_id WHERE run_id = 'x'`,
+			want: Pushdown{"runs": {eq("run_id", "x")}},
+		},
+		{
 			name: "outer join: a null-rejecting filter on the null-supplying side is still safe",
 			sql:  `SELECT r.run_id FROM runs r LEFT JOIN events e ON e.id = r.run_id WHERE e.name = 'app/x'`,
 			want: Pushdown{"events": {eq("name", "app/x")}},
