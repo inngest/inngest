@@ -112,7 +112,6 @@ func (c *ConcurrencyLimits) UnmarshalJSON(b []byte) error {
 				Limit: int,
 			},
 		}
-		return nil
 	}
 
 	// Sort concurrency items by limit, increasing.
