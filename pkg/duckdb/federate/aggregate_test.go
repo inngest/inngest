@@ -160,6 +160,9 @@ func TestValidateAggregate(t *testing.T) {
 			q.GroupBy = []GroupKey{{Column: "queued_at", Bucket: 7 * time.Hour, As: "w"}}
 		}, "dividing a day"},
 		{"repeated name", func(q *AggregateQuery) { q.GroupBy = []GroupKey{{Column: "status", As: "n"}} }, "repeated"},
+		{"name repeated in another case", func(q *AggregateQuery) {
+			q.Aggs = []Agg{{Func: AggCount, As: "n"}, {Func: AggCount, Column: "ended_at", As: "N"}}
+		}, "repeated"},
 		{"unsupported function", func(q *AggregateQuery) { q.Aggs = []Agg{{Func: "avg", Column: "queued_at", As: "x"}} }, "unsupported"},
 		{"output name that isn't an identifier", func(q *AggregateQuery) { q.Aggs = []Agg{{Func: AggCount, As: "n` FROM x --"}} }, "plain identifier"},
 		{"min of a UUID", func(q *AggregateQuery) { q.Aggs = []Agg{{Func: AggMin, Column: "app_id", As: "a"}} }, "of UUID"},

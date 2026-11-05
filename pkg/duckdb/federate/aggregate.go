@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -407,12 +408,14 @@ func validateAggregate(q AggregateQuery) error {
 	if len(q.GroupBy)+len(q.Aggs) == 0 {
 		return fmt.Errorf("federate: aggregate: no keys or aggregates")
 	}
+	// DuckDB resolves names case-insensitively, so n and N are one name.
 	names := map[string]bool{}
 	name := func(as string) error {
-		if !outputName.MatchString(as) || names[as] {
+		lower := strings.ToLower(as)
+		if !outputName.MatchString(as) || names[lower] {
 			return fmt.Errorf("federate: aggregate: output name %q is repeated or not a plain identifier", as)
 		}
-		names[as] = true
+		names[lower] = true
 		return nil
 	}
 	column := func(n string) (schema.Column, error) {
