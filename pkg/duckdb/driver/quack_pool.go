@@ -168,6 +168,7 @@ func (c *pooledQuackConn) currentSession(ctx context.Context) (*quack.Session, e
 func (c *pooledQuackConn) shouldRecover(ctx context.Context, err error) bool {
 	switch {
 	case errors.Is(err, result.ErrStatementFailed),
+		errors.Is(err, quack.ErrStreamSource),
 		errors.Is(err, ErrDisabled),
 		errors.Is(err, errQuackUnavailable),
 		errors.Is(err, ErrTooManyAbandoned):

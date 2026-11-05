@@ -47,6 +47,11 @@ func StreamScanSQL(id string, columns []ColumnKind) (string, error) {
 		stringLiteral(id), strings.Join(fields, ", ")), nil
 }
 
+// ErrStreamSource wraps an error a stream's own source (Next/NextEncoded)
+// returned. It fails only the statement reading the stream: the subprocess
+// and its transport are fine, so it must never trigger a restart.
+var ErrStreamSource = errors.New("source failed")
+
 // errStatementEnded reports that the statement finished before a stream it
 // was meant to read ever opened.
 var errStatementEnded = errors.New("duckdb: quack stream: statement ended before the stream opened")
@@ -120,7 +125,7 @@ func (s *Session) feedStream(ctx context.Context, st SendStream, done <-chan str
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("duckdb: quack stream %s: %w", st.ID, err)
+			return fmt.Errorf("duckdb: quack stream %s: %w: %w", st.ID, ErrStreamSource, err)
 		}
 		if chunks == 0 {
 			continue
