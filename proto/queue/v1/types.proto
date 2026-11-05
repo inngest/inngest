@@ -22,7 +22,6 @@ message QueueItem {
   int64 enqueued_at = 14;
   int64 scavenge_count = 15;
   optional CapacityLease capacity_lease = 16;
-  string legacy_sleep_id = 17;
 }
 
 message Scope {

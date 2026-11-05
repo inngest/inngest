@@ -53,7 +53,6 @@ message EnqueueOptions {
   // Lease the item for the enqueuing caller in the enqueue commit (see
   // CallerLease). Queues that do not support it ignore it.
   CallerLease caller_lease = 6;
-  string legacy_sleep_id = 7;
 }
 
 // CallerLease asks the queue to write the item already leased for the caller

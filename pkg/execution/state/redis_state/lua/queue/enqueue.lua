@@ -30,8 +30,8 @@ local keyGlobalNormalizeSet              = KEYS[18]
 local singletonRunKey           	  = KEYS[19]
 local singletonKey           	  = KEYS[20]
 
-local keyItemIndexA           	= KEYS[22]          -- custom item index 1
-local keyItemIndexB           	= KEYS[23]          -- custom item index 2
+local keyItemIndexA           	= KEYS[21]          -- custom item index 1
+local keyItemIndexB           	= KEYS[22]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -69,43 +69,6 @@ end
 -- Preserve duplicate precedence without writing an item before singleton checks.
 if not is_normalize and redis.call("HEXISTS", queueKey, queueID) ~= 0 then
   return 1
-end
-
--- A migrated sleep has a run-scoped ID. Check both identities in this atomic
--- enqueue, so a racing runtime retry or completion cannot create a second copy.
-local alternateSleepID = ARGV[16]
-if alternateSleepID and alternateSleepID ~= "" and not is_normalize then
-  if ARGV[17] == "0" then
-    if redis.call("HEXISTS", queueKey, alternateSleepID) ~= 0 or redis.call("EXISTS", KEYS[21]) ~= 0 then
-      return 3
-    end
-  else
-    local original = redis.call("HGET", queueKey, alternateSleepID)
-    if original then
-      local old = cjson.decode(original)
-      local incoming = cjson.decode(queueItem)
-      local oldID = old.data.identifier
-      local newID = incoming.data.identifier
-      local oldEnv = oldID.wsID
-      if not oldEnv or oldEnv == "00000000-0000-0000-0000-000000000000" then
-        oldEnv = old.wsID
-      end
-      local newEnv = newID.wsID
-      if not newEnv or newEnv == "00000000-0000-0000-0000-000000000000" then
-        newEnv = incoming.wsID
-      end
-      if old.data.kind ~= "sleep" or old.queueID or old.wfID ~= incoming.wfID or oldID.aID ~= newID.aID or oldEnv ~= newEnv then
-        return redis.error_reply("legacy sleep ID belongs to another scope or kind")
-      end
-      if oldID.runID == runID then
-        return 3
-      end
-    elseif redis.call("EXISTS", KEYS[21]) ~= 0 then
-      -- Runtime scheduling must retry an ambiguous legacy completion, rather
-      -- than reporting a different run's missing wake-up as scheduled.
-      return 4
-    end
-  end
 end
 
 -- Migration may join the same run's existing ownership, never another run's.

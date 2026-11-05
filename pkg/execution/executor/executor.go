@@ -4916,11 +4916,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	legacyID := queue.HashID(ctx, fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID))
-	jobID := queue.MigrationSleepID(queue.QueueItem{
-		ID: legacyID, FunctionID: runCtx.Metadata().ID.FunctionID,
-		Data: queue.Item{Identifier: sv2.V1FromMetadata(*runCtx.Metadata())},
-	})
+	// Include the run so a reused event key cannot collide with an older sleep.
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s-%s", runCtx.Metadata().IdempotencyKey(), runCtx.Metadata().ID.RunID, gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: runCtx.Metadata().ID.Tenant.EnvID,
@@ -5001,7 +4998,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
 		PassthroughJobId: true,
-		LegacySleepID:    legacyID,
 	})
 	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()

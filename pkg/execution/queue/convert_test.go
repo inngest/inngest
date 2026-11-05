@@ -36,7 +36,6 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 
 	original := QueueItem{
 		ID:               "item-1",
-		LegacySleepID:    "legacy-item-1",
 		EarliestPeekTime: time.Now().Add(-time.Minute).UnixMilli(),
 		AtMS:             time.Now().UnixMilli(),
 		WallTimeMS:       time.Now().Add(-2 * time.Minute).UnixMilli(),
@@ -585,7 +584,6 @@ func TestEnqueueOptionsProtoRoundTrip(t *testing.T) {
 		ForceQueueShardName:    "queue-a",
 		NormalizeFromBacklogID: "backlog-a",
 		SingletonMigrationKey:  "singleton-a",
-		LegacySleepID:          "legacy-sleep",
 		IdempotencyPeriod:      &idempotencyPeriod,
 		CallerLease:            &CallerLease{Shards: []string{"shard-a", "shard-b"}, LeaseID: ulid.Make(), AtLimit: true},
 	}
@@ -1048,7 +1046,6 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 	assertCoveredFields(t, reflect.TypeOf(QueueItem{}), fieldCoverage{
 		covered: []string{
 			"ID",
-			"LegacySleepID",
 			"EarliestPeekTime",
 			"AtMS",
 			"WallTimeMS",
@@ -1177,7 +1174,6 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"ForceQueueShardName",
 			"NormalizeFromBacklogID",
 			"SingletonMigrationKey",
-			"LegacySleepID",
 			"IdempotencyPeriod",
 			"CallerLease",
 		},

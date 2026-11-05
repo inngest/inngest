@@ -104,10 +104,6 @@ type ProcessItemResult struct {
 }
 
 type EnqueueOpts struct {
-	// LegacySleepID lets a run-scoped sleep recognize a pre-upgrade copy in
-	// the same enqueue operation. Only function sleeps with preserved IDs use it.
-	LegacySleepID string
-
 	// OnEnqueued optionally observes the finalized item and selected shard after
 	// durable enqueue succeeds. It runs synchronously; observers must not block.
 	// Queue proxies carry the result back to the caller, not the callback itself.

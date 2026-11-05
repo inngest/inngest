@@ -22,7 +22,6 @@ func QueueItemToProto(item QueueItem) (*pb.QueueItem, error) {
 
 	return &pb.QueueItem{
 		Id:                item.ID,
-		LegacySleepId:     item.LegacySleepID,
 		EarliestPeekTime:  item.EarliestPeekTime,
 		AtMs:              item.AtMS,
 		WallTimeMs:        item.WallTimeMS,
@@ -69,7 +68,6 @@ func QueueItemFromProto(msg *pb.QueueItem) (QueueItem, error) {
 
 	item := QueueItem{
 		ID:                msg.GetId(),
-		LegacySleepID:     msg.GetLegacySleepId(),
 		EarliestPeekTime:  msg.GetEarliestPeekTime(),
 		AtMS:              msg.GetAtMs(),
 		WallTimeMS:        msg.GetWallTimeMs(),
@@ -505,7 +503,6 @@ func EnqueueOptionsToProto(opts EnqueueOpts) *pb.EnqueueOptions {
 		NormalizeFromBacklogId: opts.NormalizeFromBacklogID,
 		IdempotencyPeriod:      durationPtrToProto(opts.IdempotencyPeriod),
 		SingletonMigrationKey:  opts.SingletonMigrationKey,
-		LegacySleepId:          opts.LegacySleepID,
 		CallerLease:            callerLeaseToProto(opts.CallerLease),
 	}
 }
@@ -540,7 +537,6 @@ func EnqueueOptionsFromProto(msg *pb.EnqueueOptions) EnqueueOpts {
 		NormalizeFromBacklogID: msg.GetNormalizeFromBacklogId(),
 		IdempotencyPeriod:      durationPtrFromProto(msg.GetIdempotencyPeriod()),
 		SingletonMigrationKey:  msg.GetSingletonMigrationKey(),
-		LegacySleepID:          msg.GetLegacySleepId(),
 		CallerLease:            callerLeaseFromProto(msg.GetCallerLease()),
 	}
 }

@@ -47,9 +47,9 @@ func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
 }
 
 type RedisQueueShard interface {
+	HasPendingMigrationItems(context.Context, osqueue.Scope, string) (bool, error)
 	osqueue.QueueShard
 	osqueue.BacklogOperations
-	HasPendingMigrationItems(context.Context, osqueue.Scope, string) (bool, error)
 	Client() *QueueClient
 	ItemsByPartitionSeq2(context.Context, osqueue.Scope, string, time.Time, time.Time, ...osqueue.QueueIterOpt) (iter.Seq2[*osqueue.QueueItem, error], error)
 	SingletonMigrationKey(context.Context, osqueue.QueueItem) (string, error)
@@ -130,18 +130,6 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
-	if opts.LegacySleepID == "" && opts.NormalizeFromBacklogID == "" {
-		opts.LegacySleepID = i.LegacySleepID
-	}
-	if err := osqueue.ValidateSleepJobID(i, opts); err != nil {
-		return i, err
-	}
-	if opts.LegacySleepID != "" {
-		i.LegacySleepID = opts.LegacySleepID
-	}
-	if opts.LegacySleepID != "" && opts.ForceQueueShardName != "" && opts.ForceQueueShardName != q.Name() {
-		return i, fmt.Errorf("sleep enqueue must target shard %q", q.Name())
-	}
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
@@ -226,14 +214,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
 	}
 
-	alternateSleepID := opts.LegacySleepID
-	if alternateSleepID == "" && i.Data.Kind == osqueue.KindSleep && !isSystemPartition && opts.NormalizeFromBacklogID == "" {
-		alternateSleepID = osqueue.MigrationSleepID(i)
-	}
-	if alternateSleepID == i.ID {
-		alternateSleepID = ""
-	}
-
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -263,7 +243,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		// Singletons
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 		kg.SingletonKey(singleton),
-		kg.Idempotency(alternateSleepID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {
@@ -295,8 +274,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 
 		opts.NormalizeFromBacklogID,
 		opts.SingletonMigrationKey != "",
-		alternateSleepID,
-		opts.LegacySleepID != "",
 	})
 	if err != nil {
 		return i, err
@@ -320,14 +297,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	if err != nil {
 		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
-	if status == 3 {
-		i.ID = alternateSleepID
-		i.Data.JobID = &i.ID
-		status = 1
-	}
 	switch status {
-	case 4:
-		return i, fmt.Errorf("cannot confirm ownership of legacy sleep completion %q", alternateSleepID)
 	case 0:
 		return i, nil
 	case 1:
