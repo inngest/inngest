@@ -25,7 +25,7 @@ func TestMatchesDuckDBMigrations(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 	require.NoError(t, duckdb.Migrate(t.Context(), db, true))
 
-	for _, tbl := range []Table{Runs, Spans, Events} {
+	for _, tbl := range []Table{Runs, Spans, Events, RunMetadata} {
 		t.Run(tbl.Name, func(t *testing.T) {
 			rows, err := db.QueryContext(t.Context(), `SELECT column_name, data_type, is_nullable = 'YES' FROM information_schema.columns
 				WHERE table_catalog = 'inngest' AND table_name = ? ORDER BY ordinal_position`, tbl.Name)

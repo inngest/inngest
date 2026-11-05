@@ -72,7 +72,7 @@ type sourceSpec struct {
 }
 
 // sourceTimeColumn is the column bounding a physical table's run-time range.
-var sourceTimeColumn = map[Table]string{TableRuns: "queued_at", TableSpans: "run_queued_at", TableEvents: "received_at"}
+var sourceTimeColumn = map[Table]string{TableRuns: "queued_at", TableSpans: "run_queued_at", TableEvents: "received_at", TableMetadata: "run_queued_at"}
 
 // deltaBoundColumns are the columns sourceCTE's delta-side bounds read, so
 // the delta must carry them whatever the query reads.
@@ -143,8 +143,8 @@ func deltaSelect(c schema.Column) *parser.SelectItem {
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
-// inngest.raw_runs over their federated source; spans and events are the
-// source itself (each row is its own emission / event).
+// inngest.raw_runs over their federated source; spans, events and metadata
+// are the source itself (each row is its own emission / event).
 func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
 	switch t {
 	case TableRuns:
@@ -152,7 +152,7 @@ func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
 			Name: []string{lake.Catalog, "raw_runs"},
 			Args: []parser.Expr{&parser.NamedArg{Name: "p_runs", Value: strLit(SourceName(t))}},
 		})), nil
-	case TableSpans, TableEvents:
+	case TableSpans, TableEvents, TableMetadata:
 		return cte(string(t), selectStar(tableRef(SourceName(t)))), nil
 	}
 	return nil, fmt.Errorf("federate: no view for table %q", t)

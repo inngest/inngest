@@ -92,7 +92,10 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   kind           VARCHAR NOT NULL,
   is_user        BOOLEAN NOT NULL,
   values         VARIANT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL
+  created_at     TIMESTAMPTZ NOT NULL,
+  -- When the row became visible in the buffer, as on inngest.runs: the
+  -- federation split (lake bucket_at <= W, buffer bucket_at > W).
+  bucket_at      TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind)};
@@ -232,7 +235,13 @@ SELECT * FROM query_table(p_spans);
 CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE
 SELECT * FROM query_table(p_events);
 
+-- raw_run_metadata is inngest.run_metadata as is: one row per emission
+-- (inngest.run_metadata_rollup collapses them).
+CREATE MACRO inngest.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
+SELECT * FROM query_table(p_metadata);
+
 -- +goose Down
+DROP MACRO IF EXISTS inngest.raw_run_metadata;
 DROP MACRO IF EXISTS inngest.raw_events;
 DROP MACRO IF EXISTS inngest.raw_run_trace_spans;
 DROP MACRO IF EXISTS inngest.raw_runs;

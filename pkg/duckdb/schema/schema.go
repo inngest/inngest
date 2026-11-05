@@ -1,6 +1,7 @@
 // Package schema is the single description of the physical tables the lake
-// stores (the OSS DuckDB inngest.runs, inngest.run_trace_spans and
-// inngest.events, which the ClickHouse buffer mirrors): each column's type and whether it can
+// stores (the OSS DuckDB inngest.runs, inngest.run_trace_spans,
+// inngest.events and inngest.run_metadata, which the ClickHouse buffer
+// mirrors): each column's type and whether it can
 // change over a run's life. The federated executor, the Insights transpiler
 // and buffer streamers all read it, so they can't disagree about which
 // columns exist or which filters are safe to push.
@@ -188,6 +189,29 @@ var Events = Table{Name: "events", Columns: []Column{
 	{Name: "event_v", Type: TypeVarchar},
 	{Name: "event_ts", Type: TypeTimestamp},
 	{Name: "event_meta", Type: TypeJSON, DuckDB: variant},
+	// The federation split (lake bucket_at <= W, delta > W); not a query
+	// column, so nothing is pushed.
+	{Name: "bucket_at", Type: TypeTimestamp},
+}}
+
+// RunMetadata is inngest.run_metadata: one row per metadata emission, never
+// re-written. Readers roll a span's emissions up to the latest per kind
+// (inngest.run_metadata_rollup), so only a filter on the rollup's group key
+// (or a column constant within it) is safe to push.
+var RunMetadata = Table{Name: "run_metadata", Columns: []Column{
+	{Name: "account_id", Type: TypeUUID},
+	{Name: "env_id", Type: TypeUUID},
+	{Name: "run_id", Type: TypeVarchar},
+	{Name: "run_queued_at", Type: TypeTimestamp},
+	{Name: "span_id", Type: TypeVarchar},
+	{Name: "scope", Type: TypeVarchar},
+	{Name: "step_id", Type: TypeVarchar, Nullable: true},
+	{Name: "step_index", Type: TypeBigint, Nullable: true, DuckDB: "INTEGER"},
+	{Name: "step_attempt", Type: TypeBigint, Nullable: true, DuckDB: "INTEGER"},
+	{Name: "kind", Type: TypeVarchar},
+	{Name: "is_user", Type: TypeBool},
+	{Name: "values", Type: TypeJSON, DuckDB: variant},
+	{Name: "created_at", Type: TypeTimestamp},
 	// The federation split (lake bucket_at <= W, delta > W); not a query
 	// column, so nothing is pushed.
 	{Name: "bucket_at", Type: TypeTimestamp},
