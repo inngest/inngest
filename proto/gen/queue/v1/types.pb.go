@@ -89,6 +89,7 @@ type QueueItem struct {
 	EnqueuedAt        int64                  `protobuf:"varint,14,opt,name=enqueued_at,json=enqueuedAt,proto3" json:"enqueued_at,omitempty"`
 	ScavengeCount     int64                  `protobuf:"varint,15,opt,name=scavenge_count,json=scavengeCount,proto3" json:"scavenge_count,omitempty"`
 	CapacityLease     *CapacityLease         `protobuf:"bytes,16,opt,name=capacity_lease,json=capacityLease,proto3,oneof" json:"capacity_lease,omitempty"`
+	LegacySleepId     string                 `protobuf:"bytes,17,opt,name=legacy_sleep_id,json=legacySleepId,proto3" json:"legacy_sleep_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -233,6 +234,13 @@ func (x *QueueItem) GetCapacityLease() *CapacityLease {
 		return x.CapacityLease
 	}
 	return nil
+}
+
+func (x *QueueItem) GetLegacySleepId() string {
+	if x != nil {
+		return x.LegacySleepId
+	}
+	return ""
 }
 
 type Scope struct {
@@ -1067,7 +1075,7 @@ var File_queue_v1_types_proto protoreflect.FileDescriptor
 
 const file_queue_v1_types_proto_rawDesc = "" +
 	"\n" +
-	"\x14queue/v1/types.proto\x12\bqueue.v1\x1a\x1egoogle/protobuf/duration.proto\"\xb9\x05\n" +
+	"\x14queue/v1/types.proto\x12\bqueue.v1\x1a\x1egoogle/protobuf/duration.proto\"\xe1\x05\n" +
 	"\tQueueItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x12earliest_peek_time\x18\x02 \x01(\x03R\x10earliestPeekTime\x12\x13\n" +
@@ -1090,7 +1098,8 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\venqueued_at\x18\x0e \x01(\x03R\n" +
 	"enqueuedAt\x12%\n" +
 	"\x0escavenge_count\x18\x0f \x01(\x03R\rscavengeCount\x12C\n" +
-	"\x0ecapacity_lease\x18\x10 \x01(\v2\x17.queue.v1.CapacityLeaseH\x03R\rcapacityLease\x88\x01\x01B\v\n" +
+	"\x0ecapacity_lease\x18\x10 \x01(\v2\x17.queue.v1.CapacityLeaseH\x03R\rcapacityLease\x88\x01\x01\x12&\n" +
+	"\x0flegacy_sleep_id\x18\x11 \x01(\tR\rlegacySleepIdB\v\n" +
 	"\t_lease_idB\r\n" +
 	"\v_queue_nameB\x15\n" +
 	"\x13_idempotency_periodB\x11\n" +

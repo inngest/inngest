@@ -17,7 +17,7 @@ import (
 )
 
 func TestSleepMigrationIdentity(t *testing.T) {
-	for _, tc := range []string{"collision", "no legacy", "legacy same run", "legacy completion", "other account", "other environment", "other function", "other kind", "invalid ID"} {
+	for _, tc := range []string{"collision", "no legacy", "legacy same run", "legacy completion", "other account", "other environment", "other function", "other kind", "invalid ID", "missing provenance", "changed provenance"} {
 		t.Run(tc, func(t *testing.T) {
 			r := miniredis.RunT(t)
 			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
@@ -44,7 +44,7 @@ func TestSleepMigrationIdentity(t *testing.T) {
 				other.Data.Kind = osqueue.KindEdge
 			}
 			at := time.Now().Add(time.Hour)
-			if tc != "no legacy" && tc != "invalid ID" {
+			if tc != "no legacy" && tc != "invalid ID" && tc != "missing provenance" && tc != "changed provenance" {
 				_, err = shard.EnqueueItem(t.Context(), other, at, osqueue.EnqueueOpts{PassthroughJobId: true})
 				require.NoError(t, err)
 			}
@@ -57,14 +57,21 @@ func TestSleepMigrationIdentity(t *testing.T) {
 			if tc == "invalid ID" {
 				copied.ID = "wrong"
 			}
-			copied, err = dst.EnqueueItem(t.Context(), copied, at, osqueue.EnqueueOpts{PassthroughJobId: true, LegacySleepID: item.ID})
+			opts := osqueue.EnqueueOpts{PassthroughJobId: true, LegacySleepID: item.ID}
+			if tc == "missing provenance" {
+				opts.LegacySleepID = ""
+			}
+			if tc == "changed provenance" {
+				copied.LegacySleepID = "another-legacy-ID"
+			}
+			copied, err = dst.EnqueueItem(t.Context(), copied, at, opts)
 			if tc != "collision" && tc != "no legacy" {
 				require.Error(t, err)
 				if tc != "legacy same run" {
 					require.NotErrorIs(t, err, osqueue.ErrQueueItemExists)
 				}
 				expected := 1
-				if tc == "legacy completion" || tc == "invalid ID" {
+				if tc == "legacy completion" || tc == "invalid ID" || tc == "missing provenance" || tc == "changed provenance" {
 					expected = 0
 				}
 				count, err := rc.Do(t.Context(), rc.B().Hlen().Key(shard.Client().KeyGenerator().QueueItem()).Build()).AsInt64()
@@ -173,4 +180,42 @@ func enqueueRunScopedSleep(ctx context.Context, shard osqueue.QueueShard, item o
 		opts.LegacySleepID = legacyID
 	}
 	return shard.EnqueueItem(ctx, item, at, opts)
+}
+
+func TestLaterSleepCopyChecksOriginalLegacyID(t *testing.T) {
+	for _, completed := range []bool{false, true} {
+		t.Run(fmt.Sprint("legacy completed=", completed), func(t *testing.T) {
+			shard := func() osqueue.QueueShard {
+				r := miniredis.RunT(t)
+				rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+				require.NoError(t, err)
+				t.Cleanup(rc.Close)
+				_, q := newQueue(t, rc)
+				return q
+			}
+			first, destination := shard(), shard()
+			fn, env, legacy := uuid.New(), uuid.New(), "original-sleep"
+			item := osqueue.QueueItem{ID: legacy, FunctionID: fn, WorkspaceID: env, Data: osqueue.Item{Kind: osqueue.KindSleep, WorkspaceID: env, Identifier: state.Identifier{AccountID: uuid.New(), WorkspaceID: env, WorkflowID: fn, RunID: ulid.Make()}}}
+			at := time.Now().Add(time.Hour)
+			copied, err := enqueueRunScopedSleep(t.Context(), first, item, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.NoError(t, err)
+			saved, err := first.LoadQueueItem(t.Context(), copied.ID)
+			require.NoError(t, err)
+			require.Equal(t, legacy, saved.LegacySleepID)
+			wire, err := osqueue.QueueItemToProto(*saved)
+			require.NoError(t, err)
+			roundTrip, err := osqueue.QueueItemFromProto(wire)
+			require.NoError(t, err)
+			saved = &roundTrip
+			_, err = destination.EnqueueItem(t.Context(), item, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.NoError(t, err)
+			if completed {
+				require.NoError(t, destination.Dequeue(t.Context(), item))
+			}
+			_, err = enqueueRunScopedSleep(t.Context(), destination, *saved, at, osqueue.EnqueueOpts{PassthroughJobId: true})
+			require.Error(t, err, "a later move must still check the original legacy ID")
+			_, err = destination.LoadQueueItem(t.Context(), copied.ID)
+			require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound, "must not create a second or resurrected sleep")
+		})
+	}
 }

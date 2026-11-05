@@ -36,6 +36,7 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 
 	original := QueueItem{
 		ID:               "item-1",
+		LegacySleepID:    "legacy-item-1",
 		EarliestPeekTime: time.Now().Add(-time.Minute).UnixMilli(),
 		AtMS:             time.Now().UnixMilli(),
 		WallTimeMS:       time.Now().Add(-2 * time.Minute).UnixMilli(),
@@ -1047,6 +1048,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 	assertCoveredFields(t, reflect.TypeOf(QueueItem{}), fieldCoverage{
 		covered: []string{
 			"ID",
+			"LegacySleepID",
 			"EarliestPeekTime",
 			"AtMS",
 			"WallTimeMS",

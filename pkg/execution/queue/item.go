@@ -75,6 +75,8 @@ type QueueItem struct {
 	// unique string and will be hashed.  Using the same ID provides idempotency
 	// guarantees within the queue's IdempotencyTTL.
 	ID string `json:"id"`
+	// LegacySleepID retains the original ID for duplicate checks on later moves.
+	LegacySleepID string `json:"lsid,omitempty"`
 	// EarliestPeekTime stores the earliest time that the job was peeked as a
 	// millisecond epoch timestamp.
 	//

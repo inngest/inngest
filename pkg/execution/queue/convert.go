@@ -22,6 +22,7 @@ func QueueItemToProto(item QueueItem) (*pb.QueueItem, error) {
 
 	return &pb.QueueItem{
 		Id:                item.ID,
+		LegacySleepId:     item.LegacySleepID,
 		EarliestPeekTime:  item.EarliestPeekTime,
 		AtMs:              item.AtMS,
 		WallTimeMs:        item.WallTimeMS,
@@ -68,6 +69,7 @@ func QueueItemFromProto(msg *pb.QueueItem) (QueueItem, error) {
 
 	item := QueueItem{
 		ID:                msg.GetId(),
+		LegacySleepID:     msg.GetLegacySleepId(),
 		EarliestPeekTime:  msg.GetEarliestPeekTime(),
 		AtMS:              msg.GetAtMs(),
 		WallTimeMS:        msg.GetWallTimeMs(),

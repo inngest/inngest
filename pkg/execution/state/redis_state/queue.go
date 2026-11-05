@@ -130,8 +130,14 @@ func fnConcurrencyKey(qp osqueue.QueuePartition, kg QueueKeyGenerator) string {
 }
 
 func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts) (osqueue.QueueItem, error) {
+	if opts.LegacySleepID == "" && opts.NormalizeFromBacklogID == "" {
+		opts.LegacySleepID = i.LegacySleepID
+	}
 	if err := osqueue.ValidateSleepJobID(i, opts); err != nil {
 		return i, err
+	}
+	if opts.LegacySleepID != "" {
+		i.LegacySleepID = opts.LegacySleepID
 	}
 	if opts.LegacySleepID != "" && opts.ForceQueueShardName != "" && opts.ForceQueueShardName != q.Name() {
 		return i, fmt.Errorf("sleep enqueue must target shard %q", q.Name())
