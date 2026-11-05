@@ -122,7 +122,9 @@ type Transactional interface {
 // Cursor represents a cursor over a virtual table (sqlite3_vtab_cursor).
 type Cursor interface {
 	// Filter corresponds to xFilter. idxNum and idxStr are the chosen index
-	// number and string; vals are the constraint arguments.
+	// number and string; vals are the constraint arguments. The vals slice
+	// and its entries are not valid past the return of this method;
+	// implementations must copy any value they wish to retain.
 	Filter(idxNum int, idxStr string, vals []Value) error
 
 	// Next advances the cursor to the next row (xNext).
@@ -150,10 +152,57 @@ type Cursor interface {
 //     (if provided by SQL) and should be set to the final rowid of the new row.
 //   - Update: Update(oldRowid, cols, newRowid) is called. *newRowid may be set
 //     to the final rowid of the updated row when changed.
+//
+// For Insert and Update, the cols slice and its entries are not valid past
+// the return of the method; implementations must copy any value they wish
+// to retain.
 type Updater interface {
 	Insert(cols []Value, rowid *int64) error
 	Update(oldRowid int64, cols []Value, newRowid *int64) error
 	Delete(oldRowid int64) error
+}
+
+// VolatileArgsOpter is an optional interface implemented by a Module to opt
+// into zero-copy access for string and []byte values passed to Cursor.Filter
+// and Updater.Insert / Updater.Update. When VolatileArgs returns true, the
+// engine hands those arguments to the module as direct views into
+// SQLite-owned memory instead of Go-allocated copies, saving one allocation
+// per TEXT or BLOB argument per row.
+//
+// The opt-in is read once when the module is registered on a connection and
+// is sticky for the lifetime of that registration; it covers every Filter,
+// Insert, and Update call routed to tables created from this module.
+//
+// The safety contract mirrors modernc.org/sqlite.FunctionImpl.VolatileArgs:
+//
+//   - The string and []byte values inside the vals / cols slice are valid
+//     only for the duration of the call. They must not be retained past the
+//     return of the method, directly (stored in a struct, map, channel, or
+//     outer-scope variable) or indirectly (passed to anything that captures
+//     them).
+//
+//   - Retaining a volatile argument produces silent data corruption: SQLite
+//     reuses the underlying buffer for the next row, so a retained value
+//     will later appear to hold a different row's bytes. The race detector
+//     cannot catch this; callbacks run sequentially on a single goroutine.
+//
+//   - To keep a value across rows, copy it:
+//
+//     saved := append([]byte(nil), v.([]byte)...)             // BLOB
+//     saved := string(append([]byte(nil), v.(string)...))     // TEXT, no aliasing
+//
+//   - Do not re-enter SQLite on the same connection while a volatile
+//     argument is in scope. A nested Query/Exec can cause SQLite to reuse
+//     the underlying value buffers, so a volatile string or []byte read
+//     before the nested call may alias different bytes after it returns.
+//
+// VolatileArgs has no effect on integer, float, time, or NULL arguments.
+// When in doubt, leave it returning false: the engine already pools the
+// argument-slice header, so the per-row overhead in the default mode is one
+// libc.GoString per TEXT column and one make([]byte) per BLOB column, not a
+// fresh slice header.
+type VolatileArgsOpter interface {
+	VolatileArgs() bool
 }
 
 // ConstraintOp describes the operator used in a constraint on a virtual
@@ -249,6 +298,10 @@ var registerHook func(name string, m Module) error
 // SetRegisterFunc is intended to be called by the engine package to provide
 // the concrete implementation of module registration. External callers
 // should use RegisterModule instead.
+//
+// The hook is the fallback of [RegisterModule], not its front door: a non-nil
+// db whose driver implements [ModuleRegisterer] is routed to that driver and
+// does not consult the hook.
 func SetRegisterFunc(fn func(name string, m Module) error) { registerHook = fn }
 
 // RegisterModule registers a virtual table module with the provided *sql.DB.
@@ -261,19 +314,41 @@ func SetRegisterFunc(fn func(name string, m Module) error) { registerHook = fn }
 // that error. This fail-fast behavior prevents partially-initialized
 // connections when a module cannot be installed.
 //
-// The db parameter is currently unused by the engine; it is available so
-// module implementations can capture it if they need a *sql.DB for their own
-// internal queries.
+// The db parameter selects which driver the module is registered on. A nil db
+// registers on the driver this package's engine registers as "sqlite", which
+// is what every caller got before db was honoured. A non-nil db registers on
+// the driver backing it, as reported by (*sql.DB).Driver, when that driver
+// implements [ModuleRegisterer]; for a db opened against the "sqlite" driver
+// that is the same driver as the nil case, so the outcome is unchanged.
+// Otherwise the engine's driver is used, so a db wrapped by another driver
+// still registers somewhere useful rather than failing.
+//
+// The routing trusts (*sql.DB).Driver to name the driver db actually connects
+// through. A connector whose Driver method reports a driver its Connect does
+// not use -- a database/sql anti-pattern -- makes the module land on a driver
+// that never opens a connection, so it reaches nothing and no error reports
+// that. A hook installed with [SetRegisterFunc] is likewise consulted only
+// when the db argument does not resolve to a [ModuleRegisterer].
 func RegisterModule(db *sql.DB, name string, m Module) error {
-	_ = db
-	if registerHook == nil {
-		return ErrNotImplemented
-	}
 	if name == "" {
 		return errors.New("vtab: module name must be non-empty")
 	}
 	if m == nil {
 		return errors.New("vtab: module implementation is nil")
 	}
+	if db != nil {
+		if r, ok := db.Driver().(ModuleRegisterer); ok {
+			return r.RegisterModule(name, m)
+		}
+	}
+	if registerHook == nil {
+		return ErrNotImplemented
+	}
 	return registerHook(name, m)
+}
+
+// ModuleRegisterer is implemented by a driver that can register a virtual
+// table module on itself. [RegisterModule] uses it to honour its db argument.
+type ModuleRegisterer interface {
+	RegisterModule(name string, m Module) error
 }
