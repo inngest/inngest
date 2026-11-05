@@ -1,0 +1,23 @@
+{
+  "description": "raw run_metadata is the emissions as stored, so every column is pushed.",
+  "mode": "raw",
+  "tables": {
+    "run_metadata": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "metadata.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      },
+      {
+        "logical": "is_user = true",
+        "physical": "metadata.is_user = true",
+        "pushed": true
+      },
+      {
+        "logical": "kind = 'cost'",
+        "physical": "metadata.kind = 'cost'",
+        "pushed": true
+      }
+    ]
+  }
+}

@@ -104,7 +104,7 @@ func pushdownGolden(tr *TranspileResult) map[string][]pushdownGoldenPredicate {
 	out := map[string][]pushdownGoldenPredicate{}
 	for _, lt := range tables {
 		for _, p := range tr.Pushdown[federate.Table(lt)] {
-			pt, phys, kept := physicalPredicate(federate.Table(lt), p, tr.cat)
+			pt, phys, kept := tr.physicalPredicate(federate.Table(lt), p)
 			gp := pushdownGoldenPredicate{Logical: formatPredicate("", p), Pushed: kept == "", Kept: kept}
 			if phys.Column != "" || phys.IsBool() {
 				gp.Physical = formatPredicate(string(pt), phys)

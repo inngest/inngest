@@ -1,4 +1,4 @@
--- steps isn't federated: its predicates are extracted, but nothing is pushed.
+-- steps collapses to the latest attempt per step, so only run-level columns are pushed.
 SELECT
   run_id
 FROM

@@ -249,7 +249,7 @@ func TestPhysicalColumnsExist(t *testing.T) {
 				if col.physical == "" {
 					continue
 				}
-				_, ok := federate.Physical[fs.table].Column(col.physical)
+				_, ok := federate.Physical[fs[0].table].Column(col.physical)
 				require.True(t, ok, "%s.%s maps to unknown physical column %q", logical, name, col.physical)
 			}
 		}

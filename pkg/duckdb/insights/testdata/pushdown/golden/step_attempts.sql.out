@@ -1,0 +1,23 @@
+{
+  "description": "step_attempts doesn't collapse, so its span columns are pushed (the attributes-derived step columns aren't).",
+  "mode": "product",
+  "tables": {
+    "step_attempts": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "spans.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      },
+      {
+        "logical": "name = 'executor.step'",
+        "physical": "spans.name = 'executor.step'",
+        "pushed": true
+      },
+      {
+        "logical": "step_attempt \u003e 0",
+        "pushed": false,
+        "kept": "computed column"
+      }
+    ]
+  }
+}

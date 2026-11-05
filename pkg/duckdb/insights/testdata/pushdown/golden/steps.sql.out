@@ -1,12 +1,12 @@
 {
-  "description": "steps isn't federated: its predicates are extracted, but nothing is pushed.",
+  "description": "steps collapses to the latest attempt per step, so only run-level columns are pushed.",
   "mode": "product",
   "tables": {
     "steps": [
       {
         "logical": "run_id = '01J0000000000000000000000A'",
-        "pushed": false,
-        "kept": "table not federated"
+        "physical": "spans.run_id = '01J0000000000000000000000A'",
+        "pushed": true
       }
     ]
   }

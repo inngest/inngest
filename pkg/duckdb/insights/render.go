@@ -139,18 +139,24 @@ type federatedSource struct {
 	param string
 }
 
-// federatedSources maps each table that can be federated, per mode, to its
-// physical table and the parameter its macro takes that table's source in.
-var federatedSources = map[bool]map[string]federatedSource{
+// federatedSources maps each table that can be federated, per mode, to the
+// physical tables its macro reads and the parameter it takes each one's
+// source in. The first is the table's own rows, the one its pushdown
+// targets; the rest are joined on (e.g. the metadata rollup).
+var federatedSources = map[bool]map[string][]federatedSource{
 	false: {
-		"runs":                 {federate.TableRuns, "p_runs"},
-		"extended_trace_spans": {federate.TableSpans, "p_spans"},
-		"events":               {federate.TableEvents, "p_events"},
+		"runs":                 {{federate.TableRuns, "p_runs"}, {federate.TableMetadata, "p_metadata"}},
+		"extended_trace_spans": {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
+		"steps":                {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
+		"step_attempts":        {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
+		"events":               {{federate.TableEvents, "p_events"}},
+		"metadata":             {{federate.TableMetadata, "p_metadata"}},
 	},
 	true: {
-		"runs":            {federate.TableRuns, "p_runs"},
-		"run_trace_spans": {federate.TableSpans, "p_spans"},
-		"events":          {federate.TableEvents, "p_events"},
+		"runs":            {{federate.TableRuns, "p_runs"}},
+		"run_trace_spans": {{federate.TableSpans, "p_spans"}},
+		"events":          {{federate.TableEvents, "p_events"}},
+		"run_metadata":    {{federate.TableMetadata, "p_metadata"}},
 	},
 }
 
@@ -158,50 +164,59 @@ var federatedSources = map[bool]map[string]federatedSource{
 // pushdown translated onto them (see physicalPushdown), and a renderer for
 // federate.Query.Render: each logical table's reserved CTE calls its own
 // macro (its one projection, joins and collapse) with the executor's lake ∪
-// delta source in place of the lake table. A logical table with no federated
-// source is an error, never a silent read of the lake alone. Run it through
-// ExecuteFederated, which applies Execute's limits and rendered-SQL check.
+// delta sources in place of the lake tables. A logical table with no
+// federated source is an error, never a silent read of the lake alone. Run
+// it through ExecuteFederated, which applies Execute's limits and
+// rendered-SQL check.
 func (r *TranspileResult) Federated() ([]federate.Table, map[federate.Table][]federate.Predicate, func(map[federate.Table]federate.Source) (*parser.SelectStatement, []any, error)) {
 	var tables []federate.Table
 	seen := map[federate.Table]bool{}
 	for _, t := range r.tables {
-		if fs, ok := federatedSources[r.cat.raw][t]; ok && !seen[fs.table] {
-			seen[fs.table] = true
-			tables = append(tables, fs.table)
+		for _, fs := range federatedSources[r.cat.raw][t] {
+			if !seen[fs.table] {
+				seen[fs.table] = true
+				tables = append(tables, fs.table)
+			}
 		}
 	}
 	render := func(sources map[federate.Table]federate.Source) (*parser.SelectStatement, []any, error) {
 		return r.Render(func(table string) (TableCTE, error) {
-			fs, ok := federatedSources[r.cat.raw][table]
+			fss, ok := federatedSources[r.cat.raw][table]
 			if !ok {
 				return TableCTE{}, fmt.Errorf("insights: table %q can't be federated", table)
 			}
-			src, ok := sources[fs.table]
-			if !ok {
-				return TableCTE{}, fmt.Errorf("insights: no federated source for table %q", table)
+			var params []parser.Expr
+			var prelude []*parser.CTE
+			for _, fs := range fss {
+				src, ok := sources[fs.table]
+				if !ok {
+					return TableCTE{}, fmt.Errorf("insights: no federated %s source for table %q", fs.table, table)
+				}
+				params = append(params, &parser.NamedArg{Name: fs.param, Value: &parser.Literal{Kind: parser.LitString, Text: src.Name}})
+				prelude = append(prelude, src.Prelude...)
 			}
 			view := r.cat.tables[table].view
-			source := &parser.NamedArg{Name: fs.param, Value: &parser.Literal{Kind: parser.LitString, Text: src.Name}}
 			if r.cat.raw {
-				return TableCTE{Select: macroSelect(view, source), Prelude: src.Prelude}, nil
+				return TableCTE{Select: macroSelect(view, params...), Prelude: prelude}, nil
 			}
 			return TableCTE{
-				Select:  macroSelect(view, append(tenantParams(), source)...),
+				Select:  macroSelect(view, append(tenantParams(), params...)...),
 				Args:    []any{r.accountID.String(), r.envID.String()},
-				Prelude: src.Prelude,
+				Prelude: prelude,
 			}, nil
 		})
 	}
-	return tables, physicalPushdown(r.Pushdown, r.cat), render
+	return tables, r.physicalPushdown(), render
 }
 
-// physicalPushdown translates logical-table predicates onto their federated
-// physical tables (see physicalPredicate), keeping only the pushable ones.
-func physicalPushdown(logical Pushdown, cat catalog) map[federate.Table][]federate.Predicate {
+// physicalPushdown translates the logical-table predicates onto their
+// federated physical tables (see physicalPredicate), keeping only the
+// pushable ones.
+func (r *TranspileResult) physicalPushdown() map[federate.Table][]federate.Predicate {
 	out := map[federate.Table][]federate.Predicate{}
-	for lt, preds := range logical {
+	for lt, preds := range r.Pushdown {
 		for _, p := range preds {
-			if t, phys, kept := physicalPredicate(lt, p, cat); kept == "" {
+			if t, phys, kept := r.physicalPredicate(lt, p); kept == "" {
 				out[t] = append(out[t], phys)
 			}
 		}
@@ -213,40 +228,61 @@ func physicalPushdown(logical Pushdown, cat catalog) map[federate.Table][]federa
 const (
 	keptNotFederated = "table not federated"
 	keptComputed     = "computed column"
+	keptShared       = "source shared with another table"
 )
 
 // physicalPredicate translates one logical-table predicate onto its
 // federated physical table: the logical column becomes the physical column
 // its macro passes through (knownColumn.physical). kept is "" when it's
 // forwarded to the delta (whose streamer applies it if it can represent it),
-// else why it isn't: the table isn't federated, or the column is computed by
-// the macro.
+// else why it isn't: the table isn't federated, the column is computed by
+// the macro, or another logical table in the query reads the same source
+// (one delta serves them all, so it can't be filtered for just one, e.g.
+// metadata and the rollup runs joins on).
 //
 // A boolean predicate is translated part by part, and kept whole if any
 // part is.
-func physicalPredicate(lt federate.Table, p federate.Predicate, cat catalog) (t federate.Table, phys federate.Predicate, kept string) {
-	fs, ok := federatedSources[cat.raw][string(lt)]
+func (r *TranspileResult) physicalPredicate(lt federate.Table, p federate.Predicate) (t federate.Table, phys federate.Predicate, kept string) {
+	fss, ok := federatedSources[r.cat.raw][string(lt)]
 	if !ok {
 		return "", federate.Predicate{}, keptNotFederated
 	}
+	t = fss[0].table
+	for _, other := range r.tables {
+		if other == string(lt) {
+			continue
+		}
+		for _, fs := range federatedSources[r.cat.raw][other] {
+			if fs.table == t {
+				return t, federate.Predicate{}, keptShared
+			}
+		}
+	}
+	phys, kept = translatePredicate(p, r.cat.tables[string(lt)])
+	return t, phys, kept
+}
+
+// translatePredicate renames p's columns to their physical ones, or says
+// why it can't.
+func translatePredicate(p federate.Predicate, tbl logicalTable) (federate.Predicate, string) {
 	if p.IsBool() {
 		args := make([]federate.Predicate, len(p.Args))
 		for i, a := range p.Args {
-			_, pa, k := physicalPredicate(lt, a, cat)
+			pa, k := translatePredicate(a, tbl)
 			if k != "" {
-				return fs.table, federate.Predicate{}, k
+				return federate.Predicate{}, k
 			}
 			args[i] = pa
 		}
 		p.Args = args
-		return fs.table, p, ""
+		return p, ""
 	}
-	col := cat.tables[string(lt)].columns[p.Column].physical
+	col := tbl.columns[p.Column].physical
 	if col == "" {
-		return fs.table, federate.Predicate{}, keptComputed
+		return federate.Predicate{}, keptComputed
 	}
 	p.Column = col
-	return fs.table, p, ""
+	return p, ""
 }
 
 // checkReservedNames rejects a user CTE named with TableCTEPrefix, which

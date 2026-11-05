@@ -1,0 +1,20 @@
+{
+  "description": "runs joins the metadata rollup too, so metadata's predicates can't filter the shared delta.",
+  "mode": "product",
+  "tables": {
+    "metadata": [
+      {
+        "logical": "span_id = 'span-1'",
+        "pushed": false,
+        "kept": "source shared with another table"
+      }
+    ],
+    "runs": [
+      {
+        "logical": "status = 'Completed'",
+        "physical": "runs.status = 'Completed'",
+        "pushed": true
+      }
+    ]
+  }
+}

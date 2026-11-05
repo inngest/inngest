@@ -108,6 +108,7 @@ func rawTables() map[string]logicalTable {
 		{schema.Runs, "raw_runs", "Every tenant's runs, one row per run (physical columns)."},
 		{schema.Spans, "raw_run_trace_spans", "Every tenant's run trace spans, as stored (physical columns)."},
 		{schema.Events, "raw_events", "Every tenant's events, as stored (physical columns)."},
+		{schema.RunMetadata, "raw_run_metadata", "Every tenant's run metadata emissions, as stored (physical columns)."},
 	} {
 		tbl := logicalTable{name: t.phys.Name, view: t.view, description: t.desc, columns: map[string]knownColumn{}}
 		for _, c := range t.phys.Columns {
@@ -198,11 +199,14 @@ var logicalTables = map[string]logicalTable{
 			"received_at": {physical: "received_at", colType: ColumnTypeDatetime, description: "When Inngest received the event."},
 		},
 	},
-	// metadata is backed by the run_metadata_rollup view: one row per
+	// metadata is backed by the run_metadata_rollup macro: one row per
 	// (run_id, span_id), with the latest emission (by created_at) of each
 	// kind as kind -> values in two JSON objects instead of exposing raw
 	// per-emission rows. Each emission replaces its kind outright, nothing
-	// is merged across emissions.
+	// is merged across emissions. Only the rollup's group key (and
+	// run_queued_at, fixed per run) maps to a physical column: a filter on
+	// anything else could drop some of a span's emissions and change what
+	// the rest roll up to.
 	"metadata": {
 		name:        "metadata",
 		view:        "insights_metadata",
@@ -213,9 +217,9 @@ var logicalTables = map[string]logicalTable{
 			"step_attempt", "inngest", "metadata",
 		},
 		columns: map[string]knownColumn{
-			"run_id":        {colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this metadata belongs to."},
-			"run_queued_at": {colType: ColumnTypeDatetime, description: "When the run was queued."},
-			"span_id":       {colType: ColumnTypeString, description: "Identifies which part of the run (the run itself, a step, or a request) this metadata belongs to."},
+			"run_id":        {physical: "run_id", colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this metadata belongs to."},
+			"run_queued_at": {physical: "run_queued_at", colType: ColumnTypeDatetime, description: "When the run was queued."},
+			"span_id":       {physical: "span_id", colType: ColumnTypeString, description: "Identifies which part of the run (the run itself, a step, or a request) this metadata belongs to."},
 			"scope":         {colType: ColumnTypeString, description: "What this metadata was recorded for: the run, a step, a step attempt, or a request."},
 			"step_id":       {colType: ColumnTypeString, description: "The step this metadata belongs to, if any."},
 			"step_index":    {colType: ColumnTypeNumber, description: "The step's position within the run, if this metadata belongs to a step."},
@@ -254,9 +258,9 @@ var logicalTables = map[string]logicalTable{
 		},
 	},
 	"steps": traceSpanTable("steps", "insights_steps",
-		"The steps run during your functions, showing each step's most recent attempt.", stepColumns()),
+		"The steps run during your functions, showing each step's most recent attempt.", stepColumns(), true),
 	"step_attempts": traceSpanTable("step_attempts", "insights_step_attempts",
-		"Every attempt of every step run during your functions.", stepColumns()),
+		"Every attempt of every step run during your functions.", stepColumns(), false),
 }
 
 // spanAttrPathHints is attributes' pathHints, shared by
@@ -336,7 +340,11 @@ var runInputsHints = []PathHint{
 	hint(HintSession, wc, seg("meta"), seg("sessions")),
 }
 
-func traceSpanTable(name, view, description string, extra map[string]knownColumn) logicalTable {
+// traceSpanTable's base columns map to their run_trace_spans columns for
+// pushdown. collapsed (steps' latest attempt per step) keeps only the
+// run-level ones: a filter on anything else could drop a step's latest
+// attempt and surface an older one instead.
+func traceSpanTable(name, view, description string, extra map[string]knownColumn, collapsed bool) logicalTable {
 	order := []string{
 		"run_id", "run_queued_at", "app_id",
 		"function_id", "span_id", "trace_id", "parent_span_id", "name",
@@ -356,6 +364,19 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"output":         {colType: ColumnTypeJSON, description: "The step's output, once this attempt completes successfully."},
 		"input":          {colType: ColumnTypeJSON, description: "The input passed to this step attempt."},
 		"attributes":     {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
+	}
+	physical := map[string]string{
+		"run_id": "run_id", "run_queued_at": "run_queued_at", "app_id": "app_name", "function_id": "function_slug",
+	}
+	if !collapsed {
+		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "attributes"} {
+			physical[c] = c
+		}
+	}
+	for c, phys := range physical {
+		col := cols[c]
+		col.physical = phys
+		cols[c] = col
 	}
 	for _, extraCol := range extraStepColumnOrder(extra) {
 		order = append(order, extraCol)
