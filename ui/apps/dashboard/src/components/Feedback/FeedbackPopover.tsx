@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 
 import { useInngestAPIFetch } from '@/queries/useInngestAPIFetch';
 
+const feedbackLimit = 10_000;
+
 type Props = {
   // Element rendered as the popover trigger (asChild), e.g. a bottom-bar link
   // or a floating icon button. Lets multiple entry points share one dialog.
@@ -36,6 +38,8 @@ export default function FeedbackPopover({
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const feedbackLength = Array.from(feedback.trim()).length;
+  const exceedsLimit = feedbackLength > feedbackLimit;
 
   // Cloud-only: user + organization come from Clerk, which is absent in
   // self-hosted/marketplace mode.
@@ -49,7 +53,14 @@ export default function FeedbackPopover({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!feedback.trim() || !user || !organization || isSubmitting) return;
+    if (
+      !feedback.trim() ||
+      exceedsLimit ||
+      !user ||
+      !organization ||
+      isSubmitting
+    )
+      return;
 
     setIsSubmitting(true);
 
@@ -105,6 +116,11 @@ export default function FeedbackPopover({
               rows={5}
               required
             />
+            <p
+              className={`text-xs ${exceedsLimit ? 'text-error' : 'text-muted'}`}
+            >
+              {feedbackLength.toLocaleString('en-US')} / 10,000 characters
+            </p>
             {sent && (
               <p className="text-success flex items-center gap-1 text-xs">
                 <RiCheckLine className="h-3.5 w-3.5" />
@@ -117,7 +133,7 @@ export default function FeedbackPopover({
                 kind="primary"
                 label="Submit"
                 loading={isSubmitting}
-                disabled={!feedback.trim()}
+                disabled={!feedback.trim() || exceedsLimit}
               />
             </div>
           </form>

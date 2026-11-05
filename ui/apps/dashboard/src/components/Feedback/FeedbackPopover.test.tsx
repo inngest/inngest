@@ -97,3 +97,23 @@ it.each([429, 502])(
     );
   },
 );
+
+it('counts Unicode characters and prevents submissions over the limit', async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  render(<FeedbackPopover trigger={<button>Send feedback</button>} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+  const textbox = await screen.findByRole('textbox');
+  fireEvent.change(textbox, { target: { value: '😀'.repeat(10_000) } });
+  expect(screen.getByText('10,000 / 10,000 characters')).toBeDefined();
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Submit' }).disabled,
+  ).toBe(false);
+  fireEvent.change(textbox, { target: { value: '😀'.repeat(10_001) } });
+  expect(screen.getByText('10,001 / 10,000 characters')).toBeDefined();
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Submit' }).disabled,
+  ).toBe(true);
+  fireEvent.submit(textbox.closest('form')!);
+  expect(fetch).not.toHaveBeenCalled();
+});
