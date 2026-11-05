@@ -94,9 +94,8 @@ func TestItemLeaseConstraintCheckReportsExhaustedAppSemaphore(t *testing.T) {
 	require.Equal(t, constraintapi.SemaphoreKindApp, res.ExhaustedSemaphores[0].Kind())
 }
 
-// the real LeaseItem path.  one exhausted app semaphore stops the pass after a
-// single constraint API call, while an exhausted fnkey semaphore only skips the
-// items that carry it and is checked once per pass.
+// the real LeaseItem path.  an exhausted app or fnkey semaphore is checked once
+// per pass and only skips the items that carry it.
 func TestQueueProcessorIterateWithExhaustedSemaphores(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -185,7 +184,7 @@ func TestQueueProcessorIterateWithExhaustedSemaphores(t *testing.T) {
 		}, cmLifecycles
 	}
 
-	t.Run("app semaphore stops the pass after one acquire", func(t *testing.T) {
+	t.Run("app semaphore is checked once per pass", func(t *testing.T) {
 		appSem := constraintapi.Semaphore{ID: constraintapi.SemaphoreIDApp(appID), Weight: 1}
 
 		iter, lc := setup(t, newItem(appSem), newItem(appSem), newItem(appSem), newItem(appSem))
@@ -193,10 +192,30 @@ func TestQueueProcessorIterateWithExhaustedSemaphores(t *testing.T) {
 		require.NoError(t, iter.Iterate(ctx))
 
 		require.Equal(t, 1, len(lc.AcquireCalls))
-		require.Equal(t, int32(1), iter.CtrConcurrency.Load())
+		require.Equal(t, int32(4), iter.CtrConcurrency.Load())
 		require.Equal(t, int32(0), iter.CtrSuccess.Load())
 		require.True(t, iter.IsSemaphoreLimitOnly.Load())
 		require.True(t, iter.IsRequeuable())
+	})
+
+	// an app synced over connect and then re-synced over HTTP keeps the app
+	// semaphore on items of runs started under connect, but new runs carry none.
+	t.Run("exhausted app semaphore does not block items without it", func(t *testing.T) {
+		appSem := constraintapi.Semaphore{ID: constraintapi.SemaphoreIDApp(appID), Weight: 1}
+
+		iter, lc := setup(t,
+			newItem(appSem), // exhausted, one acquire
+			newItem(),       // dispatched, one acquire
+			newItem(appSem), // memo, no acquire
+			newItem(),       // dispatched, one acquire
+		)
+
+		require.NoError(t, iter.Iterate(ctx))
+
+		require.Equal(t, 3, len(lc.AcquireCalls))
+		require.Equal(t, int32(2), iter.CtrConcurrency.Load())
+		require.Equal(t, int32(2), iter.CtrSuccess.Load())
+		require.True(t, iter.IsSemaphoreLimitOnly.Load())
 	})
 
 	t.Run("fnkey semaphore is checked once and skips only matching items", func(t *testing.T) {
