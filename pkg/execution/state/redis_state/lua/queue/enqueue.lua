@@ -103,8 +103,7 @@ if alternateSleepID and alternateSleepID ~= "" and not is_normalize then
     elseif redis.call("EXISTS", KEYS[21]) ~= 0 then
       -- Runtime scheduling must retry an ambiguous legacy completion, rather
       -- than reporting a different run's missing wake-up as scheduled.
-      if ARGV[17] == "2" then return 4 end
-      return 3
+      return 4
     end
   end
 end

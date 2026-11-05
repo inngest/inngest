@@ -47,7 +47,6 @@ func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
 }
 
 type RedisQueueShard interface {
-	osqueue.SleepMigrationDestination
 	osqueue.QueueShard
 	osqueue.BacklogOperations
 	HasPendingMigrationItems(context.Context, osqueue.Scope, string) (bool, error)
@@ -134,10 +133,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	if err := osqueue.ValidateSleepJobID(i, opts); err != nil {
 		return i, err
 	}
-	return q.enqueueItem(ctx, i, at, opts, opts.LegacySleepID)
-}
-
-func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Time, opts osqueue.EnqueueOpts, originalSleepID string) (osqueue.QueueItem, error) {
+	if opts.LegacySleepID != "" && opts.ForceQueueShardName != "" && opts.ForceQueueShardName != q.Name() {
+		return i, fmt.Errorf("sleep enqueue must target shard %q", q.Name())
+	}
 	l := logger.StdlibLogger(ctx)
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "EnqueueItem"), redis_telemetry.ScopeQueue)
@@ -222,20 +220,12 @@ func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		span.SetAttributes(attribute.String("job_id", *i.Data.JobID))
 	}
 
-	alternateSleepID := originalSleepID
+	alternateSleepID := opts.LegacySleepID
 	if alternateSleepID == "" && i.Data.Kind == osqueue.KindSleep && !isSystemPartition && opts.NormalizeFromBacklogID == "" {
 		alternateSleepID = osqueue.MigrationSleepID(i)
 	}
 	if alternateSleepID == i.ID {
 		alternateSleepID = ""
-	}
-
-	sleepIDMode := 0
-	if originalSleepID != "" {
-		sleepIDMode = 1
-	}
-	if opts.LegacySleepID != "" {
-		sleepIDMode = 2
 	}
 
 	keys := []string{
@@ -300,7 +290,7 @@ func (q *queue) enqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		opts.NormalizeFromBacklogID,
 		opts.SingletonMigrationKey != "",
 		alternateSleepID,
-		sleepIDMode,
+		opts.LegacySleepID != "",
 	})
 	if err != nil {
 		return i, err

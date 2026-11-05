@@ -1,21 +1,13 @@
 package queue
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 )
-
-// SleepMigrationDestination atomically handles legacy and run-scoped sleep IDs.
-// Migration must verify the returned identity before removing the source item.
-type SleepMigrationDestination interface {
-	EnqueueSleepForMigration(context.Context, QueueItem, time.Time, EnqueueOpts) (QueueItem, error)
-}
 
 // MigrationSleepID gives a sleep a stable identity for its run, whether created
 // by the executor or copied during migration. Preserve already scoped IDs.
