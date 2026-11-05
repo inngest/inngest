@@ -146,3 +146,83 @@ func testQuackStreamsFeedAQuery(t *testing.T, db *sql.DB) {
 		}
 	})
 }
+
+// TestQuackStreamSourceErrorDoesNotRestart covers a failing stream source
+// (a producer error, or the federate row cap) failing only its own statement:
+// it must not restart the subprocess under a concurrent in-flight statement.
+func TestQuackStreamSourceErrorDoesNotRestart(t *testing.T) {
+	binPath := RequireDuckDBBinary(t)
+	duckdbtest.RequireQuackExtension(t, binPath)
+	addr := EphemeralQuackAddr
+	c, db, err := OpenConnector(t.Context(), Options{
+		BinaryPath: binPath, DBFile: ":memory:",
+		QuackAddr: &addr, QuackConns: 2,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	gen := func() uint64 {
+		c.proc.mu.Lock()
+		defer c.proc.mu.Unlock()
+		return c.proc.quackGen
+	}
+	startGen := gen()
+
+	a, err := db.Conn(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = a.Close() })
+	b, err := db.Conn(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = b.Close() })
+
+	cols := []QuackColumnKind{QuackColumnVarchar, QuackColumnBigint}
+	boom := errors.New("row cap exceeded")
+	// Each conn takes a turn running the failing stream while the other has
+	// a slow stream query in flight.
+	for i, pair := range [][2]*sql.Conn{{a, b}, {b, a}} {
+		slowConn, failConn := pair[0], pair[1]
+		t.Run(fmt.Sprintf("round %d", i), func(t *testing.T) {
+			slow, slowScan := testStream(t, cols, 200*time.Millisecond, rowsOf(0, 10), rowsOf(10, 10), rowsOf(20, 10))
+			started := make(chan struct{})
+			next := slow.Next
+			var once bool
+			slow.Next = func(ctx context.Context) ([][]any, error) {
+				rows, err := next(ctx)
+				if !once {
+					once = true
+					close(started)
+				}
+				return rows, err
+			}
+			slowDone := make(chan error, 1)
+			var n int64
+			go func() {
+				slowDone <- slowConn.QueryRowContext(WithQuackStreams(t.Context(), slow), "SELECT count(*) FROM "+slowScan).Scan(&n)
+			}()
+			select {
+			case <-started:
+			case <-time.After(10 * time.Second):
+				t.Fatal("slow stream never started")
+			}
+
+			failing, failScan := testStream(t, cols, 0, rowsOf(0, 10))
+			failing.Next = func(ctx context.Context) ([][]any, error) { return nil, boom }
+			var m int64
+			err := failConn.QueryRowContext(WithQuackStreams(t.Context(), failing), "SELECT count(*) FROM "+failScan).Scan(&m)
+			require.ErrorIs(t, err, boom)
+
+			select {
+			case err := <-slowDone:
+				require.NoError(t, err, "the in-flight query must survive another query's failing stream")
+				require.EqualValues(t, 30, n)
+			case <-time.After(30 * time.Second):
+				t.Fatal("slow stream query didn't return")
+			}
+			require.Equal(t, startGen, gen(), "a failing stream source must not restart the subprocess")
+
+			// The conn whose stream failed still works.
+			require.NoError(t, failConn.QueryRowContext(t.Context(), "SELECT 41 + 1").Scan(&m))
+			require.EqualValues(t, 42, m)
+		})
+	}
+}
