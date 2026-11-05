@@ -15,8 +15,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/apache/iceberg-go"
-	sqlcat "github.com/apache/iceberg-go/catalog/sql"
 	"github.com/inngest/inngest/pkg/duckdb/driver"
 )
 
@@ -47,17 +45,13 @@ func TestDuckDBSmoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": warehouse})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	var (
 		mu   sync.Mutex
 		reqs []string
 	)
 	const token = "smoke-token"
-	srv := New(cat, Options{
+	srv, err := New(ctx, db, Options{
 		Warehouse: warehouse,
 		Token:     token,
 		OnRequest: func(method, path string, status int) {
@@ -66,6 +60,9 @@ func TestDuckDBSmoke(t *testing.T) {
 			reqs = append(reqs, fmt.Sprintf("%s %s -> %d", method, path, status))
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		mu.Lock()
 		defer mu.Unlock()

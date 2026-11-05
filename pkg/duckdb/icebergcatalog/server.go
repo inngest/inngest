@@ -1,9 +1,14 @@
-// Package icebergcatalog is an embedded Iceberg REST catalog server, a thin
-// HTTP layer over iceberg-go's SQL catalog (sqlite/postgres via bun). It
+// Package icebergcatalog is an embedded Iceberg REST catalog server. It
 // exists so the devserver/self-host persistent DuckDB mode can ATTACH an
 // Iceberg catalog (DuckDB can only write Iceberg through a REST, Glue or S3
 // Tables catalog) w/o running Lakekeeper locally. Open starts one on
 // 127.0.0.1 w/ a bearer token.
+//
+// It owns a small table metadata model (metadata.go, commit.go) instead of
+// linking apache/iceberg-go, which drags arrow, substrait, bun + every SQL
+// dialect and the aws sdk into the binary. Catalog state lives in sqlite or
+// postgres in the standard JDBC catalog layout (store.go). iceberg-go is
+// still used, but only by the tests (its REST client + conformance suite).
 //
 // The wire format is a spec-compliant subset of the Iceberg REST catalog API
 // (https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml),
@@ -14,57 +19,54 @@
 // scoping. Fine for 127.0.0.1, not for anything exposed.
 //
 // TODO(creds): no credential vending (storage-credentials / config in
-// LoadTable). Not needed for local disk; for S3 the DuckDB process needs its
-// own S3 secret, or we vend static creds here via the `config` map.
+// LoadTable). Not needed for local disk.
+//
+// TODO(s3): only local warehouses. Metadata files are written w/ os.*, an
+// S3 warehouse needs a small put/get/delete client.
 //
 // TODO(maintenance): no snapshot expiry, orphan file cleanup, or metadata
-// file cleanup (write.metadata.delete-after-commit.enabled is honored by
-// iceberg-go afaict, but nothing expires snapshots). Every DuckDB commit
-// leaves a metadata.json + manifest list + manifest(s) behind forever.
+// file cleanup (write.metadata.delete-after-commit.enabled is ignored).
+// Every DuckDB commit leaves a metadata.json + manifest list + manifest(s)
+// behind forever.
 //
-// TODO(views): /views endpoints aren't routed even though the sql catalog
-// supports views. DuckDB doesn't need them (yet).
+// TODO(views): /views endpoints aren't routed. DuckDB doesn't need them
+// (yet).
 //
-// TODO(txn): POST /v1/transactions/commit (multi-table) returns 406, the sql
-// catalog doesn't implement catalog.TransactionalCatalog in v0.7.0.
+// TODO(txn): POST /v1/transactions/commit (multi-table) returns 406.
 //
 // TODO(metrics): POST .../tables/{table}/metrics is accepted and ignored.
 package icebergcatalog
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/apache/iceberg-go"
-	"github.com/apache/iceberg-go/catalog"
-	"github.com/apache/iceberg-go/table"
 )
 
 // namespaceSeparator is the spec's multi-level namespace separator in path
 // params (%1F, the unit separator).
 const namespaceSeparator = "\x1f"
 
-// Catalog is the subset of iceberg-go catalog functionality we need. The sql
-// catalog (`catalog/sql.Catalog`) satisfies it.
-type Catalog interface {
-	catalog.Catalog
-}
+// CatalogName is the name stored in the JDBC layout's `catalog_name`
+// column. It only matters if several catalogs share one backing database.
+const CatalogName = "inngest"
 
 // Options configures a Server.
 type Options struct {
-	// Warehouse is the default warehouse location (local dir or s3:// URI).
-	// Tables w/o an explicit location go under
-	// `<Warehouse>/<ns>.db/<table>`, matching iceberg-go's own default.
+	// Warehouse is the warehouse directory (absolute). Tables w/o an
+	// explicit location go under `<Warehouse>/<ns>.db/<table>`, matching
+	// iceberg-go/Java's default.
 	Warehouse string
+	// CatalogName defaults to CatalogName.
+	CatalogName string
 	// Token, when non-empty, requires `Authorization: Bearer <Token>` on
 	// every request. See TODO(auth).
 	Token string
@@ -75,18 +77,27 @@ type Options struct {
 	OnRequest func(method, path string, status int)
 }
 
-// Server is an Iceberg REST catalog backed by a catalog.Catalog.
+// Server is an Iceberg REST catalog backed by a database/sql db.
 type Server struct {
-	cat  Catalog
-	opts Options
-	mux  *http.ServeMux
+	store *store
+	opts  Options
+	mux   *http.ServeMux
+	now   func() time.Time
 }
 
-// New returns a Server. The caller owns cat (and its *sql.DB).
-func New(cat Catalog, opts Options) *Server {
-	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux()}
+// New returns a Server, creating the catalog tables in db if needed. The
+// caller owns db.
+func New(ctx context.Context, db *sql.DB, opts Options) (*Server, error) {
+	if opts.CatalogName == "" {
+		opts.CatalogName = CatalogName
+	}
+	st, err := newStore(ctx, db, opts.CatalogName)
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{store: st, opts: opts, mux: http.NewServeMux(), now: time.Now}
 	s.routes()
-	return s
+	return s, nil
 }
 
 // endpoints is advertised in GET /v1/config so clients know what we support.
@@ -197,18 +208,6 @@ func (s *Server) Start(ctx context.Context, l net.Listener) error {
 	}
 }
 
-// Listen binds 127.0.0.1:0 and starts s in the background. It returns the
-// base URL (`http://127.0.0.1:<port>`) to use as DuckDB's attach URI.
-func (s *Server) Listen(ctx context.Context) (string, <-chan error, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return "", nil, err
-	}
-	done := make(chan error, 1)
-	go func() { done <- s.Start(ctx, l) }()
-	return "http://" + l.Addr().String(), done, nil
-}
-
 // ---- wire types ----
 
 type identifier struct {
@@ -216,57 +215,29 @@ type identifier struct {
 	Name      string   `json:"name"`
 }
 
-type configResponse struct {
-	Defaults  iceberg.Properties `json:"defaults"`
-	Overrides iceberg.Properties `json:"overrides"`
-	Endpoints []string           `json:"endpoints,omitempty"`
+func (id identifier) String() string {
+	return strings.Join(append(append([]string{}, id.Namespace...), id.Name), ".")
 }
 
 type namespaceResponse struct {
-	Namespace  []string           `json:"namespace"`
-	Properties iceberg.Properties `json:"properties"`
-}
-
-type createNamespaceRequest struct {
-	Namespace  []string           `json:"namespace"`
-	Properties iceberg.Properties `json:"properties"`
-}
-
-type updateNamespacePropertiesRequest struct {
-	Removals []string           `json:"removals"`
-	Updates  iceberg.Properties `json:"updates"`
+	Namespace  []string          `json:"namespace"`
+	Properties map[string]string `json:"properties"`
 }
 
 type createTableRequest struct {
-	Name          string                 `json:"name"`
-	Location      string                 `json:"location,omitempty"`
-	Schema        *iceberg.Schema        `json:"schema"`
-	PartitionSpec *iceberg.PartitionSpec `json:"partition-spec,omitempty"`
-	WriteOrder    *table.SortOrder       `json:"write-order,omitempty"`
-	StageCreate   bool                   `json:"stage-create,omitempty"`
-	Properties    iceberg.Properties     `json:"properties,omitempty"`
+	Name          string            `json:"name"`
+	Location      string            `json:"location,omitempty"`
+	Schema        jsonObject        `json:"schema"`
+	PartitionSpec jsonObject        `json:"partition-spec,omitempty"`
+	WriteOrder    jsonObject        `json:"write-order,omitempty"`
+	StageCreate   bool              `json:"stage-create,omitempty"`
+	Properties    map[string]string `json:"properties,omitempty"`
 }
 
 type loadTableResponse struct {
-	MetadataLocation string             `json:"metadata-location,omitempty"`
-	Metadata         table.Metadata     `json:"metadata"`
-	Config           iceberg.Properties `json:"config,omitempty"`
-}
-
-type commitTableRequest struct {
-	Identifier   *identifier        `json:"identifier,omitempty"`
-	Requirements table.Requirements `json:"requirements"`
-	Updates      table.Updates      `json:"updates"`
-}
-
-type commitTableResponse struct {
-	MetadataLocation string         `json:"metadata-location"`
-	Metadata         table.Metadata `json:"metadata"`
-}
-
-type renameTableRequest struct {
-	Source      identifier `json:"source"`
-	Destination identifier `json:"destination"`
+	MetadataLocation string            `json:"metadata-location,omitempty"`
+	Metadata         *tableMetadata    `json:"metadata"`
+	Config           map[string]string `json:"config"`
 }
 
 type errorModel struct {
@@ -280,32 +251,29 @@ type errorModel struct {
 func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
 	// `warehouse` query param is accepted and ignored: one warehouse per
 	// server.
-	writeJSON(w, http.StatusOK, configResponse{
-		Defaults:  iceberg.Properties{},
-		Overrides: iceberg.Properties{},
-		Endpoints: endpoints,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"defaults":  map[string]string{},
+		"overrides": map[string]string{},
+		"endpoints": endpoints,
 	})
 }
 
 func (s *Server) listNamespaces(w http.ResponseWriter, r *http.Request) {
-	var parent table.Identifier
+	var parent []string
 	if p := r.URL.Query().Get("parent"); p != "" {
 		parent = strings.Split(p, namespaceSeparator)
 	}
-	nss, err := s.cat.ListNamespaces(r.Context(), parent)
+	nss, err := s.store.listNamespaces(r.Context(), parent)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
-	}
-	if nss == nil {
-		nss = []table.Identifier{}
 	}
 	// TODO: pagination (pageToken/pageSize). Not needed at devserver scale.
 	writeJSON(w, http.StatusOK, map[string]any{"namespaces": nss})
 }
 
 func (s *Server) createNamespace(w http.ResponseWriter, r *http.Request) {
-	var req createNamespaceRequest
+	var req namespaceResponse
 	if !readJSON(w, r, &req) {
 		return
 	}
@@ -314,39 +282,36 @@ func (s *Server) createNamespace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Properties == nil {
-		req.Properties = iceberg.Properties{}
+		req.Properties = map[string]string{}
 	}
 	if err := s.checkLocationProps(req.Properties); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	if err := s.cat.CreateNamespace(r.Context(), req.Namespace, req.Properties); err != nil {
+	if err := s.store.createNamespace(r.Context(), req.Namespace, req.Properties); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, namespaceResponse(req))
+	writeJSON(w, http.StatusOK, req)
 }
 
 func (s *Server) getNamespace(w http.ResponseWriter, r *http.Request) {
 	ns := pathNamespace(r)
-	props, err := s.cat.LoadNamespaceProperties(r.Context(), ns)
+	props, err := s.store.loadNamespace(r.Context(), ns)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
-	}
-	if props == nil {
-		props = iceberg.Properties{}
 	}
 	writeJSON(w, http.StatusOK, namespaceResponse{Namespace: ns, Properties: props})
 }
 
 func (s *Server) headNamespace(w http.ResponseWriter, r *http.Request) {
-	ok, err := s.cat.CheckNamespaceExists(r.Context(), pathNamespace(r))
+	ok, err := s.store.namespaceExists(r.Context(), s.store.db, pathNamespace(r))
 	writeHead(w, ok, err)
 }
 
 func (s *Server) dropNamespace(w http.ResponseWriter, r *http.Request) {
-	if err := s.cat.DropNamespace(r.Context(), pathNamespace(r)); err != nil {
+	if err := s.store.dropNamespace(r.Context(), pathNamespace(r)); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
@@ -354,7 +319,10 @@ func (s *Server) dropNamespace(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateNamespaceProperties(w http.ResponseWriter, r *http.Request) {
-	var req updateNamespacePropertiesRequest
+	var req struct {
+		Removals []string          `json:"removals"`
+		Updates  map[string]string `json:"updates"`
+	}
 	if !readJSON(w, r, &req) {
 		return
 	}
@@ -362,7 +330,7 @@ func (s *Server) updateNamespaceProperties(w http.ResponseWriter, r *http.Reques
 		writeCatalogError(w, err)
 		return
 	}
-	sum, err := s.cat.UpdateNamespaceProperties(r.Context(), pathNamespace(r), req.Removals, req.Updates)
+	sum, err := s.store.updateNamespace(r.Context(), pathNamespace(r), req.Removals, req.Updates)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
@@ -371,19 +339,16 @@ func (s *Server) updateNamespaceProperties(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) listTables(w http.ResponseWriter, r *http.Request) {
-	ids := []identifier{}
-	for id, err := range s.cat.ListTables(r.Context(), pathNamespace(r)) {
-		if err != nil {
-			writeCatalogError(w, err)
-			return
-		}
-		ids = append(ids, toIdentifier(id))
+	ids, err := s.store.listTables(r.Context(), pathNamespace(r))
+	if err != nil {
+		writeCatalogError(w, err)
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"identifiers": ids})
 }
 
 func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
-	ns := pathNamespace(r)
+	ctx := r.Context()
 	var req createTableRequest
 	if !readJSON(w, r, &req) {
 		return
@@ -396,6 +361,7 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
+	id := identifier{Namespace: pathNamespace(r), Name: req.Name}
 	if req.Location != "" {
 		loc, err := s.checkLocation(req.Location)
 		if err != nil {
@@ -404,207 +370,196 @@ func (s *Server) createTable(w http.ResponseWriter, r *http.Request) {
 		}
 		req.Location = loc
 	}
+	if req.Properties == nil {
+		req.Properties = map[string]string{}
+	}
 	if err := s.checkLocationProps(req.Properties); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	ident := append(append(table.Identifier{}, ns...), req.Name)
+	if ok, err := s.store.namespaceExists(ctx, s.store.db, id.Namespace); err != nil || !ok {
+		if err == nil {
+			err = fmt.Errorf("%w: %s", errNoSuchNamespace, strings.Join(id.Namespace, "."))
+		}
+		writeCatalogError(w, err)
+		return
+	}
+	if _, err := s.store.tableLocation(ctx, id); err == nil {
+		writeCatalogError(w, fmt.Errorf("%w: %s", errTableAlreadyExists, id))
+		return
+	} else if !errors.Is(err, errNoSuchTable) {
+		writeCatalogError(w, err)
+		return
+	}
 
+	updates, err := createUpdates(req)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	// A create is the same as a create commit (assert-create) w/ the
+	// updates a client would send, so both go through the same builder and
+	// checks.
+	md, err := s.build(ctx, id, nil, "", updates)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
 	if req.StageCreate {
-		// Stage-create: build fresh metadata but don't persist anything. The
-		// client follows up w/ a commit carrying assert-create + the full
-		// update list, which iceberg-go's CommitTable handles as a create
-		// (current == nil).
-		s.stageCreate(w, r, ident, req)
+		// Stage-create: hand back fresh metadata but persist nothing. The
+		// client follows up w/ a commit carrying assert-create + its own
+		// full update list.
+		writeJSON(w, http.StatusOK, loadTableResponse{Metadata: md, Config: map[string]string{}})
 		return
 	}
-
-	// NOTE: w/o an explicit location, iceberg-go's CreateTable derives one
-	// from the namespace `location` property (validated on write) or the
-	// warehouse, same as defaultLocation.
-	opts := []catalog.CreateTableOpt{}
-	if req.Location != "" {
-		opts = append(opts, catalog.WithLocation(req.Location))
-	}
-	if req.PartitionSpec != nil {
-		opts = append(opts, catalog.WithPartitionSpec(req.PartitionSpec))
-	}
-	if req.WriteOrder != nil {
-		opts = append(opts, catalog.WithSortOrder(*req.WriteOrder))
-	}
-	if req.Properties != nil {
-		opts = append(opts, catalog.WithProperties(req.Properties))
-	}
-	tbl, err := s.cat.CreateTable(r.Context(), ident, req.Schema, opts...)
+	loc, err := s.persist(ctx, id, nil, "", md)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, loadTableResponse{
-		MetadataLocation: tbl.MetadataLocation(),
-		Metadata:         tbl.Metadata(),
-		Config:           iceberg.Properties{},
-	})
+	writeJSON(w, http.StatusOK, loadTableResponse{MetadataLocation: loc, Metadata: md, Config: map[string]string{}})
 }
 
-func (s *Server) stageCreate(w http.ResponseWriter, r *http.Request, ident table.Identifier, req createTableRequest) {
-	ctx := r.Context()
-	ns := catalog.NamespaceFromIdent(ident)
-	if ok, err := s.cat.CheckNamespaceExists(ctx, ns); err != nil || !ok {
-		if err == nil {
-			err = fmt.Errorf("%w: %s", catalog.ErrNoSuchNamespace, strings.Join(ns, "."))
-		}
-		writeCatalogError(w, err)
-		return
-	}
-	if ok, err := s.cat.CheckTableExists(ctx, ident); err != nil || ok {
-		if err == nil {
-			err = fmt.Errorf("%w: %s", catalog.ErrTableAlreadyExists, strings.Join(ident, "."))
-		}
-		writeCatalogError(w, err)
-		return
-	}
-	loc := req.Location
-	if loc == "" {
-		var err error
-		loc, err = s.defaultLocation(ctx, ns, req.Name)
-		if err != nil {
-			writeCatalogError(w, err)
-			return
-		}
-	}
-	spec := req.PartitionSpec
-	if spec == nil {
-		spec = iceberg.UnpartitionedSpec
-	}
-	order := table.UnsortedSortOrder
-	if req.WriteOrder != nil {
-		order = *req.WriteOrder
-	}
-	md, err := table.NewMetadata(req.Schema, spec, order, loc, req.Properties)
+// load returns a table's current metadata + its location.
+func (s *Server) load(ctx context.Context, id identifier) (*tableMetadata, string, error) {
+	loc, err := s.store.tableLocation(ctx, id)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "BadRequestException", err.Error())
-		return
+		return nil, "", err
 	}
-	writeJSON(w, http.StatusOK, loadTableResponse{Metadata: md, Config: iceberg.Properties{}})
-}
-
-// defaultLocation mirrors iceberg-go's internal getDefaultWarehouseLocation
-// (catalog/internal/utils.go), which isn't exported.
-func (s *Server) defaultLocation(ctx context.Context, ns table.Identifier, name string) (string, error) {
-	props, err := s.cat.LoadNamespaceProperties(ctx, ns)
+	md, err := readMetadata(loc)
 	if err != nil {
-		return "", err
+		return nil, "", fmt.Errorf("reading %s metadata: %w", id, err)
 	}
-	var loc string
-	switch {
-	case props.Get("location", "") != "":
-		loc, err = url.JoinPath(props.Get("location", ""), name)
-	case s.opts.Warehouse == "":
-		return "", errors.New("no warehouse configured and no location given")
-	default:
-		loc, err = url.JoinPath(s.opts.Warehouse, strings.Join(ns, ".")+".db", name)
-	}
-	if err != nil {
-		return "", err
-	}
-	// Names and the namespace location are validated on the way in, this
-	// just makes sure nothing slipped through (IE a pre-existing property).
-	return s.checkLocation(loc)
+	return md, loc, nil
 }
 
 func (s *Server) loadTable(w http.ResponseWriter, r *http.Request) {
 	// `snapshots=refs` and X-Iceberg-Access-Delegation are ignored, we
 	// always return all snapshots and never vend creds.
-	tbl, err := s.cat.LoadTable(r.Context(), pathTable(r))
+	md, loc, err := s.load(r.Context(), pathTable(r))
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, loadTableResponse{
-		MetadataLocation: tbl.MetadataLocation(),
-		Metadata:         tbl.Metadata(),
-		Config:           iceberg.Properties{},
-	})
+	writeJSON(w, http.StatusOK, loadTableResponse{MetadataLocation: loc, Metadata: md, Config: map[string]string{}})
 }
 
 func (s *Server) headTable(w http.ResponseWriter, r *http.Request) {
-	ok, err := s.cat.CheckTableExists(r.Context(), pathTable(r))
-	writeHead(w, ok, err)
+	_, err := s.store.tableLocation(r.Context(), pathTable(r))
+	if errors.Is(err, errNoSuchTable) {
+		writeHead(w, false, nil)
+		return
+	}
+	writeHead(w, err == nil, err)
 }
 
 func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ident := pathTable(r)
-	var raw struct {
-		Requirements json.RawMessage `json:"requirements"`
-		Updates      json.RawMessage `json:"updates"`
+	id := pathTable(r)
+	var body struct {
+		Identifier   *identifier       `json:"identifier,omitempty"`
+		Requirements []json.RawMessage `json:"requirements"`
+		Updates      []json.RawMessage `json:"updates"`
 	}
-	if !readJSON(w, r, &raw) {
+	if !readJSON(w, r, &body) {
 		return
 	}
-	var req commitTableRequest
-	if err := json.Unmarshal(raw.Requirements, &req.Requirements); err != nil {
-		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed requirements: "+err.Error())
-		return
+	reqs := make([]requirement, 0, len(body.Requirements))
+	create := false
+	for _, raw := range body.Requirements {
+		req, err := parseRequirement(raw)
+		if err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		create = create || req.typ == "assert-create"
+		reqs = append(reqs, req)
 	}
-	updates, err := fixCreateUpdates(req.Requirements, raw.Updates)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
-		return
-	}
-	// Decoded twice: checkCommit applies its copy to a throwaway builder.
-	var checkUpdates table.Updates
-	if err := json.Unmarshal(updates, &req.Updates); err != nil {
-		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
-		return
-	}
-	if err := json.Unmarshal(updates, &checkUpdates); err != nil {
-		writeError(w, http.StatusBadRequest, "BadRequestException", "malformed updates: "+err.Error())
-		return
+	updates := make([]update, 0, len(body.Updates))
+	for _, raw := range body.Updates {
+		u, err := parseUpdate(raw)
+		if err != nil {
+			writeCatalogError(w, err)
+			return
+		}
+		updates = append(updates, u)
 	}
 
-	// iceberg-go's requirement Validate errors are plain errors.New, not
-	// wrapped in table.ErrCommitFailed, so pre-validate here to get a clean
-	// 409. CommitTable re-validates and CASes on metadata_location, so a
-	// concurrent commit between here and there still loses (and that path
-	// does wrap ErrCommitFailed). The requirement-failed-inside-CommitTable
-	// window is caught by isRequirementFailure below.
-	var current table.Metadata
-	if tbl, err := s.cat.LoadTable(ctx, ident); err == nil {
-		current = tbl.Metadata()
-	} else if !errors.Is(err, catalog.ErrNoSuchTable) {
+	current, loc, err := s.load(ctx, id)
+	switch {
+	case errors.Is(err, errNoSuchTable) && create:
+		current = nil
+	case err != nil:
 		writeCatalogError(w, err)
 		return
 	}
-	for _, req := range req.Requirements {
-		if err := req.Validate(current); err != nil {
-			writeError(w, http.StatusConflict, "CommitFailedException", err.Error())
+	for _, req := range reqs {
+		if err := req.check(current); err != nil {
+			writeCatalogError(w, err)
 			return
 		}
 	}
-	if current == nil && !hasAssertCreate(req.Requirements) {
-		writeCatalogError(w, fmt.Errorf("%w: %s", catalog.ErrNoSuchTable, strings.Join(ident, ".")))
-		return
-	}
-	if err := s.checkCommit(current, checkUpdates); err != nil {
-		writeCatalogError(w, err)
-		return
-	}
-
-	md, loc, err := s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
+	md, err := s.build(ctx, id, current, loc, updates)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, commitTableResponse{MetadataLocation: loc, Metadata: md})
+	if current != nil && len(updates) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"metadata-location": loc, "metadata": current})
+		return
+	}
+	newLoc, err := s.persist(ctx, id, current, loc, md)
+	if err != nil {
+		writeCatalogError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"metadata-location": newLoc, "metadata": md})
+}
+
+// build applies updates to current (nil for a create) and runs every check
+// on the result.
+func (s *Server) build(ctx context.Context, id identifier, current *tableMetadata, loc string, updates []update) (*tableMetadata, error) {
+	b := newBuilder(current, loc, s.now())
+	for _, u := range updates {
+		if err := b.apply(u); err != nil {
+			return nil, err
+		}
+	}
+	md, err := b.finish(func() (string, error) { return s.defaultLocation(ctx, id) })
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkMetadata(md); err != nil {
+		return nil, err
+	}
+	return md, nil
+}
+
+// persist writes md as the next metadata file and points the catalog at it
+// (insert for a create, CAS from prevLoc otherwise). The file is removed
+// again if the catalog update loses.
+func (s *Server) persist(ctx context.Context, id identifier, current *tableMetadata, prevLoc string, md *tableMetadata) (string, error) {
+	newLoc, err := s.writeMetadata(md, prevLoc)
+	if err != nil {
+		return "", err
+	}
+	if current == nil {
+		err = s.store.createTable(ctx, id, newLoc)
+	} else {
+		err = s.store.swapTable(ctx, id, prevLoc, newLoc)
+	}
+	if err != nil {
+		_ = os.Remove(newLoc)
+		return "", err
+	}
+	return newLoc, nil
 }
 
 func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ident := pathTable(r)
+	id := pathTable(r)
 	if r.URL.Query().Get("purgeRequested") != "true" {
-		if err := s.cat.DropTable(ctx, ident); err != nil {
+		if err := s.store.dropTable(ctx, id); err != nil {
 			writeCatalogError(w, err)
 			return
 		}
@@ -612,51 +567,45 @@ func (s *Server) dropTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NOTE: purge doesn't use iceberg-go's PurgeTable, which deletes every
-	// file the table's manifests reference wherever it is (and manifests are
-	// written by the client, so we can't vouch for their contents). This
-	// only ever deletes the table's own directory, after checking it's
-	// strictly inside the warehouse.
-	tbl, err := s.cat.LoadTable(ctx, ident)
+	// NOTE: purge never deletes the files the table's manifests reference
+	// (manifests are written by the client, so we can't vouch for their
+	// contents). It only ever deletes the table's own directory, after
+	// checking it's strictly inside the warehouse.
+	md, _, err := s.load(ctx, id)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	loc, err := s.purgeLocation(tbl.Metadata())
+	loc, err := s.purgeLocation(md)
 	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	if err := s.cat.DropTable(ctx, ident); err != nil {
+	if err := s.store.dropTable(ctx, id); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
-	if loc != "" {
-		if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
-			s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", strings.Join(ident, "."), "error", err)
-		}
-	} else if s.opts.Logger != nil {
-		// TODO(maintenance): purge remote warehouses (list + delete under
-		// the table prefix).
-		s.opts.Logger.Warn("dropped iceberg table w/o purging files (remote warehouse)", "table", strings.Join(ident, "."))
+	if err := os.RemoveAll(loc); err != nil && s.opts.Logger != nil {
+		s.opts.Logger.Warn("dropped iceberg table but failed to purge its files", "table", id.String(), "error", err)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) renameTable(w http.ResponseWriter, r *http.Request) {
-	var req renameTableRequest
+	var req struct {
+		Source      identifier `json:"source"`
+		Destination identifier `json:"destination"`
+	}
 	if !readJSON(w, r, &req) {
 		return
 	}
-	from := append(append(table.Identifier{}, req.Source.Namespace...), req.Source.Name)
-	to := append(append(table.Identifier{}, req.Destination.Namespace...), req.Destination.Name)
-	for _, id := range []table.Identifier{from, to} {
-		if err := validateNames(id); err != nil {
+	for _, id := range []identifier{req.Source, req.Destination} {
+		if err := validateNames(append(append([]string{}, id.Namespace...), id.Name)); err != nil {
 			writeCatalogError(w, err)
 			return
 		}
 	}
-	if _, err := s.cat.RenameTable(r.Context(), from, to); err != nil {
+	if err := s.store.renameTable(r.Context(), req.Source, req.Destination); err != nil {
 		writeCatalogError(w, err)
 		return
 	}
@@ -670,69 +619,12 @@ func (s *Server) reportMetrics(w http.ResponseWriter, r *http.Request) {
 
 // ---- helpers ----
 
-func pathNamespace(r *http.Request) table.Identifier {
+func pathNamespace(r *http.Request) []string {
 	return strings.Split(r.PathValue("ns"), namespaceSeparator)
 }
 
-func pathTable(r *http.Request) table.Identifier {
-	return append(pathNamespace(r), r.PathValue("table"))
-}
-
-func toIdentifier(id table.Identifier) identifier {
-	return identifier{
-		Namespace: catalog.NamespaceFromIdent(id),
-		Name:      catalog.TableNameFromIdent(id),
-	}
-}
-
-// fixCreateUpdates works around an iceberg-go v0.7.0 bug in the
-// stage-create -> commit(assert-create) path. CommitTable starts a new table
-// from `table.NewMetadata(iceberg.NewSchema(0), ...)`, so the base metadata
-// already has an *empty* schema 0 (and spec 0 / sort order 0). The client's
-// `add-schema` (schema-id 0) then gets reassigned to schema 1, and its
-// `set-current-schema` 0 points at the empty placeholder, so the table ends
-// up w/ 0 columns. Same hazard for partitioned specs / real sort orders.
-//
-// For create commits we rewrite set-current-schema / set-default-spec /
-// set-default-sort-order to -1 ("last added") when a matching add-* precedes
-// them, which is what the client meant anyways. The placeholder empty schema
-// 0 still ends up in `schemas` (harmless, but ugly).
-//
-// TODO: fix upstream (base a create commit on an empty builder instead of
-// `table.NewMetadata(iceberg.NewSchema(0), ...)` in catalog/sql's
-// CommitTable) and drop this.
-func fixCreateUpdates(reqs table.Requirements, raw json.RawMessage) (json.RawMessage, error) {
-	if !hasAssertCreate(reqs) || len(raw) == 0 {
-		return raw, nil
-	}
-	var ups []map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &ups); err != nil {
-		return nil, err
-	}
-	setters := map[string]struct{ add, idField string }{
-		"set-current-schema":     {"add-schema", "schema-id"},
-		"set-default-spec":       {"add-spec", "spec-id"},
-		"set-default-sort-order": {"add-sort-order", "sort-order-id"},
-	}
-	added := map[string]bool{}
-	for _, u := range ups {
-		var action string
-		_ = json.Unmarshal(u["action"], &action)
-		added[action] = true
-		if st, ok := setters[action]; ok && added[st.add] {
-			u[st.idField] = json.RawMessage("-1")
-		}
-	}
-	return json.Marshal(ups)
-}
-
-func hasAssertCreate(reqs table.Requirements) bool {
-	for _, r := range reqs {
-		if r.GetType() == "assert-create" {
-			return true
-		}
-	}
-	return false
+func pathTable(r *http.Request) identifier {
+	return identifier{Namespace: pathNamespace(r), Name: r.PathValue("table")}
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -770,41 +662,25 @@ func writeCatalogError(w http.ResponseWriter, err error) {
 	writeError(w, status, typ, err.Error())
 }
 
-// classify maps iceberg-go errors onto the REST spec's status codes and
-// exception type names (the names are what Java/pyiceberg clients key off).
+// classify maps our errors onto the REST spec's status codes and exception
+// type names (the names are what Java/pyiceberg/iceberg-go clients key off).
 func classify(err error) (int, string) {
 	switch {
-	case errors.Is(err, catalog.ErrNoSuchTable):
+	case errors.Is(err, errNoSuchTable):
 		return http.StatusNotFound, "NoSuchTableException"
-	case errors.Is(err, catalog.ErrNoSuchNamespace):
+	case errors.Is(err, errNoSuchNamespace):
 		return http.StatusNotFound, "NoSuchNamespaceException"
-	case errors.Is(err, catalog.ErrNoSuchView):
-		return http.StatusNotFound, "NoSuchViewException"
-	case errors.Is(err, catalog.ErrTableAlreadyExists),
-		errors.Is(err, catalog.ErrNamespaceAlreadyExists),
-		errors.Is(err, catalog.ErrViewAlreadyExists):
+	case errors.Is(err, errTableAlreadyExists), errors.Is(err, errNamespaceAlreadyExists):
 		return http.StatusConflict, "AlreadyExistsException"
-	case errors.Is(err, catalog.ErrNamespaceNotEmpty):
+	case errors.Is(err, errNamespaceNotEmpty):
 		return http.StatusConflict, "NamespaceNotEmptyException"
-	case errors.Is(err, table.ErrCommitFailed), isRequirementFailure(err):
+	case errors.Is(err, errCommitFailed):
 		return http.StatusConflict, "CommitFailedException"
-	case errors.Is(err, errBadRequest),
-		errors.Is(err, catalog.ErrInvalidIdentifier),
-		errors.Is(err, table.ErrInvalidRequirement),
-		errors.Is(err, table.ErrInvalidMetadata):
+	case errors.Is(err, errBadRequest):
 		return http.StatusBadRequest, "BadRequestException"
-	case errors.Is(err, iceberg.ErrNotImplemented):
-		return http.StatusNotAcceptable, "UnsupportedOperationException"
 	default:
 		return http.StatusInternalServerError, "InternalServerError"
 	}
-}
-
-// isRequirementFailure matches iceberg-go v0.7.0's unwrapped requirement
-// errors ("Requirement failed: ..." / "requirement failed: ..."). Gross, but
-// there's no sentinel to errors.Is against.
-func isRequirementFailure(err error) bool {
-	return strings.HasPrefix(strings.ToLower(err.Error()), "requirement failed")
 }
 
 type statusRecorder struct {

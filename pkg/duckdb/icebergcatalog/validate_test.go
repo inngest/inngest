@@ -1,18 +1,13 @@
 package icebergcatalog
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/apache/iceberg-go"
-	sqlcat "github.com/apache/iceberg-go/catalog/sql"
 )
 
 func TestValidateName(t *testing.T) {
@@ -141,8 +136,8 @@ func TestRejectsEscapes(t *testing.T) {
 	}
 }
 
-// TestCommitValidation checks commits are validated against iceberg-go's own
-// decode and the metadata they'd produce, not a separate parse of the body.
+// TestCommitValidation checks commits are validated against the same decode
+// (and resulting metadata) that gets applied and written.
 func TestCommitValidation(t *testing.T) {
 	ts := newTestServer(t)
 	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {
@@ -219,19 +214,7 @@ func TestCommitValidation(t *testing.T) {
 }
 
 func TestPurge(t *testing.T) {
-	dir := t.TempDir()
-	wh := filepath.Join(dir, "warehouse")
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
-	t.Cleanup(ts.Close)
+	ts, wh := newTestServerAt(t, t.TempDir())
 
 	schema := `{"type":"struct","schema-id":0,"fields":[{"id":1,"name":"id","type":"string","required":false}]}`
 	if status, body := do(t, ts, "POST", "/v1/namespaces", `{"namespace":["app"]}`); status != 200 {

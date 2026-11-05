@@ -14,26 +14,32 @@ import (
 	"github.com/apache/iceberg-go/catalog"
 	"github.com/apache/iceberg-go/catalog/catalogtest"
 	_ "github.com/apache/iceberg-go/catalog/rest"
-	sqlcat "github.com/apache/iceberg-go/catalog/sql"
 	_ "modernc.org/sqlite"
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	dir := t.TempDir()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "catalog.db"))
+	ts, _ := newTestServerAt(t, t.TempDir())
+	return ts
+}
+
+// newTestServerAt serves a catalog on `<dir>/catalog.db` w/ the warehouse at
+// `<dir>/warehouse`, which it returns.
+func newTestServerAt(t *testing.T, dir string) (*httptest.Server, string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", sqliteDSN(filepath.Join(dir, "catalog.db")))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	wh := filepath.Join(dir, "warehouse")
-	cat, err := sqlcat.NewCatalog("inngest", db, sqlcat.SQLite, iceberg.Properties{"warehouse": wh})
+	srv, err := New(context.Background(), db, Options{Warehouse: wh})
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(New(cat, Options{Warehouse: wh}))
+	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
-	return ts
+	return ts, wh
 }
 
 func do(t *testing.T, ts *httptest.Server, method, path, body string) (int, map[string]any) {

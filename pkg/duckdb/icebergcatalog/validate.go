@@ -8,9 +8,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/apache/iceberg-go"
-	"github.com/apache/iceberg-go/table"
 )
 
 // errBadRequest marks validation failures, which classify maps to a 400.
@@ -176,7 +173,7 @@ func underRoot(p, root, sep string) bool {
 
 // checkLocationProps validates (and normalizes in place) every location-ish
 // property in props.
-func (s *Server) checkLocationProps(props iceberg.Properties) error {
+func (s *Server) checkLocationProps(props map[string]string) error {
 	for _, k := range locationProperties {
 		v, ok := props[k]
 		if !ok {
@@ -191,72 +188,18 @@ func (s *Server) checkLocationProps(props iceberg.Properties) error {
 	return nil
 }
 
-// allowedUpdates are the commit update actions we apply: what duckdb sends
-// (see the smoke test) plus what a spec-compliant client managing snapshots,
-// properties and statistics would. Anything else (encryption keys, removing
-// schemas/specs) is rejected rather than reasoned about.
-var allowedUpdates = map[string]bool{
-	table.UpdateAssignUUID:                true,
-	table.UpdateUpgradeFormatVersion:      true,
-	table.UpdateAddSchema:                 true,
-	table.UpdateSetCurrentSchema:          true,
-	table.UpdateAddSpec:                   true,
-	table.UpdateSetDefaultSpec:            true,
-	table.UpdateAddSortOrder:              true,
-	table.UpdateSetDefaultSortOrder:       true,
-	table.UpdateSetLocation:               true,
-	table.UpdateAddSnapshot:               true,
-	table.UpdateSetSnapshotRef:            true,
-	table.UpdateRemoveSnapshots:           true,
-	table.UpdateRemoveSnapshotRef:         true,
-	table.UpdateSetProperties:             true,
-	table.UpdateRemoveProperties:          true,
-	table.UpdateSetStatistics:             true,
-	table.UpdateRemoveStatistics:          true,
-	table.UpdateSetPartitionStatistics:    true,
-	table.UpdateRemovePartitionStatistics: true,
-}
-
-// checkCommit validates a commit against what iceberg-go will actually
-// apply: updates is iceberg-go's own decode of the request (so a duplicate
-// or mixed-case `action` key resolves exactly the way CommitTable sees it),
-// every action has to be allowlisted, and the metadata the updates produce
-// from base (nil for a create) has to keep every path in it inside the
-// warehouse. updates is applied to a throwaway builder, so pass a separate
-// decode from the one handed to CommitTable.
-func (s *Server) checkCommit(base table.Metadata, updates table.Updates) error {
-	for _, u := range updates {
-		if !allowedUpdates[u.Action()] {
-			return fmt.Errorf("%w: update action %q is not supported", errBadRequest, u.Action())
-		}
-	}
-	if base == nil {
-		// Same placeholder base iceberg-go's CommitTable creates from.
-		var err error
-		base, err = table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, "", nil)
-		if err != nil {
-			return err
-		}
-	}
-	md, err := table.UpdateTableMetadata(base, updates, "")
-	if err != nil {
-		return fmt.Errorf("%w: %v", errBadRequest, err)
-	}
-	return s.checkMetadata(md)
-}
-
 // checkMetadata checks every path table metadata carries: the table
 // location and location-ish properties have to be under the warehouse, and
 // manifest lists, v1 manifests and (partition) statistics files under the
 // table location or one of those properties. These are what the catalog
 // writes metadata to and what a purge would delete.
-func (s *Server) checkMetadata(md table.Metadata) error {
-	loc, err := s.checkLocation(md.Location())
+func (s *Server) checkMetadata(md *tableMetadata) error {
+	loc, err := s.checkLocation(md.Location)
 	if err != nil {
 		return fmt.Errorf("table location: %w", err)
 	}
 	roots := []string{loc}
-	props := md.Properties()
+	props := md.Properties
 	for _, k := range locationProperties {
 		v, ok := props[k]
 		if !ok {
@@ -270,16 +213,16 @@ func (s *Server) checkMetadata(md table.Metadata) error {
 	}
 
 	var paths []string
-	for _, snap := range md.Snapshots() {
+	for _, snap := range md.Snapshots {
 		if snap.ManifestList != "" {
 			paths = append(paths, snap.ManifestList)
 		}
-		paths = append(paths, snap.ManifestLocations...)
+		paths = append(paths, snap.Manifests...)
 	}
-	for st := range md.Statistics() {
+	for _, st := range md.Statistics {
 		paths = append(paths, st.StatisticsPath)
 	}
-	for st := range md.PartitionStatistics() {
+	for _, st := range md.PartitionStatistics {
 		paths = append(paths, st.StatisticsPath)
 	}
 	for _, p := range paths {
@@ -310,10 +253,9 @@ func (s *Server) checkUnder(p string, roots []string) error {
 }
 
 // purgeLocation is the local directory a purge may delete for a table w/
-// metadata md: its location, if that's strictly inside a local warehouse
-// (never the warehouse itself). It's empty for a remote warehouse, which
-// purge doesn't delete from (yet).
-func (s *Server) purgeLocation(md table.Metadata) (string, error) {
+// metadata md: its location, if that's strictly inside the (local)
+// warehouse, never the warehouse itself.
+func (s *Server) purgeLocation(md *tableMetadata) (string, error) {
 	if err := s.checkMetadata(md); err != nil {
 		return "", err
 	}
@@ -322,9 +264,9 @@ func (s *Server) purgeLocation(md table.Metadata) (string, error) {
 		return "", err
 	}
 	if !isLocal(wh) {
-		return "", nil
+		return "", fmt.Errorf("%w: purging a remote warehouse isn't supported", errBadRequest)
 	}
-	loc, err := s.checkLocation(md.Location())
+	loc, err := s.checkLocation(md.Location)
 	if err != nil {
 		return "", err
 	}
