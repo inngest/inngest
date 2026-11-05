@@ -120,6 +120,11 @@ func call(ctx context.Context, request *mcp.CallToolRequest, endpoint apiv2endpo
 	if err != nil {
 		return ToolError(err.Error(), map[string]any{"error": err.Error()}), nil
 	}
+	if request != nil && request.Extra != nil && request.Extra.Header != nil {
+		if auth := request.Extra.Header.Get("Authorization"); auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+	}
 	return opts.Execute(ctx, endpoint, req)
 }
 
