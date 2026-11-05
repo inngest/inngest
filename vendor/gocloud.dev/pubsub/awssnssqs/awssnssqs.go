@@ -73,7 +73,6 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -151,11 +150,7 @@ func DialSQS(cfg aws.Config) *sqs.Client {
 
 // lazySessionOpener obtains the AWS session from the environment on the first
 // call to OpenXXXURL.
-type lazySessionOpener struct {
-	init   sync.Once
-	opener *URLOpener
-	err    error
-}
+type lazySessionOpener struct{}
 
 func (o *lazySessionOpener) defaultOpener(u *url.URL) (*URLOpener, error) {
 	return &URLOpener{}, nil
@@ -164,7 +159,7 @@ func (o *lazySessionOpener) defaultOpener(u *url.URL) (*URLOpener, error) {
 func (o *lazySessionOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubsub.Topic, error) {
 	opener, err := o.defaultOpener(u)
 	if err != nil {
-		return nil, fmt.Errorf("open topic %v: failed to open default session: %v", u, err)
+		return nil, fmt.Errorf("open topic %v: failed to open default session: %w", u, err)
 	}
 	return opener.OpenTopicURL(ctx, u)
 }
@@ -172,7 +167,7 @@ func (o *lazySessionOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubs
 func (o *lazySessionOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsub.Subscription, error) {
 	opener, err := o.defaultOpener(u)
 	if err != nil {
-		return nil, fmt.Errorf("open subscription %v: failed to open default session: %v", u, err)
+		return nil, fmt.Errorf("open subscription %v: failed to open default session: %w", u, err)
 	}
 	return opener.OpenSubscriptionURL(ctx, u)
 }
@@ -203,6 +198,8 @@ const SQSScheme = "awssqs"
 //
 //   - raw (for "awssqs" Subscriptions only): sets SubscriberOptions.Raw. The
 //     value must be parseable by `strconv.ParseBool`.
+//   - snstopicarn (for "awssqs" Subscriptions only): sets
+//     SubscriberOptions.SNSTopicARN.
 //   - nacklazy (for "awssqs" Subscriptions only): sets SubscriberOptions.NackLazy. The
 //     value must be parseable by `strconv.ParseBool`.
 //   - waittime: sets SubscriberOptions.WaitTime, in time.ParseDuration formats.
@@ -222,7 +219,7 @@ func (o *URLOpener) OpenTopicURL(ctx context.Context, u *url.URL) (*pubsub.Topic
 	qURL := "https://" + path.Join(u.Host, u.Path)
 	cfg, err := gcaws.V2ConfigFromURLParams(ctx, u.Query())
 	if err != nil {
-		return nil, fmt.Errorf("open topic %v: %v", u, err)
+		return nil, fmt.Errorf("open topic %v: %w", u, err)
 	}
 	switch u.Scheme {
 	case SNSScheme:
@@ -243,15 +240,19 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 		var err error
 		opts.Raw, err = strconv.ParseBool(rawStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %q for raw: %v", rawStr, err)
+			return nil, fmt.Errorf("invalid value %q for raw: %w", rawStr, err)
 		}
 		q.Del("raw")
+	}
+	if arn := q.Get("snstopicarn"); arn != "" {
+		opts.SNSTopicARN = arn
+		q.Del("snstopicarn")
 	}
 	if nackLazyStr := q.Get("nacklazy"); nackLazyStr != "" {
 		var err error
 		opts.NackLazy, err = strconv.ParseBool(nackLazyStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %q for nacklazy: %v", nackLazyStr, err)
+			return nil, fmt.Errorf("invalid value %q for nacklazy: %w", nackLazyStr, err)
 		}
 		q.Del("nacklazy")
 	}
@@ -259,14 +260,14 @@ func (o *URLOpener) OpenSubscriptionURL(ctx context.Context, u *url.URL) (*pubsu
 		var err error
 		opts.WaitTime, err = time.ParseDuration(waitTimeStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value %q for waittime: %v", waitTimeStr, err)
+			return nil, fmt.Errorf("invalid value %q for waittime: %w", waitTimeStr, err)
 		}
 		q.Del("waittime")
 	}
 	qURL := "https://" + path.Join(u.Host, u.Path)
 	cfg, err := gcaws.V2ConfigFromURLParams(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("open subscription %v: %v", u, err)
+		return nil, fmt.Errorf("open subscription %v: %w", u, err)
 	}
 	return OpenSubscription(ctx, sqs.NewFromConfig(cfg), qURL, &opts), nil
 }
@@ -751,8 +752,21 @@ type SubscriptionOptions struct {
 	// identify whether message bodies are raw or SNS JSON; this may be
 	// inefficient for raw messages.
 	//
+	// Note that nothing in an SQS message proves that it was delivered by SNS,
+	// so when this is false a sender that can only choose the message body can
+	// also choose the Metadata the Subscription reports, by making the body
+	// look like an SNS notification. Set this to true, or set SNSTopicARN, if
+	// Metadata is used for anything security-relevant.
+	//
 	// See https://aws.amazon.com/sns/faqs/#Raw_message_delivery.
 	Raw bool
+
+	// SNSTopicARN is the ARN of the SNS topic this subscription is subscribed
+	// to. It is only used when Raw is false: a body that looks like an SNS
+	// notification is only unwrapped if it claims to come from this topic.
+	//
+	// Leaving it empty accepts a claimed ARN from any topic.
+	SNSTopicARN string
 
 	// NackLazy determines what Nack does.
 	//
@@ -823,7 +837,7 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 		for k, v := range m.MessageAttributes {
 			rawAttrs[k] = aws.ToString(v.StringValue)
 		}
-		bodyStr, rawAttrs = extractBody(bodyStr, rawAttrs, s.opts.Raw)
+		bodyStr, rawAttrs = extractBody(bodyStr, rawAttrs, s.opts.Raw, s.opts.SNSTopicARN)
 
 		decodeIt := false
 		attrs := map[string]string{}
@@ -875,7 +889,7 @@ func (s *subscription) ReceiveBatch(ctx context.Context, maxMessages int) ([]*dr
 	return ms, nil
 }
 
-func extractBody(bodyStr string, rawAttrs map[string]string, raw bool) (body string, attributes map[string]string) {
+func extractBody(bodyStr string, rawAttrs map[string]string, raw bool, snsTopicARN string) (body string, attributes map[string]string) {
 	// If the user told us that message bodies are raw, or if there are
 	// top-level MessageAttributes, then it's raw.
 	// (SNS JSON message can have attributes, but they are encoded in
@@ -889,13 +903,22 @@ func extractBody(bodyStr string, rawAttrs map[string]string, raw bool) (body str
 
 	// It might be SNS JSON; try to parse the raw body as such.
 	// https://aws.amazon.com/sns/faqs/#Raw_message_delivery
-	// If it parses as JSON and has a TopicArn field, assume it's SNS JSON.
+	// Require the shape of an SNS notification: SNS always sets Type,
+	// MessageId, TopicArn and Timestamp. A body that merely happens to have a
+	// TopicArn field isn't enough, because unwrapping hides the bytes the
+	// sender actually sent and promotes body content to Message.Metadata.
 	var bodyJSON struct {
+		Type              string
+		MessageId         string
 		TopicArn          string
+		Timestamp         string
 		Message           string
 		MessageAttributes map[string]struct{ Value string }
 	}
-	if err := json.Unmarshal([]byte(bodyStr), &bodyJSON); err == nil && bodyJSON.TopicArn != "" {
+	if err := json.Unmarshal([]byte(bodyStr), &bodyJSON); err == nil &&
+		bodyJSON.Type == "Notification" && bodyJSON.MessageId != "" &&
+		bodyJSON.Timestamp != "" && bodyJSON.TopicArn != "" &&
+		(snsTopicARN == "" || bodyJSON.TopicArn == snsTopicARN) {
 		// It looks like SNS JSON. Get attributes from the decoded struct,
 		// and update the body to be the JSON Message field.
 		for k, v := range bodyJSON.MessageAttributes {
@@ -903,9 +926,9 @@ func extractBody(bodyStr string, rawAttrs map[string]string, raw bool) (body str
 		}
 		return bodyJSON.Message, rawAttrs
 	}
-	// It doesn't look like SNS JSON, either because it
-	// isn't JSON or because the JSON doesn't have a TopicArn
-	// field. Treat it as raw.
+	// It doesn't look like SNS JSON, either because it isn't JSON, because it
+	// doesn't have the fields of an SNS notification, or because it claims a
+	// topic other than SNSTopicARN. Treat it as raw.
 	//
 	// As above in the other "raw" case, we leave bodyStr
 	// alone. There can't be any top-level attributes (because

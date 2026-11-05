@@ -5,9 +5,9 @@ package sqs
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns a list of your queues in the current region. The response includes a
@@ -59,6 +59,24 @@ type ListQueuesInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListQueuesInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListQueuesRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListQueuesInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.MaxResults != nil {
+		s.WriteInt32(schemas.ListQueuesRequest_MaxResults, *v.MaxResults)
+	}
+	if v.NextToken != nil {
+		s.WriteString(schemas.ListQueuesRequest_NextToken, *v.NextToken)
+	}
+	if v.QueueNamePrefix != nil {
+		s.WriteString(schemas.ListQueuesRequest_QueueNamePrefix, *v.QueueNamePrefix)
+	}
+}
+
 // A list of your queues.
 type ListQueuesOutput struct {
 
@@ -77,77 +95,48 @@ type ListQueuesOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListQueuesOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListQueuesResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListQueuesOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.NextToken != nil {
+		s.WriteString(schemas.ListQueuesResult_NextToken, *v.NextToken)
+	}
+	serializeQueueUrlList(s, schemas.ListQueuesResult_QueueUrls, v.QueueUrls)
+}
+func (v *ListQueuesOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListQueuesResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListQueuesResult_NextToken:
+			v.NextToken = new(string)
+			return d.ReadString(schemas.ListQueuesResult_NextToken, v.NextToken)
+		case schemas.ListQueuesResult_QueueUrls:
+			return deserializeQueueUrlList(d, schemas.ListQueuesResult_QueueUrls, &v.QueueUrls)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListQueuesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListQueues, schemas.ListQueuesRequest, schemas.ListQueuesResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpListQueues{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListQueues, schemas.ListQueuesRequest, schemas.ListQueuesResult), output: &ListQueuesOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpListQueues{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListQueues"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListQueues(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -160,12 +149,6 @@ func (c *Client) addOperationListQueuesMiddlewares(stack *middleware.Stack, opti
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -266,11 +249,3 @@ type ListQueuesAPIClient interface {
 }
 
 var _ ListQueuesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListQueues(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListQueues",
-	}
-}

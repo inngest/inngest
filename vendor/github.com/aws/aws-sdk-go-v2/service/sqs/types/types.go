@@ -3,6 +3,8 @@
 package types
 
 import (
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	smithydocument "github.com/aws/smithy-go/document"
 )
 
@@ -31,6 +33,43 @@ type BatchResultErrorEntry struct {
 	noSmithyDocumentSerde
 }
 
+func (v *BatchResultErrorEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.BatchResultErrorEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *BatchResultErrorEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Code != nil {
+		s.WriteString(schemas.BatchResultErrorEntry_Code, *v.Code)
+	}
+	if v.Id != nil {
+		s.WriteString(schemas.BatchResultErrorEntry_Id, *v.Id)
+	}
+	if v.Message != nil {
+		s.WriteString(schemas.BatchResultErrorEntry_Message, *v.Message)
+	}
+	s.WriteBool(schemas.BatchResultErrorEntry_SenderFault, v.SenderFault)
+}
+func (v *BatchResultErrorEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.BatchResultErrorEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.BatchResultErrorEntry_Code:
+			v.Code = new(string)
+			return d.ReadString(schemas.BatchResultErrorEntry_Code, v.Code)
+		case schemas.BatchResultErrorEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.BatchResultErrorEntry_Id, v.Id)
+		case schemas.BatchResultErrorEntry_Message:
+			v.Message = new(string)
+			return d.ReadString(schemas.BatchResultErrorEntry_Message, v.Message)
+		case schemas.BatchResultErrorEntry_SenderFault:
+			return d.ReadBool(schemas.BatchResultErrorEntry_SenderFault, &v.SenderFault)
+		}
+		return nil
+	})
+}
+
 // Encloses a receipt handle and an entry ID for each message in ChangeMessageVisibilityBatch.
 type ChangeMessageVisibilityBatchRequestEntry struct {
 
@@ -57,6 +96,37 @@ type ChangeMessageVisibilityBatchRequestEntry struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ChangeMessageVisibilityBatchRequestEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ChangeMessageVisibilityBatchRequestEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ChangeMessageVisibilityBatchRequestEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Id != nil {
+		s.WriteString(schemas.ChangeMessageVisibilityBatchRequestEntry_Id, *v.Id)
+	}
+	if v.ReceiptHandle != nil {
+		s.WriteString(schemas.ChangeMessageVisibilityBatchRequestEntry_ReceiptHandle, *v.ReceiptHandle)
+	}
+	s.WriteInt32(schemas.ChangeMessageVisibilityBatchRequestEntry_VisibilityTimeout, v.VisibilityTimeout)
+}
+func (v *ChangeMessageVisibilityBatchRequestEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ChangeMessageVisibilityBatchRequestEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ChangeMessageVisibilityBatchRequestEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.ChangeMessageVisibilityBatchRequestEntry_Id, v.Id)
+		case schemas.ChangeMessageVisibilityBatchRequestEntry_ReceiptHandle:
+			v.ReceiptHandle = new(string)
+			return d.ReadString(schemas.ChangeMessageVisibilityBatchRequestEntry_ReceiptHandle, v.ReceiptHandle)
+		case schemas.ChangeMessageVisibilityBatchRequestEntry_VisibilityTimeout:
+			return d.ReadInt32(schemas.ChangeMessageVisibilityBatchRequestEntry_VisibilityTimeout, &v.VisibilityTimeout)
+		}
+		return nil
+	})
+}
+
 // Encloses the Id of an entry in ChangeMessageVisibilityBatch.
 type ChangeMessageVisibilityBatchResultEntry struct {
 
@@ -66,6 +136,28 @@ type ChangeMessageVisibilityBatchResultEntry struct {
 	Id *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *ChangeMessageVisibilityBatchResultEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ChangeMessageVisibilityBatchResultEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ChangeMessageVisibilityBatchResultEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Id != nil {
+		s.WriteString(schemas.ChangeMessageVisibilityBatchResultEntry_Id, *v.Id)
+	}
+}
+func (v *ChangeMessageVisibilityBatchResultEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ChangeMessageVisibilityBatchResultEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ChangeMessageVisibilityBatchResultEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.ChangeMessageVisibilityBatchResultEntry_Id, v.Id)
+		}
+		return nil
+	})
 }
 
 // Encloses a receipt handle and an identifier for it.
@@ -90,6 +182,34 @@ type DeleteMessageBatchRequestEntry struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DeleteMessageBatchRequestEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DeleteMessageBatchRequestEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageBatchRequestEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Id != nil {
+		s.WriteString(schemas.DeleteMessageBatchRequestEntry_Id, *v.Id)
+	}
+	if v.ReceiptHandle != nil {
+		s.WriteString(schemas.DeleteMessageBatchRequestEntry_ReceiptHandle, *v.ReceiptHandle)
+	}
+}
+func (v *DeleteMessageBatchRequestEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.DeleteMessageBatchRequestEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.DeleteMessageBatchRequestEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.DeleteMessageBatchRequestEntry_Id, v.Id)
+		case schemas.DeleteMessageBatchRequestEntry_ReceiptHandle:
+			v.ReceiptHandle = new(string)
+			return d.ReadString(schemas.DeleteMessageBatchRequestEntry_ReceiptHandle, v.ReceiptHandle)
+		}
+		return nil
+	})
+}
+
 // Encloses the Id of an entry in DeleteMessageBatch.
 type DeleteMessageBatchResultEntry struct {
 
@@ -99,6 +219,28 @@ type DeleteMessageBatchResultEntry struct {
 	Id *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *DeleteMessageBatchResultEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DeleteMessageBatchResultEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageBatchResultEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Id != nil {
+		s.WriteString(schemas.DeleteMessageBatchResultEntry_Id, *v.Id)
+	}
+}
+func (v *DeleteMessageBatchResultEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.DeleteMessageBatchResultEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.DeleteMessageBatchResultEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.DeleteMessageBatchResultEntry_Id, v.Id)
+		}
+		return nil
+	})
 }
 
 // Contains the details of a message movement task.
@@ -142,6 +284,74 @@ type ListMessageMoveTasksResultEntry struct {
 	TaskHandle *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *ListMessageMoveTasksResultEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListMessageMoveTasksResultEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListMessageMoveTasksResultEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.ApproximateNumberOfMessagesMoved != 0 {
+		s.WriteInt64(schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesMoved, v.ApproximateNumberOfMessagesMoved)
+	}
+	if v.ApproximateNumberOfMessagesToMove != nil {
+		s.WriteInt64(schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesToMove, *v.ApproximateNumberOfMessagesToMove)
+	}
+	if v.DestinationArn != nil {
+		s.WriteString(schemas.ListMessageMoveTasksResultEntry_DestinationArn, *v.DestinationArn)
+	}
+	if v.FailureReason != nil {
+		s.WriteString(schemas.ListMessageMoveTasksResultEntry_FailureReason, *v.FailureReason)
+	}
+	if v.MaxNumberOfMessagesPerSecond != nil {
+		s.WriteInt32(schemas.ListMessageMoveTasksResultEntry_MaxNumberOfMessagesPerSecond, *v.MaxNumberOfMessagesPerSecond)
+	}
+	if v.SourceArn != nil {
+		s.WriteString(schemas.ListMessageMoveTasksResultEntry_SourceArn, *v.SourceArn)
+	}
+	if v.StartedTimestamp != 0 {
+		s.WriteInt64(schemas.ListMessageMoveTasksResultEntry_StartedTimestamp, v.StartedTimestamp)
+	}
+	if v.Status != nil {
+		s.WriteString(schemas.ListMessageMoveTasksResultEntry_Status, *v.Status)
+	}
+	if v.TaskHandle != nil {
+		s.WriteString(schemas.ListMessageMoveTasksResultEntry_TaskHandle, *v.TaskHandle)
+	}
+}
+func (v *ListMessageMoveTasksResultEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListMessageMoveTasksResultEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesMoved:
+			return d.ReadInt64(schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesMoved, &v.ApproximateNumberOfMessagesMoved)
+		case schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesToMove:
+			v.ApproximateNumberOfMessagesToMove = new(int64)
+			return d.ReadInt64(schemas.ListMessageMoveTasksResultEntry_ApproximateNumberOfMessagesToMove, v.ApproximateNumberOfMessagesToMove)
+		case schemas.ListMessageMoveTasksResultEntry_DestinationArn:
+			v.DestinationArn = new(string)
+			return d.ReadString(schemas.ListMessageMoveTasksResultEntry_DestinationArn, v.DestinationArn)
+		case schemas.ListMessageMoveTasksResultEntry_FailureReason:
+			v.FailureReason = new(string)
+			return d.ReadString(schemas.ListMessageMoveTasksResultEntry_FailureReason, v.FailureReason)
+		case schemas.ListMessageMoveTasksResultEntry_MaxNumberOfMessagesPerSecond:
+			v.MaxNumberOfMessagesPerSecond = new(int32)
+			return d.ReadInt32(schemas.ListMessageMoveTasksResultEntry_MaxNumberOfMessagesPerSecond, v.MaxNumberOfMessagesPerSecond)
+		case schemas.ListMessageMoveTasksResultEntry_SourceArn:
+			v.SourceArn = new(string)
+			return d.ReadString(schemas.ListMessageMoveTasksResultEntry_SourceArn, v.SourceArn)
+		case schemas.ListMessageMoveTasksResultEntry_StartedTimestamp:
+			return d.ReadInt64(schemas.ListMessageMoveTasksResultEntry_StartedTimestamp, &v.StartedTimestamp)
+		case schemas.ListMessageMoveTasksResultEntry_Status:
+			v.Status = new(string)
+			return d.ReadString(schemas.ListMessageMoveTasksResultEntry_Status, v.Status)
+		case schemas.ListMessageMoveTasksResultEntry_TaskHandle:
+			v.TaskHandle = new(string)
+			return d.ReadString(schemas.ListMessageMoveTasksResultEntry_TaskHandle, v.TaskHandle)
+		}
+		return nil
+	})
 }
 
 // An Amazon SQS message.
@@ -202,6 +412,58 @@ type Message struct {
 	noSmithyDocumentSerde
 }
 
+func (v *Message) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.Message)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *Message) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeMessageSystemAttributeMap(s, schemas.Message_Attributes, v.Attributes)
+	if v.Body != nil {
+		s.WriteString(schemas.Message_Body, *v.Body)
+	}
+	if v.MD5OfBody != nil {
+		s.WriteString(schemas.Message_MD5OfBody, *v.MD5OfBody)
+	}
+	if v.MD5OfMessageAttributes != nil {
+		s.WriteString(schemas.Message_MD5OfMessageAttributes, *v.MD5OfMessageAttributes)
+	}
+	serializeMessageBodyAttributeMap(s, schemas.Message_MessageAttributes, v.MessageAttributes)
+	if v.MessageId != nil {
+		s.WriteString(schemas.Message_MessageId, *v.MessageId)
+	}
+	if v.ReceiptHandle != nil {
+		s.WriteString(schemas.Message_ReceiptHandle, *v.ReceiptHandle)
+	}
+}
+func (v *Message) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.Message, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.Message_Attributes:
+			return deserializeMessageSystemAttributeMap(d, schemas.Message_Attributes, &v.Attributes)
+		case schemas.Message_Body:
+			v.Body = new(string)
+			return d.ReadString(schemas.Message_Body, v.Body)
+		case schemas.Message_MD5OfBody:
+			v.MD5OfBody = new(string)
+			return d.ReadString(schemas.Message_MD5OfBody, v.MD5OfBody)
+		case schemas.Message_MD5OfMessageAttributes:
+			v.MD5OfMessageAttributes = new(string)
+			return d.ReadString(schemas.Message_MD5OfMessageAttributes, v.MD5OfMessageAttributes)
+		case schemas.Message_MessageAttributes:
+			return deserializeMessageBodyAttributeMap(d, schemas.Message_MessageAttributes, &v.MessageAttributes)
+		case schemas.Message_MessageId:
+			v.MessageId = new(string)
+			return d.ReadString(schemas.Message_MessageId, v.MessageId)
+		case schemas.Message_ReceiptHandle:
+			v.ReceiptHandle = new(string)
+			return d.ReadString(schemas.Message_ReceiptHandle, v.ReceiptHandle)
+		}
+		return nil
+	})
+}
+
 // The user-specified message attribute value. For string data types, the Value
 // attribute has the same restrictions on the content as the message body. For more
 // information, see SendMessage.
@@ -240,6 +502,45 @@ type MessageAttributeValue struct {
 	noSmithyDocumentSerde
 }
 
+func (v *MessageAttributeValue) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.MessageAttributeValue)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *MessageAttributeValue) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeBinaryList(s, schemas.MessageAttributeValue_BinaryListValues, v.BinaryListValues)
+	if v.BinaryValue != nil {
+		s.WriteBlob(schemas.MessageAttributeValue_BinaryValue, v.BinaryValue)
+	}
+	if v.DataType != nil {
+		s.WriteString(schemas.MessageAttributeValue_DataType, *v.DataType)
+	}
+	serializeStringList(s, schemas.MessageAttributeValue_StringListValues, v.StringListValues)
+	if v.StringValue != nil {
+		s.WriteString(schemas.MessageAttributeValue_StringValue, *v.StringValue)
+	}
+}
+func (v *MessageAttributeValue) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.MessageAttributeValue, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.MessageAttributeValue_BinaryListValues:
+			return deserializeBinaryList(d, schemas.MessageAttributeValue_BinaryListValues, &v.BinaryListValues)
+		case schemas.MessageAttributeValue_BinaryValue:
+			return d.ReadBlob(schemas.MessageAttributeValue_BinaryValue, &v.BinaryValue)
+		case schemas.MessageAttributeValue_DataType:
+			v.DataType = new(string)
+			return d.ReadString(schemas.MessageAttributeValue_DataType, v.DataType)
+		case schemas.MessageAttributeValue_StringListValues:
+			return deserializeStringList(d, schemas.MessageAttributeValue_StringListValues, &v.StringListValues)
+		case schemas.MessageAttributeValue_StringValue:
+			v.StringValue = new(string)
+			return d.ReadString(schemas.MessageAttributeValue_StringValue, v.StringValue)
+		}
+		return nil
+	})
+}
+
 // The user-specified message system attribute value. For string data types, the
 // Value attribute has the same restrictions on the content as the message body.
 // For more information, see SendMessage.
@@ -274,6 +575,45 @@ type MessageSystemAttributeValue struct {
 	StringValue *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *MessageSystemAttributeValue) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.MessageSystemAttributeValue)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *MessageSystemAttributeValue) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeBinaryList(s, schemas.MessageSystemAttributeValue_BinaryListValues, v.BinaryListValues)
+	if v.BinaryValue != nil {
+		s.WriteBlob(schemas.MessageSystemAttributeValue_BinaryValue, v.BinaryValue)
+	}
+	if v.DataType != nil {
+		s.WriteString(schemas.MessageSystemAttributeValue_DataType, *v.DataType)
+	}
+	serializeStringList(s, schemas.MessageSystemAttributeValue_StringListValues, v.StringListValues)
+	if v.StringValue != nil {
+		s.WriteString(schemas.MessageSystemAttributeValue_StringValue, *v.StringValue)
+	}
+}
+func (v *MessageSystemAttributeValue) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.MessageSystemAttributeValue, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.MessageSystemAttributeValue_BinaryListValues:
+			return deserializeBinaryList(d, schemas.MessageSystemAttributeValue_BinaryListValues, &v.BinaryListValues)
+		case schemas.MessageSystemAttributeValue_BinaryValue:
+			return d.ReadBlob(schemas.MessageSystemAttributeValue_BinaryValue, &v.BinaryValue)
+		case schemas.MessageSystemAttributeValue_DataType:
+			v.DataType = new(string)
+			return d.ReadString(schemas.MessageSystemAttributeValue_DataType, v.DataType)
+		case schemas.MessageSystemAttributeValue_StringListValues:
+			return deserializeStringList(d, schemas.MessageSystemAttributeValue_StringListValues, &v.StringListValues)
+		case schemas.MessageSystemAttributeValue_StringValue:
+			v.StringValue = new(string)
+			return d.ReadString(schemas.MessageSystemAttributeValue_StringValue, v.StringValue)
+		}
+		return nil
+	})
 }
 
 // Contains the details of a single Amazon SQS message along with an Id .
@@ -419,6 +759,57 @@ type SendMessageBatchRequestEntry struct {
 	noSmithyDocumentSerde
 }
 
+func (v *SendMessageBatchRequestEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.SendMessageBatchRequestEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *SendMessageBatchRequestEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.DelaySeconds != 0 {
+		s.WriteInt32(schemas.SendMessageBatchRequestEntry_DelaySeconds, v.DelaySeconds)
+	}
+	if v.Id != nil {
+		s.WriteString(schemas.SendMessageBatchRequestEntry_Id, *v.Id)
+	}
+	serializeMessageBodyAttributeMap(s, schemas.SendMessageBatchRequestEntry_MessageAttributes, v.MessageAttributes)
+	if v.MessageBody != nil {
+		s.WriteString(schemas.SendMessageBatchRequestEntry_MessageBody, *v.MessageBody)
+	}
+	if v.MessageDeduplicationId != nil {
+		s.WriteString(schemas.SendMessageBatchRequestEntry_MessageDeduplicationId, *v.MessageDeduplicationId)
+	}
+	if v.MessageGroupId != nil {
+		s.WriteString(schemas.SendMessageBatchRequestEntry_MessageGroupId, *v.MessageGroupId)
+	}
+	serializeMessageBodySystemAttributeMap(s, schemas.SendMessageBatchRequestEntry_MessageSystemAttributes, v.MessageSystemAttributes)
+}
+func (v *SendMessageBatchRequestEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.SendMessageBatchRequestEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.SendMessageBatchRequestEntry_DelaySeconds:
+			return d.ReadInt32(schemas.SendMessageBatchRequestEntry_DelaySeconds, &v.DelaySeconds)
+		case schemas.SendMessageBatchRequestEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.SendMessageBatchRequestEntry_Id, v.Id)
+		case schemas.SendMessageBatchRequestEntry_MessageAttributes:
+			return deserializeMessageBodyAttributeMap(d, schemas.SendMessageBatchRequestEntry_MessageAttributes, &v.MessageAttributes)
+		case schemas.SendMessageBatchRequestEntry_MessageBody:
+			v.MessageBody = new(string)
+			return d.ReadString(schemas.SendMessageBatchRequestEntry_MessageBody, v.MessageBody)
+		case schemas.SendMessageBatchRequestEntry_MessageDeduplicationId:
+			v.MessageDeduplicationId = new(string)
+			return d.ReadString(schemas.SendMessageBatchRequestEntry_MessageDeduplicationId, v.MessageDeduplicationId)
+		case schemas.SendMessageBatchRequestEntry_MessageGroupId:
+			v.MessageGroupId = new(string)
+			return d.ReadString(schemas.SendMessageBatchRequestEntry_MessageGroupId, v.MessageGroupId)
+		case schemas.SendMessageBatchRequestEntry_MessageSystemAttributes:
+			return deserializeMessageBodySystemAttributeMap(d, schemas.SendMessageBatchRequestEntry_MessageSystemAttributes, &v.MessageSystemAttributes)
+		}
+		return nil
+	})
+}
+
 // Encloses a MessageId for a successfully-enqueued message in a SendMessageBatch.
 type SendMessageBatchResultEntry struct {
 
@@ -467,6 +858,58 @@ type SendMessageBatchResultEntry struct {
 	SequenceNumber *string
 
 	noSmithyDocumentSerde
+}
+
+func (v *SendMessageBatchResultEntry) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.SendMessageBatchResultEntry)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *SendMessageBatchResultEntry) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Id != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_Id, *v.Id)
+	}
+	if v.MD5OfMessageAttributes != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_MD5OfMessageAttributes, *v.MD5OfMessageAttributes)
+	}
+	if v.MD5OfMessageBody != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_MD5OfMessageBody, *v.MD5OfMessageBody)
+	}
+	if v.MD5OfMessageSystemAttributes != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_MD5OfMessageSystemAttributes, *v.MD5OfMessageSystemAttributes)
+	}
+	if v.MessageId != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_MessageId, *v.MessageId)
+	}
+	if v.SequenceNumber != nil {
+		s.WriteString(schemas.SendMessageBatchResultEntry_SequenceNumber, *v.SequenceNumber)
+	}
+}
+func (v *SendMessageBatchResultEntry) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.SendMessageBatchResultEntry, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.SendMessageBatchResultEntry_Id:
+			v.Id = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_Id, v.Id)
+		case schemas.SendMessageBatchResultEntry_MD5OfMessageAttributes:
+			v.MD5OfMessageAttributes = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_MD5OfMessageAttributes, v.MD5OfMessageAttributes)
+		case schemas.SendMessageBatchResultEntry_MD5OfMessageBody:
+			v.MD5OfMessageBody = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_MD5OfMessageBody, v.MD5OfMessageBody)
+		case schemas.SendMessageBatchResultEntry_MD5OfMessageSystemAttributes:
+			v.MD5OfMessageSystemAttributes = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_MD5OfMessageSystemAttributes, v.MD5OfMessageSystemAttributes)
+		case schemas.SendMessageBatchResultEntry_MessageId:
+			v.MessageId = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_MessageId, v.MessageId)
+		case schemas.SendMessageBatchResultEntry_SequenceNumber:
+			v.SequenceNumber = new(string)
+			return d.ReadString(schemas.SendMessageBatchResultEntry_SequenceNumber, v.SequenceNumber)
+		}
+		return nil
+	})
 }
 
 type noSmithyDocumentSerde = smithydocument.NoSerde

@@ -260,9 +260,6 @@ restartAll:
 	)
 	for _, cfg := range c.cfg.hosts() {
 		mode := cfg.SSLMode
-		if mode == "" {
-			mode = SSLModePrefer
-		}
 	restartHost:
 		if debugProto {
 			fmt.Fprintln(os.Stderr, "CONNECT ", cfg.string())
@@ -271,7 +268,7 @@ restartAll:
 		cfg.SSLMode = mode
 		cn := &conn{cfg: cfg, dialer: c.dialer}
 		cn.cfg.Password = pgpass.PasswordFromPgpass(cn.cfg.Passfile, cn.cfg.User, cn.cfg.Password,
-			cn.cfg.Host, strconv.Itoa(int(cn.cfg.Port)), cn.cfg.Database, cn.cfg.isset("password"))
+			cn.cfg.Host, strconv.Itoa(int(cn.cfg.Port)), cn.cfg.Database)
 
 		var err error
 		cn.c, err = dial(ctx, c.dialer, cn.cfg)
@@ -1240,6 +1237,10 @@ func (cn *conn) startup(cfg Config) error {
 		w.string("client_encoding")
 		w.string(cfg.ClientEncoding)
 	}
+	if cfg.Datestyle != "" {
+		w.string("datestyle")
+		w.string(cfg.Datestyle)
+	}
 	for k, v := range cfg.Runtime {
 		w.string(k)
 		w.string(v)
@@ -1318,13 +1319,13 @@ func (cn *conn) auth(r *readBuf, cfg Config) error {
 		}
 
 		var token []byte
-		if cfg.isset("krbspn") {
-			// Use the supplied SPN if provided..
+		if cfg.KrbSpn != "" {
+			// Use the supplied SPN if provided.
 			token, err = cli.GetInitTokenFromSpn(cfg.KrbSpn)
 		} else {
-			// Allow the kerberos service name to be overridden
+			// Allow the kerberos service name to be overridden.
 			service := "postgres"
-			if cfg.isset("krbsrvname") {
+			if cfg.KrbSrvname != "" {
 				service = cfg.KrbSrvname
 			}
 			token, err = cli.GetInitToken(cfg.Host, service)

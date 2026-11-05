@@ -1,9 +1,32 @@
 unreleased
 ----------
 
-- This release changes the default `sslmode` from `require` to `prefer`, which
-  is the default used by libpq and the rest of the PostgreSQL ecosystem. See
-  [#1271] for some background.
+
+v1.12.3 (2026-04-03)
+--------------------
+- Send datestyle startup parameter, improving compatbility with database engines
+  that use a different default datestyle such as EnterpriseDB ([#1312]).
+
+[#1312]: https://github.com/lib/pq/pull/1312
+
+v1.12.2 (2026-04-02)
+--------------------
+
+- Treat io.ErrUnexpectedEOF as driver.ErrBadConn so database/sql discards the
+  connection. Since v1.12.0 this could result in permanently broken connections,
+  especially with CockroachDB which frequently sends partial messages ([#1299]).
+
+[#1299]: https://github.com/lib/pq/pull/1299
+
+v1.12.1 (2026-03-30)
+--------------------
+
+- Look for pgpass file in ~/.pgpass instead of ~/.postgresql/pgpass ([#1300]).
+
+- Don't clear password if directly set on pq.Config ([#1302]).
+
+[#1300]: https://github.com/lib/pq/pull/1300
+[#1302]: https://github.com/lib/pq/pull/1302
 
 v1.12.0 (2026-03-18)
 --------------------

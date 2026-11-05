@@ -4,11 +4,10 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Deletes up to ten messages from the specified queue. This is a batch version of DeleteMessage
@@ -50,6 +49,19 @@ type DeleteMessageBatchInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DeleteMessageBatchInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DeleteMessageBatchRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageBatchInput) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeDeleteMessageBatchRequestEntryList(s, schemas.DeleteMessageBatchRequest_Entries, v.Entries)
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.DeleteMessageBatchRequest_QueueUrl, *v.QueueUrl)
+	}
+}
+
 // For each message in the batch, the response contains a DeleteMessageBatchResultEntry tag if the message is
 // deleted or a BatchResultErrorEntrytag if the message can't be deleted.
 type DeleteMessageBatchOutput struct {
@@ -70,80 +82,48 @@ type DeleteMessageBatchOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DeleteMessageBatchOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DeleteMessageBatchResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageBatchOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeBatchResultErrorEntryList(s, schemas.DeleteMessageBatchResult_Failed, v.Failed)
+	serializeDeleteMessageBatchResultEntryList(s, schemas.DeleteMessageBatchResult_Successful, v.Successful)
+}
+func (v *DeleteMessageBatchOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.DeleteMessageBatchResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.DeleteMessageBatchResult_Failed:
+			return deserializeBatchResultErrorEntryList(d, schemas.DeleteMessageBatchResult_Failed, &v.Failed)
+		case schemas.DeleteMessageBatchResult_Successful:
+			return deserializeDeleteMessageBatchResultEntryList(d, schemas.DeleteMessageBatchResult_Successful, &v.Successful)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationDeleteMessageBatchMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DeleteMessageBatch, schemas.DeleteMessageBatchRequest, schemas.DeleteMessageBatchResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpDeleteMessageBatch{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DeleteMessageBatch, schemas.DeleteMessageBatchRequest, schemas.DeleteMessageBatchResult), output: &DeleteMessageBatchOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpDeleteMessageBatch{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "DeleteMessageBatch"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpDeleteMessageBatchValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDeleteMessageBatch(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -158,22 +138,8 @@ func (c *Client) addOperationDeleteMessageBatchMiddlewares(stack *middleware.Sta
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opDeleteMessageBatch(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "DeleteMessageBatch",
-	}
 }

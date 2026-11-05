@@ -4,11 +4,10 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves one or more messages (up to 10), from the specified queue. Using the
@@ -296,6 +295,33 @@ type ReceiveMessageInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ReceiveMessageInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ReceiveMessageRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ReceiveMessageInput) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeAttributeNameList(s, schemas.ReceiveMessageRequest_AttributeNames, v.AttributeNames)
+	if v.MaxNumberOfMessages != 0 {
+		s.WriteInt32(schemas.ReceiveMessageRequest_MaxNumberOfMessages, v.MaxNumberOfMessages)
+	}
+	serializeMessageAttributeNameList(s, schemas.ReceiveMessageRequest_MessageAttributeNames, v.MessageAttributeNames)
+	serializeMessageSystemAttributeList(s, schemas.ReceiveMessageRequest_MessageSystemAttributeNames, v.MessageSystemAttributeNames)
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.ReceiveMessageRequest_QueueUrl, *v.QueueUrl)
+	}
+	if v.ReceiveRequestAttemptId != nil {
+		s.WriteString(schemas.ReceiveMessageRequest_ReceiveRequestAttemptId, *v.ReceiveRequestAttemptId)
+	}
+	if v.VisibilityTimeout != 0 {
+		s.WriteInt32(schemas.ReceiveMessageRequest_VisibilityTimeout, v.VisibilityTimeout)
+	}
+	if v.WaitTimeSeconds != 0 {
+		s.WriteInt32(schemas.ReceiveMessageRequest_WaitTimeSeconds, v.WaitTimeSeconds)
+	}
+}
+
 // A list of received messages.
 type ReceiveMessageOutput struct {
 
@@ -308,83 +334,51 @@ type ReceiveMessageOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ReceiveMessageOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ReceiveMessageResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ReceiveMessageOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	serializeMessageList(s, schemas.ReceiveMessageResult_Messages, v.Messages)
+}
+func (v *ReceiveMessageOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ReceiveMessageResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ReceiveMessageResult_Messages:
+			return deserializeMessageList(d, schemas.ReceiveMessageResult_Messages, &v.Messages)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationReceiveMessageMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ReceiveMessage, schemas.ReceiveMessageRequest, schemas.ReceiveMessageResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpReceiveMessage{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ReceiveMessage, schemas.ReceiveMessageRequest, schemas.ReceiveMessageResult), output: &ReceiveMessageOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpReceiveMessage{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ReceiveMessage"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
+	if err = addSetLongPollingContext(stack, options); err != nil {
 		return err
 	}
 	if err = addValidateReceiveMessageChecksum(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpReceiveMessageValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opReceiveMessage(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -399,22 +393,8 @@ func (c *Client) addOperationReceiveMessageMiddlewares(stack *middleware.Stack, 
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opReceiveMessage(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ReceiveMessage",
-	}
 }

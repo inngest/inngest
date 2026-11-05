@@ -3,4 +3,4 @@
 package sns
 
 // goModuleVersion is the tagged release for this module
-const goModuleVersion = "1.39.14"
+const goModuleVersion = "1.46.0"

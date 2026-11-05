@@ -4,10 +4,9 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // The GetQueueUrl API returns the URL of an existing Amazon SQS queue. This is
@@ -55,6 +54,21 @@ type GetQueueUrlInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetQueueUrlInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetQueueUrlRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetQueueUrlInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueName != nil {
+		s.WriteString(schemas.GetQueueUrlRequest_QueueName, *v.QueueName)
+	}
+	if v.QueueOwnerAWSAccountId != nil {
+		s.WriteString(schemas.GetQueueUrlRequest_QueueOwnerAWSAccountId, *v.QueueOwnerAWSAccountId)
+	}
+}
+
 // For more information, see [Interpreting Responses] in the Amazon SQS Developer Guide.
 //
 // [Interpreting Responses]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-api-responses.html
@@ -69,80 +83,48 @@ type GetQueueUrlOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetQueueUrlOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetQueueUrlResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetQueueUrlOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.GetQueueUrlResult_QueueUrl, *v.QueueUrl)
+	}
+}
+func (v *GetQueueUrlOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetQueueUrlResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetQueueUrlResult_QueueUrl:
+			v.QueueUrl = new(string)
+			return d.ReadString(schemas.GetQueueUrlResult_QueueUrl, v.QueueUrl)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetQueueUrl, schemas.GetQueueUrlRequest, schemas.GetQueueUrlResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpGetQueueUrl{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetQueueUrl, schemas.GetQueueUrlRequest, schemas.GetQueueUrlResult), output: &GetQueueUrlOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpGetQueueUrl{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetQueueUrl"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetQueueUrlValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetQueueUrl(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -157,22 +139,8 @@ func (c *Client) addOperationGetQueueUrlMiddlewares(stack *middleware.Stack, opt
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetQueueUrl(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetQueueUrl",
-	}
 }
