@@ -1,0 +1,18 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_logarithmic.yaml'
+
+# basic: Basic examples without any special cases
+ln(100000::i64) = 11.512925464970229::fp64
+ln(1.0::fp32) = 0::fp32
+ln(2.015::fp64) = 0.7006191953986464::fp64
+
+# infinity: Examples with infinity as input
+ln(-inf::fp64) [on_domain_error:ERROR] = <!ERROR>
+ln(-inf::fp64) [on_domain_error:NAN] = nan::fp64
+ln(-inf::fp64) [on_domain_error:NONE] = null::fp64?
+ln(inf::fp64) = inf::fp64
+
+# log_zero: Examples with log zero
+ln(0.0::fp64) [on_log_zero:ERROR] = <!ERROR>
+ln(0.0::fp64) [on_log_zero:NAN] = null::fp64?
+ln(0.0::fp64) [on_log_zero:MINUS_INFINITY] = -inf::fp64

@@ -1,0 +1,19 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic_decimal.yaml'
+
+# basic: Basic examples without any special cases
+power(8::dec<38, 0>, 2::dec<38, 0>) = 64::fp64
+power(1.0::dec<38, 0>, -1.0::dec<38, 0>) = 1.0::fp64
+power(2.0::dec<38, 0>, -2.0::dec<38, 0>) = 0.25::fp64
+power(13::dec<38, 0>, 10::dec<38, 0>) = 137858491849::fp64
+
+# result_more_than_input_precision: Examples demonstrating result with more precision than input
+power(16::dec<2, 0>, 4::dec<38, 0>) = 65536::fp64
+
+# floating_exception: Examples demonstrating exceptional floating point cases
+power(1.5e+10::dec<38, 0>, 1.5e+20::dec<38, 0>) = inf::fp64
+power(-16::dec<4, 0>, 1001::dec<4, 0>) = -inf::fp64
+
+# complex_number: Examples demonstrating complex number output
+power(-1::dec, 0.5::dec<38, 1>) [complex_number_result:NAN] = nan::fp64
+power(-1::dec, 0.5::dec<38, 1>) [complex_number_result:ERROR] = <!ERROR>

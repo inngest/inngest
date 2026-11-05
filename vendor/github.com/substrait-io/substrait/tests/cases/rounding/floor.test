@@ -1,0 +1,7 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding.yaml'
+
+# basic: Basic examples without any special cases
+floor(2.25::fp32) = 2::fp32
+floor(2.0000007152557373046875::fp64) = 2::fp64
+floor(-65.490000001223334444::fp64) = -66::fp64

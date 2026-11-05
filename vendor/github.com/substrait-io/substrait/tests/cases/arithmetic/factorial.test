@@ -1,0 +1,11 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+factorial(0::i32) = 1::i32
+factorial(1::i32) = 1::i32
+factorial(20::i64) = 2432902008176640000::i64
+factorial(null::i32?) = null::i32?
+
+# overflow: Examples demonstrating overflow behavior
+factorial(1000000::i32) [overflow:ERROR] = <!ERROR>

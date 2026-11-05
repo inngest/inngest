@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_datetime.yaml'
+
+# timestamps: examples using the timestamp types
+add('2016-12-31T13:30:15'::ts, 'P5D'::iday) = '2017-01-05T13:30:15'::ts
+add('2016-12-01T13:30:15'::ts, 'P5Y'::iyear) = '2021-12-01T13:30:15'::ts
+add('2016-12-01T13:30:15'::ts, 'PT5H'::iday) = '2016-12-01T18:30:15'::ts
+
+# date_to_timestamp: examples using the date types and resulting in a timestamp
+add('2020-12-31'::date, 'P5D'::iday) = '2021-01-05T00:00:00'::ts
+add('2020-12-31'::date, 'P5Y'::iyear) = '2025-12-31'::date
+add('2020-12-31'::date, 'P5M'::iyear) = '2021-05-31'::date
+
+# null_input: examples with null args or return
+add(null::date?, 'P5D'::iday) = null::ts?
+add(null::date?, 'P5Y'::iyear) = null::date?

@@ -1,0 +1,8 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+acos(0.00::fp32) = 1.5707963267948966::fp32
+acos(1.0::fp64) = 0.0::fp64
+acos(-0.0000009::fp64) = 1.5707972267948966::fp64
+acos(null::fp64?) = null::fp64?

@@ -1,0 +1,10 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_comparison.yaml'
+
+# basic: Basic examples without any special cases
+is_finite(0.0::fp32) = true::bool
+is_finite(0.55::fp32) = true::bool
+is_finite(1000.000000000001::fp64) = true::bool
+is_finite(-inf::fp64) = false::bool
+is_finite(inf::fp64) = false::bool
+is_finite(null::fp64?) = null::bool?
