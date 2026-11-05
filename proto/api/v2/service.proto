@@ -6,6 +6,7 @@ import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
 import "api/v2/image.proto";
+import "api/v2/deploy.proto";
 import "third_party/google/api/annotations.proto";
 import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
@@ -44,6 +45,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
   tags: { name: "Builds"       description: "Build images for sandboxes and compute" }
+  tags: { name: "Deploys"      description: "Deploy apps to compute" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
@@ -1249,6 +1251,53 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Cancel an unfinished build"
       tags: "Builds" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+
+  rpc CreateDeploy(CreateDeployRequest) returns (CreateDeployResponse) {
+    option (google.api.http) = { post: "/deploys/{name}" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a deploy"
+      description: "Provide config from the selected apps entry in inngest.toml with exactly one of serve or connect. Memory defaults to 2048 MiB, CPU to 1 vCPU, and connect replicas to 1. Serve path defaults to /api/inngest and an omitted port is discovered from the image's exposed ports at launch. Omitted serve_config settings use node defaults. Upload one linux/amd64 docker-save tar or tar.gz to upload_url in a PUT request with every header in upload_headers, then commit the upload to build a function artifact. Runtime ENV, ENTRYPOINT, and CMD come from the image. Requires image-build access."
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CommitDeploy(CommitDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { post: "/deploys/{name}/{deploy_id}/commit" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:create" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit an upload and start the deploy"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc GetDeploy(GetDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { get: "/deploys/{deploy_id}" };
+    option (authz) = { require_authz: true permission: "images:read:get" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a deploy"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc ListDeploys(ListDeploysRequest) returns (ListDeploysResponse) {
+    option (google.api.http) = { get: "/deploys" };
+    option (authz) = { require_authz: true permission: "images:read:list" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List recent workspace deploys"
+      tags: "Deploys" tags: "Beta"
+      security: { security_requirement: { key: "BearerAuth" value: {} } }
+    };
+  }
+  rpc CancelDeploy(CancelDeployRequest) returns (DeployResponse) {
+    option (google.api.http) = { post: "/deploys/{deploy_id}/cancel" body: "*" };
+    option (authz) = { require_authz: true permission: "images:write:cancel" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel an unfinished deploy"
+      tags: "Deploys" tags: "Beta"
       security: { security_requirement: { key: "BearerAuth" value: {} } }
     };
   }
@@ -3014,6 +3063,7 @@ enum AppMethod {
   APP_METHOD_SERVE = 1;
   APP_METHOD_CONNECT = 2;
   APP_METHOD_API = 3;
+  APP_METHOD_INNGEST_SERVE = 4;
 }
 
 message App {
