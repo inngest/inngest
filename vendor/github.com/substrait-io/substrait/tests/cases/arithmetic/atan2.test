@@ -1,0 +1,8 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+atan2(0.0::fp32, 0.0::fp32) = 0.0::fp32
+atan2(1.0::fp64, 1.0::fp64) = 0.7853981633974483::fp64
+atan2(0.009::fp64, 0.0008::fp64) = 1.482140444927459::fp64
+atan2(null::fp64?, 0.0008::fp64) = null::fp64?

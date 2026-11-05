@@ -1,0 +1,6 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_rounding_decimal.yaml'
+
+# basic: Basic examples without any special cases
+floor(2.25::dec<3,2>) = 2::dec<2,0>
+floor(-65.5::dec<3,1>) = -66::dec<3,0>

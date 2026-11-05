@@ -1,0 +1,12 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+repeat('abc'::str, 2::i64) = 'abcabc'::str
+repeat('aBc'::str, 0::i64) = ''::str
+repeat('   abd'::str, 3::i64) = '   abd   abd   abd'::str
+repeat(' '::str, 5::i64) = '     '::str
+repeat(''::str, 2::i64) = ''::str
+
+# null_input: Examples with null as input
+repeat(null::str?, 2::i64) = null::str?

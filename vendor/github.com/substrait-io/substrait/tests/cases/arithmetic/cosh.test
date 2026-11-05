@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+cosh(0.00::fp32) = 1.0::fp32
+cosh(1.0::fp64) = 1.5430806348152437::fp64
+cosh(7.0000009::fp64) = 548.3175286399451::fp64
+cosh(-7.00000095::fp64) = 548.3175560557769::fp64
+cosh(null::fp64?) = null::fp64?

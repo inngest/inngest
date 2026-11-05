@@ -1,0 +1,39 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# lazy_matching: Examples with lazy matching
+regexp_string_split('Hello'::str, 'Hel+?'::str) = ['', 'lo']::list<str>
+regexp_string_split('Hello'::str, 'Hel+'::str) = ['', 'o']::list<str>
+
+# greedy_matching: Examples with greedy matching
+regexp_string_split('HHHelloooo'::str, 'Hel+'::str) = ['HH', 'oooo']::list<str>
+
+# position_anchors: Examples with position anchors
+regexp_string_split('abcdefg'::str, '\Aabc'::str) = ['', 'defg']::list<str>
+regexp_string_split('abcdefg'::str, 'efg$'::str) = ['abcd', '']::list<str>
+
+# metacharacters: Examples with metacharacters
+regexp_string_split('abc1abc'::str, '\d'::str) = ['abc', 'abc']::list<str>
+regexp_string_split('111a111'::str, '\D'::str) = ['111', '111']::list<str>
+regexp_string_split('abc def'::str, '\s'::str) = ['abc', 'def']::list<str>
+regexp_string_split('a bcdef'::str, '\S'::str) = ['', ' ', '', '', '', '', '']::list<str>
+regexp_string_split(' abcdef'::str, '\w'::str) = [' ', '', '', '', '', '', '']::list<str>
+regexp_string_split('a bcdef'::str, '\W'::str) = ['a', 'bcdef']::list<str>
+
+# occurrence_indicator: Examples with occurrence indicators
+regexp_string_split('abc123abc'::str, '[0-9]+'::str) = ['abc', 'abc']::list<str>
+regexp_string_split('abc123abc'::str, '[bc]'::str) = ['a', '', '123a', '', '']::list<str>
+regexp_string_split('abcde'::str, '(.*)c'::str) = ['', 'de']::list<str>
+regexp_string_split('abbbbc'::str, '[b]{2,3}'::str) = ['a', 'bc']::list<str>
+
+# lookahead: Examples with lookahead
+regexp_string_split('100 dollars'::str, '\d+(?= dollars)'::str) [lookaround:TRUE] = ['', ' dollars']::list<str>
+
+# negative_lookahead: Examples with negative lookahead
+regexp_string_split('100 pesos'::str, '\d+(?!\d| dollars)'::str) [lookaround:TRUE] = ['', ' pesos']::list<str>
+
+# lookbehind: Examples with lookbehind
+regexp_string_split('USD100'::str, '(?<=USD)\d{3}'::str) [lookaround:TRUE] = ['USD', '']::list<str>
+
+# negative_lookbehind: Examples with negative lookbehind
+regexp_string_split('JPY100'::str, '\d{3}(?<!USD\d{3})'::str) [lookaround:TRUE] = ['JPY', '']::list<str>
