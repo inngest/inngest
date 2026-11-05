@@ -77,7 +77,7 @@ func TestProxyRefreshesConnectionSnapshotAfterForwardFailure(t *testing.T) {
 		Tracer: trace.NoopConditionalTracer(), StateManager: manager,
 	}, WithGatewayManager(forwarder))
 	connector.grpcConfig.Executor.IP = net.IPv4(127, 0, 0, 1)
-	response, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
+	response, servedID, err := connector.Proxy(ctx, context.Background(), ProxyOpts{
 		AccountID: accountID, EnvID: envID, AppID: appID, FunctionID: functionID,
 		Data: &connectpb.GatewayExecutorRequestData{
 			RequestId: "request", JobId: "job", RunId: ulid.Make().String(),
@@ -87,6 +87,7 @@ func TestProxyRefreshesConnectionSnapshotAfterForwardFailure(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, connectpb.SDKResponseStatus_DONE, response.Status)
+	require.Equal(t, "new-worker", servedID, "the worker that got the re-routed request must be reported")
 	calls := forwarder.getForwardCalls()
 	require.Len(t, calls, 2)
 	require.Equal(t, oldID, calls[0].connectionID)
