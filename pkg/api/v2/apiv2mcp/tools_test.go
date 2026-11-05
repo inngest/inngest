@@ -347,3 +347,21 @@ func TestEventReadTools(t *testing.T) {
 		}
 	}
 }
+
+func TestFeedbackTool(t *testing.T) {
+	endpoint := endpointByMethod(t, "SubmitFeedback")
+	tool := Tool(endpoint)
+	require.Equal(t, "submit_feedback", tool.Name)
+	require.Equal(t, "feedback:write:create", endpoint.AuthzPermission)
+	require.False(t, tool.Annotations.ReadOnlyHint)
+	require.False(t, tool.Annotations.IdempotentHint)
+	require.Contains(t, tool.Description, "user has asked to share")
+	require.ElementsMatch(t, []string{"feedback"}, InputSchema(endpoint)["required"])
+	req, err := Request(t.Context(), endpoint, map[string]any{"feedback": "More examples", "operation": "get_run"}, Options{BasePath: "/v2"})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "/v2/feedback", req.URL.Path)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+	require.Equal(t, map[string]any{"feedback": "More examples", "operation": "get_run"}, body)
+}

@@ -27,6 +27,7 @@ func New(ctx context.Context, r rueidis.Client, prefix string) RateLimiter {
 func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c inngest.RateLimit, options ...RateLimitOptionFn) (*RateLimitResult, error) {
 	o := &rateLimitOptions{
 		now:            time.Now(),
+		burst:          int(c.Limit / 10),
 		idempotencyKey: "-",
 	}
 	for _, opt := range options {
@@ -38,7 +39,6 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 		return nil, err // limited = true on error
 	}
 
-	burst := int(c.Limit / 10)
 	nowNS := o.now.UnixNano()
 	periodNS := dur.Nanoseconds()
 	limit := c.Limit
@@ -56,7 +56,7 @@ func (l *luaGCRARateLimiter) RateLimit(ctx context.Context, key string, c innges
 		fmt.Sprintf("%d", nowNS),
 		fmt.Sprintf("%d", periodNS),
 		fmt.Sprintf("%d", limit),
-		fmt.Sprintf("%d", burst),
+		fmt.Sprintf("%d", o.burst),
 		fmt.Sprintf("%d", int(o.idempotencyTTL.Seconds())),
 	}
 
