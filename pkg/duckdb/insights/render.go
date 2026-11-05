@@ -250,7 +250,8 @@ func physicalPredicate(lt federate.Table, p federate.Predicate, cat catalog) (t 
 }
 
 // checkReservedNames rejects a user CTE named with TableCTEPrefix, which
-// would collide with (or impersonate) a logical table's reserved CTE. The
+// would collide with (or impersonate) a logical table's reserved CTE, or a
+// federated executor's generated ones (federate.GeneratedPrefix). The
 // prefix matches case-insensitively, like DuckDB's own CTE names.
 func checkReservedNames(stmt *parser.SelectStatement) error {
 	v := &reservedNameCheck{}

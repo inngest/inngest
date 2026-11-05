@@ -119,7 +119,8 @@ func appendList[S ~string | ~[]byte](buf []byte, vals []S) []byte {
 func WireKind(t schema.Type) driver.QuackColumnKind { return quackKind(t) }
 
 // deltaCTEName is the MATERIALIZED CTE a streamed delta is read through.
-func deltaCTEName(t Table) string { return "__delta_" + string(t) }
+// Like SourceName, it's under GeneratedPrefix.
+func deltaCTEName(t Table) string { return GeneratedPrefix + "delta_" + string(t) }
 
 // deltaStream turns a delta reader into a quack stream and the MATERIALIZED
 // CTE definition that reads it, each column typed and named as its lake
