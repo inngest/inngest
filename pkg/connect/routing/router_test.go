@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -847,5 +848,186 @@ func TestCheckCapacity(t *testing.T) {
 		capacity2, err := stateMan.GetWorkerCapacities(ctx, envID, instanceID2)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), capacity2.Available) // 5 - 2 = 3
+	})
+}
+
+func setGatewayStatus(t *testing.T, stateMan state.StateManager, gatewayId ulid.ULID, status state.GatewayStatus, lastHeartbeatAt time.Time) {
+	err := stateMan.UpsertGateway(context.Background(), &state.Gateway{
+		Id:                gatewayId,
+		Status:            status,
+		LastHeartbeatAtMS: lastHeartbeatAt.UnixMilli(),
+		Hostname:          "host-1",
+	})
+	require.NoError(t, err)
+}
+
+// setupReplacement adds connections for the same app on a new, active gateway.
+func setupReplacement(t *testing.T, stateMan state.StateManager, orig setupRes, connsToCreate ...testConnection) setupRes {
+	return setup(t, stateMan, setupOpts{
+		acctId:  orig.acctId,
+		envId:   orig.envId,
+		appName: orig.appName,
+		appId:   orig.appId,
+		syncId:  orig.syncId,
+	}, connsToCreate...)
+}
+
+func routeRequest(res setupRes) *connectpb.GatewayExecutorRequestData {
+	return &connectpb.GatewayExecutorRequestData{
+		RequestId:      "req-1",
+		AccountId:      res.acctId.String(),
+		EnvId:          res.envId.String(),
+		AppId:          res.appId.String(),
+		FunctionId:     uuid.New().String(),
+		FunctionSlug:   res.fnSlug,
+		SystemTraceCtx: []byte("{}"),
+		RunId:          ulid.MustNew(ulid.Now(), rand.Reader).String(),
+	}
+}
+
+func TestDrainingGatewayRouting(t *testing.T) {
+	log := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
+	tracer := trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace)
+
+	t.Run("connection on active gateway is preferred over draining gateway", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		active := setupReplacement(t, stateMan, draining,
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now())
+
+		for range 50 {
+			conn, err := getSuitableConnection(context.Background(), rnd, stateMan, draining.envId, draining.appId, draining.fnSlug, log)
+			require.NoError(t, err)
+			require.Equal(t, active.connIds[0].String(), conn.Id)
+			require.Equal(t, active.gatewayId.String(), conn.GatewayId)
+		}
+	})
+
+	t.Run("only draining gateway connections report draining and are kept", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now())
+
+		_, err := getSuitableConnection(context.Background(), rnd, stateMan, draining.envId, draining.appId, draining.fnSlug, log)
+		require.ErrorIs(t, err, ErrOnlyDrainingConnections)
+
+		// Records stay until the worker reconnects or the gateway stops heartbeating.
+		_, err = stateMan.GetConnection(context.Background(), draining.envId, draining.connIds[0])
+		require.NoError(t, err)
+		_, err = stateMan.GetGateway(context.Background(), draining.gatewayId)
+		require.NoError(t, err)
+	})
+
+	t.Run("route waits for a replacement then reports no healthy connection", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now())
+
+		start := time.Now()
+		_, err := GetRoute(context.Background(), stateMan, rnd, tracer, log, routeRequest(draining))
+		require.ErrorIs(t, err, ErrNoHealthyConnection)
+		require.GreaterOrEqual(t, time.Since(start), 10*time.Second, "expected the draining wait loop to run")
+	})
+
+	t.Run("route picks a replacement that connects during the wait", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now())
+
+		type routeOutcome struct {
+			route   *RouteResult
+			err     error
+			elapsed time.Duration
+		}
+		outcome := make(chan routeOutcome, 1)
+		start := time.Now()
+		go func() {
+			route, err := GetRoute(context.Background(), stateMan, rnd, tracer, log, routeRequest(draining))
+			outcome <- routeOutcome{route: route, err: err, elapsed: time.Since(start)}
+		}()
+
+		<-time.After(1500 * time.Millisecond)
+		active := setupReplacement(t, stateMan, draining,
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+
+		res := <-outcome
+		require.NoError(t, res.err)
+		require.GreaterOrEqual(t, res.elapsed, time.Second, "expected the draining wait loop to run")
+		require.Equal(t, active.connIds[0], res.route.ConnectionID)
+		require.Equal(t, active.gatewayId, res.route.GatewayID)
+	})
+
+	t.Run("draining gateway that stopped heartbeating is cleaned up", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now().Add(-3*consts.ConnectGatewayHeartbeatInterval))
+
+		_, err := getSuitableConnection(context.Background(), rnd, stateMan, draining.envId, draining.appId, draining.fnSlug, log)
+		require.ErrorIs(t, err, ErrNoHealthyConnection)
+
+		_, err = stateMan.GetGateway(context.Background(), draining.gatewayId)
+		require.ErrorIs(t, err, state.ErrGatewayNotFound)
+		conns, err := stateMan.GetConnectionsByEnvID(context.Background(), draining.envId)
+		require.NoError(t, err)
+		require.Empty(t, conns)
+	})
+
+	t.Run("connection on starting gateway stays routable", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		starting := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, starting.gatewayId, state.GatewayStatusStarting, time.Now())
+
+		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, starting.envId, starting.appId, starting.fnSlug, log)
+		require.NoError(t, err)
+		require.Equal(t, starting.connIds[0].String(), conn.Id)
+	})
+
+	t.Run("isHealthy marks draining gateway connections as draining without cleanup", func(t *testing.T) {
+		stateMan, cleanup := setupRedis(t)
+		defer cleanup()
+
+		draining := setup(t, stateMan, setupOpts{},
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+		)
+		setGatewayStatus(t, stateMan, draining.gatewayId, state.GatewayStatusDraining, time.Now())
+
+		conn, err := stateMan.GetConnection(context.Background(), draining.envId, draining.connIds[0])
+		require.NoError(t, err)
+		res := isHealthy(context.Background(), stateMan, draining.envId, draining.appId, draining.fnSlug, conn, log)
+		require.False(t, res.isHealthy)
+		require.True(t, res.isDraining)
+		require.False(t, res.shouldDeleteUnhealthyConnection)
+		require.False(t, res.shouldDeleteUnhealthyGateway)
 	})
 }
