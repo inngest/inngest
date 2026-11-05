@@ -2,6 +2,7 @@ package insights_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,6 +75,21 @@ func TestExecuteFederated(t *testing.T) {
 		res, err := insights.ExecuteFederated(t.Context(), exec, tr, query)
 		require.NoError(t, err)
 		require.Equal(t, [][]any{{"run-delta", "Running"}, {"run-lake", "Completed"}}, res.Rows)
+	})
+
+	t.Run("user CTEs can't collide w/ the executor's generated names", func(t *testing.T) {
+		require.True(t, strings.HasPrefix(federate.SourceName(federate.TableRuns), insights.TableCTEPrefix))
+		exec := &federate.Executor{DB: db, Delta: cannedStreamer{rows: delta}}
+		for _, name := range []string{"__fed_runs", "__delta_runs", "fed_runs"} {
+			tr, err := insights.Transpile(`WITH `+name+` AS (SELECT run_id, status FROM runs) SELECT run_id, status FROM `+name+` ORDER BY run_id`, account, env)
+			require.NoError(t, err)
+			res, err := insights.ExecuteFederated(t.Context(), exec, tr, query)
+			require.NoError(t, err, name)
+			require.Equal(t, [][]any{{"run-delta", "Running"}, {"run-lake", "Completed"}}, res.Rows, name)
+		}
+
+		_, err := insights.Transpile(`WITH `+federate.SourceName(federate.TableRuns)+` AS (SELECT run_id FROM runs) SELECT run_id FROM runs`, account, env)
+		require.ErrorContains(t, err, "may not start with")
 	})
 
 	t.Run("time limit", func(t *testing.T) {

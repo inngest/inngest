@@ -27,7 +27,13 @@ func DeltaColumns(t Table) []Column {
 // SourceName is the CTE a federated physical table is read through: its
 // lake rows ∪ its delta rows, uncollapsed. Callers pass it to a macro that
 // takes a physical source (inngest.raw_runs, inngest.insights_runs, ...).
-func SourceName(t Table) string { return "__fed_" + Physical[t].Name }
+func SourceName(t Table) string { return GeneratedPrefix + "fed_" + Physical[t].Name }
+
+// GeneratedPrefix prefixes every CTE name the executor generates, so they
+// can't collide w/ a caller's own CTEs when merged into one WITH. It's
+// insights' reserved prefix (insights.TableCTEPrefix), which user queries
+// can't use.
+const GeneratedPrefix = "__inngest_"
 
 // LakeSource is the lake half of the union: a DuckLake catalog alias,
 // optionally pinned to a snapshot so one query reads one lake version.
