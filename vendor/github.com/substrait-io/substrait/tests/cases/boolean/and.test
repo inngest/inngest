@@ -1,0 +1,14 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_boolean.yaml'
+
+# basic: Basic examples without any special cases
+and(true::bool, true::bool) = true::bool
+and(true::bool, false::bool) = false::bool
+and(false::bool, false::bool) = false::bool
+
+# null_input: Examples with null as input
+and(true::bool, null::bool?) = null::bool?
+and(null::bool?, true::bool) = null::bool?
+and(false::bool, null::bool?) = false::bool?
+and(null::bool?, false::bool) = false::bool?
+and(null::bool?, null::bool?) = null::bool?

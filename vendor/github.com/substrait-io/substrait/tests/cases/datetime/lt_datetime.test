@@ -1,0 +1,25 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_datetime.yaml'
+
+# timestamps: examples using the timestamp type
+lt('2016-12-31T13:30:15'::ts, '2017-12-31T13:30:15'::ts) = true::bool
+lt('2018-12-31T13:30:15'::ts, '2017-12-31T13:30:15'::ts) = false::bool
+
+# timestamp_tz: examples using the timestamp_tz type
+lt('1999-01-08T01:05:05-08:00'::tstz, '1999-01-08T04:05:06-05:00'::tstz) = true::bool
+lt('1999-01-08T01:05:06-08:00'::tstz, '1999-01-08T04:05:06-05:00'::tstz) = false::bool
+
+# date: examples using the date type
+lt('2020-12-30'::date, '2020-12-31'::date) = true::bool
+lt('2020-12-31'::date, '2020-12-30'::date) = false::bool
+
+# interval: examples using the interval type
+lt('P7D'::iday, 'P6D'::iday) = false::bool
+lt('P5D'::iday, 'P6D'::iday) = true::bool
+lt('P5Y'::iyear, 'P6Y'::iyear) = true::bool
+lt('P7Y'::iyear, 'P6Y'::iyear) = false::bool
+
+# null_input: examples with null args or return
+lt(null::iday?, 'P5D'::iday) = null::bool?
+lt(null::date?, '2020-12-30'::date) = null::bool?
+lt(null::ts?, '2018-12-31T13:30:15'::ts) = null::bool?

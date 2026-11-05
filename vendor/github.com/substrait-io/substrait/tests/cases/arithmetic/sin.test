@@ -1,0 +1,9 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+sin(0.0::fp32) = 0.0::fp32
+sin(1.0::fp64) = 0.8414709848078965::fp64
+sin(7.0000009::fp64) = 0.6569872772305518::fp64
+sin(-7.0000009::fp64) = -0.6569872772305518::fp64
+sin(null::fp64?) = null::fp64?

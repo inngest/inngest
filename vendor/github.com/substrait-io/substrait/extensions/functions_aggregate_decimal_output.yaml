@@ -1,0 +1,42 @@
+%YAML 1.2
+---
+urn: extension:io.substrait:functions_aggregate_decimal_output
+aggregate_functions:
+  - name: "count"
+    description: Count a set of values. Result is returned as a decimal instead of i64.
+    impls:
+      - args:
+          - name: x
+            value: any
+        options:
+          overflow:
+            values: [SILENT, SATURATE, ERROR]
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: decimal<38,0>
+        return: decimal<38,0>
+  - name: "count"
+    description: "Count a set of records (not field referenced). Result is returned as a decimal instead of i64."
+    impls:
+      - options:
+          overflow:
+            values: [SILENT, SATURATE, ERROR]
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: decimal<38,0>
+        return: decimal<38,0>
+  - name: "approx_count_distinct"
+    description: >-
+      Calculates the approximate number of rows that contain distinct values of the expression argument using
+      HyperLogLog. This function provides an alternative to the COUNT (DISTINCT expression) function, which
+      returns the exact number of rows that contain distinct values of an expression. APPROX_COUNT_DISTINCT
+      processes large amounts of data significantly faster than COUNT, with negligible deviation from the exact
+      result. Result is returned as a decimal instead of i64.
+    impls:
+      - args:
+          - name: x
+            value: any
+        nullability: DECLARED_OUTPUT
+        decomposable: MANY
+        intermediate: binary
+        return: decimal<38,0>
