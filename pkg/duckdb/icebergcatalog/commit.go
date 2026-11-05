@@ -299,7 +299,6 @@ type builder struct {
 	mainSets          []int64
 	removedSnapshots  bool
 	lastUpdatedMS     int64
-	changed           bool
 	now               time.Time
 	prevMetadataFile  string
 	prevLastUpdatedMS int64
@@ -340,7 +339,6 @@ func badf(format string, args ...any) error {
 
 func (b *builder) apply(u update) error {
 	md := b.md
-	b.changed = true
 	switch u.action {
 	case "assign-uuid":
 		if _, err := uuid.Parse(u.uuid); err != nil {
