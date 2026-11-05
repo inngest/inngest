@@ -468,6 +468,7 @@ func (f Function) Validate(ctx context.Context) error {
 		uri, serr := url.Parse(step.URI)
 		if serr != nil {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
+			continue
 		}
 		switch uri.Scheme {
 		case "http", "https", "ws", "wss":
