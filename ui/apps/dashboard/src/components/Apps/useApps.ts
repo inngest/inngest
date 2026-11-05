@@ -146,7 +146,12 @@ export function useApps({
               __typename: 'App' as const,
             };
           })
-          .filter((app) => app.lastSyncedAt || app.method === methodTypes.Api);
+          .filter(
+            (app) =>
+              app.lastSyncedAt ||
+              app.method === methodTypes.Api ||
+              app.method === methodTypes.InngestServe,
+          );
 
         return apps;
       }
