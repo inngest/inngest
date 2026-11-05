@@ -348,6 +348,9 @@ func (w *writer) Write(p []byte) (n int, err error) {
 }
 
 func (w *writer) Upload(r io.Reader) error {
+	if w.md5hash != nil {
+		r = io.TeeReader(r, w.md5hash)
+	}
 	_, err := w.buf.ReadFrom(r)
 	return err
 }
@@ -407,12 +410,31 @@ func (b *bucket) Copy(ctx context.Context, dstKey, srcKey string, opts *driver.C
 	if v == nil {
 		return errNotFound
 	}
-	b.blobs[dstKey] = v
+
+	// Deep-copy the attributes so that the source and destination entries
+	// are independent. In particular, the Metadata map must not be shared:
+	// mutating the attributes of one key must not affect the other.
+	md := make(map[string]string, len(v.Attributes.Metadata))
+	maps.Copy(md, v.Attributes.Metadata)
+
+	dstAttrs := *v.Attributes
+	dstAttrs.Metadata = md
+
+	b.blobs[dstKey] = &blobEntry{
+		Content:    v.Content,
+		Attributes: &dstAttrs,
+	}
 	return nil
 }
 
 // Delete implements driver.Delete.
-func (b *bucket) Delete(ctx context.Context, key string) error {
+func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOptions) error {
+	if opts.BeforeDelete != nil {
+		if err := opts.BeforeDelete(func(any) bool { return false }); err != nil {
+			return err
+		}
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

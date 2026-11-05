@@ -5,9 +5,9 @@ package sqs
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns a list of your queues that have the RedrivePolicy queue attribute
@@ -59,6 +59,24 @@ type ListDeadLetterSourceQueuesInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListDeadLetterSourceQueuesInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListDeadLetterSourceQueuesRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListDeadLetterSourceQueuesInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.MaxResults != nil {
+		s.WriteInt32(schemas.ListDeadLetterSourceQueuesRequest_MaxResults, *v.MaxResults)
+	}
+	if v.NextToken != nil {
+		s.WriteString(schemas.ListDeadLetterSourceQueuesRequest_NextToken, *v.NextToken)
+	}
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.ListDeadLetterSourceQueuesRequest_QueueUrl, *v.QueueUrl)
+	}
+}
+
 // A list of your dead letter source queues.
 type ListDeadLetterSourceQueuesOutput struct {
 
@@ -79,80 +97,51 @@ type ListDeadLetterSourceQueuesOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ListDeadLetterSourceQueuesOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ListDeadLetterSourceQueuesResult)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ListDeadLetterSourceQueuesOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.NextToken != nil {
+		s.WriteString(schemas.ListDeadLetterSourceQueuesResult_NextToken, *v.NextToken)
+	}
+	serializeQueueUrlList(s, schemas.ListDeadLetterSourceQueuesResult_queueUrls, v.QueueUrls)
+}
+func (v *ListDeadLetterSourceQueuesOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ListDeadLetterSourceQueuesResult, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ListDeadLetterSourceQueuesResult_NextToken:
+			v.NextToken = new(string)
+			return d.ReadString(schemas.ListDeadLetterSourceQueuesResult_NextToken, v.NextToken)
+		case schemas.ListDeadLetterSourceQueuesResult_queueUrls:
+			return deserializeQueueUrlList(d, schemas.ListDeadLetterSourceQueuesResult_queueUrls, &v.QueueUrls)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListDeadLetterSourceQueues, schemas.ListDeadLetterSourceQueuesRequest, schemas.ListDeadLetterSourceQueuesResult)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpListDeadLetterSourceQueues{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ListDeadLetterSourceQueues, schemas.ListDeadLetterSourceQueuesRequest, schemas.ListDeadLetterSourceQueuesResult), output: &ListDeadLetterSourceQueuesOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpListDeadLetterSourceQueues{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ListDeadLetterSourceQueues"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpListDeadLetterSourceQueuesValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opListDeadLetterSourceQueues(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -165,12 +154,6 @@ func (c *Client) addOperationListDeadLetterSourceQueuesMiddlewares(stack *middle
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -275,11 +258,3 @@ type ListDeadLetterSourceQueuesAPIClient interface {
 }
 
 var _ ListDeadLetterSourceQueuesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opListDeadLetterSourceQueues(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ListDeadLetterSourceQueues",
-	}
-}

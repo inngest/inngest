@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -547,7 +546,6 @@ func newConfig(dsn string, env []string) (Config, error) {
 		Host:               "localhost",
 		Port:               5432,
 		SSLSNI:             true,
-		SSLMode:            SSLModePrefer,
 		MinProtocolVersion: "3.0",
 		MaxProtocolVersion: "3.0",
 	}
@@ -689,7 +687,7 @@ func (cfg *Config) fromEnv(env []string) error {
 	return cfg.setFromTag(e, "env", false)
 }
 
-// parseOpts parses the options from name and adds them to the values.
+// fromDSN parses the options from name and adds them to the values.
 //
 // The parsing code is based on conninfo_parse from libpq's fe-connect.c
 func (cfg *Config) fromDSN(dsn string) error {
@@ -748,7 +746,7 @@ func (cfg *Config) fromDSN(dsn string) error {
 
 		// The current character should be =
 		if r != '=' || !ok {
-			return fmt.Errorf(`missing "=" after %q in connection info string"`, string(keyRunes))
+			return fmt.Errorf(`missing "=" after %q in connection info string`, string(keyRunes))
 		}
 
 		// Skip any whitespace after the =
@@ -801,10 +799,7 @@ func (cfg *Config) fromService() error {
 	}
 
 	if !cfg.isset("PGSERVICEFILE") {
-		if home := pqutil.Home(); home != "" {
-			if runtime.GOOS != "windows" {
-				home = filepath.Dir(home) // Unlike other files this uses ~/ and not ~/.postgresql
-			}
+		if home := pqutil.Home(false); home != "" {
 			cfg.ServiceFile = filepath.Join(home, ".pg_service.conf")
 		}
 	}
@@ -979,6 +974,8 @@ func (cfg *Config) setFromTag(o map[string]string, tag string, service bool) err
 	return nil
 }
 
+// Should generally only be used from newConfig(), as it will never be set if
+// people go outside that.
 func (cfg Config) isset(name string) bool {
 	return slices.Contains(cfg.set, name)
 }
@@ -1041,10 +1038,13 @@ func (cfg Config) string() string {
 		switch k {
 		case "datestyle", "client_encoding":
 			continue
-		case "host", "port", "user", "sslsni", "sslmode", "min_protocol_version", "max_protocol_version":
+		case "host", "port", "user", "sslsni", "min_protocol_version", "max_protocol_version":
 			if !cfg.isset(k) {
 				continue
 			}
+		}
+		if k == "application_name" && m[k] == "pqgo" {
+			continue
 		}
 		if k == "host" && len(cfg.multiHost) > 0 {
 			m[k] += "," + strings.Join(cfg.multiHost, ",")
