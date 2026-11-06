@@ -93,6 +93,30 @@ const (
 	// leap day still fits.
 	MaxWaitForEventTimeout = time.Hour * 24 * 366
 
+	// MaxSubscriptionKeyLength is the longest step.subscribe subscription ID (and
+	// reader name). The ID is stored with every pause of the subscription.
+	MaxSubscriptionKeyLength = 256
+
+	// MaxSubscriptionPausesPerRun is the most pauses of any kind (subscription
+	// streams, parked reads, waitForEvents) a run may hold when it opens a
+	// subscription stream. A subscription pause outlives the event that matches
+	// it, so this keeps its matching cost near that of waitForEvent.
+	MaxSubscriptionPausesPerRun = 50
+
+	// MaxSubscriptionParks is the most reads of one subscription that can be
+	// parked at once. A delivery reads every parked marker of the subscription.
+	MaxSubscriptionParks = 20
+
+	// MaxSubscriptionMessages is the most messages one subscription saves. At
+	// this count the subscription is closed.
+	MaxSubscriptionMessages = 200
+
+	// MaxSubscriptionMessagesPerRun is the most messages all subscriptions of a
+	// run save. Messages are steps, so they are also held to half of the run's
+	// step limit, and a message is only saved while the run's state stays under
+	// three quarters of its state size limit.
+	MaxSubscriptionMessagesPerRun = 500
+
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 
