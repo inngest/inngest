@@ -1,5 +1,7 @@
 package inngest
 
+import "github.com/inngest/inngest/pkg/execution/driver/schemes"
+
 type FunctionDriver struct {
 	// URI represents how this function is invoked, eg https://example.com/api/inngest?step=foo.
 	URI string `json:"uri"`
@@ -41,6 +43,10 @@ func Driver(f Function) string {
 		return "http"
 	case "ws", "wss":
 		return "connect"
+	}
+
+	if name, ok := schemes.Driver(url); ok {
+		return name
 	}
 
 	return "http"

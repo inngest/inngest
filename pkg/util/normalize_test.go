@@ -1,10 +1,18 @@
 package util
 
 import (
+	"net/url"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/execution/driver/schemes"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	schemes.Register("test", func(u *url.URL) string {
+		return "test"
+	})
+}
 
 func TestNormalizeAppURL(t *testing.T) {
 	tests := []struct {
@@ -30,15 +38,15 @@ func TestNormalizeAppURL(t *testing.T) {
 			forceHTTPS:  true,
 		},
 		{
-			name:        "force https keeps the inngest scheme of hosted apps",
-			inputURL:    "inngest://serve?fnId=app-hello&stepId=step",
-			expectedURL: "inngest://serve?fnId=app-hello&stepId=step",
+			name:        "force https keeps a registered scheme",
+			inputURL:    "test://serve?fnId=app-hello&stepId=step",
+			expectedURL: "test://serve?fnId=app-hello&stepId=step",
 			forceHTTPS:  true,
 		},
 		{
-			name:        "force https rewrites other inngest hosts",
-			inputURL:    "inngest://foo?fnId=app-hello&stepId=step",
-			expectedURL: "https://foo?fnId=app-hello&stepId=step",
+			name:        "force https rewrites an unregistered scheme",
+			inputURL:    "foo://serve?fnId=app-hello&stepId=step",
+			expectedURL: "https://serve?fnId=app-hello&stepId=step",
 			forceHTTPS:  true,
 		},
 		{
