@@ -294,6 +294,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 
 	parallel := parallelFn || parallelAccount || isSystemFn
+	parallelLimit := 0
+	if (parallelFn || parallelAccount) && !isSystemFn {
+		parallelLimit = q.parallelClaimLimit
+	}
 
 	dispatchForIterator := dispatch
 	if q.runMode.Continuations {
@@ -316,6 +320,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Dispatch:             dispatchForIterator,
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
+		ParallelLimit:        parallelLimit,
 	}
 
 	if err := iter.Iterate(ctx); err != nil {
