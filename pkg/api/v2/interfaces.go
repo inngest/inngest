@@ -69,6 +69,39 @@ type GetAppsResult struct {
 	HasMore bool
 }
 
+type AppSyncProvider interface {
+	// newest first
+	ListAppSyncs(ctx context.Context, app App, opts ListAppSyncsOpts) (*ListAppSyncsResult, error)
+	GetAppSync(ctx context.Context, app App, syncID uuid.UUID) (AppSyncRecord, error)
+}
+
+type ListAppSyncsOpts struct {
+	Cursor uuid.UUID
+	Limit  int
+}
+
+type ListAppSyncsResult struct {
+	Syncs   []AppSyncRecord
+	HasMore bool
+}
+
+type AppSyncRecord struct {
+	ID          uuid.UUID
+	Status      string
+	URL         string
+	SDKLanguage string
+	SDKVersion  string
+	Framework   string
+	AppVersion  string
+	Error       *SyncError
+	CreatedAt   time.Time
+}
+
+type SyncError struct {
+	Code    string
+	Message string
+}
+
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be
 	// executed via our async execution engine as quickly as possible.

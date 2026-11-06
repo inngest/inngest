@@ -13,7 +13,12 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
-type cqrsAppProvider struct {
+var (
+	_ apiv2.AppProvider     = (*CQRSAppProvider)(nil)
+	_ apiv2.AppSyncProvider = (*CQRSAppProvider)(nil)
+)
+
+type CQRSAppProvider struct {
 	reader appProviderReader
 }
 
@@ -23,13 +28,11 @@ type appProviderReader interface {
 	GetAppFunctionCounts(context.Context, []uuid.UUID) (map[uuid.UUID]int, error)
 }
 
-// NewAppProvider returns an AppProvider that looks up apps by external ID or
-// UUID using the given AppReader.
-func NewAppProvider(reader appProviderReader) apiv2.AppProvider {
-	return &cqrsAppProvider{reader: reader}
+func NewAppProvider(reader appProviderReader) *CQRSAppProvider {
+	return &CQRSAppProvider{reader: reader}
 }
 
-func (p *cqrsAppProvider) GetApp(ctx context.Context, identifier string) (apiv2.App, error) {
+func (p *CQRSAppProvider) GetApp(ctx context.Context, identifier string) (apiv2.App, error) {
 	if appID, err := uuid.Parse(identifier); err == nil {
 		if app, err := p.reader.GetAppByID(ctx, appID); err == nil {
 			return p.toApp(ctx, app)
@@ -51,7 +54,7 @@ func (p *cqrsAppProvider) GetApp(ctx context.Context, identifier string) (apiv2.
 	return p.toApp(ctx, app)
 }
 
-func (p *cqrsAppProvider) GetApps(ctx context.Context, opts apiv2.GetAppsOpts) (*apiv2.GetAppsResult, error) {
+func (p *CQRSAppProvider) GetApps(ctx context.Context, opts apiv2.GetAppsOpts) (*apiv2.GetAppsResult, error) {
 	apps, err := p.reader.GetApps(ctx, consts.DevServerEnvID, &cqrs.FilterAppParam{
 		Cursor:   opts.Cursor,
 		Limit:    opts.Limit + 1,
@@ -83,7 +86,7 @@ func (p *cqrsAppProvider) GetApps(ctx context.Context, opts apiv2.GetAppsOpts) (
 	return result, nil
 }
 
-func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, error) {
+func (p *CQRSAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, error) {
 	fns, err := p.reader.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
 		AppID: app.ID,
 	})
@@ -121,4 +124,15 @@ func toApp(app *cqrs.App, functionCount int) apiv2.App {
 		result.Method = method
 	}
 	return result
+}
+
+func (p *CQRSAppProvider) ListAppSyncs(ctx context.Context, app apiv2.App, opts apiv2.ListAppSyncsOpts) (*apiv2.ListAppSyncsResult, error) {
+	if opts.Cursor != uuid.Nil {
+		return nil, apiv2.ErrInvalidCursor
+	}
+	return &apiv2.ListAppSyncsResult{}, nil
+}
+
+func (p *CQRSAppProvider) GetAppSync(ctx context.Context, app apiv2.App, syncID uuid.UUID) (apiv2.AppSyncRecord, error) {
+	return apiv2.AppSyncRecord{}, apiv2.ErrAppSyncNotFound
 }

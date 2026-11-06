@@ -6339,6 +6339,346 @@ func (x *SyncAppError) GetMessage() string {
 	return ""
 }
 
+type ListAppSyncsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAppSyncsRequest) Reset() {
+	*x = ListAppSyncsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[91]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAppSyncsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAppSyncsRequest) ProtoMessage() {}
+
+func (x *ListAppSyncsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[91]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAppSyncsRequest.ProtoReflect.Descriptor instead.
+func (*ListAppSyncsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{91}
+}
+
+func (x *ListAppSyncsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *ListAppSyncsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListAppSyncsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type ListAppSyncsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Sync                `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAppSyncsResponse) Reset() {
+	*x = ListAppSyncsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[92]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAppSyncsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAppSyncsResponse) ProtoMessage() {}
+
+func (x *ListAppSyncsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[92]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAppSyncsResponse.ProtoReflect.Descriptor instead.
+func (*ListAppSyncsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{92}
+}
+
+func (x *ListAppSyncsResponse) GetData() []*Sync {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListAppSyncsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListAppSyncsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type GetAppSyncRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	SyncId        string                 `protobuf:"bytes,2,opt,name=sync_id,json=syncId,proto3" json:"sync_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAppSyncRequest) Reset() {
+	*x = GetAppSyncRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[93]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAppSyncRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAppSyncRequest) ProtoMessage() {}
+
+func (x *GetAppSyncRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[93]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAppSyncRequest.ProtoReflect.Descriptor instead.
+func (*GetAppSyncRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{93}
+}
+
+func (x *GetAppSyncRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *GetAppSyncRequest) GetSyncId() string {
+	if x != nil {
+		return x.SyncId
+	}
+	return ""
+}
+
+type GetAppSyncResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Sync                  `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAppSyncResponse) Reset() {
+	*x = GetAppSyncResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[94]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAppSyncResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAppSyncResponse) ProtoMessage() {}
+
+func (x *GetAppSyncResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[94]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAppSyncResponse.ProtoReflect.Descriptor instead.
+func (*GetAppSyncResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{94}
+}
+
+func (x *GetAppSyncResponse) GetData() *Sync {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetAppSyncResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type Sync struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AppId         string                 `protobuf:"bytes,2,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Url           *string                `protobuf:"bytes,4,opt,name=url,proto3,oneof" json:"url,omitempty"`
+	SdkLanguage   *string                `protobuf:"bytes,5,opt,name=sdk_language,json=sdkLanguage,proto3,oneof" json:"sdk_language,omitempty"`
+	SdkVersion    *string                `protobuf:"bytes,6,opt,name=sdk_version,json=sdkVersion,proto3,oneof" json:"sdk_version,omitempty"`
+	Framework     *string                `protobuf:"bytes,7,opt,name=framework,proto3,oneof" json:"framework,omitempty"`
+	AppVersion    *string                `protobuf:"bytes,8,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	Error         *SyncAppError          `protobuf:"bytes,9,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Sync) Reset() {
+	*x = Sync{}
+	mi := &file_api_v2_service_proto_msgTypes[95]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Sync) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Sync) ProtoMessage() {}
+
+func (x *Sync) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[95]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Sync.ProtoReflect.Descriptor instead.
+func (*Sync) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{95}
+}
+
+func (x *Sync) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Sync) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *Sync) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *Sync) GetUrl() string {
+	if x != nil && x.Url != nil {
+		return *x.Url
+	}
+	return ""
+}
+
+func (x *Sync) GetSdkLanguage() string {
+	if x != nil && x.SdkLanguage != nil {
+		return *x.SdkLanguage
+	}
+	return ""
+}
+
+func (x *Sync) GetSdkVersion() string {
+	if x != nil && x.SdkVersion != nil {
+		return *x.SdkVersion
+	}
+	return ""
+}
+
+func (x *Sync) GetFramework() string {
+	if x != nil && x.Framework != nil {
+		return *x.Framework
+	}
+	return ""
+}
+
+func (x *Sync) GetAppVersion() string {
+	if x != nil && x.AppVersion != nil {
+		return *x.AppVersion
+	}
+	return ""
+}
+
+func (x *Sync) GetError() *SyncAppError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *Sync) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 type QueryInsightsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
@@ -6348,7 +6688,7 @@ type QueryInsightsRequest struct {
 
 func (x *QueryInsightsRequest) Reset() {
 	*x = QueryInsightsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[91]
+	mi := &file_api_v2_service_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6360,7 +6700,7 @@ func (x *QueryInsightsRequest) String() string {
 func (*QueryInsightsRequest) ProtoMessage() {}
 
 func (x *QueryInsightsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[91]
+	mi := &file_api_v2_service_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6373,7 +6713,7 @@ func (x *QueryInsightsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsRequest.ProtoReflect.Descriptor instead.
 func (*QueryInsightsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{91}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *QueryInsightsRequest) GetQuery() string {
@@ -6393,7 +6733,7 @@ type QueryInsightsResponse struct {
 
 func (x *QueryInsightsResponse) Reset() {
 	*x = QueryInsightsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[92]
+	mi := &file_api_v2_service_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6405,7 +6745,7 @@ func (x *QueryInsightsResponse) String() string {
 func (*QueryInsightsResponse) ProtoMessage() {}
 
 func (x *QueryInsightsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[92]
+	mi := &file_api_v2_service_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6418,7 +6758,7 @@ func (x *QueryInsightsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsResponse.ProtoReflect.Descriptor instead.
 func (*QueryInsightsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{92}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *QueryInsightsResponse) GetData() *QueryInsightsData {
@@ -6447,7 +6787,7 @@ type QueryInsightsData struct {
 
 func (x *QueryInsightsData) Reset() {
 	*x = QueryInsightsData{}
-	mi := &file_api_v2_service_proto_msgTypes[93]
+	mi := &file_api_v2_service_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6459,7 +6799,7 @@ func (x *QueryInsightsData) String() string {
 func (*QueryInsightsData) ProtoMessage() {}
 
 func (x *QueryInsightsData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[93]
+	mi := &file_api_v2_service_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6472,7 +6812,7 @@ func (x *QueryInsightsData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsData.ProtoReflect.Descriptor instead.
 func (*QueryInsightsData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{93}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *QueryInsightsData) GetColumns() []*InsightsOutputColumn {
@@ -6514,7 +6854,7 @@ type InsightsQueryInfo struct {
 
 func (x *InsightsQueryInfo) Reset() {
 	*x = InsightsQueryInfo{}
-	mi := &file_api_v2_service_proto_msgTypes[94]
+	mi := &file_api_v2_service_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6526,7 +6866,7 @@ func (x *InsightsQueryInfo) String() string {
 func (*InsightsQueryInfo) ProtoMessage() {}
 
 func (x *InsightsQueryInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[94]
+	mi := &file_api_v2_service_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6539,7 +6879,7 @@ func (x *InsightsQueryInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsQueryInfo.ProtoReflect.Descriptor instead.
 func (*InsightsQueryInfo) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{94}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *InsightsQueryInfo) GetPrimaryTable() string {
@@ -6574,7 +6914,7 @@ type InsightsOutputColumn struct {
 
 func (x *InsightsOutputColumn) Reset() {
 	*x = InsightsOutputColumn{}
-	mi := &file_api_v2_service_proto_msgTypes[95]
+	mi := &file_api_v2_service_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6586,7 +6926,7 @@ func (x *InsightsOutputColumn) String() string {
 func (*InsightsOutputColumn) ProtoMessage() {}
 
 func (x *InsightsOutputColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[95]
+	mi := &file_api_v2_service_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6599,7 +6939,7 @@ func (x *InsightsOutputColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsOutputColumn.ProtoReflect.Descriptor instead.
 func (*InsightsOutputColumn) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{95}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *InsightsOutputColumn) GetName() string {
@@ -6633,7 +6973,7 @@ type InsightsPathHint struct {
 
 func (x *InsightsPathHint) Reset() {
 	*x = InsightsPathHint{}
-	mi := &file_api_v2_service_proto_msgTypes[96]
+	mi := &file_api_v2_service_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6645,7 +6985,7 @@ func (x *InsightsPathHint) String() string {
 func (*InsightsPathHint) ProtoMessage() {}
 
 func (x *InsightsPathHint) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[96]
+	mi := &file_api_v2_service_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6658,7 +6998,7 @@ func (x *InsightsPathHint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsPathHint.ProtoReflect.Descriptor instead.
 func (*InsightsPathHint) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{96}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *InsightsPathHint) GetPath() []*InsightsPathSegment {
@@ -6685,7 +7025,7 @@ type InsightsPathSegment struct {
 
 func (x *InsightsPathSegment) Reset() {
 	*x = InsightsPathSegment{}
-	mi := &file_api_v2_service_proto_msgTypes[97]
+	mi := &file_api_v2_service_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6697,7 +7037,7 @@ func (x *InsightsPathSegment) String() string {
 func (*InsightsPathSegment) ProtoMessage() {}
 
 func (x *InsightsPathSegment) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[97]
+	mi := &file_api_v2_service_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6710,7 +7050,7 @@ func (x *InsightsPathSegment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsPathSegment.ProtoReflect.Descriptor instead.
 func (*InsightsPathSegment) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{97}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *InsightsPathSegment) GetKey() string {
@@ -6736,7 +7076,7 @@ type InsightsRow struct {
 
 func (x *InsightsRow) Reset() {
 	*x = InsightsRow{}
-	mi := &file_api_v2_service_proto_msgTypes[98]
+	mi := &file_api_v2_service_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6748,7 +7088,7 @@ func (x *InsightsRow) String() string {
 func (*InsightsRow) ProtoMessage() {}
 
 func (x *InsightsRow) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[98]
+	mi := &file_api_v2_service_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6761,7 +7101,7 @@ func (x *InsightsRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsRow.ProtoReflect.Descriptor instead.
 func (*InsightsRow) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{98}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *InsightsRow) GetValues() []*structpb.Value {
@@ -6783,7 +7123,7 @@ type InsightsDiagnostic struct {
 
 func (x *InsightsDiagnostic) Reset() {
 	*x = InsightsDiagnostic{}
-	mi := &file_api_v2_service_proto_msgTypes[99]
+	mi := &file_api_v2_service_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6795,7 +7135,7 @@ func (x *InsightsDiagnostic) String() string {
 func (*InsightsDiagnostic) ProtoMessage() {}
 
 func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[99]
+	mi := &file_api_v2_service_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6808,7 +7148,7 @@ func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnostic.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnostic) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{99}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *InsightsDiagnostic) GetSeverity() InsightsDiagnosticSeverity {
@@ -6850,7 +7190,7 @@ type InsightsDiagnosticPosition struct {
 
 func (x *InsightsDiagnosticPosition) Reset() {
 	*x = InsightsDiagnosticPosition{}
-	mi := &file_api_v2_service_proto_msgTypes[100]
+	mi := &file_api_v2_service_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6862,7 +7202,7 @@ func (x *InsightsDiagnosticPosition) String() string {
 func (*InsightsDiagnosticPosition) ProtoMessage() {}
 
 func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[100]
+	mi := &file_api_v2_service_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6875,7 +7215,7 @@ func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnosticPosition.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnosticPosition) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{100}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *InsightsDiagnosticPosition) GetStart() int32 {
@@ -6907,7 +7247,7 @@ type ListInsightsTablesRequest struct {
 
 func (x *ListInsightsTablesRequest) Reset() {
 	*x = ListInsightsTablesRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[101]
+	mi := &file_api_v2_service_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6919,7 +7259,7 @@ func (x *ListInsightsTablesRequest) String() string {
 func (*ListInsightsTablesRequest) ProtoMessage() {}
 
 func (x *ListInsightsTablesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[101]
+	mi := &file_api_v2_service_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6932,7 +7272,7 @@ func (x *ListInsightsTablesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsTablesRequest.ProtoReflect.Descriptor instead.
 func (*ListInsightsTablesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{101}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{106}
 }
 
 type ListInsightsTablesResponse struct {
@@ -6945,7 +7285,7 @@ type ListInsightsTablesResponse struct {
 
 func (x *ListInsightsTablesResponse) Reset() {
 	*x = ListInsightsTablesResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[102]
+	mi := &file_api_v2_service_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6957,7 +7297,7 @@ func (x *ListInsightsTablesResponse) String() string {
 func (*ListInsightsTablesResponse) ProtoMessage() {}
 
 func (x *ListInsightsTablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[102]
+	mi := &file_api_v2_service_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6970,7 +7310,7 @@ func (x *ListInsightsTablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsTablesResponse.ProtoReflect.Descriptor instead.
 func (*ListInsightsTablesResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{102}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *ListInsightsTablesResponse) GetData() []*InsightsTable {
@@ -6998,7 +7338,7 @@ type InsightsTable struct {
 
 func (x *InsightsTable) Reset() {
 	*x = InsightsTable{}
-	mi := &file_api_v2_service_proto_msgTypes[103]
+	mi := &file_api_v2_service_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7010,7 +7350,7 @@ func (x *InsightsTable) String() string {
 func (*InsightsTable) ProtoMessage() {}
 
 func (x *InsightsTable) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[103]
+	mi := &file_api_v2_service_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7023,7 +7363,7 @@ func (x *InsightsTable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsTable.ProtoReflect.Descriptor instead.
 func (*InsightsTable) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{103}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *InsightsTable) GetName() string {
@@ -7058,7 +7398,7 @@ type InsightsTableColumn struct {
 
 func (x *InsightsTableColumn) Reset() {
 	*x = InsightsTableColumn{}
-	mi := &file_api_v2_service_proto_msgTypes[104]
+	mi := &file_api_v2_service_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7070,7 +7410,7 @@ func (x *InsightsTableColumn) String() string {
 func (*InsightsTableColumn) ProtoMessage() {}
 
 func (x *InsightsTableColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[104]
+	mi := &file_api_v2_service_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7083,7 +7423,7 @@ func (x *InsightsTableColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsTableColumn.ProtoReflect.Descriptor instead.
 func (*InsightsTableColumn) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{104}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *InsightsTableColumn) GetName() string {
@@ -7116,7 +7456,7 @@ type QueryInsightsPromptRequest struct {
 
 func (x *QueryInsightsPromptRequest) Reset() {
 	*x = QueryInsightsPromptRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[105]
+	mi := &file_api_v2_service_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7128,7 +7468,7 @@ func (x *QueryInsightsPromptRequest) String() string {
 func (*QueryInsightsPromptRequest) ProtoMessage() {}
 
 func (x *QueryInsightsPromptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[105]
+	mi := &file_api_v2_service_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7141,7 +7481,7 @@ func (x *QueryInsightsPromptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptRequest.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{105}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *QueryInsightsPromptRequest) GetPrompt() string {
@@ -7161,7 +7501,7 @@ type QueryInsightsPromptResponse struct {
 
 func (x *QueryInsightsPromptResponse) Reset() {
 	*x = QueryInsightsPromptResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[106]
+	mi := &file_api_v2_service_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7173,7 +7513,7 @@ func (x *QueryInsightsPromptResponse) String() string {
 func (*QueryInsightsPromptResponse) ProtoMessage() {}
 
 func (x *QueryInsightsPromptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[106]
+	mi := &file_api_v2_service_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7186,7 +7526,7 @@ func (x *QueryInsightsPromptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptResponse.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{106}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *QueryInsightsPromptResponse) GetData() *QueryInsightsPromptData {
@@ -7213,7 +7553,7 @@ type QueryInsightsPromptData struct {
 
 func (x *QueryInsightsPromptData) Reset() {
 	*x = QueryInsightsPromptData{}
-	mi := &file_api_v2_service_proto_msgTypes[107]
+	mi := &file_api_v2_service_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7225,7 +7565,7 @@ func (x *QueryInsightsPromptData) String() string {
 func (*QueryInsightsPromptData) ProtoMessage() {}
 
 func (x *QueryInsightsPromptData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[107]
+	mi := &file_api_v2_service_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7238,7 +7578,7 @@ func (x *QueryInsightsPromptData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptData.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{107}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *QueryInsightsPromptData) GetSql() string {
@@ -7265,7 +7605,7 @@ type ListInsightsEventSchemasRequest struct {
 
 func (x *ListInsightsEventSchemasRequest) Reset() {
 	*x = ListInsightsEventSchemasRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[108]
+	mi := &file_api_v2_service_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7277,7 +7617,7 @@ func (x *ListInsightsEventSchemasRequest) String() string {
 func (*ListInsightsEventSchemasRequest) ProtoMessage() {}
 
 func (x *ListInsightsEventSchemasRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[108]
+	mi := &file_api_v2_service_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7290,7 +7630,7 @@ func (x *ListInsightsEventSchemasRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsEventSchemasRequest.ProtoReflect.Descriptor instead.
 func (*ListInsightsEventSchemasRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{108}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *ListInsightsEventSchemasRequest) GetCursor() string {
@@ -7318,7 +7658,7 @@ type ListInsightsEventSchemasResponse struct {
 
 func (x *ListInsightsEventSchemasResponse) Reset() {
 	*x = ListInsightsEventSchemasResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[109]
+	mi := &file_api_v2_service_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7330,7 +7670,7 @@ func (x *ListInsightsEventSchemasResponse) String() string {
 func (*ListInsightsEventSchemasResponse) ProtoMessage() {}
 
 func (x *ListInsightsEventSchemasResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[109]
+	mi := &file_api_v2_service_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7343,7 +7683,7 @@ func (x *ListInsightsEventSchemasResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsEventSchemasResponse.ProtoReflect.Descriptor instead.
 func (*ListInsightsEventSchemasResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{109}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *ListInsightsEventSchemasResponse) GetData() []*InsightsEventSchema {
@@ -7377,7 +7717,7 @@ type InsightsEventSchema struct {
 
 func (x *InsightsEventSchema) Reset() {
 	*x = InsightsEventSchema{}
-	mi := &file_api_v2_service_proto_msgTypes[110]
+	mi := &file_api_v2_service_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7389,7 +7729,7 @@ func (x *InsightsEventSchema) String() string {
 func (*InsightsEventSchema) ProtoMessage() {}
 
 func (x *InsightsEventSchema) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[110]
+	mi := &file_api_v2_service_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7402,7 +7742,7 @@ func (x *InsightsEventSchema) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsEventSchema.ProtoReflect.Descriptor instead.
 func (*InsightsEventSchema) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{110}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *InsightsEventSchema) GetName() string {
@@ -7433,7 +7773,7 @@ type ListExperimentsRequest struct {
 
 func (x *ListExperimentsRequest) Reset() {
 	*x = ListExperimentsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[111]
+	mi := &file_api_v2_service_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7445,7 +7785,7 @@ func (x *ListExperimentsRequest) String() string {
 func (*ListExperimentsRequest) ProtoMessage() {}
 
 func (x *ListExperimentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[111]
+	mi := &file_api_v2_service_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7458,7 +7798,7 @@ func (x *ListExperimentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExperimentsRequest.ProtoReflect.Descriptor instead.
 func (*ListExperimentsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{111}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *ListExperimentsRequest) GetCursor() string {
@@ -7514,7 +7854,7 @@ type ListExperimentsResponse struct {
 
 func (x *ListExperimentsResponse) Reset() {
 	*x = ListExperimentsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[112]
+	mi := &file_api_v2_service_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7526,7 +7866,7 @@ func (x *ListExperimentsResponse) String() string {
 func (*ListExperimentsResponse) ProtoMessage() {}
 
 func (x *ListExperimentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[112]
+	mi := &file_api_v2_service_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7539,7 +7879,7 @@ func (x *ListExperimentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExperimentsResponse.ProtoReflect.Descriptor instead.
 func (*ListExperimentsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{112}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *ListExperimentsResponse) GetData() []*Experiment {
@@ -7579,7 +7919,7 @@ type Experiment struct {
 
 func (x *Experiment) Reset() {
 	*x = Experiment{}
-	mi := &file_api_v2_service_proto_msgTypes[113]
+	mi := &file_api_v2_service_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7591,7 +7931,7 @@ func (x *Experiment) String() string {
 func (*Experiment) ProtoMessage() {}
 
 func (x *Experiment) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[113]
+	mi := &file_api_v2_service_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7604,7 +7944,7 @@ func (x *Experiment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Experiment.ProtoReflect.Descriptor instead.
 func (*Experiment) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{113}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *Experiment) GetId() string {
@@ -7677,7 +8017,7 @@ type GetExperimentRequest struct {
 
 func (x *GetExperimentRequest) Reset() {
 	*x = GetExperimentRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[114]
+	mi := &file_api_v2_service_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7689,7 +8029,7 @@ func (x *GetExperimentRequest) String() string {
 func (*GetExperimentRequest) ProtoMessage() {}
 
 func (x *GetExperimentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[114]
+	mi := &file_api_v2_service_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7702,7 +8042,7 @@ func (x *GetExperimentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExperimentRequest.ProtoReflect.Descriptor instead.
 func (*GetExperimentRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{114}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *GetExperimentRequest) GetFunctionId() string {
@@ -7757,7 +8097,7 @@ type GetExperimentResponse struct {
 
 func (x *GetExperimentResponse) Reset() {
 	*x = GetExperimentResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[115]
+	mi := &file_api_v2_service_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7769,7 +8109,7 @@ func (x *GetExperimentResponse) String() string {
 func (*GetExperimentResponse) ProtoMessage() {}
 
 func (x *GetExperimentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[115]
+	mi := &file_api_v2_service_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7782,7 +8122,7 @@ func (x *GetExperimentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExperimentResponse.ProtoReflect.Descriptor instead.
 func (*GetExperimentResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{115}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *GetExperimentResponse) GetData() *ExperimentDetail {
@@ -7813,7 +8153,7 @@ type ExperimentDetail struct {
 
 func (x *ExperimentDetail) Reset() {
 	*x = ExperimentDetail{}
-	mi := &file_api_v2_service_proto_msgTypes[116]
+	mi := &file_api_v2_service_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7825,7 +8165,7 @@ func (x *ExperimentDetail) String() string {
 func (*ExperimentDetail) ProtoMessage() {}
 
 func (x *ExperimentDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[116]
+	mi := &file_api_v2_service_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7838,7 +8178,7 @@ func (x *ExperimentDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExperimentDetail.ProtoReflect.Descriptor instead.
 func (*ExperimentDetail) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{116}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *ExperimentDetail) GetId() string {
@@ -7894,7 +8234,7 @@ type ExperimentVariantMetrics struct {
 
 func (x *ExperimentVariantMetrics) Reset() {
 	*x = ExperimentVariantMetrics{}
-	mi := &file_api_v2_service_proto_msgTypes[117]
+	mi := &file_api_v2_service_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7906,7 +8246,7 @@ func (x *ExperimentVariantMetrics) String() string {
 func (*ExperimentVariantMetrics) ProtoMessage() {}
 
 func (x *ExperimentVariantMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[117]
+	mi := &file_api_v2_service_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7919,7 +8259,7 @@ func (x *ExperimentVariantMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExperimentVariantMetrics.ProtoReflect.Descriptor instead.
 func (*ExperimentVariantMetrics) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{117}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *ExperimentVariantMetrics) GetVariantName() string {
@@ -7955,7 +8295,7 @@ type ExperimentVariantMetric struct {
 
 func (x *ExperimentVariantMetric) Reset() {
 	*x = ExperimentVariantMetric{}
-	mi := &file_api_v2_service_proto_msgTypes[118]
+	mi := &file_api_v2_service_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7967,7 +8307,7 @@ func (x *ExperimentVariantMetric) String() string {
 func (*ExperimentVariantMetric) ProtoMessage() {}
 
 func (x *ExperimentVariantMetric) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[118]
+	mi := &file_api_v2_service_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7980,7 +8320,7 @@ func (x *ExperimentVariantMetric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExperimentVariantMetric.ProtoReflect.Descriptor instead.
 func (*ExperimentVariantMetric) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{118}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *ExperimentVariantMetric) GetKey() string {
@@ -8021,7 +8361,7 @@ type ExperimentVariantWeight struct {
 
 func (x *ExperimentVariantWeight) Reset() {
 	*x = ExperimentVariantWeight{}
-	mi := &file_api_v2_service_proto_msgTypes[119]
+	mi := &file_api_v2_service_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8033,7 +8373,7 @@ func (x *ExperimentVariantWeight) String() string {
 func (*ExperimentVariantWeight) ProtoMessage() {}
 
 func (x *ExperimentVariantWeight) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[119]
+	mi := &file_api_v2_service_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8046,7 +8386,7 @@ func (x *ExperimentVariantWeight) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExperimentVariantWeight.ProtoReflect.Descriptor instead.
 func (*ExperimentVariantWeight) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{119}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *ExperimentVariantWeight) GetVariantName() string {
@@ -8074,7 +8414,7 @@ type ListSessionKeysRequest struct {
 
 func (x *ListSessionKeysRequest) Reset() {
 	*x = ListSessionKeysRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[120]
+	mi := &file_api_v2_service_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8086,7 +8426,7 @@ func (x *ListSessionKeysRequest) String() string {
 func (*ListSessionKeysRequest) ProtoMessage() {}
 
 func (x *ListSessionKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[120]
+	mi := &file_api_v2_service_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8099,7 +8439,7 @@ func (x *ListSessionKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionKeysRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{120}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *ListSessionKeysRequest) GetSearch() string {
@@ -8134,7 +8474,7 @@ type ListSessionKeysResponse struct {
 
 func (x *ListSessionKeysResponse) Reset() {
 	*x = ListSessionKeysResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[121]
+	mi := &file_api_v2_service_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8146,7 +8486,7 @@ func (x *ListSessionKeysResponse) String() string {
 func (*ListSessionKeysResponse) ProtoMessage() {}
 
 func (x *ListSessionKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[121]
+	mi := &file_api_v2_service_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8159,7 +8499,7 @@ func (x *ListSessionKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListSessionKeysResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{121}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *ListSessionKeysResponse) GetData() []*SessionKey {
@@ -8193,7 +8533,7 @@ type SessionKey struct {
 
 func (x *SessionKey) Reset() {
 	*x = SessionKey{}
-	mi := &file_api_v2_service_proto_msgTypes[122]
+	mi := &file_api_v2_service_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8205,7 +8545,7 @@ func (x *SessionKey) String() string {
 func (*SessionKey) ProtoMessage() {}
 
 func (x *SessionKey) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[122]
+	mi := &file_api_v2_service_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8218,7 +8558,7 @@ func (x *SessionKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionKey.ProtoReflect.Descriptor instead.
 func (*SessionKey) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{122}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *SessionKey) GetId() string {
@@ -8249,7 +8589,7 @@ type ListSessionsRequest struct {
 
 func (x *ListSessionsRequest) Reset() {
 	*x = ListSessionsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[123]
+	mi := &file_api_v2_service_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8261,7 +8601,7 @@ func (x *ListSessionsRequest) String() string {
 func (*ListSessionsRequest) ProtoMessage() {}
 
 func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[123]
+	mi := &file_api_v2_service_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8274,7 +8614,7 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{123}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *ListSessionsRequest) GetSessionKey() string {
@@ -8330,7 +8670,7 @@ type ListSessionsResponse struct {
 
 func (x *ListSessionsResponse) Reset() {
 	*x = ListSessionsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[124]
+	mi := &file_api_v2_service_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8342,7 +8682,7 @@ func (x *ListSessionsResponse) String() string {
 func (*ListSessionsResponse) ProtoMessage() {}
 
 func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[124]
+	mi := &file_api_v2_service_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8355,7 +8695,7 @@ func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{124}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *ListSessionsResponse) GetData() []*SessionGroup {
@@ -8393,7 +8733,7 @@ type SessionGroup struct {
 
 func (x *SessionGroup) Reset() {
 	*x = SessionGroup{}
-	mi := &file_api_v2_service_proto_msgTypes[125]
+	mi := &file_api_v2_service_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8405,7 +8745,7 @@ func (x *SessionGroup) String() string {
 func (*SessionGroup) ProtoMessage() {}
 
 func (x *SessionGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[125]
+	mi := &file_api_v2_service_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8418,7 +8758,7 @@ func (x *SessionGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionGroup.ProtoReflect.Descriptor instead.
 func (*SessionGroup) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{125}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *SessionGroup) GetId() string {
@@ -8477,7 +8817,7 @@ type ListSessionRunsRequest struct {
 
 func (x *ListSessionRunsRequest) Reset() {
 	*x = ListSessionRunsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[126]
+	mi := &file_api_v2_service_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8489,7 +8829,7 @@ func (x *ListSessionRunsRequest) String() string {
 func (*ListSessionRunsRequest) ProtoMessage() {}
 
 func (x *ListSessionRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[126]
+	mi := &file_api_v2_service_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8502,7 +8842,7 @@ func (x *ListSessionRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionRunsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{126}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *ListSessionRunsRequest) GetSessionKey() string {
@@ -8558,7 +8898,7 @@ type ListSessionRunsResponse struct {
 
 func (x *ListSessionRunsResponse) Reset() {
 	*x = ListSessionRunsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[127]
+	mi := &file_api_v2_service_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8570,7 +8910,7 @@ func (x *ListSessionRunsResponse) String() string {
 func (*ListSessionRunsResponse) ProtoMessage() {}
 
 func (x *ListSessionRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[127]
+	mi := &file_api_v2_service_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8583,7 +8923,7 @@ func (x *ListSessionRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionRunsResponse.ProtoReflect.Descriptor instead.
 func (*ListSessionRunsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{127}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *ListSessionRunsResponse) GetData() []*SessionRun {
@@ -8622,7 +8962,7 @@ type SessionRun struct {
 
 func (x *SessionRun) Reset() {
 	*x = SessionRun{}
-	mi := &file_api_v2_service_proto_msgTypes[128]
+	mi := &file_api_v2_service_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8634,7 +8974,7 @@ func (x *SessionRun) String() string {
 func (*SessionRun) ProtoMessage() {}
 
 func (x *SessionRun) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[128]
+	mi := &file_api_v2_service_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8647,7 +8987,7 @@ func (x *SessionRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionRun.ProtoReflect.Descriptor instead.
 func (*SessionRun) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{128}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *SessionRun) GetId() string {
@@ -8721,7 +9061,7 @@ type ListRunsRequest struct {
 
 func (x *ListRunsRequest) Reset() {
 	*x = ListRunsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[129]
+	mi := &file_api_v2_service_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8733,7 +9073,7 @@ func (x *ListRunsRequest) String() string {
 func (*ListRunsRequest) ProtoMessage() {}
 
 func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[129]
+	mi := &file_api_v2_service_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8746,7 +9086,7 @@ func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListRunsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{129}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{134}
 }
 
 // Deprecated: Marked as deprecated in api/v2/service.proto.
@@ -8863,7 +9203,7 @@ type ListFunctionRunsRequest struct {
 
 func (x *ListFunctionRunsRequest) Reset() {
 	*x = ListFunctionRunsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[130]
+	mi := &file_api_v2_service_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8875,7 +9215,7 @@ func (x *ListFunctionRunsRequest) String() string {
 func (*ListFunctionRunsRequest) ProtoMessage() {}
 
 func (x *ListFunctionRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[130]
+	mi := &file_api_v2_service_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8888,7 +9228,7 @@ func (x *ListFunctionRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListFunctionRunsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{130}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *ListFunctionRunsRequest) GetAppId() string {
@@ -8994,7 +9334,7 @@ type ListRunsResponse struct {
 
 func (x *ListRunsResponse) Reset() {
 	*x = ListRunsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[131]
+	mi := &file_api_v2_service_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9006,7 +9346,7 @@ func (x *ListRunsResponse) String() string {
 func (*ListRunsResponse) ProtoMessage() {}
 
 func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[131]
+	mi := &file_api_v2_service_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9019,7 +9359,7 @@ func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRunsResponse.ProtoReflect.Descriptor instead.
 func (*ListRunsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{131}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *ListRunsResponse) GetData() []*FunctionRun {
@@ -9054,7 +9394,7 @@ type ListFunctionRunsResponse struct {
 
 func (x *ListFunctionRunsResponse) Reset() {
 	*x = ListFunctionRunsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[132]
+	mi := &file_api_v2_service_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9066,7 +9406,7 @@ func (x *ListFunctionRunsResponse) String() string {
 func (*ListFunctionRunsResponse) ProtoMessage() {}
 
 func (x *ListFunctionRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[132]
+	mi := &file_api_v2_service_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9079,7 +9419,7 @@ func (x *ListFunctionRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFunctionRunsResponse.ProtoReflect.Descriptor instead.
 func (*ListFunctionRunsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{132}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *ListFunctionRunsResponse) GetData() []*FunctionRun {
@@ -9112,7 +9452,7 @@ type CancelRunRequest struct {
 
 func (x *CancelRunRequest) Reset() {
 	*x = CancelRunRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[133]
+	mi := &file_api_v2_service_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9124,7 +9464,7 @@ func (x *CancelRunRequest) String() string {
 func (*CancelRunRequest) ProtoMessage() {}
 
 func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[133]
+	mi := &file_api_v2_service_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9137,7 +9477,7 @@ func (x *CancelRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunRequest.ProtoReflect.Descriptor instead.
 func (*CancelRunRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{133}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *CancelRunRequest) GetRunId() string {
@@ -9157,7 +9497,7 @@ type CancelRunResponse struct {
 
 func (x *CancelRunResponse) Reset() {
 	*x = CancelRunResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[134]
+	mi := &file_api_v2_service_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9169,7 +9509,7 @@ func (x *CancelRunResponse) String() string {
 func (*CancelRunResponse) ProtoMessage() {}
 
 func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[134]
+	mi := &file_api_v2_service_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9182,7 +9522,7 @@ func (x *CancelRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunResponse.ProtoReflect.Descriptor instead.
 func (*CancelRunResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{134}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *CancelRunResponse) GetData() *CancelRunData {
@@ -9208,7 +9548,7 @@ type CancelRunData struct {
 
 func (x *CancelRunData) Reset() {
 	*x = CancelRunData{}
-	mi := &file_api_v2_service_proto_msgTypes[135]
+	mi := &file_api_v2_service_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9220,7 +9560,7 @@ func (x *CancelRunData) String() string {
 func (*CancelRunData) ProtoMessage() {}
 
 func (x *CancelRunData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[135]
+	mi := &file_api_v2_service_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9233,7 +9573,7 @@ func (x *CancelRunData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRunData.ProtoReflect.Descriptor instead.
 func (*CancelRunData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{135}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *CancelRunData) GetRunId() string {
@@ -9253,7 +9593,7 @@ type RunDeferredFrom struct {
 
 func (x *RunDeferredFrom) Reset() {
 	*x = RunDeferredFrom{}
-	mi := &file_api_v2_service_proto_msgTypes[136]
+	mi := &file_api_v2_service_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9265,7 +9605,7 @@ func (x *RunDeferredFrom) String() string {
 func (*RunDeferredFrom) ProtoMessage() {}
 
 func (x *RunDeferredFrom) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[136]
+	mi := &file_api_v2_service_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9278,7 +9618,7 @@ func (x *RunDeferredFrom) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunDeferredFrom.ProtoReflect.Descriptor instead.
 func (*RunDeferredFrom) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{136}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *RunDeferredFrom) GetFunctionSlug() string {
@@ -9307,7 +9647,7 @@ type PauseFunctionRequest struct {
 
 func (x *PauseFunctionRequest) Reset() {
 	*x = PauseFunctionRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[137]
+	mi := &file_api_v2_service_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9319,7 +9659,7 @@ func (x *PauseFunctionRequest) String() string {
 func (*PauseFunctionRequest) ProtoMessage() {}
 
 func (x *PauseFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[137]
+	mi := &file_api_v2_service_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9332,7 +9672,7 @@ func (x *PauseFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseFunctionRequest.ProtoReflect.Descriptor instead.
 func (*PauseFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{137}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *PauseFunctionRequest) GetAppId() string {
@@ -9359,7 +9699,7 @@ type PauseFunctionResponse struct {
 
 func (x *PauseFunctionResponse) Reset() {
 	*x = PauseFunctionResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[138]
+	mi := &file_api_v2_service_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9371,7 +9711,7 @@ func (x *PauseFunctionResponse) String() string {
 func (*PauseFunctionResponse) ProtoMessage() {}
 
 func (x *PauseFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[138]
+	mi := &file_api_v2_service_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9384,7 +9724,7 @@ func (x *PauseFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseFunctionResponse.ProtoReflect.Descriptor instead.
 func (*PauseFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{138}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *PauseFunctionResponse) GetData() *Function {
@@ -9413,7 +9753,7 @@ type ResumeFunctionRequest struct {
 
 func (x *ResumeFunctionRequest) Reset() {
 	*x = ResumeFunctionRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[139]
+	mi := &file_api_v2_service_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9425,7 +9765,7 @@ func (x *ResumeFunctionRequest) String() string {
 func (*ResumeFunctionRequest) ProtoMessage() {}
 
 func (x *ResumeFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[139]
+	mi := &file_api_v2_service_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9438,7 +9778,7 @@ func (x *ResumeFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeFunctionRequest.ProtoReflect.Descriptor instead.
 func (*ResumeFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{139}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *ResumeFunctionRequest) GetAppId() string {
@@ -9465,7 +9805,7 @@ type ResumeFunctionResponse struct {
 
 func (x *ResumeFunctionResponse) Reset() {
 	*x = ResumeFunctionResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[140]
+	mi := &file_api_v2_service_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9477,7 +9817,7 @@ func (x *ResumeFunctionResponse) String() string {
 func (*ResumeFunctionResponse) ProtoMessage() {}
 
 func (x *ResumeFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[140]
+	mi := &file_api_v2_service_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9490,7 +9830,7 @@ func (x *ResumeFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeFunctionResponse.ProtoReflect.Descriptor instead.
 func (*ResumeFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{140}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *ResumeFunctionResponse) GetData() *Function {
@@ -9517,7 +9857,7 @@ type PauseFunctionsRequest struct {
 
 func (x *PauseFunctionsRequest) Reset() {
 	*x = PauseFunctionsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[141]
+	mi := &file_api_v2_service_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9529,7 +9869,7 @@ func (x *PauseFunctionsRequest) String() string {
 func (*PauseFunctionsRequest) ProtoMessage() {}
 
 func (x *PauseFunctionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[141]
+	mi := &file_api_v2_service_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9542,7 +9882,7 @@ func (x *PauseFunctionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseFunctionsRequest.ProtoReflect.Descriptor instead.
 func (*PauseFunctionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{141}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *PauseFunctionsRequest) GetAppId() string {
@@ -9569,7 +9909,7 @@ type PauseFunctionsResponse struct {
 
 func (x *PauseFunctionsResponse) Reset() {
 	*x = PauseFunctionsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[142]
+	mi := &file_api_v2_service_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9581,7 +9921,7 @@ func (x *PauseFunctionsResponse) String() string {
 func (*PauseFunctionsResponse) ProtoMessage() {}
 
 func (x *PauseFunctionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[142]
+	mi := &file_api_v2_service_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9594,7 +9934,7 @@ func (x *PauseFunctionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PauseFunctionsResponse.ProtoReflect.Descriptor instead.
 func (*PauseFunctionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{142}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *PauseFunctionsResponse) GetData() []*FunctionPauseResult {
@@ -9621,7 +9961,7 @@ type ResumeFunctionsRequest struct {
 
 func (x *ResumeFunctionsRequest) Reset() {
 	*x = ResumeFunctionsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[143]
+	mi := &file_api_v2_service_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9633,7 +9973,7 @@ func (x *ResumeFunctionsRequest) String() string {
 func (*ResumeFunctionsRequest) ProtoMessage() {}
 
 func (x *ResumeFunctionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[143]
+	mi := &file_api_v2_service_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9646,7 +9986,7 @@ func (x *ResumeFunctionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeFunctionsRequest.ProtoReflect.Descriptor instead.
 func (*ResumeFunctionsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{143}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *ResumeFunctionsRequest) GetAppId() string {
@@ -9673,7 +10013,7 @@ type ResumeFunctionsResponse struct {
 
 func (x *ResumeFunctionsResponse) Reset() {
 	*x = ResumeFunctionsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[144]
+	mi := &file_api_v2_service_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9685,7 +10025,7 @@ func (x *ResumeFunctionsResponse) String() string {
 func (*ResumeFunctionsResponse) ProtoMessage() {}
 
 func (x *ResumeFunctionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[144]
+	mi := &file_api_v2_service_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9698,7 +10038,7 @@ func (x *ResumeFunctionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeFunctionsResponse.ProtoReflect.Descriptor instead.
 func (*ResumeFunctionsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{144}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *ResumeFunctionsResponse) GetData() []*FunctionPauseResult {
@@ -9729,7 +10069,7 @@ type FunctionPauseResult struct {
 
 func (x *FunctionPauseResult) Reset() {
 	*x = FunctionPauseResult{}
-	mi := &file_api_v2_service_proto_msgTypes[145]
+	mi := &file_api_v2_service_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9741,7 +10081,7 @@ func (x *FunctionPauseResult) String() string {
 func (*FunctionPauseResult) ProtoMessage() {}
 
 func (x *FunctionPauseResult) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[145]
+	mi := &file_api_v2_service_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9754,7 +10094,7 @@ func (x *FunctionPauseResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionPauseResult.ProtoReflect.Descriptor instead.
 func (*FunctionPauseResult) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{145}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *FunctionPauseResult) GetFunctionId() string {
@@ -9819,7 +10159,7 @@ type ListEventsRequest struct {
 
 func (x *ListEventsRequest) Reset() {
 	*x = ListEventsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[146]
+	mi := &file_api_v2_service_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9831,7 +10171,7 @@ func (x *ListEventsRequest) String() string {
 func (*ListEventsRequest) ProtoMessage() {}
 
 func (x *ListEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[146]
+	mi := &file_api_v2_service_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9844,7 +10184,7 @@ func (x *ListEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventsRequest.ProtoReflect.Descriptor instead.
 func (*ListEventsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{146}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *ListEventsRequest) GetCursor() string {
@@ -9899,7 +10239,7 @@ type GetEventRequest struct {
 
 func (x *GetEventRequest) Reset() {
 	*x = GetEventRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[147]
+	mi := &file_api_v2_service_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9911,7 +10251,7 @@ func (x *GetEventRequest) String() string {
 func (*GetEventRequest) ProtoMessage() {}
 
 func (x *GetEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[147]
+	mi := &file_api_v2_service_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9924,7 +10264,7 @@ func (x *GetEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEventRequest.ProtoReflect.Descriptor instead.
 func (*GetEventRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{147}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *GetEventRequest) GetEventId() string {
@@ -9952,7 +10292,7 @@ type ListEventsResponse struct {
 
 func (x *ListEventsResponse) Reset() {
 	*x = ListEventsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[148]
+	mi := &file_api_v2_service_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9964,7 +10304,7 @@ func (x *ListEventsResponse) String() string {
 func (*ListEventsResponse) ProtoMessage() {}
 
 func (x *ListEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[148]
+	mi := &file_api_v2_service_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9977,7 +10317,7 @@ func (x *ListEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventsResponse.ProtoReflect.Descriptor instead.
 func (*ListEventsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{148}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *ListEventsResponse) GetData() []*Event {
@@ -10011,7 +10351,7 @@ type GetEventResponse struct {
 
 func (x *GetEventResponse) Reset() {
 	*x = GetEventResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[149]
+	mi := &file_api_v2_service_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10023,7 +10363,7 @@ func (x *GetEventResponse) String() string {
 func (*GetEventResponse) ProtoMessage() {}
 
 func (x *GetEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[149]
+	mi := &file_api_v2_service_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10036,7 +10376,7 @@ func (x *GetEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEventResponse.ProtoReflect.Descriptor instead.
 func (*GetEventResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{149}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *GetEventResponse) GetData() *Event {
@@ -10069,7 +10409,7 @@ type Event struct {
 
 func (x *Event) Reset() {
 	*x = Event{}
-	mi := &file_api_v2_service_proto_msgTypes[150]
+	mi := &file_api_v2_service_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10081,7 +10421,7 @@ func (x *Event) String() string {
 func (*Event) ProtoMessage() {}
 
 func (x *Event) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[150]
+	mi := &file_api_v2_service_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10094,7 +10434,7 @@ func (x *Event) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Event.ProtoReflect.Descriptor instead.
 func (*Event) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{150}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *Event) GetId() string {
@@ -10163,7 +10503,7 @@ type EventSource struct {
 
 func (x *EventSource) Reset() {
 	*x = EventSource{}
-	mi := &file_api_v2_service_proto_msgTypes[151]
+	mi := &file_api_v2_service_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10175,7 +10515,7 @@ func (x *EventSource) String() string {
 func (*EventSource) ProtoMessage() {}
 
 func (x *EventSource) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[151]
+	mi := &file_api_v2_service_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10188,7 +10528,7 @@ func (x *EventSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventSource.ProtoReflect.Descriptor instead.
 func (*EventSource) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{151}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *EventSource) GetId() string {
@@ -10219,7 +10559,7 @@ type CreateReplayRequest struct {
 
 func (x *CreateReplayRequest) Reset() {
 	*x = CreateReplayRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[152]
+	mi := &file_api_v2_service_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10231,7 +10571,7 @@ func (x *CreateReplayRequest) String() string {
 func (*CreateReplayRequest) ProtoMessage() {}
 
 func (x *CreateReplayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[152]
+	mi := &file_api_v2_service_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10244,7 +10584,7 @@ func (x *CreateReplayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReplayRequest.ProtoReflect.Descriptor instead.
 func (*CreateReplayRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{152}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *CreateReplayRequest) GetAppId() string {
@@ -10299,7 +10639,7 @@ type CreateReplayResponse struct {
 
 func (x *CreateReplayResponse) Reset() {
 	*x = CreateReplayResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[153]
+	mi := &file_api_v2_service_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10311,7 +10651,7 @@ func (x *CreateReplayResponse) String() string {
 func (*CreateReplayResponse) ProtoMessage() {}
 
 func (x *CreateReplayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[153]
+	mi := &file_api_v2_service_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10324,7 +10664,7 @@ func (x *CreateReplayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReplayResponse.ProtoReflect.Descriptor instead.
 func (*CreateReplayResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{153}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *CreateReplayResponse) GetData() *Replay {
@@ -10356,7 +10696,7 @@ type Replay struct {
 
 func (x *Replay) Reset() {
 	*x = Replay{}
-	mi := &file_api_v2_service_proto_msgTypes[154]
+	mi := &file_api_v2_service_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10368,7 +10708,7 @@ func (x *Replay) String() string {
 func (*Replay) ProtoMessage() {}
 
 func (x *Replay) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[154]
+	mi := &file_api_v2_service_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10381,7 +10721,7 @@ func (x *Replay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Replay.ProtoReflect.Descriptor instead.
 func (*Replay) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{154}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *Replay) GetId() string {
@@ -10447,7 +10787,7 @@ type CreateCancellationRequest struct {
 
 func (x *CreateCancellationRequest) Reset() {
 	*x = CreateCancellationRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[155]
+	mi := &file_api_v2_service_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10459,7 +10799,7 @@ func (x *CreateCancellationRequest) String() string {
 func (*CreateCancellationRequest) ProtoMessage() {}
 
 func (x *CreateCancellationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[155]
+	mi := &file_api_v2_service_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10472,7 +10812,7 @@ func (x *CreateCancellationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateCancellationRequest.ProtoReflect.Descriptor instead.
 func (*CreateCancellationRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{155}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *CreateCancellationRequest) GetAppId() string {
@@ -10527,7 +10867,7 @@ type CreateCancellationResponse struct {
 
 func (x *CreateCancellationResponse) Reset() {
 	*x = CreateCancellationResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[156]
+	mi := &file_api_v2_service_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10539,7 +10879,7 @@ func (x *CreateCancellationResponse) String() string {
 func (*CreateCancellationResponse) ProtoMessage() {}
 
 func (x *CreateCancellationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[156]
+	mi := &file_api_v2_service_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10552,7 +10892,7 @@ func (x *CreateCancellationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateCancellationResponse.ProtoReflect.Descriptor instead.
 func (*CreateCancellationResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{156}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *CreateCancellationResponse) GetData() *Cancellation {
@@ -10585,7 +10925,7 @@ type Cancellation struct {
 
 func (x *Cancellation) Reset() {
 	*x = Cancellation{}
-	mi := &file_api_v2_service_proto_msgTypes[157]
+	mi := &file_api_v2_service_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10597,7 +10937,7 @@ func (x *Cancellation) String() string {
 func (*Cancellation) ProtoMessage() {}
 
 func (x *Cancellation) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[157]
+	mi := &file_api_v2_service_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10610,7 +10950,7 @@ func (x *Cancellation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Cancellation.ProtoReflect.Descriptor instead.
 func (*Cancellation) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{157}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *Cancellation) GetId() string {
@@ -10681,7 +11021,7 @@ type SubmitFeedbackRequest struct {
 
 func (x *SubmitFeedbackRequest) Reset() {
 	*x = SubmitFeedbackRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[158]
+	mi := &file_api_v2_service_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10693,7 +11033,7 @@ func (x *SubmitFeedbackRequest) String() string {
 func (*SubmitFeedbackRequest) ProtoMessage() {}
 
 func (x *SubmitFeedbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[158]
+	mi := &file_api_v2_service_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10706,7 +11046,7 @@ func (x *SubmitFeedbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitFeedbackRequest.ProtoReflect.Descriptor instead.
 func (*SubmitFeedbackRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{158}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *SubmitFeedbackRequest) GetFeedback() string {
@@ -10747,7 +11087,7 @@ type SubmitFeedbackResponse struct {
 
 func (x *SubmitFeedbackResponse) Reset() {
 	*x = SubmitFeedbackResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[159]
+	mi := &file_api_v2_service_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10759,7 +11099,7 @@ func (x *SubmitFeedbackResponse) String() string {
 func (*SubmitFeedbackResponse) ProtoMessage() {}
 
 func (x *SubmitFeedbackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[159]
+	mi := &file_api_v2_service_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10772,7 +11112,7 @@ func (x *SubmitFeedbackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitFeedbackResponse.ProtoReflect.Descriptor instead.
 func (*SubmitFeedbackResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{159}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *SubmitFeedbackResponse) GetData() *FeedbackData {
@@ -10798,7 +11138,7 @@ type FeedbackData struct {
 
 func (x *FeedbackData) Reset() {
 	*x = FeedbackData{}
-	mi := &file_api_v2_service_proto_msgTypes[160]
+	mi := &file_api_v2_service_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10810,7 +11150,7 @@ func (x *FeedbackData) String() string {
 func (*FeedbackData) ProtoMessage() {}
 
 func (x *FeedbackData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[160]
+	mi := &file_api_v2_service_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10823,7 +11163,7 @@ func (x *FeedbackData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeedbackData.ProtoReflect.Descriptor instead.
 func (*FeedbackData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{160}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *FeedbackData) GetAccepted() bool {
@@ -11372,7 +11712,45 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06_error\"<\n" +
 	"\fSyncAppError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"t\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xb4\x02\n" +
+	"\x13ListAppSyncsRequest\x123\n" +
+	"\x06app_id\x18\x01 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12n\n" +
+	"\x06cursor\x18\x02 \x01(\tBQ\x92AN2LPagination cursor from previous response: the UUID of the last returned syncH\x00R\x06cursor\x88\x01\x01\x12c\n" +
+	"\x05limit\x18\x03 \x01(\x05BH\x92AE2?Number of syncs to return per page: 1-100; 0 or omitted uses 20:\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x90\x01\n" +
+	"\x14ListAppSyncsResponse\x12 \n" +
+	"\x04data\x18\x01 \x03(\v2\f.api.v2.SyncR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"q\n" +
+	"\x11GetAppSyncRequest\x123\n" +
+	"\x06app_id\x18\x01 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12'\n" +
+	"\async_id\x18\x02 \x01(\tB\x0e\x92A\v2\tSync UUIDR\x06syncId\"l\n" +
+	"\x12GetAppSyncResponse\x12 \n" +
+	"\x04data\x18\x01 \x01(\v2\f.api.v2.SyncR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xb7\t\n" +
+	"\x04Sync\x12C\n" +
+	"\x02id\x18\x01 \x01(\tB3\x92A02.Sync UUID, matching the ID returned by SyncAppR\x02id\x123\n" +
+	"\x06app_id\x18\x02 \x01(\tB\x1c\x92A\x192\x17The user-defined app IDR\x05appId\x12\xe8\x02\n" +
+	"\x06status\x18\x03 \x01(\tB\xcf\x02\x92A\xcb\x022\xa0\x02Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress.\xf2\x02\apending\xf2\x02\asuccess\xf2\x02\x05error\xf2\x02\tduplicateR\x06status\x12C\n" +
+	"\x03url\x18\x04 \x01(\tB,\x92A)2'URL for the Inngest endpoint in the appH\x00R\x03url\x88\x01\x01\x12O\n" +
+	"\fsdk_language\x18\x05 \x01(\tB'\x92A$2\"SDK language reported by this syncH\x01R\vsdkLanguage\x88\x01\x01\x12L\n" +
+	"\vsdk_version\x18\x06 \x01(\tB&\x92A#2!SDK version reported by this syncH\x02R\n" +
+	"sdkVersion\x88\x01\x01\x12G\n" +
+	"\tframework\x18\a \x01(\tB$\x92A!2\x1fFramework reported by this syncH\x03R\tframework\x88\x01\x01\x12L\n" +
+	"\vapp_version\x18\b \x01(\tB&\x92A#2!App version reported by this syncH\x04R\n" +
+	"appVersion\x88\x01\x01\x12Y\n" +
+	"\x05error\x18\t \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x05R\x05error\x88\x01\x01\x12Y\n" +
+	"\n" +
+	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x1e\x92A\x1b2\x19When the sync was createdR\tcreatedAtB\x06\n" +
+	"\x04_urlB\x0f\n" +
+	"\r_sdk_languageB\x0e\n" +
+	"\f_sdk_versionB\f\n" +
+	"\n" +
+	"_frameworkB\x0e\n" +
+	"\f_app_versionB\b\n" +
+	"\x06_errorJ\x04\b\n" +
+	"\x10\vJ\x04\b\v\x10\fJ\x04\b\f\x10\rR\x0fadded_functionsR\x12modified_functionsR\x11removed_functions\"t\n" +
 	"\x14QueryInsightsRequest\x12\\\n" +
 	"\x05query\x18\x01 \x01(\tBF\x92AC2AThe insights query to execute, written in modified ClickHouse SQLR\x05query\"|\n" +
 	"\x15QueryInsightsResponse\x12-\n" +
@@ -11857,7 +12235,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x9e\x92\x02\n" +
+	"\x04INFO\x10\x032ڙ\x02\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -12390,7 +12768,20 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xf6\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x13\b\x01\x12\x0fapps:write:sync\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xe1\x03\n" +
+	"\fListAppSyncs\x12\x1b.api.v2.ListAppSyncsRequest\x1a\x1c.api.v2.ListAppSyncsResponse\"\x95\x03\x92A\xd9\x02\n" +
+	"\x04Apps\n" +
+	"\x04Beta\x12\x0eList app syncs\x1a\xa8\x02Lists app syncs newest first. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x18\b\x01\x12\x14apps:read:list_syncs\x82\xd3\xe4\x93\x02\x16\x12\x14/apps/{app_id}/syncs\x12\xd5\x03\n" +
+	"\n" +
+	"GetAppSync\x12\x19.api.v2.GetAppSyncRequest\x1a\x1a.api.v2.GetAppSyncResponse\"\x8f\x03\x92A\xcb\x02\n" +
+	"\x04Apps\n" +
+	"\x04Beta\x12\fGet app sync\x1a\x9c\x02Gets an app sync. Cloud keeps syncs until the app is deleted, with no separate retention window. The dev server keeps no sync history: for a known app, list is empty, cursors are invalid, and get with a valid UUID returns 404. Use GetApp latestSync for the dev server's current state.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x16\b\x01\x12\x12apps:read:get_sync\x82\xd3\xe4\x93\x02 \x12\x1e/apps/{app_id}/syncs/{sync_id}\x12\xf6\x01\n" +
 	"\x10GetFunctionTrace\x12\x1f.api.v2.GetFunctionTraceRequest\x1a .api.v2.GetFunctionTraceResponse\"\x9e\x01\x92Ad\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
@@ -12702,7 +13093,7 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 12)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 162)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 167)
 var file_api_v2_service_proto_goTypes = []any{
 	(FunctionRunStatus)(0),                        // 0: api.v2.FunctionRunStatus
 	(TraceSpanStatus)(0),                          // 1: api.v2.TraceSpanStatus
@@ -12807,149 +13198,154 @@ var file_api_v2_service_proto_goTypes = []any{
 	(*SyncAppResponse)(nil),                       // 100: api.v2.SyncAppResponse
 	(*SyncAppData)(nil),                           // 101: api.v2.SyncAppData
 	(*SyncAppError)(nil),                          // 102: api.v2.SyncAppError
-	(*QueryInsightsRequest)(nil),                  // 103: api.v2.QueryInsightsRequest
-	(*QueryInsightsResponse)(nil),                 // 104: api.v2.QueryInsightsResponse
-	(*QueryInsightsData)(nil),                     // 105: api.v2.QueryInsightsData
-	(*InsightsQueryInfo)(nil),                     // 106: api.v2.InsightsQueryInfo
-	(*InsightsOutputColumn)(nil),                  // 107: api.v2.InsightsOutputColumn
-	(*InsightsPathHint)(nil),                      // 108: api.v2.InsightsPathHint
-	(*InsightsPathSegment)(nil),                   // 109: api.v2.InsightsPathSegment
-	(*InsightsRow)(nil),                           // 110: api.v2.InsightsRow
-	(*InsightsDiagnostic)(nil),                    // 111: api.v2.InsightsDiagnostic
-	(*InsightsDiagnosticPosition)(nil),            // 112: api.v2.InsightsDiagnosticPosition
-	(*ListInsightsTablesRequest)(nil),             // 113: api.v2.ListInsightsTablesRequest
-	(*ListInsightsTablesResponse)(nil),            // 114: api.v2.ListInsightsTablesResponse
-	(*InsightsTable)(nil),                         // 115: api.v2.InsightsTable
-	(*InsightsTableColumn)(nil),                   // 116: api.v2.InsightsTableColumn
-	(*QueryInsightsPromptRequest)(nil),            // 117: api.v2.QueryInsightsPromptRequest
-	(*QueryInsightsPromptResponse)(nil),           // 118: api.v2.QueryInsightsPromptResponse
-	(*QueryInsightsPromptData)(nil),               // 119: api.v2.QueryInsightsPromptData
-	(*ListInsightsEventSchemasRequest)(nil),       // 120: api.v2.ListInsightsEventSchemasRequest
-	(*ListInsightsEventSchemasResponse)(nil),      // 121: api.v2.ListInsightsEventSchemasResponse
-	(*InsightsEventSchema)(nil),                   // 122: api.v2.InsightsEventSchema
-	(*ListExperimentsRequest)(nil),                // 123: api.v2.ListExperimentsRequest
-	(*ListExperimentsResponse)(nil),               // 124: api.v2.ListExperimentsResponse
-	(*Experiment)(nil),                            // 125: api.v2.Experiment
-	(*GetExperimentRequest)(nil),                  // 126: api.v2.GetExperimentRequest
-	(*GetExperimentResponse)(nil),                 // 127: api.v2.GetExperimentResponse
-	(*ExperimentDetail)(nil),                      // 128: api.v2.ExperimentDetail
-	(*ExperimentVariantMetrics)(nil),              // 129: api.v2.ExperimentVariantMetrics
-	(*ExperimentVariantMetric)(nil),               // 130: api.v2.ExperimentVariantMetric
-	(*ExperimentVariantWeight)(nil),               // 131: api.v2.ExperimentVariantWeight
-	(*ListSessionKeysRequest)(nil),                // 132: api.v2.ListSessionKeysRequest
-	(*ListSessionKeysResponse)(nil),               // 133: api.v2.ListSessionKeysResponse
-	(*SessionKey)(nil),                            // 134: api.v2.SessionKey
-	(*ListSessionsRequest)(nil),                   // 135: api.v2.ListSessionsRequest
-	(*ListSessionsResponse)(nil),                  // 136: api.v2.ListSessionsResponse
-	(*SessionGroup)(nil),                          // 137: api.v2.SessionGroup
-	(*ListSessionRunsRequest)(nil),                // 138: api.v2.ListSessionRunsRequest
-	(*ListSessionRunsResponse)(nil),               // 139: api.v2.ListSessionRunsResponse
-	(*SessionRun)(nil),                            // 140: api.v2.SessionRun
-	(*ListRunsRequest)(nil),                       // 141: api.v2.ListRunsRequest
-	(*ListFunctionRunsRequest)(nil),               // 142: api.v2.ListFunctionRunsRequest
-	(*ListRunsResponse)(nil),                      // 143: api.v2.ListRunsResponse
-	(*ListFunctionRunsResponse)(nil),              // 144: api.v2.ListFunctionRunsResponse
-	(*CancelRunRequest)(nil),                      // 145: api.v2.CancelRunRequest
-	(*CancelRunResponse)(nil),                     // 146: api.v2.CancelRunResponse
-	(*CancelRunData)(nil),                         // 147: api.v2.CancelRunData
-	(*RunDeferredFrom)(nil),                       // 148: api.v2.RunDeferredFrom
-	(*PauseFunctionRequest)(nil),                  // 149: api.v2.PauseFunctionRequest
-	(*PauseFunctionResponse)(nil),                 // 150: api.v2.PauseFunctionResponse
-	(*ResumeFunctionRequest)(nil),                 // 151: api.v2.ResumeFunctionRequest
-	(*ResumeFunctionResponse)(nil),                // 152: api.v2.ResumeFunctionResponse
-	(*PauseFunctionsRequest)(nil),                 // 153: api.v2.PauseFunctionsRequest
-	(*PauseFunctionsResponse)(nil),                // 154: api.v2.PauseFunctionsResponse
-	(*ResumeFunctionsRequest)(nil),                // 155: api.v2.ResumeFunctionsRequest
-	(*ResumeFunctionsResponse)(nil),               // 156: api.v2.ResumeFunctionsResponse
-	(*FunctionPauseResult)(nil),                   // 157: api.v2.FunctionPauseResult
-	(*ListEventsRequest)(nil),                     // 158: api.v2.ListEventsRequest
-	(*GetEventRequest)(nil),                       // 159: api.v2.GetEventRequest
-	(*ListEventsResponse)(nil),                    // 160: api.v2.ListEventsResponse
-	(*GetEventResponse)(nil),                      // 161: api.v2.GetEventResponse
-	(*Event)(nil),                                 // 162: api.v2.Event
-	(*EventSource)(nil),                           // 163: api.v2.EventSource
-	(*CreateReplayRequest)(nil),                   // 164: api.v2.CreateReplayRequest
-	(*CreateReplayResponse)(nil),                  // 165: api.v2.CreateReplayResponse
-	(*Replay)(nil),                                // 166: api.v2.Replay
-	(*CreateCancellationRequest)(nil),             // 167: api.v2.CreateCancellationRequest
-	(*CreateCancellationResponse)(nil),            // 168: api.v2.CreateCancellationResponse
-	(*Cancellation)(nil),                          // 169: api.v2.Cancellation
-	(*SubmitFeedbackRequest)(nil),                 // 170: api.v2.SubmitFeedbackRequest
-	(*SubmitFeedbackResponse)(nil),                // 171: api.v2.SubmitFeedbackResponse
-	(*FeedbackData)(nil),                          // 172: api.v2.FeedbackData
-	nil,                                           // 173: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),                 // 174: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                       // 175: google.protobuf.Struct
-	(*structpb.ListValue)(nil),                    // 176: google.protobuf.ListValue
-	(*structpb.Value)(nil),                        // 177: google.protobuf.Value
-	(*CreateBuildRequest)(nil),                    // 178: api.v2.CreateBuildRequest
-	(*CommitBuildRequest)(nil),                    // 179: api.v2.CommitBuildRequest
-	(*GetBuildRequest)(nil),                       // 180: api.v2.GetBuildRequest
-	(*ListBuildsRequest)(nil),                     // 181: api.v2.ListBuildsRequest
-	(*CancelBuildRequest)(nil),                    // 182: api.v2.CancelBuildRequest
-	(*CreateDeployRequest)(nil),                   // 183: api.v2.CreateDeployRequest
-	(*CommitDeployRequest)(nil),                   // 184: api.v2.CommitDeployRequest
-	(*GetDeployRequest)(nil),                      // 185: api.v2.GetDeployRequest
-	(*ListDeploysRequest)(nil),                    // 186: api.v2.ListDeploysRequest
-	(*CancelDeployRequest)(nil),                   // 187: api.v2.CancelDeployRequest
-	(*CreateSandboxRequest)(nil),                  // 188: api.v2.CreateSandboxRequest
-	(*ListSandboxesRequest)(nil),                  // 189: api.v2.ListSandboxesRequest
-	(*GetSandboxRequest)(nil),                     // 190: api.v2.GetSandboxRequest
-	(*DestroySandboxRequest)(nil),                 // 191: api.v2.DestroySandboxRequest
-	(*PauseSandboxRequest)(nil),                   // 192: api.v2.PauseSandboxRequest
-	(*ResumeSandboxRequest)(nil),                  // 193: api.v2.ResumeSandboxRequest
-	(*CreateSandboxSnapshotRequest)(nil),          // 194: api.v2.CreateSandboxSnapshotRequest
-	(*ListSandboxSnapshotsRequest)(nil),           // 195: api.v2.ListSandboxSnapshotsRequest
-	(*GetSandboxSnapshotRequest)(nil),             // 196: api.v2.GetSandboxSnapshotRequest
-	(*DeleteSandboxSnapshotRequest)(nil),          // 197: api.v2.DeleteSandboxSnapshotRequest
-	(*ExecSandboxRequest)(nil),                    // 198: api.v2.ExecSandboxRequest
-	(*StreamSandboxLogsRequest)(nil),              // 199: api.v2.StreamSandboxLogsRequest
-	(*WriteSandboxFileRequest)(nil),               // 200: api.v2.WriteSandboxFileRequest
-	(*ReadSandboxFileRequest)(nil),                // 201: api.v2.ReadSandboxFileRequest
-	(*StartSandboxProcessRequest)(nil),            // 202: api.v2.StartSandboxProcessRequest
-	(*ListSandboxProcessesRequest)(nil),           // 203: api.v2.ListSandboxProcessesRequest
-	(*GetSandboxProcessRequest)(nil),              // 204: api.v2.GetSandboxProcessRequest
-	(*SignalSandboxProcessRequest)(nil),           // 205: api.v2.SignalSandboxProcessRequest
-	(*WaitSandboxProcessRequest)(nil),             // 206: api.v2.WaitSandboxProcessRequest
-	(*GetSandboxProcessOutputRequest)(nil),        // 207: api.v2.GetSandboxProcessOutputRequest
-	(*StreamSandboxProcessOutputRequest)(nil),     // 208: api.v2.StreamSandboxProcessOutputRequest
-	(*CreateBuildResponse)(nil),                   // 209: api.v2.CreateBuildResponse
-	(*BuildResponse)(nil),                         // 210: api.v2.BuildResponse
-	(*ListBuildsResponse)(nil),                    // 211: api.v2.ListBuildsResponse
-	(*CreateDeployResponse)(nil),                  // 212: api.v2.CreateDeployResponse
-	(*DeployResponse)(nil),                        // 213: api.v2.DeployResponse
-	(*ListDeploysResponse)(nil),                   // 214: api.v2.ListDeploysResponse
-	(*CreateSandboxResponse)(nil),                 // 215: api.v2.CreateSandboxResponse
-	(*ListSandboxesResponse)(nil),                 // 216: api.v2.ListSandboxesResponse
-	(*GetSandboxResponse)(nil),                    // 217: api.v2.GetSandboxResponse
-	(*DestroySandboxResponse)(nil),                // 218: api.v2.DestroySandboxResponse
-	(*PauseSandboxResponse)(nil),                  // 219: api.v2.PauseSandboxResponse
-	(*ResumeSandboxResponse)(nil),                 // 220: api.v2.ResumeSandboxResponse
-	(*CreateSandboxSnapshotResponse)(nil),         // 221: api.v2.CreateSandboxSnapshotResponse
-	(*ListSandboxSnapshotsResponse)(nil),          // 222: api.v2.ListSandboxSnapshotsResponse
-	(*GetSandboxSnapshotResponse)(nil),            // 223: api.v2.GetSandboxSnapshotResponse
-	(*DeleteSandboxSnapshotResponse)(nil),         // 224: api.v2.DeleteSandboxSnapshotResponse
-	(*ExecSandboxResponse)(nil),                   // 225: api.v2.ExecSandboxResponse
-	(*StreamSandboxLogsResponse)(nil),             // 226: api.v2.StreamSandboxLogsResponse
-	(*WriteSandboxFileResponse)(nil),              // 227: api.v2.WriteSandboxFileResponse
-	(*httpbody.HttpBody)(nil),                     // 228: google.api.HttpBody
-	(*StartSandboxProcessResponse)(nil),           // 229: api.v2.StartSandboxProcessResponse
-	(*ListSandboxProcessesResponse)(nil),          // 230: api.v2.ListSandboxProcessesResponse
-	(*GetSandboxProcessResponse)(nil),             // 231: api.v2.GetSandboxProcessResponse
-	(*SignalSandboxProcessResponse)(nil),          // 232: api.v2.SignalSandboxProcessResponse
-	(*WaitSandboxProcessResponse)(nil),            // 233: api.v2.WaitSandboxProcessResponse
-	(*GetSandboxProcessOutputResponse)(nil),       // 234: api.v2.GetSandboxProcessOutputResponse
-	(*StreamSandboxProcessOutputResponse)(nil),    // 235: api.v2.StreamSandboxProcessOutputResponse
+	(*ListAppSyncsRequest)(nil),                   // 103: api.v2.ListAppSyncsRequest
+	(*ListAppSyncsResponse)(nil),                  // 104: api.v2.ListAppSyncsResponse
+	(*GetAppSyncRequest)(nil),                     // 105: api.v2.GetAppSyncRequest
+	(*GetAppSyncResponse)(nil),                    // 106: api.v2.GetAppSyncResponse
+	(*Sync)(nil),                                  // 107: api.v2.Sync
+	(*QueryInsightsRequest)(nil),                  // 108: api.v2.QueryInsightsRequest
+	(*QueryInsightsResponse)(nil),                 // 109: api.v2.QueryInsightsResponse
+	(*QueryInsightsData)(nil),                     // 110: api.v2.QueryInsightsData
+	(*InsightsQueryInfo)(nil),                     // 111: api.v2.InsightsQueryInfo
+	(*InsightsOutputColumn)(nil),                  // 112: api.v2.InsightsOutputColumn
+	(*InsightsPathHint)(nil),                      // 113: api.v2.InsightsPathHint
+	(*InsightsPathSegment)(nil),                   // 114: api.v2.InsightsPathSegment
+	(*InsightsRow)(nil),                           // 115: api.v2.InsightsRow
+	(*InsightsDiagnostic)(nil),                    // 116: api.v2.InsightsDiagnostic
+	(*InsightsDiagnosticPosition)(nil),            // 117: api.v2.InsightsDiagnosticPosition
+	(*ListInsightsTablesRequest)(nil),             // 118: api.v2.ListInsightsTablesRequest
+	(*ListInsightsTablesResponse)(nil),            // 119: api.v2.ListInsightsTablesResponse
+	(*InsightsTable)(nil),                         // 120: api.v2.InsightsTable
+	(*InsightsTableColumn)(nil),                   // 121: api.v2.InsightsTableColumn
+	(*QueryInsightsPromptRequest)(nil),            // 122: api.v2.QueryInsightsPromptRequest
+	(*QueryInsightsPromptResponse)(nil),           // 123: api.v2.QueryInsightsPromptResponse
+	(*QueryInsightsPromptData)(nil),               // 124: api.v2.QueryInsightsPromptData
+	(*ListInsightsEventSchemasRequest)(nil),       // 125: api.v2.ListInsightsEventSchemasRequest
+	(*ListInsightsEventSchemasResponse)(nil),      // 126: api.v2.ListInsightsEventSchemasResponse
+	(*InsightsEventSchema)(nil),                   // 127: api.v2.InsightsEventSchema
+	(*ListExperimentsRequest)(nil),                // 128: api.v2.ListExperimentsRequest
+	(*ListExperimentsResponse)(nil),               // 129: api.v2.ListExperimentsResponse
+	(*Experiment)(nil),                            // 130: api.v2.Experiment
+	(*GetExperimentRequest)(nil),                  // 131: api.v2.GetExperimentRequest
+	(*GetExperimentResponse)(nil),                 // 132: api.v2.GetExperimentResponse
+	(*ExperimentDetail)(nil),                      // 133: api.v2.ExperimentDetail
+	(*ExperimentVariantMetrics)(nil),              // 134: api.v2.ExperimentVariantMetrics
+	(*ExperimentVariantMetric)(nil),               // 135: api.v2.ExperimentVariantMetric
+	(*ExperimentVariantWeight)(nil),               // 136: api.v2.ExperimentVariantWeight
+	(*ListSessionKeysRequest)(nil),                // 137: api.v2.ListSessionKeysRequest
+	(*ListSessionKeysResponse)(nil),               // 138: api.v2.ListSessionKeysResponse
+	(*SessionKey)(nil),                            // 139: api.v2.SessionKey
+	(*ListSessionsRequest)(nil),                   // 140: api.v2.ListSessionsRequest
+	(*ListSessionsResponse)(nil),                  // 141: api.v2.ListSessionsResponse
+	(*SessionGroup)(nil),                          // 142: api.v2.SessionGroup
+	(*ListSessionRunsRequest)(nil),                // 143: api.v2.ListSessionRunsRequest
+	(*ListSessionRunsResponse)(nil),               // 144: api.v2.ListSessionRunsResponse
+	(*SessionRun)(nil),                            // 145: api.v2.SessionRun
+	(*ListRunsRequest)(nil),                       // 146: api.v2.ListRunsRequest
+	(*ListFunctionRunsRequest)(nil),               // 147: api.v2.ListFunctionRunsRequest
+	(*ListRunsResponse)(nil),                      // 148: api.v2.ListRunsResponse
+	(*ListFunctionRunsResponse)(nil),              // 149: api.v2.ListFunctionRunsResponse
+	(*CancelRunRequest)(nil),                      // 150: api.v2.CancelRunRequest
+	(*CancelRunResponse)(nil),                     // 151: api.v2.CancelRunResponse
+	(*CancelRunData)(nil),                         // 152: api.v2.CancelRunData
+	(*RunDeferredFrom)(nil),                       // 153: api.v2.RunDeferredFrom
+	(*PauseFunctionRequest)(nil),                  // 154: api.v2.PauseFunctionRequest
+	(*PauseFunctionResponse)(nil),                 // 155: api.v2.PauseFunctionResponse
+	(*ResumeFunctionRequest)(nil),                 // 156: api.v2.ResumeFunctionRequest
+	(*ResumeFunctionResponse)(nil),                // 157: api.v2.ResumeFunctionResponse
+	(*PauseFunctionsRequest)(nil),                 // 158: api.v2.PauseFunctionsRequest
+	(*PauseFunctionsResponse)(nil),                // 159: api.v2.PauseFunctionsResponse
+	(*ResumeFunctionsRequest)(nil),                // 160: api.v2.ResumeFunctionsRequest
+	(*ResumeFunctionsResponse)(nil),               // 161: api.v2.ResumeFunctionsResponse
+	(*FunctionPauseResult)(nil),                   // 162: api.v2.FunctionPauseResult
+	(*ListEventsRequest)(nil),                     // 163: api.v2.ListEventsRequest
+	(*GetEventRequest)(nil),                       // 164: api.v2.GetEventRequest
+	(*ListEventsResponse)(nil),                    // 165: api.v2.ListEventsResponse
+	(*GetEventResponse)(nil),                      // 166: api.v2.GetEventResponse
+	(*Event)(nil),                                 // 167: api.v2.Event
+	(*EventSource)(nil),                           // 168: api.v2.EventSource
+	(*CreateReplayRequest)(nil),                   // 169: api.v2.CreateReplayRequest
+	(*CreateReplayResponse)(nil),                  // 170: api.v2.CreateReplayResponse
+	(*Replay)(nil),                                // 171: api.v2.Replay
+	(*CreateCancellationRequest)(nil),             // 172: api.v2.CreateCancellationRequest
+	(*CreateCancellationResponse)(nil),            // 173: api.v2.CreateCancellationResponse
+	(*Cancellation)(nil),                          // 174: api.v2.Cancellation
+	(*SubmitFeedbackRequest)(nil),                 // 175: api.v2.SubmitFeedbackRequest
+	(*SubmitFeedbackResponse)(nil),                // 176: api.v2.SubmitFeedbackResponse
+	(*FeedbackData)(nil),                          // 177: api.v2.FeedbackData
+	nil,                                           // 178: api.v2.TraceSpanMetadata.ValuesEntry
+	(*timestamppb.Timestamp)(nil),                 // 179: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                       // 180: google.protobuf.Struct
+	(*structpb.ListValue)(nil),                    // 181: google.protobuf.ListValue
+	(*structpb.Value)(nil),                        // 182: google.protobuf.Value
+	(*CreateBuildRequest)(nil),                    // 183: api.v2.CreateBuildRequest
+	(*CommitBuildRequest)(nil),                    // 184: api.v2.CommitBuildRequest
+	(*GetBuildRequest)(nil),                       // 185: api.v2.GetBuildRequest
+	(*ListBuildsRequest)(nil),                     // 186: api.v2.ListBuildsRequest
+	(*CancelBuildRequest)(nil),                    // 187: api.v2.CancelBuildRequest
+	(*CreateDeployRequest)(nil),                   // 188: api.v2.CreateDeployRequest
+	(*CommitDeployRequest)(nil),                   // 189: api.v2.CommitDeployRequest
+	(*GetDeployRequest)(nil),                      // 190: api.v2.GetDeployRequest
+	(*ListDeploysRequest)(nil),                    // 191: api.v2.ListDeploysRequest
+	(*CancelDeployRequest)(nil),                   // 192: api.v2.CancelDeployRequest
+	(*CreateSandboxRequest)(nil),                  // 193: api.v2.CreateSandboxRequest
+	(*ListSandboxesRequest)(nil),                  // 194: api.v2.ListSandboxesRequest
+	(*GetSandboxRequest)(nil),                     // 195: api.v2.GetSandboxRequest
+	(*DestroySandboxRequest)(nil),                 // 196: api.v2.DestroySandboxRequest
+	(*PauseSandboxRequest)(nil),                   // 197: api.v2.PauseSandboxRequest
+	(*ResumeSandboxRequest)(nil),                  // 198: api.v2.ResumeSandboxRequest
+	(*CreateSandboxSnapshotRequest)(nil),          // 199: api.v2.CreateSandboxSnapshotRequest
+	(*ListSandboxSnapshotsRequest)(nil),           // 200: api.v2.ListSandboxSnapshotsRequest
+	(*GetSandboxSnapshotRequest)(nil),             // 201: api.v2.GetSandboxSnapshotRequest
+	(*DeleteSandboxSnapshotRequest)(nil),          // 202: api.v2.DeleteSandboxSnapshotRequest
+	(*ExecSandboxRequest)(nil),                    // 203: api.v2.ExecSandboxRequest
+	(*StreamSandboxLogsRequest)(nil),              // 204: api.v2.StreamSandboxLogsRequest
+	(*WriteSandboxFileRequest)(nil),               // 205: api.v2.WriteSandboxFileRequest
+	(*ReadSandboxFileRequest)(nil),                // 206: api.v2.ReadSandboxFileRequest
+	(*StartSandboxProcessRequest)(nil),            // 207: api.v2.StartSandboxProcessRequest
+	(*ListSandboxProcessesRequest)(nil),           // 208: api.v2.ListSandboxProcessesRequest
+	(*GetSandboxProcessRequest)(nil),              // 209: api.v2.GetSandboxProcessRequest
+	(*SignalSandboxProcessRequest)(nil),           // 210: api.v2.SignalSandboxProcessRequest
+	(*WaitSandboxProcessRequest)(nil),             // 211: api.v2.WaitSandboxProcessRequest
+	(*GetSandboxProcessOutputRequest)(nil),        // 212: api.v2.GetSandboxProcessOutputRequest
+	(*StreamSandboxProcessOutputRequest)(nil),     // 213: api.v2.StreamSandboxProcessOutputRequest
+	(*CreateBuildResponse)(nil),                   // 214: api.v2.CreateBuildResponse
+	(*BuildResponse)(nil),                         // 215: api.v2.BuildResponse
+	(*ListBuildsResponse)(nil),                    // 216: api.v2.ListBuildsResponse
+	(*CreateDeployResponse)(nil),                  // 217: api.v2.CreateDeployResponse
+	(*DeployResponse)(nil),                        // 218: api.v2.DeployResponse
+	(*ListDeploysResponse)(nil),                   // 219: api.v2.ListDeploysResponse
+	(*CreateSandboxResponse)(nil),                 // 220: api.v2.CreateSandboxResponse
+	(*ListSandboxesResponse)(nil),                 // 221: api.v2.ListSandboxesResponse
+	(*GetSandboxResponse)(nil),                    // 222: api.v2.GetSandboxResponse
+	(*DestroySandboxResponse)(nil),                // 223: api.v2.DestroySandboxResponse
+	(*PauseSandboxResponse)(nil),                  // 224: api.v2.PauseSandboxResponse
+	(*ResumeSandboxResponse)(nil),                 // 225: api.v2.ResumeSandboxResponse
+	(*CreateSandboxSnapshotResponse)(nil),         // 226: api.v2.CreateSandboxSnapshotResponse
+	(*ListSandboxSnapshotsResponse)(nil),          // 227: api.v2.ListSandboxSnapshotsResponse
+	(*GetSandboxSnapshotResponse)(nil),            // 228: api.v2.GetSandboxSnapshotResponse
+	(*DeleteSandboxSnapshotResponse)(nil),         // 229: api.v2.DeleteSandboxSnapshotResponse
+	(*ExecSandboxResponse)(nil),                   // 230: api.v2.ExecSandboxResponse
+	(*StreamSandboxLogsResponse)(nil),             // 231: api.v2.StreamSandboxLogsResponse
+	(*WriteSandboxFileResponse)(nil),              // 232: api.v2.WriteSandboxFileResponse
+	(*httpbody.HttpBody)(nil),                     // 233: google.api.HttpBody
+	(*StartSandboxProcessResponse)(nil),           // 234: api.v2.StartSandboxProcessResponse
+	(*ListSandboxProcessesResponse)(nil),          // 235: api.v2.ListSandboxProcessesResponse
+	(*GetSandboxProcessResponse)(nil),             // 236: api.v2.GetSandboxProcessResponse
+	(*SignalSandboxProcessResponse)(nil),          // 237: api.v2.SignalSandboxProcessResponse
+	(*WaitSandboxProcessResponse)(nil),            // 238: api.v2.WaitSandboxProcessResponse
+	(*GetSandboxProcessOutputResponse)(nil),       // 239: api.v2.GetSandboxProcessOutputResponse
+	(*StreamSandboxProcessOutputResponse)(nil),    // 240: api.v2.StreamSandboxProcessOutputResponse
 }
 var file_api_v2_service_proto_depIdxs = []int32{
 	15,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
 	18,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
 	16,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	174, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	174, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	179, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	179, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
 	19,  // 5: api.v2.ResponseMetadata.time_range:type_name -> api.v2.TimeRange
-	174, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
-	174, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
+	179, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
+	179, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
 	21,  // 8: api.v2.FunctionRef.app:type_name -> api.v2.AppRef
 	3,   // 9: api.v2.FunctionTrigger.type:type_name -> api.v2.FunctionTriggerType
 	4,   // 10: api.v2.FunctionConcurrencyConfiguration.scope:type_name -> api.v2.FunctionConcurrencyScope
@@ -12970,30 +13366,30 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	20,  // 25: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
 	21,  // 26: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
 	0,   // 27: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	174, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	174, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	174, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	179, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	179, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	179, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
 	36,  // 31: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	175, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
-	148, // 33: api.v2.FunctionRun.deferred_from:type_name -> api.v2.RunDeferredFrom
+	180, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	153, // 33: api.v2.FunctionRun.deferred_from:type_name -> api.v2.RunDeferredFrom
 	37,  // 34: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
 	18,  // 35: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
 	37,  // 36: api.v2.GetEventRunsResponse.data:type_name -> api.v2.FunctionRun
 	18,  // 37: api.v2.GetEventRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 38: api.v2.GetEventRunsResponse.page:type_name -> api.v2.Page
 	43,  // 39: api.v2.RerunRequest.from_step:type_name -> api.v2.RerunFromStep
-	176, // 40: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
+	181, // 40: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
 	45,  // 41: api.v2.RerunResponse.data:type_name -> api.v2.RerunData
 	18,  // 42: api.v2.RerunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	173, // 43: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	174, // 44: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	178, // 43: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	179, // 44: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
 	1,   // 45: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
 	2,   // 46: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	174, // 47: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	174, // 48: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	174, // 49: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	175, // 50: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	175, // 51: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	179, // 47: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	179, // 48: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	179, // 49: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	180, // 50: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	180, // 51: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
 	46,  // 52: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
 	47,  // 53: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
 	47,  // 54: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
@@ -13002,10 +13398,10 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	35,  // 57: api.v2.GetFunctionResponse.data:type_name -> api.v2.Function
 	18,  // 58: api.v2.GetFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
 	6,   // 59: api.v2.App.method:type_name -> api.v2.AppMethod
-	174, // 60: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
-	174, // 61: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
+	179, // 60: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
+	179, // 61: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
 	54,  // 62: api.v2.App.latest_sync:type_name -> api.v2.AppSync
-	174, // 63: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
+	179, // 63: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
 	53,  // 64: api.v2.GetAppResponse.data:type_name -> api.v2.App
 	18,  // 65: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	53,  // 66: api.v2.GetAppsResponse.data:type_name -> api.v2.App
@@ -13019,27 +13415,27 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	65,  // 74: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
 	18,  // 75: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	7,   // 76: api.v2.Env.type:type_name -> api.v2.EnvType
-	174, // 77: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	174, // 78: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	174, // 79: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	179, // 77: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 78: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 79: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
 	70,  // 80: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
 	18,  // 81: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 82: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
 	70,  // 83: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
 	18,  // 84: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	174, // 85: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	174, // 86: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	179, // 85: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 86: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
 	74,  // 87: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
 	18,  // 88: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 89: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	174, // 90: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 90: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
 	65,  // 91: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
 	18,  // 92: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 93: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
 	79,  // 94: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
 	18,  // 95: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 96: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	174, // 97: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 97: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
 	82,  // 98: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
 	85,  // 99: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
 	18,  // 100: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
@@ -13048,296 +13444,307 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	18,  // 103: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
 	71,  // 104: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
 	82,  // 105: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	174, // 106: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	174, // 107: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	179, // 106: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	179, // 107: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
 	65,  // 108: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
 	18,  // 109: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	175, // 110: api.v2.SendEventRequest.data:type_name -> google.protobuf.Struct
-	175, // 111: api.v2.SendEventRequest.user:type_name -> google.protobuf.Struct
+	180, // 110: api.v2.SendEventRequest.data:type_name -> google.protobuf.Struct
+	180, // 111: api.v2.SendEventRequest.user:type_name -> google.protobuf.Struct
 	90,  // 112: api.v2.SendEventResponse.data:type_name -> api.v2.SendEventData
 	18,  // 113: api.v2.SendEventResponse.metadata:type_name -> api.v2.ResponseMetadata
-	175, // 114: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	180, // 114: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
 	93,  // 115: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
 	18,  // 116: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	174, // 117: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	174, // 118: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	174, // 119: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	179, // 117: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	179, // 118: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	179, // 119: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
 	95,  // 120: api.v2.CreateScoreRequest.scores:type_name -> api.v2.CreateScoreInput
-	177, // 121: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
+	182, // 121: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
 	96,  // 122: api.v2.CreateScoreInput.experiment:type_name -> api.v2.ScoreExperiment
 	98,  // 123: api.v2.CreateScoreResponse.data:type_name -> api.v2.Score
 	18,  // 124: api.v2.CreateScoreResponse.metadata:type_name -> api.v2.ResponseMetadata
-	177, // 125: api.v2.Score.value:type_name -> google.protobuf.Value
+	182, // 125: api.v2.Score.value:type_name -> google.protobuf.Value
 	96,  // 126: api.v2.Score.experiment:type_name -> api.v2.ScoreExperiment
 	101, // 127: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
 	18,  // 128: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
 	102, // 129: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	105, // 130: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
-	18,  // 131: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	107, // 132: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
-	110, // 133: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
-	111, // 134: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
-	106, // 135: api.v2.QueryInsightsData.info:type_name -> api.v2.InsightsQueryInfo
-	10,  // 136: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
-	108, // 137: api.v2.InsightsOutputColumn.path_hints:type_name -> api.v2.InsightsPathHint
-	109, // 138: api.v2.InsightsPathHint.path:type_name -> api.v2.InsightsPathSegment
-	9,   // 139: api.v2.InsightsPathHint.hint:type_name -> api.v2.InsightsColumnHint
-	177, // 140: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
-	11,  // 141: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
-	112, // 142: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
-	115, // 143: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
-	18,  // 144: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
-	116, // 145: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
-	119, // 146: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
-	18,  // 147: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
-	122, // 148: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
-	18,  // 149: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 150: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	175, // 151: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	174, // 152: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 153: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
-	125, // 154: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
-	18,  // 155: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 156: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
-	20,  // 157: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
-	174, // 158: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
-	174, // 159: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
-	174, // 160: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 161: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
-	128, // 162: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
-	18,  // 163: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
-	129, // 164: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
-	131, // 165: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
-	174, // 166: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
-	174, // 167: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
-	130, // 168: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
-	134, // 169: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
-	18,  // 170: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 171: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
-	174, // 172: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
-	174, // 173: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 174: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
-	137, // 175: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
-	18,  // 176: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 177: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
-	174, // 178: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
-	20,  // 179: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
-	174, // 180: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 181: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
-	140, // 182: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
-	18,  // 183: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 184: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
-	20,  // 185: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
-	0,   // 186: api.v2.SessionRun.status:type_name -> api.v2.FunctionRunStatus
-	174, // 187: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
-	174, // 188: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
-	174, // 189: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
-	174, // 190: api.v2.ListRunsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 191: api.v2.ListRunsRequest.until:type_name -> google.protobuf.Timestamp
-	174, // 192: api.v2.ListFunctionRunsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 193: api.v2.ListFunctionRunsRequest.until:type_name -> google.protobuf.Timestamp
-	37,  // 194: api.v2.ListRunsResponse.data:type_name -> api.v2.FunctionRun
-	18,  // 195: api.v2.ListRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 196: api.v2.ListRunsResponse.page:type_name -> api.v2.Page
-	37,  // 197: api.v2.ListFunctionRunsResponse.data:type_name -> api.v2.FunctionRun
-	18,  // 198: api.v2.ListFunctionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 199: api.v2.ListFunctionRunsResponse.page:type_name -> api.v2.Page
-	147, // 200: api.v2.CancelRunResponse.data:type_name -> api.v2.CancelRunData
-	18,  // 201: api.v2.CancelRunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 202: api.v2.PauseFunctionResponse.data:type_name -> api.v2.Function
-	18,  // 203: api.v2.PauseFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 204: api.v2.ResumeFunctionResponse.data:type_name -> api.v2.Function
-	18,  // 205: api.v2.ResumeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	157, // 206: api.v2.PauseFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
-	18,  // 207: api.v2.PauseFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	157, // 208: api.v2.ResumeFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
-	18,  // 209: api.v2.ResumeFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 210: api.v2.FunctionPauseResult.function:type_name -> api.v2.Function
-	16,  // 211: api.v2.FunctionPauseResult.error:type_name -> api.v2.Error
-	174, // 212: api.v2.ListEventsRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 213: api.v2.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
-	162, // 214: api.v2.ListEventsResponse.data:type_name -> api.v2.Event
-	18,  // 215: api.v2.ListEventsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 216: api.v2.ListEventsResponse.page:type_name -> api.v2.Page
-	162, // 217: api.v2.GetEventResponse.data:type_name -> api.v2.Event
-	18,  // 218: api.v2.GetEventResponse.metadata:type_name -> api.v2.ResponseMetadata
-	174, // 219: api.v2.Event.received_at:type_name -> google.protobuf.Timestamp
-	174, // 220: api.v2.Event.occurred_at:type_name -> google.protobuf.Timestamp
-	163, // 221: api.v2.Event.source:type_name -> api.v2.EventSource
-	175, // 222: api.v2.Event.payload:type_name -> google.protobuf.Struct
-	174, // 223: api.v2.CreateReplayRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 224: api.v2.CreateReplayRequest.until:type_name -> google.protobuf.Timestamp
-	166, // 225: api.v2.CreateReplayResponse.data:type_name -> api.v2.Replay
-	18,  // 226: api.v2.CreateReplayResponse.metadata:type_name -> api.v2.ResponseMetadata
-	174, // 227: api.v2.Replay.created_at:type_name -> google.protobuf.Timestamp
-	174, // 228: api.v2.Replay.from:type_name -> google.protobuf.Timestamp
-	174, // 229: api.v2.Replay.until:type_name -> google.protobuf.Timestamp
-	174, // 230: api.v2.CreateCancellationRequest.from:type_name -> google.protobuf.Timestamp
-	174, // 231: api.v2.CreateCancellationRequest.until:type_name -> google.protobuf.Timestamp
-	169, // 232: api.v2.CreateCancellationResponse.data:type_name -> api.v2.Cancellation
-	18,  // 233: api.v2.CreateCancellationResponse.metadata:type_name -> api.v2.ResponseMetadata
-	174, // 234: api.v2.Cancellation.from:type_name -> google.protobuf.Timestamp
-	174, // 235: api.v2.Cancellation.until:type_name -> google.protobuf.Timestamp
-	174, // 236: api.v2.Cancellation.created_at:type_name -> google.protobuf.Timestamp
-	172, // 237: api.v2.SubmitFeedbackResponse.data:type_name -> api.v2.FeedbackData
-	18,  // 238: api.v2.SubmitFeedbackResponse.metadata:type_name -> api.v2.ResponseMetadata
-	12,  // 239: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	12,  // 240: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	61,  // 241: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	63,  // 242: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	67,  // 243: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	13,  // 244: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	75,  // 245: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	72,  // 246: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	77,  // 247: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	80,  // 248: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	83,  // 249: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	86,  // 250: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	38,  // 251: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	141, // 252: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
-	142, // 253: api.v2.V2.ListFunctionRuns:input_type -> api.v2.ListFunctionRunsRequest
-	40,  // 254: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
-	164, // 255: api.v2.V2.CreateReplay:input_type -> api.v2.CreateReplayRequest
-	42,  // 256: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
-	145, // 257: api.v2.V2.CancelRun:input_type -> api.v2.CancelRunRequest
-	55,  // 258: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
-	57,  // 259: api.v2.V2.GetApps:input_type -> api.v2.GetAppsRequest
-	178, // 260: api.v2.V2.CreateBuild:input_type -> api.v2.CreateBuildRequest
-	179, // 261: api.v2.V2.CommitBuild:input_type -> api.v2.CommitBuildRequest
-	180, // 262: api.v2.V2.GetBuild:input_type -> api.v2.GetBuildRequest
-	181, // 263: api.v2.V2.ListBuilds:input_type -> api.v2.ListBuildsRequest
-	182, // 264: api.v2.V2.CancelBuild:input_type -> api.v2.CancelBuildRequest
-	183, // 265: api.v2.V2.CreateDeploy:input_type -> api.v2.CreateDeployRequest
-	184, // 266: api.v2.V2.CommitDeploy:input_type -> api.v2.CommitDeployRequest
-	185, // 267: api.v2.V2.GetDeploy:input_type -> api.v2.GetDeployRequest
-	186, // 268: api.v2.V2.ListDeploys:input_type -> api.v2.ListDeploysRequest
-	187, // 269: api.v2.V2.CancelDeploy:input_type -> api.v2.CancelDeployRequest
-	188, // 270: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
-	189, // 271: api.v2.V2.ListSandboxes:input_type -> api.v2.ListSandboxesRequest
-	190, // 272: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
-	191, // 273: api.v2.V2.DestroySandbox:input_type -> api.v2.DestroySandboxRequest
-	192, // 274: api.v2.V2.PauseSandbox:input_type -> api.v2.PauseSandboxRequest
-	193, // 275: api.v2.V2.ResumeSandbox:input_type -> api.v2.ResumeSandboxRequest
-	194, // 276: api.v2.V2.CreateSandboxSnapshot:input_type -> api.v2.CreateSandboxSnapshotRequest
-	195, // 277: api.v2.V2.ListSandboxSnapshots:input_type -> api.v2.ListSandboxSnapshotsRequest
-	196, // 278: api.v2.V2.GetSandboxSnapshot:input_type -> api.v2.GetSandboxSnapshotRequest
-	197, // 279: api.v2.V2.DeleteSandboxSnapshot:input_type -> api.v2.DeleteSandboxSnapshotRequest
-	198, // 280: api.v2.V2.ExecSandbox:input_type -> api.v2.ExecSandboxRequest
-	199, // 281: api.v2.V2.StreamSandboxLogs:input_type -> api.v2.StreamSandboxLogsRequest
-	200, // 282: api.v2.V2.WriteSandboxFile:input_type -> api.v2.WriteSandboxFileRequest
-	201, // 283: api.v2.V2.ReadSandboxFile:input_type -> api.v2.ReadSandboxFileRequest
-	202, // 284: api.v2.V2.StartSandboxProcess:input_type -> api.v2.StartSandboxProcessRequest
-	203, // 285: api.v2.V2.ListSandboxProcesses:input_type -> api.v2.ListSandboxProcessesRequest
-	204, // 286: api.v2.V2.GetSandboxProcess:input_type -> api.v2.GetSandboxProcessRequest
-	205, // 287: api.v2.V2.SignalSandboxProcess:input_type -> api.v2.SignalSandboxProcessRequest
-	206, // 288: api.v2.V2.WaitSandboxProcess:input_type -> api.v2.WaitSandboxProcessRequest
-	207, // 289: api.v2.V2.GetSandboxProcessOutput:input_type -> api.v2.GetSandboxProcessOutputRequest
-	208, // 290: api.v2.V2.StreamSandboxProcessOutput:input_type -> api.v2.StreamSandboxProcessOutputRequest
-	94,  // 291: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
-	99,  // 292: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	49,  // 293: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	51,  // 294: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
-	167, // 295: api.v2.V2.CreateCancellation:input_type -> api.v2.CreateCancellationRequest
-	149, // 296: api.v2.V2.PauseFunction:input_type -> api.v2.PauseFunctionRequest
-	151, // 297: api.v2.V2.ResumeFunction:input_type -> api.v2.ResumeFunctionRequest
-	153, // 298: api.v2.V2.PauseFunctions:input_type -> api.v2.PauseFunctionsRequest
-	155, // 299: api.v2.V2.ResumeFunctions:input_type -> api.v2.ResumeFunctionsRequest
-	59,  // 300: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
-	158, // 301: api.v2.V2.ListEvents:input_type -> api.v2.ListEventsRequest
-	159, // 302: api.v2.V2.GetEvent:input_type -> api.v2.GetEventRequest
-	88,  // 303: api.v2.V2.SendEvent:input_type -> api.v2.SendEventRequest
-	91,  // 304: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	113, // 305: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	120, // 306: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	117, // 307: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	103, // 308: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	123, // 309: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
-	126, // 310: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
-	132, // 311: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
-	135, // 312: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
-	138, // 313: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
-	170, // 314: api.v2.V2.SubmitFeedback:input_type -> api.v2.SubmitFeedbackRequest
-	14,  // 315: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	17,  // 316: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	62,  // 317: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	64,  // 318: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	68,  // 319: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	69,  // 320: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	76,  // 321: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	73,  // 322: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	78,  // 323: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	81,  // 324: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	84,  // 325: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	87,  // 326: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	39,  // 327: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	143, // 328: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
-	144, // 329: api.v2.V2.ListFunctionRuns:output_type -> api.v2.ListFunctionRunsResponse
-	41,  // 330: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
-	165, // 331: api.v2.V2.CreateReplay:output_type -> api.v2.CreateReplayResponse
-	44,  // 332: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
-	146, // 333: api.v2.V2.CancelRun:output_type -> api.v2.CancelRunResponse
-	56,  // 334: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
-	58,  // 335: api.v2.V2.GetApps:output_type -> api.v2.GetAppsResponse
-	209, // 336: api.v2.V2.CreateBuild:output_type -> api.v2.CreateBuildResponse
-	210, // 337: api.v2.V2.CommitBuild:output_type -> api.v2.BuildResponse
-	210, // 338: api.v2.V2.GetBuild:output_type -> api.v2.BuildResponse
-	211, // 339: api.v2.V2.ListBuilds:output_type -> api.v2.ListBuildsResponse
-	210, // 340: api.v2.V2.CancelBuild:output_type -> api.v2.BuildResponse
-	212, // 341: api.v2.V2.CreateDeploy:output_type -> api.v2.CreateDeployResponse
-	213, // 342: api.v2.V2.CommitDeploy:output_type -> api.v2.DeployResponse
-	213, // 343: api.v2.V2.GetDeploy:output_type -> api.v2.DeployResponse
-	214, // 344: api.v2.V2.ListDeploys:output_type -> api.v2.ListDeploysResponse
-	213, // 345: api.v2.V2.CancelDeploy:output_type -> api.v2.DeployResponse
-	215, // 346: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
-	216, // 347: api.v2.V2.ListSandboxes:output_type -> api.v2.ListSandboxesResponse
-	217, // 348: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse
-	218, // 349: api.v2.V2.DestroySandbox:output_type -> api.v2.DestroySandboxResponse
-	219, // 350: api.v2.V2.PauseSandbox:output_type -> api.v2.PauseSandboxResponse
-	220, // 351: api.v2.V2.ResumeSandbox:output_type -> api.v2.ResumeSandboxResponse
-	221, // 352: api.v2.V2.CreateSandboxSnapshot:output_type -> api.v2.CreateSandboxSnapshotResponse
-	222, // 353: api.v2.V2.ListSandboxSnapshots:output_type -> api.v2.ListSandboxSnapshotsResponse
-	223, // 354: api.v2.V2.GetSandboxSnapshot:output_type -> api.v2.GetSandboxSnapshotResponse
-	224, // 355: api.v2.V2.DeleteSandboxSnapshot:output_type -> api.v2.DeleteSandboxSnapshotResponse
-	225, // 356: api.v2.V2.ExecSandbox:output_type -> api.v2.ExecSandboxResponse
-	226, // 357: api.v2.V2.StreamSandboxLogs:output_type -> api.v2.StreamSandboxLogsResponse
-	227, // 358: api.v2.V2.WriteSandboxFile:output_type -> api.v2.WriteSandboxFileResponse
-	228, // 359: api.v2.V2.ReadSandboxFile:output_type -> google.api.HttpBody
-	229, // 360: api.v2.V2.StartSandboxProcess:output_type -> api.v2.StartSandboxProcessResponse
-	230, // 361: api.v2.V2.ListSandboxProcesses:output_type -> api.v2.ListSandboxProcessesResponse
-	231, // 362: api.v2.V2.GetSandboxProcess:output_type -> api.v2.GetSandboxProcessResponse
-	232, // 363: api.v2.V2.SignalSandboxProcess:output_type -> api.v2.SignalSandboxProcessResponse
-	233, // 364: api.v2.V2.WaitSandboxProcess:output_type -> api.v2.WaitSandboxProcessResponse
-	234, // 365: api.v2.V2.GetSandboxProcessOutput:output_type -> api.v2.GetSandboxProcessOutputResponse
-	235, // 366: api.v2.V2.StreamSandboxProcessOutput:output_type -> api.v2.StreamSandboxProcessOutputResponse
-	97,  // 367: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
-	100, // 368: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	50,  // 369: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	52,  // 370: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
-	168, // 371: api.v2.V2.CreateCancellation:output_type -> api.v2.CreateCancellationResponse
-	150, // 372: api.v2.V2.PauseFunction:output_type -> api.v2.PauseFunctionResponse
-	152, // 373: api.v2.V2.ResumeFunction:output_type -> api.v2.ResumeFunctionResponse
-	154, // 374: api.v2.V2.PauseFunctions:output_type -> api.v2.PauseFunctionsResponse
-	156, // 375: api.v2.V2.ResumeFunctions:output_type -> api.v2.ResumeFunctionsResponse
-	60,  // 376: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
-	160, // 377: api.v2.V2.ListEvents:output_type -> api.v2.ListEventsResponse
-	161, // 378: api.v2.V2.GetEvent:output_type -> api.v2.GetEventResponse
-	89,  // 379: api.v2.V2.SendEvent:output_type -> api.v2.SendEventResponse
-	92,  // 380: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	114, // 381: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	121, // 382: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	118, // 383: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	104, // 384: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	124, // 385: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
-	127, // 386: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
-	133, // 387: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
-	136, // 388: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
-	139, // 389: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
-	171, // 390: api.v2.V2.SubmitFeedback:output_type -> api.v2.SubmitFeedbackResponse
-	315, // [315:391] is the sub-list for method output_type
-	239, // [239:315] is the sub-list for method input_type
-	239, // [239:239] is the sub-list for extension type_name
-	239, // [239:239] is the sub-list for extension extendee
-	0,   // [0:239] is the sub-list for field type_name
+	107, // 130: api.v2.ListAppSyncsResponse.data:type_name -> api.v2.Sync
+	18,  // 131: api.v2.ListAppSyncsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 132: api.v2.ListAppSyncsResponse.page:type_name -> api.v2.Page
+	107, // 133: api.v2.GetAppSyncResponse.data:type_name -> api.v2.Sync
+	18,  // 134: api.v2.GetAppSyncResponse.metadata:type_name -> api.v2.ResponseMetadata
+	102, // 135: api.v2.Sync.error:type_name -> api.v2.SyncAppError
+	179, // 136: api.v2.Sync.created_at:type_name -> google.protobuf.Timestamp
+	110, // 137: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
+	18,  // 138: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	112, // 139: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
+	115, // 140: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
+	116, // 141: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	111, // 142: api.v2.QueryInsightsData.info:type_name -> api.v2.InsightsQueryInfo
+	10,  // 143: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
+	113, // 144: api.v2.InsightsOutputColumn.path_hints:type_name -> api.v2.InsightsPathHint
+	114, // 145: api.v2.InsightsPathHint.path:type_name -> api.v2.InsightsPathSegment
+	9,   // 146: api.v2.InsightsPathHint.hint:type_name -> api.v2.InsightsColumnHint
+	182, // 147: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	11,  // 148: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
+	117, // 149: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
+	120, // 150: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
+	18,  // 151: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
+	121, // 152: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
+	124, // 153: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
+	18,  // 154: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
+	127, // 155: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
+	18,  // 156: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 157: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
+	180, // 158: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	179, // 159: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 160: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
+	130, // 161: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
+	18,  // 162: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 163: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
+	20,  // 164: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
+	179, // 165: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
+	179, // 166: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
+	179, // 167: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 168: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
+	133, // 169: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
+	18,  // 170: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
+	134, // 171: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
+	136, // 172: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
+	179, // 173: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
+	179, // 174: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
+	135, // 175: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
+	139, // 176: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
+	18,  // 177: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 178: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
+	179, // 179: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
+	179, // 180: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 181: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
+	142, // 182: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
+	18,  // 183: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 184: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
+	179, // 185: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
+	20,  // 186: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
+	179, // 187: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 188: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	145, // 189: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
+	18,  // 190: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 191: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
+	20,  // 192: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
+	0,   // 193: api.v2.SessionRun.status:type_name -> api.v2.FunctionRunStatus
+	179, // 194: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
+	179, // 195: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
+	179, // 196: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
+	179, // 197: api.v2.ListRunsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 198: api.v2.ListRunsRequest.until:type_name -> google.protobuf.Timestamp
+	179, // 199: api.v2.ListFunctionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 200: api.v2.ListFunctionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	37,  // 201: api.v2.ListRunsResponse.data:type_name -> api.v2.FunctionRun
+	18,  // 202: api.v2.ListRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 203: api.v2.ListRunsResponse.page:type_name -> api.v2.Page
+	37,  // 204: api.v2.ListFunctionRunsResponse.data:type_name -> api.v2.FunctionRun
+	18,  // 205: api.v2.ListFunctionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 206: api.v2.ListFunctionRunsResponse.page:type_name -> api.v2.Page
+	152, // 207: api.v2.CancelRunResponse.data:type_name -> api.v2.CancelRunData
+	18,  // 208: api.v2.CancelRunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	35,  // 209: api.v2.PauseFunctionResponse.data:type_name -> api.v2.Function
+	18,  // 210: api.v2.PauseFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	35,  // 211: api.v2.ResumeFunctionResponse.data:type_name -> api.v2.Function
+	18,  // 212: api.v2.ResumeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	162, // 213: api.v2.PauseFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
+	18,  // 214: api.v2.PauseFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	162, // 215: api.v2.ResumeFunctionsResponse.data:type_name -> api.v2.FunctionPauseResult
+	18,  // 216: api.v2.ResumeFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	35,  // 217: api.v2.FunctionPauseResult.function:type_name -> api.v2.Function
+	16,  // 218: api.v2.FunctionPauseResult.error:type_name -> api.v2.Error
+	179, // 219: api.v2.ListEventsRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 220: api.v2.ListEventsRequest.until:type_name -> google.protobuf.Timestamp
+	167, // 221: api.v2.ListEventsResponse.data:type_name -> api.v2.Event
+	18,  // 222: api.v2.ListEventsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	71,  // 223: api.v2.ListEventsResponse.page:type_name -> api.v2.Page
+	167, // 224: api.v2.GetEventResponse.data:type_name -> api.v2.Event
+	18,  // 225: api.v2.GetEventResponse.metadata:type_name -> api.v2.ResponseMetadata
+	179, // 226: api.v2.Event.received_at:type_name -> google.protobuf.Timestamp
+	179, // 227: api.v2.Event.occurred_at:type_name -> google.protobuf.Timestamp
+	168, // 228: api.v2.Event.source:type_name -> api.v2.EventSource
+	180, // 229: api.v2.Event.payload:type_name -> google.protobuf.Struct
+	179, // 230: api.v2.CreateReplayRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 231: api.v2.CreateReplayRequest.until:type_name -> google.protobuf.Timestamp
+	171, // 232: api.v2.CreateReplayResponse.data:type_name -> api.v2.Replay
+	18,  // 233: api.v2.CreateReplayResponse.metadata:type_name -> api.v2.ResponseMetadata
+	179, // 234: api.v2.Replay.created_at:type_name -> google.protobuf.Timestamp
+	179, // 235: api.v2.Replay.from:type_name -> google.protobuf.Timestamp
+	179, // 236: api.v2.Replay.until:type_name -> google.protobuf.Timestamp
+	179, // 237: api.v2.CreateCancellationRequest.from:type_name -> google.protobuf.Timestamp
+	179, // 238: api.v2.CreateCancellationRequest.until:type_name -> google.protobuf.Timestamp
+	174, // 239: api.v2.CreateCancellationResponse.data:type_name -> api.v2.Cancellation
+	18,  // 240: api.v2.CreateCancellationResponse.metadata:type_name -> api.v2.ResponseMetadata
+	179, // 241: api.v2.Cancellation.from:type_name -> google.protobuf.Timestamp
+	179, // 242: api.v2.Cancellation.until:type_name -> google.protobuf.Timestamp
+	179, // 243: api.v2.Cancellation.created_at:type_name -> google.protobuf.Timestamp
+	177, // 244: api.v2.SubmitFeedbackResponse.data:type_name -> api.v2.FeedbackData
+	18,  // 245: api.v2.SubmitFeedbackResponse.metadata:type_name -> api.v2.ResponseMetadata
+	12,  // 246: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	12,  // 247: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	61,  // 248: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	63,  // 249: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	67,  // 250: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	13,  // 251: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	75,  // 252: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	72,  // 253: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	77,  // 254: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	80,  // 255: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	83,  // 256: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	86,  // 257: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	38,  // 258: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	146, // 259: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
+	147, // 260: api.v2.V2.ListFunctionRuns:input_type -> api.v2.ListFunctionRunsRequest
+	40,  // 261: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
+	169, // 262: api.v2.V2.CreateReplay:input_type -> api.v2.CreateReplayRequest
+	42,  // 263: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
+	150, // 264: api.v2.V2.CancelRun:input_type -> api.v2.CancelRunRequest
+	55,  // 265: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
+	57,  // 266: api.v2.V2.GetApps:input_type -> api.v2.GetAppsRequest
+	183, // 267: api.v2.V2.CreateBuild:input_type -> api.v2.CreateBuildRequest
+	184, // 268: api.v2.V2.CommitBuild:input_type -> api.v2.CommitBuildRequest
+	185, // 269: api.v2.V2.GetBuild:input_type -> api.v2.GetBuildRequest
+	186, // 270: api.v2.V2.ListBuilds:input_type -> api.v2.ListBuildsRequest
+	187, // 271: api.v2.V2.CancelBuild:input_type -> api.v2.CancelBuildRequest
+	188, // 272: api.v2.V2.CreateDeploy:input_type -> api.v2.CreateDeployRequest
+	189, // 273: api.v2.V2.CommitDeploy:input_type -> api.v2.CommitDeployRequest
+	190, // 274: api.v2.V2.GetDeploy:input_type -> api.v2.GetDeployRequest
+	191, // 275: api.v2.V2.ListDeploys:input_type -> api.v2.ListDeploysRequest
+	192, // 276: api.v2.V2.CancelDeploy:input_type -> api.v2.CancelDeployRequest
+	193, // 277: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
+	194, // 278: api.v2.V2.ListSandboxes:input_type -> api.v2.ListSandboxesRequest
+	195, // 279: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
+	196, // 280: api.v2.V2.DestroySandbox:input_type -> api.v2.DestroySandboxRequest
+	197, // 281: api.v2.V2.PauseSandbox:input_type -> api.v2.PauseSandboxRequest
+	198, // 282: api.v2.V2.ResumeSandbox:input_type -> api.v2.ResumeSandboxRequest
+	199, // 283: api.v2.V2.CreateSandboxSnapshot:input_type -> api.v2.CreateSandboxSnapshotRequest
+	200, // 284: api.v2.V2.ListSandboxSnapshots:input_type -> api.v2.ListSandboxSnapshotsRequest
+	201, // 285: api.v2.V2.GetSandboxSnapshot:input_type -> api.v2.GetSandboxSnapshotRequest
+	202, // 286: api.v2.V2.DeleteSandboxSnapshot:input_type -> api.v2.DeleteSandboxSnapshotRequest
+	203, // 287: api.v2.V2.ExecSandbox:input_type -> api.v2.ExecSandboxRequest
+	204, // 288: api.v2.V2.StreamSandboxLogs:input_type -> api.v2.StreamSandboxLogsRequest
+	205, // 289: api.v2.V2.WriteSandboxFile:input_type -> api.v2.WriteSandboxFileRequest
+	206, // 290: api.v2.V2.ReadSandboxFile:input_type -> api.v2.ReadSandboxFileRequest
+	207, // 291: api.v2.V2.StartSandboxProcess:input_type -> api.v2.StartSandboxProcessRequest
+	208, // 292: api.v2.V2.ListSandboxProcesses:input_type -> api.v2.ListSandboxProcessesRequest
+	209, // 293: api.v2.V2.GetSandboxProcess:input_type -> api.v2.GetSandboxProcessRequest
+	210, // 294: api.v2.V2.SignalSandboxProcess:input_type -> api.v2.SignalSandboxProcessRequest
+	211, // 295: api.v2.V2.WaitSandboxProcess:input_type -> api.v2.WaitSandboxProcessRequest
+	212, // 296: api.v2.V2.GetSandboxProcessOutput:input_type -> api.v2.GetSandboxProcessOutputRequest
+	213, // 297: api.v2.V2.StreamSandboxProcessOutput:input_type -> api.v2.StreamSandboxProcessOutputRequest
+	94,  // 298: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
+	99,  // 299: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	103, // 300: api.v2.V2.ListAppSyncs:input_type -> api.v2.ListAppSyncsRequest
+	105, // 301: api.v2.V2.GetAppSync:input_type -> api.v2.GetAppSyncRequest
+	49,  // 302: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	51,  // 303: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
+	172, // 304: api.v2.V2.CreateCancellation:input_type -> api.v2.CreateCancellationRequest
+	154, // 305: api.v2.V2.PauseFunction:input_type -> api.v2.PauseFunctionRequest
+	156, // 306: api.v2.V2.ResumeFunction:input_type -> api.v2.ResumeFunctionRequest
+	158, // 307: api.v2.V2.PauseFunctions:input_type -> api.v2.PauseFunctionsRequest
+	160, // 308: api.v2.V2.ResumeFunctions:input_type -> api.v2.ResumeFunctionsRequest
+	59,  // 309: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
+	163, // 310: api.v2.V2.ListEvents:input_type -> api.v2.ListEventsRequest
+	164, // 311: api.v2.V2.GetEvent:input_type -> api.v2.GetEventRequest
+	88,  // 312: api.v2.V2.SendEvent:input_type -> api.v2.SendEventRequest
+	91,  // 313: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	118, // 314: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	125, // 315: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	122, // 316: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	108, // 317: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	128, // 318: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
+	131, // 319: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
+	137, // 320: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
+	140, // 321: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
+	143, // 322: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
+	175, // 323: api.v2.V2.SubmitFeedback:input_type -> api.v2.SubmitFeedbackRequest
+	14,  // 324: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	17,  // 325: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	62,  // 326: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	64,  // 327: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	68,  // 328: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	69,  // 329: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	76,  // 330: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	73,  // 331: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	78,  // 332: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	81,  // 333: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	84,  // 334: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	87,  // 335: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	39,  // 336: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	148, // 337: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
+	149, // 338: api.v2.V2.ListFunctionRuns:output_type -> api.v2.ListFunctionRunsResponse
+	41,  // 339: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
+	170, // 340: api.v2.V2.CreateReplay:output_type -> api.v2.CreateReplayResponse
+	44,  // 341: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
+	151, // 342: api.v2.V2.CancelRun:output_type -> api.v2.CancelRunResponse
+	56,  // 343: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
+	58,  // 344: api.v2.V2.GetApps:output_type -> api.v2.GetAppsResponse
+	214, // 345: api.v2.V2.CreateBuild:output_type -> api.v2.CreateBuildResponse
+	215, // 346: api.v2.V2.CommitBuild:output_type -> api.v2.BuildResponse
+	215, // 347: api.v2.V2.GetBuild:output_type -> api.v2.BuildResponse
+	216, // 348: api.v2.V2.ListBuilds:output_type -> api.v2.ListBuildsResponse
+	215, // 349: api.v2.V2.CancelBuild:output_type -> api.v2.BuildResponse
+	217, // 350: api.v2.V2.CreateDeploy:output_type -> api.v2.CreateDeployResponse
+	218, // 351: api.v2.V2.CommitDeploy:output_type -> api.v2.DeployResponse
+	218, // 352: api.v2.V2.GetDeploy:output_type -> api.v2.DeployResponse
+	219, // 353: api.v2.V2.ListDeploys:output_type -> api.v2.ListDeploysResponse
+	218, // 354: api.v2.V2.CancelDeploy:output_type -> api.v2.DeployResponse
+	220, // 355: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
+	221, // 356: api.v2.V2.ListSandboxes:output_type -> api.v2.ListSandboxesResponse
+	222, // 357: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse
+	223, // 358: api.v2.V2.DestroySandbox:output_type -> api.v2.DestroySandboxResponse
+	224, // 359: api.v2.V2.PauseSandbox:output_type -> api.v2.PauseSandboxResponse
+	225, // 360: api.v2.V2.ResumeSandbox:output_type -> api.v2.ResumeSandboxResponse
+	226, // 361: api.v2.V2.CreateSandboxSnapshot:output_type -> api.v2.CreateSandboxSnapshotResponse
+	227, // 362: api.v2.V2.ListSandboxSnapshots:output_type -> api.v2.ListSandboxSnapshotsResponse
+	228, // 363: api.v2.V2.GetSandboxSnapshot:output_type -> api.v2.GetSandboxSnapshotResponse
+	229, // 364: api.v2.V2.DeleteSandboxSnapshot:output_type -> api.v2.DeleteSandboxSnapshotResponse
+	230, // 365: api.v2.V2.ExecSandbox:output_type -> api.v2.ExecSandboxResponse
+	231, // 366: api.v2.V2.StreamSandboxLogs:output_type -> api.v2.StreamSandboxLogsResponse
+	232, // 367: api.v2.V2.WriteSandboxFile:output_type -> api.v2.WriteSandboxFileResponse
+	233, // 368: api.v2.V2.ReadSandboxFile:output_type -> google.api.HttpBody
+	234, // 369: api.v2.V2.StartSandboxProcess:output_type -> api.v2.StartSandboxProcessResponse
+	235, // 370: api.v2.V2.ListSandboxProcesses:output_type -> api.v2.ListSandboxProcessesResponse
+	236, // 371: api.v2.V2.GetSandboxProcess:output_type -> api.v2.GetSandboxProcessResponse
+	237, // 372: api.v2.V2.SignalSandboxProcess:output_type -> api.v2.SignalSandboxProcessResponse
+	238, // 373: api.v2.V2.WaitSandboxProcess:output_type -> api.v2.WaitSandboxProcessResponse
+	239, // 374: api.v2.V2.GetSandboxProcessOutput:output_type -> api.v2.GetSandboxProcessOutputResponse
+	240, // 375: api.v2.V2.StreamSandboxProcessOutput:output_type -> api.v2.StreamSandboxProcessOutputResponse
+	97,  // 376: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
+	100, // 377: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	104, // 378: api.v2.V2.ListAppSyncs:output_type -> api.v2.ListAppSyncsResponse
+	106, // 379: api.v2.V2.GetAppSync:output_type -> api.v2.GetAppSyncResponse
+	50,  // 380: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	52,  // 381: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
+	173, // 382: api.v2.V2.CreateCancellation:output_type -> api.v2.CreateCancellationResponse
+	155, // 383: api.v2.V2.PauseFunction:output_type -> api.v2.PauseFunctionResponse
+	157, // 384: api.v2.V2.ResumeFunction:output_type -> api.v2.ResumeFunctionResponse
+	159, // 385: api.v2.V2.PauseFunctions:output_type -> api.v2.PauseFunctionsResponse
+	161, // 386: api.v2.V2.ResumeFunctions:output_type -> api.v2.ResumeFunctionsResponse
+	60,  // 387: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
+	165, // 388: api.v2.V2.ListEvents:output_type -> api.v2.ListEventsResponse
+	166, // 389: api.v2.V2.GetEvent:output_type -> api.v2.GetEventResponse
+	89,  // 390: api.v2.V2.SendEvent:output_type -> api.v2.SendEventResponse
+	92,  // 391: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	119, // 392: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	126, // 393: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	123, // 394: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	109, // 395: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	129, // 396: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
+	132, // 397: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
+	138, // 398: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
+	141, // 399: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
+	144, // 400: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
+	176, // 401: api.v2.V2.SubmitFeedback:output_type -> api.v2.SubmitFeedbackResponse
+	324, // [324:402] is the sub-list for method output_type
+	246, // [246:324] is the sub-list for method input_type
+	246, // [246:246] is the sub-list for extension type_name
+	246, // [246:246] is the sub-list for extension extendee
+	0,   // [0:246] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -13391,36 +13798,38 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[83].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[86].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[89].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[94].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[97].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[91].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[95].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[99].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[108].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[111].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[114].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[120].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[123].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[126].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[102].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[104].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[113].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[116].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[119].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[125].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[128].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[129].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[130].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[136].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[145].OneofWrappers = []any{
+	file_api_v2_service_proto_msgTypes[131].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[133].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[134].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[135].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[141].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[150].OneofWrappers = []any{
 		(*FunctionPauseResult_Function)(nil),
 		(*FunctionPauseResult_Error)(nil),
 	}
-	file_api_v2_service_proto_msgTypes[146].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[150].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[151].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[155].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[157].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[158].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[156].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[160].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[162].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[163].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
 			NumEnums:      12,
-			NumMessages:   162,
+			NumMessages:   167,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
