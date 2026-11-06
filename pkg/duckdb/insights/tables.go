@@ -369,7 +369,7 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"run_id": "run_id", "run_queued_at": "run_queued_at", "app_id": "app_name", "function_id": "function_slug",
 	}
 	if !collapsed {
-		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "attributes"} {
+		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "output", "input", "attributes"} {
 			physical[c] = c
 		}
 	}
