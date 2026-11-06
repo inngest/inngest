@@ -2,11 +2,7 @@ package tracing
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"fmt"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -19,7 +15,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// runsMaterializingSpanNames are the only span names materializeRuns
+// runsMaterializingSpanNames are the only span names runsInsertSQL
 // promotes into a row in inngest.runs.
 var runsMaterializingSpanNames = []string{"executor.run", "executor.run.queued", "executor.run.started"}
 
@@ -269,31 +265,14 @@ func safeMetadata(md sv2.Metadata) *sv2.Metadata {
 	return &md
 }
 
-// materializeRuns is DuckDBInserter.InsertSpans' follow-up: once per span
-// batch, after that batch's own rows land in inngest.run_trace_spans, it
-// promotes whichever of those rows name a run-level span (
-// runsMaterializingSpanNames) into a corresponding row in inngest.runs.
-// Scoping the follow-up SELECT to exactly this batch's span_ids (rather than
-// e.g. every row for the run) keeps a concurrent flush, or a row a prior
-// flush already materialized, from ever being touched twice.
-func materializeRuns(ctx context.Context, db *sql.DB, spans []Span) error {
-	var spanIDs []any
-	for _, s := range spans {
-		if !slices.Contains(runsMaterializingSpanNames, s.Name) {
-			continue
-		}
-		spanIDs = append(spanIDs, s.SpanID)
-	}
-	if len(spanIDs) == 0 {
-		return nil
-	}
-
-	placeholders := make([]string, len(spanIDs))
-	for i := range placeholders {
-		placeholders[i] = "?"
-	}
-
-	query := fmt.Sprintf(`INSERT INTO inngest.runs
+// runsInsertSQL is the INSERT that promotes run-level spans (
+// runsMaterializingSpanNames) from source into inngest.runs. source holds
+// rows shaped exactly like inngest.run_trace_spans (same column types,
+// bucket_at included). DuckDBInserter.InsertSpans points it at its staged
+// copy of the batch (see spanBatchTable), so it only ever sees the batch's
+// own spans and never scans the lake.
+func runsInsertSQL(source string) string {
+	return `INSERT INTO inngest.runs
 SELECT
   account_id,
   env_id,
@@ -322,11 +301,6 @@ SELECT
   COALESCE(TRY_CAST(attributes."_inngest.defer.parent_run_ids" AS VARCHAR[]), []::VARCHAR[]) AS defer_parent_run_ids,
   trace_id,
   bucket_at
-FROM inngest.run_trace_spans
-WHERE span_id IN (%s)
-AND name IN ('executor.run', 'executor.run.queued', 'executor.run.started');`,
-		strings.Join(placeholders, ", "))
-
-	_, err := db.ExecContext(ctx, query, spanIDs...)
-	return err
+FROM ` + source + `
+WHERE name IN ('executor.run', 'executor.run.queued', 'executor.run.started');`
 }

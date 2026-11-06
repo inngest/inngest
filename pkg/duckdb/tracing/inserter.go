@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/duckdb/driver"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -79,7 +81,7 @@ type RunMetadata struct {
 // each entity type in its own batcher (batch.go) and calls the matching
 // method once per flushed batch, so an Inserter only does the write. Runs are
 // not an entity of their own here: they're derived from run-level spans, and
-// it's up to the Inserter how (DuckDBInserter materializes inngest.runs from
+// it's up to the Inserter how (DuckDBInserter builds inngest.runs rows from
 // each span batch; a ClickHouse-backed one would rely on a materialized view).
 //
 // Each entity's batcher runs on its own goroutine, so implementations must
@@ -95,8 +97,8 @@ type Inserter interface {
 }
 
 // DuckDBInserter is the Inserter for the DuckDB dual-write: one literal
-// multi-row INSERT per batch into inngest.<table>, plus materializeRuns for
-// span batches.
+// multi-row INSERT per batch into inngest.<table> (span batches also
+// write their runs rows, see InsertSpans).
 type DuckDBInserter struct {
 	db *sql.DB
 }
@@ -113,6 +115,33 @@ var spanColumns = []string{
 	"start_time", "end_time", "attributes", "output", "input",
 }
 
+// spanBatchTable is the per-connection temp table InsertSpans stages each
+// span batch in.
+const spanBatchTable = "temp.main.dualwrite_span_batch"
+
+// bucketAtSQL is inngest.run_trace_spans.bucket_at's column default (see
+// 000001_baseline.sql). InsertSpans stamps it once while staging, so a span
+// and the runs row built from it share one bucket_at, same as when runs were
+// read back from the stored span.
+const bucketAtSQL = "make_timestamp_ms(epoch_ms(current_timestamp))"
+
+// rollbackTimeout bounds the ROLLBACK after a failed span batch.
+const rollbackTimeout = 5 * time.Second
+
+// InsertSpans stages the batch once in a temp table (spanBatchTable) and
+// inserts both inngest.run_trace_spans and inngest.runs from it (see
+// runsInsertSQL), so building the batch's runs rows never reads the lake.
+//
+// On a quack connection the whole thing runs as one transaction, so a
+// failure can't leave the batch's spans w/o their runs rows (nothing ever
+// rebuilds runs from spans, so that run row would be lost for good). DuckLake
+// commits multi-table transactions atomically. NOTE: an Iceberg catalog
+// can't commit 2 tables atomically unless it advertises
+// /v1/transactions/commit, so there this degrades to 2 commits; the
+// batcher's retries (retryableFlushError) cover most of that gap. The
+// jsonlines transport (tests) can't recover from a failed statement inside a
+// transaction (see driver.SupportsTransactions), so it runs the same
+// statements w/o one.
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
@@ -125,10 +154,45 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
 		}
 	}
-	if err := d.insert(ctx, "inngest.run_trace_spans", spanColumns, rows); err != nil {
+
+	cols := strings.Join(spanColumns, ", ") + ", bucket_at"
+	stageSQL, args := insertSQL(spanBatchTable, spanColumns, rows, [2]string{"bucket_at", bucketAtSQL})
+	stmts := []string{
+		// Clones run_trace_spans' column types (VARIANT etc.) so the runs
+		// projection sees exactly what it would reading the stored span.
+		// LIMIT 0 is planned as an empty result, so this doesn't scan the
+		// lake.
+		"CREATE OR REPLACE TEMP TABLE " + spanBatchTable + " AS SELECT * FROM inngest.run_trace_spans LIMIT 0;",
+		stageSQL,
+		fmt.Sprintf("INSERT INTO inngest.run_trace_spans (%s) SELECT %s FROM %s;", cols, cols, spanBatchTable),
+	}
+	if slices.ContainsFunc(spans, func(s Span) bool { return slices.Contains(runsMaterializingSpanNames, s.Name) }) {
+		stmts = append(stmts, runsInsertSQL(spanBatchTable))
+	}
+	stmts = append(stmts, "DROP TABLE "+spanBatchTable+";")
+
+	conn, err := d.db.Conn(ctx)
+	if err != nil {
 		return err
 	}
-	return materializeRuns(ctx, d.db, spans)
+	defer conn.Close()
+
+	if !driver.SupportsTransactions(conn) {
+		_, err = conn.ExecContext(ctx, strings.Join(stmts, "\n"), args...)
+		return err
+	}
+
+	script := "BEGIN TRANSACTION;\n" + strings.Join(stmts, "\n") + "\nCOMMIT;"
+	if _, err := conn.ExecContext(ctx, script, args...); err != nil {
+		// A failed statement leaves the transaction aborted on this session
+		// (a failed COMMIT has already rolled back, and this just errors).
+		// Roll back so the pooled conn is usable again.
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		_, _ = conn.ExecContext(rctx, "ROLLBACK;")
+		cancel()
+		return err
+	}
+	return nil
 }
 
 var eventColumns = []string{
@@ -174,11 +238,25 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 	if len(rows) == 0 {
 		return nil
 	}
+	query, args := insertSQL(table, cols, rows)
+	_, err := d.db.ExecContext(ctx, query, args...)
+	return err
+}
 
+// insertSQL builds one literal multi-row INSERT of rows (each in cols order)
+// into table, w/ a ? per value. extra are {column, SQL expression} pairs
+// appended to every row after cols (InsertSpans passes bucket_at's).
+func insertSQL(table string, cols []string, rows [][]any, extra ...[2]string) (string, []any) {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, strings.Join(cols, ", "))
+	colList := strings.Join(cols, ", ")
+	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
+	for _, e := range extra {
+		colList += ", " + e[0]
+		placeholders += ", " + e[1]
+	}
+	fmt.Fprintf(&sb, "INSERT INTO %s (%s) VALUES ", table, colList)
 
-	placeholders := "(" + strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ") + ")"
+	placeholders = "(" + placeholders + ")"
 	args := make([]any, 0, len(rows)*len(cols))
 	for i, row := range rows {
 		if i > 0 {
@@ -188,9 +266,7 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 		args = append(args, row...)
 	}
 	sb.WriteString(";")
-
-	_, err := d.db.ExecContext(ctx, sb.String(), args...)
-	return err
+	return sb.String(), args
 }
 
 // nullableJSON maps an absent JSON value to SQL NULL rather than an empty

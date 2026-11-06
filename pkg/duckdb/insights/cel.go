@@ -409,7 +409,7 @@ func celFieldConverter(n *expr.Node, scope *celFieldScope) ([]sq.Expression, err
 // own single-quoted struct syntax (e.g. `{'foo': bar}`, not
 // `{"foo":"bar"}`) rather than erroring, so the extraction then re-parses
 // that as JSON and fails with a "Malformed JSON at byte 1" error — see
-// pkg/execution/dualwrite/tracing.go's materializeRuns for the same
+// pkg/duckdb/tracing/tracing.go's runsInsertSQL for the same
 // underlying VARIANT/JSON distinction on the write side.
 //
 // The JSONPath is bound as a query parameter rather than spliced into the
