@@ -1,0 +1,45 @@
+.cloud-deploy-viewport {
+  overflow: clip;
+  transition: height 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.cloud-deploy-forward {
+  animation: cloud-deploy-enter-forward 180ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.cloud-deploy-back {
+  animation: cloud-deploy-enter-back 180ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes cloud-deploy-enter-forward {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cloud-deploy-enter-back {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud-deploy-viewport {
+    transition: none;
+  }
+
+  .cloud-deploy-forward,
+  .cloud-deploy-back {
+    animation: none;
+  }
+}
