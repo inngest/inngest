@@ -16,6 +16,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { graphql } from '@/gql';
 import { WebhookFailureReason, type WebhookHealthQuery } from '@/gql/graphql';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import {
   useGraphQLQuery,
   useSkippableGraphQLQuery,
@@ -354,15 +355,21 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
   const environment = useEnvironment();
   const flag = useBooleanFlag('webhook-failure-rows');
   const enabled = flag.isReady && flag.value;
-  const [from] = useState(() =>
-    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+  const features = useAccountFeatures();
+  const history = features.data?.history ?? 7;
+  const days = history > 0 ? Math.min(7, history) : 7;
+  const span = days === 1 ? 'day' : `${days} days`;
+  const [now] = useState(() => Date.now());
+  const from = useMemo(
+    () => new Date(now - days * 24 * 60 * 60 * 1000).toISOString(),
+    [now, days],
   );
   const [reason, setReason] = useState<WebhookFailureReason | null>(null);
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
 
   const res = useSkippableGraphQLQuery({
     query: WebhookHealthDocument,
-    skip: !enabled,
+    skip: !enabled || (!features.data && !features.error),
     variables: { environmentID: environment.id, keyID, from },
   });
 
@@ -426,12 +433,12 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
       )}
       {events === 0 && groups.length === 0 ? (
         <p className="text-subtle text-sm">
-          No requests received in the last 7 days.
+          No requests received in the last {span}.
         </p>
       ) : (
         <>
           <p className="text-subtle mb-6 text-sm">
-            Last 7 days: {plural(events, 'event')} ingested ·{' '}
+            Last {span}: {plural(events, 'event')} ingested ·{' '}
             {plural(failed, 'failed request')}
             {filtered > 0 && <> · {plural(filtered, 'filtered request')}</>}
           </p>
