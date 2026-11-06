@@ -6,7 +6,10 @@
       {
         "logical": "run_id = '01J0000000000000000000000A'",
         "physical": "spans.run_id = '01J0000000000000000000000A'",
-        "pushed": true
+        "pushed": true,
+        "joined": [
+          "metadata.run_id = '01J0000000000000000000000A'"
+        ]
       },
       {
         "logical": "name = 'executor.step'",

@@ -11,7 +11,10 @@
       {
         "logical": "run_id = '01J0000000000000000000000A'",
         "physical": "runs.run_id = '01J0000000000000000000000A'",
-        "pushed": true
+        "pushed": true,
+        "joined": [
+          "metadata.run_id = '01J0000000000000000000000A'"
+        ]
       }
     ]
   }

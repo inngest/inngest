@@ -137,7 +137,15 @@ func (r *TranspileResult) Render(src TableSource) (*parser.SelectStatement, []an
 type federatedSource struct {
 	table federate.Table
 	param string
+	// joined maps the logical table's columns to this (joined, not first)
+	// source's physical columns for pushdown. Only columns that can't
+	// change what the join contributes to a kept row belong here, IE the
+	// run_id the metadata rollup is per.
+	joined map[string]string
 }
+
+// metadataByRun is the metadata rollup joined on a logical table's run_id.
+var metadataByRun = federatedSource{federate.TableMetadata, "p_metadata", map[string]string{"run_id": "run_id"}}
 
 // federatedSources maps each table that can be federated, per mode, to the
 // physical tables its macro reads and the parameter it takes each one's
@@ -145,18 +153,18 @@ type federatedSource struct {
 // targets; the rest are joined on (e.g. the metadata rollup).
 var federatedSources = map[bool]map[string][]federatedSource{
 	false: {
-		"runs":                 {{federate.TableRuns, "p_runs"}, {federate.TableMetadata, "p_metadata"}},
-		"extended_trace_spans": {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
-		"steps":                {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
-		"step_attempts":        {{federate.TableSpans, "p_spans"}, {federate.TableMetadata, "p_metadata"}},
-		"events":               {{federate.TableEvents, "p_events"}},
-		"metadata":             {{federate.TableMetadata, "p_metadata"}},
+		"runs":                 {{table: federate.TableRuns, param: "p_runs"}, metadataByRun},
+		"extended_trace_spans": {{table: federate.TableSpans, param: "p_spans"}, metadataByRun},
+		"steps":                {{table: federate.TableSpans, param: "p_spans"}, metadataByRun},
+		"step_attempts":        {{table: federate.TableSpans, param: "p_spans"}, metadataByRun},
+		"events":               {{table: federate.TableEvents, param: "p_events"}},
+		"metadata":             {{table: federate.TableMetadata, param: "p_metadata"}},
 	},
 	true: {
-		"runs":            {{federate.TableRuns, "p_runs"}},
-		"run_trace_spans": {{federate.TableSpans, "p_spans"}},
-		"events":          {{federate.TableEvents, "p_events"}},
-		"run_metadata":    {{federate.TableMetadata, "p_metadata"}},
+		"runs":            {{table: federate.TableRuns, param: "p_runs"}},
+		"run_trace_spans": {{table: federate.TableSpans, param: "p_spans"}},
+		"events":          {{table: federate.TableEvents, param: "p_events"}},
+		"run_metadata":    {{table: federate.TableMetadata, param: "p_metadata"}},
 	},
 }
 
@@ -210,14 +218,16 @@ func (r *TranspileResult) Federated() ([]federate.Table, map[federate.Table][]fe
 }
 
 // physicalPushdown translates the logical-table predicates onto their
-// federated physical tables (see physicalPredicate), keeping only the
+// federated physical tables (see physicalPredicates), keeping only the
 // pushable ones.
 func (r *TranspileResult) physicalPushdown() map[federate.Table][]federate.Predicate {
 	out := map[federate.Table][]federate.Predicate{}
 	for lt, preds := range r.Pushdown {
 		for _, p := range preds {
-			if t, phys, kept := r.physicalPredicate(lt, p); kept == "" {
-				out[t] = append(out[t], phys)
+			for _, pp := range r.physicalPredicates(lt, p) {
+				if pp.kept == "" {
+					out[pp.table] = append(out[pp.table], pp.pred)
+				}
 			}
 		}
 	}
@@ -231,44 +241,76 @@ const (
 	keptShared       = "source shared with another table"
 )
 
-// physicalPredicate translates one logical-table predicate onto its
-// federated physical table: the logical column becomes the physical column
-// its macro passes through (knownColumn.physical). kept is "" when it's
-// forwarded to the delta (whose streamer applies it if it can represent it),
-// else why it isn't: the table isn't federated, the column is computed by
-// the macro, or another logical table in the query reads the same source
-// (one delta serves them all, so it can't be filtered for just one, e.g.
-// metadata and the rollup runs joins on).
+// physicalPredicate is one logical predicate translated onto one of its
+// table's federated sources.
+type physicalPredicate struct {
+	table federate.Table
+	pred  federate.Predicate
+	// kept is "" when it's forwarded to the delta (whose streamer applies
+	// it if it can represent it), else why it isn't.
+	kept string
+}
+
+// physicalPredicates translates one logical-table predicate onto its
+// federated sources. On the first (the table's own rows) the logical column
+// becomes the physical column its macro passes through
+// (knownColumn.physical); on a joined one it's federatedSource.joined, and
+// a predicate on a column that doesn't map there is just left out. A
+// source's predicate is kept when the table isn't federated, the column is
+// computed by the macro, or another logical table in the query reads the
+// same source (one delta serves them all, so it can't be filtered for just
+// one, e.g. metadata and the rollup runs joins on).
 //
 // A boolean predicate is translated part by part, and kept whole if any
 // part is.
-func (r *TranspileResult) physicalPredicate(lt federate.Table, p federate.Predicate) (t federate.Table, phys federate.Predicate, kept string) {
+func (r *TranspileResult) physicalPredicates(lt federate.Table, p federate.Predicate) []physicalPredicate {
 	fss, ok := federatedSources[r.cat.raw][string(lt)]
 	if !ok {
-		return "", federate.Predicate{}, keptNotFederated
+		return []physicalPredicate{{kept: keptNotFederated}}
 	}
-	t = fss[0].table
+	tbl := r.cat.tables[string(lt)]
+	var out []physicalPredicate
+	for i, fs := range fss {
+		column := func(c string) string { return tbl.columns[c].physical }
+		if i > 0 {
+			column = func(c string) string { return fs.joined[c] }
+		}
+		pp := physicalPredicate{table: fs.table}
+		pp.pred, pp.kept = translatePredicate(p, column)
+		if i > 0 && pp.kept != "" {
+			continue
+		}
+		if pp.kept == "" && r.sharedSource(lt, fs.table) {
+			pp.pred, pp.kept = federate.Predicate{}, keptShared
+		}
+		out = append(out, pp)
+	}
+	return out
+}
+
+// sharedSource is whether a logical table in the query other than lt reads
+// physical table t.
+func (r *TranspileResult) sharedSource(lt, t federate.Table) bool {
 	for _, other := range r.tables {
 		if other == string(lt) {
 			continue
 		}
 		for _, fs := range federatedSources[r.cat.raw][other] {
 			if fs.table == t {
-				return t, federate.Predicate{}, keptShared
+				return true
 			}
 		}
 	}
-	phys, kept = translatePredicate(p, r.cat.tables[string(lt)])
-	return t, phys, kept
+	return false
 }
 
-// translatePredicate renames p's columns to their physical ones, or says
-// why it can't.
-func translatePredicate(p federate.Predicate, tbl logicalTable) (federate.Predicate, string) {
+// translatePredicate renames p's columns to their physical ones (by
+// column), or says why it can't.
+func translatePredicate(p federate.Predicate, column func(string) string) (federate.Predicate, string) {
 	if p.IsBool() {
 		args := make([]federate.Predicate, len(p.Args))
 		for i, a := range p.Args {
-			pa, k := translatePredicate(a, tbl)
+			pa, k := translatePredicate(a, column)
 			if k != "" {
 				return federate.Predicate{}, k
 			}
@@ -277,7 +319,7 @@ func translatePredicate(p federate.Predicate, tbl logicalTable) (federate.Predic
 		p.Args = args
 		return p, ""
 	}
-	col := tbl.columns[p.Column].physical
+	col := column(p.Column)
 	if col == "" {
 		return federate.Predicate{}, keptComputed
 	}

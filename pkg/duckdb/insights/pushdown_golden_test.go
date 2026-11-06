@@ -32,6 +32,9 @@ type pushdownGoldenPredicate struct {
 	// it if it can represent it); Kept says why not.
 	Pushed bool   `json:"pushed"`
 	Kept   string `json:"kept,omitempty"`
+	// Joined is what's pushed to the table's joined sources (e.g. the
+	// metadata rollup's).
+	Joined []string `json:"joined,omitempty"`
 }
 
 // TestPushdownGolden runs each testdata/pushdown/*.sql query through the
@@ -104,10 +107,15 @@ func pushdownGolden(tr *TranspileResult) map[string][]pushdownGoldenPredicate {
 	out := map[string][]pushdownGoldenPredicate{}
 	for _, lt := range tables {
 		for _, p := range tr.Pushdown[federate.Table(lt)] {
-			pt, phys, kept := tr.physicalPredicate(federate.Table(lt), p)
-			gp := pushdownGoldenPredicate{Logical: formatPredicate("", p), Pushed: kept == "", Kept: kept}
-			if phys.Column != "" || phys.IsBool() {
-				gp.Physical = formatPredicate(string(pt), phys)
+			pps := tr.physicalPredicates(federate.Table(lt), p)
+			gp := pushdownGoldenPredicate{Logical: formatPredicate("", p), Pushed: pps[0].kept == "", Kept: pps[0].kept}
+			if phys := pps[0].pred; phys.Column != "" || phys.IsBool() {
+				gp.Physical = formatPredicate(string(pps[0].table), phys)
+			}
+			for _, pp := range pps[1:] {
+				if pp.kept == "" {
+					gp.Joined = append(gp.Joined, formatPredicate(string(pp.table), pp.pred))
+				}
 			}
 			out[lt] = append(out[lt], gp)
 		}
