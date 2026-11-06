@@ -240,11 +240,12 @@ var allowedUpdates = map[string]bool{
 // every action has to be allowlisted, and the metadata the updates produce
 // from base (nil for a create) has to keep every path in it inside the
 // warehouse. updates is applied to a throwaway builder, so pass a separate
-// decode from the one handed to CommitTable.
-func (s *Server) checkCommit(base table.Metadata, updates table.Updates) error {
+// decode from the one handed to CommitTable. It returns the metadata the
+// updates produce.
+func (s *Server) checkCommit(base table.Metadata, updates table.Updates) (table.Metadata, error) {
 	for _, u := range updates {
 		if !allowedUpdates[u.Action()] {
-			return fmt.Errorf("%w: update action %q is not supported", errBadRequest, u.Action())
+			return nil, fmt.Errorf("%w: update action %q is not supported", errBadRequest, u.Action())
 		}
 	}
 	if base == nil {
@@ -252,14 +253,14 @@ func (s *Server) checkCommit(base table.Metadata, updates table.Updates) error {
 		var err error
 		base, err = table.NewMetadata(iceberg.NewSchema(0), nil, table.UnsortedSortOrder, "", nil)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	md, err := table.UpdateTableMetadata(base, updates, "")
 	if err != nil {
-		return fmt.Errorf("%w: %v", errBadRequest, err)
+		return nil, fmt.Errorf("%w: %v", errBadRequest, err)
 	}
-	return s.checkMetadata(md, base)
+	return md, s.checkMetadata(md, base)
 }
 
 // checkMetadata checks every path table metadata carries: the table
