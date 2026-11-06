@@ -742,7 +742,11 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			}
 			service.Go(func() {
 				err := e.HandleInvokeFinish(context.WithoutCancel(ctx), tracked)
-				if err != nil && !errors.Is(err, ErrNoCorrelationID) {
+				if err != nil &&
+					!errors.Is(err, ErrNoCorrelationID) &&
+					!errors.Is(err, state.ErrInvokePauseNotFound) &&
+					!errors.Is(err, state.ErrPauseNotFound) &&
+					!errors.Is(err, state.ErrRunNotFound) {
 					logger.From(ctx).Error("error fast resuming invoke", "error", err)
 				}
 			})
