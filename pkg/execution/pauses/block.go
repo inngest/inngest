@@ -1205,19 +1205,19 @@ func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 //
 // This is a zset containing block IDs -> the last pause timestamp.
 func (b blockstore) blockIndexKey(idx Index) string {
-	return fmt.Sprintf("{%s}:blk:idx:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
+	return fmt.Sprintf("{%s}:blk:idx:%s:%s", b.pc.BlockKeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockMetadataKey is internal and stores metadata for a given block.
 //
 // This is an HMAP of block IDs -> metadata.
 func (b blockstore) blockMetadataKey(idx Index) string {
-	return fmt.Sprintf("{%s}:blk:md:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
+	return fmt.Sprintf("{%s}:blk:md:%s:%s", b.pc.BlockKeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockDeleteKey tracks all deletes for a specific block within an index.
 func (b blockstore) blockDeleteKey(idx Index, blockID ulid.ULID) string {
-	return fmt.Sprintf("{%s}:blk:dels:%s:%s:%s", b.pc.KeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
+	return fmt.Sprintf("{%s}:blk:dels:%s:%s:%s", b.pc.BlockKeyPrefix(idx.WorkspaceID), idx.WorkspaceID, util.XXHash(idx.EventName), blockID.String())
 }
 
 type blockMetadata struct {

@@ -14,12 +14,66 @@ import (
 	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gocloud.dev/blob/memblob"
 )
+
+func TestBlockMetadataCustomPrefix(t *testing.T) {
+	for _, scoped := range []bool{false, true} {
+		name := "legacy"
+		if scoped {
+			name = "workspace"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			t.Cleanup(rc.Close)
+			var opts []redis_state.UnshardedClientOpt
+			if scoped {
+				opts = append(opts, redis_state.WithWorkspaceScopedPauseKeys())
+			}
+			client := redis_state.NewUnshardedClient(rc, "custom", "queue", opts...)
+			leaser := NewRedisBlockLeaser(rc, "test", time.Minute)
+			store, err := NewBlockstore(BlockstoreOpts{
+				PauseClient: client.Pauses(), Bufferer: StateBufferer(redis_state.NewPauseStore(client)),
+				Leaser: leaser, CompactionLeaser: leaser,
+			})
+			require.NoError(t, err)
+			ctx := context.Background()
+			index := Index{WorkspaceID: uuid.New(), EventName: "test/compatibility"}
+			id := ulid.Make()
+			deleted := uuid.New().String()
+			prefix := "estate"
+			if scoped {
+				prefix = "custom:" + index.WorkspaceID.String()
+			}
+			// Seed the persisted layout independently of the current key generator.
+			suffix := fmt.Sprintf("%s:%s", index.WorkspaceID, util.XXHash(index.EventName))
+			_, err = r.ZAdd("{"+prefix+"}:blk:idx:"+suffix, 2000, id.String())
+			require.NoError(t, err)
+			r.HSet("{"+prefix+"}:blk:md:"+suffix, id.String(), `{"tr":[1000,2000],"len":2}`)
+			_, err = r.SAdd("{"+prefix+"}:blk:dels:"+suffix+":"+id.String(), deleted)
+			require.NoError(t, err)
+
+			ids, err := store.BlocksSince(ctx, index, time.Time{})
+			require.NoError(t, err)
+			require.Equal(t, []ulid.ULID{id}, ids)
+			metadata, err := store.GetBlockMetadata(ctx, index)
+			require.NoError(t, err)
+			require.Contains(t, metadata, id.String())
+			require.Equal(t, 2, metadata[id.String()].Len)
+			deletedIDs, count, err := store.GetBlockDeletedIDs(ctx, index, id)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, count)
+			require.Equal(t, []string{deleted}, deletedIDs)
+		})
+	}
+}
 
 func TestBlockID(t *testing.T) {
 	// Create a block with a deterministic pause

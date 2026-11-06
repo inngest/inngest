@@ -140,6 +140,15 @@ func (p *PauseClient) KeyPrefix(workspaceID uuid.UUID) string {
 	return p.stateDefaultKey
 }
 
+// BlockKeyPrefix preserves the historical block metadata prefix unless
+// workspace-scoped keys are explicitly enabled.
+func (p *PauseClient) BlockKeyPrefix(workspaceID uuid.UUID) string {
+	if !p.workspaceScoped {
+		return "estate"
+	}
+	return p.KeyPrefix(workspaceID)
+}
+
 func (p *PauseClient) KeyGenerator(workspaceID uuid.UUID) PauseKeyGenerator {
 	if p.workspaceScoped {
 		return pauseKeyGenerator{stateDefaultKey: p.KeyPrefix(workspaceID)}
