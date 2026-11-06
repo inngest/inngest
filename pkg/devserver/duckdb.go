@@ -232,8 +232,9 @@ func setupDualWrite(ctx context.Context, enabled, persist bool, binaryPath, stat
 // and manifest list), and there's no inlining like DuckLake had, so the
 // in-memory mode's 200ms would make a pile of tiny files + snapshots.
 //
-// TODO(maintenance): nothing expires snapshots, removes orphan files or
-// compacts the lake yet, so it still grows w/o bound.
+// TODO(maintenance): the catalog expires old snapshots + metadata.json
+// files (see icebergcatalog.Retention), but nothing removes orphan files or
+// compacts the lake yet, so data + manifests still grow w/o bound.
 const lakeFlushInterval = 3 * time.Second
 
 // lakeListener is the dual-write listener for a persisted lake: Close stops
