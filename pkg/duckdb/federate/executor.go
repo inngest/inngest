@@ -266,7 +266,7 @@ func deltaTables(tables []Table) []Table {
 }
 
 // Physical is the physical table each logical delta table is stored as.
-var Physical = map[Table]schema.Table{TableRuns: schema.Runs, TableSpans: schema.Spans, TableEvents: schema.Events}
+var Physical = map[Table]schema.Table{TableRuns: schema.Runs, TableSpans: schema.Spans, TableEvents: schema.Events, TableMetadata: schema.RunMetadata}
 
 func sameColumns(got, want []Column) error {
 	if len(got) != len(want) {

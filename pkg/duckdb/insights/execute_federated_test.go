@@ -92,6 +92,71 @@ func TestExecuteFederated(t *testing.T) {
 		require.ErrorContains(t, err, "may not start with")
 	})
 
+	t.Run("metadata rolls up across lake and delta", func(t *testing.T) {
+		// run-lake's "cost" is in the lake, then replaced by a newer
+		// emission in the delta; run-delta's only emission is in the delta.
+		_, err := db.ExecContext(t.Context(), `INSERT INTO inngest.run_metadata
+			(account_id, env_id, run_id, run_queued_at, span_id, scope, kind, is_user, values, created_at, bucket_at)
+			VALUES (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'cost', true, '{"usd":1}'::JSON::VARIANT, ?, ?),
+			       (?::UUID, ?::UUID, 'run-lake', ?, 'span-lake', 'run', 'region', true, '{"name":"us"}'::JSON::VARIANT, ?, ?)`,
+			account.String(), env.String(), queued, queued, w.Add(-time.Second),
+			account.String(), env.String(), queued, queued, w.Add(-time.Second))
+		require.NoError(t, err)
+		emission := func(run, span, kind, values string, at time.Time) map[string]any {
+			return map[string]any{
+				"account_id": account, "env_id": env, "run_id": run, "run_queued_at": queued, "span_id": span,
+				"scope": "run", "kind": kind, "is_user": true, "values": values, "created_at": at, "bucket_at": at,
+			}
+		}
+		delta := map[federate.Table][]map[string]any{
+			federate.TableRuns: delta[federate.TableRuns],
+			federate.TableMetadata: {
+				emission("run-lake", "span-lake", "cost", `{"usd":2}`, w.Add(time.Second)),
+				emission("run-delta", "span-delta", "cost", `{"usd":3}`, w.Add(time.Second)),
+			},
+		}
+		exec := &federate.Executor{DB: db, Delta: cannedStreamer{rows: delta}}
+		want := [][]any{
+			{"run-delta", map[string]any{"cost": map[string]any{"usd": float64(3)}}},
+			{"run-lake", map[string]any{"cost": map[string]any{"usd": float64(2)}, "region": map[string]any{"name": "us"}}},
+		}
+		for _, sql := range []string{
+			`SELECT run_id, metadata FROM runs ORDER BY run_id`,
+			`SELECT run_id, metadata FROM metadata ORDER BY run_id`,
+			`SELECT m.run_id, m.metadata FROM runs r JOIN metadata m ON m.run_id = r.run_id ORDER BY m.run_id`,
+		} {
+			tr, err := insights.Transpile(sql, account, env)
+			require.NoError(t, err)
+			res, err := insights.ExecuteFederated(t.Context(), exec, tr, query)
+			require.NoError(t, err, sql)
+			require.Equal(t, want, res.Rows, sql)
+		}
+	})
+
+	t.Run("steps read federated spans and metadata", func(t *testing.T) {
+		at := w.Add(time.Second)
+		delta := map[federate.Table][]map[string]any{
+			federate.TableSpans: {{
+				"account_id": account, "env_id": env, "run_id": "run-delta", "run_queued_at": queued, "app_id": app,
+				"app_name": "app", "function_id": fn, "function_slug": "fn", "name": "executor.step", "start_time": at,
+				"end_time": at, "trace_id": "trace", "span_id": "span-step", "attributes": `{"_inngest.step.userland.id":"s1","_inngest.step.attempt":0}`,
+				"bucket_at": at,
+			}},
+			federate.TableMetadata: {{
+				"account_id": account, "env_id": env, "run_id": "run-delta", "run_queued_at": queued, "span_id": "span-step",
+				"scope": "step", "kind": "cost", "is_user": true, "values": `{"usd":4}`, "created_at": at, "bucket_at": at,
+			}},
+		}
+		exec := &federate.Executor{DB: db, Delta: cannedStreamer{rows: delta}}
+		for _, table := range []string{"steps", "step_attempts"} {
+			tr, err := insights.Transpile(`SELECT step_id, metadata FROM `+table, account, env)
+			require.NoError(t, err)
+			res, err := insights.ExecuteFederated(t.Context(), exec, tr, query)
+			require.NoError(t, err, table)
+			require.Equal(t, [][]any{{"s1", map[string]any{"cost": map[string]any{"usd": float64(4)}}}}, res.Rows, table)
+		}
+	})
+
 	t.Run("time limit", func(t *testing.T) {
 		insights.SetExecuteTimeout(t, 500*time.Millisecond)
 		exec := &federate.Executor{DB: db, Delta: cannedStreamer{block: true}}

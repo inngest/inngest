@@ -187,13 +187,16 @@ func TestFederatedPushdownIsPhysical(t *testing.T) {
 		want map[federate.Table][]federate.Predicate
 	}{
 		{
-			name: "logical columns map to the physical columns their macro passes through",
+			name: "logical columns map to the physical columns their macro passes through (run_id to the joined metadata too)",
 			sql:  `SELECT run_id FROM runs WHERE app_id = 'my-app' AND function_id IN ('a', 'b') AND run_id = 'r1'`,
-			want: map[federate.Table][]federate.Predicate{federate.TableRuns: {
-				{Column: "app_name", Op: federate.OpEq, Value: "my-app"},
-				{Column: "function_slug", Op: federate.OpIn, Value: []any{"a", "b"}},
-				{Column: "run_id", Op: federate.OpEq, Value: "r1"},
-			}},
+			want: map[federate.Table][]federate.Predicate{
+				federate.TableRuns: {
+					{Column: "app_name", Op: federate.OpEq, Value: "my-app"},
+					{Column: "function_slug", Op: federate.OpIn, Value: []any{"a", "b"}},
+					{Column: "run_id", Op: federate.OpEq, Value: "r1"},
+				},
+				federate.TableMetadata: {{Column: "run_id", Op: federate.OpEq, Value: "r1"}},
+			},
 		},
 		{
 			name: "every status and attribute key filter is forwarded (the runs delta filters after its collapse)",
@@ -249,8 +252,16 @@ func TestPhysicalColumnsExist(t *testing.T) {
 				if col.physical == "" {
 					continue
 				}
-				_, ok := federate.Physical[fs.table].Column(col.physical)
+				_, ok := federate.Physical[fs[0].table].Column(col.physical)
 				require.True(t, ok, "%s.%s maps to unknown physical column %q", logical, name, col.physical)
+			}
+			for _, joined := range fs[1:] {
+				for name, phys := range joined.joined {
+					_, ok := cat.tables[logical].columns[name]
+					require.True(t, ok, "%s has no column %q to push onto %s", logical, name, joined.table)
+					_, ok = federate.Physical[joined.table].Column(phys)
+					require.True(t, ok, "%s.%s maps to unknown %s column %q", logical, name, joined.table, phys)
+				}
 			}
 		}
 	}

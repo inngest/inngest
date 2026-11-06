@@ -16,7 +16,10 @@
       {
         "logical": "NOT (run_id \u003e= 'a' AND run_id \u003c= 'b')",
         "physical": "NOT (runs.run_id \u003e= 'a' AND runs.run_id \u003c= 'b')",
-        "pushed": true
+        "pushed": true,
+        "joined": [
+          "NOT (metadata.run_id \u003e= 'a' AND metadata.run_id \u003c= 'b')"
+        ]
       }
     ]
   }

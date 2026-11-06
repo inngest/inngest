@@ -133,7 +133,7 @@ func TestGetSpansByRunIDAgreesWithMetadataRollup(t *testing.T) {
 
 	var user, internal any
 	require.NoError(t, db.QueryRowContext(ctx,
-		`SELECT user_metadata, internal_metadata FROM inngest.run_metadata_rollup WHERE run_id = ? AND span_id = ?;`,
+		`SELECT user_metadata, internal_metadata FROM inngest.run_metadata_rollup() WHERE run_id = ? AND span_id = ?;`,
 		runID.String(), "root-span",
 	).Scan(&user, &internal))
 
