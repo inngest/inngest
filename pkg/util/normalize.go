@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/inngest/inngest/pkg/execution/driver/schemes"
 )
 
 // NormalizeAppURL normalizes localhost and 127.0.0.1 as the same string.  This
@@ -17,9 +19,8 @@ func NormalizeAppURL(u string, forceHTTPS bool) string {
 
 	parsed = stripInternalQueryParams(*parsed)
 
-	// inngest://serve names an Inngest-hosted app rather than a network
-	// address, so it keeps its scheme.
-	if forceHTTPS && (parsed.Scheme != "inngest" || parsed.Host != "serve") {
+	// a registered scheme is not a network address, so it keeps its scheme.
+	if forceHTTPS && !schemes.Registered(parsed.Scheme) {
 		isWebSocket := strings.HasPrefix(parsed.Scheme, "ws")
 		parsed.Scheme = "https"
 		if isWebSocket {

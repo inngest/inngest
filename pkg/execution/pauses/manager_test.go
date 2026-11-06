@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,257 @@ import (
 	"github.com/stretchr/testify/require"
 	"gocloud.dev/blob/memblob"
 )
+
+// PAUSE_TEST_REDIS_ADDR may point at a disposable multi-primary Valkey Cluster
+// to exercise the same contract with real slot enforcement and redirects.
+func TestPauseKeyLayouts(t *testing.T) {
+	addr := os.Getenv("PAUSE_TEST_REDIS_ADDR")
+	if addr == "" {
+		addr = miniredis.RunT(t).Addr()
+	}
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{addr}, DisableCache: true})
+	require.NoError(t, err)
+	t.Cleanup(rc.Close)
+	ctx := context.Background()
+	workspaces := []uuid.UUID{
+		uuid.MustParse("00000000-0000-4000-8000-000000000001"),
+		uuid.MustParse("00000000-0000-4000-8000-000000000002"),
+		uuid.MustParse("00000000-0000-4000-8000-000000000003"),
+	}
+	if os.Getenv("PAUSE_TEST_REDIS_ADDR") != "" {
+		ranges, err := rc.Do(ctx, rc.B().ClusterSlots().Build()).ToArray()
+		require.NoError(t, err)
+		owners := map[string]bool{}
+		for _, ws := range workspaces {
+			slot, err := rc.Do(ctx, rc.B().ClusterKeyslot().Key("{estate:"+ws.String()+"}").Build()).AsInt64()
+			require.NoError(t, err)
+			for _, slotRange := range ranges {
+				fields, err := slotRange.ToArray()
+				require.NoError(t, err)
+				first, err := fields[0].AsInt64()
+				require.NoError(t, err)
+				last, err := fields[1].AsInt64()
+				require.NoError(t, err)
+				if slot >= first && slot <= last {
+					primary, err := fields[2].ToArray()
+					require.NoError(t, err)
+					id, err := primary[2].ToString()
+					require.NoError(t, err)
+					owners[id] = true
+				}
+			}
+		}
+		require.Len(t, owners, 3, "cluster fixture must place these workspaces on three different primaries")
+	}
+	for _, scoped := range []bool{false, true} {
+		name := "legacy"
+		var opts []redis_state.UnshardedClientOpt
+		if scoped {
+			name = "workspace"
+			opts = append(opts, redis_state.WithWorkspaceScopedPauseKeys())
+		}
+		t.Run(name, func(t *testing.T) {
+			client := redis_state.NewUnshardedClient(rc, "estate", "queue", opts...)
+			buffer := StateBufferer(redis_state.NewPauseStore(client))
+			bucket := memblob.OpenBucket(nil)
+			t.Cleanup(func() { require.NoError(t, bucket.Close()) })
+			leaser := NewRedisBlockLeaser(rc, "test-pause-layout-"+name, time.Minute)
+			blocks, err := NewBlockstore(BlockstoreOpts{
+				PauseClient: client.Pauses(), Bufferer: buffer, Bucket: bucket,
+				Leaser: leaser, CompactionLeaser: leaser, BlockSize: 2,
+				DeleteAfterFlush: alwaysEnabled,
+			})
+			require.NoError(t, err)
+			mgr := NewManager(buffer, blocks, WithBlockFlushEnabled(alwaysEnabled), WithBlockStoreEnabled(alwaysEnabled))
+			for _, ws := range workspaces {
+				event := "test/workspace-layout"
+				idx := Index{WorkspaceID: ws, EventName: event}
+				t.Run(ws.String()+"/lifecycle", func(t *testing.T) {
+					run := ulid.Make()
+					ps := make([]*state.Pause, 3)
+					for i := range ps {
+						ps[i] = &state.Pause{
+							ID: uuid.New(), WorkspaceID: ws, Event: &event,
+							Identifier: state.PauseIdentifier{RunID: run, FunctionID: uuid.New()},
+							CreatedAt:  time.Now().Add(time.Duration(i-10) * time.Second).Truncate(time.Second),
+							Expires:    state.Time(time.Now().Add(time.Hour)),
+						}
+					}
+					_, err := mgr.Write(ctx, idx, ps...)
+					require.NoError(t, err)
+					for _, since := range []time.Time{{}, ps[1].CreatedAt} {
+						iter, err := mgr.PausesSince(ctx, idx, since)
+						require.NoError(t, err)
+						var ids []uuid.UUID
+						for iter.Next(ctx) {
+							p := iter.Val(ctx)
+							require.NotNil(t, p)
+							ids = append(ids, p.ID)
+						}
+						require.ErrorIs(t, iter.Error(), context.Canceled)
+						expected := []uuid.UUID{ps[1].ID, ps[2].ID}
+						if since.IsZero() {
+							expected = append(expected, ps[0].ID)
+						}
+						require.ElementsMatch(t, expected, ids)
+					}
+					// Signal and invoke indexes must use the same slot as pause writes.
+					for _, signal := range []bool{true, false} {
+						p := *ps[0]
+						p.ID, p.Event = uuid.New(), nil
+						correlation := "shared-correlation"
+						if signal {
+							p.SignalID = &correlation
+						} else {
+							p.InvokeCorrelationID = &correlation
+						}
+						_, err := mgr.Write(ctx, PauseIndex(p), &p)
+						require.NoError(t, err)
+						var found *state.Pause
+						if signal {
+							found, err = mgr.PauseBySignalID(ctx, ws, correlation)
+						} else {
+							found, err = mgr.PauseByInvokeCorrelationID(ctx, ws, correlation)
+						}
+						require.NoError(t, err)
+						require.NotNil(t, found)
+						require.Equal(t, p.ID, found.ID)
+					}
+					require.NoError(t, blocks.FlushIndexBlock(ctx, idx))
+					require.Eventually(t, func() bool {
+						n, err := buffer.BufferLen(ctx, idx)
+						return err == nil && n == 1
+					}, 5*time.Second, 10*time.Millisecond)
+					stats, err := mgr.IndexStats(ctx, idx)
+					require.NoError(t, err)
+					require.Len(t, stats.Blocks, 1)
+					iter, err := mgr.PausesSince(ctx, idx, time.Time{})
+					require.NoError(t, err)
+					var loaded []uuid.UUID
+					for iter.Next(ctx) {
+						p := iter.Val(ctx)
+						require.NotNil(t, p)
+						loaded = append(loaded, p.ID)
+					}
+					require.ErrorIs(t, iter.Error(), context.Canceled)
+					require.ElementsMatch(t, []uuid.UUID{ps[0].ID, ps[1].ID, ps[2].ID}, loaded)
+					for _, p := range ps {
+						found, err := mgr.PauseByID(ctx, Index{WorkspaceID: ws}, p.ID)
+						require.NoError(t, err)
+						require.Equal(t, p.ID, found.ID)
+					}
+					require.NoError(t, mgr.DeletePauseByID(ctx, ps[0].ID, ws))
+					_, err = mgr.PauseByID(ctx, idx, ps[0].ID)
+					require.ErrorIs(t, err, state.ErrPauseNotFound)
+					// Consumption's cleanup must use the same layout for a buffered pause.
+					result, cleanup, err := mgr.ConsumePause(ctx, &mockRunService{}, *ps[2], state.ConsumePauseOpts{})
+					require.NoError(t, err)
+					require.True(t, result.DidConsume)
+					require.NoError(t, cleanup())
+					_, err = mgr.PauseByID(ctx, idx, ps[2].ID)
+					require.ErrorIs(t, err, state.ErrPauseNotFound)
+					require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
+					ids, err := mgr.PauseIDsForRun(ctx, run, ws)
+					require.NoError(t, err)
+					require.Empty(t, ids)
+					for _, p := range ps[1:] {
+						_, err := mgr.PauseByID(ctx, idx, p.ID)
+						require.ErrorIs(t, err, state.ErrPauseNotFound)
+					}
+					found, err := mgr.PauseBySignalID(ctx, ws, "shared-correlation")
+					require.NoError(t, err)
+					require.Nil(t, found)
+					_, err = mgr.PauseByInvokeCorrelationID(ctx, ws, "shared-correlation")
+					require.ErrorIs(t, err, state.ErrInvokePauseNotFound)
+				})
+
+				t.Run(ws.String()+"/pagination", func(t *testing.T) {
+					// Keep pagination independent of the block lifecycle above.
+					mgr := NewManager(buffer, nil)
+					idx := Index{WorkspaceID: ws, EventName: "test/workspace-pagination"}
+					// Cross both the HSCAN threshold and the incremental MGET batch size.
+					run := ulid.Make()
+					base := time.Now().Add(-time.Hour).Truncate(time.Second)
+					many := make([]*state.Pause, 1003)
+					for i := range many {
+						many[i] = &state.Pause{
+							ID: uuid.New(), WorkspaceID: ws, Event: &idx.EventName,
+							Identifier: state.PauseIdentifier{RunID: run},
+							CreatedAt:  base.Add(time.Duration(i) * time.Second),
+							Expires:    state.Time(time.Now().Add(time.Hour)),
+						}
+					}
+					_, err := mgr.Write(ctx, idx, many...)
+					require.NoError(t, err)
+					for _, start := range []int{0, 713} {
+						since := time.Time{}
+						if start > 0 {
+							since = many[start].CreatedAt
+						}
+						iter, err := mgr.PausesSince(ctx, idx, since)
+						require.NoError(t, err)
+						var got, want []uuid.UUID
+						for iter.Next(ctx) {
+							p := iter.Val(ctx)
+							require.NotNil(t, p)
+							require.Equal(t, ws, p.WorkspaceID)
+							got = append(got, p.ID)
+						}
+						require.ErrorIs(t, iter.Error(), context.Canceled)
+						for _, p := range many[start:] {
+							want = append(want, p.ID)
+						}
+						require.ElementsMatch(t, want, got)
+					}
+					require.NoError(t, mgr.DeletePausesForRun(ctx, run, ws))
+				})
+			}
+		})
+	}
+	t.Run("coexisting layouts and workspace isolation", func(t *testing.T) {
+		legacyClient := redis_state.NewUnshardedClient(rc, "estate", "queue")
+		scopedClient := redis_state.NewUnshardedClient(rc, "estate", "queue", redis_state.WithWorkspaceScopedPauseKeys())
+		legacy := NewManager(StateBufferer(redis_state.NewPauseStore(legacyClient)), nil)
+		scoped := NewManager(StateBufferer(redis_state.NewPauseStore(scopedClient)), nil)
+		signal := "isolated-signal"
+		p := state.Pause{
+			ID: uuid.New(), WorkspaceID: workspaces[0], SignalID: &signal,
+			Identifier: state.PauseIdentifier{RunID: ulid.Make()},
+			Expires:    state.Time(time.Now().Add(time.Hour)), StepName: "legacy",
+		}
+		_, err := legacy.Write(ctx, PauseIndex(p), &p)
+		require.NoError(t, err)
+		for _, ws := range workspaces {
+			p.WorkspaceID, p.StepName = ws, "workspace"
+			_, err := scoped.Write(ctx, PauseIndex(p), &p)
+			require.NoError(t, err)
+			found, err := scoped.PauseBySignalID(ctx, ws, signal)
+			require.NoError(t, err)
+			require.NotNil(t, found)
+			require.Equal(t, ws, found.WorkspaceID)
+			require.Equal(t, "workspace", found.StepName)
+		}
+		// A missing workspace must not accidentally locate another workspace's pause.
+		_, err = scoped.PauseByID(ctx, Index{}, p.ID)
+		require.ErrorIs(t, err, state.ErrPauseNotFound)
+		for i, ws := range workspaces {
+			require.NoError(t, scoped.DeletePausesForRun(ctx, p.Identifier.RunID, ws))
+			found, err := scoped.PauseBySignalID(ctx, ws, signal)
+			require.NoError(t, err)
+			require.Nil(t, found)
+			for _, other := range workspaces[i+1:] {
+				found, err := scoped.PauseBySignalID(ctx, other, signal)
+				require.NoError(t, err)
+				require.NotNil(t, found, "cleanup must not touch another workspace")
+			}
+		}
+		found, err := legacy.PauseBySignalID(ctx, workspaces[0], signal)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		require.Equal(t, "legacy", found.StepName)
+		require.NoError(t, legacy.DeletePausesForRun(ctx, p.Identifier.RunID, workspaces[0]))
+	})
+}
 
 func TestManagerFlushingWithLowLimit(t *testing.T) {
 	// Setup miniredis

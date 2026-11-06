@@ -27,6 +27,7 @@ type Service struct {
 	apps           AppProvider
 	functions      FunctionProvider
 	functionPauser FunctionPauser
+	cancellations  CancellationCreator
 	functionConfig FunctionConfigProvider
 	runs           RunProvider
 	events         EventProvider
@@ -55,6 +56,7 @@ type ServiceOptions struct {
 	Apps                AppProvider
 	Functions           FunctionProvider
 	FunctionPauser      FunctionPauser
+	Cancellations       CancellationCreator
 	FunctionConfig      FunctionConfigProvider
 	Runs                RunProvider
 	Events              EventProvider
@@ -86,6 +88,7 @@ func NewService(opts ServiceOptions) *Service {
 		apps:           opts.Apps,
 		functions:      opts.Functions,
 		functionPauser: opts.FunctionPauser,
+		cancellations:  opts.Cancellations,
 		functionConfig: opts.FunctionConfig,
 		runs:           opts.Runs,
 		events:         opts.Events,

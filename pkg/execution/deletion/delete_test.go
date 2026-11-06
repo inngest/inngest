@@ -146,7 +146,7 @@ func TestDeleteManager(t *testing.T) {
 		_, err := pauseMgr.Write(ctx, pauseIndex, pause)
 		require.NoError(t, err)
 
-		require.True(t, redisCluster.Exists(unshardedClient.Pauses().KeyGenerator().Pause(ctx, pauseID)), redisCluster.Dump())
+		require.True(t, redisCluster.Exists(unshardedClient.Pauses().KeyGenerator(workspaceID).Pause(ctx, pauseID)), redisCluster.Dump())
 
 		// Verify pause was created
 		retrievedPause, err := pauseMgr.PauseByID(ctx, pauseIndex, pauseID)
