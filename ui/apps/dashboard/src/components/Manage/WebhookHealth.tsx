@@ -101,22 +101,47 @@ function shortAge(date: string): string {
   return `${Math.floor(minutes / (24 * 60))}d`;
 }
 
+function shortMinute(date: Date): string {
+  const time = date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  if (date.toDateString() === new Date().toDateString()) return time;
+  const day = date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+  return `${day} ${time}`;
+}
+
 function plural(count: number, word: string): string {
   return `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
 }
 
-function TimeCell({ value }: { value: string }) {
+function TimeCell({
+  value,
+  absolute = false,
+}: {
+  value: string;
+  absolute?: boolean;
+}) {
   const date = new Date(value);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="text-muted whitespace-nowrap text-sm">
-          {shortAge(value)}
+          {absolute ? shortMinute(date) : shortAge(value)}
         </span>
       </TooltipTrigger>
       <TooltipContent className="whitespace-nowrap">
         <div>{formatLocalTime(date)}</div>
         <div className="text-light text-xs">{formatUTCTime(date)} UTC</div>
+        {absolute && (
+          <div className="text-light text-xs">
+            {shortAge(value) === 'now' ? 'Just now' : `${shortAge(value)} ago`}
+          </div>
+        )}
       </TooltipContent>
     </Tooltip>
   );
@@ -204,7 +229,7 @@ const getColumns = (expandedIDs: string[]): ColumnDef<GroupRow>[] => [
 ];
 
 const failureGridClassName =
-  'grid grid-cols-[4rem_4rem_minmax(0,1fr)_minmax(0,18rem)] gap-4';
+  'grid grid-cols-[6.5rem_4rem_minmax(0,1fr)_minmax(0,18rem)] gap-4';
 
 function FailuresPage({
   keyID,
@@ -262,7 +287,7 @@ function FailuresPage({
             key={`${failure.requestID}-${i}`}
             className={cn(failureGridClassName, 'items-center py-1.5')}
           >
-            <TimeCell value={failure.receivedAt} />
+            <TimeCell value={failure.receivedAt} absolute />
             <span className="text-right tabular-nums">
               {failure.count.toLocaleString()}
             </span>
