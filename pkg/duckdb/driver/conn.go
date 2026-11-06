@@ -3,12 +3,14 @@ package driver
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/inngest/inngest/pkg/duckdb/driver/internal/quack"
 	"github.com/inngest/inngest/pkg/duckdb/driver/internal/result"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -189,4 +191,34 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	}
 
 	return driver.ErrSkip
+}
+
+// SupportsTransactions reports whether c can run an explicit
+// `BEGIN ... COMMIT` script and recover from a failure partway through it
+// (by running `ROLLBACK` on the same connection afterwards), IE whether
+// c's transport is quack. The jsonlines transport can't: a failed statement
+// leaves the session's transaction aborted, so the trailing marker SELECT
+// jsonlines uses to find the end of a statement's output fails too and the
+// read never returns.
+//
+// c must be pinned (*sql.DB.Conn) for the answer to mean anything about the
+// statements the caller runs next.
+func SupportsTransactions(c *sql.Conn) bool {
+	var ok bool
+	_ = c.Raw(func(driverConn any) error {
+		dc, isConn := driverConn.(*conn)
+		if !isConn {
+			return nil
+		}
+		switch s := dc.sess.(type) {
+		case *quack.Session, *pooledQuackConn:
+			ok = true
+		case *process:
+			s.mu.Lock()
+			_, ok = s.sess.(*quack.Session)
+			s.mu.Unlock()
+		}
+		return nil
+	})
+	return ok
 }
