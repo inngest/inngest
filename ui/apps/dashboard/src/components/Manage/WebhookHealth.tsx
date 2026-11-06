@@ -478,6 +478,7 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
                   }
                   renderSubComponent={({ row }) => (
                     <GroupFailures
+                      key={row.original.reason}
                       keyID={keyID}
                       from={from}
                       reason={row.original.reason}
