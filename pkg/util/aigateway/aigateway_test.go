@@ -39,6 +39,21 @@ func TestParseOutput(t *testing.T) {
 			},
 		},
 		{
+			description: "anthropic msg response with prompt cache usage",
+			format:      FormatAnthropic,
+			input:       `{"id":"msg_cache","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":12,"output_tokens":34,"cache_creation_input_tokens":560,"cache_read_input_tokens":7800}}`,
+			expected: ParsedInferenceResponse{
+				ID:                  "msg_cache",
+				Model:               "claude-sonnet-4-5",
+				TokensIn:            12,
+				TokensOut:           34,
+				CacheReadTokens:     7800,
+				CacheCreationTokens: 560,
+				StopReason:          "end_turn",
+				Tools:               []ToolUseResponse{},
+			},
+		},
+		{
 			description: "anthropic rate limit error",
 			format:      FormatAnthropic,
 			input:       `{"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed your organization’s rate limit of 50,000 input tokens per minute. For details, refer to: https://docs.anthropic.com/en/api/rate-limits; see the response headers for current usage. Please reduce the prompt length or the maximum tokens requested, or try again later. You may also contact sales at https://www.anthropic.com/contact-sales to discuss your options for a rate limit increase."}}`,
