@@ -6,6 +6,7 @@ import { useBooleanFlag } from './useBooleanFlag';
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 // Guards like DuckDBGuard redirect as soon as isReady is true, so it can't
