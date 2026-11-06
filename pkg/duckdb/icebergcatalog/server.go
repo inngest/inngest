@@ -17,10 +17,10 @@
 // LoadTable). Not needed for local disk; for S3 the DuckDB process needs its
 // own S3 secret, or we vend static creds here via the `config` map.
 //
-// TODO(maintenance): no snapshot expiry, orphan file cleanup, or metadata
-// file cleanup (write.metadata.delete-after-commit.enabled is honored by
-// iceberg-go afaict, but nothing expires snapshots). Every DuckDB commit
-// leaves a metadata.json + manifest list + manifest(s) behind forever.
+// TODO(maintenance): no orphan file cleanup or compaction. Commits expire
+// old snapshots and delete metadata.json files that fell out of the
+// metadata log (see Retention), but every DuckDB commit's manifest list +
+// manifest(s) stay behind forever.
 //
 // TODO(views): /views endpoints aren't routed even though the sql catalog
 // supports views. DuckDB doesn't need them (yet).
@@ -70,6 +70,9 @@ type Options struct {
 	Token string
 	// Logger, when non-nil, gets one line per request.
 	Logger *slog.Logger
+	// Retention configures snapshot expiry + metadata file cleanup on
+	// commit. The zero value is on w/ the defaults.
+	Retention Retention
 	// OnRequest, when non-nil, is called after every request (used by tests
 	// to record what DuckDB actually calls).
 	OnRequest func(method, path string, status int)
@@ -81,11 +84,13 @@ type Server struct {
 	opts   Options
 	mux    *http.ServeMux
 	tables tableCache
+	// now is the clock snapshot ages are measured against (tests swap it).
+	now func() time.Time
 }
 
 // New returns a Server. The caller owns cat (and its *sql.DB).
 func New(cat Catalog, opts Options) *Server {
-	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux()}
+	s := &Server{cat: cat, opts: opts, mux: http.NewServeMux(), now: time.Now}
 	s.routes()
 	return s
 }
@@ -609,10 +614,14 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, fmt.Errorf("%w: %s", catalog.ErrNoSuchTable, strings.Join(ident, ".")))
 		return
 	}
-	if err := s.checkCommit(current, checkUpdates); err != nil {
+	next, err := s.checkCommit(current, checkUpdates)
+	if err != nil {
 		writeCatalogError(w, err)
 		return
 	}
+	// Ours go after the client's updates are validated, and only ever
+	// remove snapshots (see retain).
+	s.retain(current, next, checkUpdates, &req, s.now())
 
 	md, loc, err := s.cat.CommitTable(ctx, ident, req.Requirements, req.Updates)
 	if err != nil {
@@ -620,6 +629,7 @@ func (s *Server) commitTable(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, err)
 		return
 	}
+	s.deleteOldMetadata(current, md, loc)
 	body, err := s.tables.put(ident, loc, md)
 	if err != nil {
 		writeCatalogError(w, err)
