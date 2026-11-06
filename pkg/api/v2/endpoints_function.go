@@ -34,7 +34,7 @@ import (
 const (
 	defaultFunctionsLimit = 20
 	maxFunctionsLimit     = 100
-	maxBulkFunctionIDs    = 100
+	maxBulkFunctionIDs    = 500
 )
 
 func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest) (*apiv2.GetFunctionResponse, error) {

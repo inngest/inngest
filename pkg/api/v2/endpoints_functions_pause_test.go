@@ -180,7 +180,7 @@ func TestHTTPGateway_FunctionsPauseResumeRequestErrors(t *testing.T) {
 		{"resume", apiv2.V2_ResumeFunctions_FullMethodName},
 	} {
 		t.Run(action.name, func(t *testing.T) {
-			ids := make([]string, 101)
+			ids := make([]string, 501)
 			for i := range ids {
 				ids[i] = fmt.Sprintf("fn-%d", i)
 			}
@@ -233,6 +233,8 @@ func TestHTTPGateway_FunctionsPauseResumeRequestErrors(t *testing.T) {
 						require.JSONEq(t, `{"errors":[{"code":"missing_field","message":"App ID and function IDs are required"}]}`, rec.Body.String())
 					}
 					switch tc.name {
+					case "too many":
+						require.Equal(t, "Function IDs cannot exceed 500", response.Errors[0].Message)
 					case "duplicate":
 						require.Equal(t, "Function IDs must be unique", response.Errors[0].Message)
 					case "long id", "long multibyte id":
@@ -263,12 +265,12 @@ func TestHTTPGateway_FunctionsPauseResumeLimitAndSingleResponse(t *testing.T) {
 			id := "11111111-1111-1111-1111-111111111111"
 			fn := inngest.DeployedFunction{ID: uuid.MustParse(id), Slug: "app-echo", Function: inngest.Function{Name: "Echo", Slug: "echo"}}
 			functions := &mockFunctionProvider{}
-			ids := make([]string, 100)
+			ids := make([]string, 500)
 			for i := range ids {
-				ids[i] = fmt.Sprintf("fn-%d", i)
+				ids[i] = fmt.Sprintf("fn-%0253d", i)
 			}
 			ids[0] = id
-			ids[99] = strings.Repeat("é", 128)
+			ids[len(ids)-1] = strings.Repeat("é", 128)
 			for i, functionID := range ids {
 				count := 1
 				if i == 0 {
@@ -307,7 +309,7 @@ func TestHTTPGateway_FunctionsPauseResumeLimitAndSingleResponse(t *testing.T) {
 				} `json:"data"`
 			}
 			require.NoError(t, json.Unmarshal(bulk.Body.Bytes(), &many))
-			require.Len(t, many.Data, 100)
+			require.Len(t, many.Data, 500)
 			for i, item := range many.Data {
 				require.Equal(t, ids[i], item.FunctionID)
 				require.JSONEq(t, string(one.Data), string(item.Function))
