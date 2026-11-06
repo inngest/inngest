@@ -150,7 +150,7 @@ func TestValidateAggregate(t *testing.T) {
 		wantErr string
 	}{
 		{"ok", func(q *AggregateQuery) {}, ""},
-		{"unknown table", func(q *AggregateQuery) { q.Table = "metadata" }, "unknown table"},
+		{"unknown table", func(q *AggregateQuery) { q.Table = "nope" }, "unknown table"},
 		{"nothing to compute", func(q *AggregateQuery) { q.Aggs = nil }, "no keys or aggregates"},
 		{"JSON key", func(q *AggregateQuery) { q.GroupBy = []GroupKey{{Column: "attributes", As: "a"}} }, "isn't a scalar"},
 		{"bucket on a string", func(q *AggregateQuery) {
