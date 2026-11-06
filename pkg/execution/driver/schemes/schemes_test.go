@@ -11,6 +11,11 @@ func TestRegister(t *testing.T) {
 	Register("registered", func(u *url.URL) string {
 		return "driver-" + u.Host
 	})
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		delete(registered, "registered")
+	})
 
 	tests := []struct {
 		name       string
