@@ -25,9 +25,7 @@ const WebhookHealthDocument = graphql(`
   query WebhookHealth($environmentID: ID!, $keyID: ID!, $from: Time!) {
     environment: workspace(id: $environmentID) {
       ingestKey(id: $keyID) {
-        stats(from: $from, bucketSeconds: 3600) {
-          events
-        }
+        eventCount(from: $from)
         failureGroups(from: $from) {
           reason
           count
@@ -405,10 +403,7 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
     );
   }
 
-  const events = res.data.environment.ingestKey.stats.reduce(
-    (sum, bucket) => sum + bucket.events,
-    0,
-  );
+  const events = res.data.environment.ingestKey.eventCount;
   let failed = 0;
   let filtered = 0;
   for (const g of groups) {
