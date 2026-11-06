@@ -1,6 +1,7 @@
 package icebergcatalog
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -158,6 +159,84 @@ SET VARIABLE first_snap = (SELECT snapshot_id FROM iceberg_snapshots('lake.app.r
 SELECT id, strftime(ts AT TIME ZONE 'UTC', '%Y-%m') AS m FROM lake.app.runs AT (VERSION => getvariable('first_snap')) ORDER BY id;
 `); !strings.Contains(out, "a,2026-01") {
 		t.Fatalf("time travel didn't return the original row:\n%s", out)
+	}
+
+	// Retention: a table that only keeps 2 snapshots once they're older
+	// than the age window (0ms here) gets its older ones expired on
+	// commit, and the default window keeps an older snapshot readable.
+	must("retention-setup", `
+CREATE TABLE lake.app.expiring (id INT) WITH ('history.expire.min-snapshots-to-keep' = '2', 'history.expire.max-snapshot-age-ms' = '0');
+`)
+	for i := range 6 {
+		must(fmt.Sprintf("retention-insert-%d", i), fmt.Sprintf(`INSERT INTO lake.app.expiring VALUES (%d);
+INSERT INTO lake.app.runs VALUES ('r%d', now(), [], []);`, i, i))
+	}
+	if out := must("retention-expired", `SELECT count(*) AS n, sum(id) AS s FROM lake.app.expiring;
+SELECT count(*) AS snaps FROM iceberg_snapshots('lake.app.expiring');`); !strings.Contains(out, "\n6,15\n") || !strings.Contains(out, "snaps\n2\n") {
+		t.Fatalf("expected all rows readable w/ only 2 snapshots left:\n%s", out)
+	}
+	// app.runs is on the defaults, so its first snapshot (well within the
+	// age window) still time travels after more commits.
+	if out := must("retention-time-travel", `
+SET VARIABLE first_snap = (SELECT snapshot_id FROM iceberg_snapshots('lake.app.runs') ORDER BY sequence_number LIMIT 1);
+SELECT count(*) AS n FROM lake.app.runs AT (VERSION => getvariable('first_snap'));
+SELECT count(*) AS snaps FROM iceberg_snapshots('lake.app.runs');
+`); !strings.Contains(out, "n\n1\n") || !strings.Contains(out, "snaps\n10\n") {
+		t.Fatalf("expected the first snapshot to still be readable:\n%s", out)
+	}
+
+	// A transaction that read a table before some commits expired older
+	// snapshots keeps reading its own version (duckdb goes back to that
+	// version's metadata.json through the metadata log).
+	must("held-setup", `
+CREATE TABLE lake.app.held (id INT) WITH ('history.expire.min-snapshots-to-keep' = '1');
+INSERT INTO lake.app.held VALUES (1);
+`)
+	reader := exec.CommandContext(ctx, bin, "-no-agent", "-bail", "-csv")
+	reader.Env = append(os.Environ(), "DUCKDB_AGENT_MODE=0")
+	stdin, err := reader.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := reader.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader.Stderr = reader.Stdout
+	if err := reader.Start(); err != nil {
+		t.Fatal(err)
+	}
+	lines := bufio.NewScanner(stdout)
+	readUntil := func(mark string) string {
+		t.Helper()
+		var out []string
+		for lines.Scan() {
+			out = append(out, lines.Text())
+			if lines.Text() == mark {
+				return strings.Join(out, "\n")
+			}
+		}
+		t.Fatalf("reader exited before %s:\n%s", mark, strings.Join(out, "\n"))
+		return ""
+	}
+	_, _ = io.WriteString(stdin, preamble+`BEGIN; SELECT count(*) AS n1 FROM lake.app.held; SELECT 'mark1' AS m;`+"\n")
+	if out := readUntil("mark1"); !strings.Contains(out, "n1\n1\n") {
+		t.Fatalf("unexpected first read:\n%s", out)
+	}
+	for i := range 4 {
+		must(fmt.Sprintf("held-insert-%d", i), `INSERT INTO lake.app.held VALUES (1);`)
+	}
+	_, _ = io.WriteString(stdin, `SELECT count(*) AS n2 FROM lake.app.held; COMMIT; SELECT 'mark2' AS m;`+"\n")
+	if out := readUntil("mark2"); !strings.Contains(out, "n2\n1\n") {
+		t.Fatalf("expected the held transaction to still read its version:\n%s", out)
+	}
+	_ = stdin.Close()
+	if err := reader.Wait(); err != nil {
+		t.Fatalf("reader: %v", err)
+	}
+	if out := must("held-after", `SELECT count(*) AS n FROM lake.app.held;
+SELECT count(*) AS snaps FROM iceberg_snapshots('lake.app.held');`); !strings.Contains(out, "n\n5\n") {
+		t.Fatalf("unexpected rows after the held transaction:\n%s", out)
 	}
 
 	// The sandbox (see pkg/duckdb/driver/sandbox.go) blocks the REST calls
