@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.50.0] - 2026-11-05
+## [v1.51.0] - 2026-11-06
+
+### 🚀 Features
+
+- *(drivers)* Allow drivers to be registered with schemes at init (#5198)
+- *(api)* Bulk pause/resume functions via v2 api, cli & mcp (#5152)
+- *(duckdb)* Stamp lake rows w/ bucket_at and read tables by name (#5160)
+- *(duckdb)* Stream query relations into DuckDB over quack (#5154)
+- *(duckdb)* Federate reads across the lake and a buffer (#5155)
+- *(insights)* Add raw mode and federated reads (#5156)
+- *(duckdb)* Aggregate federated reads (#5157)
+- *(duckdb)* Push a query's top-n into federated sources (#5158)
+- *(duckdb)* Skip the raw_runs collapse for flat lakes and use TIMESTAMPTZ in federate (#5159)
+
+## [v1.50.0] - 2026-11-06
 
 ### 🚀 Features
 
@@ -76,6 +90,7 @@ All notable changes to this project will be documented in this file.
 - Run DuckDB tests in the unit test job (#5123)
 - *(batch)* Log primary store name on fallback reads (#5161)
 - *(deploys)* Add new deploy types (#5045)
+- *(release)* V1.50.0 (#5075)
 
 ## [v1.49.0] - 2026-10-23
 
