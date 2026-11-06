@@ -27,7 +27,13 @@ func DeltaColumns(t Table) []Column {
 // SourceName is the CTE a federated physical table is read through: its
 // lake rows ∪ its delta rows, uncollapsed. Callers pass it to a macro that
 // takes a physical source (inngest.raw_runs, inngest.insights_runs, ...).
-func SourceName(t Table) string { return "__fed_" + Physical[t].Name }
+func SourceName(t Table) string { return GeneratedPrefix + "fed_" + Physical[t].Name }
+
+// GeneratedPrefix prefixes every CTE name the executor generates, so they
+// can't collide w/ a caller's own CTEs when merged into one WITH. It's
+// insights' reserved prefix (insights.TableCTEPrefix), which user queries
+// can't use.
+const GeneratedPrefix = "__inngest_"
 
 // LakeSource is the lake half of the union: a DuckLake catalog alias,
 // optionally pinned to a snapshot so one query reads one lake version.
@@ -66,7 +72,7 @@ type sourceSpec struct {
 }
 
 // sourceTimeColumn is the column bounding a physical table's run-time range.
-var sourceTimeColumn = map[Table]string{TableRuns: "queued_at", TableSpans: "run_queued_at", TableEvents: "received_at"}
+var sourceTimeColumn = map[Table]string{TableRuns: "queued_at", TableSpans: "run_queued_at", TableEvents: "received_at", TableMetadata: "run_queued_at"}
 
 // deltaBoundColumns are the columns sourceCTE's delta-side bounds read, so
 // the delta must carry them whatever the query reads.
@@ -137,8 +143,8 @@ func deltaSelect(c schema.Column) *parser.SelectItem {
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
-// inngest.raw_runs over their federated source; spans and events are the
-// source itself (each row is its own emission / event).
+// inngest.raw_runs over their federated source; spans, events and metadata
+// are the source itself (each row is its own emission / event).
 func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
 	switch t {
 	case TableRuns:
@@ -146,7 +152,7 @@ func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
 			Name: []string{lake.Catalog, "raw_runs"},
 			Args: []parser.Expr{&parser.NamedArg{Name: "p_runs", Value: strLit(SourceName(t))}},
 		})), nil
-	case TableSpans, TableEvents:
+	case TableSpans, TableEvents, TableMetadata:
 		return cte(string(t), selectStar(tableRef(SourceName(t)))), nil
 	}
 	return nil, fmt.Errorf("federate: no view for table %q", t)

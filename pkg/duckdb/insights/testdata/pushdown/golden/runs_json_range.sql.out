@@ -1,0 +1,4 @@
+{
+  "description": "Only =, != and IN are extracted on JSON keys.",
+  "mode": "product"
+}

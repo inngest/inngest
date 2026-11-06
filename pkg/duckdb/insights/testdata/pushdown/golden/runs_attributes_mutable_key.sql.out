@@ -1,0 +1,13 @@
+{
+  "description": "A mutable attribute key is pushed: the runs delta filters each run's latest row.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "attributes-\u003e\u003e'_inngest.dynamic.status' = 'Completed'",
+        "physical": "runs.attributes-\u003e\u003e'_inngest.dynamic.status' = 'Completed'",
+        "pushed": true
+      }
+    ]
+  }
+}

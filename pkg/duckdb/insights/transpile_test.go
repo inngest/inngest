@@ -78,15 +78,30 @@ func TestTranspileQuotesNamedArgNames(t *testing.T) {
 	requireSingleMacroScopedTable(t, tr.SQL)
 }
 
-// requireSingleMacroScopedTable reparses sql and checks its only table
-// reference is a tenant-scoped insights macro call.
+// requireSingleMacroScopedTable reparses sql and checks every table it reads
+// is tenant scoped: each bare table reference names one of the statement's
+// own reserved CTEs, and each reserved CTE's body is exactly a scoped
+// insights macro call.
 func requireSingleMacroScopedTable(t *testing.T, sql string) {
 	t.Helper()
 	stmt, err := parser.ParseString(sql)
 	require.NoError(t, err, "reparsing %q", sql)
+	require.NotNil(t, stmt.With, "no reserved CTEs in %q", sql)
+	reserved := map[string]bool{}
+	for _, c := range stmt.With.CTEs {
+		if !strings.HasPrefix(c.Name, TableCTEPrefix) {
+			continue
+		}
+		table := strings.TrimPrefix(c.Name, TableCTEPrefix)
+		require.Equal(t, "SELECT * FROM inngest."+logicalTables[table].view+"(?, ?)", parser.String(c.Select),
+			"reserved CTE %s isn't a scoped macro call in %q", c.Name, sql)
+		reserved[c.Name] = true
+	}
 	v := &bareTableCollector{}
 	parser.Walk(v, stmt)
-	require.Empty(t, v.names, "bare table references in %q", sql)
+	for _, name := range v.names {
+		require.True(t, reserved[name], "bare table reference %q in %q", name, sql)
+	}
 }
 
 type bareTableCollector struct{ names []string }
@@ -124,7 +139,7 @@ func TestTranspileOffsetOnlyInNestedQueries(t *testing.T) {
 		t.Run(sql, func(t *testing.T) {
 			tr, err := Transpile(sql, testAccountID, testEnvID)
 			require.NoError(t, err)
-			require.Contains(t, tr.SQL, "FROM inngest.insights_runs(?, ?) AS runs OFFSET 5)")
+			require.Contains(t, tr.SQL, "FROM __inngest_runs AS runs OFFSET 5)")
 		})
 	}
 }

@@ -91,6 +91,7 @@ var (
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // step_id, step_index, step_attempt
 		duckdbdriver.QuackColumnVarchar, duckdbdriver.QuackColumnVarchar, // kind, is_user
 		duckdbdriver.QuackColumnJSON, duckdbdriver.QuackColumnTimestampTZ, // values, created_at
+		duckdbdriver.QuackColumnTimestampTZ, // bucket_at
 	}
 )
 
@@ -266,6 +267,7 @@ func metadataRowValues(m MetadataRow) []any {
 		stepID, stepIndex, stepAttempt,
 		m.Kind, strconv.FormatBool(m.IsUser),
 		m.Values, m.CreatedAt,
+		m.CreatedAt, // bucket_at: an emission is written when it's recorded
 	}
 }
 

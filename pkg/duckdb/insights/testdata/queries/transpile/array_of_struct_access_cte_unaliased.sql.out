@@ -1,5 +1,5 @@
 {
-  "sql": "WITH x AS (SELECT sessions -\u003e\u003e '$[*].key' AS key FROM inngest.insights_runs(?, ?) AS runs) SELECT key FROM x LIMIT 1000",
+  "sql": "WITH __inngest_runs AS NOT MATERIALIZED (SELECT * FROM inngest.insights_runs(?, ?)), x AS (SELECT sessions -\u003e\u003e '$[*].key' AS key FROM __inngest_runs AS runs) SELECT key FROM x LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000"

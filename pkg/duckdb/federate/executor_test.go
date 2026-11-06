@@ -378,6 +378,13 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, append([]string{"span_id", "parent_span_id", "name"}, bounds...), names(f.streamer.reqs[0].Columns))
 
+		// A JSON key the planner pushes into the scan (projected as
+		// attributes.<key>) still reads its column.
+		f.streamer.reqs = nil
+		f.query(t, []Table{TableSpans}, nil, `SELECT attributes."_inngest.step.userland.id"::VARCHAR FROM spans`)
+		require.Len(t, f.streamer.reqs, 1)
+		require.ElementsMatch(t, append([]string{"attributes"}, bounds...), names(f.streamer.reqs[0].Columns))
+
 		f.streamer.reqs = nil
 		f.query(t, []Table{TableRuns}, nil, `SELECT run_id, status FROM runs`)
 		require.Len(t, f.streamer.reqs, 1)

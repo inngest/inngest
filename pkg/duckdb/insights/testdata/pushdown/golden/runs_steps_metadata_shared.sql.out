@@ -1,0 +1,20 @@
+{
+  "description": "runs and steps both join the metadata rollup, so neither's run_id filter goes to it.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "runs.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      }
+    ],
+    "steps": [
+      {
+        "logical": "run_id = '01J0000000000000000000000A'",
+        "physical": "spans.run_id = '01J0000000000000000000000A'",
+        "pushed": true
+      }
+    ]
+  }
+}

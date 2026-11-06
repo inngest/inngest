@@ -92,6 +92,9 @@ const (
 	TableRuns   Table = "runs"
 	TableSpans  Table = "spans"
 	TableEvents Table = "events"
+	// TableMetadata is the raw metadata emissions, which readers roll up
+	// (inngest.run_metadata_rollup) over lake and delta together.
+	TableMetadata Table = "metadata"
 )
 
 // Op is a predicate's operator: a comparison, LIKE, or a boolean

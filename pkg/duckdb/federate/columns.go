@@ -157,7 +157,7 @@ func scanColumns(plan []planNode, table string, cols []Column) (map[string]bool,
 			if tbl, _ := info["Table"].(string); tableIs(tbl, table) {
 				found = true
 				for _, p := range stringsOf(info["Projections"]) {
-					names[strings.Trim(p, `"`)] = true
+					names[projectedColumn(p)] = true
 				}
 				for k, v := range info {
 					if !strings.Contains(strings.ToLower(k), "filter") {
@@ -181,6 +181,21 @@ func scanColumns(plan []planNode, table string, cols []Column) (map[string]bool,
 		walk(n)
 	}
 	return names, found
+}
+
+// projectedColumn is the column a scan projection reads: the projection
+// itself, or for a field pushed into the scan (attributes."a.b" plans as
+// the projection attributes.a.b) the column before the first dot. Column
+// names never have dots.
+func projectedColumn(p string) string {
+	p = strings.TrimSpace(p)
+	if strings.HasPrefix(p, `"`) {
+		if end := strings.Index(p[1:], `"`); end >= 0 {
+			return p[1 : end+1]
+		}
+	}
+	name, _, _ := strings.Cut(p, ".")
+	return name
 }
 
 // tableIs reports whether a plan's table reference (bare, or qualified as

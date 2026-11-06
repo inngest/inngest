@@ -1,0 +1,13 @@
+{
+  "description": "A key of a string attribute is pushed.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "attributes-\u003e\u003e'_inngest.event.trigger.name' = 'app/user.created'",
+        "physical": "runs.attributes-\u003e\u003e'_inngest.event.trigger.name' = 'app/user.created'",
+        "pushed": true
+      }
+    ]
+  }
+}

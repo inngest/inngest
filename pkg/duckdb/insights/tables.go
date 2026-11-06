@@ -1,6 +1,10 @@
 package insights
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/inngest/inngest/pkg/duckdb/schema"
+)
 
 // knownColumn is one column of a logicalTable's static schema — the same
 // allowlist validate checks input columns against, the source
@@ -41,6 +45,12 @@ type knownColumn struct {
 	// be rewritten to the JSONPath wildcard form col ->> '$[*].field' to
 	// actually run — rewriteArrayOfStructAccess (rewrite.go) does that.
 	arrayOfStructs bool
+	// physical is the physical-table column this logical column is a plain
+	// pass-through of in its table macro's projection (insights_runs'
+	// r.app_name AS app_id is "app_name"), or "" for a computed one. It's
+	// what a pushed-down predicate on the logical column filters in a
+	// federated physical source.
+	physical string
 }
 
 // logicalTable is one of the six logical tables this package exposes. view
@@ -72,11 +82,42 @@ func (t logicalTable) column(name string) (knownColumn, bool) {
 	return col, ok
 }
 
-// lookupLogicalTable looks a bare table name up in logicalTables
-// case-insensitively, like DuckDB resolves "FROM RUNS" or "FROM \"Runs\"".
-func lookupLogicalTable(name string) (logicalTable, bool) {
-	tbl, ok := logicalTables[strings.ToLower(name)]
-	return tbl, ok
+// catalog is the set of tables one transpile mode exposes.
+type catalog struct {
+	tables map[string]logicalTable
+	// raw marks the internal raw mode: the physical tables themselves,
+	// unscoped (every tenant), through their inngest.raw_* macros.
+	raw bool
+}
+
+var (
+	productCatalog = catalog{tables: logicalTables}
+	rawCatalog     = catalog{tables: rawTables(), raw: true}
+)
+
+// rawTables exposes each physical table (schema.Runs, schema.Spans) under its
+// own name and columns, through its raw macro: runs collapsed to one row per
+// run (inngest.raw_runs), spans as stored.
+func rawTables() map[string]logicalTable {
+	out := map[string]logicalTable{}
+	for _, t := range []struct {
+		phys schema.Table
+		view string
+		desc string
+	}{
+		{schema.Runs, "raw_runs", "Every tenant's runs, one row per run (physical columns)."},
+		{schema.Spans, "raw_run_trace_spans", "Every tenant's run trace spans, as stored (physical columns)."},
+		{schema.Events, "raw_events", "Every tenant's events, as stored (physical columns)."},
+		{schema.RunMetadata, "raw_run_metadata", "Every tenant's run metadata emissions, as stored (physical columns)."},
+	} {
+		tbl := logicalTable{name: t.phys.Name, view: t.view, description: t.desc, columns: map[string]knownColumn{}}
+		for _, c := range t.phys.Columns {
+			tbl.columnOrder = append(tbl.columnOrder, c.Name)
+			tbl.columns[c.Name] = knownColumn{colType: DuckDBToColumnType(c.PhysicalType()), physical: c.Name}
+		}
+		out[t.phys.Name] = tbl
+	}
+	return out
 }
 
 var logicalTables = map[string]logicalTable{
@@ -95,22 +136,22 @@ var logicalTables = map[string]logicalTable{
 			"metadata", "inngest",
 		},
 		columns: map[string]knownColumn{
-			"run_id":       {colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The unique ID of the run."},
-			"queued_at":    {colType: ColumnTypeDatetime, description: "When the run was queued."},
-			"scheduled_at": {colType: ColumnTypeDatetime, description: "When the run is scheduled to start, if it was scheduled for later."},
-			"started_at":   {colType: ColumnTypeDatetime, description: "When the run started executing."},
-			"ended_at":     {colType: ColumnTypeDatetime, description: "When the run finished (succeeded, failed, or was cancelled)."},
-			"app_id":       {colType: ColumnTypeString, pathHints: rootHint(HintAppID), description: "The app that owns the function this run belongs to."},
-			"function_id":  {colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function that was run."},
-			"status":       {colType: ColumnTypeString, description: "The run's current status: Queued, Running, Completed, Failed, or Cancelled."},
-			"attributes":   {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about the run."},
+			"run_id":       {physical: "run_id", colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The unique ID of the run."},
+			"queued_at":    {physical: "queued_at", colType: ColumnTypeDatetime, description: "When the run was queued."},
+			"scheduled_at": {physical: "scheduled_at", colType: ColumnTypeDatetime, description: "When the run is scheduled to start: its queued time, unless it was scheduled for later."},
+			"started_at":   {physical: "started_at", colType: ColumnTypeDatetime, description: "When the run started executing."},
+			"ended_at":     {physical: "ended_at", colType: ColumnTypeDatetime, description: "When the run finished (succeeded, failed, or was cancelled)."},
+			"app_id":       {physical: "app_name", colType: ColumnTypeString, pathHints: rootHint(HintAppID), description: "The app that owns the function this run belongs to."},
+			"function_id":  {physical: "function_slug", colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function that was run."},
+			"status":       {physical: "status", colType: ColumnTypeString, description: "The run's current status: Queued, Running, Completed, Failed, or Cancelled."},
+			"attributes":   {physical: "attributes", colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about the run."},
 			// inputs' elements are full marshaled event.Event objects, not
 			// flattened event data — event.Event's own payload lives under
 			// its "data" field, hence runInputsHints' "data." segment
 			// (distinct from events.data's own eventDataHints, one level
 			// shallower).
-			"inputs": {colType: ColumnTypeJSON, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
-			"output": {colType: ColumnTypeJSON, description: "The run's final output, once it completes successfully."},
+			"inputs": {physical: "inputs", colType: ColumnTypeJSON, pathHints: runInputsHints, description: "The event(s) that were sent to the function when it ran."},
+			"output": {physical: "output", colType: ColumnTypeJSON, description: "The run's final output, once it completes successfully."},
 			// event_ids is array-valued (VARCHAR[], so JSON per
 			// DuckDBToColumnType). The hint describes each element, not the
 			// column's own value -- an array of event IDs isn't itself an
@@ -118,16 +159,16 @@ var logicalTables = map[string]logicalTable{
 			// the explicit "[*]" pathHints entry declares that per-element
 			// hint directly, rather than leaving it to resolveItemHint's
 			// implicit UNNEST(...)/single-index fallback alone.
-			"event_ids": {colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintEventID, wc)}, description: "The event(s) that triggered this run."},
+			"event_ids": {physical: "event_ids", colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintEventID, wc)}, description: "The event(s) that triggered this run."},
 			// sessions is STRUCT(key VARCHAR, id VARCHAR)[] on disk, not
 			// real JSON — see knownColumn.arrayOfStructs. Same "[*]"-only
 			// convention as event_ids, just one level up: each element is
 			// itself the {key,id} object HintSession describes, not a bare
 			// scalar, so there's no separate "[*].id"-only hint either.
-			"sessions":                 {colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: []PathHint{hint(HintSession, wc)}, description: "Session identifiers carried by the triggering event(s), if any."},
-			"is_deferred":              {colType: ColumnTypeBoolean, description: "Whether this run continues another run that deferred to it, rather than being triggered directly by an event."},
-			"defer_parent_function_id": {colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function of the run that deferred to this one, if is_deferred is true."},
-			"defer_parent_run_ids":     {colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintRunID, wc)}, description: "The run(s) that deferred to this run, if is_deferred is true."},
+			"sessions":                 {physical: "sessions", colType: ColumnTypeJSON, arrayOfStructs: true, pathHints: []PathHint{hint(HintSession, wc)}, description: "Session identifiers carried by the triggering event(s), if any."},
+			"is_deferred":              {physical: "is_deferred", colType: ColumnTypeBoolean, description: "Whether this run continues another run that deferred to it, rather than being triggered directly by an event."},
+			"defer_parent_function_id": {physical: "defer_parent_fn_slug", colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function of the run that deferred to this one, if is_deferred is true."},
+			"defer_parent_run_ids":     {physical: "defer_parent_run_ids", colType: ColumnTypeJSON, pathHints: []PathHint{hint(HintRunID, wc)}, description: "The run(s) that deferred to this run, if is_deferred is true."},
 			// metadata/inngest are the run-scoped metadata rollup joined
 			// onto insights_runs: metadata is caller (userland) emitted
 			// key->value data, inngest is Inngest's own internal metadata —
@@ -149,20 +190,23 @@ var logicalTables = map[string]logicalTable{
 			// id is insights_events' own alias for the underlying
 			// inngest.events table's event_id column — it's the event's
 			// ID, so it carries the same HintEventID event_ids (runs) does.
-			"id":          {colType: ColumnTypeString, pathHints: rootHint(HintEventID), description: "The unique ID of the event."},
-			"name":        {colType: ColumnTypeString, description: "The event's name."},
-			"data":        {colType: ColumnTypeJSON, pathHints: eventDataHints, description: "The event's payload."},
-			"v":           {colType: ColumnTypeString, description: "The event's version, if one was set when it was sent."},
-			"ts":          {colType: ColumnTypeDatetime, description: "The timestamp included with the event when it was sent."},
-			"meta":        {colType: ColumnTypeJSON, pathHints: eventMetaHints, description: "Additional metadata Inngest recorded about the event."},
-			"received_at": {colType: ColumnTypeDatetime, description: "When Inngest received the event."},
+			"id":          {physical: "event_id", colType: ColumnTypeString, pathHints: rootHint(HintEventID), description: "The unique ID of the event."},
+			"name":        {physical: "event_name", colType: ColumnTypeString, description: "The event's name."},
+			"data":        {physical: "event_data", colType: ColumnTypeJSON, pathHints: eventDataHints, description: "The event's payload."},
+			"v":           {physical: "event_v", colType: ColumnTypeString, description: "The event's version, if one was set when it was sent."},
+			"ts":          {physical: "event_ts", colType: ColumnTypeDatetime, description: "The timestamp included with the event when it was sent."},
+			"meta":        {physical: "event_meta", colType: ColumnTypeJSON, pathHints: eventMetaHints, description: "Additional metadata Inngest recorded about the event."},
+			"received_at": {physical: "received_at", colType: ColumnTypeDatetime, description: "When Inngest received the event."},
 		},
 	},
-	// metadata is backed by the run_metadata_rollup view: one row per
+	// metadata is backed by the run_metadata_rollup macro: one row per
 	// (run_id, span_id), with the latest emission (by created_at) of each
 	// kind as kind -> values in two JSON objects instead of exposing raw
 	// per-emission rows. Each emission replaces its kind outright, nothing
-	// is merged across emissions.
+	// is merged across emissions. Only the rollup's group key (and
+	// run_queued_at, fixed per run) maps to a physical column: a filter on
+	// anything else could drop some of a span's emissions and change what
+	// the rest roll up to.
 	"metadata": {
 		name:        "metadata",
 		view:        "insights_metadata",
@@ -173,9 +217,9 @@ var logicalTables = map[string]logicalTable{
 			"step_attempt", "inngest", "metadata",
 		},
 		columns: map[string]knownColumn{
-			"run_id":        {colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this metadata belongs to."},
-			"run_queued_at": {colType: ColumnTypeDatetime, description: "When the run was queued."},
-			"span_id":       {colType: ColumnTypeString, description: "Identifies which part of the run (the run itself, a step, or a request) this metadata belongs to."},
+			"run_id":        {physical: "run_id", colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this metadata belongs to."},
+			"run_queued_at": {physical: "run_queued_at", colType: ColumnTypeDatetime, description: "When the run was queued."},
+			"span_id":       {physical: "span_id", colType: ColumnTypeString, description: "Identifies which part of the run (the run itself, a step, or a request) this metadata belongs to."},
 			"scope":         {colType: ColumnTypeString, description: "What this metadata was recorded for: the run, a step, a step attempt, or a request."},
 			"step_id":       {colType: ColumnTypeString, description: "The step this metadata belongs to, if any."},
 			"step_index":    {colType: ColumnTypeNumber, description: "The step's position within the run, if this metadata belongs to a step."},
@@ -198,25 +242,25 @@ var logicalTables = map[string]logicalTable{
 			"start_time", "end_time", "attributes", "metadata", "inngest",
 		},
 		columns: map[string]knownColumn{
-			"run_id":         {colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this event belongs to."},
-			"run_queued_at":  {colType: ColumnTypeDatetime, description: "When the run was queued."},
-			"app_id":         {colType: ColumnTypeString, pathHints: rootHint(HintAppID), description: "The app that owns the function this run belongs to."},
-			"function_id":    {colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function this run belongs to."},
-			"trace_id":       {colType: ColumnTypeString, description: "Identifies the full execution trace this event belongs to."},
-			"span_id":        {colType: ColumnTypeString, description: "The unique ID of this event."},
-			"parent_span_id": {colType: ColumnTypeString, description: "The step or event this one is nested under, if any."},
-			"name":           {colType: ColumnTypeString, description: "The name given to this trace event."},
-			"start_time":     {colType: ColumnTypeDatetime, description: "When this event started."},
-			"end_time":       {colType: ColumnTypeDatetime, description: "When this event ended."},
-			"attributes":     {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded with this event."},
+			"run_id":         {physical: "run_id", colType: ColumnTypeString, pathHints: rootHint(HintRunID), description: "The run this event belongs to."},
+			"run_queued_at":  {physical: "run_queued_at", colType: ColumnTypeDatetime, description: "When the run was queued."},
+			"app_id":         {physical: "app_name", colType: ColumnTypeString, pathHints: rootHint(HintAppID), description: "The app that owns the function this run belongs to."},
+			"function_id":    {physical: "function_slug", colType: ColumnTypeString, pathHints: rootHint(HintFunctionID), description: "The function this run belongs to."},
+			"trace_id":       {physical: "trace_id", colType: ColumnTypeString, description: "Identifies the full execution trace this event belongs to."},
+			"span_id":        {physical: "span_id", colType: ColumnTypeString, description: "The unique ID of this event."},
+			"parent_span_id": {physical: "parent_span_id", colType: ColumnTypeString, description: "The step or event this one is nested under, if any."},
+			"name":           {physical: "name", colType: ColumnTypeString, description: "The name given to this trace event."},
+			"start_time":     {physical: "start_time", colType: ColumnTypeDatetime, description: "When this event started."},
+			"end_time":       {physical: "end_time", colType: ColumnTypeDatetime, description: "When this event ended."},
+			"attributes":     {physical: "attributes", colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded with this event."},
 			"metadata":       {colType: ColumnTypeJSON, pathHints: nil, description: "Custom metadata your code recorded during the run."},
 			"inngest":        {colType: ColumnTypeJSON, pathHints: nil, description: "Metadata Inngest recorded automatically during the run."},
 		},
 	},
 	"steps": traceSpanTable("steps", "insights_steps",
-		"The steps run during your functions, showing each step's most recent attempt.", stepColumns()),
+		"The steps run during your functions, showing each step's most recent attempt.", stepColumns(), true),
 	"step_attempts": traceSpanTable("step_attempts", "insights_step_attempts",
-		"Every attempt of every step run during your functions.", stepColumns()),
+		"Every attempt of every step run during your functions.", stepColumns(), false),
 }
 
 // spanAttrPathHints is attributes' pathHints, shared by
@@ -296,7 +340,11 @@ var runInputsHints = []PathHint{
 	hint(HintSession, wc, seg("meta"), seg("sessions")),
 }
 
-func traceSpanTable(name, view, description string, extra map[string]knownColumn) logicalTable {
+// traceSpanTable's base columns map to their run_trace_spans columns for
+// pushdown. collapsed (steps' latest attempt per step) keeps only the
+// run-level ones: a filter on anything else could drop a step's latest
+// attempt and surface an older one instead.
+func traceSpanTable(name, view, description string, extra map[string]knownColumn, collapsed bool) logicalTable {
 	order := []string{
 		"run_id", "run_queued_at", "app_id",
 		"function_id", "span_id", "trace_id", "parent_span_id", "name",
@@ -316,6 +364,19 @@ func traceSpanTable(name, view, description string, extra map[string]knownColumn
 		"output":         {colType: ColumnTypeJSON, description: "The step's output, once this attempt completes successfully."},
 		"input":          {colType: ColumnTypeJSON, description: "The input passed to this step attempt."},
 		"attributes":     {colType: ColumnTypeJSON, pathHints: spanAttrPathHints, description: "Additional details recorded about this step attempt."},
+	}
+	physical := map[string]string{
+		"run_id": "run_id", "run_queued_at": "run_queued_at", "app_id": "app_name", "function_id": "function_slug",
+	}
+	if !collapsed {
+		for _, c := range []string{"span_id", "trace_id", "parent_span_id", "name", "start_time", "end_time", "output", "input", "attributes"} {
+			physical[c] = c
+		}
+	}
+	for c, phys := range physical {
+		col := cols[c]
+		col.physical = phys
+		cols[c] = col
 	}
 	for _, extraCol := range extraStepColumnOrder(extra) {
 		order = append(order, extraCol)

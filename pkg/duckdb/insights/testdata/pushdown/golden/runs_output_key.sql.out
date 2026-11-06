@@ -1,0 +1,13 @@
+{
+  "description": "Output is set once, when the run ends; a null-rejecting filter can only match ended runs, so it's pushed.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "output-\u003e\u003e'result' = 'ok'",
+        "physical": "runs.output-\u003e\u003e'result' = 'ok'",
+        "pushed": true
+      }
+    ]
+  }
+}
