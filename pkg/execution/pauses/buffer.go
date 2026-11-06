@@ -60,7 +60,7 @@ func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause
 //
 // This can be deleted in Sept 2025.
 func (r redisAdapter) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
-	return r.rsm.PauseByID(ctx, pauseID)
+	return r.rsm.PauseByID(ctx, pauseID, index.WorkspaceID)
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
@@ -96,16 +96,16 @@ func (r redisAdapter) DeletePauseByID(ctx context.Context, pauseID uuid.UUID, wo
 	return r.rsm.DeletePauseByID(ctx, pauseID, workspaceID)
 }
 
-func (r redisAdapter) PauseIDsForRun(ctx context.Context, runID ulid.ULID) ([]uuid.UUID, error) {
-	return r.rsm.PauseIDsForRun(ctx, runID)
+func (r redisAdapter) PauseIDsForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) ([]uuid.UUID, error) {
+	return r.rsm.PauseIDsForRun(ctx, runID, workspaceID)
 }
 
-func (r redisAdapter) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID) error {
-	return r.rsm.DeleteRunPausesIndex(ctx, runID)
+func (r redisAdapter) DeleteRunPausesIndex(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
+	return r.rsm.DeleteRunPausesIndex(ctx, runID, workspaceID)
 }
 
 func (r redisAdapter) DeletePausesForRun(ctx context.Context, runID ulid.ULID, workspaceID uuid.UUID) error {
-	pauseIDs, err := r.rsm.PauseIDsForRun(ctx, runID)
+	pauseIDs, err := r.rsm.PauseIDsForRun(ctx, runID, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -116,5 +116,5 @@ func (r redisAdapter) DeletePausesForRun(ctx context.Context, runID ulid.ULID, w
 		}
 	}
 
-	return r.rsm.DeleteRunPausesIndex(ctx, runID)
+	return r.rsm.DeleteRunPausesIndex(ctx, runID, workspaceID)
 }
