@@ -35,6 +35,13 @@ import (
 // wraps this too, so a caller never has to fail twice to notice.
 var ErrDisabled = errors.New("duckdb: subprocess permanently disabled after a failed restart attempt")
 
+// ErrStatementFailed marks an error duckdb itself reported for a statement
+// (the server answered, it just rejected it), as opposed to a transport
+// failure. It's exported so callers can tell "this definitely didn't
+// commit" apart from an ambiguous failure (see pkg/duckdb/tracing's
+// retryableFlushError).
+var ErrStatementFailed = result.ErrStatementFailed
+
 // restartHealthTimeout bounds the health check of an exec-triggered restart.
 // It is deliberately detached from the caller's ctx — see exec.
 const restartHealthTimeout = 10 * time.Second
