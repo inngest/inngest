@@ -74,9 +74,23 @@ type FailureGroup =
 
 type GroupRow = FailureGroup & { id: string };
 
+const reasonLabels: Record<WebhookFailureReason, string> = {
+  [WebhookFailureReason.BodyTooLarge]: 'Request body too large',
+  [WebhookFailureReason.EnvNotFound]: 'Environment not found',
+  [WebhookFailureReason.Filtered]: 'Filtered',
+  [WebhookFailureReason.InternalError]: 'Internal error',
+  [WebhookFailureReason.InvalidBody]: 'Invalid request body',
+  [WebhookFailureReason.InvalidEvent]: 'Invalid event',
+  [WebhookFailureReason.PublishError]: 'Failed to publish event',
+  [WebhookFailureReason.ResponseError]: 'Failed to send response',
+  [WebhookFailureReason.TooManyEvents]: 'Too many events',
+  [WebhookFailureReason.TransformError]: 'Transform failed',
+  [WebhookFailureReason.TransformInvalidOutput]:
+    'Transform returned invalid output',
+};
+
 function reasonLabel(reason: WebhookFailureReason): string {
-  const text = reason.replaceAll('_', ' ').toLowerCase();
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return reasonLabels[reason];
 }
 
 function shortAge(date: string): string {
