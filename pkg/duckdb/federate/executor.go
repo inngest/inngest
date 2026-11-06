@@ -45,13 +45,7 @@ type Query struct {
 	// Predicates are conjuncts per table that a delta may pre-filter on (SQL
 	// must still apply the full predicate). All are forwarded; the
 	// DeltaStreamer applies those it can represent and drops the rest.
-	//
-	// Future work: push GROUP BY with associative aggregates (count, sum,
-	// min, max, any; avg as sum and count) into the delta, so it returns partial
-	// aggregates DuckDB merges with the lake's instead of raw rows. That
-	// needs exact predicates rather than pre-filters, and holds only where
-	// lake and delta rows are disjoint (spans, events), not for runs, which
-	// collapse across the two.
+	// (Executor.Aggregate pushes a GROUP BY itself, w/ exact predicates.)
 	Predicates map[Table][]Predicate
 	// RowCap bounds each table's delta.
 	RowCap int
@@ -164,7 +158,7 @@ func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 			if err := sameColumns(r.Schema(), req.Columns); err != nil {
 				return fail(fmt.Errorf("federate: %s delta: %w", t, err))
 			}
-			st, def, err := encodedDeltaStream(t, r, q.RowCap)
+			st, def, err := encodedDeltaStream(t, r, q.RowCap, deltaRows)
 			if err != nil {
 				return fail(err)
 			}

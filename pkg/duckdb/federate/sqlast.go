@@ -2,10 +2,12 @@ package federate
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/duckdb/parser"
 )
 
@@ -35,6 +37,37 @@ func typeName(s string) *parser.TypeName {
 
 func cast(x parser.Expr, typ string) parser.Expr {
 	return &parser.CastExpr{X: x, Type: typeName(typ)}
+}
+
+// lit renders v as a typed SQL literal.
+func lit(v any) (parser.Expr, error) {
+	switch x := v.(type) {
+	case nil:
+		return &parser.Literal{Kind: parser.LitNull}, nil
+	case string:
+		return strLit(x), nil
+	case bool:
+		if x {
+			return &parser.Literal{Kind: parser.LitTrue}, nil
+		}
+		return &parser.Literal{Kind: parser.LitFalse}, nil
+	case int:
+		return numLit(int64(x)), nil
+	case int32:
+		return numLit(int64(x)), nil
+	case int64:
+		return numLit(x), nil
+	case float64:
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return nil, fmt.Errorf("federate: can't render %v as a SQL literal", x)
+		}
+		return &parser.Literal{Kind: parser.LitNumber, Text: strconv.FormatFloat(x, 'g', -1, 64)}, nil
+	case time.Time:
+		return timeLit(x), nil
+	case uuid.UUID:
+		return uuidLit(x.String()), nil
+	}
+	return nil, fmt.Errorf("federate: can't render %T as a SQL literal", v)
 }
 
 func timeLit(t time.Time) parser.Expr {
