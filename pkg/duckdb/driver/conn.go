@@ -85,7 +85,19 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, err
 	}
 	start := time.Now()
-	cols, types, rows, err := c.sess.Query(ctx, sql)
+	var cols, types []string
+	var rows []result.Row
+	if streams := quackStreamsFrom(ctx); len(streams) > 0 {
+		// The streams are fed on the same quack session the query runs on,
+		// under the transport's own locking and restart policy.
+		sq, ok := c.sess.(streamQuerier)
+		if !ok {
+			return nil, errQuackStreamsTransport
+		}
+		cols, types, rows, err = sq.QueryWithStreams(ctx, sql, toSendStreams(streams))
+	} else {
+		cols, types, rows, err = c.sess.Query(ctx, sql)
+	}
 	logStatement(ctx, "query", query, len(args), start, len(rows), err)
 	if err != nil {
 		return nil, err
