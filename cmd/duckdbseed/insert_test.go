@@ -99,7 +99,7 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	generated, err := GenerateRuns(rand.New(rand.NewSource(1)), tmpl, cfg)
 	require.NoError(t, err)
 
-	summary, err := InsertGeneratedRuns(ctx, connector, generated, 10, 1, nil)
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 10, Parallelism: 1})
 	require.NoError(t, err)
 	require.Equal(t, 3, summary.Runs)
 
@@ -138,7 +138,7 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 func TestInsertGeneratedRunsWithNoRunsIsANoop(t *testing.T) {
 	connector, _ := newTestDB(t, 1)
 
-	summary, err := InsertGeneratedRuns(t.Context(), connector, nil, 10, 1, nil)
+	summary, err := InsertGeneratedRuns(t.Context(), connector, nil, InsertOptions{BatchSize: 10, Parallelism: 1})
 	require.NoError(t, err)
 	require.Equal(t, Summary{}, summary)
 }
@@ -162,7 +162,7 @@ func TestInsertGeneratedRunsReportsProgressAfterEachBatch(t *testing.T) {
 
 	// batchSize=1 and parallelism=1 means one flush per run, strictly in
 	// order — the same granularity and ordering as before batching existed.
-	_, err = InsertGeneratedRuns(ctx, connector, generated, 1, 1, onProgress)
+	_, err = InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 1, Parallelism: 1, OnProgress: onProgress})
 	require.NoError(t, err)
 
 	require.Equal(t, [][4]int{{1, 3, 1, 3}, {2, 3, 2, 3}, {3, 3, 3, 3}}, progress)
@@ -185,7 +185,7 @@ func TestInsertGeneratedRunsBatchesAcrossMultipleRunsPerFlush(t *testing.T) {
 		progress = append(progress, [4]int{batchIndex, totalBatches, done, total})
 	}
 
-	summary, err := InsertGeneratedRuns(ctx, connector, generated, 2, 1, onProgress)
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 2, Parallelism: 1, OnProgress: onProgress})
 	require.NoError(t, err)
 
 	require.Equal(t, [][4]int{{1, 3, 2, 5}, {2, 3, 4, 5}, {3, 3, 5, 5}}, progress,
@@ -231,7 +231,7 @@ func TestInsertGeneratedRunsProgressBatchIndicesAreDistinctUnderConcurrency(t *t
 		totalBatchesSeen = totalBatches
 	}
 
-	summary, err := InsertGeneratedRuns(ctx, connector, generated, 5, 4, onProgress)
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 5, Parallelism: 4, OnProgress: onProgress})
 	require.NoError(t, err)
 
 	require.Equal(t, 8, totalBatchesSeen)
@@ -257,7 +257,7 @@ func TestInsertGeneratedRunsClampsNonPositiveBatchSizeToOne(t *testing.T) {
 	generated, err := GenerateRuns(rand.New(rand.NewSource(3)), tmpl, cfg)
 	require.NoError(t, err)
 
-	summary, err := InsertGeneratedRuns(ctx, connector, generated, 0, 1, nil)
+	summary, err := InsertGeneratedRuns(ctx, connector, generated, InsertOptions{BatchSize: 0, Parallelism: 1})
 	require.NoError(t, err)
 	require.Equal(t, 2, summary.Runs)
 }
@@ -278,11 +278,11 @@ func TestGenerateAndInsertMatchesPreGeneratingThenInserting(t *testing.T) {
 	preGenerated, err := GenerateRuns(rand.New(rand.NewSource(9)), tmpl, genCfg)
 	require.NoError(t, err)
 	preGenConnector, preGenDB := newTestDB(t, 1)
-	wantSummary, err := InsertGeneratedRuns(ctx, preGenConnector, preGenerated, 4, 1, nil)
+	wantSummary, err := InsertGeneratedRuns(ctx, preGenConnector, preGenerated, InsertOptions{BatchSize: 4, Parallelism: 1})
 	require.NoError(t, err)
 
 	interleavedConnector, interleavedDB := newTestDB(t, 1)
-	gotSummary, _, err := GenerateAndInsert(ctx, interleavedConnector, rand.New(rand.NewSource(9)), tmpl, genCfg, 4, 1, nil)
+	gotSummary, _, err := GenerateAndInsert(ctx, interleavedConnector, rand.New(rand.NewSource(9)), tmpl, genCfg, InsertOptions{BatchSize: 4, Parallelism: 1})
 	require.NoError(t, err)
 
 	require.Equal(t, wantSummary, gotSummary)
@@ -305,7 +305,7 @@ func TestGenerateAndInsertReportsProgressPerBatch(t *testing.T) {
 		progress = append(progress, [4]int{batchIndex, totalBatches, done, total})
 	}
 
-	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, 2, 1, onProgress)
+	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, InsertOptions{BatchSize: 2, Parallelism: 1, OnProgress: onProgress})
 	require.NoError(t, err)
 	require.Equal(t, 5, summary.Runs)
 
@@ -321,7 +321,7 @@ func TestGenerateAndInsertPropagatesGenerationErrors(t *testing.T) {
 	tmpl.Tenants = nil
 	genCfg := GenerateConfig{RunCount: 5, Window: time.Hour, Now: time.Now().UTC()}
 
-	_, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, 2, 1, nil)
+	_, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(1)), tmpl, genCfg, InsertOptions{BatchSize: 2, Parallelism: 1})
 	require.Error(t, err)
 }
 
@@ -333,7 +333,7 @@ func TestGenerateAndInsertWithParallelism(t *testing.T) {
 	tmpl := testTemplates()
 	genCfg := GenerateConfig{RunCount: 40, Window: time.Hour, Now: time.Now().UTC()}
 
-	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(5)), tmpl, genCfg, 5, 4, nil)
+	summary, _, err := GenerateAndInsert(t.Context(), connector, rand.New(rand.NewSource(5)), tmpl, genCfg, InsertOptions{BatchSize: 5, Parallelism: 4})
 	require.NoError(t, err)
 	require.Equal(t, 40, summary.Runs)
 
