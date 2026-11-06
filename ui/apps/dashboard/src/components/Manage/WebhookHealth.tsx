@@ -460,7 +460,7 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
     }
   }
   const chips = [...groups].sort((a, b) => b.count - a.count);
-  const rows = reason ? groups.filter((g) => g.reason === reason) : groups;
+  const rows = reason ? chips.filter((g) => g.reason === reason) : chips;
 
   return (
     <div className="mt-8 pt-3">
