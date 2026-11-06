@@ -88,3 +88,23 @@ func TestEventReadCatalog(t *testing.T) {
 		require.Equal(t, []string{"payload"}, FieldEnum(endpoint.Input.Fields().ByName("include")))
 	}
 }
+
+func TestFunctionsPauseResumeCatalog(t *testing.T) {
+	byMethod := map[string]Endpoint{}
+	for _, endpoint := range Discover() {
+		byMethod[endpoint.MethodName] = endpoint
+	}
+	for _, tc := range []struct{ method, action string }{
+		{"PauseFunctions", "pause"},
+		{"ResumeFunctions", "resume"},
+	} {
+		endpoint := byMethod[tc.method]
+		require.Equal(t, "functions:write:"+tc.action, endpoint.AuthzPermission)
+		require.Equal(t, tc.action+"-functions", endpoint.CommandName)
+		require.Equal(t, tc.action+"_functions", endpoint.ToolName)
+		require.Equal(t, http.MethodPost, endpoint.HTTPMethod)
+		require.Equal(t, "/apps/{app_id}/functions/"+tc.action, endpoint.Path)
+		require.Equal(t, "*", endpoint.Body)
+		require.True(t, IsRequired(endpoint.Input.Fields().ByName("function_ids")))
+	}
+}

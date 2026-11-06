@@ -79,6 +79,8 @@ const (
 	V2_CreateCancellation_FullMethodName         = "/api.v2.V2/CreateCancellation"
 	V2_PauseFunction_FullMethodName              = "/api.v2.V2/PauseFunction"
 	V2_ResumeFunction_FullMethodName             = "/api.v2.V2/ResumeFunction"
+	V2_PauseFunctions_FullMethodName             = "/api.v2.V2/PauseFunctions"
+	V2_ResumeFunctions_FullMethodName            = "/api.v2.V2/ResumeFunctions"
 	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
 	V2_ListEvents_FullMethodName                 = "/api.v2.V2/ListEvents"
 	V2_GetEvent_FullMethodName                   = "/api.v2.V2/GetEvent"
@@ -162,6 +164,8 @@ type V2Client interface {
 	CreateCancellation(ctx context.Context, in *CreateCancellationRequest, opts ...grpc.CallOption) (*CreateCancellationResponse, error)
 	PauseFunction(ctx context.Context, in *PauseFunctionRequest, opts ...grpc.CallOption) (*PauseFunctionResponse, error)
 	ResumeFunction(ctx context.Context, in *ResumeFunctionRequest, opts ...grpc.CallOption) (*ResumeFunctionResponse, error)
+	PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error)
+	ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error)
 	GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error)
 	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
 	GetEvent(ctx context.Context, in *GetEventRequest, opts ...grpc.CallOption) (*GetEventResponse, error)
@@ -804,6 +808,26 @@ func (c *v2Client) ResumeFunction(ctx context.Context, in *ResumeFunctionRequest
 	return out, nil
 }
 
+func (c *v2Client) PauseFunctions(ctx context.Context, in *PauseFunctionsRequest, opts ...grpc.CallOption) (*PauseFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PauseFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_PauseFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ResumeFunctions(ctx context.Context, in *ResumeFunctionsRequest, opts ...grpc.CallOption) (*ResumeFunctionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeFunctionsResponse)
+	err := c.cc.Invoke(ctx, V2_ResumeFunctions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) GetFunctions(ctx context.Context, in *GetFunctionsRequest, opts ...grpc.CallOption) (*GetFunctionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionsResponse)
@@ -1020,6 +1044,8 @@ type V2Server interface {
 	CreateCancellation(context.Context, *CreateCancellationRequest) (*CreateCancellationResponse, error)
 	PauseFunction(context.Context, *PauseFunctionRequest) (*PauseFunctionResponse, error)
 	ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error)
+	PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error)
+	ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error)
 	GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error)
 	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
 	GetEvent(context.Context, *GetEventRequest) (*GetEventResponse, error)
@@ -1221,6 +1247,12 @@ func (UnimplementedV2Server) PauseFunction(context.Context, *PauseFunctionReques
 }
 func (UnimplementedV2Server) ResumeFunction(context.Context, *ResumeFunctionRequest) (*ResumeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResumeFunction not implemented")
+}
+func (UnimplementedV2Server) PauseFunctions(context.Context, *PauseFunctionsRequest) (*PauseFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PauseFunctions not implemented")
+}
+func (UnimplementedV2Server) ResumeFunctions(context.Context, *ResumeFunctionsRequest) (*ResumeFunctionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeFunctions not implemented")
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
@@ -2329,6 +2361,42 @@ func _V2_ResumeFunction_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_PauseFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PauseFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).PauseFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_PauseFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).PauseFunctions(ctx, req.(*PauseFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ResumeFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeFunctionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ResumeFunctions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ResumeFunctions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ResumeFunctions(ctx, req.(*ResumeFunctionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_GetFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFunctionsRequest)
 	if err := dec(in); err != nil {
@@ -2829,6 +2897,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResumeFunction",
 			Handler:    _V2_ResumeFunction_Handler,
+		},
+		{
+			MethodName: "PauseFunctions",
+			Handler:    _V2_PauseFunctions_Handler,
+		},
+		{
+			MethodName: "ResumeFunctions",
+			Handler:    _V2_ResumeFunctions_Handler,
 		},
 		{
 			MethodName: "GetFunctions",

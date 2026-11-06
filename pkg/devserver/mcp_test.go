@@ -44,6 +44,11 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	names := make([]string, 0, len(tools))
 	for _, tool := range tools {
 		names = append(names, tool.Name)
+		if tool.Name == "pause_functions" || tool.Name == "resume_functions" {
+			require.True(t, tool.Annotations.IdempotentHint)
+			require.False(t, tool.Annotations.ReadOnlyHint)
+			require.ElementsMatch(t, []any{"appId", "functionIds"}, tool.InputSchema["required"])
+		}
 		if _, ok := generated[tool.Name]; ok {
 			require.IsType(t, []any{}, tool.InputSchema["required"], tool.Name)
 			properties := tool.InputSchema["properties"].(map[string]any)
@@ -60,6 +65,8 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	require.Contains(t, names, "pause_function")
 	require.Contains(t, names, "create_cancellation")
 	require.Contains(t, names, "resume_function")
+	require.Contains(t, names, "pause_functions")
+	require.Contains(t, names, "resume_functions")
 	require.Contains(t, names, "list_events")
 	require.Contains(t, names, "get_event")
 	require.Contains(t, names, "submit_feedback")
@@ -172,6 +179,14 @@ func TestMCPOperations(t *testing.T) {
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/resume", resume.HTTP.Path)
 	require.Equal(t, "resume-function", resume.CLI.Command)
 
+	for _, action := range []struct{ method, name string }{{"PauseFunctions", "pause"}, {"ResumeFunctions", "resume"}} {
+		op := operations[action.name+"_functions"]
+		require.Equal(t, action.method, op.ID)
+		require.Equal(t, "POST", op.HTTP.Method)
+		require.Equal(t, "/apps/{app_id}/functions/"+action.name, op.HTTP.Path)
+		require.Equal(t, action.name+"-functions", op.CLI.Command)
+	}
+
 	grepDocs := operations["grep_docs"]
 	require.Equal(t, "mcp.grep_docs", grepDocs.ID)
 	require.Nil(t, grepDocs.HTTP)
@@ -234,10 +249,11 @@ func TestMCPNotImplementedIsToolError(t *testing.T) {
 }
 
 type listedMCPTool struct {
-	Name        string         `json:"name"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	InputSchema map[string]any `json:"inputSchema"`
+	Name        string              `json:"name"`
+	Title       string              `json:"title"`
+	Description string              `json:"description"`
+	InputSchema map[string]any      `json:"inputSchema"`
+	Annotations mcp.ToolAnnotations `json:"annotations"`
 }
 
 func listMCPTools(t *testing.T, handler http.Handler) []listedMCPTool {

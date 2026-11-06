@@ -252,7 +252,12 @@ func normalizedV2Path(path string) string {
 func RequestBodyLimitMiddleware(maxEventBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		type route struct{ method, path string }
-		limits := map[string]int64{"SendEvent": maxEventBytes, "CreateReplay": 64 << 10}
+		limits := map[string]int64{
+			"SendEvent":       maxEventBytes,
+			"CreateReplay":    64 << 10,
+			"PauseFunctions":  256 << 10,
+			"ResumeFunctions": 256 << 10,
+		}
 		handlers := map[route]http.Handler{}
 		paths := chi.NewRouter()
 		for _, endpoint := range apiv2endpoint.Discover() {

@@ -1443,6 +1443,35 @@ func TestListEventsAcceptsLargePayloadPage(t *testing.T) {
 	require.Equal(t, body+"\n", out.String())
 }
 
+func TestCommandPausesAndResumesFunctions(t *testing.T) {
+	for _, action := range []struct{ name, response string }{
+		{"pause", `{"data":[{"functionId":"echo","function":{"id":"echo","isPaused":true}},{"functionId":"missing","error":{"code":"not_found","message":"Function not found"}}]}`},
+		{"resume", `{"data":[{"functionId":"echo","function":{"id":"echo","isPaused":false}},{"functionId":"missing","error":{"code":"not_found","message":"Function not found"}}]}`},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			var method, path, body string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				method, path = r.Method, r.URL.Path
+				data, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				body = string(data)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(action.response))
+			}))
+			defer srv.Close()
+			cmd := Command()
+			var out bytes.Buffer
+			cmd.Writer = &out
+			err := cmd.Run(t.Context(), []string{"api", action.name + "-functions", "--api-host", srv.URL, "--app-id", "app", "--function-ids", "echo", "--function-ids", "missing"})
+			require.NoError(t, err)
+			require.Equal(t, http.MethodPost, method)
+			require.Equal(t, "/api/v2/apps/app/functions/"+action.name, path)
+			require.JSONEq(t, `{"functionIds":["echo","missing"]}`, body)
+			require.JSONEq(t, action.response, out.String())
+		})
+	}
+}
+
 func TestSubmitFeedbackCommand(t *testing.T) {
 	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
 	var gotBody map[string]any
