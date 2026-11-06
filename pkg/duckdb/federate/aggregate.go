@@ -71,6 +71,10 @@ type AggregateQuery struct {
 	// RowCap bounds the delta: its groups when it aggregates, its rows when
 	// it can't and the delta is aggregated in DuckDB instead.
 	RowCap int
+	// RunsCollapsed says the runs lake and delta are one row per run, as
+	// Query.RunsCollapsed. Both sides aggregate their rows as is, so an
+	// aggregate over runs needs it (ErrRunsNotCollapsed otherwise).
+	RunsCollapsed bool
 	// Select, if set, reads the merged result as the table agg (columns:
 	// the keys' and aggs' As names), e.g. to order or limit it; Args bind
 	// its '?' placeholders. Unset, every merged row is returned.
@@ -107,6 +111,9 @@ const aggRelation = "agg"
 func (e *Executor) Aggregate(ctx context.Context, q AggregateQuery) (*Rows, error) {
 	if err := validateAggregate(q); err != nil {
 		return nil, err
+	}
+	if q.Table == TableRuns && !q.RunsCollapsed {
+		return nil, ErrRunsNotCollapsed
 	}
 	if as, ok := e.Delta.(AggregateStreamer); ok {
 		rows, err := e.aggregatePushed(ctx, as, q)
@@ -178,7 +185,7 @@ func (e *Executor) aggregatePushed(ctx context.Context, as AggregateStreamer, q 
 func (e *Executor) aggregateRows(ctx context.Context, q AggregateQuery) (*Rows, error) {
 	return e.Query(ctx, Query{
 		AccountID: q.AccountID, EnvID: q.EnvID, From: q.From, To: q.To,
-		Lake: q.Lake, Watermark: q.Watermark, Tables: []Table{q.Table},
+		Lake: q.Lake, Watermark: q.Watermark, Tables: []Table{q.Table}, RunsCollapsed: q.RunsCollapsed,
 		Predicates: map[Table][]Predicate{q.Table: q.Predicates}, RowCap: q.RowCap,
 		Render: func(sources map[Table]Source) (*parser.SelectStatement, []any, error) {
 			src := sources[q.Table]

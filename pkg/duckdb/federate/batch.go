@@ -2,7 +2,8 @@
 // tables and the not-yet-exported delta held in a buffer database (ClickHouse
 // in Cloud). The delta is streamed in as batches (DeltaStreamer), straight
 // into the query over quack, and unioned with the lake by logical views
-// (views.go) that apply the latest-wins / is_final rules.
+// (views.go): raw_runs' latest-wins collapse for runs (unless
+// Query.RunsCollapsed), and the plain union for spans, events and metadata.
 //
 // The batch type here is deliberately tiny and dependency-free: OSS carries
 // no Arrow dependency. A streamer backed by an Arrow source (e.g. ClickHouse

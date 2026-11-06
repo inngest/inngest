@@ -123,6 +123,12 @@ func TestExecutorAggregate(t *testing.T) {
 				q := tt.agg
 				q.AccountID, q.EnvID, q.From, q.To = f.account, f.env, f.from, f.to
 				q.Lake, q.Watermark, q.Table, q.RowCap = LakeSource{Catalog: "inngest"}, f.watermark(), TableRuns, 1000
+				// Over a raw runs lake, each side would count a run once per
+				// row.
+				_, err := f.exec.Aggregate(context.Background(), q)
+				require.ErrorIs(t, err, ErrRunsNotCollapsed)
+
+				q.RunsCollapsed = true
 				rows, err := f.exec.Aggregate(context.Background(), q)
 				require.NoError(t, err)
 				got := scanStrings(t, rows)
@@ -132,7 +138,7 @@ func TestExecutorAggregate(t *testing.T) {
 				check, err := f.exec.Query(context.Background(), Query{
 					AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 					Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(),
-					Tables: []Table{TableRuns}, RowCap: 1000, Select: sel(tt.check),
+					Tables: []Table{TableRuns}, RowCap: 1000, RunsCollapsed: true, Select: sel(tt.check),
 				})
 				require.NoError(t, err)
 				require.Equal(t, got, scanStrings(t, check), "Aggregate and a GROUP BY over the runs view disagree")

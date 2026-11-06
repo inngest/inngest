@@ -39,7 +39,7 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("opening duckdb: %v", err)
 	}
-	if err := duckdb.Migrate(t.Context(), db, true); err != nil {
+	if err := duckdb.Migrate(t.Context(), db, duckdb.ModeRawLake); err != nil {
 		t.Fatalf("migrating duckdb: %v", err)
 	}
 	return db, func() { _ = db.Close() }
@@ -263,7 +263,7 @@ func TestQueryInsights_ExecutionErrorNamesLogicalTables(t *testing.T) {
 		t.Skipf("opening quack duckdb: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeMemory))
 	service := NewService(ServiceOptions{DuckDB: db})
 
 	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{Query: "SELECT length(queued_at) FROM runs"})
@@ -291,7 +291,7 @@ func TestQueryInsights_EncodesUnrepresentableNumbers(t *testing.T) {
 		t.Skipf("opening quack duckdb: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	require.NoError(t, duckdb.Migrate(t.Context(), db, false))
+	require.NoError(t, duckdb.Migrate(t.Context(), db, duckdb.ModeMemory))
 	service := NewService(ServiceOptions{DuckDB: db})
 
 	resp, err := service.QueryInsights(context.Background(), &apiv2.QueryInsightsRequest{

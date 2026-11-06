@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestExecutorTopN checks a pushed TopN keeps the lake side to its first
-// rows without changing the answer. The fake delta streamer ignores the
-// limit, as a streamer that can't apply every predicate exactly would.
+// TestExecutorTopN checks a pushed TopN reaches the delta without changing
+// the answer. The fake delta streamer ignores the limit, as a streamer that
+// can't apply every predicate exactly would.
 func TestExecutorTopN(t *testing.T) {
 	withFixture(t, func(t *testing.T, f *fixture) {
 		q := f.base
@@ -36,6 +36,7 @@ func TestExecutorTopN(t *testing.T) {
 				AccountID: f.account, EnvID: f.env, From: f.from, To: f.to,
 				Lake: LakeSource{Catalog: "inngest"}, Watermark: f.watermark(), Tables: []Table{TableRuns},
 				Predicates: map[Table][]Predicate{TableRuns: completed}, RowCap: 1000, Select: sel(sqlText),
+				RunsCollapsed: true,
 			}
 			if tn != nil {
 				query.TopN = map[Table]TopN{TableRuns: *tn}
@@ -52,11 +53,11 @@ func TestExecutorTopN(t *testing.T) {
 		require.Equal(t, want, run(&top, list))
 		require.Equal(t, 5, f.streamer.reqs[len(f.streamer.reqs)-1].Limit, "the limit reaches the delta")
 
-		// The lake side holds 5 rows, not 30 (the fake delta's 3 completed
-		// runs are unlimited).
+		// Nothing collapses runs (RunsCollapsed), so DuckDB applies the top-n
+		// to the plain union itself and the lake side stays whole.
 		count := `SELECT count(*)::VARCHAR, '' FROM runs`
 		require.Equal(t, "33", run(nil, count)[0][0])
-		require.Equal(t, "8", run(&top, count)[0][0])
+		require.Equal(t, "33", run(&top, count)[0][0])
 	})
 }
 

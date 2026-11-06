@@ -3,7 +3,9 @@ package federate
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +24,10 @@ type Executor struct {
 	DB    *sql.DB
 	Delta DeltaStreamer
 }
+
+// ErrRunsNotCollapsed is returned for a query reading runs w/o
+// Query.RunsCollapsed: a delta needs a flat lake.
+var ErrRunsNotCollapsed = errors.New("federate: reading runs w/ a delta needs a flat lake (Query.RunsCollapsed)")
 
 // Query is one federated query.
 type Query struct {
@@ -49,6 +55,15 @@ type Query struct {
 	Predicates map[Table][]Predicate
 	// RowCap bounds each table's delta.
 	RowCap int
+	// RunsCollapsed says the runs lake and delta are already one row per
+	// run, disjoint (IE the lake holds exported finals at or below W and
+	// the delta each run's latest row above it, or still open), so nothing
+	// collapses them: the runs view is the plain union rather than
+	// raw_runs, and a top-n cuts no lake side of its own. A query reading
+	// runs must set it: over a lake whose runs straddle W, forwarded run
+	// predicates and a top-n's lake cut return wrong rows, so Query
+	// rejects that (ErrRunsNotCollapsed) rather than answer wrong.
+	RunsCollapsed bool
 	// TopN pushes the query's ORDER BY ... LIMIT into a table's source,
 	// when the query meets TopN's conditions.
 	TopN map[Table]TopN
@@ -100,6 +115,9 @@ func (r *Rows) Close() error {
 func (e *Executor) Query(ctx context.Context, q Query) (*Rows, error) {
 	if q.Select == nil && q.Render == nil {
 		return nil, fmt.Errorf("federate: query has no Select or Render")
+	}
+	if slices.Contains(q.Tables, TableRuns) && !q.RunsCollapsed {
+		return nil, ErrRunsNotCollapsed
 	}
 
 	conn, err := e.DB.Conn(ctx)
@@ -222,7 +240,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		src, err := sourceCTE(t, sourceSpec{
 			AccountID: q.AccountID, EnvID: q.EnvID, AllTenants: q.AllTenants, From: q.From, To: q.To,
 			Lake: q.Lake, Watermark: q.Watermark, Delta: deltaRel[t], DeltaColumns: deltaCols[t],
-			TopN: topNOf(q, t),
+			TopN: topNOf(q, t), Collapses: collapses[t] && (t != TableRuns || !q.RunsCollapsed),
 		})
 		if err != nil {
 			return nil, nil, err
@@ -243,7 +261,7 @@ func assemble(q Query, needed []Table, deltaRel map[Table]string, preludes map[T
 		return stmt, args, nil
 	}
 	for _, t := range needed {
-		v, err := rawView(t, q.Lake)
+		v, err := rawView(t, q.Lake, q.RunsCollapsed)
 		if err != nil {
 			return nil, nil, err
 		}

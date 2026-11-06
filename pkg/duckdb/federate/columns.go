@@ -99,7 +99,7 @@ func deltaColumnsUsed(ctx context.Context, conn *sql.Conn, q Query, needed []Tab
 	out := map[Table][]Column{}
 	for _, t := range needed {
 		names, found := scanColumns(plan, Physical[t].Name, DeltaColumns(t))
-		if !found || len(names) == 0 {
+		if !found {
 			out[t] = nil
 			continue
 		}

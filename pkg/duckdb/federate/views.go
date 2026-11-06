@@ -72,6 +72,9 @@ type sourceSpec struct {
 	// TopN, if set, keeps the lake side to its first rows (Query.TopN), its
 	// predicates applied exactly.
 	TopN *topNSpec
+	// Collapses says the table's view collapses rows (see collapses), so a
+	// TopN cuts the lake side on its own.
+	Collapses bool
 }
 
 // collapses are the tables whose views collapse rows (raw_runs keeps each
@@ -157,7 +160,7 @@ func sourceCTE(t Table, spec sourceSpec) (*parser.CTE, error) {
 	if t != TableRuns {
 		deltaWhere = and(deltaWhere, binary(">", colRef("bucket_at"), timeLit(spec.Watermark)))
 	}
-	if spec.TopN != nil && collapses[t] {
+	if spec.TopN != nil && spec.Collapses {
 		where, err := predicatesExpr(t, spec.TopN.Predicates)
 		if err != nil {
 			return nil, err
@@ -178,11 +181,15 @@ func deltaSelect(c schema.Column) *parser.SelectItem {
 }
 
 // rawView is the plain-SQL path's logical table for t: runs collapsed by
-// inngest.raw_runs over their federated source; spans, events and metadata
-// are the source itself (each row is its own emission / event).
-func rawView(t Table, lake LakeSource) (*parser.CTE, error) {
+// inngest.raw_runs over their federated source (unless runsCollapsed, see
+// Query.RunsCollapsed); spans, events and metadata are the source itself
+// (each row is its own emission / event).
+func rawView(t Table, lake LakeSource, runsCollapsed bool) (*parser.CTE, error) {
 	switch t {
 	case TableRuns:
+		if runsCollapsed {
+			return cte(string(t), selectStar(tableRef(SourceName(t)))), nil
+		}
 		return cte(string(t), selectStar(&parser.TableFunctionRef{
 			Name: []string{lake.Catalog, "raw_runs"},
 			Args: []parser.Expr{&parser.NamedArg{Name: "p_runs", Value: strLit(SourceName(t))}},
