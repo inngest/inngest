@@ -15,6 +15,12 @@ import (
 type FileControl interface {
 	// Set or query SQLITE_FCNTL_PERSIST_WAL, returns set mode or query result
 	FileControlPersistWAL(dbName string, mode int) (int, error)
+	// Query SQLITE_FCNTL_DATA_VERSION, returns the pager-cache data version
+	// for dbName. The value changes whenever the contents of the database
+	// file change, which makes it suitable for cache-invalidation use cases.
+	// See
+	// https://www.sqlite.org/c3ref/c_fcntl_begin_atomic_write.html#sqlitefcntldataversion.
+	FileControlDataVersion(dbName string) (uint32, error)
 }
 
 var _ FileControl = (*conn)(nil)
@@ -26,6 +32,15 @@ func (c *conn) FileControlPersistWAL(dbName string, mode int) (int, error) {
 	*(*int32)(unsafe.Pointer(pi32)) = int32(mode)
 	err := c.fileControl(dbName, sqlite3.SQLITE_FCNTL_PERSIST_WAL, pi32)
 	return int(*(*int32)(unsafe.Pointer(pi32))), err
+}
+
+func (c *conn) FileControlDataVersion(dbName string) (uint32, error) {
+	pu32 := c.tls.Alloc(4)
+	defer c.tls.Free(4)
+
+	*(*uint32)(unsafe.Pointer(pu32)) = 0
+	err := c.fileControl(dbName, sqlite3.SQLITE_FCNTL_DATA_VERSION, pu32)
+	return *(*uint32)(unsafe.Pointer(pu32)), err
 }
 
 func (c *conn) fileControl(dbName string, op int, pArg uintptr) error {

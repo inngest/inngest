@@ -4,19 +4,16 @@ package sts
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/sts/types"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns a set of temporary security credentials that you can use to access
 // Amazon Web Services resources. These temporary credentials consist of an access
 // key ID, a secret access key, and a security token. Typically, you use AssumeRole
 // within your account or for cross-account access. For a comparison of AssumeRole
-// with other API operations that produce temporary credentials, see [Requesting Temporary Security Credentials]and [Comparing the Amazon Web Services STS API operations] in the
+// with other API operations that produce temporary credentials, see [Requesting Temporary Security Credentials]and [Compare STS credentials] in the
 // IAM User Guide.
 //
 // # Permissions
@@ -26,16 +23,16 @@ import (
 // cannot call the Amazon Web Services STS GetFederationToken or GetSessionToken
 // API operations.
 //
-// (Optional) You can pass inline or managed [session policies] to this operation. You can pass a
-// single JSON policy document to use as an inline session policy. You can also
-// specify up to 10 managed policy Amazon Resource Names (ARNs) to use as managed
-// session policies. The plaintext that you use for both inline and managed session
-// policies can't exceed 2,048 characters. Passing policies to this operation
-// returns new temporary credentials. The resulting session's permissions are the
-// intersection of the role's identity-based policy and the session policies. You
-// can use the role's temporary credentials in subsequent Amazon Web Services API
-// calls to access resources in the account that owns the role. You cannot use
-// session policies to grant more permissions than those allowed by the
+// (Optional) You can pass inline or managed session policies to this operation.
+// You can pass a single JSON policy document to use as an inline session policy.
+// You can also specify up to 10 managed policy Amazon Resource Names (ARNs) to use
+// as managed session policies. The plaintext that you use for both inline and
+// managed session policies can't exceed 2,048 characters. Passing policies to this
+// operation returns new temporary credentials. The resulting session's permissions
+// are the intersection of the role's identity-based policy and the session
+// policies. You can use the role's temporary credentials in subsequent Amazon Web
+// Services API calls to access resources in the account that owns the role. You
+// cannot use session policies to grant more permissions than those allowed by the
 // identity-based policy of the role that is being assumed. For more information,
 // see [Session Policies]in the IAM User Guide.
 //
@@ -104,10 +101,9 @@ import (
 // [Session Policies]: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies_session
 // [Passing Session Tags in STS]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_session-tags.html
 // [Chaining Roles with Session Tags]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_session-tags.html#id_session-tags_role-chaining
-// [Comparing the Amazon Web Services STS API operations]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_request.html#stsapi_comparison
-// [session policies]: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies_session
 // [IAM Policies]: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html
 // [Requesting Temporary Security Credentials]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_request.html
+// [Compare STS credentials]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_sts-comparison.html
 // [Tutorial: Using Tags for Attribute-Based Access Control]: https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_attribute-based-access-control.html
 func (c *Client) AssumeRole(ctx context.Context, params *AssumeRoleInput, optFns ...func(*Options)) (*AssumeRoleOutput, error) {
 	if params == nil {
@@ -141,9 +137,17 @@ type AssumeRoleInput struct {
 	// the temporary security credentials will expose the role session name to the
 	// external account in their CloudTrail logs.
 	//
+	// For security purposes, administrators can view this field in [CloudTrail logs] to help identify
+	// who performed an action in Amazon Web Services. Your administrator might require
+	// that you specify your user name as the session name when you assume the role.
+	// For more information, see [sts:RoleSessionName]sts:RoleSessionName .
+	//
 	// The regex used to validate this parameter is a string of characters consisting
 	// of upper- and lower-case alphanumeric characters with no spaces. You can also
-	// include underscores or any of the following characters: =,.@-
+	// include underscores or any of the following characters: +=,.@-
+	//
+	// [CloudTrail logs]: https://docs.aws.amazon.com/IAM/latest/UserGuide/cloudtrail-integration.html#cloudtrail-integration_signin-tempcreds
+	// [sts:RoleSessionName]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#ck_rolesessionname
 	//
 	// This member is required.
 	RoleSessionName *string
@@ -163,7 +167,7 @@ type AssumeRoleInput struct {
 	// 43200 seconds (12 hours), depending on the maximum session duration setting for
 	// your role. However, if you assume a role using role chaining and provide a
 	// DurationSeconds parameter value greater than one hour, the operation fails. To
-	// learn how to view the maximum value for your role, see [View the Maximum Session Duration Setting for a Role]in the IAM User Guide.
+	// learn how to view the maximum value for your role, see [Update the maximum session duration for a role].
 	//
 	// By default, the value is set to 3600 seconds.
 	//
@@ -173,7 +177,7 @@ type AssumeRoleInput struct {
 	// parameter that specifies the maximum length of the console session. For more
 	// information, see [Creating a URL that Enables Federated Users to Access the Amazon Web Services Management Console]in the IAM User Guide.
 	//
-	// [View the Maximum Session Duration Setting for a Role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html#id_roles_use_view-role-max-session
+	// [Update the maximum session duration for a role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_update-role-settings.html#id_roles_update-session-duration
 	// [Creating a URL that Enables Federated Users to Access the Amazon Web Services Management Console]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_enable-console-custom-url.html
 	DurationSeconds *int32
 
@@ -189,7 +193,7 @@ type AssumeRoleInput struct {
 	//
 	// The regex used to validate this parameter is a string of characters consisting
 	// of upper- and lower-case alphanumeric characters with no spaces. You can also
-	// include underscores or any of the following characters: =,.@:/-
+	// include underscores or any of the following characters: +=,.@:\/-
 	//
 	// [How to Use an External ID When Granting Access to Your Amazon Web Services Resources to a Third Party]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
 	ExternalId *string
@@ -218,7 +222,10 @@ type AssumeRoleInput struct {
 	// by percentage how close the policies and tags for your request are to the upper
 	// size limit.
 	//
+	// For more information about role session permissions, see [Session policies].
+	//
 	// [Session Policies]: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies_session
+	// [Session policies]: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies.html#policies_session
 	Policy *string
 
 	// The Amazon Resource Names (ARNs) of the IAM managed policies that you want to
@@ -269,14 +276,14 @@ type AssumeRoleInput struct {
 	//
 	// The regex used to validate this parameter is a string of characters consisting
 	// of upper- and lower-case alphanumeric characters with no spaces. You can also
-	// include underscores or any of the following characters: =,.@-
+	// include underscores or any of the following characters: +=/:,.@-
 	SerialNumber *string
 
 	// The source identity specified by the principal that is calling the AssumeRole
-	// operation.
+	// operation. The source identity value persists across [chained role]sessions.
 	//
 	// You can require users to specify a source identity when they assume a role. You
-	// do this by using the sts:SourceIdentity condition key in a role trust policy.
+	// do this by using the [sts:SourceIdentity]sts:SourceIdentity condition key in a role trust policy.
 	// You can use source identity information in CloudTrail logs to determine who took
 	// actions with a role. You can use the aws:SourceIdentity condition key to
 	// further control access to Amazon Web Services resources based on the value of
@@ -285,11 +292,13 @@ type AssumeRoleInput struct {
 	//
 	// The regex used to validate this parameter is a string of characters consisting
 	// of upper- and lower-case alphanumeric characters with no spaces. You can also
-	// include underscores or any of the following characters: =,.@-. You cannot use a
+	// include underscores or any of the following characters: +=,.@-. You cannot use a
 	// value that begins with the text aws: . This prefix is reserved for Amazon Web
 	// Services internal use.
 	//
+	// [chained role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html#iam-term-role-chaining
 	// [Monitor and control actions taken with assumed roles]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_control-access_monitor.html
+	// [sts:SourceIdentity]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-sourceidentity
 	SourceIdentity *string
 
 	// A list of session tags that you want to pass. Each session tag consists of a
@@ -342,8 +351,8 @@ type AssumeRoleInput struct {
 	// a tag key as transitive, the corresponding key and value passes to subsequent
 	// sessions in a role chain. For more information, see [Chaining Roles with Session Tags]in the IAM User Guide.
 	//
-	// This parameter is optional. When you set session tags as transitive, the
-	// session policy and session tags packed binary limit is not affected.
+	// This parameter is optional. The transitive status of a session tag does not
+	// impact its packed binary size.
 	//
 	// If you choose not to specify a transitive tag key, then no tags are passed from
 	// this session to any subsequent sessions.
@@ -403,9 +412,6 @@ type AssumeRoleOutput struct {
 }
 
 func (c *Client) addOperationAssumeRoleMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpAssumeRole{}, middleware.After)
 	if err != nil {
 		return err
@@ -414,62 +420,20 @@ func (c *Client) addOperationAssumeRoleMiddlewares(stack *middleware.Stack, opti
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "AssumeRole"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpAssumeRoleValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opAssumeRole(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -484,15 +448,10 @@ func (c *Client) addOperationAssumeRoleMiddlewares(stack *middleware.Stack, opti
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opAssumeRole(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "AssumeRole",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }
 
 // PresignAssumeRole is used to generate a presigned HTTP Request which contains
