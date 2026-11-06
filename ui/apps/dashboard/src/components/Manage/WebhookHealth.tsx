@@ -9,7 +9,7 @@ import {
 } from '@inngest/components/Tooltip/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { formatLocalTime, formatUTCTime } from '@inngest/components/utils/time';
-import { RiArrowRightSLine } from '@remixicon/react';
+import { RiArrowRightSLine, RiInformationLine } from '@remixicon/react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -476,11 +476,26 @@ export default function WebhookHealth({ keyID }: { keyID: string }) {
         </p>
       ) : (
         <>
-          <p className="text-subtle mb-6 text-sm">
-            Last {span}: {plural(events, 'event')} ingested ·{' '}
-            {plural(failed, 'failed request')}
-            {filtered > 0 && <> · {plural(filtered, 'filtered request')}</>}
-          </p>
+          <div className="text-subtle mb-6 text-sm">
+            <p className="flex items-center gap-1">
+              Last {span}: {plural(events, 'event')} ingested
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <RiInformationLine className="text-muted h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Counts events, not requests. A request that only partly
+                  ingested also shows up as a failure.
+                </TooltipContent>
+              </Tooltip>
+            </p>
+            <p>
+              {plural(failed, 'failed request')}
+              {filtered > 0 && <> · {plural(filtered, 'filtered request')}</>}
+            </p>
+          </div>
           {groups.length > 0 && (
             <>
               <div className="mb-4 flex flex-wrap gap-2">
