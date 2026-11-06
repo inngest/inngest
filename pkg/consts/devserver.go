@@ -32,6 +32,13 @@ var (
 	DevServerAccountID = uuid.MustParse("00000000-0000-4000-a000-000000000000")
 	DevServerEnvID     = uuid.MustParse("00000000-0000-4000-b000-000000000000")
 
+	// DevServerConnectJwtSecret is the connect gateway session-token secret
+	// used ONLY when no signing key is configured, i.e. single-user `inngest
+	// dev` runs. When a signing key is present, a per-instance secret is
+	// derived from it instead (see auth.DeriveSessionJwtSecret) so that
+	// forged HS256 tokens signed with this public constant are rejected on
+	// production-posture `inngest start`. This value is public by design and
+	// must never be treated as secret.
 	DevServerConnectJwtSecret  = []byte("this-does-not-need-to-be-secret")
 	DevServerRealtimeJWTSecret = []byte("dev-mode-is-not-secret")
 	DevServerRunJWTSecret      = []byte("dev-mode-is-not-secret")
