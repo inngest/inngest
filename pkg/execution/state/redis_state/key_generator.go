@@ -52,6 +52,10 @@ type RunStateKeyGenerator interface {
 	// to cjson's number-precision and empty-object mangling. DefersMeta holds
 	// the fields Lua does read and rewrite.
 	DefersControlMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
+
+	// InboxWaits returns the key of the hash holding a run's recorded inbox
+	// waits, by the id of the read's op.
+	InboxWaits(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -98,6 +102,10 @@ func (s runStateKeyGenerator) DefersInput(ctx context.Context, isSharded bool, f
 
 func (s runStateKeyGenerator) DefersControlMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:defers-control-meta:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) InboxWaits(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:inbox-waits:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {

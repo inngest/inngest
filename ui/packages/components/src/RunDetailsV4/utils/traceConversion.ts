@@ -9,6 +9,7 @@ import { max, min } from 'date-fns';
 import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { hasMetadataKind } from '../../RunDetailsShared/metadataKind';
 import type {
+  BarMarkerData,
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
@@ -82,6 +83,8 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
       return 'step.sleep';
     case 'WAIT_FOR_EVENT':
     case 'WAITFOREVENT':
+    case 'SUBSCRIBE':
+    case 'INBOX_READ':
       return 'step.waitForEvent';
     case 'INVOKE':
       return 'step.invoke';
@@ -347,8 +350,20 @@ function traceToBarData(
     warnings: getWarnings(trace.metadata),
     sandbox: sandboxBarData(trace),
     groupKind: trace.groupKind ?? undefined,
+    markers: ticksToMarkers(trace.ticks),
     dimmed: isInngestOrigin(trace.origin) && status !== 'FAILED',
   };
+}
+
+/**
+ * Turns the ticks of a span into markers: one dot at each tick's arrival.
+ */
+function ticksToMarkers(ticks: Trace['ticks']): BarMarkerData[] | undefined {
+  if (!ticks || ticks.length === 0) return undefined;
+
+  return ticks.map((tick) => {
+    return { id: tick.id, at: new Date(tick.at) };
+  });
 }
 
 /**

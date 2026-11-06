@@ -28,6 +28,18 @@ const (
 
 	OpcodeDeferAdd
 	OpcodeDeferAbort
+
+	// OpcodeSubscribe opens an inbox: one long-lived pause per source, then
+	// the open record.
+	OpcodeSubscribe
+	// OpcodeSubscribeWait reports a read of an inbox that has nothing unread.
+	OpcodeSubscribeWait
+	// OpcodeSubscribeRead reports, as a lazy op, a read of an inbox that was
+	// answered from state: which messages it took.
+	OpcodeSubscribeRead
+	// OpcodeSubscribeClose closes an inbox: it deletes the pauses of the
+	// inbox's sources and ends the read waiting on it.
+	OpcodeSubscribeClose
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -40,7 +52,8 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},
 	OpcodeDeferAdd:        {},
-	OpcodeDeferAbort:     {},
+	OpcodeDeferAbort:      {},
+	OpcodeSubscribeRead:   {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This
@@ -61,7 +74,7 @@ func OpcodeIsAsync(o Opcode) bool {
 // ForceStepPlan or per-step history grouping.
 func OpcodeIsLazy(o Opcode) bool {
 	switch o {
-	case OpcodeDeferAdd, OpcodeDeferAbort:
+	case OpcodeDeferAdd, OpcodeDeferAbort, OpcodeSubscribeRead:
 		return true
 	}
 	return false
@@ -77,6 +90,10 @@ func OpcodeIsPriority(o Opcode) bool {
 		// that's sent by a function triggered by the SendEvent. If we don't
 		// finish processing the WaitForEvent before the SendEvent does its
 		// thing, then we may miss the event.
+		return true
+	case OpcodeSubscribe:
+		// An inbox must be listening before a sibling SendEvent in the same
+		// response sends what it is meant to receive.
 		return true
 	case OpcodeDeferAdd, OpcodeDeferAbort:
 		// Prioritize in case the SDK returned something like "[DeferAdd,
