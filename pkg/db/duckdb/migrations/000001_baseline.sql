@@ -39,7 +39,13 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   -- The run's OTel trace ID, copied from the span row materializeRuns builds
   -- each runs row from, so run listings can report it without joining
   -- run_trace_spans.
-  trace_id VARCHAR
+  trace_id VARCHAR,
+  -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
+  -- LogAppendTime for exported rows, the insert time for rows written here
+  -- directly. Federated reads take the lake for bucket_at <= W and the buffer
+  -- for bucket_at > W, so any W both stores cover gives the same result.
+  -- A run row's is its source span's.
+  bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 );
 -- +goose ENVSUB ON
 -- Partitioned by time only: a partition per account would mean a file per active
@@ -86,7 +92,10 @@ CREATE TABLE IF NOT EXISTS inngest.run_metadata (
   kind           VARCHAR NOT NULL,
   is_user        BOOLEAN NOT NULL,
   values         VARIANT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL
+  created_at     TIMESTAMPTZ NOT NULL,
+  -- When the row became visible in the buffer, as on inngest.runs: the
+  -- federation split (lake bucket_at <= W, buffer bucket_at > W).
+  bucket_at      TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_metadata SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, scope, step_id, step_index, step_attempt, span_id, kind)};
@@ -117,7 +126,12 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   parent_span_id VARCHAR,
   attributes VARIANT NOT NULL,
   output VARIANT,
-  input VARIANT
+  input VARIANT,
+  -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
+  -- LogAppendTime for exported rows, the insert time for rows written here
+  -- directly. Federated reads take the lake for bucket_at <= W and the buffer
+  -- for bucket_at > W, so any W both stores cover gives the same result.
+  bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.run_trace_spans SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, start_time, end_time)};
@@ -176,14 +190,59 @@ CREATE TABLE IF NOT EXISTS inngest.events (
   event_data VARIANT NOT NULL DEFAULT '{}',
   event_v VARCHAR NOT NULL,
   event_ts TIMESTAMPTZ NOT NULL,
-  event_meta VARIANT NOT NULL DEFAULT '{}'
+  event_meta VARIANT NOT NULL DEFAULT '{}',
+  -- When the row became visible in the buffer: the ClickHouse buffer's Kafka
+  -- LogAppendTime for exported rows, the insert time for rows written here
+  -- directly. Federated reads take the lake for bucket_at <= W and the buffer
+  -- for bucket_at > W, so any W both stores cover gives the same result.
+  bucket_at TIMESTAMPTZ NOT NULL DEFAULT make_timestamp_ms(epoch_ms(current_timestamp))
 );
 -- +goose ENVSUB ON
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET SORTED BY (year(received_at), month(received_at), account_id, env_id, internal_id, received_at)};
 ${DUCKDB_DUCKLAKE_ONLY-ALTER TABLE inngest.events SET PARTITIONED BY (year(received_at), month(received_at))};
 -- +goose ENVSUB OFF
 
+-- raw_runs is the one collapse of inngest.runs (one row per run), unscoped:
+-- insights_runs projects over it, and Insights' internal raw mode and the
+-- federated executor read it directly. A run's rows collapse by lifecycle
+-- stage before recency (final, i.e. ended_at set, beats started beats
+-- queued), so a row that arrives out of order can't regress it. Rows
+-- that tie (ms timestamps) pick terminal > in-progress > queued status, then
+-- status itself, so the pick never depends on insert order. It
+-- partitions by account_id/env_id first, so tenant (and run) filters still
+-- push below the window into the scan. raw_run_trace_spans is
+-- inngest.run_trace_spans as is: spans need no collapse, each row is its own
+-- emission.
+--
+-- A lake whose runs are already one row per run (duckdb.ModeFlatLake: it only
+-- holds exported final rows, and a federated read's delta is each run's
+-- latest row) skips the collapse: DUCKDB_RUNS_COLLAPSE is set empty, since
+-- the window over every run row is most of an Insights query's cost there.
+-- The QUALIFY is one line because goose's substitution can't take a default
+-- spanning lines.
+-- +goose ENVSUB ON
+CREATE MACRO inngest.raw_runs(p_runs := 'inngest.runs') AS TABLE
+SELECT * FROM query_table(p_runs)
+${DUCKDB_RUNS_COLLAPSE-QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, env_id, run_id ORDER BY ended_at IS NOT NULL DESC, started_at IS NOT NULL DESC, COALESCE(ended_at, started_at, queued_at) DESC, CASE WHEN status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped') THEN 2 WHEN status IN ('Running', 'Waiting', 'Sleeping', 'Invoking') THEN 1 ELSE 0 END DESC, status DESC) = 1};
+-- +goose ENVSUB OFF
+
+CREATE MACRO inngest.raw_run_trace_spans(p_spans := 'inngest.run_trace_spans') AS TABLE
+SELECT * FROM query_table(p_spans);
+
+-- raw_events is inngest.events as is: an event is never re-written.
+CREATE MACRO inngest.raw_events(p_events := 'inngest.events') AS TABLE
+SELECT * FROM query_table(p_events);
+
+-- raw_run_metadata is inngest.run_metadata as is: one row per emission
+-- (inngest.run_metadata_rollup collapses them).
+CREATE MACRO inngest.raw_run_metadata(p_metadata := 'inngest.run_metadata') AS TABLE
+SELECT * FROM query_table(p_metadata);
+
 -- +goose Down
+DROP MACRO IF EXISTS inngest.raw_run_metadata;
+DROP MACRO IF EXISTS inngest.raw_events;
+DROP MACRO IF EXISTS inngest.raw_run_trace_spans;
+DROP MACRO IF EXISTS inngest.raw_runs;
 DROP TABLE IF EXISTS inngest.runs;
 DROP TABLE IF EXISTS inngest.run_metadata;
 DROP TABLE IF EXISTS inngest.run_trace_spans;

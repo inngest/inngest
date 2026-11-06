@@ -1,0 +1,13 @@
+{
+  "description": "A filter inside a FROM subquery.",
+  "mode": "product",
+  "tables": {
+    "runs": [
+      {
+        "logical": "status = 'Failed'",
+        "physical": "runs.status = 'Failed'",
+        "pushed": true
+      }
+    ]
+  }
+}

@@ -4,10 +4,9 @@ package sqs
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Deletes the specified message from the specified queue. To select the message
@@ -17,11 +16,13 @@ import (
 // consumer. Amazon SQS automatically deletes messages left in a queue longer than
 // the retention period configured for the queue.
 //
-// The ReceiptHandle is associated with a specific instance of receiving a
-// message. If you receive a message more than once, the ReceiptHandle is
-// different each time you receive a message. When you use the DeleteMessage
-// action, you must provide the most recently received ReceiptHandle for the
-// message (otherwise, the request succeeds, but the message will not be deleted).
+// Each time you receive a message, meaning when a consumer retrieves a message
+// from the queue, it comes with a unique ReceiptHandle . If you receive the same
+// message more than once, you will get a different ReceiptHandle each time. When
+// you want to delete a message using the DeleteMessage action, you must use the
+// ReceiptHandle from the most recent time you received the message. If you use an
+// old ReceiptHandle , the request will succeed, but the message might not be
+// deleted.
 //
 // For standard queues, it is possible to receive a message even after you delete
 // it. This might happen on rare occasions if one of the servers which stores a
@@ -61,6 +62,21 @@ type DeleteMessageInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DeleteMessageInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DeleteMessageRequest)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.QueueUrl != nil {
+		s.WriteString(schemas.DeleteMessageRequest_QueueUrl, *v.QueueUrl)
+	}
+	if v.ReceiptHandle != nil {
+		s.WriteString(schemas.DeleteMessageRequest_ReceiptHandle, *v.ReceiptHandle)
+	}
+}
+
 type DeleteMessageOutput struct {
 	// Metadata pertaining to the operation's result.
 	ResultMetadata middleware.Metadata
@@ -68,74 +84,42 @@ type DeleteMessageOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DeleteMessageOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(nil)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DeleteMessageOutput) SerializeMembers(s smithy.ShapeSerializer) {
+}
+func (v *DeleteMessageOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, nil, func(s *smithy.Schema) error {
+		switch s {
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationDeleteMessageMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DeleteMessage, schemas.DeleteMessageRequest, nil)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsjson10_serializeOpDeleteMessage{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DeleteMessage, schemas.DeleteMessageRequest, nil), output: &DeleteMessageOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsjson10_deserializeOpDeleteMessage{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "DeleteMessage"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpDeleteMessageValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDeleteMessage(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -150,13 +134,8 @@ func (c *Client) addOperationDeleteMessageMiddlewares(stack *middleware.Stack, o
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opDeleteMessage(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "DeleteMessage",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }

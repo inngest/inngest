@@ -130,7 +130,7 @@ type IgnoreConfiguredEndpointsProvider interface {
 
 // GetIgnoreConfiguredEndpoints is used in knowing when to disable configured
 // endpoints feature.
-func GetIgnoreConfiguredEndpoints(ctx context.Context, configs []interface{}) (value bool, found bool, err error) {
+func GetIgnoreConfiguredEndpoints(ctx context.Context, configs []any) (value bool, found bool, err error) {
 	for _, cfg := range configs {
 		if p, ok := cfg.(IgnoreConfiguredEndpointsProvider); ok {
 			value, found, err = p.GetIgnoreConfiguredEndpoints(ctx)
@@ -208,6 +208,23 @@ func getDisableRequestCompression(ctx context.Context, configs configs) (value b
 	return
 }
 
+// disableClockSkewCorrectionProvider provides access to the DisableClockSkewCorrection
+type disableClockSkewCorrectionProvider interface {
+	getDisableClockSkewCorrection(context.Context) (bool, bool, error)
+}
+
+func getDisableClockSkewCorrection(ctx context.Context, configs configs) (value bool, found bool, err error) {
+	for _, cfg := range configs {
+		if p, ok := cfg.(disableClockSkewCorrectionProvider); ok {
+			value, found, err = p.getDisableClockSkewCorrection(ctx)
+			if err != nil || found {
+				break
+			}
+		}
+	}
+	return
+}
+
 // requestMinCompressSizeBytesProvider provides access to the MinCompressSizeBytes
 type requestMinCompressSizeBytesProvider interface {
 	getRequestMinCompressSizeBytes(context.Context) (int64, bool, error)
@@ -234,6 +251,40 @@ func getAccountIDEndpointMode(ctx context.Context, configs configs) (value aws.A
 	for _, cfg := range configs {
 		if p, ok := cfg.(accountIDEndpointModeProvider); ok {
 			value, found, err = p.getAccountIDEndpointMode(ctx)
+			if err != nil || found {
+				break
+			}
+		}
+	}
+	return
+}
+
+// requestChecksumCalculationProvider provides access to the RequestChecksumCalculation
+type requestChecksumCalculationProvider interface {
+	getRequestChecksumCalculation(context.Context) (aws.RequestChecksumCalculation, bool, error)
+}
+
+func getRequestChecksumCalculation(ctx context.Context, configs configs) (value aws.RequestChecksumCalculation, found bool, err error) {
+	for _, cfg := range configs {
+		if p, ok := cfg.(requestChecksumCalculationProvider); ok {
+			value, found, err = p.getRequestChecksumCalculation(ctx)
+			if err != nil || found {
+				break
+			}
+		}
+	}
+	return
+}
+
+// responseChecksumValidationProvider provides access to the ResponseChecksumValidation
+type responseChecksumValidationProvider interface {
+	getResponseChecksumValidation(context.Context) (aws.ResponseChecksumValidation, bool, error)
+}
+
+func getResponseChecksumValidation(ctx context.Context, configs configs) (value aws.ResponseChecksumValidation, found bool, err error) {
+	for _, cfg := range configs {
+		if p, ok := cfg.(responseChecksumValidationProvider); ok {
+			value, found, err = p.getResponseChecksumValidation(ctx)
 			if err != nil || found {
 				break
 			}
@@ -718,4 +769,51 @@ func getRetryMode(ctx context.Context, configs configs) (v aws.RetryMode, found 
 		}
 	}
 	return v, found, err
+}
+
+func getAuthSchemePreference(ctx context.Context, configs configs) ([]string, bool) {
+	type provider interface {
+		getAuthSchemePreference() ([]string, bool)
+	}
+
+	for _, cfg := range configs {
+		if p, ok := cfg.(provider); ok {
+			if v, ok := p.getAuthSchemePreference(); ok {
+				return v, true
+			}
+		}
+	}
+	return nil, false
+}
+
+type serviceOptionsProvider interface {
+	getServiceOptions(ctx context.Context) ([]func(string, any), bool, error)
+}
+
+func getServiceOptions(ctx context.Context, configs configs) (v []func(string, any), found bool, err error) {
+	for _, c := range configs {
+		if p, ok := c.(serviceOptionsProvider); ok {
+			v, found, err = p.getServiceOptions(ctx)
+			if err != nil || found {
+				break
+			}
+		}
+	}
+	return v, found, err
+}
+
+type restrictFilePermissionsProvider interface {
+	getRestrictFilePermissions(context.Context) (aws.RestrictFilePermissions, bool, error)
+}
+
+func getRestrictFilePermissions(ctx context.Context, configs configs) (value aws.RestrictFilePermissions, found bool, err error) {
+	for _, cfg := range configs {
+		if p, ok := cfg.(restrictFilePermissionsProvider); ok {
+			value, found, err = p.getRestrictFilePermissions(ctx)
+			if err != nil || found {
+				break
+			}
+		}
+	}
+	return
 }

@@ -1,5 +1,5 @@
 {
-  "sql": "SELECT * EXCLUDE (m.run_id, e.span_id) FROM inngest.insights_metadata(?, ?) AS m INNER JOIN inngest.insights_extended_trace_spans(?, ?) AS e ON m.run_id = e.run_id LIMIT 1000",
+  "sql": "WITH __inngest_metadata AS NOT MATERIALIZED (SELECT * FROM inngest.insights_metadata(?, ?)), __inngest_extended_trace_spans AS NOT MATERIALIZED (SELECT * FROM inngest.insights_extended_trace_spans(?, ?)) SELECT * EXCLUDE (m.run_id, e.span_id) FROM __inngest_metadata AS m INNER JOIN __inngest_extended_trace_spans AS e ON m.run_id = e.run_id LIMIT 1000",
   "args": [
     "00000000-0000-4000-a000-000000000000",
     "00000000-0000-4000-b000-000000000000",

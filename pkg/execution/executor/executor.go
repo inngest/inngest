@@ -2761,8 +2761,7 @@ func correlationID(event event.Event) *string {
 }
 
 func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts []json.RawMessage) (bool, error) {
-	// If no cancellation checker was provided, assume run should not be cancelled
-	if e.cancellationChecker == nil {
+	if e.cancellationChecker == nil || len(evts) == 0 {
 		return false, nil
 	}
 
@@ -6126,7 +6125,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
-		if err := e.batcher.DeleteKeys(ctx, payload.FunctionID, payload.BatchID); err != nil {
+		if _, err := e.batcher.DeleteKeys(ctx, payload.AccountID, payload.FunctionID, payload.BatchID); err != nil {
 			return err
 		}
 	}

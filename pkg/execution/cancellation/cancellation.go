@@ -56,9 +56,7 @@ func (c checker) IsCancelled(ctx context.Context, wsID, fnID uuid.UUID, runID ul
 	for _, i := range all {
 		cancel := i
 
-		if at.After(cancel.StartedBefore) || (cancel.StartedAfter != nil && at.Before(*cancel.StartedAfter)) {
-			// The loader may have messed up times, so verify that the cancellation includes this
-			// run ID as within bounds.
+		if !ContainsTime(cancel, at) {
 			continue
 		}
 
@@ -81,4 +79,8 @@ func (c checker) IsCancelled(ctx context.Context, wsID, fnID uuid.UUID, runID ul
 
 	// None of the cancellations match.
 	return nil, nil
+}
+
+func ContainsTime(c cqrs.Cancellation, at time.Time) bool {
+	return !at.After(c.StartedBefore) && (c.StartedAfter == nil || !at.Before(*c.StartedAfter))
 }

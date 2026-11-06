@@ -193,6 +193,21 @@ type attr[T any] struct {
 	wrap        func(attribute.Value) any
 }
 
+// StringAttrKeys returns the keys of every attribute whose value is a
+// string (string, UUID and ULID attributes): the ones a text comparison
+// means the same thing on in any store that holds them.
+func StringAttrKeys() []string {
+	var keys []string
+	for k, s := range AttrsByKey {
+		switch s.(type) {
+		case attr[*string], attr[*uuid.UUID], attr[*ulid.ULID]:
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func (a attr[T]) Key() string {
 	return a.key
 }

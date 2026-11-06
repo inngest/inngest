@@ -307,10 +307,11 @@ func (sw *sqlWriter) node(n Node) {
 		sw.typeName(v)
 	case *TypeField:
 		sw.typeField(v)
+	case TableRef:
+		// Ahead of Expr, which every TableRef also satisfies (baseExpr).
+		sw.tableRef(v)
 	case Expr:
 		sw.exprTop(v)
-	case TableRef:
-		sw.tableRef(v)
 	case GroupByItem:
 		sw.groupByItem(v)
 	default:
@@ -1155,6 +1156,13 @@ func (sw *sqlWriter) tableRef(t TableRef) {
 	case *BaseTableRef:
 		writeDottedName(sw, v.Name)
 		sw.tableAlias(v.Alias)
+		if v.At != nil {
+			sw.str(" AT (")
+			sw.str(v.At.Unit)
+			sw.str(" => ")
+			sw.exprTop(v.At.Expr)
+			sw.str(")")
+		}
 	case *TableFunctionRef:
 		if v.Lateral {
 			sw.str("LATERAL ")

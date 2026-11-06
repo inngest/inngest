@@ -312,7 +312,7 @@ func TestMigratingIntegration_WriteToCurrent(t *testing.T) {
 
 		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, dkBatchID)))
 
-		err := env.migBM.DeleteKeys(ctx, dkFnID, dkBatchID)
+		_, err := env.migBM.DeleteKeys(ctx, uuid.Nil, dkFnID, dkBatchID)
 		require.NoError(t, err)
 		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, dkBatchID)))
 	})
@@ -514,7 +514,7 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		require.False(t, results2[1].Scheduled)
 	})
 
-	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
+	t.Run("DeleteKeys finds the batch in either cluster", func(t *testing.T) {
 		env := newMigratingTestEnv(t)
 
 		fnID := uuid.New()
@@ -524,24 +524,66 @@ func TestMigratingIntegration_DualRead(t *testing.T) {
 		resCur, _ := appendItem(ctx, t, env.bmCurrent, fnID, fn)
 		batchIDCur := ulid.MustParse(resCur.BatchID)
 
-		// Append to next directly (different batch but same fnID — use different event).
-		// We need to use the same batchID for DeleteKeys to remove from both.
-		// Since batches are created independently, we'll verify keys exist in each, then delete.
+		// Append to next directly (a different batch for the same function).
 		resNext, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
 		batchIDNext := ulid.MustParse(resNext.BatchID)
 
+		// batchIDCur only exists in current.
 		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchIDCur)))
-		require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
+		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
 
-		// DeleteKeys for current's batchID — hits both clusters.
-		err := env.migBM.DeleteKeys(ctx, fnID, batchIDCur)
+		// batchIDNext only exists in next.
+		require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
+		require.False(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDCur)))
+
+		// current is the primary and holds this batch.
+		deleted, err := env.migBM.DeleteKeys(ctx, uuid.Nil, fnID, batchIDCur)
 		require.NoError(t, err)
+		require.True(t, deleted)
 		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchIDCur)))
 
-		// DeleteKeys for next's batchID — hits both clusters.
-		err = env.migBM.DeleteKeys(ctx, fnID, batchIDNext)
+		// current doesn't hold this batch, so DeleteKeys falls back to next.
+		deleted, err = env.migBM.DeleteKeys(ctx, uuid.Nil, fnID, batchIDNext)
 		require.NoError(t, err)
+		require.True(t, deleted)
 		require.False(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchIDNext)))
+	})
+
+	t.Run("DeleteKeys does not touch the other cluster when the primary holds the batch", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// current is the primary and holds the batch; next is down.
+		res, _ := appendItem(ctx, t, env.bmCurrent, fnID, fn)
+		batchID := ulid.MustParse(res.BatchID)
+		env.rNext.SetError("next unavailable")
+
+		deleted, err := env.migBM.DeleteKeys(ctx, uuid.Nil, fnID, batchID)
+		require.NoError(t, err)
+		require.True(t, deleted)
+		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, fnID, batchID)))
+
+		//cleanup
+		env.rNext.SetError("")
+	})
+
+	t.Run("DeleteKeys does not fall back when the primary errors", func(t *testing.T) {
+		env := newMigratingTestEnv(t)
+		fnID := uuid.New()
+		fn := newFunction(fnID)
+
+		// The batch lives in next, but current is the primary and is down.
+		res, _ := appendItem(ctx, t, env.bmNext, fnID, fn)
+		batchID := ulid.MustParse(res.BatchID)
+		env.rCurrent.SetError("current unavailable")
+
+		_, err := env.migBM.DeleteKeys(ctx, uuid.Nil, fnID, batchID)
+		require.Error(t, err)
+		require.True(t, env.rNext.Exists(env.bcNext.KeyGenerator().Batch(ctx, fnID, batchID)))
+
+		//cleanup
+		env.rCurrent.SetError("")
 	})
 }
 
@@ -632,19 +674,6 @@ func TestMigratingIntegration_WriteToNext(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, results[0].Scheduled)
 		require.True(t, results[1].Scheduled)
-	})
-
-	t.Run("DeleteKeys hits both clusters", func(t *testing.T) {
-		dkFnID := uuid.New()
-		dkFn := newFunction(dkFnID)
-
-		resCur, _ := appendItem(ctx, t, env.bmCurrent, dkFnID, dkFn)
-		curBatchID := ulid.MustParse(resCur.BatchID)
-		require.True(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, curBatchID)))
-
-		err := env.migBM.DeleteKeys(ctx, dkFnID, curBatchID)
-		require.NoError(t, err)
-		require.False(t, env.rCurrent.Exists(env.bcCurrent.KeyGenerator().Batch(ctx, dkFnID, curBatchID)))
 	})
 
 	t.Run("reads fall back to current when next is empty", func(t *testing.T) {

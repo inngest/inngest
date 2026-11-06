@@ -4,10 +4,7 @@ package sns
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Returns all of the properties of a topic. Topic properties returned might
@@ -92,7 +89,12 @@ type GetTopicAttributesOutput struct {
 	//
 	// The following attributes apply only to [FIFO topics]:
 	//
-	//   - FifoTopic – When this is set to true , a FIFO topic is created.
+	//   - ArchivePolicy – The policy that sets the retention period for messages
+	//   stored in the message archive of an Amazon SNS FIFO topic.
+	//
+	//   - BeginningArchiveTime – The earliest starting point at which a message in the
+	//   topic’s archive can be replayed from. This point in time is based on the
+	//   configured message retention period set by the topic’s message archiving policy.
 	//
 	//   - ContentBasedDeduplication – Enables content-based deduplication for FIFO
 	//   topics.
@@ -108,6 +110,8 @@ type GetTopicAttributesOutput struct {
 	// (Optional) To override the generated value, you can specify a value for the
 	//   MessageDeduplicationId parameter for the Publish action.
 	//
+	//   - FifoTopic – When this is set to true , a FIFO topic is created.
+	//
 	// [Key Terms]: https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html#sse-key-terms
 	// [KeyId]: https://docs.aws.amazon.com/kms/latest/APIReference/API_DescribeKey.html#API_DescribeKey_RequestParameters
 	// [server-side-encryption]: https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html
@@ -122,9 +126,6 @@ type GetTopicAttributesOutput struct {
 }
 
 func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetTopicAttributes{}, middleware.After)
 	if err != nil {
 		return err
@@ -133,62 +134,20 @@ func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Sta
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetTopicAttributes"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetTopicAttributesValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetTopicAttributes(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -203,13 +162,8 @@ func (c *Client) addOperationGetTopicAttributesMiddlewares(stack *middleware.Sta
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	return nil
-}
-
-func newServiceMetadataMiddleware_opGetTopicAttributes(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetTopicAttributes",
+	if err = addInterceptors(stack, options); err != nil {
+		return err
 	}
+	return nil
 }
