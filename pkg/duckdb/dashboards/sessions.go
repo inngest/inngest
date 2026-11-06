@@ -79,7 +79,7 @@ const latestRunOrder = `COALESCE(ended_at, started_at, queued_at) DESC,
 //
 // scope.From/To bound queued_at *inside* the CTE, below the window:
 // queued_at is the run ID's own ULID timestamp on every lifecycle row
-// (pkg/duckdb/tracing's materializeRuns writes run_queued_at), so filtering
+// (pkg/duckdb/tracing's runsInsertSQL writes run_queued_at), so filtering
 // first never splits a run's rows or changes which one wins, and DuckDB only
 // window-sorts the runs in range instead of every run in the env (it can't
 // push a queued_at filter through a window partitioned by run_id itself).
