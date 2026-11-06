@@ -204,7 +204,7 @@ func (q *queueProcessor) ProcessItem(
 
 		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
 			AccountID:      accountID,
-			IdempotencyKey: capacityReleaseItem.ID,
+			IdempotencyKey: currentLeaseID.String(),
 			LeaseID:        *currentLeaseID,
 			Source: constraintapi.LeaseSource{
 				Location:          constraintapi.CallerLocationItemLease,
