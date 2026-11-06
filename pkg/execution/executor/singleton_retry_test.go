@@ -26,7 +26,7 @@ import (
 
 // Exercise scheduling idempotency with the real singleton, state, and queue Lua.
 func TestScheduleSingletonRetryPreservesRun(t *testing.T) {
-	for _, mode := range []string{"no_singleton", "cancel_singleton", "cancel_singleton_new_event", "cancel_singleton_custom_key", "cancel_singleton_enqueue_retry", "cancel_singleton_lookup_error", "cancel_singleton_old_event_retry"} {
+	for _, mode := range []string{"no_singleton", "cancel_singleton", "cancel_singleton_new_event", "cancel_singleton_custom_key", "cancel_singleton_enqueue_retry", "cancel_singleton_lookup_error", "cancel_singleton_old_event_retry", "cancel_singleton_migration", "skip_singleton_migration"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 			mr := miniredis.RunT(t)
@@ -59,6 +59,9 @@ func TestScheduleSingletonRetryPreservesRun(t *testing.T) {
 			key := "event.data.postId"
 			if mode != "no_singleton" {
 				req.Function.Singleton = &inngest.Singleton{Key: &key, Mode: enums.SingletonModeCancel}
+			}
+			if mode == "skip_singleton_migration" {
+				req.Function.Singleton.Mode = enums.SingletonModeSkip
 			}
 			// Match the post-debounce scheduling call; do not test the debounce timer itself.
 			req.PreventDebounce = true
@@ -103,6 +106,24 @@ func TestScheduleSingletonRetryPreservesRun(t *testing.T) {
 			}
 			t.Logf("first scheduling: original run exists, queued jobs=%d", len(jobs))
 			req.RunID = nil
+			if mode == "cancel_singleton_migration" || mode == "skip_singleton_migration" {
+				require.NoError(t, shard.(queue.SingletonMigrationOperations).BeginSingletonMigration(ctx, scope, "migration"))
+				fresh := evt
+				fresh.ID = ulid.Make()
+				fresh.Event.ID = fresh.ID.String()
+				req.Events = []event.TrackedEvent{fresh}
+				_, _, err := e.Schedule(ctx, req)
+				require.ErrorIs(t, err, queue.ErrSingletonMigrationInProgress)
+				require.NotErrorIs(t, err, ErrFunctionSkipped)
+				_, err = rs.LoadMetadata(ctx, originalID)
+				require.NoError(t, err, "migration retry must not cancel the source run")
+				sk, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, evt.Event.Map())
+				require.NoError(t, err)
+				owner, err := shard.SingletonGetRunID(ctx, scope, sk)
+				require.NoError(t, err)
+				require.Equal(t, id, owner)
+				return
+			}
 			if mode == "cancel_singleton_old_event_retry" {
 				require.NoError(t, e.Cancel(ctx, originalID, execution.CancelRequest{}))
 				select {
