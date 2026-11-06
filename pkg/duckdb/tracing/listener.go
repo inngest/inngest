@@ -103,7 +103,7 @@ func scanTriggerEvents(evts []json.RawMessage) (sessions meta.EventSessions) {
 }
 
 // addRunEventAttrs sets the run-level, event-derived span attributes
-// tracing.go's materializeRuns reads: event.ids and event.sessions. Both are
+// tracing.go's runsInsertSQL reads: event.ids and event.sessions. Both are
 // omitted entirely rather than set empty when not applicable (e.g. a
 // cron-only run has no triggering event).
 func addRunEventAttrs(attrs *meta.SerializableAttrs, md sv2.Metadata, evts []json.RawMessage) {
