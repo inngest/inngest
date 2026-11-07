@@ -6,6 +6,7 @@ import (
 )
 
 func fetchWithAuthFallback(
+	httpClient *http.Client,
 	createRequest func() (*http.Request, error),
 	signingKey string,
 	signingKeyFallback string,
@@ -23,7 +24,7 @@ func fetchWithAuthFallback(
 		req.Header.Set(HeaderKeyAuthorization, fmt.Sprintf("Bearer %s", string(key)))
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -43,7 +44,7 @@ func fetchWithAuthFallback(
 		}
 		req.Header.Set(HeaderKeyAuthorization, fmt.Sprintf("Bearer %s", string(key)))
 
-		resp, err = http.DefaultClient.Do(req)
+		resp, err = httpClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("error making request: %w", err)
 		}

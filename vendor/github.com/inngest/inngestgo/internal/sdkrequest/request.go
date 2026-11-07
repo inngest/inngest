@@ -45,7 +45,11 @@ type CallCtx struct {
 	QueueItemRef              string    `json:"qi_id"`
 	RequestID                 string    `json:"-"`
 	JobID                     string    `json:"-"`
-	MaxAttempts               *int      `json:"max_attempts"`
+	// InstanceID is the connect worker's instance ID.  it is empty for
+	// requests that do not come through connect.  checkpoint requests send it
+	// in the x-inngest-instance-id header.
+	InstanceID  string `json:"-"`
+	MaxAttempts *int   `json:"max_attempts"`
 }
 
 type CallStack struct {

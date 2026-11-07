@@ -1,4 +1,4 @@
-package connect
+package connectworker
 
 import connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 
@@ -58,8 +58,13 @@ func (c *connection) canWrite(kind connectproto.GatewayMessageType) bool {
 	case connPhaseClosing:
 		// Local close tells the gateway to pause new work while allowing replies
 		// and lease extensions for requests already owned by this worker.
+		// heartbeats continue, or the gateway closes the connection after 5
+		// missed heartbeats while long requests still run.  after
+		// WORKER_PAUSE the gateway keeps the connection DRAINING on each
+		// heartbeat, so the router does not select it again.
 		switch kind {
-		case connectproto.GatewayMessageType_WORKER_REPLY,
+		case connectproto.GatewayMessageType_WORKER_HEARTBEAT,
+			connectproto.GatewayMessageType_WORKER_REPLY,
 			connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
 			connectproto.GatewayMessageType_WORKER_PAUSE:
 			return true
