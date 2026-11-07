@@ -1,0 +1,16 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_string.yaml'
+
+# basic: Basic examples without any special cases
+ltrim('abc'::str, ' '::str) = 'abc'::str
+ltrim('   abc'::str, ' '::str) = 'abc'::str
+ltrim('abc   '::str, ' '::str) = 'abc   '::str
+ltrim('   abc   '::str, ' '::str) = 'abc   '::str
+ltrim(''::str, ' '::str) = ''::str
+ltrim(' '::str, ' '::str) = ''::str
+ltrim(null::str?, ' '::str) = null::str?
+
+# two_inputs: Examples with character input to trim off
+ltrim('aaaaabc'::str, 'a'::str) [spaces_only:FALSE] = 'bc'::str
+ltrim('abcabcdef'::str, 'abc'::str) [spaces_only:FALSE] = 'def'::str
+ltrim('abccbadef'::str, 'abc'::str) [spaces_only:FALSE] = 'def'::str

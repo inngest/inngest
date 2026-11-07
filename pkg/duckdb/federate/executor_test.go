@@ -124,7 +124,7 @@ func (f *fixture) lakeRun(t *testing.T, account uuid.UUID, runID, status string,
 	_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.runs
 		(account_id, env_id, run_id, queued_at, scheduled_at, started_at, ended_at, app_id, app_name, function_id, function_slug,
 		 status, attributes, inputs, output, bucket_at)
-		VALUES (?::UUID, ?::UUID, ?, ?, ?, ?, ?, ?::UUID, 'app', ?::UUID, 'fn', ?, '{}'::JSON::VARIANT, '[]'::JSON::VARIANT, NULL, ?)`,
+		VALUES (?::UUID, ?::UUID, ?, ?, ?, ?, ?, ?::UUID, 'app', ?::UUID, 'fn', ?, '{}', '[]', NULL, ?)`,
 		account.String(), f.env.String(), runID, queuedAt, queuedAt, startedAt(status, queuedAt), ended, f.app.String(), f.fn.String(), status, f.lakeBucketAt())
 	require.NoError(t, err)
 }
@@ -324,7 +324,7 @@ func TestExecutorSpansUnionLakeAndDelta(t *testing.T) {
 			_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.run_trace_spans
 				(account_id, env_id, run_id, run_queued_at, app_id, app_name, function_id, function_slug, name,
 				 start_time, end_time, trace_id, span_id, parent_span_id, attributes, bucket_at)
-				VALUES (?::UUID, ?::UUID, 'run-A', ?, ?::UUID, 'app', ?::UUID, 'fn', 'executor.step', ?, ?, 'trace-1', ?, '', ?::JSON::VARIANT, ?)`,
+				VALUES (?::UUID, ?::UUID, 'run-A', ?, ?::UUID, 'app', ?::UUID, 'fn', 'executor.step', ?, ?, 'trace-1', ?, '', ?, ?)`,
 				f.account.String(), f.env.String(), q, f.app.String(), f.fn.String(), q, q, spanID, attrs, f.lakeBucketAt())
 			require.NoError(t, err)
 		}
@@ -348,7 +348,7 @@ func TestExecutorSpansUnionLakeAndDelta(t *testing.T) {
 			deltaSpan("span-1", f.account, q, f.lakeBucketAt()), // already in the lake
 		}
 
-		got := f.query(t, []Table{TableSpans}, nil, `SELECT span_id, attributes.v::VARCHAR FROM spans`)
+		got := f.query(t, []Table{TableSpans}, nil, `SELECT span_id, attributes->>'v' FROM spans`)
 		require.Equal(t, map[string]string{"span-1": "lake", "span-2": "lake", "span-3": "delta"}, got)
 	})
 }
@@ -359,7 +359,7 @@ func TestExecutorEventsUnionLakeAndDelta(t *testing.T) {
 		insertLakeEvent := func(account uuid.UUID, id string, receivedAt time.Time) {
 			_, err := f.db.ExecContext(context.Background(), `INSERT INTO inngest.events
 				(account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta, bucket_at)
-				VALUES (?::UUID, ?::UUID, ?, ?, 'api', ?, 'app/x', '{"src":"lake"}'::JSON::VARIANT, '1', ?, '{}'::JSON::VARIANT, ?)`,
+				VALUES (?::UUID, ?::UUID, ?, ?, 'api', ?, 'app/x', '{"src":"lake"}', '1', ?, '{}', ?)`,
 				account.String(), f.env.String(), "internal-"+id, receivedAt, id, receivedAt, f.lakeBucketAt())
 			require.NoError(t, err)
 		}
@@ -372,7 +372,7 @@ func TestExecutorEventsUnionLakeAndDelta(t *testing.T) {
 			"event_v": "1", "event_ts": q, "event_meta": `{}`, "bucket_at": f.deltaBucketAt(),
 		}}
 
-		got := f.query(t, []Table{TableEvents}, nil, `SELECT event_id, event_data.src::VARCHAR FROM events`)
+		got := f.query(t, []Table{TableEvents}, nil, `SELECT event_id, event_data->>'src' FROM events`)
 		require.Equal(t, map[string]string{"e1": "lake", "e2": "delta"}, got)
 	})
 }
@@ -433,10 +433,9 @@ func TestExecutorStreamsOnlyColumnsTheQueryReads(t *testing.T) {
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, append([]string{"span_id", "parent_span_id", "name"}, bounds...), names(f.streamer.reqs[0].Columns))
 
-		// A JSON key the planner pushes into the scan (projected as
-		// attributes.<key>) still reads its column.
+		// A JSON key extraction still reads its column.
 		f.streamer.reqs = nil
-		f.query(t, []Table{TableSpans}, nil, `SELECT attributes."_inngest.step.userland.id"::VARCHAR FROM spans`)
+		f.query(t, []Table{TableSpans}, nil, `SELECT attributes->>'$."_inngest.step.userland.id"' FROM spans`)
 		require.Len(t, f.streamer.reqs, 1)
 		require.ElementsMatch(t, append([]string{"attributes"}, bounds...), names(f.streamer.reqs[0].Columns))
 

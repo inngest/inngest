@@ -113,7 +113,8 @@ func rawTables() map[string]logicalTable {
 		tbl := logicalTable{name: t.phys.Name, view: t.view, description: t.desc, columns: map[string]knownColumn{}}
 		for _, c := range t.phys.Columns {
 			tbl.columnOrder = append(tbl.columnOrder, c.Name)
-			tbl.columns[c.Name] = knownColumn{colType: DuckDBToColumnType(c.PhysicalType()), physical: c.Name}
+			// The raw macros return the read type (JSON text as JSON).
+			tbl.columns[c.Name] = knownColumn{colType: DuckDBToColumnType(c.LogicalType()), physical: c.Name}
 		}
 		out[t.phys.Name] = tbl
 	}

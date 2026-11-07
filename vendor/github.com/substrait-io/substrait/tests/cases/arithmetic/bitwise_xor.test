@@ -1,0 +1,15 @@
+### SUBSTRAIT_SCALAR_TEST: v1.0
+### SUBSTRAIT_INCLUDE: '/extensions/functions_arithmetic.yaml'
+
+# basic: Basic examples without any special cases
+bitwise_xor(0::i8, 1::i8) = 1::i8
+bitwise_xor(127::i8, 127::i8) = 0::i8
+bitwise_xor(-127::i8, -10::i8) = 119::i8
+bitwise_xor(31766::i16, 900::i16) = 32658::i16
+bitwise_xor(-31766::i16, 900::i16) = -32658::i16
+bitwise_xor(2147483647::i32, 123456789::i32) = 2024026858::i32
+bitwise_xor(2147483647::i32, 123456789::i32) = 2024026858::i32
+bitwise_xor(9223372036854775807::i64, 127::i64) = 9223372036854775680::i64
+bitwise_xor(-9223372036854775807::i64, 127::i64) = -9223372036854775682::i64
+bitwise_xor(null::i64?, 127::i64) = null::i64?
+bitwise_xor(127::i64, null::i64?) = null::i64?
