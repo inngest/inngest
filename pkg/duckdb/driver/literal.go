@@ -21,7 +21,7 @@ import (
 // so a bound time compares against the columns w/o casting them. A
 // TIMESTAMP-typed bound against a TIMESTAMPTZ column (or the reverse) makes
 // DuckDB cast the column instead (`CAST(ended_at AS TIMESTAMP WITH TIME ZONE)
-// >= ...`), which costs per row and keeps DuckLake from pruning files on the
+// >= ...`), which costs per row and keeps the lake from pruning files on the
 // column's min/max stats. now()/current_timestamp are TIMESTAMPTZ too, so
 // hand-written `ended_at >= now() - INTERVAL 1 DAY` doesn't cast either.
 //

@@ -110,19 +110,20 @@ func NewDuckDBInserter(db *sql.DB) *DuckDBInserter {
 var spanColumns = []string{
 	"account_id", "env_id", "app_id", "app_name", "function_id", "function_slug",
 	"run_id", "run_queued_at", "trace_id", "span_id", "parent_span_id", "name",
-	"start_time", "end_time", "attributes", "output", "input",
+	"start_time", "end_time", "attributes", "output", "input", "bucket_at",
 }
 
 func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 	if len(spans) == 0 {
 		return nil
 	}
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(spans))
 	for i, s := range spans {
 		rows[i] = []any{
 			s.AccountID, s.EnvID, s.AppID, s.AppName, s.FunctionID, s.FunctionSlug,
 			s.RunID, s.RunQueuedAt, s.TraceID, s.SpanID, nullableString(s.ParentSpanID), s.Name,
-			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input),
+			s.StartTime, s.EndTime, s.Attributes, nullableJSON(s.Output), nullableJSON(s.Input), bucketAt,
 		}
 	}
 	if err := d.insert(ctx, "inngest.run_trace_spans", spanColumns, rows); err != nil {
@@ -133,15 +134,16 @@ func (d *DuckDBInserter) InsertSpans(ctx context.Context, spans []Span) error {
 
 var eventColumns = []string{
 	"account_id", "env_id", "internal_id", "received_at", "source", "source_id", "event_id",
-	"event_name", "event_ts", "event_data", "event_v", "event_meta",
+	"event_name", "event_ts", "event_data", "event_v", "event_meta", "bucket_at",
 }
 
 func (d *DuckDBInserter) InsertEvents(ctx context.Context, events []Event) error {
+	bucketAt := bucketAtNow()
 	rows := make([][]any, len(events))
 	for i, e := range events {
 		rows[i] = []any{
 			e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt, e.Source, nullable(e.SourceID), e.EventID,
-			e.EventName, e.EventTS, e.EventData, e.EventV, e.EventMeta,
+			e.EventName, e.EventTS, e.EventData, e.EventV, e.EventMeta, bucketAt,
 		}
 	}
 	return d.insert(ctx, "inngest.events", eventColumns, rows)
@@ -191,6 +193,13 @@ func (d *DuckDBInserter) insert(ctx context.Context, table string, cols []string
 
 	_, err := d.db.ExecContext(ctx, sb.String(), args...)
 	return err
+}
+
+// bucketAtNow is a batch's bucket_at: when it became visible, at the ms
+// precision the ClickHouse buffer stores. Writers set it explicitly since an
+// Iceberg column default is a literal frozen at CREATE TABLE time.
+func bucketAtNow() time.Time {
+	return time.Now().UTC().Truncate(time.Millisecond)
 }
 
 // nullableJSON maps an absent JSON value to SQL NULL rather than an empty

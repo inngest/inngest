@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/duckdb/icebergcatalog/icebergtest"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
@@ -29,14 +30,10 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Skip("duckdb binary not found on PATH; skipping")
 	}
-	dir := t.TempDir()
 	db, err := driver.Open(t.Context(), driver.Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &driver.DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.duckdb"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    icebergtest.Start(t),
 		// Mirror devserver's setupDualWrite, which sandboxes the handle
 		// Execute runs on.
 		RestrictExternalAccess: true,
@@ -52,7 +49,7 @@ func newTestDuckDB(t *testing.T) (*sql.DB, func()) {
 
 // insertRunRow inserts a minimal inngest.runs row satisfying every NOT
 // NULL column. Only queued_at is set (not started_at/ended_at), so
-// inngest.insights_runs' COALESCE(ended_at, started_at, queued_at)
+// inngest_local.insights_runs' COALESCE(ended_at, started_at, queued_at)
 // collapse ordering is driven entirely by queuedAt.
 //
 // Every query string in this file ends with ";" -- this driver's
@@ -74,7 +71,7 @@ func insertRunRow(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, s
 // step attempt (name executor.step, attributes carrying the "_inngest."
 // prefixed step.userland.id/step.attempt keys insights_step_attempts reads
 // its own step_id/step_attempt columns from -- see the macro in
-// pkg/db/duckdb/migrations/000002_insights_views.sql and
+// pkg/db/duckdb/views.sql and
 // pkg/tracing/meta's AttrKeyPrefix/StepUserlandID), satisfying every NOT
 // NULL column on that table.
 func insertStepSpan(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, spanID, stepID string, attempt int, startTime time.Time) {
@@ -115,7 +112,7 @@ func TestInsightsRunsMacroCollapsesToLatestRow(t *testing.T) {
 	var status string
 	var count int
 	require.NoError(t, db.QueryRowContext(ctx,
-		"SELECT COUNT(*), status FROM inngest.insights_runs(?, ?) WHERE run_id = ? GROUP BY status;", accountID.String(), envID.String(), runID,
+		"SELECT COUNT(*), status FROM inngest_local.insights_runs(?, ?) WHERE run_id = ? GROUP BY status;", accountID.String(), envID.String(), runID,
 	).Scan(&count, &status))
 	require.Equal(t, 1, count)
 	require.Equal(t, "Completed", status)
@@ -132,7 +129,7 @@ func TestInsightsRunsMacroExcludesAccountEnvColumns(t *testing.T) {
 	// (e.g. LIMIT 0) reports no columns at all (confirmed against the real
 	// binary; see Execute's DESCRIBE-based workaround, Task 10). Query a
 	// real row instead of LIMIT 0 here.
-	rows, err := db.QueryContext(t.Context(), "SELECT * FROM inngest.insights_runs(?, ?);", accountID.String(), envID.String())
+	rows, err := db.QueryContext(t.Context(), "SELECT * FROM inngest_local.insights_runs(?, ?);", accountID.String(), envID.String())
 	require.NoError(t, err)
 	defer rows.Close()
 	cols, err := rows.Columns()
@@ -152,7 +149,7 @@ func TestInsightsRunsMacroIsolatesByEnv(t *testing.T) {
 	insertRunRow(t, db, accountID, envB, "run-b", "Completed", time.Now())
 
 	var runIDs []string
-	rows, err := db.QueryContext(t.Context(), "SELECT run_id FROM inngest.insights_runs(?, ?);", accountID.String(), envA.String())
+	rows, err := db.QueryContext(t.Context(), "SELECT run_id FROM inngest_local.insights_runs(?, ?);", accountID.String(), envA.String())
 	require.NoError(t, err)
 	defer rows.Close()
 	for rows.Next() {
@@ -178,18 +175,18 @@ func TestInsightsRunsMacroCollectsRunScopedMetadataByKind(t *testing.T) {
 	// (Task 10), which relies on exactly this for pkg/gql_scalars.Unknown.
 	var metadata, internal any
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT metadata, inngest FROM inngest.insights_runs(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT metadata, inngest FROM inngest_local.insights_runs(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&metadata, &internal))
 	require.Equal(t, map[string]any{"k1": map[string]any{"x": float64(1)}, "k2": map[string]any{"y": float64(2)}}, metadata)
 	require.Equal(t, map[string]any{"sys": map[string]any{"z": float64(3)}}, internal)
 }
 
 // rollupMetadata reads one span's user/internal metadata out of
-// inngest.insights_metadata.
+// inngest_local.insights_metadata.
 func rollupMetadata(t *testing.T, db *sql.DB, accountID, envID uuid.UUID, runID, spanID string) (user, internal any) {
 	t.Helper()
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT metadata, inngest FROM inngest.insights_metadata(?, ?) WHERE run_id = ? AND span_id = ?;",
+		"SELECT metadata, inngest FROM inngest_local.insights_metadata(?, ?) WHERE run_id = ? AND span_id = ?;",
 		accountID.String(), envID.String(), runID, spanID,
 	).Scan(&user, &internal))
 	return user, internal
@@ -264,14 +261,14 @@ func TestInsightsStepAttemptsFiltersToStepSpans(t *testing.T) {
 
 	var total int
 	require.NoError(t, db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM inngest.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT COUNT(*) FROM inngest_local.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&total))
 	require.Greater(t, total, 0)
 
 	var stepID string
 	var attempt int
 	require.NoError(t, db.QueryRowContext(ctx,
-		"SELECT step_id, step_attempt FROM inngest.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT step_id, step_attempt FROM inngest_local.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&stepID, &attempt))
 	require.Equal(t, "step-1", stepID)
 	require.Equal(t, 0, attempt)
@@ -288,13 +285,13 @@ func TestInsightsStepsCollapsesToLatestAttempt(t *testing.T) {
 	var count int
 	var attempt int
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT COUNT(*), MAX(step_attempt) FROM inngest.insights_steps(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT COUNT(*), MAX(step_attempt) FROM inngest_local.insights_steps(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&count, &attempt))
 	require.Equal(t, 1, count)
 	require.Equal(t, 1, attempt)
 
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT COUNT(*) FROM inngest.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT COUNT(*) FROM inngest_local.insights_step_attempts(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&count))
 	require.Equal(t, 2, count)
 }
@@ -322,7 +319,7 @@ func TestInsightsExtendedTraceSpansFiltersToSDKSpans(t *testing.T) {
 
 	var count int
 	require.NoError(t, db.QueryRowContext(t.Context(),
-		"SELECT COUNT(*) FROM inngest.insights_extended_trace_spans(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
+		"SELECT COUNT(*) FROM inngest_local.insights_extended_trace_spans(?, ?) WHERE run_id = ?;", accountID.String(), envID.String(), runID,
 	).Scan(&count))
 	require.Equal(t, 1, count)
 }

@@ -161,7 +161,8 @@ type InsertOptions struct {
 	BatchSize int
 	// Parallelism is how many writer sets run, each w/ one writer (its own
 	// quack connection + appender) per table. Clamped to >= 1. Values > 1
-	// mean concurrent commits to the same table.
+	// mean concurrent Iceberg commits to the same table, which conflict and
+	// retry.
 	Parallelism int
 	// OnProgress, if non-nil, is called once each batch is flushed to every
 	// table, w/ that batch's own 1-based index and the total batch count
@@ -430,7 +431,8 @@ type tableWork struct {
 // opts.Parallelism writers per table, each its own quack connection and
 // appender. A dispatcher hands each batch to every table's queue, so the
 // tables flush in parallel and a slow table (spans) only holds back its own
-// writers until its queue fills.
+// writers until its queue fills. Iceberg commits to different tables don't
+// conflict, so w/ Parallelism 1 nothing ever retries.
 //
 // A batch is reported to opts.OnProgress once its last table has flushed.
 func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work <-chan indexedBatch, opts InsertOptions, total, totalBatches int) (Summary, Timings, error) {
@@ -488,7 +490,7 @@ func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work
 					return fmt.Errorf("duckdbseed: opening %s connection: %w", table.name, err)
 				}
 				defer conn.Close()
-				appender, err := duckdbdriver.NewQuackAppenderFromConn(gctx, conn, duckdbdriver.DuckLakeAlias, "main", table.name, table.columns)
+				appender, err := duckdbdriver.NewQuackAppenderFromConn(gctx, conn, duckdbdriver.LakeAlias, "main", table.name, table.columns)
 				if err != nil {
 					return fmt.Errorf("duckdbseed: creating %s appender: %w", table.name, err)
 				}
@@ -539,7 +541,7 @@ func drainAndInsert(ctx context.Context, connector *duckdbdriver.Connector, work
 // each table's declared SORTED BY key exactly
 // (pkg/db/duckdb/migrations/000001_baseline.sql) — GenerateRuns produces
 // rows in arbitrary RNG order, so without this, writes would land out of
-// the order DuckLake expects for zonemap pruning. Each key is built as a
+// the order the lake sorts by for min/max pruning. Each key is built as a
 // single sortable string — year and month zero-padded, timestamps as
 // zero-padded UnixNano — so a plain lexicographic string comparison
 // reproduces the exact multi-column ORDER BY the schema declares, including

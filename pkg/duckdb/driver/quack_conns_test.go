@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,17 +36,13 @@ func TestOpenWithQuackConnsRequiresQuackAddr(t *testing.T) {
 func TestOpenWithQuackConnsRunsQueriesConcurrently(t *testing.T) {
 	binPath := RequireDuckDBBinary(t)
 	duckdbtest.RequireQuackExtension(t, binPath)
-	dir := t.TempDir()
 
 	addr := EphemeralQuackAddr
 
 	db, err := Open(t.Context(), Options{
 		BinaryPath: binPath,
 		DBFile:     ":memory:",
-		DuckLake: &DuckLakeOptions{
-			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-			DataPath:    filepath.Join(dir, "data"),
-		},
+		Iceberg:    testIceberg(t),
 		QuackAddr:  &addr,
 		QuackConns: 3,
 	})

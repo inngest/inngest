@@ -318,7 +318,7 @@ func encodeUUID(id uuid.UUID) [16]byte {
 // Identifier double-quotes a DuckDB identifier, doubling any embedded
 // double quote. Used only for the "USE <catalog>;" statement
 // driver.NewQuackAppender issues; treated as injection-sensitive per this package's
-// convention even though every caller passes DuckLakeAlias, not external
+// convention even though every caller passes LakeAlias, not external
 // stringLiteral quotes s as a SQL string literal. Only used for values this
 // package generates itself (stream IDs), never caller input.
 func stringLiteral(s string) string {

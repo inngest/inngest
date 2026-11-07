@@ -40,8 +40,8 @@ func TestGetEventsCELMatchesExpressionSemantics(t *testing.T) {
 	for i := 1; i < len(evts); i++ {
 		ids[i] = ulid.MustNew(ulid.Timestamp(now.Add(time.Duration(i)*time.Millisecond)), nil)
 		_, err := m.db.ExecContext(ctx,
-			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-			 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '', ?);`,
+			`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+			 VALUES (?, ?, ?, ?, 'test', ?, ?, ?, '', ?, '{}'::JSON);`,
 			accountID.String(), envID.String(), ids[i].String(), now, fmt.Sprintf("evt-%d", i), evts[i].name, json.RawMessage(evts[i].data), now,
 		)
 		require.NoError(t, err)
@@ -152,8 +152,8 @@ func TestGetEventsCELStreamsPastNonMatchingCandidates(t *testing.T) {
 		ids[i] = ulid.MustNew(ulid.Timestamp(now.Add(time.Duration(i)*time.Millisecond)), nil)
 	}
 	_, err := m.db.ExecContext(ctx,
-		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts)
-		 SELECT ?, ?, (?::VARCHAR[])[i + 1], ?, 'test', printf('evt-%d', i), 'x', json_object('a', i % 100), '', ?
+		`INSERT INTO inngest.events (account_id, env_id, internal_id, received_at, source, event_id, event_name, event_data, event_v, event_ts, event_meta)
+		 SELECT ?, ?, (?::VARCHAR[])[i + 1], ?, 'test', printf('evt-%d', i), 'x', json_object('a', i % 100), '', ?, '{}'::JSON
 		 FROM range(?) t(i);`,
 		accountID.String(), envID.String(), ulidStrings(ids), now, now, total,
 	)

@@ -568,13 +568,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		// EnableDuckDBReads (which only affects gqlData) is also set.
 		dwDB *sql.DB
 	)
-	// opts.Persist alone (--persist) is not enough to write an on-disk DuckLake
-	// catalog: that also requires enableDuckDBPersistence
+	// opts.Persist alone (--persist) is not enough to write an on-disk Iceberg
+	// lake: that also requires enableDuckDBPersistence
 	// (EXPERIMENTAL_DUCKDB_PERSISTENT_DUALWRITE), so --duckdb without that env
 	// var still dual-writes, just against an in-memory catalog. opts.PostgresURI
-	// is only honored alongside those same two gates (see duckLakeOptionsFor):
-	// a persisted DuckLake catalog reuses the same Postgres database as its
-	// catalog store when one is already configured, instead of a local file.
+	// is only honored alongside those same two gates (see icebergConfigFor):
+	// a persisted lake's embedded catalog reuses the same Postgres database as
+	// its catalog store when one is already configured, instead of a local file.
 	if dwListener, _, readDB := setupDualWrite(ctx, opts.EnableDuckDB, opts.Persist && enableDuckDBPersistence, "", opts.SQLiteDir, opts.PostgresURI); dwListener != nil {
 		dwDB = readDB
 		l.Info("dual-write enabled: syncing executions to DuckDB subprocess")
