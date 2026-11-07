@@ -23,10 +23,10 @@ func TestCELEventAndOutputFiltersMatchWholeExpression(t *testing.T) {
 	defer cleanup()
 	ctx := t.Context()
 
-	// VARIANT, like inngest.runs' own inputs/output columns.
-	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE cel_runs (id INTEGER, inputs VARIANT, output VARIANT);`)
+	// JSON text, like inngest.runs' own inputs/output columns.
+	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE cel_runs (id INTEGER, inputs VARCHAR, output VARCHAR);`)
 	require.NoError(t, err)
-	_, err = db.ExecContext(ctx, `INSERT INTO cel_runs SELECT id, inputs::JSON, output::JSON FROM (VALUES
+	_, err = db.ExecContext(ctx, `INSERT INTO cel_runs SELECT id, inputs, output FROM (VALUES
 		(1, '[{"name":"x","data":{"a":1}}]', '{"data":{"ok":false}}'),
 		(2, '[{"name":"y","data":{"a":2}}]', '{"data":{"ok":true}}'),
 		(3, '[{"name":"x"}]', '{"data":{"ok":true}}'),

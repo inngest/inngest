@@ -122,7 +122,7 @@ func (t Table) Column(name string) (Column, bool) {
 // jsonText is a JSON column's lake type: the JSON text as is, in a VARCHAR
 // rather than JSON so an Iceberg lake (which rejects duckdb's JSON type, and
 // duckdb doesn't keep the alias on a string column) can use the same types.
-// The macros in pkg/db/duckdb's 000002_insights_views.sql return it as JSON
+// The raw_*/insights_* macros in pkg/db/duckdb's migrations return it as JSON
 // (LogicalType), casting only where a whole value is returned or embedded:
 // the cast is a validating parse per row, so filters and key extractions
 // read the text directly.
