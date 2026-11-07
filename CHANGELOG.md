@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.51.1] - 2026-11-07
+
+### 🐛 Bug Fixes
+
+- *(ui)* Don't report dev server flags as ready before they load (#5201)
+
 ## [v1.51.0] - 2026-11-06
 
 ### 🚀 Features
@@ -15,6 +21,10 @@ All notable changes to this project will be documented in this file.
 - *(duckdb)* Aggregate federated reads (#5157)
 - *(duckdb)* Push a query's top-n into federated sources (#5158)
 - *(duckdb)* Skip the raw_runs collapse for flat lakes and use TIMESTAMPTZ in federate (#5159)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.51.0 (#5199)
 
 ## [v1.50.0] - 2026-11-06
 
